@@ -1,0 +1,7 @@
+plugins { id 'java-library' }
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+dependencies {
+    api project(':core')
+    api 'com.badlogicgames.gdx:gdx:1.14.2'
+}

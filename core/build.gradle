@@ -1,0 +1,10 @@
+plugins { id 'java-library' }
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+tasks.register('smoke', JavaExec) {
+    group = 'verification'
+    description = 'Java 17 deterministic battle smoke test without JUnit.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleSmokeTest'
+    dependsOn testClasses
+}

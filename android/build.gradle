@@ -1,0 +1,78 @@
+plugins { id 'com.android.application' }
+
+def props = new Properties()
+def propsPath = rootProject.file('.local-secrets/release.properties')
+if (propsPath.exists()) propsPath.withInputStream { props.load(it) }
+def secret = { String variable, String field -> System.getenv(variable) ?: props.getProperty(field) }
+def keyPath = secret('CD_ANDROID_KEYSTORE_PATH', 'storeFile')
+def signingAvailable = keyPath && secret('CD_ANDROID_KEYSTORE_PASSWORD', 'storePassword') &&
+        secret('CD_ANDROID_KEY_ALIAS', 'keyAlias') && secret('CD_ANDROID_KEY_PASSWORD', 'keyPassword')
+
+android {
+    namespace 'games.catastrophicdiplomacy.android'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'games.catastrophicdiplomacy'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    signingConfigs {
+        release {
+            if (signingAvailable) {
+                storeFile rootProject.file(keyPath)
+                storePassword secret('CD_ANDROID_KEYSTORE_PASSWORD', 'storePassword')
+                keyAlias secret('CD_ANDROID_KEY_ALIAS', 'keyAlias')
+                keyPassword secret('CD_ANDROID_KEY_PASSWORD', 'keyPassword')
+                storeType 'pkcs12'
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signingAvailable) signingConfig signingConfigs.release
+        }
+    }
+    sourceSets { main { assets.srcDirs = ['../assets'] } }
+    packaging { resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] } }
+}
+
+configurations { natives }
+
+tasks.register('copyAndroidNatives') {
+    doLast {
+        configurations.natives.files.each { jar ->
+            ['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'].each { abi ->
+                if (jar.name.endsWith('natives-' + abi + '.jar')) {
+                    copy { from zipTree(jar); into file('src/main/jniLibs/' + abi); include '*.so' }
+                }
+            }
+        }
+    }
+}
+tasks.configureEach { task ->
+    if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
+        task.dependsOn(tasks.named('copyAndroidNatives'))
+    }
+}
+
+dependencies {
+    implementation project(':game')
+    implementation 'com.badlogicgames.gdx:gdx-backend-android:1.14.2'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-armeabi-v7a'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-arm64-v8a'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-x86'
+    natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-x86_64'
+}
+// Build unsigned debug APKs without a keystore. Fail closed for release builds.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') } && !signingAvailable) {
+        throw new GradleException('Release signing unavailable. Run python tools/bootstrap_secrets.py and ensure local signing material exists.')
+    }
+}

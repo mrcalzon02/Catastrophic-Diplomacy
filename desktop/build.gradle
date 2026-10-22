@@ -1,0 +1,10 @@
+plugins { id 'application' }
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+dependencies {
+    implementation project(':game')
+    implementation 'com.badlogicgames.gdx:gdx-backend-lwjgl3:1.14.2'
+    runtimeOnly 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-desktop'
+}
+application { mainClass = 'diplomacy.desktop.DesktopLauncher' }
+run { workingDir rootProject.projectDir }

@@ -1,0 +1,1 @@
+Only original or correctly licensed model, sound and UI assets may be added. The 2D tactical renderer uses built-in geometry and fonts until authored resources arrive. Do not copy assets from the reference games, nor silently redistribute assets from Beckenburg or The Malefic Veil.
