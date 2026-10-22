@@ -114,7 +114,7 @@ public final class Battle {
         ships.add(ship); return ship;
     }
     /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
-    public Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery, double x, double y) {
+    private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery, double x, double y) {
         if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
         Ship s = addShip(team, design.faction, x, y);
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
@@ -191,8 +191,12 @@ public final class Battle {
             double gain = Math.min(s.maxShields - s.shields, 5 * DT);
             s.shields += gain; s.power -= gain * 0.6;
         }
-        if (s.faction == Faction.MANDRALLY && s.power > 5) {
-            s.hull = Math.min(s.maxHull, s.hull + s.damageControl * DT * 30);
+        if (s.power > 5 && s.damageControl > 0) {
+            // All repair-equipped fleets can restore hull slowly. Mandrally regenerative
+            // ecology receives the established fivefold field-repair advantage.
+            double restoration = s.damageControl * DT * 30
+                    * (s.faction == Faction.MANDRALLY ? 1.0 : 0.20);
+            s.hull = Math.min(s.maxHull, s.hull + restoration);
         }
         s.laserReload = Math.max(0, s.laserReload - DT);
         s.missileReload = Math.max(0, s.missileReload - DT);

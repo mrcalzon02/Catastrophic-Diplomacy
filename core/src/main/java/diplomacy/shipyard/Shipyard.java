@@ -20,10 +20,10 @@ public final class Shipyard {
     public enum Mount { SYSTEM, WEAPON, DEFENSE, SUPPORT }
     public enum Track { OUTPUT, EFFICIENCY, RESILIENCE, SPECIALIST }
     public enum Hull {
-        CORVETTE(150, 240, 155, 0.96, 3, 2, 1, 0),
-        FRIGATE(290, 460, 325, 0.82, 4, 3, 2, 1),
-        CRUISER(540, 860, 685, 0.65, 6, 5, 3, 2),
-        DREADNOUGHT(1100, 1700, 1550, 0.46, 9, 9, 5, 4);
+        CORVETTE(120, 180, 155, 0.96, 3, 2, 1, 0),
+        FRIGATE(195, 310, 325, 0.82, 4, 3, 2, 1),
+        CRUISER(360, 570, 685, 0.65, 6, 5, 3, 2),
+        DREADNOUGHT(630, 990, 1550, 0.46, 9, 9, 5, 4);
         public final double massCapacity, volumeCapacity, baseHull, mobility;
         public final List<Slot> slots;
         Hull(double mass, double volume, double hull, double agility, int systems, int weapons, int defenses, int supports) {
@@ -222,7 +222,7 @@ public final class Shipyard {
         double mobility=(36+thrust*1.3)*design.hull.mobility*(1-0.35*report.mass()/design.hull.massCapacity);
         double charge=Math.max(2,(report.generation()-report.demand())*0.36);
         return new Fitted(hull,shields,armor,Math.min(0.75,sif),Math.max(40,report.generation()*0.95),
-                110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),0,
+                110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
                 Math.max(9,mobility),Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
                 repair);
     }

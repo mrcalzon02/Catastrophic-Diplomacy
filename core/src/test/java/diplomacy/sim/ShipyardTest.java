@@ -45,6 +45,19 @@ public final class ShipyardTest {
         rejects(()->Shipyard.fit(normal.install(weapon,"BASE-DRA-LAS"),catalog),"unlicensed other faction");
         rejects(()->Shipyard.decode("CD-SHIP-1|UNKNOWN|CORVETTE|QQ\n",catalog),"bad faction");
         rejects(()->Shipyard.decode(Shipyard.encode(normal).replace("0|", "99|"),catalog),"out of range slot");
+        Shipyard.Design heavy=Shipyard.starter(Battle.Faction.CARNELIAN,Shipyard.Hull.CORVETTE)
+                .install(find(Shipyard.starter(Battle.Faction.CARNELIAN,Shipyard.Hull.CORVETTE),Shipyard.Mount.WEAPON,0),"BASE-CAR-FLK")
+                .install(find(Shipyard.starter(Battle.Faction.CARNELIAN,Shipyard.Hull.CORVETTE),Shipyard.Mount.WEAPON,1),"BASE-CAR-FLK")
+                .install(find(Shipyard.starter(Battle.Faction.CARNELIAN,Shipyard.Hull.CORVETTE),Shipyard.Mount.DEFENSE,0),"BASE-CAR-ARM");
+        require(Shipyard.inspect(heavy,catalog).errors().contains("Hull displacement exceeded"),"mass budget must reject overloaded mounts");
+        rejects(()->Shipyard.fit(heavy,catalog),"overweight ship may not deploy");
+        Shipyard.Design demanding=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE)
+                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.SYSTEM,3),"BASE-TER-SEN")
+                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.WEAPON,2),"BASE-TER-FLK")
+                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.DEFENSE,1),"BASE-TER-ARM")
+                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.SUPPORT,0),"BASE-TER-REP");
+        require(Shipyard.inspect(demanding,catalog).errors().contains("Insufficient reactor output"),"power budget must reject brownout");
+        require(Shipyard.inspect(demanding,catalog).errors().contains("Thermal rejection insufficient"),"cooling budget must reject overheating");
         Shipyard.Design improved=normal.stage(weapon,Shipyard.Track.OUTPUT,3);
         require(Shipyard.inspect(improved,catalog).valid(),"three output stages should fit stock corvette");
         require(Shipyard.fit(improved,catalog).laserDamage()>Shipyard.fit(normal,catalog).laserDamage(),"upgrades must impact actual combat firepower");
@@ -62,6 +75,17 @@ public final class ShipyardTest {
         require(first.hitCount>0,"fitted ships must fight");
         require(first.fingerprint()==again.fingerprint(),"fitted combat must be deterministic");
         require(first.ships().get(0).laserDamage>first.ships().get(8).laserDamage,"shipyard output must affect deployed ships");
+        Shipyard.Design supportBase=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        Shipyard.Design supportRepair=supportBase.install(find(supportBase,Shipyard.Mount.SUPPORT,0),"BASE-TER-REP");
+        require(Shipyard.inspect(supportRepair,catalog).valid(),"repair-equipped cruiser must fit");
+        Battle maintenance=new Battle(391L);
+        maintenance.spawnWing(0,supportBase,catalog,1,100,100);
+        maintenance.spawnWing(0,supportRepair,catalog,1,200,100);
+        Battle.Ship baseline=maintenance.ships().get(0);
+        Battle.Ship repaired=maintenance.ships().get(1);
+        baseline.hull-=30;repaired.hull-=30;
+        for(int t=0;t<600;t++)maintenance.step();
+        require(repaired.hull>baseline.hull+1.0,"non-Mandrally repair bays must repair faster than empty support slots");
         String encoded=Shipyard.encode(improved);
         Shipyard.Design loaded=Shipyard.decode(encoded,catalog);
         require(loaded.at(weapon).stage(Shipyard.Track.OUTPUT)==3,"upgrade stage serialization");
