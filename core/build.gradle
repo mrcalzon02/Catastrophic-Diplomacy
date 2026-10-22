@@ -8,3 +8,12 @@ tasks.register('smoke', JavaExec) {
     mainClass = 'diplomacy.sim.BattleSmokeTest'
     dependsOn testClasses
 }
+
+// Both deterministic combat and the packaged technology corpus are smoke-gated.
+tasks.register('technologySmoke', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.TechnologyCatalogTest'
+    dependsOn testClasses
+}
+tasks.named('smoke') { finalizedBy(tasks.named('technologySmoke')) }

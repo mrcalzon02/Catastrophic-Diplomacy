@@ -39,6 +39,10 @@ This generates and privately stores one Android PKCS12 upload key and password s
 
 ## Roadmap
 
-The first actual slice is the sandbox: accurate ship-fitting constraints, physics and component damage, fleet AI, shared clients, technology CSV ingestion, fleet editor and replay tests. Campaign strategy and diplomacy follow a playable combat loop. Technology planning and primary lore are staged in the Catastrophic Diplomacy Google Drive workspace.
+The first actual slice is the sandbox: accurate ship-fitting constraints, physics and component damage, fleet AI, shared clients, technology CSV ingestion (strict catalog now checked in), fleet editor and replay tests. Campaign strategy and diplomacy follow a playable combat loop. Technology planning and primary lore are staged in the Catastrophic Diplomacy Google Drive workspace.
 
 Inspirations include the *concept* of preprogrammed space fleet battle sandboxes. All code, lore, graphics and rules here are original and not copied from proprietary games.
+
+## Technology database (data-backed)
+
+The repository includes **120 base components and 2,880 upgrades** in Java-resource CSVs under `core/src/main/resources/technology/`. `TechnologyCatalog.loadDefault()` loads both sources and rejects noncanonical IDs, duplicate IDs, broken same-track prerequisites, missing base components, invalid faction/track names, nonfinite or nonpositive multipliers and invalid costs. Four tracks — OUTPUT, EFFICIENCY, RESILIENCE and SPECIALIST — branch separately in six stages for every faction/subsystem pairing. The authoritative editable source is the native Google Sheet in the project Drive folder; any updated CSV export must pass `:core:technologySmoke` before it is considered game data. Player loadout application and balancing are **not yet implemented**, so catalogue presence does not imply 2,880 presently playable component upgrades.
