@@ -131,7 +131,15 @@ def main() -> int:
         print('Missing GitHub CLI `gh`. Install it, then run gh auth login.', file=sys.stderr)
         return 2
     try:
-        invoke([cli, 'auth', 'status'])
+        try:
+            invoke([cli, 'auth', 'status'])
+        except RuntimeError:
+            print('GitHub CLI is not authenticated. Opening one-time browser authorization.')
+            login = subprocess.run([cli, 'auth', 'login', '--hostname', 'github.com',
+                                    '--web', '--scopes', 'repo,workflow'], check=False)
+            if login.returncode != 0:
+                raise RuntimeError('GitHub browser authentication was not completed.')
+            invoke([cli, 'auth', 'status'])
         resolved = invoke([cli, 'repo', 'view', REPO, '--json', 'nameWithOwner',
                            '--jq', '.nameWithOwner'])
         if resolved.lower() != REPO.lower():
@@ -139,6 +147,13 @@ def main() -> int:
         if args.check_only:
             print('PASS: gh is authenticated and repository is reachable. No keys changed.')
             return 0
+        existing_listing = invoke([cli, 'secret', 'list', '--repo', REPO,
+                                   '--app', 'actions', '--json', 'name'])
+        existing = {entry['name'] for entry in json.loads(existing_listing)}
+        if (set(NAMES) & existing) and not (STORE.exists() and PROPERTIES.exists()):
+            raise RuntimeError('This repository already has Android signing secrets, but the '
+                               'local signing identity is absent. Restore .local-secrets '
+                               'from backup; refusing to rotate an existing release key.')
         values = credentials()
         for name in NAMES:
             invoke([cli, 'secret', 'set', name, '--repo', REPO, '--app', 'actions'],
