@@ -70,7 +70,7 @@ public final class Battle {
         public double x, y, vx, vy, fuel, damage, integrity;
         Missile(int source, int owner, int target, double sx, double sy, double dx, double dy, double amount) {
             sourceId = source; team = owner; targetId = target; x = sx; y = sy;
-            double magnitude = Math.hypot(dx, dy);
+            double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
             fuel = 10; damage = amount; integrity = 2.5;
@@ -163,7 +163,7 @@ public final class Battle {
         Ship choice = null;
         double best = Double.POSITIVE_INFINITY;
         for (Ship s : ships) if (s.team != actor.team && s.alive()) {
-            double distance = Math.hypot(s.x - actor.x, s.y - actor.y);
+            double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
             // Inexperienced commanders misjudge target resilience; tactical aggression
             // sometimes wins over a conservative point-value estimate.
             double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
@@ -173,16 +173,16 @@ public final class Battle {
         return choice;
     }
 
-    private static double wrap(double angle) { return Math.atan2(Math.sin(angle), Math.cos(angle)); }
+    private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
     private void steer(Ship s, Ship target) {
         double dx = target.x - s.x, dy = target.y - s.y;
-        double range = Math.hypot(dx, dy);
-        double heading = Math.atan2(dy, dx);
+        double range = StrictMath.hypot(dx, dy);
+        double heading = StrictMath.atan2(dy, dx);
         if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
         double thrust = s.speed * s.engineCondition;
-        double desiredVx = Math.cos(s.facing) * thrust, desiredVy = Math.sin(s.facing) * thrust;
+        double desiredVx = StrictMath.cos(s.facing) * thrust, desiredVy = StrictMath.sin(s.facing) * thrust;
         double smoothing = Math.min(1, 1.6 * DT);
         s.vx += (desiredVx - s.vx) * smoothing;
         s.vy += (desiredVy - s.vy) * smoothing;
@@ -190,7 +190,7 @@ public final class Battle {
     }
 
     private void fire(Ship s, Ship target) {
-        double distance = Math.hypot(target.x - s.x, target.y - s.y);
+        double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
         double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition;
         if (distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
@@ -214,7 +214,7 @@ public final class Battle {
             for (int i = missiles.size() - 1; i >= 0; i--) {
                 Missile missile = missiles.get(i);
                 if (missile.team == defender.team) continue;
-                if (Math.hypot(missile.x - defender.x, missile.y - defender.y) > defender.pdRange) continue;
+                if (StrictMath.hypot(missile.x - defender.x, missile.y - defender.y) > defender.pdRange) continue;
                 defender.pdReload = 0.16 / defender.pointDefenseCondition;
                 if (defender.power < 1.5) break;
                 defender.power -= 1.5; defender.heat += 0.8;
@@ -231,12 +231,12 @@ public final class Battle {
             Missile m = missiles.get(i);
             Ship target = findShip(m.targetId);
             if (target == null || !target.alive() || (m.fuel -= DT) <= 0) { missiles.remove(i); continue; }
-            double dx = target.x - m.x, dy = target.y - m.y, range = Math.hypot(dx, dy);
+            double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
             if (range < 13) { hit(target, m.damage, findShip(m.sourceId)); missiles.remove(i); continue; }
             if (range > 0) {
                 m.vx = 0.96 * m.vx + 0.04 * dx / range;
                 m.vy = 0.96 * m.vy + 0.04 * dy / range;
-                double magnitude = Math.hypot(m.vx, m.vy);
+                double magnitude = StrictMath.hypot(m.vx, m.vy);
                 m.x += (m.vx / magnitude) * 220 * DT;
                 m.y += (m.vy / magnitude) * 220 * DT;
             }
