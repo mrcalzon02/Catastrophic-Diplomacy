@@ -12,6 +12,9 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
+import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.TechnologyCatalog;
+import java.io.IOException;
 
 /** Same interactive client on Windows/Linux desktop and Android; no duplicate rules. */
 public final class CatastrophicGame extends ApplicationAdapter {
@@ -23,6 +26,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private BitmapFont font;
     private InstancedShipRenderer instanced;
     private Battle battle;
+    private TechnologyCatalog technology;
+    private Shipyard.Design leftDesign, rightDesign;
+    private ShipyardPanel shipyard;
     private Battle.Faction left = Battle.Faction.TERRAN, right = Battle.Faction.DRAXIAN;
     private long nextSeed = 2479;
     private float accumulator;
@@ -42,31 +48,70 @@ public final class CatastrophicGame extends ApplicationAdapter {
         } catch (RuntimeException error) {
             Gdx.app.error("GPU", "Instanced renderer unavailable; falling back", error);
         }
+        try { technology = TechnologyCatalog.loadDefault(); }
+        catch (IOException error) { throw new IllegalStateException("Technology resources missing from game distribution", error); }
+        leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
+        rightDesign=Shipyard.starter(right,Shipyard.Hull.CORVETTE);
+        shipyard = new ShipyardPanel(technology,(team,design)->{
+            if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
+            reset();
+        },leftDesign,rightDesign);
         reset();
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
+                if (shipyard.open()) return shipyard.key(key);
+                if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
                 if (key == Input.Keys.MINUS) { speed = Math.max(1, speed / 2); return true; }
-                if (key == Input.Keys.Q) { left = next(left); reset(); return true; }
-                if (key == Input.Keys.E) { right = next(right); reset(); return true; }
+                if (key == Input.Keys.Q) { changeFaction(0); return true; }
+                if (key == Input.Keys.E) { changeFaction(1); return true; }
                 return false;
             }
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
+                if (shipyard.open()) {
+                    shipyard.startTouch(world.x,world.y);
+                    return shipyard.tap(world.x,world.y);
+                }
                 if (world.y > 650) {
+                    if (world.x > 1160) { shipyard.show(); return true; }
                     if (world.x < 125) running = !running;
                     else if (world.x < 250) reset();
                     else if (world.x < 365) speed = Math.max(1, speed / 2);
                     else if (world.x < 475) speed = Math.min(16, speed * 2);
-                    else if (world.x < 850) { left = next(left); reset(); }
-                    else { right = next(right); reset(); }
+                    else if (world.x < 850) changeFaction(0);
+                    else changeFaction(1);
                     return true;
                 }
                 return false;
             }
+            @Override public boolean touchDragged(int x,int y,int pointer) {
+                if(!shipyard.open())return false;
+                com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
+                return shipyard.drag(world.x,world.y);
+            }
+            @Override public boolean touchUp(int x,int y,int pointer,int button) {
+                shipyard.endTouch();return shipyard.open();
+            }
+            @Override public boolean scrolled(float amountX,float amountY) {
+                return shipyard.scroll(amountY);
+            }
         });
+    }
+
+    private void changeFaction(int team) {
+        if(team==0) {
+            left=next(left);
+            leftDesign=Shipyard.starter(left,leftDesign.hull);
+            shipyard.sync(0,leftDesign);
+        } else {
+            right=next(right);
+            rightDesign=Shipyard.starter(right,rightDesign.hull);
+            shipyard.sync(1,rightDesign);
+        }
+        reset();
     }
 
     private static Battle.Faction next(Battle.Faction f) {
@@ -74,14 +119,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void reset() {
-        battle = Battle.duel(nextSeed++, 16, left, right);
+        battle = Battle.duel(nextSeed++, 16, leftDesign, rightDesign, technology);
         accumulator = 0;
         running = true;
     }
 
     @Override public void render() {
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
-        if (running && !battle.finished()) {
+        if (running && !shipyard.open() && !battle.finished()) {
             accumulator += delta * speed;
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
@@ -92,6 +137,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.gl.glClearColor(0.015f, 0.025f, 0.055f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         viewport.apply(); camera.update();
+        if (shipyard.open()) {
+            shapes.setProjectionMatrix(camera.combined);
+            batch.setProjectionMatrix(camera.combined);
+            shipyard.draw(shapes,batch,font);
+            return;
+        }
         shapes.setProjectionMatrix(camera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
@@ -129,6 +180,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch, "< " + left.displayName, 508, 693);
         font.setColor(right.r, right.g, right.b, 1);
         font.draw(batch, "< " + right.displayName, 866, 693);
+        font.setColor(Color.GOLD);
+        font.draw(batch,"SHIPYARD",1166,693);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount

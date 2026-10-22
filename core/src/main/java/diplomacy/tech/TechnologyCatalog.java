@@ -48,16 +48,36 @@ public final class TechnologyCatalog {
         }
     }
 
+    /** Quantified base machinery, including the engineering category used for slot fitting. */
+    public static final class Component {
+        public final String id, faction, subsystem, name, category;
+        public final double mass, power, heat, integrity, effect;
+        public final int industryCost;
+        Component(List<String> row) {
+            id = row.get(0); faction = row.get(1); subsystem = row.get(2);
+            name = row.get(3); category = row.get(4);
+            mass = positive(row.get(6)); power = positive(row.get(7));
+            heat = positive(row.get(8)); integrity = positive(row.get(9));
+            industryCost = integer(row.get(10), "component cost"); effect = positive(row.get(11));
+            if (!FACTIONS.contains(faction) || !Set.of("weapons", "defense", "systems", "support").contains(category)
+                    || !id.equals("BASE-" + faction + "-" + subsystem) || name.isBlank()
+                    || industryCost <= 0) throw new IllegalArgumentException("Invalid base component: " + id);
+        }
+    }
+    private final Map<String, Component> baseComponents;
     private final Map<String, Upgrade> upgrades;
     private final Set<String> components;
-    private TechnologyCatalog(Map<String, Upgrade> map, Set<String> base) {
+    private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base) {
         upgrades = Collections.unmodifiableMap(map);
-        components = Collections.unmodifiableSet(base);
+        baseComponents = Collections.unmodifiableMap(base);
+        components = Collections.unmodifiableSet(base.keySet());
     }
     public int upgradeCount() { return upgrades.size(); }
     public int componentCount() { return components.size(); }
     public Upgrade get(String id) { return upgrades.get(id); }
     public boolean hasBase(String id) { return components.contains(id); }
+    public Component base(String id) { return baseComponents.get(id); }
+    public Map<String, Component> baseComponents() { return baseComponents; }
     public Map<String, Upgrade> upgrades() { return upgrades; }
 
     public static TechnologyCatalog loadDefault() throws IOException {
@@ -75,12 +95,13 @@ public final class TechnologyCatalog {
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
                 || !rows.get(0).get(6).equals("Prerequisite ID") || !rows.get(0).get(19).equals("Tradeoff"))
             throw new IllegalArgumentException("Unexpected technology CSV schema");
-        Set<String> baseIds = new HashSet<>();
+        Map<String, Component> baseMap = new LinkedHashMap<>();
         for (int i = 1; i < bases.size(); i++) {
-            String id = bases.get(i).get(0);
-            if (!id.equals("BASE-" + bases.get(i).get(1) + "-" + bases.get(i).get(2)) || !baseIds.add(id))
-                throw new IllegalArgumentException("Invalid/duplicate base component ID: " + id);
+            Component part = new Component(bases.get(i));
+            if (baseMap.putIfAbsent(part.id, part) != null)
+                throw new IllegalArgumentException("Duplicate base component ID: " + part.id);
         }
+        Set<String> baseIds = baseMap.keySet();
         Map<String, Upgrade> upgrades = new LinkedHashMap<>();
         for (int i = 1; i < rows.size(); i++) {
             Upgrade upgrade = new Upgrade(rows.get(i));
@@ -97,7 +118,7 @@ public final class TechnologyCatalog {
                     || (u.stage > 1 && !upgrades.containsKey(expected)))
                 throw new IllegalArgumentException("Missing prerequisite for " + u.id);
         }
-        return new TechnologyCatalog(upgrades, baseIds);
+        return new TechnologyCatalog(upgrades, baseMap);
     }
 
     private static int integer(String text, String field) {

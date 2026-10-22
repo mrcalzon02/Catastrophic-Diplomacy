@@ -5,7 +5,7 @@
 ## Current scope and proof
 
 - **Java 17 shared `:core`** is deterministic, renderer independent and physically advances combat at 30 Hz. It has faction-specific ship stats, self-directed target selection with uncertainty, movement, power/heat/shield budgets, ablative armor, SIF, lasers, homing missiles, point defense, subsystem casualties and destruction.
-- **`:game`** is the same libGDX client on desktop and Android. The tactical arena has pause, speed, reset, faction cycling and touch/keyboard controls; the GPU path uses OpenGL 3 instanced ship geometry with a fallback renderer when GL30 is unavailable.
+- **`:game`** is the same libGDX client on desktop and Android. The tactical arena has pause, speed, reset, faction cycling and touch/keyboard controls, including the shared **Shipyard**; the GPU path uses OpenGL 3 instanced ship geometry with a fallback renderer when GL30 is unavailable.
 - **`:desktop`** is LWJGL3. **`:android`** is the Android launcher. Both share every rules implementation. Desktop/Android graphics and native APK packaging are not yet accepted on physical devices.
 - A headless 16-vs-16 Java 17 smoke test passed locally. The online repository must be inspected at the commit SHA before claiming deployment. Balance and large-fleet GPU performance remain unverified.
 
@@ -15,6 +15,7 @@ Install **JDK 17**, **Gradle 8.11.1 or compatible AGP 8.9.2 toolchain**; Android
 
 ```text
 gradle :core:smoke
+gradle :core:shipyardSmoke
 gradle :desktop:run
 gradle :android:assembleDebug
 ```
@@ -46,3 +47,21 @@ Inspirations include the *concept* of preprogrammed space fleet battle sandboxes
 ## Technology database (data-backed)
 
 The repository includes **120 base components and 2,880 upgrades** in Java-resource CSVs under `core/src/main/resources/technology/`. `TechnologyCatalog.loadDefault()` loads both sources and rejects noncanonical IDs, duplicate IDs, broken same-track prerequisites, missing base components, invalid faction/track names, nonfinite or nonpositive multipliers and invalid costs. Four tracks — OUTPUT, EFFICIENCY, RESILIENCE and SPECIALIST — branch separately in six stages for every faction/subsystem pairing. The authoritative editable source is the native Google Sheet in the project Drive folder; any updated CSV export must pass `:core:technologySmoke` before it is considered game data. Player loadout application and balancing are **not yet implemented**, so catalogue presence does not imply 2,880 presently playable component upgrades.
+
+## Shipyard — first integrated fitting slice
+
+Open **SHIPYARD** (keyboard **Y**/**Tab**, or the upper-right touch button). Choose the left/right fleet, cycle Corvette/Frigate/Cruiser/Dreadnought, select a hardpoint in the scrollable list, install a compatible faction component, then adjust OUTPUT/EFFICIENCY/RESILIENCE/SPECIALIST ranks independently from 0 to 6. Each rank consumes research/industry costs; the selected highest rank per parallel track defines the multiplier rather than compounding the same branch's stage values on top of each other. **APPLY** deploys the design to the battle only if the fitting is legal. **SAVE/LOAD** preserve text blueprints under the application's local `shipyard/` directory; loaded designs must pass schema and engineering validation. Android and desktop call the identical `Shipyard` rules and same `Battle` simulation.
+
+The fitting checks mount category, faction ownership, hull mass/volume, reactor generation versus installed draw, thermal rejection, basic propulsion and at least one weapon. The battle actually uses installed shield capacity, armor, SIF, engines, laser and missile damage, point-defense range, output headroom and radiator capacity. A missing missile mount means no missiles fire. Launchers remain shared, with no duplicated platform rules. The simulator's original faction-presets can still be used by existing tests.
+
+Java-only verification independent of GPU/Android dependencies:
+
+```bash
+mkdir -p out
+javac --release 17 -encoding UTF-8 -d out $(find core/src/main/java core/src/test/java -name '*.java')
+java -cp out:core/src/main/resources diplomacy.sim.BattleSmokeTest
+java -cp out:core/src/main/resources diplomacy.sim.TechnologyCatalogTest
+java -cp out:core/src/main/resources diplomacy.sim.ShipyardTest
+```
+
+**Still gated:** actual libGDX/Android builds, platform-specific loading/saving, touch usability on devices, physical compartment damage, custom weapons with distinct projectile behaviors, and mass-fleet performance profiling. Do not infer successful physical device verification from headless Java tests.

@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.TechnologyCatalog;
 
 /** Deterministic 30 Hz combat simulation. No graphics, files, time or Android APIs. */
 public final class Battle {
@@ -34,6 +36,8 @@ public final class Battle {
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
+        /** Installed machinery determines operating headroom and thermal rejection. */
+        public double powerRegen = 16, coolingRate = 19, passiveHeat;
         public double laserReload, missileReload, pdReload;
         public int launched, intercepted, kills;
         public boolean retired;
@@ -109,6 +113,42 @@ public final class Battle {
         ship.x = x; ship.y = y; ship.facing = team == 0 ? 0 : Math.PI;
         ships.add(ship); return ship;
     }
+    /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
+    public Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery, double x, double y) {
+        if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
+        Ship s = addShip(team, design.faction, x, y);
+        s.maxHull = machinery.hull(); s.hull = s.maxHull;
+        s.maxShields = machinery.shields(); s.shields = s.maxShields;
+        s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
+        s.sif = machinery.sif();
+        s.maxPower = machinery.maxPower(); s.power = s.maxPower;
+        s.maxHeat = machinery.maxHeat();
+        s.powerRegen = machinery.powerRegen();
+        s.coolingRate = machinery.coolingRate(); s.passiveHeat = machinery.passiveHeat();
+        s.speed = machinery.speed(); s.accuracy = machinery.accuracy();
+        s.laserDamage = machinery.laserDamage(); s.missileDamage = machinery.missileDamage();
+        s.pdRange = machinery.pdRange(); s.damageControl = machinery.damageControl();
+        return s;
+    }
+    public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
+                          int count, double centerX, double centerY) {
+        if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
+        Shipyard.Fitted machinery = Shipyard.fit(design, catalog);
+        int columns = Math.max(1, (int) StrictMath.ceil(StrictMath.sqrt(count)));
+        for (int i=0;i<count;i++) {
+            double x=centerX+((i%columns)-(columns-1)/2.0)*31+random.nextDouble()*3;
+            double y=centerY+((i/columns)-(count/columns)/2.0)*41+random.nextDouble()*3;
+            addShip(team,design,machinery,x,y);
+        }
+        log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
+    }
+    public static Battle duel(long seed, int shipsPerSide, Shipyard.Design left,
+                              Shipyard.Design right, TechnologyCatalog catalog) {
+        Battle battle = new Battle(seed);
+        battle.spawnWing(0,left,catalog,shipsPerSide,200,335);
+        battle.spawnWing(1,right,catalog,shipsPerSide,1070,335);
+        return battle;
+    }
     public void spawnWing(int team, Faction faction, int count, double centerX, double centerY) {
         if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
         int columns = Math.max(1, (int) Math.ceil(Math.sqrt(count)));
@@ -145,8 +185,8 @@ public final class Battle {
     }
 
     private void replenish(Ship s) {
-        s.power = Math.min(s.maxPower * s.reactorCondition, s.power + 16 * DT * s.reactorCondition);
-        s.heat = Math.max(0, s.heat - (9 + 10 * s.coolingCondition) * DT);
+        s.power = Math.min(s.maxPower * s.reactorCondition, s.power + s.powerRegen * DT * s.reactorCondition);
+        s.heat = Math.max(0, s.heat + (s.passiveHeat - s.coolingRate * s.coolingCondition) * DT);
         if (s.power > 3 && s.shields < s.maxShields && s.heat < s.maxHeat * 0.9) {
             double gain = Math.min(s.maxShields - s.shields, 5 * DT);
             s.shields += gain; s.power -= gain * 0.6;
@@ -192,14 +232,14 @@ public final class Battle {
     private void fire(Ship s, Ship target) {
         double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
         double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition;
-        if (distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
+        if (s.laserDamage > 0 && distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
             beams.add(new Beam(s.x, s.y, target.x, target.y, s.team));
             double chance = Math.min(0.98, s.accuracy * (0.7 + lock * 0.45));
             if (random.nextDouble() < chance) hit(target, s.laserDamage, s);
         }
-        if (distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15) {
+        if (s.missileDamage > 0 && distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15) {
             s.missileReload = 3.2 / Math.max(0.4, s.weaponsCondition);
             s.power -= 13; s.heat += 5;
             missiles.add(new Missile(s.id, s.team, target.id, s.x, s.y,
