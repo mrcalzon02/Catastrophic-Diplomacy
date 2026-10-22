@@ -27,3 +27,28 @@ tasks.register('shipyardSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('technologySmoke') { finalizedBy(tasks.named('shipyardSmoke')) }
+
+// Portable fleet encoding and pointer gestures shared by the desktop/Android client.
+tasks.register('platformSmoke', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PlatformPersistenceTest'
+    dependsOn testClasses
+}
+tasks.named('technologySmoke') { finalizedBy(tasks.named('platformSmoke')) }
+
+tasks.register('combatMachinerySmoke', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CombatMachineryTest'
+    dependsOn testClasses
+}
+tasks.named('platformSmoke') { finalizedBy(tasks.named('combatMachinerySmoke')) }
+
+tasks.register('fleetScaleSmoke', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetScaleTest'
+    dependsOn testClasses
+}
+tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fleetScaleSmoke')) }

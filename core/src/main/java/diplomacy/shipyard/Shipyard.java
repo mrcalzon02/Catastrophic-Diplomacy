@@ -198,23 +198,36 @@ public final class Shipyard {
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
                          double speed, double accuracy, double laserDamage, double missileDamage,
-                         double pdRange, double damageControl) { }
+                         double pdRange, double damageControl,
+                         double kineticDamage, double plasmaDamage, double particleDamage,
+                         double torpedoDamage, double ecmStrength, int fighterCapacity,
+                         int droneCapacity, int magazineCapacity) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
         double hull=design.hull.baseHull,shields=0,armor=0,sif=0;
         double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0.001;
+        double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
+        int fighters=0,drones=0,magazines=0;
         for(Part p:fittedParts(design,catalog,new ArrayList<>())) {
             switch(p.base.subsystem) {
                 case "ARM" -> armor+=p.effect*2.0*p.integrity/p.base.integrity;
                 case "SHD" -> shields+=p.effect*2.6*p.shields;
                 case "SIF" -> sif+=p.effect*0.0065*p.integrity/p.base.integrity;
                 case "ENG" -> thrust+=p.effect*p.thrust;
-                case "KIN", "LAS", "PAR", "PLA" -> laser+=p.effect*0.78*p.accuracy;
-                case "MSL", "TOR" -> missile+=p.effect*3.1;
+                case "KIN" -> kinetic+=p.effect*0.75*p.accuracy;
+                case "LAS" -> laser+=p.effect*0.78*p.accuracy;
+                case "PAR" -> particle+=p.effect*0.82*p.accuracy;
+                case "PLA" -> plasma+=p.effect*1.05*p.accuracy;
+                case "MSL" -> missile+=p.effect*3.1;
+                case "TOR" -> torpedo+=p.effect*5.4;
                 case "PD", "FLK" -> pd+=p.effect*2.8;
                 case "SEN" -> accuracy+=0.12*p.accuracy;
                 case "REP" -> repair+=p.effect*0.0004;
+                case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
+                case "FTR" -> fighters+=2+(int)(p.effect/18.0);
+                case "DRN" -> drones+=2+(int)(p.effect/18.0);
+                case "MAG" -> magazines+=(int)(p.effect/3.8);
                 default -> { }
             }
             hull+=p.integrity*0.08;
@@ -224,7 +237,8 @@ public final class Shipyard {
         return new Fitted(hull,shields,armor,Math.min(0.75,sif),Math.max(40,report.generation()*0.95),
                 110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
                 Math.max(9,mobility),Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
-                repair);
+                repair,kinetic,plasma,particle,torpedo,Math.min(0.65,ecm),
+                fighters,drones,magazines);
     }
 
     /** Portable, deterministic blueprint text (no Java object deserialization). */

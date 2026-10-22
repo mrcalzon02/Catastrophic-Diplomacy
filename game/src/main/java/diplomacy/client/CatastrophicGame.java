@@ -4,6 +4,7 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -13,6 +14,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.IOException;
 
@@ -35,6 +37,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean running = true;
     private int speed = 1;
     private String renderer = "software geometry";
+    private String saveState = "FLEETS NOT SAVED";
+    private static final String FLEET_FILE = "fleet/fleets-v1.dat";
 
     @Override public void create() {
         camera = new OrthographicCamera();
@@ -52,8 +56,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         catch (IOException error) { throw new IllegalStateException("Technology resources missing from game distribution", error); }
         leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
         rightDesign=Shipyard.starter(right,Shipyard.Hull.CORVETTE);
+        restoreFleets();
         shipyard = new ShipyardPanel(technology,(team,design)->{
             if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
+            saveFleets();
             reset();
         },leftDesign,rightDesign);
         reset();
@@ -72,8 +78,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
                 if (shipyard.open()) {
-                    shipyard.startTouch(world.x,world.y);
-                    return shipyard.tap(world.x,world.y);
+                    shipyard.startTouch(world.x,world.y,pointer);
+                    return true;
                 }
                 if (world.y > 650) {
                     if (world.x > 1160) { shipyard.show(); return true; }
@@ -90,10 +96,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             @Override public boolean touchDragged(int x,int y,int pointer) {
                 if(!shipyard.open())return false;
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
-                return shipyard.drag(world.x,world.y);
+                return shipyard.drag(world.x,world.y,pointer);
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
-                shipyard.endTouch();return shipyard.open();
+                com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
+                return shipyard.endTouch(world.x,world.y,pointer);
             }
             @Override public boolean scrolled(float amountX,float amountY) {
                 return shipyard.scroll(amountY);
@@ -111,7 +118,51 @@ public final class CatastrophicGame extends ApplicationAdapter {
             rightDesign=Shipyard.starter(right,rightDesign.hull);
             shipyard.sync(1,rightDesign);
         }
+        saveFleets();
         reset();
+    }
+
+    /** Local storage is private to this app on Android and the user's home directory on desktop. */
+    private void restoreFleets() {
+        FileHandle primary=Gdx.files.local(FLEET_FILE);
+        FileHandle backup=Gdx.files.local(FLEET_FILE+".bak");
+        if(!primary.exists()&&!backup.exists())return;
+        for(FileHandle file:new FileHandle[]{primary,backup}) {
+            if(!file.exists())continue;
+            try {
+                FleetPresets.Fleets saved=FleetPresets.decode(file.readString("UTF-8"),technology);
+                leftDesign=saved.left();rightDesign=saved.right();
+                left=leftDesign.faction;right=rightDesign.faction;
+                saveState=file==primary?"FLEETS RESTORED":"BACKUP FLEETS RESTORED";
+                return;
+            }catch(RuntimeException damaged){
+                Gdx.app.error("SAVE", "Fleet preset failed checksum/fitting validation: "+file.path(), damaged);
+            }
+        }
+        saveState="SAVES INVALID - STARTER FLEETS USED";
+    }
+    private void saveFleets() {
+        try {
+            String data=FleetPresets.encode(leftDesign,rightDesign,technology);
+            FileHandle destination=Gdx.files.local(FLEET_FILE);
+            FileHandle temporary=Gdx.files.local(FLEET_FILE+".tmp");
+            FileHandle backup=Gdx.files.local(FLEET_FILE+".bak");
+            temporary.writeString(data,false,"UTF-8");
+            FleetPresets.decode(temporary.readString("UTF-8"),technology);
+            if(destination.exists()) {
+                try {
+                    FleetPresets.decode(destination.readString("UTF-8"),technology);
+                    destination.copyTo(backup);
+                } catch(IllegalArgumentException damaged) {
+                    Gdx.app.log("SAVE", "Refusing to overwrite a valid backup with an invalid primary save");
+                }
+            }
+            temporary.moveTo(destination);
+            saveState="FLEETS SAVED";
+        } catch(RuntimeException failed) {
+            Gdx.app.error("SAVE", "Unable to persist fitted fleets", failed);
+            saveState="FLEET SAVE FAILED";
+        }
     }
 
     private static Battle.Faction next(Battle.Faction f) {
@@ -165,7 +216,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Missile m : battle.missiles()) {
             shapes.setColor(m.team == 0 ? Color.CYAN : Color.SCARLET);
-            shapes.circle((float) m.x, (float) m.y, 2.8f, 7);
+            shapes.circle((float) m.x, (float) m.y, m.torpedo?4.4f:2.8f, 7);
+        }
+        for (Battle.Craft craft : battle.crafts()) {
+            shapes.setColor(craft.team==0?Color.CYAN:Color.CORAL);
+            shapes.circle((float)craft.x,(float)craft.y,craft.fighter?3.6f:2.4f,8);
         }
         shapes.setColor(0.08f, 0.13f, 0.22f, 0.94f);
         shapes.rect(0, 649, W, 71);
@@ -185,7 +240,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
-                + "   PD " + battle.missileIntercepts + "   " + renderer, 22, 38);
+                + "   PD " + battle.missileIntercepts + "   CRAFT " + battle.crafts().size()
+                + "   " + saveState, 22, 38);
         if (battle.finished()) {
             font.setColor(Color.GOLD);
             font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.alive(0) > 0 ? left.displayName : right.displayName)

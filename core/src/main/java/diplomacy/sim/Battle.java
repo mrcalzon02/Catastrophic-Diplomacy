@@ -25,7 +25,8 @@ public final class Battle {
         }
     }
 
-    public enum Subsystem { REACTOR, ENGINES, WEAPONS, POINT_DEFENSE, SENSORS, COOLING, COMMAND }
+    public enum Subsystem { REACTOR, ENGINES, WEAPONS, POINT_DEFENSE, SENSORS, COOLING, COMMAND, HANGAR, MAGAZINE, ELECTRONIC_WARFARE }
+    public enum DamageType { LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, FIGHTER }
 
     public static final class Ship {
         public final int id, team;
@@ -39,7 +40,11 @@ public final class Battle {
         /** Installed machinery determines operating headroom and thermal rejection. */
         public double powerRegen = 16, coolingRate = 19, passiveHeat;
         public double laserReload, missileReload, pdReload;
-        public int launched, intercepted, kills;
+        public double kineticDamage, plasmaDamage, particleDamage, torpedoDamage, ecmStrength;
+        public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload;
+        public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
+        public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve;
+        public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
         public int commanderSkill;
         Ship(int identifier, int side, Faction group, String callSign) {
@@ -72,12 +77,27 @@ public final class Battle {
         public final int sourceId, team;
         public int targetId;
         public double x, y, vx, vy, fuel, damage, integrity;
-        Missile(int source, int owner, int target, double sx, double sy, double dx, double dy, double amount) {
-            sourceId = source; team = owner; targetId = target; x = sx; y = sy;
+        public final boolean torpedo;
+        Missile(int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
+                boolean heavy) {
+            sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
-            fuel = 10; damage = amount; integrity = 2.5;
+            fuel = heavy?14:10; damage = amount; integrity = heavy?5.1:2.5;
+        }
+    }
+
+    /** Fighters attack hostile hulls. Defensive drones deliberately hunt hostile ordnance. */
+    public static final class Craft {
+        public final int id, sourceId, team;
+        public final boolean fighter;
+        public double x, y, integrity, fuel, reload;
+        public int targetId;
+        Craft(int identifier, Ship source, boolean offensive, int target) {
+            id=identifier;sourceId=source.id;team=source.team;fighter=offensive;
+            targetId=target;x=source.x;y=source.y;
+            integrity=offensive?24:15; fuel=offensive?28:22;
         }
     }
 
@@ -93,6 +113,8 @@ public final class Battle {
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
     private final List<Missile> missiles = new ArrayList<>();
+    private final List<Craft> crafts = new ArrayList<>();
+    private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private int nextId = 1;
@@ -104,6 +126,7 @@ public final class Battle {
     public long seed() { return seed; }
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
+    public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
     public List<String> events() { return Collections.unmodifiableList(events); }
 
@@ -128,6 +151,12 @@ public final class Battle {
         s.speed = machinery.speed(); s.accuracy = machinery.accuracy();
         s.laserDamage = machinery.laserDamage(); s.missileDamage = machinery.missileDamage();
         s.pdRange = machinery.pdRange(); s.damageControl = machinery.damageControl();
+        s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
+        s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
+        s.ecmStrength=machinery.ecmStrength();
+        s.fighterReserve=machinery.fighterCapacity();s.droneReserve=machinery.droneCapacity();
+        s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
+        s.torpedoAmmo=s.torpedoDamage>0?3+machinery.magazineCapacity()/3:0;
         return s;
     }
     public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
@@ -179,9 +208,11 @@ public final class Battle {
             if (target != null) {
                 steer(s, target);
                 fire(s, target);
+                launchAuxiliary(s, target);
             } else { s.x += s.vx * DT; s.y += s.vy * DT; }
         }
         updateMissiles();
+        updateCraft();
     }
 
     private void replenish(Ship s) {
@@ -201,6 +232,12 @@ public final class Battle {
         s.laserReload = Math.max(0, s.laserReload - DT);
         s.missileReload = Math.max(0, s.missileReload - DT);
         s.pdReload = Math.max(0, s.pdReload - DT);
+        s.kineticReload=Math.max(0,s.kineticReload-DT);
+        s.plasmaReload=Math.max(0,s.plasmaReload-DT);
+        s.particleReload=Math.max(0,s.particleReload-DT);
+        s.torpedoReload=Math.max(0,s.torpedoReload-DT);
+        s.fighterReload=Math.max(0,s.fighterReload-DT);
+        s.droneReload=Math.max(0,s.droneReload-DT);
     }
 
     private Ship chooseTarget(Ship actor) {
@@ -235,20 +272,111 @@ public final class Battle {
 
     private void fire(Ship s, Ship target) {
         double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
-        double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition;
+        double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition
+                * (1 - target.ecmStrength*target.ecmCondition);
         if (s.laserDamage > 0 && distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
             beams.add(new Beam(s.x, s.y, target.x, target.y, s.team));
             double chance = Math.min(0.98, s.accuracy * (0.7 + lock * 0.45));
-            if (random.nextDouble() < chance) hit(target, s.laserDamage, s);
+            if (random.nextDouble() < chance) hit(target, s.laserDamage, s, DamageType.LASER);
         }
-        if (s.missileDamage > 0 && distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15) {
+        if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
             s.missileReload = 3.2 / Math.max(0.4, s.weaponsCondition);
             s.power -= 13; s.heat += 5;
             missiles.add(new Missile(s.id, s.team, target.id, s.x, s.y,
-                    target.x - s.x, target.y - s.y, s.missileDamage));
-            s.launched++;
+                    target.x - s.x, target.y - s.y, s.missileDamage,false));
+            s.launched++;s.missileAmmo--;
+        }
+        if (s.kineticDamage > 0 && distance < 445 && s.kineticReload <= 0 && s.power>5 && s.heat<s.maxHeat*0.95) {
+            s.kineticReload=0.75/Math.max(0.25,s.weaponsCondition);
+            s.power-=5;s.heat+=4;
+            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team));
+            if(random.nextDouble()<Math.min(0.97,s.accuracy*(0.72+lock*0.4)))
+                hit(target,s.kineticDamage,s,DamageType.KINETIC);
+        }
+        if (s.plasmaDamage > 0 && distance < 245 && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
+            s.plasmaReload=1.8/Math.max(0.25,s.weaponsCondition);
+            s.power-=14;s.heat+=17;
+            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team));
+            if(random.nextDouble()<Math.min(0.94,s.accuracy*(0.80+lock*0.4)))
+                hit(target,s.plasmaDamage,s,DamageType.PLASMA);
+        }
+        if (s.particleDamage > 0 && distance < 565 && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
+            s.particleReload=2.1/Math.max(0.25,s.weaponsCondition);
+            s.power-=17;s.heat+=10;
+            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team));
+            if(random.nextDouble()<Math.min(0.98,s.accuracy*(0.76+lock*0.45)))
+                hit(target,s.particleDamage,s,DamageType.PARTICLE);
+        }
+        if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840 && distance>110
+                && s.torpedoReload<=0 && s.power>18 && s.magazineCondition>0.15) {
+            s.torpedoReload=6.4/Math.max(0.25,s.weaponsCondition);
+            s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
+            missiles.add(new Missile(s.id,s.team,target.id,s.x,s.y,
+                    target.x-s.x,target.y-s.y,s.torpedoDamage,true));
+        }
+    }
+
+    private void launchAuxiliary(Ship ship, Ship enemy) {
+        if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
+        if(ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
+            crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
+            ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
+            ship.power-=7;ship.heat+=3;
+        }
+        if(ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000) {
+            crafts.add(new Craft(nextCraftId++,ship,false,enemy.id));
+            ship.droneReserve--;ship.dronesLaunched++;ship.droneReload=5.5/ship.hangarCondition;
+            ship.power-=5;ship.heat+=2;
+        }
+    }
+
+    private void updateCraft() {
+        for(int i=crafts.size()-1;i>=0;i--) {
+            Craft craft=crafts.get(i);
+            if((craft.fuel-=DT)<=0 || craft.integrity<=0){crafts.remove(i);continue;}
+            if(craft.fighter) {
+                Ship target=findShip(craft.targetId);
+                if(target==null || !target.alive()) {
+                    Ship source=findShip(craft.sourceId);
+                    target=source==null?null:chooseTarget(source);
+                    if(target!=null)craft.targetId=target.id;
+                }
+                if(target==null)continue;
+                double dx=target.x-craft.x,dy=target.y-craft.y;
+                double range=StrictMath.hypot(dx,dy);
+                if(range>0) {
+                    craft.x+=dx/range*175*DT;craft.y+=dy/range*175*DT;
+                }
+                if((craft.reload-=DT)<=0 && range<115){
+                    craft.reload=1.6;
+                    if(random.nextDouble()<0.64*(1-target.ecmStrength*target.ecmCondition))
+                        hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
+                }
+            } else {
+                Missile nearest=null;double range=150;
+                for(Missile missile:missiles)if(missile.team!=craft.team){
+                    double d=StrictMath.hypot(missile.x-craft.x,missile.y-craft.y);
+                    if(d<range){range=d;nearest=missile;}
+                }
+                if(nearest!=null){
+                    double dx=nearest.x-craft.x,dy=nearest.y-craft.y;
+                    if(range>0){craft.x+=dx/range*205*DT;craft.y+=dy/range*205*DT;}
+                    if(range<28){
+                        nearest.integrity-=3;
+                        if(nearest.integrity<=0 && missiles.remove(nearest))missileIntercepts++;
+                        crafts.remove(i);
+                    }
+                } else {
+                    Ship source=findShip(craft.sourceId);
+                    if(source!=null){
+                        double dx=source.x-craft.x,dy=source.y-craft.y;
+                        double distance=StrictMath.hypot(dx,dy);
+                        if(distance>35){craft.x+=dx/distance*95*DT;craft.y+=dy/distance*95*DT;}
+                    }
+                }
+            }
         }
     }
 
@@ -271,31 +399,49 @@ public final class Battle {
                 break;
             }
         }
+        for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
+                &&defender.pointDefenseCondition>0.20&&defender.pdRange>0&&defender.power>1.5){
+            for(int i=crafts.size()-1;i>=0;i--) {
+                Craft craft=crafts.get(i);
+                if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange)continue;
+                defender.power-=1.5;defender.heat+=0.8;
+                defender.pdReload=0.18/defender.pointDefenseCondition;
+                if(random.nextDouble()<0.67*defender.pointDefenseCondition) {
+                    craft.integrity-=20;
+                    if(craft.integrity<=0)crafts.remove(i);
+                }
+                break;
+            }
+        }
         for (int i = missiles.size() - 1; i >= 0; i--) {
             Missile m = missiles.get(i);
             Ship target = findShip(m.targetId);
             if (target == null || !target.alive() || (m.fuel -= DT) <= 0) { missiles.remove(i); continue; }
             double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
-            if (range < 13) { hit(target, m.damage, findShip(m.sourceId)); missiles.remove(i); continue; }
+            if (range < 13) { hit(target, m.damage, findShip(m.sourceId),m.torpedo?DamageType.TORPEDO:DamageType.MISSILE); missiles.remove(i); continue; }
             if (range > 0) {
-                m.vx = 0.96 * m.vx + 0.04 * dx / range;
-                m.vy = 0.96 * m.vy + 0.04 * dy / range;
+                double guidance=(m.torpedo?0.025:0.04)*(1-target.ecmStrength*target.ecmCondition);
+                m.vx = (1-guidance)*m.vx + guidance*dx/range;
+                m.vy = (1-guidance)*m.vy + guidance*dy/range;
                 double magnitude = StrictMath.hypot(m.vx, m.vy);
-                m.x += (m.vx / magnitude) * 220 * DT;
-                m.y += (m.vy / magnitude) * 220 * DT;
+                m.x += (m.vx / magnitude) * (m.torpedo?135:220) * DT;
+                m.y += (m.vy / magnitude) * (m.torpedo?135:220) * DT;
             }
         }
     }
     private Ship findShip(int id) { for (Ship ship : ships) if (ship.id == id) return ship; return null; }
 
-    private void hit(Ship defender, double raw, Ship attacker) {
+    private void hit(Ship defender, double raw, Ship attacker,DamageType kind) {
         if (!defender.alive()) return;
         hitCount++;
         double damage = raw;
-        double shieldHit = Math.min(defender.shields, damage);
-        defender.shields -= shieldHit; damage -= shieldHit;
+        double shieldEfficiency=kind==DamageType.KINETIC?0.82:kind==DamageType.PLASMA?1.2:1.0;
+        double shieldHit = Math.min(defender.shields, damage*shieldEfficiency);
+        defender.shields -= shieldHit; damage -= shieldHit/shieldEfficiency;
         if (damage <= 0) return;
-        double armorAbsorb = Math.min(defender.armor, damage * 0.35);
+        double absorption=kind==DamageType.KINETIC?0.18:kind==DamageType.TORPEDO?0.52:
+                kind==DamageType.PLASMA?0.27:0.35;
+        double armorAbsorb = Math.min(defender.armor, damage * absorption);
         defender.armor -= armorAbsorb; damage -= armorAbsorb;
         if (defender.power > 3 && defender.sif > 0 && defender.reactorCondition > 0.15) {
             double fieldAbsorb = damage * defender.sif;
@@ -303,6 +449,11 @@ public final class Battle {
             damage -= fieldAbsorb;
         }
         defender.hull -= damage;
+        if(kind==DamageType.PARTICLE){
+            defender.power=Math.max(0,defender.power-damage*0.45);
+            defender.sensorsCondition=Math.max(0,defender.sensorsCondition-damage/defender.maxHull*0.15);
+        }
+        if(kind==DamageType.PLASMA)defender.heat+=damage*0.35;
         if (damage > 5 && random.nextDouble() < 0.24) {
             Subsystem part = Subsystem.values()[random.nextInt(Subsystem.values().length)];
             double loss = Math.min(0.36, damage / defender.maxHull * 0.7);
@@ -314,6 +465,9 @@ public final class Battle {
                 case SENSORS: defender.sensorsCondition = Math.max(0, defender.sensorsCondition - loss); break;
                 case COOLING: defender.coolingCondition = Math.max(0, defender.coolingCondition - loss); break;
                 case COMMAND: defender.commandCondition = Math.max(0, defender.commandCondition - loss); break;
+                case HANGAR: defender.hangarCondition = Math.max(0,defender.hangarCondition-loss); break;
+                case MAGAZINE: defender.magazineCondition=Math.max(0,defender.magazineCondition-loss); break;
+                case ELECTRONIC_WARFARE: defender.ecmCondition=Math.max(0,defender.ecmCondition-loss); break;
                 default: break;
             }
         }
@@ -336,8 +490,13 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));
             hash = mix(hash, Double.doubleToLongBits(s.power));
+            hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
+            hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
+            hash=mix(hash,Double.doubleToLongBits(s.hangarCondition));
+            hash=mix(hash,Double.doubleToLongBits(s.magazineCondition));
         }
-        for (Missile m : missiles) { hash = mix(hash, m.sourceId); hash = mix(hash, Double.doubleToLongBits(m.x)); }
+        for (Missile m : missiles) { hash = mix(hash, m.sourceId); hash = mix(hash,Double.doubleToLongBits(m.y)); hash = mix(hash, Double.doubleToLongBits(m.x)); }
+        for (Craft craft : crafts) { hash=mix(hash,craft.id);hash=mix(hash,Double.doubleToLongBits(craft.x));hash=mix(hash,Double.doubleToLongBits(craft.y)); }
         return hash;
     }
     private static long mix(long hash, long n) { return (hash ^ n) * 0x100000001b3L; }

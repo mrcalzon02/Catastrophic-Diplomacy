@@ -65,3 +65,20 @@ java -cp out:core/src/main/resources diplomacy.sim.ShipyardTest
 ```
 
 **Still gated:** actual libGDX/Android builds, platform-specific loading/saving, touch usability on devices, physical compartment damage, custom weapons with distinct projectile behaviors, and mass-fleet performance profiling. Fighter hangars, drone control, electronic warfare and ordnance magazine mechanics are not yet active beyond their fitting loads, costs and prerequisites; do not treat these as implemented combat effects. Do not infer successful physical device verification from headless Java tests.
+
+## Fleet persistence, mobile input and combat machinery (next development slice)
+
+Fitted left/right fleets are now serialized into a checksummed, versioned, cross-platform `CD-FLEETS-1` save under the app-private libGDX local storage. The client restores on startup, saves when a fleet changes, retains a validated previous save as backup, and refuses corrupt or incompatible fittings. Shipyard touch actions occur on release rather than on finger-down, so a long-list drag is not misinterpreted as a component tap; secondary pointers cannot hijack the active scroll.
+
+Dedicated kinetic, plasma, particle and torpedo damage now coexist with lasers and standard missiles. Mounted fighter hangars launch finite attack craft, drone controllers launch finite missile-interception drones, ECM reduces lock/guidance, and magazines supply finite extra ammunition. These modules consume fitting budgets; damaged hangars and magazines lose combat effectiveness. The shared 2D client draws fighters, drones and heavier torpedoes on both platforms. These are first operational models, not full carrier logistics or per-compartment damage.
+
+Portable test commands using a JDK 17+ with Java 17 release targeting (and no renderer dependencies):
+
+```sh
+mkdir -p out
+javac --release 17 -encoding UTF-8 -d out $(find core/src/main/java core/src/test/java -name '*.java')
+cp -r core/src/main/resources/* out/
+for test in BattleSmokeTest TechnologyCatalogTest ShipyardTest PlatformPersistenceTest CombatMachineryTest FleetScaleTest; do java -cp out diplomacy.sim.$test; done
+```
+
+Gradle `:core:smoke` chains these suites. See [platform acceptance checklist](docs/PLATFORM_ACCEPTANCE.md) for outstanding real desktop and Android builds, signing verification, save/restore device tests, and release gates. No GitHub Actions workflow was introduced.

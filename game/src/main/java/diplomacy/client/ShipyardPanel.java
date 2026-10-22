@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.TouchGesture;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 
@@ -23,8 +24,8 @@ final class ShipyardPanel {
     private int team, selectedSlot, scroll;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
-    private float swipeLastY = Float.NaN;
-    private float swipeTravel;
+    private final TouchGesture gesture = new TouchGesture();
+    private boolean scrollGesture;
 
     ShipyardPanel(TechnologyCatalog tech, BiConsumer<Integer,Shipyard.Design> deployment,
                   Shipyard.Design first, Shipyard.Design second) {
@@ -33,7 +34,7 @@ final class ShipyardPanel {
     }
     boolean open() { return open; }
     void show() { open=true; draft=active[team]; selectedSlot=0; scroll=0; }
-    void close() { open=false; }
+    void close() { open=false; gesture.cancel(); }
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
@@ -81,22 +82,20 @@ final class ShipyardPanel {
         scroll=Math.max(0,Math.min(Math.max(0,draft.slots()-SLOT_ROWS),scroll+(int)Math.signum(dy)));
         return true;
     }
-    void startTouch(float x,float y) {
-        swipeLastY=(x<370&&y>105&&y<590)?y:Float.NaN;
-        swipeTravel=0;
+    void startTouch(float x,float y,int pointer) {
+        if(gesture.start(pointer,x,y))scrollGesture=x<370&&y>105&&y<590;
     }
-    boolean drag(float x,float y){
-        if(!open || !Float.isFinite(swipeLastY))return false;
-        swipeTravel += swipeLastY-y;
-        swipeLastY=y;
-        int rows=(int)(swipeTravel/26);
-        if(rows!=0){
-            scroll=Math.max(0,Math.min(Math.max(0,draft.slots()-SLOT_ROWS),scroll+rows));
-            swipeTravel-=rows*26;
-        }
+    boolean drag(float x,float y,int pointer){
+        if(!open)return false;
+        int rows=gesture.drag(pointer,x,y,26,scrollGesture);
+        if(rows!=0)scroll=Math.max(0,Math.min(Math.max(0,draft.slots()-SLOT_ROWS),scroll+rows));
         return true;
     }
-    void endTouch() { swipeLastY=Float.NaN; swipeTravel=0; }
+    boolean endTouch(float x,float y,int pointer) {
+        if(!open) { gesture.cancel(); return false; }
+        if(gesture.end(pointer,x,y)) return tap(x,y);
+        return true;
+    }
     boolean tap(float x,float y){
         if(!open)return false;
         if(y>638){
