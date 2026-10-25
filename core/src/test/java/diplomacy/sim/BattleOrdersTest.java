@@ -62,6 +62,12 @@ public final class BattleOrdersTest {
                 .withPosition(BattleOrders.Position.FORMATION));
         check(attacker.anchorOffsetX==-25&&attacker.anchorOffsetY==-40,
                 "formation anchor must capture actual deployed offset");
+        b.setTeamPointDefense(0,BattleOrders.PointDefense.INTERCEPT_ONLY);
+        check(attacker.orders.position()==BattleOrders.Position.FORMATION
+                        &&attacker.orders.anchorShipId()==friend.id,
+                "PD-only fleet edits must not silently erase custom formation assignments");
+        check(attacker.orders.pointDefense()==BattleOrders.PointDefense.INTERCEPT_ONLY,
+                "Individual ships must receive updated PD doctrine");
     }
     private static void checkReplay(){
         Battle a=threat(682,false,BattleOrders.PointDefense.INTERCEPT_ONLY);
