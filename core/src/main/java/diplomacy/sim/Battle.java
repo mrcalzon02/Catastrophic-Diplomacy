@@ -408,8 +408,13 @@ public final class Battle {
                 }
                 if((craft.reload-=DT)<=0 && range<115){
                     craft.reload=1.6;
+                    // A craft's individual attack is a new authoritative shot,
+                    // distinct from the fighter's original launch notification.
+                    long fighterShot=nextVisualShotId++;
+                    visual(fighterShot,VisualPhase.FIRE,"FIGHTER",craft.team,craft.sourceId,target.id,
+                            craft.x,craft.y,target.x,target.y);
                     if(random.nextDouble()<0.64*(1-target.ecmStrength*target.ecmCondition))
-                        hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
+                        hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER,fighterShot);
                 }
             } else {
                 Missile nearest=null;double range=150;
