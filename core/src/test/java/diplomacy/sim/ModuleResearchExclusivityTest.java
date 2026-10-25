@@ -95,14 +95,20 @@ public final class ModuleResearchExclusivityTest {
         for(Battle.Faction faction:Battle.Faction.values()){
             String id=Shipyard.factionId(faction);
             for(String kind:new String[]{"KIN","MSL","TOR","PD","SEN"}){
+                Shipyard.Mount mount=kind.equals("SEN")
+                        ?Shipyard.Mount.SYSTEM:Shipyard.Mount.WEAPON;
+                int moduleSlot=-1;
+                for(Shipyard.Slot slot:hull.slots)
+                    if(slot.mount()==mount){moduleSlot=slot.index();break;}
+                if(moduleSlot<0)throw new AssertionError("Missing legal research test socket");
                 Shipyard.Design d=Shipyard.starter(faction,hull)
-                        .install(first,"BASE-"+id+"-"+kind);
+                        .install(moduleSlot,"BASE-"+id+"-"+kind);
                 for(Shipyard.Track branch:Shipyard.Track.values()){
-                    Shipyard.Design single=d.stage(first,branch,6);
-                    check(single.at(first).branch()==branch
-                            &&single.at(first).stage(branch)==6,
+                    Shipyard.Design single=d.stage(moduleSlot,branch,6);
+                    check(single.at(moduleSlot).branch()==branch
+                            &&single.at(moduleSlot).stage(branch)==6,
                             "All four 6-stage branches available individually: "+id+"/"+kind+"/"+branch);
-                    check(single.at(first).stages().size()==1,
+                    check(single.at(moduleSlot).stages().size()==1,
                             "No fixture may carry two mutually exclusive paths");
                     for(int rank=1;rank<=6;rank++)
                         check(catalog.get("TECH-"+id+"-"+kind+"-"+branch+"-"
