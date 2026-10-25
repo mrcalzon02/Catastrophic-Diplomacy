@@ -25,7 +25,7 @@ The Play candidate branch contains `tools/verify_play_release.py` as a fail-clos
 
 ## Application-specific readiness assessment
 
-Current `android/build.gradle` uses targetSdk 35 and the existing local PKCS12 release signer. A separate Play upload identity and compliant AAB flow are not yet configured. `gradle :core:smoke :desktop:classes :android:assembleDebug` forms the required source preflight. Blockers: current Play target API check, Play signer and AAB work, Play Console registration/review, real Android handset acceptance, save/upgrade proof. DO NOT invoke `tools/bootstrap_secrets.py` as part of this branch scaffolding; it is reserved for an explicit signing handoff.
+`main` retains targetSdk 35 and its existing local PKCS12 sideload signer. The `google-play` branch stages compileSdk/targetSdk 36 and an independent, fail-closed `:android:bundlePlay` signing variant requiring `catastrophicdiplomacy-play-upload-v1`. No Play upload key has been created, and no Play AAB has been built or tested. `gradle :core:smoke :desktop:classes :android:assembleDebug` forms the required source preflight. Blockers: verify the staged API 36 build actually compiles and runs; provision distinct Play signing only with explicit authorization; build and independently validate the Play AAB, Play Console registration/review, real Android handset acceptance and save/upgrade proof. DO NOT invoke `tools/bootstrap_secrets.py` as part of this branch scaffolding; it is reserved for an explicit signing handoff.
 
 ## Enforcement and evidence limitations
 
