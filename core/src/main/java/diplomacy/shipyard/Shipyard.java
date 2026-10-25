@@ -384,6 +384,14 @@ public final class Shipyard {
                         repairDrones,droneRepair,droneEndurance,efficiency));
     }
 
+    /** Current exclusive research branch effect of one selected installed module. */
+    public static ModuleBranchEffects.Tuning tuningAt(
+            Design design,TechnologyCatalog catalog,int slot){
+        Installed installed=design.at(slot);
+        return installed==null?ModuleBranchEffects.NEUTRAL
+                :evaluate(installed,catalog,design.faction).tuning();
+    }
+
     /** Expose the exact fitted projectile parameters for an individual shipyard socket.
      * An empty or non-ordnance slot has no projectile body to inspect. */
     public static ProjectileModel.Spec projectileAt(Design design,TechnologyCatalog catalog,int slot) {
