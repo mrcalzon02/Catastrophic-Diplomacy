@@ -44,20 +44,20 @@ final class ShipyardPanel {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
     }
-    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;}
+    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=false;}
     private void hull(int step){
         Shipyard.Hull[] options=Shipyard.Hull.shipyardOrder();
         int current=0;
         for(int i=0;i<options.length;i++)if(options[i]==draft.hull){current=i;break;}
         Shipyard.Hull next=options[Math.floorMod(current+step,options.length)];
         draft=Shipyard.starter(draft.faction,next);
-        selectedSlot=0;scroll=0;notice="New "+next+" frame; stock equipment installed";
+        selectedSlot=0;scroll=0;artPreview=false;notice="New "+next+" frame; stock equipment installed";
     }
     private void faction(int step) {
         Battle.Faction[] options=Battle.Faction.values();
         Battle.Faction next=options[Math.floorMod(draft.faction.ordinal()+step,options.length)];
         draft=Shipyard.starter(next,draft.hull);
-        selectedSlot=0;scroll=0;
+        selectedSlot=0;scroll=0;artPreview=false;
         notice="New "+next.displayName+" "+draft.hull+" frame; stock equipment installed";
     }
     private String legacyFileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)+".ship";}
@@ -76,7 +76,7 @@ final class ShipyardPanel {
             Shipyard.Design loaded=Shipyard.decode(file.readString("UTF-8"),catalog);
             if(loaded.faction!=draft.faction||loaded.hull!=draft.hull)
                 throw new IllegalArgumentException("Blueprint must match selected faction AND hull class");
-            draft=loaded;selectedSlot=0;scroll=0;notice="Loaded "+file.path()+"; APPLY to deploy";
+            draft=loaded;selectedSlot=0;scroll=0;artPreview=false;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
     private void apply(){
