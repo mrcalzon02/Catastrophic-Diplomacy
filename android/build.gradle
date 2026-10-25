@@ -57,8 +57,16 @@ tasks.register('copyAndroidNatives') {
     }
 }
 tasks.configureEach { task ->
-    if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
+    // Both packaging and release lint inspect these generated asset directories.
+    // Gradle 8+ requires the producer tasks to be explicit dependencies, not
+    // just incidental side effects of Android's mergeAssets task ordering.
+    if ((task.name.startsWith('merge') && task.name.endsWith('Assets')) ||
+            (task.name.startsWith('generate') && task.name.endsWith('LintVitalReportModel')) ||
+            task.name.startsWith('lintVital')) {
         task.dependsOn rootProject.tasks.named('prepareUiAssets')
+        task.dependsOn rootProject.tasks.named('prepareMusicAssets')
+    }
+    if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
         task.dependsOn rootProject.tasks.named('verifyBattlefieldResources')
         task.dependsOn rootProject.tasks.named('verifyBattleAudioResources')
     }
