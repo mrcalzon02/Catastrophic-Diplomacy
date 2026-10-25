@@ -178,9 +178,21 @@ final class ShipyardPanel {
                 Shipyard.Track track=Shipyard.Track.values()[trackIndex];
                 int delta=x>=1185?1:x>=1090?-1:0;
                 if(delta!=0){
-                    int level=Math.max(0,Math.min(6,installed.stage(track)+delta));
-                    draft=draft.stage(selectedSlot,track,level);
-                    notice=track+" set to stage "+level;
+                    Shipyard.Track chosen=installed.branch();
+                    if(chosen!=null && chosen!=track){
+                        notice="LOCKED: "+chosen+" research selected on this module. "
+                                +"Reduce "+chosen+" to stage 0 to respec before choosing "+track;
+                    }else{
+                        int level=Math.max(0,Math.min(6,installed.stage(track)+delta));
+                        try{
+                            draft=draft.stage(selectedSlot,track,level);
+                            notice=level==0
+                                    ?"Module research reset; choose any one technology branch"
+                                    :track+" research stage "+level+" / 6 (other branches locked)";
+                        }catch(IllegalArgumentException rejected){
+                            notice=rejected.getMessage();
+                        }
+                    }
                 }
             }
         }
@@ -334,13 +346,16 @@ final class ShipyardPanel {
             font.setColor(installed!=null&&c.id.equals(installed.component)?Color.GOLD:Color.WHITE);
             font.draw(batch,shortText(c.name,34),813,564-(n+1)*25);
         }
+        Shipyard.Track activeResearch=installed==null?null:installed.branch();
         font.setColor(Color.WHITE);
-        font.draw(batch,"UPGRADES - "+selected.mount()+" #"+(selectedSlot+1),813,372);
+        font.draw(batch,"EXCLUSIVE RESEARCH - "+selected.mount()+" #"+(selectedSlot+1),813,372);
         for(int n=0;n<Shipyard.Track.values().length;n++){
             Shipyard.Track track=Shipyard.Track.values()[n];
             int level=installed==null?0:installed.stage(track);
-            font.draw(batch,track.name(),813,341-n*30);
-            font.draw(batch,"-   "+level+" / 6   +",1097,341-n*30);
+            boolean locked=activeResearch!=null && activeResearch!=track;
+            font.setColor(locked?Color.GRAY:activeResearch==track?Color.GOLD:Color.WHITE);
+            font.draw(batch,track.name()+(locked?" [LOCKED]":activeResearch==track?" [ACTIVE]":""),813,341-n*30);
+            font.draw(batch,locked?"---":("-   "+level+" / 6   +"),1097,341-n*30);
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"MASS  "+units(report.mass())+" / "+units(draft.hull.massCapacity)+" t",813,209);
