@@ -13,8 +13,8 @@ public final class UpdatePolicy {
     public static final long MAX_APK_BYTES = 400L * 1024 * 1024;
     public static final int SUPPORTED_DATA_SCHEMA = 1;
     private static final Pattern SHA = Pattern.compile("[a-fA-F0-9]{64}");
-    private static final Pattern TAG = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,119}");
-    private static final Pattern APK_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,179}\\.apk", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TAG = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+/-]{0,199}");
+    private static final Pattern APK_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._ +()-]{0,179}\\.apk", Pattern.CASE_INSENSITIVE);
     private static final List<String> REDIRECT_HOSTS = List.of("github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com");
 
     public record Candidate(String tag, String version, long versionCode, String applicationId,
@@ -39,7 +39,10 @@ public final class UpdatePolicy {
             throw new IllegalArgumentException("Unsupported local save schema");
     }
     public static void requireAsset(String tag, String fileName, long bytes, String sha256) {
-        if (tag == null || !TAG.matcher(tag).matches()) throw new IllegalArgumentException("Unsafe release tag");
+        if (tag == null || !TAG.matcher(tag).matches() || tag.contains("/../") ||
+                tag.contains("/./") || tag.endsWith("/.") || tag.endsWith("/..") ||
+                tag.contains("//"))
+            throw new IllegalArgumentException("Unsafe release tag");
         if (fileName == null || !APK_NAME.matcher(fileName).matches())
             throw new IllegalArgumentException("Unsafe APK filename");
         if (bytes < 4096 || bytes > MAX_APK_BYTES) throw new IllegalArgumentException("APK outside bounded size limit");
@@ -55,10 +58,12 @@ public final class UpdatePolicy {
     }
     public static void requireDownloadUrl(String url, String tag, String name) {
         URI uri = allowedUrl(url);
-        if (tag == null || !TAG.matcher(tag).matches() || name == null ||
+        if (tag == null || !TAG.matcher(tag).matches() || tag.contains("/../") ||
+                tag.contains("/./") || name == null ||
                 !(APK_NAME.matcher(name).matches() || "release-manifest.json".equals(name)) ||
                 !"github.com".equals(uri.getHost()) || uri.getRawQuery() != null || uri.getRawFragment() != null ||
-                !uri.getRawPath().equals("/" + REPOSITORY + "/releases/download/" + tag + "/" + name))
+                !uri.getRawPath().startsWith("/" + REPOSITORY + "/releases/download/") ||
+                !uri.getPath().equals("/" + REPOSITORY + "/releases/download/" + tag + "/" + name))
             throw new IllegalArgumentException("Release asset must originate from this repository and tag");
     }
     /** Every hop is validated separately; redirect targets may be temporary GitHub asset URLs. */

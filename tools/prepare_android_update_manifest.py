@@ -15,7 +15,7 @@ import sys
 
 PACKAGE = 'games.catastrophicdiplomacy'
 VERSION = re.compile(r'[A-Za-z0-9][A-Za-z0-9._+\-]{0,99}')
-APK_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._+\-]{0,179}\.apk$', re.IGNORECASE)
+APK_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._ +()-]{0,179}\.apk$', re.IGNORECASE)
 MAX_BYTES = 400 * 1024 * 1024
 
 

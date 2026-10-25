@@ -38,6 +38,11 @@ public final class UpdatePolicyTest {
         reject(()->UpdatePolicy.provisional("test","a.apk",UpdatePolicy.MAX_APK_BYTES+1,""),"oversize APK");
         String url="https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/rc_28/provisional.apk";
         UpdatePolicy.requireDownloadUrl(url,"rc_28","provisional.apk");
+        // GitHub encodes spaces and may encode slashes inside a release tag.
+        UpdatePolicy.requireDownloadUrl(
+                "https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/test%2Fbuild%2B3/nightly%20Build%203.apk",
+                "test/build+3", "nightly Build 3.apk");
+        UpdatePolicy.provisional("test/build+3","nightly Build 3.apk",8192,"");
         for(String bad: new String[]{url.replace("https:","http:"),
                  url.replace("github.com","github.com.evil.com"),url.replace("/mrcalzon02/","/bad-owner/"),
                  url+"?token=evil","file:///tmp/bad.apk"})
