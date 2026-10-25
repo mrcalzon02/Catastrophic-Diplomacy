@@ -7,47 +7,91 @@ allprojects {
 }
 
 
-// Exact-byte approved UI art, transferred as small Git blobs to avoid binary upload limits.
+// Original source sheets are already stored as exact-byte Git blobs in a
+// 20-part ZIP. Retain those binaries but never bundle the rejected 87-cell atlas.
+// Reconstruct only reviewed UI entries from their source pixel rectangles.
 def approvedUiParts = (0..<20).collect { file('asset_packs/ui-kit/part-' + String.format('%02d', it) + '.bin') }
 def approvedUiOutput = layout.buildDirectory.dir('generated/cd-ui')
+
 tasks.register('prepareUiAssets') {
     inputs.files approvedUiParts
+    inputs.file file('assets/ui/tactical/selected_manifest.json')
+    inputs.dir file('assets/ui/tactical/selected')
     outputs.dir approvedUiOutput
     doLast {
-        approvedUiParts.each { if (!it.isFile()) throw new GradleException('Missing approved UI part: ' + it.name) }
-        def archive = layout.buildDirectory.file('tmp/approved-ui-kit.zip').get().asFile
+        approvedUiParts.each { if (!it.isFile()) throw new GradleException('Missing UI source part: ' + it.name) }
+        def archive = layout.buildDirectory.file('tmp/approved-ui-sources.zip').get().asFile
         archive.parentFile.mkdirs()
         archive.withOutputStream { out ->
             approvedUiParts.each { part -> part.withInputStream { input -> input.transferTo(out) } }
         }
-        def digest = { File f ->
-            f.withInputStream { input ->
-                def sha = java.security.MessageDigest.getInstance('SHA-256')
-                byte[] bytes = new byte[65536]
-                int n
-                while ((n = input.read(bytes)) != -1) sha.update(bytes, 0, n)
-                sha.digest().encodeHex().toString()
+        def digestBytes = { byte[] data ->
+            java.security.MessageDigest.getInstance('SHA-256').digest(data).encodeHex().toString()
+        }
+        if (digestBytes(archive.bytes) != '8220b70e36e7133f8bbb5d1d89dacc0a1b14ee12671c481d822454901f80a170')
+            throw new GradleException('Original UI ZIP checksum mismatch')
+        def rawSources = [
+            systems: ['art_source/ui/ui_sheet_01_systems.png',
+                      '3b74777d6c4a6dc8448fa0958f161b1b44967ef5a159a768bd36ca223e36417c'],
+            combat: ['art_source/ui/ui_sheet_02_combat.png',
+                     '7bca86a5ba6cb908f5985e34293157ccad0cb4fb23e4700112afc2f0b2622d26']
+        ]
+        def sources = [:]
+        new java.util.zip.ZipFile(archive).withCloseable { zip ->
+            rawSources.each { name, sourceInfo ->
+                def entry = zip.getEntry(sourceInfo[0])
+                if (entry == null) throw new GradleException('UI source not found: ' + name)
+                byte[] bytes = zip.getInputStream(entry).withCloseable { it.bytes }
+                if (digestBytes(bytes) != sourceInfo[1])
+                    throw new GradleException('Altered UI source bytes: ' + name)
+                def image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes))
+                if (image == null || image.width != 1536 || image.height != 1024)
+                    throw new GradleException('Unexpected UI source dimensions: ' + name)
+                sources[name] = image
             }
         }
-        if (digest(archive) != '8220b70e36e7133f8bbb5d1d89dacc0a1b14ee12671c481d822454901f80a170')
-            throw new GradleException('UI pack checksum mismatch; refusing art installation')
+        def manifest = new groovy.json.JsonSlurper().parse(
+            file('assets/ui/tactical/selected_manifest.json'))
+        if (manifest.schema != 'catastrophic-diplomacy-selected-ui-v5'
+                || manifest.approved_only != true || manifest.assets.size() != 24)
+            throw new GradleException('Unexpected UI approval manifest')
         def target = approvedUiOutput.get().asFile
         project.delete(target)
-        project.copy {
-            from(zipTree(archive)) {
-                include 'assets/ui/tactical/**'
-                exclude 'assets/ui/tactical/bars/**' // Incomplete source slices, not runtime assets
-                eachFile { detail -> detail.path = detail.path.substring('assets/'.length()) }
-                includeEmptyDirs = false
+        target.mkdirs()
+        manifest.assets.each { id, selection ->
+            if (!(id ==~ /[a-z][a-z0-9_]*/)
+                    || selection.destination != ('assets/ui/tactical/selected/' + id + '.png')
+                    || !(selection.sheet in ['systems', 'combat'])
+                    || !(selection.source ==~ /approved\/[a-z_]+\/[a-z_]+\/[a-z_0-9]+\.png/)
+                    || !(selection.box instanceof java.util.List) || selection.box.size() != 4)
+                throw new GradleException('Unsafe UI selection: ' + id)
+            def original = sources[selection.sheet]
+            def bounds = selection.box.collect { (it as Number).intValue() }
+            int x = bounds[0], y = bounds[1], w = bounds[2] - bounds[0], h = bounds[3] - bounds[1]
+            if (x < 0 || y < 0 || w < 16 || h < 16 || x + w > original.width || y + h > original.height)
+                throw new GradleException('Bad UI crop bounds: ' + id)
+            def crop = original.getSubimage(x, y, w, h)
+            def pixelDigest = java.security.MessageDigest.getInstance('SHA-256')
+            for (int yy = 0; yy < h; yy++) for (int xx = 0; xx < w; xx++) {
+                int argb = crop.getRGB(xx, yy)
+                pixelDigest.update((byte)(argb >> 16))
+                pixelDigest.update((byte)(argb >> 8))
+                pixelDigest.update((byte)argb)
+                pixelDigest.update((byte)(argb >> 24))
             }
-            into(target)
+            if (pixelDigest.digest().encodeHex().toString() != selection.pixel_sha256)
+                throw new GradleException('UI selected crop pixel mismatch: ' + id)
+            // A manually imported, pinned PNG in assets/ shadows generated assets.
+            // Reject differing replacements rather than accidentally shipping them.
+            def installed = file(selection.destination)
+            if (installed.isFile() && digestBytes(installed.bytes) != selection.sha256)
+                throw new GradleException('Unapproved UI PNG in assets/: ' + id)
+            def png = new File(target, 'ui/tactical/selected/' + id + '.png')
+            png.parentFile.mkdirs()
+            if (!javax.imageio.ImageIO.write(crop, 'png', png))
+                throw new GradleException('Cannot encode reviewed UI sprite: ' + id)
         }
-        def atlas = new File(target, 'ui/tactical/icons.png')
-        if (!atlas.isFile() || digest(atlas) != '1bc99703f65496727ef3c08db82ea660db22f0581f811c1cf9c20c6fc14dc293')
-            throw new GradleException('Approved UI icon atlas is absent or invalid')
-        def index = new File(target, 'ui/tactical/icons.tsv')
-        if (!index.isFile() || index.readLines('UTF-8').count { line -> line.trim() && !line.startsWith('#') } != 87)
-            throw new GradleException('Approved UI index must contain exactly 87 icons')
+        println('PASS: 24 exact-source verified UI icons generated; rejected atlas excluded.')
     }
 }
 
