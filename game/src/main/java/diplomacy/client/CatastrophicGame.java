@@ -376,15 +376,26 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
         // Query sprite availability before opening ShapeRenderer's GL batch.
         java.util.Set<Long> texturedMissiles=new java.util.HashSet<>();
-        if(weaponFx!=null)for(Battle.Missile missile:battle.missiles())
-            if(weaponFx.hasMissilePayload(missile,battle.tick))
-                texturedMissiles.add(missile.visualId);
+        java.util.Set<Long> texturedBallistics=new java.util.HashSet<>();
+        if(weaponFx!=null){
+            for(Battle.Missile missile:battle.missiles())
+                if(weaponFx.hasMissilePayload(missile,battle.tick))
+                    texturedMissiles.add(missile.visualId);
+            for(Battle.Ballistic shell:battle.ballistics())
+                if(weaponFx.hasBallisticPayload(shell,battle.tick))
+                    texturedBallistics.add(shell.visualId);
+        }
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Missile m : battle.missiles()) {
             if(texturedMissiles.contains(m.visualId))continue;
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
             shapes.circle((float) m.x, (float) m.y, m.torpedo?4.4f:2.8f, 7);
+        }
+        for (Battle.Ballistic shell:battle.ballistics()) {
+            if(texturedBallistics.contains(shell.visualId))continue;
+            shapes.setColor(Color.GOLD);
+            shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
         }
         for (Battle.Craft craft : battle.crafts()) {
             shapes.setColor(craft.team==0?Color.CYAN:Color.CORAL);
@@ -439,7 +450,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
-                + "   PD " + battle.missileIntercepts + "   CRAFT " + battle.crafts().size()
+                + "   PD " + (battle.missileIntercepts+battle.ballisticIntercepts)
+                + "   CRAFT " + battle.crafts().size()
                 + "   " + renderer + "   " + saveState, 22, 38);
         // Optional source-backed ornamentation; labels and pointer hitboxes remain unchanged.
         if (uiIcons != null && uiIcons.available()) {
