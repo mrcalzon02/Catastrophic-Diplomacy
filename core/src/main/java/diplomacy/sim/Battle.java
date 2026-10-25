@@ -51,6 +51,10 @@ public final class Battle {
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
         public ProjectileModel.Spec torpedoProjectile=ProjectileModel.standard(ProjectileModel.Kind.TORPEDO);
         public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
+        public Shipyard.Weapons weapons=new Shipyard.Weapons(1,1,1,1,1,1,1,1,1,1,1,1);
+        public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1);
+        public double hullRepaired,shieldRecharged,remoteHullRepaired,shieldsTransferred;
+        public int repairDronesLaunched;
         /** Installed machinery determines operating headroom and thermal rejection. */
         public double powerRegen = 16, coolingRate = 19, passiveHeat;
         public double laserReload, missileReload, pdReload;
@@ -138,13 +142,18 @@ public final class Battle {
     /** Fighters attack hostile hulls. Defensive drones deliberately hunt hostile ordnance. */
     public static final class Craft {
         public final int id, sourceId, team;
-        public final boolean fighter;
-        public double x, y, integrity, fuel, reload;
+        public final boolean fighter,repair;
+        public double x, y, integrity, fuel, reload,repairReserve;
         public int targetId;
         Craft(int identifier, Ship source, boolean offensive, int target) {
-            id=identifier;sourceId=source.id;team=source.team;fighter=offensive;
-            targetId=target;x=source.x;y=source.y;
-            integrity=offensive?24:15; fuel=offensive?28:22;
+            this(identifier,source,offensive,false,target);
+        }
+        Craft(int identifier, Ship source,boolean offensive,boolean service,int target) {
+            id=identifier;sourceId=source.id;team=source.team;
+            fighter=offensive;repair=service;targetId=target;x=source.x;y=source.y;
+            integrity=offensive?24:service?20:15;
+            fuel=offensive?28:service?26:22;
+            repairReserve=service?32*source.support.droneEndurance():0;
         }
     }
 
@@ -156,6 +165,20 @@ public final class Battle {
         public double lifetime = 0.13;
         Beam(long visualId,long spawnTick, double startX, double startY, double endX, double endY, int side, DamageType weapon) {
             this.visualId=visualId;this.spawnTick=spawnTick;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
+        }
+    }
+
+    /** Simulation-confirmed beam from a repair or shield support module. */
+    public enum SupportKind { HULL, SHIELD, DRONE }
+    public static final class SupportLink {
+        public final int sourceId,targetId,team;
+        public final SupportKind kind;
+        public final double x1,y1,x2,y2;
+        public final long spawnTick;
+        public double life=0.36;
+        SupportLink(Ship source,Ship target,SupportKind type,long time,double fromX,double fromY){
+            sourceId=source.id;targetId=target.id;team=source.team;kind=type;
+            x1=fromX;y1=fromY;x2=target.x;y2=target.y;spawnTick=time;
         }
     }
 
@@ -174,6 +197,7 @@ public final class Battle {
     private final List<Craft> crafts = new ArrayList<>();
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
+    private final List<SupportLink> supportLinks=new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<VisualEvent> visualEvents=new ArrayList<>();
     private long nextVisualShotId=1, nextVisualSequence=1;
@@ -199,6 +223,7 @@ public final class Battle {
     public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
+    public List<SupportLink> supportLinks(){return Collections.unmodifiableList(supportLinks);}
     public List<String> events() { return Collections.unmodifiableList(events); }
     /** History allows renderers to catch up when more than one tick elapses per frame. */
     public List<VisualEvent> visualEvents() { return Collections.unmodifiableList(visualEvents); }
@@ -297,6 +322,8 @@ public final class Battle {
         s.missileProjectile=machinery.missileProjectile();
         s.torpedoProjectile=machinery.torpedoProjectile();
         s.pointDefenseProfile=machinery.pointDefense();
+        s.weapons=machinery.weapons();
+        s.support=machinery.support();
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
@@ -362,6 +389,8 @@ public final class Battle {
         for (int i = beams.size() - 1; i >= 0; i--) {
             if ((beams.get(i).lifetime -= DT) <= 0) beams.remove(i);
         }
+        for(int i=supportLinks.size()-1;i>=0;i--)
+            if((supportLinks.get(i).life-=DT)<=0)supportLinks.remove(i);
         // Environment is deterministic, separately seeded, and uses the same damage rules.
         for (SpaceWeather.Impact effect : weather.advance(tick, ships)) {
             Ship victim = findShip(effect.targetId());
@@ -380,7 +409,6 @@ public final class Battle {
             if (target != null) {
                 steer(s, target);
                 fire(s, target);
-                launchAuxiliary(s, target);
             } else {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
@@ -389,7 +417,9 @@ public final class Battle {
                 }
                 s.x += s.vx * DT; s.y += s.vy * DT;
             }
+            launchAuxiliary(s,target);
         }
+        updateSupport();
         updateMissiles();
         updateBallistics();
         updateCraft();
@@ -406,11 +436,20 @@ public final class Battle {
         s.power-=rechargeCost;
         s.shields=s.defense.totalShields();
         if (s.power > 5 && s.damageControl > 0) {
-            // All repair-equipped fleets can restore hull slowly. Mandrally regenerative
-            // ecology receives the established fivefold field-repair advantage.
+            // Preserve legacy low-level damage control for old/non-fitted ships.
             double restoration = s.damageControl * DT * 30
                     * (s.faction == Faction.MANDRALLY ? 1.0 : 0.20);
-            s.hull = Math.min(s.maxHull, s.hull + restoration);
+            double actual=Math.min(Math.max(0,s.maxHull-s.hull),restoration);
+            s.hull+=actual;s.hullRepaired+=actual;
+        }
+        if(s.power>6 && s.support.selfRepairRate()>0 && s.hull<s.maxHull) {
+            double desired=s.support.selfRepairRate()*DT;
+            double efficiency=s.support.powerEfficiency();
+            double actual=Math.min(Math.min(desired,s.maxHull-s.hull),
+                    (s.power-6)*efficiency/0.85);
+            s.power-=actual*0.85/efficiency;
+            s.hull+=actual;s.hullRepaired+=actual;
+            s.heat+=actual*0.11;
         }
         s.laserReload = Math.max(0, s.laserReload - DT);
         s.missileReload = Math.max(0, s.missileReload - DT);
