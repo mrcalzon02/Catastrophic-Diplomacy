@@ -23,7 +23,20 @@ public final class Shipyard {
         CORVETTE(120, 180, 155, 0.96, 3, 2, 1, 0),
         FRIGATE(195, 310, 325, 0.82, 4, 3, 2, 1),
         CRUISER(360, 570, 685, 0.65, 6, 5, 3, 2),
-        DREADNOUGHT(630, 990, 1550, 0.46, 9, 9, 5, 4);
+        DREADNOUGHT(630, 990, 1550, 0.46, 9, 9, 5, 4),
+        INTERCEPTOR(145, 215, 110, 1.25, 4, 2, 1, 0),
+        MISSILE_CORVETTE(175, 260, 190, 0.91, 4, 4, 1, 1),
+        DESTROYER(270, 430, 460, 0.75, 5, 5, 3, 1),
+        LIGHT_CRUISER(345, 550, 640, 0.68, 6, 5, 3, 2),
+        HEAVY_CRUISER(445, 730, 870, 0.56, 7, 6, 4, 3),
+        BATTLECRUISER(555, 890, 1170, 0.52, 8, 8, 4, 3),
+        CARRIER(670, 1120, 1320, 0.44, 9, 4, 6, 8);
+
+        /** Preserve legacy enum ordinals and blueprint names; give designers size-sorted navigation. */
+        public static Hull[] shipyardOrder() {
+            return new Hull[]{INTERCEPTOR,CORVETTE,MISSILE_CORVETTE,FRIGATE,DESTROYER,
+                    LIGHT_CRUISER,CRUISER,HEAVY_CRUISER,BATTLECRUISER,CARRIER,DREADNOUGHT};
+        }
         public final double massCapacity, volumeCapacity, baseHull, mobility;
         public final List<Slot> slots;
         Hull(double mass, double volume, double hull, double agility, int systems, int weapons, int defenses, int supports) {
@@ -62,6 +75,8 @@ public final class Shipyard {
         }
         public Installed at(int slot) { return parts.get(slot); }
         public int slots() { return parts.size(); }
+        /** Slot coordinates are authoritative for this faction's physical fitting diagram. */
+        public List<Slot> placements() { return HullLayouts.slots(faction,hull); }
         public Design install(int slot, String baseId) {
             if(baseId!=null && (baseId.length()>60||!baseId.matches("BASE-[A-Z]{3}-[A-Z]{2,3}")))
                 throw new IllegalArgumentException("Invalid base component ID");
@@ -97,7 +112,8 @@ public final class Shipyard {
     /** Factory template: genuinely buildable ship with reactor, drive, radiator, lasers and missiles. */
     public static Design starter(Battle.Faction faction, Hull hull) {
         List<Installed> parts=new ArrayList<>(Collections.nCopies(hull.slots.size(),null));
-        Design ship = new Design(faction,hull,hull.name().charAt(0)+hull.name().substring(1).toLowerCase(Locale.ROOT)+" Prototype",parts);
+        String shipName=hull.name().replace('_',' ').toLowerCase(Locale.ROOT);
+        Design ship = new Design(faction,hull,Character.toUpperCase(shipName.charAt(0))+shipName.substring(1)+" Prototype",parts);
         String id=factionId(faction);
         ship=ship.install(slotOf(hull,Mount.SYSTEM,0),"BASE-"+id+"-REA")
                  .install(slotOf(hull,Mount.SYSTEM,1),"BASE-"+id+"-ENG")
