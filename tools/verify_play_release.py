@@ -54,6 +54,10 @@ def verify_artifacts(record_path, apk_path, aab_path, publish):
         raise ValueError("Play candidate evidence MUST declare distribution=play")
     if record.get("application_id") != APP_ID:
         raise ValueError(f"Incorrect Play application package ID; expected {APP_ID}")
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT,
+                          check=True, capture_output=True, text=True).stdout.strip()
+    if record.get("git_commit") != head:
+        raise ValueError("Evidence commit does not match the actual tested source HEAD")
     run([sys.executable, "tools/verify_apk_release_gate.py",
          "--evidence", str(record_path.resolve()), "--apk", str(apk_path.resolve())])
     if not aab_path.is_file() or aab_path.suffix != ".aab":
@@ -77,6 +81,12 @@ def verify_artifacts(record_path, apk_path, aab_path, publish):
     package_line = next((line for line in badging.splitlines() if line.startswith("package:")), "")
     if f"name='{APP_ID}'" not in package_line:
         raise ValueError("APK package name mismatch")
+    version_code = re.search(r"versionCode='([0-9]+)'", package_line)
+    version_name = re.search(r"versionName='([^']+)'", package_line)
+    if not version_code or str(record.get("android_version_code")) != version_code.group(1):
+        raise ValueError("Android versionCode is missing or does not match evidence")
+    if not version_name or str(record.get("android_version_name")) != version_name.group(1):
+        raise ValueError("Android versionName is missing or does not match evidence")
     sdk_line = next((line for line in badging.splitlines() if "targetSdkVersion:" in line), "")
     if not sdk_line:
         raise ValueError("APK target SDK could not be read")
