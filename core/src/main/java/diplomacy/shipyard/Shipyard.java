@@ -309,6 +309,15 @@ public final class Shipyard {
         return kind==null?null:ProjectileModel.module(design.faction,kind,
                 p.effect/p.base.effect,p.accuracy,p.integrity/p.base.integrity);
     }
+    /** Nominal detection reach of one fitted PD/FLK mount, in world units,
+     * before signatures, sensor condition, weather and supporting PD banks. */
+    public static double pointDefenseRangeAt(Design design,TechnologyCatalog catalog,int slot){
+        Installed current=design.at(slot);
+        if(current==null)return 0;
+        Part p=evaluate(current,catalog,design.faction);
+        return p.base.subsystem.equals("PD")||p.base.subsystem.equals("FLK")
+                ?70+p.effect*2.8:0;
+    }
     /** Individual PD module profile before fleet sensors and stacked batteries contribute. */
     public static ProjectileModel.Defense defenseAt(Design design,TechnologyCatalog catalog,int slot) {
         Installed current=design.at(slot);
