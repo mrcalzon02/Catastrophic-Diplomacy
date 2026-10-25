@@ -42,6 +42,11 @@ public final class InstancedShipRenderer implements AutoCloseable {
     }
 
     public void render(Battle battle, OrthographicCamera camera) {
+        render(battle,camera,ship -> false);
+    }
+    /** Do not overdraw a vessel that already has an approved visible hull sprite. */
+    public void render(Battle battle, OrthographicCamera camera,
+                       java.util.function.Predicate<Battle.Ship> hasArt) {
         drawCalls = 0; instances = 0;
         shader.bind();
         shader.setUniformMatrix("u_proj", camera.combined);
@@ -49,7 +54,8 @@ public final class InstancedShipRenderer implements AutoCloseable {
             for (int team = 0; team < 2; team++) {
                 int n = 0;
                 for (Battle.Ship ship : battle.ships()) {
-                    if (!ship.alive() || ship.faction != faction || ship.team != team) continue;
+                    if (!ship.alive() || ship.faction != faction || ship.team != team
+                            || hasArt.test(ship)) continue;
                     if (n >= 4096) { // Explicit limit, renderer falls back rather than dropping ships.
                         throw new IllegalStateException("Instance batch exceeded 4096 ships");
                     }
