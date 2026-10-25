@@ -14,6 +14,10 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleView;
+import diplomacy.sim.DemonstrationBattle;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
@@ -47,6 +51,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
+    // Only Android's debuggable launcher can enable this opt-in, read-only probe.
+    private final boolean verifyDemo;
+    private long lastVerifiedEvent;
+    private int verifiedFrames, verifiedShots, verifiedImpacts, maxAnimations;
+    private boolean verificationReported;
+    private final EnumSet<Battle.DamageType> firedWeapons=EnumSet.noneOf(Battle.DamageType.class);
+    private final Set<Long> observedShots=new HashSet<>();
+
+    public CatastrophicGame(){this(false);}
+    public CatastrophicGame(boolean verifyDemo){
+        this.verifyDemo=verifyDemo;
+        if(verifyDemo){fleetIndex=FLEET_SIZES.length-1;speed=8;}
+    }
 
     @Override public void create() {
         camera = new OrthographicCamera();
@@ -194,9 +211,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void reset() {
-        battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
+        battle = verifyDemo ? DemonstrationBattle.create(technology) :
+                Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         accumulator = 0;
         running = true;
+        if(verifyDemo){
+            lastVerifiedEvent=0;verifiedFrames=verifiedShots=verifiedImpacts=maxAnimations=0;
+            verificationReported=false;firedWeapons.clear();observedShots.clear();
+            Gdx.app.log("CD-DEMO-VERIFY","START 200v200 combined-arms; seed="+DemonstrationBattle.SEED);
+        }
     }
 
     @Override public void render() {
@@ -315,6 +338,56 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     + " HOLDS THE FIELD", 330, 617);
         }
         batch.end();
+        // Observe a completed GL frame, not just headless simulation ticks.
+        if(verifyDemo)verifyRenderedDemoFrame();
+    }
+
+    /**
+     * Debug-only, read-only telemetry. Does not alter damage, projectile motion,
+     * ship selection, tick cadence, or the player's permanent fleet blueprints.
+     */
+    private void verifyRenderedDemoFrame(){
+        if(verificationReported)return;
+        verifiedFrames++;
+        if(weaponFx!=null)maxAnimations=Math.max(maxAnimations,weaponFx.activeAnimations());
+        for(Battle.VisualEvent event:battle.visualEvents()){
+            if(event.sequence()<=lastVerifiedEvent)continue;
+            lastVerifiedEvent=event.sequence();
+            if(event.phase()==Battle.VisualPhase.FIRE){
+                verifiedShots++;observedShots.add(event.shotId());
+                try {firedWeapons.add(Battle.DamageType.valueOf(event.weapon()));}
+                catch(IllegalArgumentException auxiliary){ /* Drone launches are separate from weapon families. */ }
+            }
+            if(event.phase()==Battle.VisualPhase.IMPACT && observedShots.contains(event.shotId()))
+                verifiedImpacts++;
+        }
+        if(battle.tick<480 && !battle.finished())return;
+        StringBuilder error=new StringBuilder();
+        if(battle.ships().size()!=400)error.append("wrong deployed ship count; ");
+        for(Battle.DamageType type:new Battle.DamageType[]{
+                Battle.DamageType.LASER,Battle.DamageType.KINETIC,
+                Battle.DamageType.PLASMA,Battle.DamageType.PARTICLE,
+                Battle.DamageType.MISSILE,Battle.DamageType.TORPEDO})
+            if(!firedWeapons.contains(type))error.append("missing FIRE ").append(type).append("; ");
+        if(verifiedFrames<6)error.append("insufficient rendered frames; ");
+        if(verifiedShots==0||verifiedImpacts==0||battle.hitCount==0)
+            error.append("no correlated weapon fire/impact/damage; ");
+        if(maxAnimations==0)error.append("modular animation compositor not exercised; ");
+        verificationReported=true;
+        if(error.length()>0){
+            Gdx.app.error("CD-DEMO-VERIFY","FAIL 200v200 tick="+battle.tick+" "+error);
+            throw new IllegalStateException("CD 200v200 APK verification failed: "+error);
+        }
+        int authored=weaponFx==null?0:weaponFx.loadedTextures();
+        int payload=weaponBeams==null?0:weaponBeams.loaded();
+        Gdx.app.log("CD-DEMO-VERIFY","PASS 200v200 mechanics+render-loop tick="+battle.tick+
+                " frames="+verifiedFrames+" shots="+verifiedShots+" impacts="+verifiedImpacts+
+                " weaponFamilies="+firedWeapons+" hits="+battle.hitCount+
+                " renderer="+renderer+" composedAnimations="+maxAnimations+
+                " authoredTextures="+authored+" beamFrames="+payload);
+        if(authored==0||payload==0)
+            Gdx.app.log("CD-DEMO-VERIFY","ART_PENDING 200v200: optional curated PNGs missing from this APK; geometry fallback used");
+        else Gdx.app.log("CD-DEMO-VERIFY","ART_PRESENT 200v200: loaded authored muzzle/impact or payload textures (pixel-level review still required)");
     }
 
     /** World camera follows the active engagement; UI coordinates never move. */
