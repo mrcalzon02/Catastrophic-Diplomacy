@@ -190,3 +190,14 @@ tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('skySmoke')) }
 tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
 tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
 tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
+
+/** Armed aircraft profiles and each live nested weapon family, device-free. */
+tasks.register('fighterCraftSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Six independent craft classes, real nested ordnance, sensors, damage and replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterCraftTest'
+}
+tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fighterCraftSmoke')) }
+tasks.named('massBattleCampaign') { dependsOn tasks.named('fighterCraftSmoke') }

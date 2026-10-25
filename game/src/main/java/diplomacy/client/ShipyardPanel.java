@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.sim.ProjectileModel;
+import diplomacy.sim.FighterModel;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
 import diplomacy.shipyard.TouchGesture;
@@ -83,6 +84,16 @@ final class ShipyardPanel {
             draft=loaded;selectedSlot=0;scroll=0;artPreview=false;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
+    private void cycleFighter(){
+        Shipyard.Installed installed=draft.at(selectedSlot);
+        if(installed==null||!installed.component.endsWith("-FTR")){
+            notice="Select an installed fighter hangar before choosing its craft type";return;
+        }
+        FighterModel.Hull[] options=FighterModel.Hull.values();
+        draft=draft.withFighterHull(options[(draft.fighterHull.ordinal()+1)%options.length]);
+        notice="Fighter hangars now carry "+draft.fighterHull.name().replace('_',' ')
+                +"; APPLY to launch the new fighter loadout";
+    }
     private void apply(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot deploy: "+report.explanation();return;}
@@ -95,6 +106,7 @@ final class ShipyardPanel {
         if(!open)return false;
         if(code==com.badlogic.gdx.Input.Keys.ESCAPE||code==com.badlogic.gdx.Input.Keys.TAB){close();return true;}
         if(code==com.badlogic.gdx.Input.Keys.ENTER){apply();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.K){cycleFighter();return true;}
         if(code==com.badlogic.gdx.Input.Keys.UP){selectedSlot=Math.max(0,selectedSlot-1);scroll=Math.min(scroll,selectedSlot);return true;}
         if(code==com.badlogic.gdx.Input.Keys.DOWN){selectedSlot=Math.min(draft.slots()-1,selectedSlot+1);scroll=Math.max(scroll,selectedSlot-SLOT_ROWS+1);return true;}
         return true;
@@ -152,6 +164,11 @@ final class ShipyardPanel {
             int index=scroll+(int)((590-y)/26);
             if(index>=0&&index<draft.slots())select(index);
             return true;
+        }
+        if(x>=335&&x<=796&&y>=180&&y<=215
+                &&draft.at(selectedSlot)!=null
+                &&draft.at(selectedSlot).component.endsWith("-FTR")){
+            cycleFighter();return true;
         }
         if(x>=335&&x<=796&&y>=110&&y<=580){
             if(artPreview){notice="Switch to SHOW MAP to select physical module hardpoints";return true;}
@@ -341,7 +358,14 @@ final class ShipyardPanel {
             ProjectileModel.Spec projectile=Shipyard.projectileAt(draft,catalog,selectedSlot);
             ProjectileModel.Defense defense=Shipyard.defenseAt(draft,catalog,selectedSlot);
             font.setColor(Color.GOLD);
-            if(projectile!=null){
+            if(installed.component.endsWith("-FTR")){
+                FighterModel.Profile profile=FighterModel.forFaction(draft.fighterHull,draft.faction);
+                font.draw(batch,"FIGHTER: "+profile.hull()+"  [K / TAP TO CYCLE]",342,209);
+                font.draw(batch,"WEAPON "+profile.weapon()+"  HP "+units(profile.health())+
+                        "  ARMOR "+units(profile.armor()),342,158);
+                font.draw(batch,"SCAN "+units(profile.sensors())+"  SPEED "+units(profile.speed())+
+                        "  AMMO "+profile.ammunition(),342,137);
+            }else if(projectile!=null){
                 font.draw(batch,String.format(Locale.ROOT,
                         "PROJECTILE SPEED %.0f  |  HEALTH %.2f",projectile.speed(),
                         projectile.health()),342,158);

@@ -2,6 +2,7 @@ package diplomacy.shipyard;
 
 import diplomacy.sim.Battle;
 import diplomacy.sim.ProjectileModel;
+import diplomacy.sim.FighterModel;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 import diplomacy.tech.TechnologyCatalog.Upgrade;
@@ -82,11 +83,22 @@ public final class Shipyard {
         public final Hull hull;
         public final String name;
         private final List<Installed> parts;
+        /** Hangar payload is a separately chosen launch loadout, not a cosmetic sprite. */
+        public final FighterModel.Hull fighterHull;
         private Design(Battle.Faction group, Hull frame, String callSign, List<Installed> mounted) {
+            this(group,frame,callSign,mounted,FighterModel.Hull.ASSAULT_GUNSHIP);
+        }
+        private Design(Battle.Faction group, Hull frame, String callSign, List<Installed> mounted,
+                       FighterModel.Hull craftType) {
             if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70) throw new IllegalArgumentException("Invalid vessel identity");
             if(mounted.size()!=frame.slots.size()) throw new IllegalArgumentException("Incorrect hardpoint count");
-            faction=group;hull=frame;name=callSign;
+            if(craftType==null)throw new IllegalArgumentException("Fighter type required");
+            faction=group;hull=frame;name=callSign;fighterHull=craftType;
             parts=Collections.unmodifiableList(new ArrayList<>(mounted));
+        }
+        /** Changing a hangar's launched craft does not overwrite ship module research. */
+        public Design withFighterHull(FighterModel.Hull type) {
+            return new Design(faction,hull,name,parts,type);
         }
         public Installed at(int slot) { return parts.get(slot); }
         public int slots() { return parts.size(); }
@@ -97,7 +109,7 @@ public final class Shipyard {
                 throw new IllegalArgumentException("Invalid base component ID");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,baseId==null?null:new Installed(baseId, Map.of()));
-            return new Design(faction,hull,name,changed);
+            return new Design(faction,hull,name,changed,fighterHull);
         }
         public Design stage(int slot, Track track, int level) {
             if(level<0||level>6||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..6");
@@ -112,7 +124,7 @@ public final class Shipyard {
             if(level==0) updated.remove(track); else updated.put(track,level);
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(current.component,updated));
-            return new Design(faction,hull,name,changed);
+            return new Design(faction,hull,name,changed,fighterHull);
         }
     }
     public static String factionId(Battle.Faction faction) {
@@ -439,7 +451,11 @@ public final class Shipyard {
     public static String encode(Design design) {
         StringBuilder out=new StringBuilder("CD-SHIP-1|").append(design.faction.name()).append('|')
             .append(design.hull.name()).append('|')
-            .append(Base64.getUrlEncoder().withoutPadding().encodeToString(design.name.getBytes(StandardCharsets.UTF_8))).append('\n');
+            .append(Base64.getUrlEncoder().withoutPadding().encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
+        // Preserve byte-for-byte legacy CD-SHIP-1 for default gunship fits.
+        if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
+            out.append('|').append(design.fighterHull.name());
+        out.append('\n');
         for(int i=0;i<design.slots();i++) {
             Installed installed=design.at(i);
             if(installed==null)continue;
@@ -454,12 +470,16 @@ public final class Shipyard {
         String[] lines=encoded.split("\\n",-1);
         if(lines.length<2||lines.length>70)throw new IllegalArgumentException("Invalid blueprint lines");
         String[] header=lines[0].split("\\|",-1);
-        if(header.length!=4||!header[0].equals("CD-SHIP-1"))throw new IllegalArgumentException("Wrong ship file version");
+        if((header.length!=4&&header.length!=5)||!header[0].equals("CD-SHIP-1"))
+            throw new IllegalArgumentException("Wrong ship file version");
         final Design base;
         try{
             Battle.Faction faction=Battle.Faction.valueOf(header[1]);Hull hull=Hull.valueOf(header[2]);
             String name=new String(Base64.getUrlDecoder().decode(header[3]),StandardCharsets.UTF_8);
-            base=new Design(faction,hull,name,new ArrayList<>(Collections.nCopies(hull.slots.size(),null)));
+            FighterModel.Hull aircraft=header.length==5
+                    ?FighterModel.Hull.valueOf(header[4]):FighterModel.Hull.ASSAULT_GUNSHIP;
+            base=new Design(faction,hull,name,
+                    new ArrayList<>(Collections.nCopies(hull.slots.size(),null)),aircraft);
         }catch(RuntimeException err){throw new IllegalArgumentException("Invalid ship identity",err);}
         Design design=base;
         boolean[] seen=new boolean[base.slots()];

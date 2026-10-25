@@ -169,11 +169,22 @@ public final class MassBattleCampaignTest {
             int qty=33+(group<2?1:0); // 34+34+33+33+33+33 = 200
             double centerX=(team==0?220:880)+(group%3)*95;
             double centerY=238+(group/3)*190;
-            b.spawnWing(team,design,catalog,qty,centerX,centerY);
+            // At least one real carrier of EVERY fighter hull on EACH team.
+            // Keep the other 32/33 ships' original mixed weapon/support outfits.
+            FighterModel.Hull craft=FighterModel.Hull.values()[group];
+            Shipyard.Design carrier=Shipyard.starter(faction,Shipyard.Hull.CRUISER)
+                    .install(slot(Shipyard.Hull.CRUISER,Shipyard.Mount.SUPPORT,0),
+                            "BASE-"+Shipyard.factionId(faction)+"-FTR")
+                    .withFighterHull(craft);
+            check(Shipyard.inspect(carrier,catalog).valid(),
+                    "Aircraft carrier fitting "+faction+" / "+craft);
+            b.spawnWing(team,carrier,catalog,1,centerX,centerY);
+            b.spawnWing(team,design,catalog,qty-1,centerX+15,centerY);
         }
         initiallyVisible(b,400,"200v200 combined-arms deployment");
         EnumSet<Battle.DamageType> visible=EnumSet.noneOf(Battle.DamageType.class);
         boolean missiles=false,torpedoes=false,kinetics=false,craft=false;
+        EnumSet<FighterModel.Hull> deployedAircraft=EnumSet.noneOf(FighterModel.Hull.class);
         int peakOrdnance=0,peakCraft=0;
         for(int tick=0;tick<steps;tick++){
             b.step();
@@ -183,6 +194,8 @@ public final class MassBattleCampaignTest {
             peakOrdnance=Math.max(peakOrdnance,b.missiles().size()+b.ballistics().size());
             peakCraft=Math.max(peakCraft,b.crafts().size());
             craft|=!b.crafts().isEmpty();
+            for(Battle.Craft c:b.crafts())if(c.fighter)
+                deployedAircraft.add(c.profile.hull());
         }
         sane(b,"200v200 combined-arms "+steps);
         check(b.hitCount>0&&b.destructions>0,"mixed fleet must exchange lethal fire");
@@ -191,8 +204,18 @@ public final class MassBattleCampaignTest {
                 "all energy beams and kinetic tracked payloads in live mass engagement: "+visible);
         check(missiles&&torpedoes,"mixed fleet must fire both ordnance classes");
         check(craft,"mixed fleet carrier or defensive drone should launch craft");
+        check(deployedAircraft.size()==FighterModel.Hull.values().length,
+                "200v200 must DEPLOY every distinct fighter profile, got "+deployedAircraft);
+        check(b.fighterGunShots>0&&b.fighterLaserShots>0&&b.fighterParticleShots>0
+                &&b.fighterMissilesLaunched>0&&b.fighterTorpedoesLaunched>0,
+                "200v200 must ACTUALLY FIRE all five fighter weapon types: "+
+                b.fighterGunShots+"/"+b.fighterLaserShots+"/"+b.fighterParticleShots+"/"+
+                b.fighterMissilesLaunched+"/"+b.fighterTorpedoesLaunched);
         System.out.println("PASS 200v200 combined arms: ticks="+steps+" hits="+b.hitCount
                 +" destroyed="+b.destructions+" peak-missiles="+peakOrdnance+" peak-craft="+peakCraft
+                +" fighter-types="+deployedAircraft
+                +" fighter-payloads="+b.fighterGunShots+"/"+b.fighterLaserShots+"/"+
+                    b.fighterParticleShots+"/"+b.fighterMissilesLaunched+"/"+b.fighterTorpedoesLaunched
                 +" visible-beam-types="+visible+" tracked-kinetics="+kinetics
                 +" fingerprint="+Long.toHexString(b.fingerprint()));
         return b.fingerprint();

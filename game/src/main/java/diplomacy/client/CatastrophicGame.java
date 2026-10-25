@@ -564,8 +564,35 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
         }
         for (Battle.Craft craft : battle.crafts()) {
+            float x=(float)craft.x,y=(float)craft.y;
             shapes.setColor(craft.repair?Color.GREEN:craft.team==0?Color.CYAN:Color.CORAL);
-            shapes.circle((float)craft.x,(float)craft.y,craft.fighter?3.6f:2.4f,8);
+            if(!craft.fighter){
+                shapes.circle(x,y,craft.repair?3.0f:2.4f,8);
+                continue;
+            }
+            // Weapon-class silhouettes are functional art fallbacks until
+            // each faction receives individually approved strike-craft sprites.
+            switch(craft.profile.hull()) {
+                case INTERCEPTOR -> shapes.triangle(x+5,y,x-4,y+2,x-4,y-2);
+                case ASSAULT_GUNSHIP -> shapes.rect(x-4,y-3,8,6);
+                case LASER_FIGHTER -> {
+                    shapes.triangle(x+5,y,x-3,y+4,x-3,y-4);
+                    shapes.circle(x,y,1.3f,6);
+                }
+                case PARTICLE_FIGHTER -> {
+                    shapes.triangle(x+5,y,x-4,y+4,x-4,y-4);
+                    shapes.rect(x-1,y-1,2,2);
+                }
+                case MISSILE_FIGHTER -> {
+                    shapes.rect(x-4,y-2,8,4);
+                    shapes.circle(x-3,y+3,1.5f,6);
+                    shapes.circle(x-3,y-3,1.5f,6);
+                }
+                case TORPEDO_BOMBER -> {
+                    shapes.rect(x-6,y-4,12,8);
+                    shapes.circle(x+3,y,2.3f,7);
+                }
+            }
         }
         shapes.end();
         // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
