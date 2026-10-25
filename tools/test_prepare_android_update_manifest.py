@@ -38,6 +38,27 @@ class ManifestTests(unittest.TestCase):
         ok=subprocess.CompletedProcess([],0,"package: name='games.catastrophicdiplomacy' versionCode='3' versionName='0.1.2'",'')
         run.side_effect=[ok,subprocess.CalledProcessError(1,'apksigner')]
         with self.assertRaises(subprocess.CalledProcessError):module.describe(self.apk)
+    @patch.object(module.shutil,'which',return_value='/mock/sdk')
+    @patch.object(module.subprocess,'run')
+    def test_prerelease_arbitrary_filename(self, run, which):
+        apk = Path(self.tmp.name) / 'nightly-test_build.42.apk'
+        apk.write_bytes(self.apk.read_bytes())
+        run.return_value = subprocess.CompletedProcess([],0,
+            "package: name='games.catastrophicdiplomacy' versionCode='47' versionName='0.1.1-beta.8'",'')
+        candidate = module.describe(apk)
+        self.assertEqual(candidate['versionCode'],47)
+        self.assertEqual(candidate['version'],'0.1.1-beta.8')
+        self.assertEqual(candidate['apk']['name'],'nightly-test_build.42.apk')
+    def test_bad_filename_rejected(self):
+        with patch.object(module.shutil,'which',return_value='/mock/sdk'), \
+             patch.object(module.subprocess,'run') as run:
+            run.return_value = subprocess.CompletedProcess([],0,
+                "package: name='games.catastrophicdiplomacy' versionCode='47' versionName='0.1.1-beta.8'",'')
+            apk = Path(self.tmp.name) / 'not-an-apk.zip'
+            apk.write_bytes(self.apk.read_bytes())
+            with self.assertRaisesRegex(ValueError,'APK filename'):
+                module.describe(apk)
+
     def test_missing_sdk_rejected(self):
         with patch.object(module.shutil,'which',return_value=None):
             with self.assertRaisesRegex(ValueError,'must be installed'):module.describe(self.apk)
