@@ -12,6 +12,8 @@ Every missile, torpedo and *slow* kinetic shell now spawns with a snapshot of th
 | Missile | 220 | 2.50 | 0.82 | 1.25 |
 | Torpedo | 135 | 5.10 | 1.35 | 1.65 |
 
+**Mutually exclusive per-socket specialization:** Every installed ordnance, PD or sensor module may invest in only **one** OUTPUT, EFFICIENCY, RESILIENCE or SPECIALIST technology tree at a time. Each has six ranks. A different module can select another tree, including a second module of the same weapon family. Switching a module's tree requires an explicit reset to rank 0 and never silently combines multipliers. See [Module Research Exclusivity](MODULE_RESEARCH_EXCLUSIVITY.md).
+
 These are **initial tuning values**, not immutable faction canon. `ProjectileModel.module(faction,kind,outputRatio,accuracyRatio,integrityRatio)` also incorporates the individual faction's propulsion, armor and emission style:
 - **OUTPUT:** modifies projectile acceleration/effective speed and slightly raises thermal/emission signature
 - **RESILIENCE:** gives the projectile greater physical intercept health, with a small increase in cross-section
