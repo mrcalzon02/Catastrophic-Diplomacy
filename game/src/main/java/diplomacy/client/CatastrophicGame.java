@@ -28,6 +28,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private SpriteBatch batch;
     private BitmapFont font;
     private InstancedShipRenderer instanced;
+    private TerranPlaceholderSprites terranSprites;
     private Battle battle;
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
@@ -51,6 +52,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         viewport = new FitViewport(W, H, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
+        terranSprites = new TerranPlaceholderSprites();
         font.getData().setScale(1.23f);
         try {
             instanced = new InstancedShipRenderer();
@@ -245,6 +247,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 drawShipsFallback();
             }
         }
+        // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
+        if(terranSprites!=null && terranSprites.loaded()>0) {
+            batch.setProjectionMatrix(battleCamera.combined);
+            terranSprites.render(battle,batch);
+        }
+        drawArmorDamage();
+        shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Missile m : battle.missiles()) {
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
@@ -293,6 +302,32 @@ public final class CatastrophicGame extends ApplicationAdapter {
         battleCamera.update();
     }
 
+    /**
+     * Temporary ship-local damage indicators until an exterior alpha mask and
+     * structural sublayer shader are introduced for the final sprite pipeline.
+     */
+    private void drawArmorDamage() {
+        shapes.setProjectionMatrix(battleCamera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for(Battle.Ship ship:battle.ships())if(ship.alive()) {
+            double length=23*ship.visualScale(), breadth=13*ship.visualScale();
+            double c=StrictMath.cos(ship.facing),s=StrictMath.sin(ship.facing);
+            for(int row=0;row<diplomacy.sim.DirectionalDefense.GRID;row++)
+                for(int col=0;col<diplomacy.sim.DirectionalDefense.GRID;col++) {
+                    var tile=ship.defense.tile(row,col);
+                    if(!tile.occupied || tile.exposure()<0.45)continue;
+                    double x=(1-(row+0.5)*2/diplomacy.sim.DirectionalDefense.GRID)*length;
+                    double y=(1-(col+0.5)*2/diplomacy.sim.DirectionalDefense.GRID)*breadth;
+                    float wx=(float)(ship.x+x*c-y*s),wy=(float)(ship.y+x*s+y*c);
+                    float radius=(float)(0.6+tile.exposure()*0.8);
+                    shapes.setColor(tile.internalDamage()>0.65?com.badlogic.gdx.graphics.Color.SCARLET:
+                            com.badlogic.gdx.graphics.Color.ORANGE);
+                    shapes.circle(wx,wy,radius,5);
+                }
+        }
+        shapes.end();
+    }
+
     private void drawShipsFallback() {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Ship s : battle.ships()) if (s.alive()) {
@@ -310,6 +345,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     @Override public void resize(int width, int height) { viewport.update(width, height, true); }
     @Override public void dispose() {
         if (instanced != null) instanced.close();
+        if(terranSprites!=null)terranSprites.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }
