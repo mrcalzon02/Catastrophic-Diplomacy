@@ -6,6 +6,8 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.HullLayouts;
+import diplomacy.sim.Battle;
 import diplomacy.shipyard.TouchGesture;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
@@ -48,6 +50,13 @@ final class ShipyardPanel {
         Shipyard.Hull next=options[Math.floorMod(current+step,options.length)];
         draft=Shipyard.starter(draft.faction,next);
         selectedSlot=0;scroll=0;notice="New "+next+" frame; stock equipment installed";
+    }
+    private void faction(int step) {
+        Battle.Faction[] options=Battle.Faction.values();
+        Battle.Faction next=options[Math.floorMod(draft.faction.ordinal()+step,options.length)];
+        draft=Shipyard.starter(next,draft.hull);
+        selectedSlot=0;scroll=0;
+        notice="New "+next.displayName+" "+draft.hull+" frame; stock equipment installed";
     }
     private String fileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)+".ship";}
     private void save(){
@@ -99,16 +108,9 @@ final class ShipyardPanel {
         if(gesture.end(pointer,x,y)) return tap(x,y);
         return true;
     }
-    /** Selects the nearest physical hardpoint; an empty hull patch is not a hit. */
+    /** Shared pointer/touch hit test is intentionally independent of the renderer. */
     private int hitHardpoint(float x,float y) {
-        float nearest=14f*14f;
-        int chosen=-1;
-        for(Shipyard.Slot slot:draft.placements()){
-            float dx=x-(MAP_CX+slot.x()*MAP_SCALE),dy=y-(MAP_CY+slot.y()*MAP_SCALE);
-            float d=dx*dx+dy*dy;
-            if(d<nearest){nearest=d;chosen=slot.index();}
-        }
-        return chosen;
+        return HullLayouts.pick(draft.placements(),x,y,MAP_CX,MAP_CY,MAP_SCALE,14);
     }
     private void select(int index) {
         selectedSlot=index;
@@ -126,6 +128,7 @@ final class ShipyardPanel {
             if(x>=705&&x<810){apply();return true;}
             if(x>=819&&x<910){save();return true;}
             if(x>=923&&x<1017){load();return true;}
+            if(x>=1018&&x<=1120){faction(1);return true;}
             if(x>1120){close();return true;}
             return true;
         }
@@ -210,7 +213,7 @@ final class ShipyardPanel {
         shapes.end();
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
-        List<diplomacy.shipyard.HullLayouts.Point> border=diplomacy.shipyard.HullLayouts.outline(draft.faction,draft.hull);
+        List<HullLayouts.Point> border=HullLayouts.outline(draft.faction,draft.hull);
         float[] vertices=new float[border.size()*2];
         for(int n=0;n<border.size();n++){
             vertices[n*2]=MAP_CX+border.get(n).x()*MAP_SCALE;
@@ -230,7 +233,7 @@ final class ShipyardPanel {
         font.draw(batch,draft.hull.name().replace('_',' '),392,660);
         font.draw(batch,">",657,660);
         font.draw(batch,"APPLY",711,660);font.draw(batch,"SAVE",833,660);
-        font.draw(batch,"LOAD",940,660);font.draw(batch,"CLOSE",1140,660);
+        font.draw(batch,"LOAD",940,660);font.draw(batch,"FACTION >",1023,660);font.draw(batch,"CLOSE",1140,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);
         font.draw(batch,"FACTION HULL SCHEMATIC",345,590);
