@@ -4,91 +4,70 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Optional curated UI from two original art sheets. The game's existing text,
- * input regions, and combat behavior remain authoritative if art is absent.
+ * Optional, individually reviewed tactical UI assets. The rejected 87-cell
+ * generated atlas is deliberately NOT loaded. Original text controls and
+ * pointer/touch hit areas remain authoritative when sprites are absent.
  */
 final class TacticalUiIcons {
-    private static final int TILE = 80;
-    private static final String ATLAS = "ui/tactical/icons.png";
-    private static final String INDEX = "ui/tactical/icons.tsv";
-    private Texture texture;
-    private final Map<String, Texture> buttons = new HashMap<>();
-    private final Map<String, TextureRegion> regions = new HashMap<>();
+    private static final String BASE = "ui/tactical/selected/";
+    private static final String[] REVIEWED = {
+        "restart", "speed", "squadron", "shipyard_ship",
+        "complete", "information", "close", "back", "next",
+        "target", "shield", "repair", "energy", "fleet",
+        "weapons", "armor", "engine", "drone", "turret",
+        "missile", "laser", "emp", "stealth", "detect"
+    };
+    private final Map<String, Texture> icons = new HashMap<>();
 
     TacticalUiIcons() {
-        FileHandle atlas = Gdx.files.internal(ATLAS);
-        FileHandle registry = Gdx.files.internal(INDEX);
-        if (!atlas.exists() || !registry.exists()) return;
-        try {
-            texture = new Texture(atlas);
-            if (texture.getWidth() != 800 || texture.getHeight() != 720)
-                throw new IllegalArgumentException("Tactical UI atlas must be 800x720");
-            texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-            for (String line : registry.readString("UTF-8").split("\\r?\\n")) {
-                if (line.isBlank() || line.startsWith("#")) continue;
-                String[] fields = line.split("\\t");
-                if (fields.length != 3) throw new IllegalArgumentException("Bad UI atlas row: " + line);
-                int x = Integer.parseInt(fields[1]);
-                int y = Integer.parseInt(fields[2]);
-                if (x < 0 || x >= 10 || y < 0 || y >= 9 || regions.containsKey(fields[0]))
-                    throw new IllegalArgumentException("Bad UI cell/id: " + line);
-                regions.put(fields[0], new TextureRegion(texture, x * TILE, y * TILE, TILE, TILE));
+        for (String name : REVIEWED) {
+            FileHandle image = Gdx.files.internal(BASE + name + ".png");
+            if (!image.exists()) continue;
+            try {
+                Texture texture = new Texture(image);
+                // Prevent unexpectedly large sprites from exhausting mobile VRAM.
+                if (texture.getWidth() < 16 || texture.getHeight() < 16
+                        || texture.getWidth() > 256 || texture.getHeight() > 256) {
+                    texture.dispose();
+                    throw new IllegalArgumentException("Unexpected dimensions for " + name);
+                }
+                texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+                icons.put(name, texture);
+            } catch (RuntimeException error) {
+                if (Gdx.app != null)
+                    Gdx.app.error("UI", "Skipping unusable optional icon: " + name, error);
             }
-            if (regions.size() != 87) throw new IllegalArgumentException("Expected 87 approved UI icons");
-            for (String id : new String[]{"primary","secondary","special","danger","confirm","cancel","info"}) {
-                loadLayer(buttons, "ui/tactical/buttons/" + id + ".png", id);
-            }
-            // Status-bar source slices are excluded until their cropped ends are revalidated.
-        } catch (RuntimeException failed) {
-            if (texture != null) texture.dispose();
-            texture = null;
-            regions.clear();
-            clearLayers();
-            if (Gdx.app != null) Gdx.app.error("UI", "UI sprite atlas unavailable, preserving text controls", failed);
         }
-    }
-
-    private static void loadLayer(Map<String,Texture> target, String path, String id) {
-        FileHandle file = Gdx.files.internal(path);
-        if (!file.exists()) return;
-        Texture layer = new Texture(file);
-        layer.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
-        target.put(id, layer);
-    }
-
-    void drawButton(SpriteBatch batch, String style, float x, float y, float width, float height) {
-        Texture layer = buttons.get(style);
-        if (layer == null) return;
-        batch.setColor(1,1,1,0.92f);
-        batch.draw(layer, x, y, width, height);
-        batch.setColor(1,1,1,1);
-    }
-
-    private void clearLayers() {
-        for (Texture layer : buttons.values()) layer.dispose();
-        buttons.clear();
     }
 
     boolean available() {
-        return texture != null;
+        return !icons.isEmpty();
     }
 
+    /**
+     * Fit a source image into a size x size slot without stretching its frame.
+     * Called while SpriteBatch is begun; missing images draw nothing.
+     */
     void draw(SpriteBatch batch, String id, float x, float y, float size) {
-        TextureRegion region = regions.get(id);
-        if (region != null) batch.draw(region, x, y, size, size);
+        Texture texture = icons.get(id);
+        if (texture == null || size <= 0) return;
+        float scale = Math.min(size / texture.getWidth(), size / texture.getHeight());
+        float width = texture.getWidth() * scale;
+        float height = texture.getHeight() * scale;
+        batch.draw(texture, x + (size - width) * 0.5f,
+                y + (size - height) * 0.5f, width, height);
+    }
+
+    int loaded() {
+        return icons.size();
     }
 
     void dispose() {
-        if (texture != null) {
-            texture.dispose();
-            texture = null;
-        }
-        regions.clear();
-        clearLayers();
+        for (Texture texture : icons.values()) texture.dispose();
+        icons.clear();
     }
 }
