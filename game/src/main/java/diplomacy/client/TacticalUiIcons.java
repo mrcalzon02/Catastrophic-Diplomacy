@@ -25,6 +25,18 @@ final class TacticalUiIcons {
     };
     private final Map<String, Texture> icons = new HashMap<>();
     private Texture solid; // A generated pixel, not a crop from any unapproved button image.
+    private static final Color BORDER_CONFIRM = new Color(0.16f, 0.73f, 0.46f, 0.95f);
+    private static final Color CENTER_CONFIRM = new Color(0.025f, 0.16f, 0.11f, 0.94f);
+    private static final Color BORDER_DANGER = new Color(0.85f, 0.30f, 0.32f, 0.96f);
+    private static final Color CENTER_DANGER = new Color(0.21f, 0.04f, 0.07f, 0.94f);
+    private static final Color BORDER_SPECIAL = new Color(0.73f, 0.50f, 0.93f, 0.96f);
+    private static final Color CENTER_SPECIAL = new Color(0.16f, 0.08f, 0.25f, 0.93f);
+    private static final Color BORDER_INFO = new Color(0.35f, 0.66f, 0.84f, 0.95f);
+    private static final Color CENTER_INFO = new Color(0.06f, 0.13f, 0.23f, 0.92f);
+    private static final Color BORDER_SECONDARY = new Color(0.33f, 0.48f, 0.60f, 0.88f);
+    private static final Color CENTER_SECONDARY = new Color(0.055f, 0.085f, 0.13f, 0.92f);
+    private static final Color BORDER_PRIMARY = new Color(0.22f, 0.77f, 0.98f, 0.96f);
+    private static final Color CENTER_PRIMARY = new Color(0.035f, 0.15f, 0.27f, 0.93f);
 
     TacticalUiIcons() {
         // Procedural chrome supports button styles without ever shipping broken button crops.
@@ -77,33 +89,15 @@ final class TacticalUiIcons {
         if (solid == null || w < 8 || h < 8) return;
         Color border, center;
         switch (style) {
-            case "confirm" -> {
-                border = new Color(0.16f, 0.73f, 0.46f, 0.95f);
-                center = new Color(0.025f, 0.16f, 0.11f, 0.94f);
-            }
-            case "danger", "cancel" -> {
-                border = new Color(0.85f, 0.30f, 0.32f, 0.96f);
-                center = new Color(0.21f, 0.04f, 0.07f, 0.94f);
-            }
-            case "special" -> {
-                border = new Color(0.73f, 0.50f, 0.93f, 0.96f);
-                center = new Color(0.16f, 0.08f, 0.25f, 0.93f);
-            }
-            case "info" -> {
-                border = new Color(0.35f, 0.66f, 0.84f, 0.95f);
-                center = new Color(0.06f, 0.13f, 0.23f, 0.92f);
-            }
-            case "secondary" -> {
-                border = new Color(0.33f, 0.48f, 0.60f, 0.88f);
-                center = new Color(0.055f, 0.085f, 0.13f, 0.92f);
-            }
-            case "primary" -> {
-                border = new Color(0.22f, 0.77f, 0.98f, 0.96f);
-                center = new Color(0.035f, 0.15f, 0.27f, 0.93f);
-            }
+            case "confirm" -> { border = BORDER_CONFIRM; center = CENTER_CONFIRM; }
+            case "danger", "cancel" -> { border = BORDER_DANGER; center = CENTER_DANGER; }
+            case "special" -> { border = BORDER_SPECIAL; center = CENTER_SPECIAL; }
+            case "info" -> { border = BORDER_INFO; center = CENTER_INFO; }
+            case "secondary" -> { border = BORDER_SECONDARY; center = CENTER_SECONDARY; }
+            case "primary" -> { border = BORDER_PRIMARY; center = CENTER_PRIMARY; }
             default -> throw new IllegalArgumentException("Unknown procedural button style: " + style);
         }
-        Color prior = new Color(batch.getColor());
+        float prior = batch.getPackedColor();
         try {
             batch.setColor(border);
             batch.draw(solid,x,y,w,h);
@@ -112,7 +106,7 @@ final class TacticalUiIcons {
             batch.setColor(border.r,border.g,border.b,0.50f);
             batch.draw(solid,x+4,y+h-5,w-8,1);
         } finally {
-            batch.setColor(prior);
+            batch.setPackedColor(prior);
         }
     }
 
