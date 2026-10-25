@@ -17,7 +17,7 @@ Exactly 49 RGBA PNGs are installed under `assets/effects/weather/` with stable n
 
 The game-side `WeatherFxAssets` library auto-detects these files through LibGDX internal assets, loads each texture once, disposes correctly, and leaves `BattlefieldWeatherVfx`'s deterministic geometric fallback intact if files are absent. Rocks use normal alpha blending; luminous beams, particles, arcs and shockwave sprites use additive blending. The art does **not** control hit tests, projectile collision, or damage.
 
-The 49 audited binaries are **not yet committed as binary assets**. They are provided in the verified ZIP. The runtime's procedural renderer remains fully functional without them, and Android packages source assets directly from the repository's `assets/` directory. The runtime will therefore use procedural fallbacks until the approved PNGs are imported and committed. Do not report art as shipped simply because the loader exists.
+**All 49 QA-approved PNGs are now committed as binary GitHub blobs** under `assets/effects/weather/` on the integration branch. Both Android `sourceSets` and the desktop asset-staging task include the `assets/` root. The texture loader reads them by the shared relative path `effects/weather/...`; procedural fallback stays available for missing or broken assets. The runtime will therefore use procedural fallbacks until the approved PNGs are imported and committed. Do not report art as shipped simply because the loader exists.
 
 ## Quality gates before production
 

@@ -15,6 +15,7 @@ import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.SpaceWeather;
+import diplomacy.sim.LevelEnvironment;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
@@ -296,10 +297,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void reset() {
+        LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
-        if (weatherEnabled) battle.configureWeather(SpaceWeather.forLevel(battlefieldLevel));
-        // Background and hazards select the same 1..500 level on first launch and after resets.
-        if (starfield != null) starfield.useLevel(battlefieldLevel);
+        if (weatherEnabled) battle.configureWeather(environment.weather());
+        // The same validated stage index drives both GPU background and simulation.
+        if (starfield != null) starfield.useLevel(environment.level());
         accumulator = 0;
         running = true;
     }

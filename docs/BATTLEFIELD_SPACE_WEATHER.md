@@ -52,3 +52,7 @@ These controls are a development preview. The campaign level UI, once implemente
 - Java 17 `BattleWeatherTest` checks real core integration for target acquisition, heat, damage, replay and default clear behavior.
 - Run with `gradle :core:spaceWeatherSmoke`. This does not validate OpenGL, Android touch handling or effects artwork.
 - Desktop/Android builds, visual acceptance, accessibility/flashing controls, performance on a 200v200 engagement, and longer-term hazard tuning still require device verification. The VFX class passed a Java 17 syntax/API-surface check against small mock libGDX types; this **does not** establish actual mobile GPU compatibility or frame-time performance.
+
+## Integration status
+
+On the integration branch the weather simulator, procedural VFX and the full 49-PNG audited texture library are wired into the current game's battle draw order. The APK asset root is `assets/` (not `game/assets/`). Level 1 begins with asteroids active; changing levels with B/N or the on-screen controls selects both new sky and weather in the active duel. The upgraded client retains the newer modular weapon-effect renderer and tactical command menu. Java smoke tasks check level mapping; actual Android GPU/physical device acceptance remains unverified until a build has been tested.

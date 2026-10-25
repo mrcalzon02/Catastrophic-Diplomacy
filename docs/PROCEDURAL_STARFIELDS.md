@@ -21,3 +21,7 @@ The game generates its skies in Java/libGDX, **not** from a 500-image gallery. T
 - `LevelSkyTest` checks 500 distinct/reproducible recipes, 10 sector palettes, six formations and invalid bounds. It was compiled and run using the real `LevelEconomy` source with Java 17 target. A separate mock-libGDX lifecycle test exercised 500 stage switches and confirmed the renderer allocated three textures once, released three textures on disposal, and balanced batch calls; this is a **mock test**, not GPU validation.
 - The shader targets ES2 SpriteBatch; failure falls back to star-only rendering.
 - Still requires desktop/Android GPU acceptance and benchmark of 200v200 battles, viewport resizing and Android context loss on a physical device. Procedural results may need art tuning to resemble the photographic reference sheets.
+
+## Live level selection (integrated)
+
+`CatastrophicGame` now constructs the procedural renderer at launch and draws it every battle frame. The selected 1..500 environment index is used for both the sky and hazard simulation via `LevelEnvironment`. Keyboard **B/N** or touchable arrows on the lower battlefield HUD change the current encounter environment immediately, resetting the duel. Levels do not require a separate hidden preview toggle. The sandbox retains its currently selected level across engagement resets; wave-campaign implementation is separate future work.
