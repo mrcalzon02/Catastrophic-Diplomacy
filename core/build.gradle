@@ -118,3 +118,11 @@ tasks.register('levelEconomySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('levelEconomySmoke')) }
+
+tasks.register('demoWeaponSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Replay the actual APK 200v200 six-weapon demonstration and assert firing/impact causality.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.DemonstrationBattleTest'
+    dependsOn testClasses
+}
