@@ -59,6 +59,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** Keyboard [ ] and the compact header controls select actual deployed ships per side. */
     private static final int[] FLEET_SIZES = {1,2,4,8,16,32,64,100,150,200};
     private int fleetIndex = 4;
+    private float manualZoom = 1f;
+    private int focusedShipId = -1;
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
@@ -134,6 +136,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.N) { changeBattlefieldLevel(1); return true; }
                 if (key == Input.Keys.B) { changeBattlefieldLevel(-1); return true; }
                 if (key == Input.Keys.W) { weatherEnabled = !weatherEnabled; reset(); return true; }
+                if (key == Input.Keys.Z) { zoomBy(-1); return true; }
+                if (key == Input.Keys.X) { zoomBy(1); return true; }
+                if (key == Input.Keys.C) { manualZoom=1f; focusedShipId=-1; return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
@@ -158,6 +163,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     shipyard.startTouch(world.x,world.y,pointer);
                     return true;
                 }
+                if (world.y >= 72 && world.y <= 120) {
+                    if (world.x>=18 && world.x<118) { zoomBy(-1); return true; }
+                    if (world.x>=126 && world.x<226) { zoomBy(1); return true; }
+                    if (world.x>=235 && world.x<330) {
+                        focusedShipId=-1;manualZoom=1f;return true;
+                    }
+                }
                 if (world.y >= 613 && world.y < 649) {
                     if (world.x < 830) { weatherEnabled = !weatherEnabled; reset(); return true; }
                     if (world.x >= 900 && world.x < 1040) { changeBattlefieldLevel(-1); return true; }
@@ -175,6 +187,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else changeFaction(1);
                     return true;
                 }
+                if (world.y>25 && world.y<610) {
+                    focusNearest(world.x,world.y);
+                    return true;
+                }
                 return false;
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
@@ -189,9 +205,30 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return activated;
             }
             @Override public boolean scrolled(float amountX,float amountY) {
-                return shipyard.scroll(amountY);
+                if(shipyard.open())return shipyard.scroll(amountY);
+                if(tacticalMenuOpen || (fleetOrdersPanel!=null&&fleetOrdersPanel.open()))return false;
+                zoomBy(amountY);
+                return true;
             }
         });
+    }
+
+    /** Manual zoom leaves the renderer-independent automatic framing untouched. */
+    private void zoomBy(float steps) {
+        manualZoom=(float)Math.max(0.18,Math.min(4.0,manualZoom*Math.pow(1.18,steps)));
+    }
+    /** Tap a vessel to follow it while zoomed in. Empty space clears focus. */
+    private void focusNearest(float uiX,float uiY) {
+        if(battle==null)return;
+        double x=battleCamera.position.x+(uiX-W*0.5)*battleCamera.zoom;
+        double y=battleCamera.position.y+(uiY-H*0.5)*battleCamera.zoom;
+        double nearest=Math.max(24,34*battleCamera.zoom);
+        int chosen=-1;
+        for(Battle.Ship ship:battle.ships())if(ship.alive()){
+            double d=Math.hypot(ship.x-x,ship.y-y);
+            if(d<nearest){nearest=d;chosen=ship.id;}
+        }
+        focusedShipId=chosen;
     }
 
     private void openTacticalMenu() {
@@ -427,7 +464,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
-        if (audio != null) audio.advance(battle);
+        updateBattleCamera();
+        if (audio != null) audio.advance(battle,battleCamera.position.x,
+                battleCamera.position.y,battleCamera.zoom,
+                running && !tacticalMenuOpen && !shipyard.open()
+                && (fleetOrdersPanel==null || !fleetOrdersPanel.open())
+                );
         Gdx.gl.glClearColor(0.015f, 0.025f, 0.055f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         viewport.apply(); camera.update();
@@ -443,7 +485,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipyard.draw(shapes,batch,font);
             return;
         }
-        updateBattleCamera();
         // World-space sky & hazard layers render before tactical grid, weapons and hulls.
         if (starfield != null) starfield.render(batch,camera,battleCamera,W,H);
         if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
@@ -557,6 +598,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"SHIPYARD",1195,693);
         font.setColor(Color.WHITE);
         font.draw(batch,"MENU (M)",1174,107);
+        font.setColor(Color.CYAN);
+        font.draw(batch,"ZOOM +",24,106);
+        font.draw(batch,"ZOOM -",133,106);
+        font.draw(batch,"AUTO",242,106);
+        font.setColor(Color.LIGHT_GRAY);
+        font.draw(batch,String.format(java.util.Locale.ROOT,"%.2fx  %s",battleCamera.zoom,
+                focusedShipId>=0?"FOLLOW #"+focusedShipId:"FLEET VIEW"),338,106);
         font.setColor(Color.GOLD);
         SpaceWeather.Preset activeWeather = battle.weather().preset();
         String condition = activeWeather.enabled()
@@ -587,8 +635,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** World camera follows the active engagement; UI coordinates never move. */
     private void updateBattleCamera() {
         BattleView.Frame shot=BattleView.of(battle);
-        battleCamera.zoom=(float)shot.zoom();
-        battleCamera.position.set((float)shot.centerX(),(float)shot.centerY(),0);
+        battleCamera.zoom=Math.max(0.16f,Math.min(8f,(float)shot.zoom()*manualZoom));
+        double cx=shot.centerX(),cy=shot.centerY();
+        if(focusedShipId>=0){
+            Battle.Ship followed=null;
+            for(Battle.Ship ship:battle.ships())if(ship.alive()&&ship.id==focusedShipId){
+                followed=ship;break;
+            }
+            if(followed==null)focusedShipId=-1;
+            else {cx=followed.x;cy=followed.y;}
+        }
+        battleCamera.position.set((float)cx,(float)cy,0);
         battleCamera.update();
     }
 

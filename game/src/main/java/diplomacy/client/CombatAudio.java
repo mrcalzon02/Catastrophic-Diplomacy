@@ -19,6 +19,7 @@ public final class CombatAudio implements AutoCloseable {
     private static final String PREF_NAME = "catastrophic-diplomacy-audio";
     private final Map<CombatAudioCue.Cue, Sound> cues = new EnumMap<>(CombatAudioCue.Cue.class);
     private final long[] lastPlayedTick = new long[CombatAudioCue.Cue.values().length];
+    private final SpatialAudioRuntime spatial;
     private Preferences prefs;
     private Music battleMusic, ambientMusic, activeMusic;
     private long seenSequence;
@@ -47,6 +48,7 @@ public final class CombatAudio implements AutoCloseable {
         load(CombatAudioCue.Cue.HULL, "audio/sfx/hollow_metal.wav");
         load(CombatAudioCue.Cue.EXPLOSION, "audio/sfx/grenade.wav");
         load(CombatAudioCue.Cue.UI, "audio/sfx/ui_confirm.wav");
+        spatial = new SpatialAudioRuntime(cues);
         ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3");
         battleMusic = loadMusic("audio/music/final_surge.mp3");
         switchTrack();
@@ -110,52 +112,23 @@ public final class CombatAudio implements AutoCloseable {
         else switchTrack();
         persist();
     }
-    public void toggleEffects() { effectsOn = !effectsOn; persist(); }
+    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn)spatial.silence(); persist(); }
     public void toggleTrack() { useBattleMusic = !useBattleMusic; switchTrack(); persist(); }
 
     public void resetForBattle() {
-        seenSequence = 0;
-        seenDestructions = 0;
-        Arrays.fill(lastPlayedTick, -1000000L);
+        seenSequence=0;seenDestructions=0;
+        Arrays.fill(lastPlayedTick,-1000000L);
+        spatial.reset();
     }
 
-    /** Reads each immutable visual event once; no simulation modification. */
-    public void advance(Battle battle) {
-        if (battle == null) return;
-        if (battle.destructions > seenDestructions) {
-            if (effectsOn && !suspended) play(CombatAudioCue.Cue.EXPLOSION, battle.tick, 0.72f, 1f);
-        }
-        seenDestructions = battle.destructions;
-        int voices = 0;
-        for (Battle.VisualEvent event : battle.visualEvents()) {
-            if (event.sequence() <= seenSequence) continue;
-            seenSequence = event.sequence();
-            if (!effectsOn || suspended || voices >= MAX_CUES_PER_FRAME) continue;
-            CombatAudioCue.Cue cue = CombatAudioCue.from(event);
-            if (cue == null) continue;
-            // Deterministic pitch variation, independent of Battle's Random.
-            float pitch = 0.91f + (float)(Math.floorMod(event.shotId(), 7) * 0.027);
-            float volume = event.phase() == Battle.VisualPhase.FIRE ? 0.70f : 0.90f;
-            if (play(cue, event.tick(), volume, pitch)) voices++;
-        }
-    }
-
-    private boolean play(CombatAudioCue.Cue cue, long tick, float volume, float pitch) {
-        if (!effectsOn || suspended) return false;
-        Sound sound = cues.get(cue);
-        if (sound == null) return false;
-        int index = cue.ordinal();
-        if (tick - lastPlayedTick[index] < CombatAudioCue.cooldownTicks(cue)) return false;
-        lastPlayedTick[index] = tick;
-        try {
-            sound.play(Math.max(0f, Math.min(1f, effectsVolume * volume)), pitch, 0f);
-            return true;
-        } catch (RuntimeException error) {
-            Gdx.app.error("AUDIO", "Disabling failed cue " + cue, error);
-            cues.remove(cue);
-            sound.dispose();
-            return false;
-        }
+    /**
+     * Camera-aware mixer: proximity, zoom and event priority replace global,
+     * identical-volume sounds. Music remains independent of combat SFX.
+     */
+    public void advance(Battle battle,double cameraX,double cameraY,float zoom,
+                        boolean battleVisible) {
+        spatial.advance(battle,cameraX,cameraY,zoom,battleVisible&&!suspended,
+                effectsOn,effectsVolume);
     }
 
     public void ui() {
@@ -170,11 +143,13 @@ public final class CombatAudio implements AutoCloseable {
 
     public void pause() {
         suspended = true;
+        spatial.silence();
         if (activeMusic != null) activeMusic.pause();
     }
     public void resume() { suspended = false; switchTrack(); }
 
     @Override public void close() {
+        spatial.close();
         if (activeMusic != null) activeMusic.stop();
         for (Sound sound : cues.values()) sound.dispose();
         cues.clear();
