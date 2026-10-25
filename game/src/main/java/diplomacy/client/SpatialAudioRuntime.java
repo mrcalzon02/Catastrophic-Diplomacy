@@ -116,17 +116,12 @@ final class SpatialAudioRuntime implements AutoCloseable {
             if(list.get(i).priority<list.get(smallest).priority)smallest=i;
         if(pending.priority>list.get(smallest).priority)list.set(smallest,pending);
     }
-    private static Battle.Ship byId(Battle battle,int id) {
-        // 400 vessels maximum in the current tactical battle; index built once below
-        for(Battle.Ship s:battle.ships())if(s.id==id)return s;
-        return null;
-    }
-    private void event(List<Pending> list,Battle battle,Battle.VisualEvent event,
-                       double cx,double cy,double zoom){
+    private void event(List<Pending> list,Map<Integer,Battle.Ship> ships,
+                       Battle.VisualEvent event,double cx,double cy,double zoom){
         CombatAudioCue.Cue cue=CombatAudioCue.from(event);
         if(cue==null)return;
-        Battle.Ship source=byId(battle,event.sourceId());
-        Battle.Ship target=byId(battle,event.targetId());
+        Battle.Ship source=ships.get(event.sourceId());
+        Battle.Ship target=ships.get(event.targetId());
         SpatialAudioModel.Layer layer=layer(event,source,target);
         double x=event.phase()==Battle.VisualPhase.FIRE?event.x():event.x();
         double y=event.y();
@@ -254,10 +249,13 @@ final class SpatialAudioRuntime implements AutoCloseable {
         if(!effectsOn){lastSequence=lastSeen(battle);lastDestructions=battle.destructions;
             stopEngines();return;}
         List<Pending> candidates=new ArrayList<>();
+        // One indexed lookup per ship replaces event-by-event linear fleet scans.
+        Map<Integer,Battle.Ship> ships=new HashMap<>();
+        for(Battle.Ship ship:battle.ships())ships.put(ship.id,ship);
         for(Battle.VisualEvent event:battle.visualEvents()){
             if(event.sequence()<=lastSequence)continue;
             lastSequence=event.sequence();
-            if(active)event(candidates,battle,event,cx,cy,zoom);
+            if(active)event(candidates,ships,event,cx,cy,zoom);
         }
         if(active){
             shieldChanges(candidates,battle,cx,cy,zoom);
