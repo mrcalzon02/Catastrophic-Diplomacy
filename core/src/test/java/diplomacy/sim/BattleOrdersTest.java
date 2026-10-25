@@ -31,6 +31,10 @@ public final class BattleOrdersTest {
             boolean mustFire=craft?mode.craft():mode.ordnance();
             check((b.ships().get(1).pdReload>0)==mustFire,
                     mode+" must "+(mustFire?"fire at":"ignore")+" "+(craft?"craft":"missiles"));
+            boolean animatedShot=b.visualEvents().stream().anyMatch(e->
+                    e.phase()==Battle.VisualPhase.FIRE
+                            && e.weapon().equals("POINT_DEFENSE") && e.team()==1);
+            check(animatedShot==mustFire,"PD firing visuals must follow actual mode and firing event");
             check(b.teamOrders(1).pointDefense()==mode,"fleet orders exposed");
             check(b.ships().get(1).orders.pointDefense()==mode,"orders applied to deployed ships");
         }
