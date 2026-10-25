@@ -61,9 +61,16 @@ public final class ProceduralStarfield implements Disposable {
                 float cloud = smoothstep(0.34, 0.72, n);
                 float mode = u_shape.w;
                 if (mode > 0.5 && mode < 1.5) cloud *= 0.28 + 0.95 * band; // dust lane
-                if (mode > 1.5 && mode < 2.5) { // galactic core and dusty spiral
-                    float r = length(centered * vec2(1.0, 1.6));
-                    cloud = 0.35 * cloud * band + (1.0 - smoothstep(0.04, 0.51, r)) * 0.70;
+                if (mode > 1.5 && mode < 2.5) { // inclined spiral disk and luminous core
+                    float sn = sin(u_shape.x), cs = cos(u_shape.x);
+                    vec2 diskPos = vec2(dot(centered, vec2(cs, sn)),
+                                        dot(centered, vec2(-sn, cs)) * 1.9);
+                    float r = length(diskPos);
+                    float theta = atan(diskPos.y, diskPos.x);
+                    float arms = 0.5 + 0.5 * cos(2.0 * theta - 16.0 * r + (wisps - 0.5) * 3.0);
+                    float disk = (1.0 - smoothstep(0.13, 0.52, r)) * (0.16 + 0.84 * arms);
+                    float core = 1.0 - smoothstep(0.015, 0.16, r);
+                    cloud = max(cloud * band * 0.25, 0.68 * disk + 0.62 * core);
                 }
                 if (mode > 2.5 && mode < 3.5) cloud *= 0.22; // deep void
                 if (mode > 3.5 && mode < 4.5) cloud *= 0.65; // clustered stars, quiet gas
@@ -85,21 +92,19 @@ public final class ProceduralStarfield implements Disposable {
         pixel = makePixel();
         glow = makeGlow();
         ShaderProgram candidate = new ShaderProgram(VERTEX, FRAGMENT);
-        if (candidate.isCompiled()) nebulaShader = candidate;
-        else {
+        if (candidate.isCompiled()) {
+            nebulaShader = candidate;
+            // A single reusable tileable field; level selection changes uniforms, not textures.
+            noise = makeNoise(0x534b592d4e4f4953L);
+        } else {
             Gdx.app.error("SKY", "Nebula shader unavailable; star-only fallback: " + candidate.getLog());
             candidate.dispose();
         }
     }
 
-    /** Rebuilds just one 256x256 RGBA field when the selected level changes. */
+    /** Level changes are uniform-only: no Pixmap allocations or GPU texture uploads. */
     public void useLevel(int index) {
-        LevelSky.Recipe target = LevelSky.forLevel(index);
-        if (target.equals(recipe)) return;
-        Texture next = makeNoise(target.seed());
-        if (noise != null) noise.dispose();
-        noise = next;
-        recipe = target;
+        recipe = LevelSky.forLevel(index);
     }
 
     public LevelSky.Recipe recipe() { return recipe; }
