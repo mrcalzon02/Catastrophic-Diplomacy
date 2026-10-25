@@ -30,6 +30,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private InstancedShipRenderer instanced;
     private TerranPlaceholderSprites terranSprites;
     private WeaponBeamSprites weaponBeams;
+    private ProceduralStarfield starfield;
+    private int skyPreviewLevel = 1;
     private Battle battle;
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
@@ -55,6 +57,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
         terranSprites = new TerranPlaceholderSprites();
         weaponBeams = new WeaponBeamSprites();
+        try {
+            starfield = new ProceduralStarfield();
+            starfield.useLevel(skyPreviewLevel);
+        } catch (RuntimeException error) {
+            Gdx.app.error("SKY", "Background generator unavailable; using plain background", error);
+            if (starfield != null) starfield.dispose();
+            starfield = null;
+        }
         font.getData().setScale(1.23f);
         try {
             instanced = new InstancedShipRenderer();
@@ -79,6 +89,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
+                if (key == Input.Keys.N) { previewSky(1); return true; }
+                if (key == Input.Keys.B) { previewSky(-1); return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
@@ -120,6 +132,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.scroll(amountY);
             }
         });
+    }
+
+    /** Preview only, independent of sandbox battle state until campaign selection ships. */
+    private void previewSky(int delta) {
+        int selected = Math.max(1, Math.min(500, skyPreviewLevel + delta));
+        if (selected == skyPreviewLevel || starfield == null) return;
+        try {
+            starfield.useLevel(selected);
+            skyPreviewLevel = selected;
+        } catch (RuntimeException error) {
+            Gdx.app.error("SKY", "Unable to generate background for level " + selected, error);
+        }
     }
 
     private void changeFleetSize(int delta) {
@@ -214,6 +238,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         updateBattleCamera();
+        if (starfield != null) starfield.render(batch, camera, battleCamera, W, H);
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
@@ -353,6 +378,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
+        if(starfield!=null)starfield.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }

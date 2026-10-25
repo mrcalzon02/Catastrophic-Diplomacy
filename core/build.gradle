@@ -109,3 +109,12 @@ tasks.register('levelEconomySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('levelEconomySmoke')) }
+
+tasks.register('skySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check all 500 deterministic procedural sky definitions, no GPU required.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelSkyTest'
+    dependsOn testClasses
+}
+tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('skySmoke')) }
