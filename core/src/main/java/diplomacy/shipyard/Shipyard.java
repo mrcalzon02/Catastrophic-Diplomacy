@@ -56,10 +56,24 @@ public final class Shipyard {
         public final String component;
         private final Map<Track,Integer> stages;
         private Installed(String id, Map<Track,Integer> upgrades) {
+            if(id==null || upgrades==null)throw new IllegalArgumentException("Module identity required");
             component=id;
             Map<Track,Integer> copy = new EnumMap<>(Track.class);
-            copy.putAll(upgrades); stages=Collections.unmodifiableMap(copy);
+            Track chosen=null;
+            for(Map.Entry<Track,Integer> entry:upgrades.entrySet()) {
+                Track branch=entry.getKey();
+                Integer level=entry.getValue();
+                if(branch==null||level==null||level<1||level>6)
+                    throw new IllegalArgumentException("Invalid module research stage");
+                if(chosen!=null && chosen!=branch)
+                    throw new IllegalArgumentException(
+                            "Mutually exclusive research branches: "+chosen+" and "+branch);
+                chosen=branch;copy.put(branch,level);
+            }
+            stages=Collections.unmodifiableMap(copy);
         }
+        /** Null means an unmodified base component, free to choose a research branch. */
+        public Track branch(){return stages.isEmpty()?null:stages.keySet().iterator().next();}
         public int stage(Track track) { return stages.getOrDefault(track,0); }
         public Map<Track,Integer> stages() { return stages; }
     }
@@ -89,6 +103,10 @@ public final class Shipyard {
             if(level<0||level>6||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..6");
             Installed current=at(slot);
             if(current==null) throw new IllegalArgumentException("Empty slot has no technology");
+            Track active=current.branch();
+            if(level>0 && active!=null && active!=track)
+                throw new IllegalArgumentException("Module "+(slot+1)+" is committed to "+active
+                        +"; reset that branch to stage 0 before selecting "+track);
             Map<Track,Integer> updated=new EnumMap<>(Track.class);
             updated.putAll(current.stages);
             if(level==0) updated.remove(track); else updated.put(track,level);
@@ -148,6 +166,11 @@ public final class Shipyard {
         Component base=catalog.base(installed.component);
         if(base==null) throw new IllegalArgumentException("Missing base: "+installed.component);
         if(!base.faction.equals(factionId(faction)))throw new IllegalArgumentException("Foreign technology requires a license: "+base.id);
+        // Installed module constructor and blueprint decoder enforce exactly
+        // one active research family. Defend at evaluation too, so costs and
+        // projectile stats can never combine mutually exclusive bonuses.
+        if(installed.stages.size()>1)
+            throw new IllegalArgumentException("A module cannot combine research branches");
         double mass=1,power=1,heat=1,effect=1,accuracy=1,integrity=1,shields=1,thrust=1,cooling=1,maintenance=1;
         int industry=base.industryCost,research=0;
         for(Map.Entry<Track,Integer> selected:installed.stages.entrySet()) {
@@ -365,12 +388,26 @@ public final class Shipyard {
             try{index=Integer.parseInt(p[0]);}catch(NumberFormatException bad){throw new IllegalArgumentException("Invalid slot",bad);}
             if(index<0||index>=seen.length||seen[index])throw new IllegalArgumentException("Duplicate/out-of-range slot");
             seen[index]=true;
-            design=design.install(index,p[1]);
-            for(int j=0;j<4;j++) {
-                final int stage;
-                try{stage=Integer.parseInt(p[j+2]);}catch(NumberFormatException bad){throw new IllegalArgumentException("Invalid technology rank",bad);}
-                if(stage!=0)design=design.stage(index,Track.values()[j],stage);
+            // CD-SHIP-1 compatibility is retained. Reject (do not silently
+            // downgrade!) legacy blueprints which stacked incompatible paths.
+            int[] levels=new int[Track.values().length];
+            Track chosen=null;
+            for(int j=0;j<levels.length;j++){
+                try{levels[j]=Integer.parseInt(p[j+2]);}
+                catch(NumberFormatException bad){throw new IllegalArgumentException("Invalid technology rank",bad);}
+                if(levels[j]<0||levels[j]>6)
+                    throw new IllegalArgumentException("Upgrade stage must be 0..6 at slot "+index);
+                if(levels[j]>0){
+                    Track branch=Track.values()[j];
+                    if(chosen!=null)
+                        throw new IllegalArgumentException("Blueprint slot "+(index+1)+
+                                " contains incompatible "+chosen+" and "+branch+
+                                " research paths; legacy data was not modified");
+                    chosen=branch;
+                }
             }
+            design=design.install(index,p[1]);
+            if(chosen!=null)design=design.stage(index,chosen,levels[chosen.ordinal()]);
         }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
         return design;
