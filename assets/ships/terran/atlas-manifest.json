@@ -1,0 +1,131 @@
+{
+  "faction": "TERRAN",
+  "source": "Original 2026-10-24 generated top-down Terran fleet placeholder sheet",
+  "format": "RGBA PNG",
+  "forward": "image top",
+  "unit": "source pixel",
+  "runtimeAssetRoot": "assets",
+  "note": "Binary PNG crops generated as external asset archive; copy PNGs into this folder before launch. This manifest alone does not contain pixels.",
+  "ships": [
+    {
+      "id": "interceptor",
+      "file": "interceptor.png",
+      "bbox": [
+        56,
+        245,
+        248,
+        447
+      ],
+      "width": 192,
+      "height": 202
+    },
+    {
+      "id": "corvette",
+      "file": "corvette.png",
+      "bbox": [
+        267,
+        189,
+        463,
+        447
+      ],
+      "width": 196,
+      "height": 258
+    },
+    {
+      "id": "missile_corvette",
+      "file": "missile_corvette.png",
+      "bbox": [
+        503,
+        139,
+        698,
+        446
+      ],
+      "width": 195,
+      "height": 307
+    },
+    {
+      "id": "frigate",
+      "file": "frigate.png",
+      "bbox": [
+        719,
+        90,
+        954,
+        447
+      ],
+      "width": 235,
+      "height": 357
+    },
+    {
+      "id": "destroyer",
+      "file": "destroyer.png",
+      "bbox": [
+        958,
+        20,
+        1233,
+        446
+      ],
+      "width": 275,
+      "height": 426
+    },
+    {
+      "id": "light_cruiser",
+      "file": "light_cruiser.png",
+      "bbox": [
+        17,
+        625,
+        220,
+        1141
+      ],
+      "width": 203,
+      "height": 516
+    },
+    {
+      "id": "heavy_cruiser",
+      "file": "heavy_cruiser.png",
+      "bbox": [
+        232,
+        556,
+        459,
+        1141
+      ],
+      "width": 227,
+      "height": 585
+    },
+    {
+      "id": "battlecruiser",
+      "file": "battlecruiser.png",
+      "bbox": [
+        464,
+        537,
+        706,
+        1141
+      ],
+      "width": 242,
+      "height": 604
+    },
+    {
+      "id": "carrier",
+      "file": "carrier.png",
+      "bbox": [
+        711,
+        481,
+        952,
+        1141
+      ],
+      "width": 241,
+      "height": 660
+    },
+    {
+      "id": "dreadnought",
+      "file": "dreadnought.png",
+      "bbox": [
+        941,
+        477,
+        1245,
+        1141
+      ],
+      "width": 304,
+      "height": 664
+    }
+  ]
+}

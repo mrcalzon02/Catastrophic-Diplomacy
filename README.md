@@ -123,3 +123,7 @@ The hulls are presently simple colored top-down geometry with visible engine tra
 not finished sprites or 3D ship art. Directed-fire lines are colored by laser, kinetic,
 plasma and particle weapon type; missiles, torpedoes, fighters and defensive drones
 are separate on-screen shapes. See `docs/MASS_BATTLE_ACCEPTANCE.md`.
+
+## Directional protection, damage and first-faction sprite placeholders
+
+The combat core now separates four powered shield facings from 16x16 localized armor tiles and an exposed structural sublayer. Damage types have independent shielding, armor and structural multipliers; per-facing armor and shield upgrade APIs are present. The external Terran fleet sprite cutouts may be installed under `assets/ships/terran/`; missing PNGs keep the tested fallback renderer. A basic visual damage marker exists, but transparent armor gouging, normal maps and custom structural-image compositing are **not yet implemented**. [Directional design and acceptance](docs/DIRECTIONAL_DAMAGE.md) · [Sprite placeholder manifest](docs/TERRAN_SPRITE_ATLAS.md) · [Level System I roadmap](docs/LEVEL_SYSTEM_I.md).
