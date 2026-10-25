@@ -7,4 +7,5 @@ dependencies {
     runtimeOnly 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-desktop'
 }
 application { mainClass = 'diplomacy.desktop.DesktopLauncher' }
-run { workingDir rootProject.projectDir }
+// Internal libGDX file paths must resolve identically on desktop and Android.
+run { workingDir rootProject.file('assets') }
