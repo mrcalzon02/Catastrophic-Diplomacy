@@ -31,22 +31,22 @@ public final class HullLayouts {
                 case SYSTEM -> {
                     // 3 longitudinal rows of deep, central machinery compartments.
                     x=(n%3-1)*15;
-                    y=20-(n/3)*19;
+                    y=24-(n/3)*17;
                 }
                 case WEAPON -> {
                     // Opposed banks; the odd last mount sits on the bow centerline.
                     int bank=n/2;
                     x=(n%2==0?-1:1)*(29+Math.min(2,bank)*3+size);
-                    y=32-bank*13;
+                    y=37-bank*14;
                     if(total%2==1 && n==total-1){x=0;y=40;}
                 }
                 case DEFENSE -> {
                     x=total==1?0:(int)Math.round(-34.0+68.0*n/(total-1));
-                    y=-27-(n%2)*5;
+                    y=-30-(n%2)*4;
                 }
                 case SUPPORT -> {
                     x=total==1?0:(int)Math.round(-30.0+60.0*(n%4)/Math.max(1,Math.min(total,4)-1));
-                    y=-47-(n/4)*13;
+                    y=-47-(n/4)*12;
                 }
                 default -> throw new IllegalStateException("Unhandled mount");
             }
@@ -56,27 +56,27 @@ public final class HullLayouts {
                 case DRAXIAN -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) x=(int)Math.round(x*1.24);
                     if(slot.mount()==Shipyard.Mount.SYSTEM) y+=5;
-                    if(slot.mount()==Shipyard.Mount.DEFENSE) y+=9;
+                    if(slot.mount()==Shipyard.Mount.DEFENSE) y+=3;
                 }
                 case CARNELIAN -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) x=(int)Math.round(x*0.85);
-                    if(slot.mount()==Shipyard.Mount.DEFENSE) x=(int)Math.round(x*1.20);
+                    if(slot.mount()==Shipyard.Mount.DEFENSE) {x=(int)Math.round(x*1.20);y-=4;}
                     if(slot.mount()==Shipyard.Mount.SYSTEM) y-=6;
                 }
                 case ZIPPLEDROW -> {
-                    if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*0.78);y+=9;}
-                    if(slot.mount()==Shipyard.Mount.SUPPORT) y-=7;
+                    if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*0.93);y+=9;}
+                    if(slot.mount()==Shipyard.Mount.SUPPORT) y-=2;
                     if(slot.mount()==Shipyard.Mount.SYSTEM) y+=3;
                 }
                 case UZIPT -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*1.17);y+=4;}
-                    if(slot.mount()==Shipyard.Mount.DEFENSE) y-=8;
+                    // Defense remains on the separated aft perimeter.
                     if(slot.mount()==Shipyard.Mount.SYSTEM) x+=3;
                 }
                 case MANDRALLY -> {
                     if(slot.mount()==Shipyard.Mount.SYSTEM) x=(int)Math.round(x*1.35);
-                    if(slot.mount()==Shipyard.Mount.SUPPORT) {x=(int)Math.round(x*1.16);y+=9;}
-                    if(slot.mount()==Shipyard.Mount.WEAPON) y-=6;
+                    if(slot.mount()==Shipyard.Mount.SUPPORT) {x=(int)Math.round(x*1.16);y+=2;}
+                    if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*1.30);y-=6;}
                 }
             }
             answer.add(new Shipyard.Slot(slot.index(),slot.mount(),x,y));
