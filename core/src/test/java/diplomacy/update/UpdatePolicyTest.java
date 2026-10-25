@@ -8,6 +8,11 @@ public final class UpdatePolicyTest {
         catch(IllegalArgumentException expected){ }
     }
     public static void main(String[] args){
+        check(UpdatePolicy.eligibleRelease(false,false),"stable release");
+        check(UpdatePolicy.eligibleRelease(false,true),"beta/prerelease must be discoverable");
+        check(!UpdatePolicy.eligibleRelease(true,true),"unpublished draft is not publicly available");
+        check(UpdatePolicy.newerAndroidBuild(53,52),"test-build version code increase");
+        check(!UpdatePolicy.newerAndroidBuild(52,52),"same code must not install");
         var nightly = new UpdatePolicy.Candidate("nightly_2026.10.25","0.1.1-rc.3",53,
                 UpdatePolicy.PACKAGE_ID,1,"unusual-Nightly-Build.apk",8192,"a".repeat(64));
         UpdatePolicy.requireCandidate(nightly,"0.1.1",52);

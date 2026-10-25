@@ -99,7 +99,8 @@ final class SideloadUpdater {
                         java.nio.charset.StandardCharsets.UTF_8));
                 for (int i = 0; i < releases.length(); i++) {
                     JSONObject release = releases.optJSONObject(i);
-                    if (release == null || release.optBoolean("draft")) continue;
+                    if (release == null || !UpdatePolicy.eligibleRelease(
+                            release.optBoolean("draft"), release.optBoolean("prerelease"))) continue;
                     // Public GitHub does not reveal unpublished drafts; prereleases ARE included.
                     String tag = release.optString("tag_name", "");
                     JSONArray assets = release.optJSONArray("assets");
@@ -132,8 +133,7 @@ final class SideloadUpdater {
                             String apkUrl = asset.getString("browser_download_url");
                             UpdatePolicy.requireDownloadUrl(apkUrl, tag, name);
                             String githubDigest = asset.optString("digest", "");
-                            if (!githubDigest.isEmpty() && !githubDigest.startsWith("sha256:"))
-                                throw new IOException("Unsupported GitHub asset digest");
+                            // Unknown checksum algorithms are ignored; Android signing is still mandatory.
                             String sha = githubDigest.startsWith("sha256:") ? githubDigest.substring(7) : "";
                             UpdatePolicy.Candidate candidate = UpdatePolicy.provisional(tag, name, bytes, sha);
                             if (manifest != null && manifest.optInt("schema") == 1) {
@@ -270,7 +270,7 @@ final class SideloadUpdater {
         if (archive == null || !candidate.applicationId().equals(archive.packageName) ||
                 !activity.getPackageName().equals(archive.packageName))
             throw new IOException("APK has an unexpected Android application ID");
-        if (code(archive) <= code(installed))
+        if (!UpdatePolicy.newerAndroidBuild(code(archive), code(installed)))
             throw new IOException("APK is not a newer Android versionCode");
         if (candidate.versionCode() > 0 &&
                 (code(archive) != candidate.versionCode() || !candidate.version().equals(archive.versionName)))

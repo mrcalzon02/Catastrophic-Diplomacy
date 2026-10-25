@@ -3,7 +3,6 @@ package diplomacy.update;
 import java.net.URI;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** Pure Java fail-closed metadata and URL policy shared by update clients and headless tests. */
@@ -13,7 +12,6 @@ public final class UpdatePolicy {
     public static final String REPOSITORY = "mrcalzon02/Catastrophic-Diplomacy";
     public static final long MAX_APK_BYTES = 400L * 1024 * 1024;
     public static final int SUPPORTED_DATA_SCHEMA = 1;
-    private static final Pattern VERSION = Pattern.compile("(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})");
     private static final Pattern SHA = Pattern.compile("[a-fA-F0-9]{64}");
     private static final Pattern TAG = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,119}");
     private static final Pattern APK_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,179}\\.apk", Pattern.CASE_INSENSITIVE);
@@ -21,16 +19,12 @@ public final class UpdatePolicy {
 
     public record Candidate(String tag, String version, long versionCode, String applicationId,
                             int minDataSchema, String fileName, long bytes, String sha256) { }
-    public static int compareVersions(String candidate, String installed) {
-        int[] a = parse(candidate), b = parse(installed);
-        for (int i = 0; i < 3; i++) if (a[i] != b[i]) return Integer.compare(a[i], b[i]);
-        return 0;
+    /** GitHub's public releases API includes prereleases but not unpublished drafts. */
+    public static boolean eligibleRelease(boolean draft, boolean prerelease) {
+        return !draft; // The prerelease flag is deliberately NOT an exclusion.
     }
-    private static int[] parse(String s) {
-        if (s == null) throw new IllegalArgumentException("Missing application version");
-        Matcher match = VERSION.matcher(s);
-        if (!match.matches()) throw new IllegalArgumentException("Expected stable MAJOR.MINOR.PATCH version");
-        return new int[]{Integer.parseInt(match.group(1)), Integer.parseInt(match.group(2)), Integer.parseInt(match.group(3))};
+    public static boolean newerAndroidBuild(long candidateCode, long installedCode) {
+        return candidateCode > installedCode && candidateCode <= Integer.MAX_VALUE;
     }
     /** This gate deliberately uses Android's monotonic versionCode, NOT release channels or versionName. */
     public static void requireCandidate(Candidate candidate, String installedVersion, long installedCode) {
@@ -39,7 +33,7 @@ public final class UpdatePolicy {
         if (!PACKAGE_ID.equals(candidate.applicationId())) throw new IllegalArgumentException("Unexpected Android package ID");
         if (candidate.version() == null || !candidate.version().matches("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,99}"))
             throw new IllegalArgumentException("Malformed Android versionName");
-        if (candidate.versionCode() <= installedCode || candidate.versionCode() > Integer.MAX_VALUE)
+        if (!newerAndroidBuild(candidate.versionCode(), installedCode))
             throw new IllegalArgumentException("Not a newer Android versionCode");
         if (candidate.minDataSchema() < 1 || candidate.minDataSchema() > SUPPORTED_DATA_SCHEMA)
             throw new IllegalArgumentException("Unsupported local save schema");
