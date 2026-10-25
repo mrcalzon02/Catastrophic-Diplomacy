@@ -20,9 +20,15 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final Texture innerHull;
     private static String spriteName(Shipyard.Hull hull) {
         return switch(hull) {
+            case INTERCEPTOR -> "interceptor";
             case CORVETTE -> "corvette";
+            case MISSILE_CORVETTE -> "missile_corvette";
             case FRIGATE -> "frigate";
-            case CRUISER -> "light_cruiser";
+            case DESTROYER -> "destroyer";
+            case LIGHT_CRUISER, CRUISER -> "light_cruiser";
+            case HEAVY_CRUISER -> "heavy_cruiser";
+            case BATTLECRUISER -> "battlecruiser";
+            case CARRIER -> "carrier";
             case DREADNOUGHT -> "dreadnought";
         };
     }
@@ -59,11 +65,16 @@ public final class TerranPlaceholderSprites implements Disposable {
         return result;
     }
     public int loaded() { return textures.size(); }
+    /** True only when this living vessel has an actual image, never for unapproved alien sheets. */
+    public boolean hasSprite(Battle.Ship ship) {
+        return ship != null && ship.alive() && ship.faction == Battle.Faction.TERRAN
+                && ship.hullClass != null && textures.containsKey(ship.hullClass);
+    }
     public void render(Battle battle,SpriteBatch batch) {
         if(textures.isEmpty())return;
         batch.begin();
         for(Battle.Ship ship:battle.ships()) {
-            if(!ship.alive()||ship.faction!=Battle.Faction.TERRAN||ship.hullClass==null)continue;
+            if(!hasSprite(ship))continue;
             Texture tex=textures.get(ship.hullClass);
             if(tex==null)continue;
             float height=(float)(34*ship.visualScale());
