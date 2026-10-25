@@ -117,6 +117,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else changeFaction(1);
                     return true;
                 }
+                // On-device sky preview; does not restart or alter the active battle.
+                if (starfield != null && world.y >= 616 && world.y <= 649) {
+                    if (world.x >= 1000 && world.x <= 1050) { previewSky(-1); return true; }
+                    if (world.x >= 1210 && world.x <= 1280) { previewSky(1); return true; }
+                }
                 return false;
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
@@ -293,8 +298,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(craft.team==0?Color.CYAN:Color.CORAL);
             shapes.circle((float)craft.x,(float)craft.y,craft.fighter?3.6f:2.4f,8);
         }
+        shapes.end();
+        // The HUD belongs to the fixed viewport camera, never the moving battle camera.
+        shapes.setProjectionMatrix(camera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(0.08f, 0.13f, 0.22f, 0.94f);
         shapes.rect(0, 649, W, 71);
+        if (starfield != null) {
+            shapes.setColor(0.045f, 0.075f, 0.15f, 0.88f);
+            shapes.rect(1000, 616, 280, 33);
+        }
         shapes.end();
         batch.setProjectionMatrix(camera.combined); batch.begin();
         font.setColor(Color.WHITE);
@@ -312,6 +325,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"+",1112,693);
         font.draw(batch,"SHIPYARD",1166,693);
         font.setColor(Color.LIGHT_GRAY);
+        if (starfield != null) {
+            font.draw(batch, "<", 1016, 638);
+            font.draw(batch, "SKY " + skyPreviewLevel + "/500  SECTOR " + ((skyPreviewLevel-1)/50+1), 1056, 638);
+            font.draw(batch, ">", 1246, 638);
+        }
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
                 + "   PD " + battle.missileIntercepts + "   CRAFT " + battle.crafts().size()
