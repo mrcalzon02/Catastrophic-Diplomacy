@@ -120,6 +120,8 @@ public final class ProjectileModuleTest {
         for(int t=0;t<15;t++){
             b.step();
             for(Battle.Missile m:b.missiles()){
+                // Other ships carry DIFFERENT faction/module ordnance in this live duel.
+                if(m.sourceId!=launcher.id)continue;
                 if(m.torpedo){
                     check(m.spec.equals(installed.torpedoProjectile()),
                             "live torpedo must inherit launch module configuration");
@@ -131,6 +133,7 @@ public final class ProjectileModuleTest {
                 }
             }
             for(Battle.Ballistic shell:b.ballistics()){
+                if(shell.sourceId!=launcher.id)continue;
                 check(shell.spec.equals(installed.kineticProjectile()),
                         "live shell must inherit actual kinetic module speed, health and RCS");
                 hasShell=true;
