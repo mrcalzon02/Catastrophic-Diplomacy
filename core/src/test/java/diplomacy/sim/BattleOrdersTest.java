@@ -74,11 +74,30 @@ public final class BattleOrdersTest {
                         ==BattleOrders.PointDefense.HOLD_FIRE,
                 "team PD templates must affect future deployments");
     }
+    private static void checkPersistence(){
+        BattleOrders.Orders left=BattleOrders.DEFAULT
+                .withPointDefense(BattleOrders.PointDefense.INTERCEPT_ONLY)
+                .withTargeting(BattleOrders.Targeting.COOPERATE)
+                .withEngagement(BattleOrders.Size.CAPITAL,80,480);
+        BattleOrders.Orders right=BattleOrders.DEFAULT
+                .withPointDefense(BattleOrders.PointDefense.HOLD_FIRE)
+                .withPosition(BattleOrders.Position.CAUTIOUS)
+                .withRetreat(0.35);
+        String saved=BattleOrdersCodec.encode(left,right);
+        BattleOrdersCodec.Pair restored=BattleOrdersCodec.decode(saved);
+        check(restored.left().equals(left)&&restored.right().equals(right),
+                "tactical doctrine saves must roundtrip exactly");
+        String tampered=saved.replace("INTERCEPT_ONLY","BALANCED");
+        try{
+            BattleOrdersCodec.decode(tampered);
+            throw new AssertionError("A changed orders file passed checksum validation");
+        }catch(IllegalArgumentException expected){/* checksum protects source */}
+    }
     public static void main(String[] args){
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,
                 "PD control must cycle through all four modes");
-        checkTargeting();checkReplay();
+        checkTargeting();checkReplay();checkPersistence();
         System.out.println("PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay");
     }
 }
