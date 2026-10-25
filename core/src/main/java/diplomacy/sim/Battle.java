@@ -823,7 +823,9 @@ public final class Battle {
             }
             if(target!=null){
                 double range=StrictMath.hypot(target.x-craft.x,target.y-craft.y);
-                if(range>profile.sensors()*weather.sensorFactor())target=null;
+                // Carrier datalink supplies a coarse off-sensor intercept course.
+                // Local fighter sensors govern actual lock and firing below.
+                if(range>Math.max(600,profile.sensors()*weather.sensorFactor()*2))target=null;
             }
         }
         if(target==null&&intercept==null)return;
@@ -837,7 +839,8 @@ public final class Battle {
             craft.x+=(tx-craft.x)/distance*movement;
             craft.y+=(ty-craft.y)/distance*movement;
         }
-        if(craft.reload>0 || distance>profile.range())return;
+        if(craft.reload>0 || distance>profile.range()
+                || distance>profile.sensors()*weather.sensorFactor())return;
         if(profile.ammunition()>0&&craft.ammunition<=0)return;
         Ship carrier=findShip(craft.sourceId);
         double accuracy=profile.accuracy()*weather.accuracyFactor();
