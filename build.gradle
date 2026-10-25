@@ -5,3 +5,47 @@ allprojects {
     group = 'games.catastrophicdiplomacy'
     version = '0.1.0-SNAPSHOT'
 }
+
+
+// Exact-byte approved UI art, transferred as small Git blobs to avoid binary upload limits.
+def approvedUiParts = (0..<20).collect { file('asset_packs/ui-kit/part-' + String.format('%02d', it) + '.bin') }
+def approvedUiOutput = layout.buildDirectory.dir('generated/cd-ui')
+tasks.register('prepareUiAssets') {
+    inputs.files approvedUiParts
+    outputs.dir approvedUiOutput
+    doLast {
+        approvedUiParts.each { if (!it.isFile()) throw new GradleException('Missing approved UI part: ' + it.name) }
+        def archive = layout.buildDirectory.file('tmp/approved-ui-kit.zip').get().asFile
+        archive.parentFile.mkdirs()
+        archive.withOutputStream { out ->
+            approvedUiParts.each { part -> part.withInputStream { input -> input.transferTo(out) } }
+        }
+        def digest = { File f ->
+            f.withInputStream { input ->
+                def sha = java.security.MessageDigest.getInstance('SHA-256')
+                byte[] bytes = new byte[65536]
+                int n
+                while ((n = input.read(bytes)) != -1) sha.update(bytes, 0, n)
+                sha.digest().encodeHex().toString()
+            }
+        }
+        if (digest(archive) != '8220b70e36e7133f8bbb5d1d89dacc0a1b14ee12671c481d822454901f80a170')
+            throw new GradleException('UI pack checksum mismatch; refusing art installation')
+        def target = approvedUiOutput.get().asFile
+        project.delete(target)
+        project.copy {
+            from(zipTree(archive)) {
+                include 'assets/ui/tactical/**'
+                eachFile { detail -> detail.path = detail.path.substring('assets/'.length()) }
+                includeEmptyDirs = false
+            }
+            into(target)
+        }
+        def atlas = new File(target, 'ui/tactical/icons.png')
+        if (!atlas.isFile() || digest(atlas) != '1bc99703f65496727ef3c08db82ea660db22f0581f811c1cf9c20c6fc14dc293')
+            throw new GradleException('Approved UI icon atlas is absent or invalid')
+        def index = new File(target, 'ui/tactical/icons.tsv')
+        if (!index.isFile() || index.readLines('UTF-8').count { line -> line.trim() && !line.startsWith('#') } != 87)
+            throw new GradleException('Approved UI index must contain exactly 87 icons')
+    }
+}

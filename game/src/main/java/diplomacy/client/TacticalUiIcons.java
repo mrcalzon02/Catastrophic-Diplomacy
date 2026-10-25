@@ -17,6 +17,8 @@ final class TacticalUiIcons {
     private static final String ATLAS = "ui/tactical/icons.png";
     private static final String INDEX = "ui/tactical/icons.tsv";
     private Texture texture;
+    private final Map<String, Texture> buttons = new HashMap<>();
+    private final Map<String, Texture> bars = new HashMap<>();
     private final Map<String, TextureRegion> regions = new HashMap<>();
 
     TacticalUiIcons() {
@@ -39,12 +41,47 @@ final class TacticalUiIcons {
                 regions.put(fields[0], new TextureRegion(texture, x * TILE, y * TILE, TILE, TILE));
             }
             if (regions.size() != 87) throw new IllegalArgumentException("Expected 87 approved UI icons");
+            for (String id : new String[]{"primary","secondary","special","danger","confirm","cancel","info"}) {
+                loadLayer(buttons, "ui/tactical/buttons/" + id + ".png", id);
+            }
+            for (String id : new String[]{"hull","shield","energy","heat","critical"}) {
+                loadLayer(bars, "ui/tactical/bars/" + id + ".png", id);
+            }
         } catch (RuntimeException failed) {
             if (texture != null) texture.dispose();
             texture = null;
             regions.clear();
+            clearLayers();
             if (Gdx.app != null) Gdx.app.error("UI", "UI sprite atlas unavailable, preserving text controls", failed);
         }
+    }
+
+    private static void loadLayer(Map<String,Texture> target, String path, String id) {
+        FileHandle file = Gdx.files.internal(path);
+        if (!file.exists()) return;
+        Texture layer = new Texture(file);
+        layer.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        target.put(id, layer);
+    }
+
+    void drawButton(SpriteBatch batch, String style, float x, float y, float width, float height) {
+        Texture layer = buttons.get(style);
+        if (layer == null) return;
+        batch.setColor(1,1,1,0.92f);
+        batch.draw(layer, x, y, width, height);
+        batch.setColor(1,1,1,1);
+    }
+
+    void drawBar(SpriteBatch batch, String style, float x, float y, float width, float height) {
+        Texture layer = bars.get(style);
+        if (layer != null) batch.draw(layer, x, y, width, height);
+    }
+
+    private void clearLayers() {
+        for (Texture layer : buttons.values()) layer.dispose();
+        for (Texture layer : bars.values()) layer.dispose();
+        buttons.clear();
+        bars.clear();
     }
 
     boolean available() {
@@ -62,5 +99,6 @@ final class TacticalUiIcons {
             texture = null;
         }
         regions.clear();
+        clearLayers();
     }
 }

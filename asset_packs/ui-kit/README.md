@@ -1,0 +1,5 @@
+# Approved UI pack
+
+These 20 exact-byte binary chunks concatenate in numeric order to form Catastrophic_Diplomacy_UI_Kit_v1.zip (SHA-256 `8220b70e36e7133f8bbb5d1d89dacc0a1b14ee12671c481d822454901f80a170`). `prepareUiAssets` verifies the ZIP then extracts only approved `assets/ui/tactical/**` sprites into the platform's runtime assets. Source concept sheets are not bundled. Never display a whole palette as one icon. The 87 approved atlas icons and themed button sprites are required for visual acceptance. Failure to verify hashes MUST stop the build; do not silently use garbage.
+
+The ten Terran ship images and 35 beam strips from the separately verified `Catastrophic_Diplomacy_Runtime_Art_Stage1.zip` (SHA-256 `5d1035bb7ca5684dd4027f22e73e46fe043cad2fa14356adb41349da9436aaaa`) still require installation under `assets/ships/terran/` and `assets/effects/beams/`. The existing Terran sprite render path falls back to geometry when missing. Alien lineup sheets are references, not segmented sprites.

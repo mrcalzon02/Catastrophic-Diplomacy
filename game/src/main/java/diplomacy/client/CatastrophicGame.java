@@ -40,6 +40,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private long nextSeed = 2479;
     private float accumulator;
     private boolean running = true;
+    private boolean tacticalMenuOpen;
+    private boolean resumeAfterMenu;
     private int speed = 1;
     /** Keyboard [ ] and the compact header controls select actual deployed ships per side. */
     private static final int[] FLEET_SIZES = {1,2,4,8,16,32,64,100,150,200};
@@ -80,7 +82,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         reset();
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
+                if (tacticalMenuOpen) {
+                    if (key == Input.Keys.ESCAPE || key == Input.Keys.M) closeTacticalMenu();
+                    return true;
+                }
                 if (shipyard.open()) return shipyard.key(key);
+                if (key == Input.Keys.M || key == Input.Keys.ESCAPE) { openTacticalMenu(); return true; }
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
@@ -94,6 +101,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
+                if (tacticalMenuOpen) { tapTacticalMenu(world.x,world.y); return true; }
+                if (!shipyard.open() && world.x >= 1140 && world.y >= 71 && world.y <= 124) {
+                    openTacticalMenu(); return true;
+                }
                 if (shipyard.open()) {
                     shipyard.startTouch(world.x,world.y,pointer);
                     return true;
@@ -125,6 +136,54 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.scroll(amountY);
             }
         });
+    }
+
+    private void openTacticalMenu() {
+        if (tacticalMenuOpen || shipyard.open()) return;
+        resumeAfterMenu = running;
+        running = false;
+        tacticalMenuOpen = true;
+    }
+    private void closeTacticalMenu() {
+        if (!tacticalMenuOpen) return;
+        tacticalMenuOpen = false;
+        running = resumeAfterMenu;
+    }
+    private void tapTacticalMenu(float x, float y) {
+        if (x < 420 || x > 860) { closeTacticalMenu(); return; }
+        if (y >= 462 && y < 510) closeTacticalMenu();
+        else if (y >= 402 && y < 450) { reset(); closeTacticalMenu(); }
+        else if (y >= 342 && y < 390) {
+            closeTacticalMenu();
+            shipyard.show();
+        }
+        else if (y >= 282 && y < 330) changeFleetSize(-1);
+        else if (y >= 222 && y < 270) changeFleetSize(1);
+        else if (y >= 162 && y < 210) closeTacticalMenu();
+    }
+    private void drawTacticalMenu() {
+        shapes.setProjectionMatrix(camera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(0.008f,0.014f,0.034f,0.97f);
+        shapes.rect(408,136,464,423);
+        shapes.setColor(0.10f,0.20f,0.32f,1);
+        shapes.rect(421,536,438,2);
+        shapes.end();
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch,"TACTICAL COMMAND",518,530);
+        String[] labels = {"RESUME ENGAGEMENT","RESTART ENGAGEMENT","OPEN SHIPYARD",
+                "REDUCE FLEET SIZE","INCREASE FLEET SIZE","CLOSE MENU"};
+        for (int i=0;i<labels.length;i++) {
+            float y=462-60*i;
+            if(uiIcons!=null) uiIcons.drawButton(batch,i==1?"danger":i==2?"special":"primary",438,y,405,46);
+            font.setColor(Color.WHITE);
+            font.draw(batch,labels[i],476,y+30);
+        }
+        font.setColor(Color.LIGHT_GRAY);
+        font.draw(batch,"DEPLOYED " + FLEET_SIZES[fleetIndex] + " VERSUS " + FLEET_SIZES[fleetIndex],487,150);
+        batch.end();
     }
 
     private void changeFleetSize(int delta) {
@@ -201,7 +260,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     @Override public void render() {
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
-        if (running && !shipyard.open() && !battle.finished()) {
+        if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
             accumulator += delta * speed;
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
@@ -283,6 +342,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.rect(0, 649, W, 71);
         shapes.end();
         batch.setProjectionMatrix(camera.combined); batch.begin();
+        if (uiIcons != null) {
+            uiIcons.drawButton(batch,running?"primary":"special",4,663,121,38);
+            uiIcons.drawButton(batch,"secondary",132,663,117,38);
+            uiIcons.drawButton(batch,"secondary",262,663,106,38);
+            uiIcons.drawButton(batch,"secondary",374,663,104,38);
+            uiIcons.drawButton(batch,"special",1158,663,120,38);
+            uiIcons.drawButton(batch,"primary",1138,78,132,41);
+        }
         font.setColor(Color.WHITE);
         font.draw(batch, running ? "PAUSE" : "RESUME", 15, 693);
         font.draw(batch, "RESTART", 139, 693);
@@ -297,6 +364,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,""+FLEET_SIZES[fleetIndex]+"v"+FLEET_SIZES[fleetIndex],1022,693);
         font.draw(batch,"+",1112,693);
         font.draw(batch,"SHIPYARD",1166,693);
+        font.setColor(Color.WHITE);
+        font.draw(batch,"MENU (M)",1156,107);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
@@ -315,6 +384,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     + " HOLDS THE FIELD", 330, 617);
         }
         batch.end();
+        if (tacticalMenuOpen) drawTacticalMenu();
     }
 
     /** World camera follows the active engagement; UI coordinates never move. */

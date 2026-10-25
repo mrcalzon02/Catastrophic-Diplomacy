@@ -243,6 +243,18 @@ final class ShipyardPanel {
         }
         shapes.end();
         batch.begin();
+        if (uiIcons != null) {
+            uiIcons.drawButton(batch,team==0?"primary":"secondary",24,642,137,42);
+            uiIcons.drawButton(batch,team==1?"primary":"secondary",169,642,139,42);
+            uiIcons.drawButton(batch,"secondary",338,642,39,42);
+            uiIcons.drawButton(batch,"secondary",643,642,51,42);
+            uiIcons.drawButton(batch,"confirm",706,642,107,42);
+            uiIcons.drawButton(batch,"secondary",819,642,96,42);
+            uiIcons.drawButton(batch,"secondary",924,642,94,42);
+            uiIcons.drawButton(batch,"special",1019,642,109,42);
+            uiIcons.drawButton(batch,"cancel",1135,642,116,42);
+            uiIcons.drawButton(batch,"info",697,579,102,41);
+        }
         if(artPreview&&fleetArt!=null)
             fleetArt.drawPreview(batch,draft.faction,draft.hull,MAP_CX,MAP_CY,330,402);
         if (uiIcons != null && uiIcons.available()) {
