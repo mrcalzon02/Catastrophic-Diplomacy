@@ -117,3 +117,6 @@ tasks.register('updaterPolicySmoke', JavaExec) {
     mainClass = 'diplomacy.update.UpdatePolicyTest'
     dependsOn testClasses
 }
+
+// Run updater security policy with the normal deterministic core smoke chain.
+tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('updaterPolicySmoke')) }
