@@ -18,3 +18,7 @@ The repository shares one Java 17 `:core` combat/shipyard implementation and one
 ## Outstanding
 
 Physical component/compartment damage, carrier recovery/refuel logistics, missile warhead variants and long-fleet GPU optimization remain additional implementation tasks. No end-to-end Java17 desktop libGDX or Android toolchain build was run in this environment. No signing keys or GitHub Actions workflow files were created, rotated or read for this development slice.
+
+## Mandatory mobile APK release compliance (P0, not yet certified)
+
+Every Android APK acceptance cycle MUST review all 38 controls in [the canonical release checklist](APK_RELEASE_COMPLIANCE_GATE.md), including current Play distribution rules, platform-specific target API, user-data flow, signer continuity and updater/download restrictions. Run `python3 tools/verify_apk_release_gate.py --checklist-only` during source preflight and then `python3 tools/verify_apk_release_gate.py --evidence <record.json> --apk <signed.apk>` for an actual candidate. An evidence record does not replace device upgrade tests, `apksigner` verification or Play Console approval. Keep GitHub/sideload development on `main`; the dormant `google-play` branch has a fail-closed complete functional-test release command. The current Android targetSdk 35 must be evaluated against today's Play upload requirement before any Play submission, and a distinct Play upload-signing plan remains outstanding. No private signing work is authorized by this checklist.
