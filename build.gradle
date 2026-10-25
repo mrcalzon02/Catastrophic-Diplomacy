@@ -67,7 +67,7 @@ tasks.register('verifyBattlefieldResources') {
         int present = 0
         inventory.each { prefix, count ->
             (0..<count).each { i ->
-                def name = sprintf('%s_%02d.png', prefix, i)
+                def name = String.format(java.util.Locale.ROOT, '%s_%02d.png', prefix, i)
                 def png = new File(folder, name)
                 if (!png.isFile() || png.length() < 200) {
                     throw new GradleException('Missing vetted battlefield resource: ' + png)

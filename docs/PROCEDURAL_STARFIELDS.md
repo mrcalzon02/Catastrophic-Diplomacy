@@ -12,7 +12,7 @@ The game generates its skies in Java/libGDX, **not** from a 500-image gallery. T
 
 ## Current integration
 
-- The sandbox is not yet a real 500-level campaign. Preview starts at **1**; keyboard **N**/**B** and the on-screen touchable **< / > SKY** bar preview next/previous sky without restarting an encounter. The sky bar is screen-anchored independently of the moving battle camera.
+- The full wave campaign is not yet wired, but level environments 1..500 **are playable in the sandbox**. Keyboard **N**/**B** and the on-screen touchable **< / > LEVEL** bar select an environment and restart the encounter with matching weather immediately. The bar remains stationary while the battle camera moves.
 - When campaign selection is implemented, call `starfield.useLevel(level.index())` on entering a stage, not each frame. Replays reuse the same definition.
 - Starfields render before ships, weapons, damage effects and HUD. The existing top HUD background now uses the fixed viewport camera, so it does not pan or zoom with the battlefield.
 

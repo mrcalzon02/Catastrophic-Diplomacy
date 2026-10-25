@@ -39,10 +39,10 @@ VFX renders in two explicitly separated passes: translucent phenomena **behind**
 
 ## Current sandbox controls
 
-- **B / N** or the sky preview arrows: choose one of the 500 sky recipes, without interrupting the current battle.
-- **R**: restart the encounter using the currently previewed sky number's weather preset.
+- **B / N** or the LEVEL arrow controls: choose one of 500 sky recipes and restart the encounter with that level's weather enabled.
+- **R**: restart the current encounter, retaining the selected level's environment.
 - **W** or tap the environment status strip: toggle hazards on/off and restart the encounter. Off means CLEAR.
-- The HUD displays the ACTIVE encounter hazard, which may differ from the previewed sky number until R is pressed.
+- The HUD displays the active hazard belonging to the selected level. There is no separate uncommitted sky preview state.
 
 These controls are a development preview. The campaign level UI, once implemented, should bind the selected `LevelEconomy.Level.index()` to the sky AND environment during encounter construction.
 
