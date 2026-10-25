@@ -266,7 +266,7 @@ public final class Shipyard {
                          ProjectileModel.Spec missileProjectile,
                          ProjectileModel.Spec torpedoProjectile,
                          ProjectileModel.Defense pointDefense,
-                         Weapons weapons,Support support) { }
+                         Weapons weapons,Support support,double pdCycle) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -277,7 +277,7 @@ public final class Shipyard {
         List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
-        double pdWeight=0,pdOutput=0,pdTracking=0,sensorRatio=1;
+        double pdWeight=0,pdOutput=0,pdTracking=0,pdCycle=0,sensorRatio=1;
         double[] ranges=new double[6],cycles=new double[6],trackers=new double[6];
         int[] weaponCounts=new int[6];
         double selfRate=0,remoteRate=0,remoteRange=180;
@@ -334,6 +334,7 @@ public final class Shipyard {
                     pdWeight++;
                     pdOutput+=p.effect/p.base.effect*tuning.damage();
                     pdTracking+=p.accuracy*tuning.tracking();
+                    pdCycle+=tuning.cycle();
                 }
                 case "SEN" -> {
                     accuracy+=0.12*p.accuracy;
@@ -388,7 +389,8 @@ public final class Shipyard {
                         trackers[0],trackers[1],trackers[2],trackers[3],trackers[4],trackers[5]),
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
                         repairDrones,droneRepair,droneEndurance,efficiency,
-                        repairDroneCapacity));
+                        repairDroneCapacity),
+                pdWeight==0?1:pdCycle/pdWeight);
     }
 
     /** Current exclusive research branch effect of one selected installed module. */
