@@ -209,6 +209,29 @@ final class ShipyardPanel {
             case SUPPORT -> Color.VIOLET;
         };
     }
+    /** Display-only category lookup; does not grant or change any module behavior. */
+    private static String iconForModule(String label, Shipyard.Mount mount) {
+        String item=label.toUpperCase(Locale.ROOT);
+        if(item.contains("MISSILE") || item.contains("TORPEDO"))return "missile";
+        if(item.contains("LASER") || item.contains("BEAM") || item.contains("PARTICLE"))return "laser";
+        if(item.contains("POINT DEFENSE") || item.contains("FLAK") || item.contains("TURRET"))return "turret";
+        if(item.contains("DRONE"))return "drone";
+        if(item.contains("HANGAR") || item.contains("FIGHTER"))return "squadron";
+        if(item.contains("EMP") || item.contains("ECM") || item.contains("JAMMER"))return "emp";
+        if(item.contains("STEALTH") || item.contains("CLOAK"))return "stealth";
+        if(item.contains("SENSOR") || item.contains("RADAR") || item.contains("SCANNER"))return "detect";
+        if(item.contains("SHIELD"))return "shield";
+        if(item.contains("ARMOR"))return "armor";
+        if(item.contains("REPAIR"))return "repair";
+        if(item.contains("ENGINE") || item.contains("THRUST") || item.contains("PROPULSION"))return "engine";
+        if(item.contains("REACTOR") || item.contains("POWER"))return "energy";
+        return switch(mount) {
+            case SYSTEM -> "engine";
+            case WEAPON -> "weapons";
+            case DEFENSE -> "shield";
+            case SUPPORT -> "repair";
+        };
+    }
     private static int count(List<Shipyard.Slot> slots,Shipyard.Mount mount){
         int result=0;
         for(Shipyard.Slot s:slots)if(s.mount()==mount)result++;
@@ -276,12 +299,9 @@ final class ShipyardPanel {
             uiIcons.draw(batch, "complete", 713, 648, 25);
             uiIcons.draw(batch, "close", 1142, 649, 25);
             // Selected mount icon remains data-driven; never imply a weapon on a support slot.
-            String mountIcon = switch(selected.mount()) {
-                case SYSTEM -> "engine";
-                case WEAPON -> "weapons";
-                case DEFENSE -> "shield";
-                case SUPPORT -> "repair";
-            };
+            String mountIcon = installed==null
+                    ? iconForModule("",selected.mount())
+                    : iconForModule(installed.component,selected.mount());
             uiIcons.draw(batch,mountIcon,1218,357,23);
             uiIcons.draw(batch, "energy", 1213,148,22);
         }
@@ -352,6 +372,8 @@ final class ShipyardPanel {
         font.setColor(Color.LIGHT_GRAY);font.draw(batch,"CLEAR MOUNT",813,564);
         for(int n=0;n<options.size();n++){
             Component c=options.get(n);
+            if(uiIcons!=null && n<8)
+                uiIcons.draw(batch,iconForModule(c.name,selected.mount()),1220,533-n*25,21);
             font.setColor(installed!=null&&c.id.equals(installed.component)?Color.GOLD:Color.WHITE);
             font.draw(batch,shortText(c.name,34),813,564-(n+1)*25);
         }
