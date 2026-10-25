@@ -61,6 +61,12 @@ def main():
         for rel,data in content.items():
             target=root/rel;target.parent.mkdir(parents=True,exist_ok=True)
             if not target.exists():target.write_bytes(data)
+        # Commit this exact per-image SHA-256 contract beside the binary artwork.
+        index=root/"assets/ships/factions/approved-sprites.json"
+        serialized=json.dumps(manifest,indent=2,sort_keys=True)+"\\n"
+        if index.exists() and index.read_text()!=serialized:
+            raise ValueError("Existing art approval index differs; review before replacing")
+        index.write_text(serialized)
     print("PASS 50 unmodified RGBA sprites verified and staged at assets/ships/factions/")
     print("Commit the 50 binary assets with Git (they are NOT present until imported).")
 if __name__=="__main__":main()
