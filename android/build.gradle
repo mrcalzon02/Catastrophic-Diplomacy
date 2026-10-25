@@ -39,7 +39,7 @@ android {
             if (signingAvailable) signingConfig signingConfigs.release
         }
     }
-    sourceSets { main { assets.srcDirs = ['../assets', rootProject.layout.buildDirectory.dir('generated/cd-ui').get().asFile] } }
+    sourceSets { main { assets.srcDirs = ['../assets', rootProject.layout.buildDirectory.dir('generated/cd-ui').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-music').get().asFile] } }
     packaging { resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] } }
 }
 
@@ -60,6 +60,7 @@ tasks.configureEach { task ->
     if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
         task.dependsOn rootProject.tasks.named('prepareUiAssets')
         task.dependsOn rootProject.tasks.named('verifyBattlefieldResources')
+        task.dependsOn rootProject.tasks.named('verifyBattleAudioResources')
     }
     if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
         task.dependsOn(tasks.named('copyAndroidNatives'))

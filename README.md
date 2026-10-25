@@ -3,6 +3,16 @@
 *An Unreasonable Space Warfare Simulator* — six rival civilizations, engineering-driven fleet combat and entirely unnecessary quantities of ordnance.
 
 
+## Combat audio and soundtrack
+
+Shared libGDX audio now turns simulation weapon fire, shield and hull hits, interceptions,
+ship destruction and UI actions into audible effects, with an intentionally throttled
+200v200 mix. Two user-Drive music tracks are packaged for desktop and Android.
+The tactical menu exposes music/effects toggles and track selection (keyboard **U/I/J**),
+with persistent preferences and graceful audio-device failure handling. See
+[combat audio, Drive provenance and verification](docs/AUDIO_SYSTEM.md).
+Hardware playback and release music-rights clearance are still acceptance gates.
+
 ## Graphics stage 2 (faction hull silhouettes and source-backed UI)
 
 All six factions now receive class-specific fallback tactical silhouettes derived from the

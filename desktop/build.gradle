@@ -11,8 +11,10 @@ application { mainClass = 'diplomacy.desktop.DesktopLauncher' }
 tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareUiAssets')
     dependsOn rootProject.tasks.named('verifyBattlefieldResources')
+    dependsOn rootProject.tasks.named('verifyBattleAudioResources')
     from(rootProject.file('assets'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-ui'))
+    from(rootProject.layout.buildDirectory.dir('generated/cd-music'))
     into(layout.buildDirectory.dir('runtime-assets'))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
