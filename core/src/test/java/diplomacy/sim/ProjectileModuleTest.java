@@ -20,7 +20,7 @@ public final class ProjectileModuleTest {
         int missileSlot=slot(hull,Shipyard.Mount.WEAPON,1);
         int kineticSlot=slot(hull,Shipyard.Mount.WEAPON,2);
         int torpedoSlot=slot(hull,Shipyard.Mount.WEAPON,3);
-        int pointDefenseSlot=slot(hull,Shipyard.Mount.DEFENSE,1);
+        int pointDefenseSlot=slot(hull,Shipyard.Mount.WEAPON,4);
         int sensorSlot=slot(hull,Shipyard.Mount.SYSTEM,3);
         Shipyard.Design base=Shipyard.starter(Battle.Faction.TERRAN,hull)
                 .install(kineticSlot,"BASE-TER-KIN")
