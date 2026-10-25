@@ -15,7 +15,7 @@ public final class UpdatePolicy {
     private static final Pattern SHA = Pattern.compile("[a-fA-F0-9]{64}");
     private static final Pattern TAG = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+/-]{0,199}");
     private static final Pattern APK_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._ +()-]{0,179}\\.apk", Pattern.CASE_INSENSITIVE);
-    private static final List<String> REDIRECT_HOSTS = List.of("github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com");
+    private static final List<String> REDIRECT_HOSTS = java.util.Arrays.asList("github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com");
 
     public record Candidate(String tag, String version, long versionCode, String applicationId,
                             int minDataSchema, String fileName, long bytes, String sha256) { }
@@ -47,7 +47,7 @@ public final class UpdatePolicy {
             throw new IllegalArgumentException("Unsafe APK filename");
         if (bytes < 4096 || bytes > MAX_APK_BYTES) throw new IllegalArgumentException("APK outside bounded size limit");
         // GitHub digest and manifest are optional. Android signature verification is mandatory.
-        if (sha256 != null && !sha256.isBlank() && !SHA.matcher(sha256).matches())
+        if (sha256 != null && !sha256.trim().isEmpty() && !SHA.matcher(sha256).matches())
             throw new IllegalArgumentException("Invalid SHA256 checksum");
     }
     /** Manifestless published APK: code and version are inspected after downloading. */
