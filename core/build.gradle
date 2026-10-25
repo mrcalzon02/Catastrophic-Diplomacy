@@ -28,6 +28,15 @@ tasks.register('shipyardSmoke', JavaExec) {
 }
 tasks.named('technologySmoke') { finalizedBy(tasks.named('shipyardSmoke')) }
 
+tasks.register('hullLayoutsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'All 11 hull classes x six factions: hardpoint positions, selection and legacy blueprint schema.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullLayoutsTest'
+    dependsOn testClasses
+}
+tasks.named('shipyardSmoke') { finalizedBy(tasks.named('hullLayoutsSmoke')) }
+
 // Portable fleet encoding and pointer gestures shared by the desktop/Android client.
 tasks.register('platformSmoke', JavaExec) {
     group = 'verification'
