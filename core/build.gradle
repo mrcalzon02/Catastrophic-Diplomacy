@@ -81,6 +81,15 @@ tasks.register('projectileModuleSmoke', JavaExec) {
 }
 tasks.named('battleOrdersSmoke') { finalizedBy(tasks.named('projectileModuleSmoke')) }
 
+tasks.register('moduleResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Enforce one exclusive tech path per module and independent cross-module six-stage research.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ModuleResearchExclusivityTest'
+    dependsOn testClasses
+}
+tasks.named('projectileModuleSmoke') { finalizedBy(tasks.named('moduleResearchSmoke')) }
+
 
 
 tasks.register('fleetScaleSmoke', JavaExec) {
