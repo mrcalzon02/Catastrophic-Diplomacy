@@ -22,6 +22,7 @@ final class ShipyardPanel {
     private static final float MAP_CX=563f, MAP_CY=343f, MAP_SCALE=2.65f;
     private final TechnologyCatalog catalog;
     private final TerranPlaceholderSprites fleetArt;
+    private TacticalUiIcons uiIcons;
     private final BiConsumer<Integer,Shipyard.Design> deploy;
     private Shipyard.Design[] active = new Shipyard.Design[2];
     private Shipyard.Design draft;
@@ -37,6 +38,7 @@ final class ShipyardPanel {
         catalog=tech;deploy=deployment;fleetArt=art;active[0]=first;active[1]=second;
         draft=first;
     }
+    void setIcons(TacticalUiIcons icons) { uiIcons = icons; }
     boolean open() { return open; }
     void show() { open=true; draft=active[team]; selectedSlot=0; scroll=0; artPreview=false; }
     void close() { open=false; gesture.cancel(); }
@@ -243,6 +245,12 @@ final class ShipyardPanel {
         batch.begin();
         if(artPreview&&fleetArt!=null)
             fleetArt.drawPreview(batch,draft.faction,draft.hull,MAP_CX,MAP_CY,330,402);
+        if (uiIcons != null && uiIcons.available()) {
+            uiIcons.draw(batch, "complete", 743, 674, 25);
+            uiIcons.draw(batch, "information", 841, 674, 25);
+            uiIcons.draw(batch, "restart", 950, 674, 25);
+            uiIcons.draw(batch, "close", 1152, 674, 25);
+        }
         font.setColor(Color.WHITE);font.draw(batch,"SHIPYARD",22,702);
         font.setColor(team==0?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"LEFT FLEET",35,660);
         font.setColor(team==1?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"RIGHT FLEET",175,660);
