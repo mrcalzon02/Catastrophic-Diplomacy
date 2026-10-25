@@ -98,6 +98,26 @@ public final class Battle {
         }
     }
 
+    /**
+     * Slow kinetic rounds are real interceptable objects, NOT a visual beam with
+     * instantaneous damage. All positions/velocities are world units per second.
+     * A ballistic shell never homes after launch; its destination is predicted by
+     * the firing ship at the instant it pulls the trigger.
+     */
+    public static final class Ballistic {
+        public static final double SPEED=285.0;
+        public final long visualId,spawnTick;
+        public final int sourceId,team,targetId;
+        public final double vx,vy,damage;
+        public double x,y,life=2.50,integrity=1.60;
+        Ballistic(long id,long firedAt,int source,int side,int target,
+                  double px,double py,double heading,double amount){
+            visualId=id;spawnTick=firedAt;sourceId=source;team=side;targetId=target;
+            x=px;y=py;vx=SPEED*StrictMath.cos(heading);
+            vy=SPEED*StrictMath.sin(heading);damage=amount;
+        }
+    }
+
     /** Fighters attack hostile hulls. Defensive drones deliberately hunt hostile ordnance. */
     public static final class Craft {
         public final int id, sourceId, team;
@@ -132,6 +152,7 @@ public final class Battle {
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
     private final List<Missile> missiles = new ArrayList<>();
+    private final List<Ballistic> ballistics = new ArrayList<>();
     private final List<Craft> crafts = new ArrayList<>();
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
@@ -141,7 +162,7 @@ public final class Battle {
     private int nextId = 1;
     private final long seed;
     public long tick;
-    public int hitCount, missileIntercepts, destructions, environmentalHits;
+    public int hitCount, missileIntercepts, ballisticIntercepts, destructions, environmentalHits;
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
 
     public Battle(long initialSeed) { seed = initialSeed; random = new Random(initialSeed); }
@@ -154,6 +175,7 @@ public final class Battle {
     }
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
+    public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
     public List<String> events() { return Collections.unmodifiableList(events); }
@@ -281,6 +303,7 @@ public final class Battle {
             }
         }
         updateMissiles();
+        updateBallistics();
         updateCraft();
     }
 
@@ -371,10 +394,15 @@ public final class Battle {
             s.kineticReload=0.75/Math.max(0.25,s.weaponsCondition);
             s.power-=5;s.heat+=4;
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
-            visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.97,s.accuracy*weatherAim*(0.72+lock*0.4)))
-                hit(target,s.kineticDamage,s,DamageType.KINETIC,shotId);
+            double angle=StrictMath.atan2(target.y-s.y,target.x-s.x);
+            // Preserve the existing one-roll accuracy model, but a miss now has a
+            // genuinely displaced trajectory rather than an unexplained failed hit.
+            boolean onTarget=random.nextDouble()<Math.min(0.97,s.accuracy*weatherAim*(0.72+lock*0.4));
+            if(!onTarget)angle+=(shotId%2==0?1:-1)*0.24;
+            ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
+                    s.x,s.y,angle,s.kineticDamage));
+            visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
+                    s.x,s.y,target.x,target.y);
         }
         if (s.plasmaDamage > 0 && distance < 245 && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
             s.plasmaReload=1.8/Math.max(0.25,s.weaponsCondition);
@@ -476,6 +504,50 @@ public final class Battle {
         }
     }
 
+    /** Returns the first collision fraction in [0,1], or infinity if missed. */
+    private static double segmentHit(double ax,double ay,double bx,double by,
+                                     double cx,double cy,double radius) {
+        double dx=bx-ax,dy=by-ay;
+        double t=(dx*dx+dy*dy)<1e-10?0:
+                Math.max(0,Math.min(1,((cx-ax)*dx+(cy-ay)*dy)/(dx*dx+dy*dy)));
+        double closestX=ax+dx*t,closestY=ay+dy*t;
+        if(StrictMath.hypot(cx-closestX,cy-closestY)>radius)return Double.POSITIVE_INFINITY;
+        // Entry time, not nearest point: prevents projectiles passing through
+        // two ships and hitting whichever happens to be listed first.
+        double a=dx*dx+dy*dy;
+        if(a<1e-10)return 0;
+        double ox=ax-cx,oy=ay-cy;
+        double discriminant=StrictMath.pow(dx*ox+dy*oy,2)-a*(ox*ox+oy*oy-radius*radius);
+        if(discriminant<0)return t;
+        return Math.max(0,Math.min(1,(-(dx*ox+dy*oy)-StrictMath.sqrt(discriminant))/a));
+    }
+
+    private void updateBallistics() {
+        for(int i=ballistics.size()-1;i>=0;i--){
+            Ballistic p=ballistics.get(i);
+            if((p.life-=DT)<=0){
+                ballistics.remove(i);
+                visual(p.visualId,VisualPhase.TIMEOUT,"KINETIC",p.team,p.sourceId,
+                        p.targetId,p.x,p.y,p.x,p.y);
+                continue;
+            }
+            double nextX=p.x+p.vx*DT,nextY=p.y+p.vy*DT;
+            Ship closest=null;double earliest=Double.POSITIVE_INFINITY;
+            for(Ship candidate:ships){
+                if(candidate.team==p.team||!candidate.alive())continue;
+                double contact=segmentHit(p.x,p.y,nextX,nextY,candidate.x,candidate.y,
+                        12*candidate.visualScale());
+                if(contact<earliest){earliest=contact;closest=candidate;}
+            }
+            if(closest!=null){
+                p.x+=(nextX-p.x)*earliest;p.y+=(nextY-p.y)*earliest;
+                hit(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
+                        p.visualId,p.x,p.y);
+                ballistics.remove(i);
+            }else{p.x=nextX;p.y=nextY;}
+        }
+    }
+
     private void updateMissiles() {
         // Defensive fire is evaluated before missile movement/impact.
         for (Ship defender : ships) if (defender.alive() && defender.pdReload <= 0 && defender.pointDefenseCondition > 0.20) {
@@ -543,9 +615,13 @@ public final class Battle {
         hit(defender,raw,attacker,kind,0);
     }
     private void hit(Ship defender, double raw, Ship attacker,DamageType kind,long shotId) {
+        hit(defender,raw,attacker,kind,shotId,defender.x,defender.y);
+    }
+    private void hit(Ship defender, double raw, Ship attacker,DamageType kind,long shotId,
+                     double impactX,double impactY) {
         if (!defender.alive()) return;
         visual(shotId,VisualPhase.IMPACT,kind.name(),attacker==null?-1:attacker.team,
-                attacker==null?0:attacker.id,defender.id,defender.x,defender.y,
+                attacker==null?0:attacker.id,defender.id,impactX,impactY,
                 defender.x,defender.y);
         double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
@@ -627,6 +703,11 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(s.magazineCondition));
         }
         for (Missile m : missiles) { hash = mix(hash, m.sourceId); hash = mix(hash,Double.doubleToLongBits(m.y)); hash = mix(hash, Double.doubleToLongBits(m.x)); }
+        for (Ballistic p : ballistics) {
+            hash=mix(hash,p.visualId);hash=mix(hash,Double.doubleToLongBits(p.x));
+            hash=mix(hash,Double.doubleToLongBits(p.y));
+            hash=mix(hash,Double.doubleToLongBits(p.integrity));
+        }
         for (Craft craft : crafts) { hash=mix(hash,craft.id);hash=mix(hash,Double.doubleToLongBits(craft.x));hash=mix(hash,Double.doubleToLongBits(craft.y)); }
         return hash;
     }
