@@ -55,8 +55,9 @@ public final class InstancedShipRenderer implements AutoCloseable {
                     }
                     int offset = n++ * 4;
                     positions[offset] = (float) ship.x; positions[offset + 1] = (float) ship.y;
-                    positions[offset + 2] = (float) Math.cos(ship.facing);
-                    positions[offset + 3] = (float) Math.sin(ship.facing);
+                    float scale=(float)ship.visualScale();
+                    positions[offset + 2] = (float) Math.cos(ship.facing)*scale;
+                    positions[offset + 3] = (float) Math.sin(ship.facing)*scale;
                 }
                 if (n == 0) continue;
                 hull.setInstanceData(positions, 0, n * 4);

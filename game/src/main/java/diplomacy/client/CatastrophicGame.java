@@ -13,6 +13,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
+import diplomacy.sim.BattleView;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
@@ -21,7 +22,7 @@ import java.io.IOException;
 /** Same interactive client on Windows/Linux desktop and Android; no duplicate rules. */
 public final class CatastrophicGame extends ApplicationAdapter {
     private static final float W = 1280, H = 720;
-    private OrthographicCamera camera;
+    private OrthographicCamera camera, battleCamera;
     private FitViewport viewport;
     private ShapeRenderer shapes;
     private SpriteBatch batch;
@@ -36,12 +37,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private float accumulator;
     private boolean running = true;
     private int speed = 1;
+    /** Keyboard [ ] and the compact header controls select actual deployed ships per side. */
+    private static final int[] FLEET_SIZES = {1,2,4,8,16,32,64,100,150,200};
+    private int fleetIndex = 4;
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
 
     @Override public void create() {
         camera = new OrthographicCamera();
+        battleCamera = new OrthographicCamera();
+        battleCamera.setToOrtho(false,W,H);
         viewport = new FitViewport(W, H, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
@@ -69,6 +75,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
+                if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
+                if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
                 if (key == Input.Keys.MINUS) { speed = Math.max(1, speed / 2); return true; }
                 if (key == Input.Keys.Q) { changeFaction(0); return true; }
@@ -83,11 +91,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 if (world.y > 650) {
                     if (world.x > 1160) { shipyard.show(); return true; }
-                    if (world.x < 125) running = !running;
+                    if (world.x >= 1080) changeFleetSize(1);
+                    else if (world.x >= 990) changeFleetSize(-1);
+                    else if (world.x < 125) running = !running;
                     else if (world.x < 250) reset();
                     else if (world.x < 365) speed = Math.max(1, speed / 2);
                     else if (world.x < 475) speed = Math.min(16, speed * 2);
-                    else if (world.x < 850) changeFaction(0);
+                    else if (world.x < 745) changeFaction(0);
                     else changeFaction(1);
                     return true;
                 }
@@ -106,6 +116,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.scroll(amountY);
             }
         });
+    }
+
+    private void changeFleetSize(int delta) {
+        int selected = Math.max(0,Math.min(FLEET_SIZES.length-1,fleetIndex+delta));
+        if(selected!=fleetIndex){fleetIndex=selected;reset();}
     }
 
     private void changeFaction(int team) {
@@ -170,7 +185,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void reset() {
-        battle = Battle.duel(nextSeed++, 16, leftDesign, rightDesign, technology);
+        battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         accumulator = 0;
         running = true;
     }
@@ -194,19 +209,36 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipyard.draw(shapes,batch,font);
             return;
         }
-        shapes.setProjectionMatrix(camera.combined);
+        updateBattleCamera();
+        shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
         for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
         for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
         for (Battle.Beam beam : battle.beams()) {
-            shapes.setColor(beam.team == 0 ? Color.CYAN : Color.CORAL);
+            shapes.setColor(switch(beam.type) {
+                case KINETIC -> Color.GOLD;
+                case PLASMA -> Color.ORANGE;
+                case PARTICLE -> Color.VIOLET;
+                default -> beam.team==0?Color.CYAN:Color.CORAL;
+            });
             shapes.line((float) beam.x1, (float) beam.y1, (float) beam.x2, (float) beam.y2);
+        }
+        // Engine exhaust is displayed by both GPU-instanced and fallback hull paths.
+        for (Battle.Ship ship : battle.ships()) if(ship.alive()) {
+            double scale=ship.visualScale(),dx=StrictMath.cos(ship.facing),dy=StrictMath.sin(ship.facing);
+            shapes.setColor(ship.team==0?Color.SKY:Color.ORANGE);
+            shapes.line((float)(ship.x-dx*10*scale),(float)(ship.y-dy*10*scale),
+                    (float)(ship.x-dx*23*scale),(float)(ship.y-dy*23*scale));
         }
         shapes.end();
         if (instanced == null) drawShipsFallback();
         else {
-            try { instanced.render(battle, camera); }
+            try {
+                instanced.render(battle, battleCamera);
+                if(instanced.instances!=battle.alive(0)+battle.alive(1))
+                    throw new IllegalStateException("GPU instance count disagrees with living ships");
+            }
             catch (RuntimeException error) {
                 Gdx.app.error("GPU", "Switching to per-ship rendering", error);
                 instanced.close(); instanced = null; renderer = "software geometry";
@@ -215,7 +247,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Missile m : battle.missiles()) {
-            shapes.setColor(m.team == 0 ? Color.CYAN : Color.SCARLET);
+            shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
             shapes.circle((float) m.x, (float) m.y, m.torpedo?4.4f:2.8f, 7);
         }
         for (Battle.Craft craft : battle.crafts()) {
@@ -232,16 +264,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch, "SLOW", 270, 693);
         font.draw(batch, "FAST x" + speed, 378, 693);
         font.setColor(left.r, left.g, left.b, 1);
-        font.draw(batch, "< " + left.displayName, 508, 693);
+        font.draw(batch, "< " + left.displayName, 505, 693);
         font.setColor(right.r, right.g, right.b, 1);
-        font.draw(batch, "< " + right.displayName, 866, 693);
+        font.draw(batch, "< " + right.displayName, 751, 693);
         font.setColor(Color.GOLD);
+        font.draw(batch,"-",1000,693);
+        font.draw(batch,""+FLEET_SIZES[fleetIndex]+"v"+FLEET_SIZES[fleetIndex],1022,693);
+        font.draw(batch,"+",1112,693);
         font.draw(batch,"SHIPYARD",1166,693);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
                 + "   PD " + battle.missileIntercepts + "   CRAFT " + battle.crafts().size()
-                + "   " + saveState, 22, 38);
+                + "   " + renderer + "   " + saveState, 22, 38);
         if (battle.finished()) {
             font.setColor(Color.GOLD);
             font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.alive(0) > 0 ? left.displayName : right.displayName)
@@ -250,12 +285,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.end();
     }
 
+    /** World camera follows the active engagement; UI coordinates never move. */
+    private void updateBattleCamera() {
+        BattleView.Frame shot=BattleView.of(battle);
+        battleCamera.zoom=(float)shot.zoom();
+        battleCamera.position.set((float)shot.centerX(),(float)shot.centerY(),0);
+        battleCamera.update();
+    }
+
     private void drawShipsFallback() {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Ship s : battle.ships()) if (s.alive()) {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             float x = (float) s.x, y = (float) s.y;
-            float a = (float) Math.cos(s.facing), b = (float) Math.sin(s.facing);
+            float scale=(float)s.visualScale();
+            float a = (float) Math.cos(s.facing)*scale, b = (float) Math.sin(s.facing)*scale;
             shapes.triangle(x + a * 14, y + b * 14,
                     x - a * 8 - b * 7, y - b * 8 + a * 7,
                     x - a * 8 + b * 7, y - b * 8 - a * 7);

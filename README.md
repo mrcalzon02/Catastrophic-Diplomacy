@@ -82,3 +82,44 @@ for test in BattleSmokeTest TechnologyCatalogTest ShipyardTest PlatformPersisten
 ```
 
 Gradle `:core:smoke` chains these suites. See [platform acceptance checklist](docs/PLATFORM_ACCEPTANCE.md) for outstanding real desktop and Android builds, signing verification, save/restore device tests, and release gates. No GitHub Actions workflow was introduced.
+
+## Massed fleet verification (200v200)
+
+The staged Java 17 headless campaign in `core/src/test/java/diplomacy/sim/MassBattleCampaignTest.java`
+checks **every fleet size from 1v1 to 200v200**, 860 valid weapon/hull/faction pairings
+(4 intentionally invalid), **all six weapon families**, 568 accepted drive-technology stages,
+3,404 accepted weapon-technology stages, repeated deterministic engagements and **two 480-tick
+200v200 mixed-arsenal carrier battles**. Fighters, drones, magazines and ECM participate in
+the mixed fleet. Ship deployment coordinates, draw-effect metadata, numerical state and
+in-flight ordnance are asserted, not simply reported.
+
+`BattleViewTest` verifies screen-safe camera framing across all 200 fleet sizes and
+750 moving 200v200 ticks. `BattleGeometryRasterTest` is a separate Java2D proof that
+**400 ship polygons are visible** in a headless diagnostic image. These do **not** verify
+that actual libGDX graphics reach a physical display; desktop graphics drivers, the
+OpenGL instancing path, Android UI and frame-rate remain hardware acceptance gates.
+
+From a local checkout with JDK17 and Gradle:
+
+```text
+gradle :core:massBattleCampaign
+```
+
+From JDK17 alone (Java sources compiled to Java17 bytecode; test-only raster requires `java.desktop`):
+
+```bash
+mkdir -p out
+javac --release 17 -d out $(find core/src/main/java core/src/test/java -name '*.java')
+java -cp out:core/src/main/resources diplomacy.sim.MassBattleCampaignTest mass-battles.csv
+java -cp out:core/src/main/resources diplomacy.sim.BattleViewTest
+java -Djava.awt.headless=true -cp out:core/src/main/resources diplomacy.sim.BattleGeometryRasterTest headless-hulls.png
+```
+
+Game controls: `[ / ]` or on-screen **− / +** adjust each side's fleet from **1 to 200**
+by fixed steps, `Y` opens the shipyard, `Q / E` change factions, `R` restarts,
+`Space` pauses, `+ / -` adjusts simulation speed. Large engagements use a separate
+world camera that zooms to keep surviving ships inside the battle panel; the HUD stays fixed.
+The hulls are presently simple colored top-down geometry with visible engine trails,
+not finished sprites or 3D ship art. Directed-fire lines are colored by laser, kinetic,
+plasma and particle weapon type; missiles, torpedoes, fighters and defensive drones
+are separate on-screen shapes. See `docs/MASS_BATTLE_ACCEPTANCE.md`.

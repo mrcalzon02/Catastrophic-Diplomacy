@@ -32,6 +32,7 @@ public final class Battle {
         public final int id, team;
         public final Faction faction;
         public final String name;
+        public Shipyard.Hull hullClass;
         public double x, y, vx, vy, facing;
         public double hull, maxHull, shields, maxShields, armor, maxArmor, sif, power, maxPower, heat, maxHeat;
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
@@ -64,6 +65,8 @@ public final class Battle {
             hull = maxHull; shields = maxShields; armor = maxArmor; power = maxPower;
         }
         public boolean alive() { return hull > 0 && !retired; }
+        /** Visible top-down hull scale; larger fitted capital hulls read as larger ships. */
+        public double visualScale() { return Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0))); }
         public double combatReadiness() {
             return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition);
         }
@@ -104,9 +107,10 @@ public final class Battle {
     public static final class Beam {
         public final double x1, y1, x2, y2;
         public final int team;
+        public final DamageType type;
         public double lifetime = 0.13;
-        Beam(double startX, double startY, double endX, double endY, int side) {
-            x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side;
+        Beam(double startX, double startY, double endX, double endY, int side, DamageType weapon) {
+            x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
         }
     }
 
@@ -140,6 +144,7 @@ public final class Battle {
     private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery, double x, double y) {
         if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
         Ship s = addShip(team, design.faction, x, y);
+        s.hullClass = design.hull;
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
@@ -163,36 +168,47 @@ public final class Battle {
                           int count, double centerX, double centerY) {
         if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
         Shipyard.Fitted machinery = Shipyard.fit(design, catalog);
-        int columns = Math.max(1, (int) StrictMath.ceil(StrictMath.sqrt(count)));
         for (int i=0;i<count;i++) {
-            double x=centerX+((i%columns)-(columns-1)/2.0)*31+random.nextDouble()*3;
-            double y=centerY+((i/columns)-(count/columns)/2.0)*41+random.nextDouble()*3;
-            addShip(team,design,machinery,x,y);
+            double[] point = formationPosition(i,count,centerX,centerY,random);
+            addShip(team,design,machinery,point[0],point[1]);
         }
         log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
     }
     public static Battle duel(long seed, int shipsPerSide, Shipyard.Design left,
                               Shipyard.Design right, TechnologyCatalog catalog) {
         Battle battle = new Battle(seed);
-        battle.spawnWing(0,left,catalog,shipsPerSide,200,335);
-        battle.spawnWing(1,right,catalog,shipsPerSide,1070,335);
+        battle.spawnWing(0,left,catalog,shipsPerSide,310,335);
+        battle.spawnWing(1,right,catalog,shipsPerSide,970,335);
         return battle;
     }
     public void spawnWing(int team, Faction faction, int count, double centerX, double centerY) {
         if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
-        int columns = Math.max(1, (int) Math.ceil(Math.sqrt(count)));
         for (int i = 0; i < count; i++) {
-            double x = centerX + ((i % columns) - (columns - 1) / 2.0) * 31 + random.nextDouble() * 3;
-            double y = centerY + ((i / columns) - (count / columns) / 2.0) * 41 + random.nextDouble() * 3;
-            addShip(team, faction, x, y);
+            double[] point = formationPosition(i,count,centerX,centerY,random);
+            addShip(team, faction, point[0], point[1]);
         }
         log(faction.displayName + " deployed " + count + " combatants");
     }
     public static Battle duel(long seed, int shipsPerSide, Faction left, Faction right) {
         Battle battle = new Battle(seed);
-        battle.spawnWing(0, left, shipsPerSide, 200, 335);
-        battle.spawnWing(1, right, shipsPerSide, 1070, 335);
+        battle.spawnWing(0, left, shipsPerSide, 310, 335);
+        battle.spawnWing(1, right, shipsPerSide, 970, 335);
         return battle;
+    }
+    /** Formation coordinates are bounded for 1–200 ships per side within a 1280×720 view.
+     * Wider fleets compress their spacing instead of losing entire flanks off-screen.
+     * The injected Random keeps old deterministic seed behavior. */
+    private static double[] formationPosition(int index, int count, double cx, double cy, Random rng) {
+        int columns = Math.max(1, (int) StrictMath.ceil(StrictMath.sqrt(count)));
+        int rows = (count + columns - 1) / columns;
+        double spacingX = Math.min(31, 440.0 / Math.max(1, columns-1));
+        double spacingY = Math.min(41, 495.0 / Math.max(1, rows-1));
+        double jitter = Math.min(2.0, Math.min(spacingX, spacingY) * 0.07);
+        double x = cx + ((index % columns) - (columns - 1) / 2.0) * spacingX
+                + (rng.nextDouble() - 0.5) * jitter;
+        double y = cy + ((index / columns) - (rows - 1) / 2.0) * spacingY
+                + (rng.nextDouble() - 0.5) * jitter;
+        return new double[]{x,y};
     }
     public int alive(int team) { int count = 0; for (Ship s : ships) if (s.team == team && s.alive()) count++; return count; }
     public boolean finished() { return alive(0) == 0 || alive(1) == 0; }
@@ -277,7 +293,7 @@ public final class Battle {
         if (s.laserDamage > 0 && distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
-            beams.add(new Beam(s.x, s.y, target.x, target.y, s.team));
+            beams.add(new Beam(s.x, s.y, target.x, target.y, s.team, DamageType.LASER));
             double chance = Math.min(0.98, s.accuracy * (0.7 + lock * 0.45));
             if (random.nextDouble() < chance) hit(target, s.laserDamage, s, DamageType.LASER);
         }
@@ -291,21 +307,21 @@ public final class Battle {
         if (s.kineticDamage > 0 && distance < 445 && s.kineticReload <= 0 && s.power>5 && s.heat<s.maxHeat*0.95) {
             s.kineticReload=0.75/Math.max(0.25,s.weaponsCondition);
             s.power-=5;s.heat+=4;
-            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team));
+            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
             if(random.nextDouble()<Math.min(0.97,s.accuracy*(0.72+lock*0.4)))
                 hit(target,s.kineticDamage,s,DamageType.KINETIC);
         }
         if (s.plasmaDamage > 0 && distance < 245 && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
             s.plasmaReload=1.8/Math.max(0.25,s.weaponsCondition);
             s.power-=14;s.heat+=17;
-            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team));
+            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
             if(random.nextDouble()<Math.min(0.94,s.accuracy*(0.80+lock*0.4)))
                 hit(target,s.plasmaDamage,s,DamageType.PLASMA);
         }
         if (s.particleDamage > 0 && distance < 565 && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
             s.particleReload=2.1/Math.max(0.25,s.weaponsCondition);
             s.power-=17;s.heat+=10;
-            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team));
+            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
             if(random.nextDouble()<Math.min(0.98,s.accuracy*(0.76+lock*0.45)))
                 hit(target,s.particleDamage,s,DamageType.PARTICLE);
         }

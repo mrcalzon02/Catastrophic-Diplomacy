@@ -52,3 +52,32 @@ tasks.register('fleetScaleSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fleetScaleSmoke')) }
+
+// Explicit heavy campaign: not automatically chained to routine smoke tests.
+// No device/GPU coverage is implied by JavaExec success.
+tasks.register('massBattleSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Cross all scales 1v1 to 200v200; weapon/engine tech and 400-ship combined arms replays.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.MassBattleCampaignTest'
+    dependsOn testClasses
+}
+tasks.register('battleViewSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate live vessel positions under the HUD in 1v1..200v200 and moving battles.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleViewTest'
+    dependsOn testClasses
+}
+tasks.register('battleRasterSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Rasterize all 400 hulls with Java2D to verify observable ship polygons; NOT GPU acceptance.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleGeometryRasterTest'
+    dependsOn testClasses
+}
+tasks.register('massBattleCampaign') {
+    group = 'verification'
+    description = 'Run all exhaustive fleet, framing and headless raster acceptance suites.'
+    dependsOn(tasks.named('massBattleSmoke'),tasks.named('battleViewSmoke'),tasks.named('battleRasterSmoke'))
+}
