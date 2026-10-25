@@ -32,6 +32,18 @@ python tools/import_game_art.py --source-dir /path/to/archives --import
 
 Alternatively, extract `Catastrophic_Diplomacy_Runtime_Art_Stage1.zip` at the repository root to install the runtime-ready subset only. Verify `runtime-art-manifest.json` first and commit original PNG bytes rather than screenshot proxies.
 
+## Static firing-range video QA (planned)
+
+The repeatable two/three-weapon static range and nine review batches are specified in
+[Weapon Firing Range](WEAPON_FIRING_RANGE.md) and the machine-readable
+[`qa/firing-range/batches.json`](../qa/firing-range/batches.json).
+This includes a 24-second three-lane fixed-camera barrage, deterministic 30 Hz combat
+sampling with 60 fps video, impact and cleanup tests, and **explicit human video approval**.
+This is a *plan*, not an already-rendered MP4, and the missing 45 runtime PNG Git binaries
+remain an asset installation gate. The current four-tick beams cannot be represented
+as a completed seven-frame animation; production-timed and slow frame-inspection
+captures have separate acceptance statuses.
+
 ## Boundaries and remaining acceptance work
 
 - No libGDX desktop or Android display/build verification was run during this integration. The user must not be told this is a verified playable APK.
