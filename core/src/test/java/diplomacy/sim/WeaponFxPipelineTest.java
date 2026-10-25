@@ -36,7 +36,7 @@ public final class WeaponFxPipelineTest {
     }
     public static void main(String[] args){
         Clip frames=WeaponFxProfile.forType(Battle.DamageType.LASER).firing();
-        require(frames.frame(0)==0 && frames.frame(5)==5 && frames.frame(6)==-1,
+        require(frames.frame(0)==0 && frames.frame(7)==7 && frames.frame(8)==-1,
                 "firing frames must terminate, not loop");
         require(frames.path(0).equals("effects/weapon_fx/laser/firing_01.png"),
                 "asset path should be relative to the existing runtime assets root");
