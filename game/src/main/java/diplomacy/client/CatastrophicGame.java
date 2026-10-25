@@ -503,6 +503,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
             });
             shapes.line((float) beam.x1, (float) beam.y1, (float) beam.x2, (float) beam.y2);
         }
+        // Preserve visibility of genuine service links when an approved
+        // atlas strip is absent (no fabricated replacement sprite).
+        for(Battle.SupportLink link:battle.supportLinks()){
+            if(weaponBeams!=null&&weaponBeams.canDrawSupport(link,battle.tick))continue;
+            shapes.setColor(link.kind==Battle.SupportKind.SHIELD?Color.SKY:Color.GREEN);
+            shapes.line((float)link.x1,(float)link.y1,(float)link.x2,(float)link.y2);
+        }
         // Engine exhaust is displayed by both GPU-instanced and fallback hull paths.
         for (Battle.Ship ship : battle.ships()) if(ship.alive()) {
             double scale=ship.visualScale(),dx=StrictMath.cos(ship.facing),dy=StrictMath.sin(ship.facing);
@@ -557,7 +564,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
         }
         for (Battle.Craft craft : battle.crafts()) {
-            shapes.setColor(craft.team==0?Color.CYAN:Color.CORAL);
+            shapes.setColor(craft.repair?Color.GREEN:craft.team==0?Color.CYAN:Color.CORAL);
             shapes.circle((float)craft.x,(float)craft.y,craft.fighter?3.6f:2.4f,8);
         }
         shapes.end();
