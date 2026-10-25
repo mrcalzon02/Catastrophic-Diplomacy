@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.sim.ProjectileModel;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
 import diplomacy.shipyard.TouchGesture;
@@ -294,6 +295,26 @@ final class ShipyardPanel {
                 "  WPN "+count(layout,Shipyard.Mount.WEAPON)+
                 "  DEF "+count(layout,Shipyard.Mount.DEFENSE)+
                 "  SUP "+count(layout,Shipyard.Mount.SUPPORT),343,100);
+        if(installed!=null){
+            ProjectileModel.Spec projectile=Shipyard.projectileAt(draft,catalog,selectedSlot);
+            ProjectileModel.Defense defense=Shipyard.defenseAt(draft,catalog,selectedSlot);
+            font.setColor(Color.GOLD);
+            if(projectile!=null){
+                font.draw(batch,String.format(Locale.ROOT,
+                        "PROJECTILE SPEED %.0f  |  HEALTH %.2f",projectile.speed(),
+                        projectile.health()),342,158);
+                font.draw(batch,String.format(Locale.ROOT,
+                        "CROSS SECTION %.2f  |  SIGNATURE %.2f",projectile.crossSection(),
+                        projectile.signature()),342,137);
+            }else if(defense!=null){
+                font.draw(batch,String.format(Locale.ROOT,
+                        "PD TRACKING x%.2f  |  PD DAMAGE %.2f",
+                        defense.tracking(),defense.damage()),342,158);
+                font.draw(batch,String.format(Locale.ROOT,
+                        "DETECTION MULT x%.2f (before sensors/weather)",
+                        defense.detectionMultiplier()),342,137);
+            }
+        }
         if(!artPreview && draft.slots()<=18){
             font.setColor(Color.LIGHT_GRAY);
             for(Shipyard.Slot slot:layout){
