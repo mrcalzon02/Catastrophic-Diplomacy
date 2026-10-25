@@ -40,8 +40,11 @@ def describe(apk):
         raise ValueError('APK outside bounded size limits')
     subprocess.run([apksigner, 'verify', '--verbose', str(apk)], check=True,
                    capture_output=True, timeout=90)
+    digest_engine = hashlib.sha256()
     with apk.open('rb') as source:
-        digest = hashlib.file_digest(source, 'sha256').hexdigest()
+        for block in iter(lambda: source.read(1024 * 1024), b''):
+            digest_engine.update(block)
+    digest = digest_engine.hexdigest()
     return {
         'schema': 1,
         'version': version,
