@@ -21,22 +21,24 @@ final class ShipyardPanel {
     private static final int SLOT_ROWS=18;
     private static final float MAP_CX=563f, MAP_CY=343f, MAP_SCALE=2.65f;
     private final TechnologyCatalog catalog;
+    private final TerranPlaceholderSprites fleetArt;
     private final BiConsumer<Integer,Shipyard.Design> deploy;
     private Shipyard.Design[] active = new Shipyard.Design[2];
     private Shipyard.Design draft;
     private int team, selectedSlot, scroll;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
+    private boolean artPreview;
     private final TouchGesture gesture = new TouchGesture();
     private boolean scrollGesture;
 
     ShipyardPanel(TechnologyCatalog tech, BiConsumer<Integer,Shipyard.Design> deployment,
-                  Shipyard.Design first, Shipyard.Design second) {
-        catalog=tech;deploy=deployment;active[0]=first;active[1]=second;
+                  Shipyard.Design first, Shipyard.Design second,TerranPlaceholderSprites art) {
+        catalog=tech;deploy=deployment;fleetArt=art;active[0]=first;active[1]=second;
         draft=first;
     }
     boolean open() { return open; }
-    void show() { open=true; draft=active[team]; selectedSlot=0; scroll=0; }
+    void show() { open=true; draft=active[team]; selectedSlot=0; scroll=0; artPreview=false; }
     void close() { open=false; gesture.cancel(); }
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
@@ -136,6 +138,12 @@ final class ShipyardPanel {
             if(x>1120){close();return true;}
             return true;
         }
+        if(x>=690&&x<=795&&y>=580&&y<=635) {
+            if(artPreview)artPreview=false;
+            else if(fleetArt!=null && fleetArt.hasHull(draft.faction,draft.hull))artPreview=true;
+            else notice="No approved individual hull artwork for "+draft.faction+" "+draft.hull;
+            return true;
+        }
         if(x<320 && y>=105&&y<=590){
             int index=scroll+(int)((590-y)/26);
             if(index>=0&&index<draft.slots())select(index);
@@ -207,7 +215,7 @@ final class ShipyardPanel {
             if(index==selectedSlot)rectangle(shapes,30,561-n*26,286,25,new Color(0.13f,0.23f,0.33f,1));
         }
         // Hardpoints are positioned in faction-specific normalized ship coordinates.
-        for(Shipyard.Slot slot:layout){
+        if(!artPreview)for(Shipyard.Slot slot:layout){
             float px=MAP_CX+slot.x()*MAP_SCALE, py=MAP_CY+slot.y()*MAP_SCALE;
             shapes.setColor(slot.index()==selectedSlot?Color.WHITE:
                     draft.at(slot.index())==null?Color.GRAY:mountColor(slot.mount()));
@@ -224,12 +232,16 @@ final class ShipyardPanel {
             vertices[n*2]=MAP_CX+border.get(n).x()*MAP_SCALE;
             vertices[n*2+1]=MAP_CY+border.get(n).y()*MAP_SCALE;
         }
-        shapes.polygon(vertices);
-        // Prow indicator, never an imaginary weapon barrel.
-        shapes.line(MAP_CX-6,562,MAP_CX,574);
-        shapes.line(MAP_CX,574,MAP_CX+6,562);
+        if(!artPreview){
+            shapes.polygon(vertices);
+            // Prow indicator, never an imaginary weapon barrel.
+            shapes.line(MAP_CX-6,562,MAP_CX,574);
+            shapes.line(MAP_CX,574,MAP_CX+6,562);
+        }
         shapes.end();
         batch.begin();
+        if(artPreview&&fleetArt!=null)
+            fleetArt.drawPreview(batch,draft.faction,draft.hull,MAP_CX,MAP_CY,330,402);
         font.setColor(Color.WHITE);font.draw(batch,"SHIPYARD",22,702);
         font.setColor(team==0?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"LEFT FLEET",35,660);
         font.setColor(team==1?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"RIGHT FLEET",175,660);
@@ -241,7 +253,9 @@ final class ShipyardPanel {
         font.draw(batch,"LOAD",940,660);font.draw(batch,"FACTION >",1023,660);font.draw(batch,"CLOSE",1140,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);
-        font.draw(batch,"FACTION HULL SCHEMATIC",345,590);
+        font.draw(batch,artPreview?"HULL ART PREVIEW":"FACTION HULL SCHEMATIC",345,590);
+        font.setColor(Color.GOLD);
+        font.draw(batch,artPreview?"SHOW MAP":"SHOW ART",705,590);
         font.draw(batch,"COMPATIBLE MODULES",813,590);
         for(int n=0;n<SLOT_ROWS;n++) {
             int index=scroll+n;
@@ -259,13 +273,13 @@ final class ShipyardPanel {
                 "  WPN "+count(layout,Shipyard.Mount.WEAPON)+
                 "  DEF "+count(layout,Shipyard.Mount.DEFENSE)+
                 "  SUP "+count(layout,Shipyard.Mount.SUPPORT),343,100);
-        if(draft.slots()<=18){
+        if(!artPreview && draft.slots()<=18){
             font.setColor(Color.LIGHT_GRAY);
             for(Shipyard.Slot slot:layout){
                 font.draw(batch,""+(slot.index()+1),MAP_CX+slot.x()*MAP_SCALE+10,
                                         MAP_CY+slot.y()*MAP_SCALE+6);
             }
-        }else{
+        }else if(!artPreview){
             font.setColor(Color.GOLD);
             font.draw(batch,"#"+(selectedSlot+1),MAP_CX+selected.x()*MAP_SCALE+13,
                                             MAP_CY+selected.y()*MAP_SCALE+5);
