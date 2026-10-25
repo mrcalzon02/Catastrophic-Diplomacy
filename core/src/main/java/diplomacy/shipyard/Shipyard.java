@@ -294,6 +294,30 @@ public final class Shipyard {
                         pdWeight==0?1:pdTracking/pdWeight,sensorRatio));
     }
 
+    /** Expose the exact fitted projectile parameters for an individual shipyard socket.
+     * An empty or non-ordnance slot has no projectile body to inspect. */
+    public static ProjectileModel.Spec projectileAt(Design design,TechnologyCatalog catalog,int slot) {
+        Installed current=design.at(slot);
+        if(current==null)return null;
+        Part p=evaluate(current,catalog,design.faction);
+        ProjectileModel.Kind kind=switch(p.base.subsystem) {
+            case "KIN" -> ProjectileModel.Kind.KINETIC;
+            case "MSL" -> ProjectileModel.Kind.MISSILE;
+            case "TOR" -> ProjectileModel.Kind.TORPEDO;
+            default -> null;
+        };
+        return kind==null?null:ProjectileModel.module(design.faction,kind,
+                p.effect/p.base.effect,p.accuracy,p.integrity/p.base.integrity);
+    }
+    /** Individual PD module profile before fleet sensors and stacked batteries contribute. */
+    public static ProjectileModel.Defense defenseAt(Design design,TechnologyCatalog catalog,int slot) {
+        Installed current=design.at(slot);
+        if(current==null)return null;
+        Part p=evaluate(current,catalog,design.faction);
+        if(!p.base.subsystem.equals("PD")&&!p.base.subsystem.equals("FLK"))return null;
+        return ProjectileModel.defense(p.effect/p.base.effect,p.accuracy,1);
+    }
+
     /** Portable, deterministic blueprint text (no Java object deserialization). */
     public static String encode(Design design) {
         StringBuilder out=new StringBuilder("CD-SHIP-1|").append(design.faction.name()).append('|')
