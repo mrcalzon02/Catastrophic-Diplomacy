@@ -12,6 +12,11 @@ public final class AndroidLauncher extends AndroidApplication {
         config.useGL30 = true;
         config.numSamples = 0;
         config.useImmersiveMode = true;
-        initialize(new CatastrophicGame(), config);
+        // Only debuggable APKs accept the automation harness switch.
+        boolean debug=(getApplicationInfo().flags &
+                android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0;
+        boolean verify=debug && getIntent()!=null &&
+                getIntent().getBooleanExtra("cd.verify_200v200",false);
+        initialize(new CatastrophicGame(verify), config);
     }
 }
