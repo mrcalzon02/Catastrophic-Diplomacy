@@ -200,7 +200,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void applyFleetOrders(int side,BattleOrders.Orders orders){
         if(side<0||side>1||orders==null)throw new IllegalArgumentException("Invalid fleet orders");
         fleetOrders[side]=orders;
-        if(battle!=null)battle.setTeamOrders(side,orders);
+        if(battle!=null)battle.patchTeamOrders(side,orders);
         saveOrderPresets();
     }
     private void togglePd(int side){
