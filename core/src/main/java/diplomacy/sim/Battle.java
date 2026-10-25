@@ -790,6 +790,41 @@ public final class Battle {
                     if(random.nextDouble()<0.64*weather.accuracyFactor()*(1-target.ecmStrength*target.ecmCondition))
                         hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
                 }
+            } else if(craft.repair){
+                Ship source=findShip(craft.sourceId);
+                if(source==null||!source.alive()){crafts.remove(i);continue;}
+                Ship target=findShip(craft.targetId);
+                if(target==null||!target.alive()||target.team!=craft.team
+                        ||target.hull>=target.maxHull-1e-8){
+                    target=mostDamagedAlly(source,300,false);
+                    craft.targetId=target==null?0:target.id;
+                }
+                if(target==null){
+                    double dx=source.x-craft.x,dy=source.y-craft.y;
+                    double d=StrictMath.hypot(dx,dy);
+                    if(d>26){craft.x+=dx/d*110*DT;craft.y+=dy/d*110*DT;}
+                    continue;
+                }
+                double dx=target.x-craft.x,dy=target.y-craft.y;
+                double distance=StrictMath.hypot(dx,dy);
+                if(distance>25){
+                    double advance=Math.min(distance-25,145*DT);
+                    if(distance>0){craft.x+=dx/distance*advance;craft.y+=dy/distance*advance;}
+                }
+                craft.reload=Math.max(0,craft.reload-DT);
+                if(StrictMath.hypot(target.x-craft.x,target.y-craft.y)<=29
+                        &&craft.reload<=0&&craft.repairReserve>0){
+                    double gained=Math.min(craft.repairReserve,Math.min(
+                            source.support.repairDroneRate()*0.80,target.maxHull-target.hull));
+                    if(gained>0){
+                        target.hull+=gained;craft.repairReserve-=gained;
+                        source.remoteHullRepaired+=gained;
+                        supportLinks.add(new SupportLink(source,target,SupportKind.DRONE,
+                                tick,craft.x,craft.y));
+                    }
+                    craft.reload=0.8;
+                }
+                if(craft.repairReserve<=1e-8)crafts.remove(i);
             } else {
                 Ship controller=findShip(craft.sourceId);
                 ProjectileModel.Defense suite=controller==null?ProjectileModel.STANDARD_PD
@@ -1142,6 +1177,9 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.power));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
+            hash=mix(hash,Double.doubleToLongBits(s.remoteHullRepaired));
+            hash=mix(hash,Double.doubleToLongBits(s.shieldsTransferred));
+            hash=mix(hash,Double.doubleToLongBits(s.hullRepaired));
             hash=mix(hash,Double.doubleToLongBits(s.hangarCondition));
             hash=mix(hash,Double.doubleToLongBits(s.magazineCondition));
         }
@@ -1155,7 +1193,13 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(p.y));
             hash=mix(hash,Double.doubleToLongBits(p.integrity));
         }
-        for (Craft craft : crafts) { hash=mix(hash,craft.id);hash=mix(hash,Double.doubleToLongBits(craft.x));hash=mix(hash,Double.doubleToLongBits(craft.y)); }
+        for (Craft craft : crafts) {
+            hash=mix(hash,craft.id);hash=mix(hash,Double.doubleToLongBits(craft.x));
+            hash=mix(hash,Double.doubleToLongBits(craft.y));
+            hash=mix(hash,craft.repair?1:0);
+            hash=mix(hash,Double.doubleToLongBits(craft.repairReserve));
+            hash=mix(hash,craft.targetId);
+        }
         return hash;
     }
     private static long mix(long hash, long n) { return (hash ^ n) * 0x100000001b3L; }
