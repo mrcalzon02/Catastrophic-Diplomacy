@@ -5,3 +5,9 @@ dependencies {
     api project(':core')
     api 'com.badlogicgames.gdx:gdx:1.14.2'
 }
+
+tasks.register('geometrySmoke', JavaExec) {
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.HullSilhouetteTest'
+}

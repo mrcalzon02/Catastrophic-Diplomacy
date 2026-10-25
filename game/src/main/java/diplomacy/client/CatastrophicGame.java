@@ -428,10 +428,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             float x = (float) s.x, y = (float) s.y;
             float scale=(float)s.visualScale();
-            float a = (float) Math.cos(s.facing)*scale, b = (float) Math.sin(s.facing)*scale;
-            shapes.triangle(x + a * 14, y + b * 14,
-                    x - a * 8 - b * 7, y - b * 8 + a * 7,
-                    x - a * 8 + b * 7, y - b * 8 - a * 7);
+            // Software/OpenGL2 uses the SAME filled faction/class artwork geometry
+            // as the instanced GL3 path. This is not a collision or physics change.
+            float angle=(float)(s.facing-Math.PI/2);
+            float c=(float)Math.cos(angle), d=(float)Math.sin(angle);
+            float[] triangles=HullSilhouette.of(s.faction,s.hullClass);
+            for(int i=0;i<triangles.length;i+=6) {
+                float ax=x+scale*(triangles[i]*c-triangles[i+1]*d);
+                float ay=y+scale*(triangles[i]*d+triangles[i+1]*c);
+                float bx=x+scale*(triangles[i+2]*c-triangles[i+3]*d);
+                float by=y+scale*(triangles[i+2]*d+triangles[i+3]*c);
+                float cx=x+scale*(triangles[i+4]*c-triangles[i+5]*d);
+                float cy=y+scale*(triangles[i+4]*d+triangles[i+5]*c);
+                shapes.triangle(ax,ay,bx,by,cx,cy);
+            }
         }
         shapes.end();
     }
