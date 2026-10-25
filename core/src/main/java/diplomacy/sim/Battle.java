@@ -204,6 +204,32 @@ public final class Battle {
         teamOrders[team]=value;
         for(Ship ship:ships)if(ship.team==team)ship.orders=value;
     }
+    /**
+     * Apply only the fields changed in a fleet editor operation. A PD toggle
+     * must NOT silently erase bespoke per-ship escort or formation orders.
+     */
+    public void patchTeamOrders(int team,BattleOrders.Orders revised) {
+        if(team<0||team>1||revised==null)throw new IllegalArgumentException("Invalid fleet order");
+        BattleOrders.Orders old=teamOrders[team];
+        teamOrders[team]=revised;
+        for(Ship ship:ships)if(ship.team==team){
+            BattleOrders.Orders current=ship.orders;
+            if(old.pointDefense()!=revised.pointDefense())
+                current=current.withPointDefense(revised.pointDefense());
+            if(old.targeting()!=revised.targeting())
+                current=current.withTargeting(revised.targeting());
+            if(old.position()!=revised.position())
+                current=current.withPosition(revised.position());
+            for(BattleOrders.Size size:BattleOrders.Size.values()){
+                BattleOrders.Engagement before=old.forSize(size),after=revised.forSize(size);
+                if(!before.equals(after))
+                    current=current.withEngagement(size,after.priority(),after.range());
+            }
+            if(old.retreatAtHullFraction()!=revised.retreatAtHullFraction())
+                current=current.withRetreat(revised.retreatAtHullFraction());
+            ship.orders=current;
+        }
+    }
     public void setShipOrders(int shipId,BattleOrders.Orders value) {
         if(value==null)throw new IllegalArgumentException("Orders missing");
         Ship ship=findShip(shipId);
@@ -222,7 +248,7 @@ public final class Battle {
     }
     public void setTeamPointDefense(int team,BattleOrders.PointDefense mode) {
         if(mode==null)throw new IllegalArgumentException("PD mode missing");
-        setTeamOrders(team,teamOrders(team).withPointDefense(mode));
+        patchTeamOrders(team,teamOrders(team).withPointDefense(mode));
     }
     private void visual(long shotId, VisualPhase phase, String weapon, int team,
                         int sourceId,int targetId,double x,double y,double tx,double ty) {
