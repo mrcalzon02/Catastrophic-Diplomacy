@@ -18,6 +18,8 @@ public final class TerranPlaceholderSprites implements Disposable {
     private static final int GRID=DirectionalDefense.GRID;
     private final EnumMap<Shipyard.Hull,Texture> textures = new EnumMap<>(Shipyard.Hull.class);
     private final Texture innerHull;
+    private final Texture severeHull;
+    private final Texture shieldHull;
     private static String spriteName(Shipyard.Hull hull) {
         return switch(hull) {
             case INTERCEPTOR -> "interceptor";
@@ -33,7 +35,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         };
     }
     public TerranPlaceholderSprites() {
-        innerHull=createGenericStructure();
+        innerHull=createGenericStructure("materials/structure_damaged.png");
+        severeHull=createGenericStructure("materials/structure_destroyed.png");
+        shieldHull=Gdx.files.internal("materials/shield_energy_blue.png").exists()
+                ? createGenericStructure("materials/shield_energy_blue.png") : null;
         for (Shipyard.Hull hull:Shipyard.Hull.values()) {
             String file="ships/terran/"+spriteName(hull)+".png";
             if (!Gdx.files.internal(file).exists())continue;
@@ -47,12 +52,22 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
     }
     /** Procedural generic plating, lattice ribs and longitudinal inner structure. */
-    private static Texture createGenericStructure() {
+    private static Texture createGenericStructure(String sourcePath) {
         Pixmap pix=new Pixmap(64,96,Pixmap.Format.RGBA8888);
+        Pixmap source=null;
+        if(Gdx.files.internal(sourcePath).exists()){
+            try{source=new Pixmap(Gdx.files.internal(sourcePath));}
+            catch(RuntimeException bad){Gdx.app.error("MATERIAL","Falling back from "+sourcePath,bad);}
+        }
         pix.setColor(0,0,0,0);pix.fill();
         for(int y=0;y<96;y++)for(int x=0;x<64;x++) {
             double lx=(48-y)/48.0,ly=(32-x)/32.0;
             if(lx*lx+ly*ly/0.61>1)continue;
+            if(source!=null){
+                pix.drawPixel(x,y,source.getPixel(
+                        x*source.getWidth()/64,y*source.getHeight()/96));
+                continue;
+            }
             boolean rib=y%13<3,rail=x%15<3;
             boolean conduit=StrictMath.abs(x-32)<4;
             int shade=rib?105:rail?86:conduit?148:50+((x*17+y*7)%24);
@@ -62,6 +77,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         Texture result=new Texture(pix);
         result.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
         pix.dispose();
+        if(source!=null)source.dispose();
         return result;
     }
     public int loaded() { return textures.size(); }
@@ -103,10 +119,12 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(!damaged) {
                 batch.setColor(1,1,1,1);
                 drawWhole(batch,tex,ship,width,height,rotation);
+                drawShield(batch,ship,width,height,rotation);
                 continue;
             }
             batch.setColor(1,1,1,1);
-            drawWhole(batch,innerHull,ship,width,height,rotation);
+            drawWhole(batch,ship.hull<ship.maxHull*0.30?severeHull:innerHull,
+                    ship,width,height,rotation);
             // One shared UV/grid layout for exterior and internal structure.
             // Only breached ships need the more expensive 16x16 texture draws.
             final float radians=(float)StrictMath.toRadians(rotation);
@@ -127,9 +145,18 @@ public final class TerranPlaceholderSprites implements Disposable {
                         tileW/2,tileH/2,tileW,tileH,1,1,rotation,
                         sx,sy,ex-sx,ey-sy,false,false);
             }
+            drawShield(batch,ship,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
         batch.end();
+    }
+    private void drawShield(SpriteBatch batch,Battle.Ship ship,
+                            float width,float height,float rotation) {
+        if(shieldHull==null || ship.maxShields<=0 || ship.shields<=0)return;
+        float strength=(float)Math.min(1,ship.shields/ship.maxShields);
+        batch.setColor(0.70f,0.88f,1f,0.11f*strength);
+        drawWhole(batch,shieldHull,ship,width*1.14f,height*1.14f,rotation);
+        batch.setColor(1,1,1,1);
     }
     private static void drawWhole(SpriteBatch batch,Texture tex,Battle.Ship ship,
                                   float width,float height,float rotation) {
@@ -141,5 +168,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture texture:textures.values())texture.dispose();
         textures.clear();
         innerHull.dispose();
+        severeHull.dispose();
+        if(shieldHull!=null)shieldHull.dispose();
     }
 }
