@@ -30,6 +30,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private InstancedShipRenderer instanced;
     private TerranPlaceholderSprites terranSprites;
     private WeaponBeamSprites weaponBeams;
+    private TacticalUiIcons uiIcons;
     private Battle battle;
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
@@ -55,6 +56,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
         terranSprites = new TerranPlaceholderSprites();
         weaponBeams = new WeaponBeamSprites();
+        uiIcons = new TacticalUiIcons();
         font.getData().setScale(1.23f);
         try {
             instanced = new InstancedShipRenderer();
@@ -72,6 +74,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             saveFleets();
             reset();
         },leftDesign,rightDesign,terranSprites);
+        shipyard.setIcons(uiIcons);
         reset();
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
@@ -291,6 +294,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
                 + "   PD " + battle.missileIntercepts + "   CRAFT " + battle.crafts().size()
                 + "   " + renderer + "   " + saveState, 22, 38);
+        // Optional source-backed ornamentation; labels and pointer hitboxes remain unchanged.
+        if (uiIcons != null && uiIcons.available()) {
+            uiIcons.draw(batch, "restart", 146, 652, 25);
+            uiIcons.draw(batch, "speed", 391, 652, 25);
+            uiIcons.draw(batch, "squadron", 1056, 652, 25);
+            uiIcons.draw(batch, "shipyard_ship", 1192, 652, 25);
+        }
         if (battle.finished()) {
             font.setColor(Color.GOLD);
             font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.alive(0) > 0 ? left.displayName : right.displayName)
@@ -353,6 +363,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
+        if(uiIcons!=null)uiIcons.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }
