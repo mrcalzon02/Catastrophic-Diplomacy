@@ -54,6 +54,15 @@ tasks.register('combatMachinerySmoke', JavaExec) {
 }
 tasks.named('platformSmoke') { finalizedBy(tasks.named('combatMachinerySmoke')) }
 
+tasks.register('weaponFxSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless checks for independent firing/payload/impact stages and deterministic projectile outcomes.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WeaponFxPipelineTest'
+    dependsOn testClasses
+}
+tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('weaponFxSmoke')) }
+
 tasks.register('fleetScaleSmoke', JavaExec) {
     group = 'verification'
     classpath = sourceSets.test.runtimeClasspath
