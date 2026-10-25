@@ -34,7 +34,8 @@ public final class Battle {
         public final String name;
         /** Per-hull doctrine. POINT DEFENSE is independent of main gun fire orders. */
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
-        public int lastTargetId;
+        public int lastTargetId,lastAttackerId;
+        public double anchorOffsetX,anchorOffsetY;
         public Shipyard.Hull hullClass;
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
@@ -209,6 +210,11 @@ public final class Battle {
             if(parent==null||parent.team!=ship.team||parent.id==ship.id)
                 throw new IllegalArgumentException("Escort parent must be a different allied ship");
         }
+        if(value.anchorShipId()!=0){
+            Ship parent=findShip(value.anchorShipId());
+            ship.anchorOffsetX=ship.x-parent.x;
+            ship.anchorOffsetY=ship.y-parent.y;
+        }
         ship.orders=value;
     }
     public void setTeamPointDefense(int team,BattleOrders.PointDefense mode) {
@@ -371,23 +377,62 @@ public final class Battle {
     }
 
     private Ship chooseTarget(Ship actor) {
-        Ship choice = null;
-        double best = Double.POSITIVE_INFINITY;
-        for (Ship s : ships) if (s.team != actor.team && s.alive()) {
-            double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
-            if (weather.preset().enabled() && distance > 1100.0 * actor.sensorsCondition
-                    * weather.sensorFactor()) continue;
-            // Inexperienced commanders misjudge target resilience; tactical aggression
-            // sometimes wins over a conservative point-value estimate.
-            double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
-            double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
-            if (assessed < best) { best = assessed; choice = s; }
+        // Preserve old target selection and RNG stream for baseline fleet tests.
+        if(actor.orders.equals(BattleOrders.DEFAULT)){
+            Ship choice = null;
+            double best = Double.POSITIVE_INFINITY;
+            for (Ship s : ships) if (s.team != actor.team && s.alive()) {
+                double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
+                if (weather.preset().enabled() && distance > 1100.0 * actor.sensorsCondition
+                        * weather.sensorFactor()) continue;
+                double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
+                double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
+                if (assessed < best) { best = assessed; choice = s; }
+            }
+            actor.lastTargetId=choice==null?0:choice.id;
+            return choice;
         }
+        BattleOrders.Orders orders=actor.orders;
+        Ship choice=null;double best=Double.POSITIVE_INFINITY;
+        // Zero priority disables a class rather than silently turning it into
+        // another target. PD continues according to its independent selector.
+        for(Ship candidate:ships)if(candidate.team!=actor.team&&candidate.alive()){
+            BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
+            if(classOrder.priority()==0)continue;
+            double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
+            if(weather.preset().enabled() && distance>1100.0*actor.sensorsCondition
+                    *weather.sensorFactor())continue;
+            double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
+            double assessed=distance*(1+error)*100.0/classOrder.priority()
+                    +candidate.combatReadiness()*32;
+            switch(orders.targeting()){
+                case NEAREST -> { }
+                case VULTURE -> assessed-=(1-Math.max(0,candidate.hull/candidate.maxHull))*160;
+                case COOPERATE -> {
+                    int allies=0;
+                    for(Ship friend:ships)if(friend.team==actor.team && friend!=actor
+                            && friend.alive()&&friend.lastTargetId==candidate.id)allies++;
+                    assessed-=Math.min(6,allies)*25;
+                }
+                case RETALIATE -> {
+                    if(candidate.id==actor.lastAttackerId)assessed-=225;
+                }
+                case PROTECT -> {
+                    Ship friend=findShip(orders.anchorShipId());
+                    if(friend!=null&&candidate.id==friend.lastAttackerId)assessed-=240;
+                }
+            }
+            if(assessed<best){best=assessed;choice=candidate;}
+        }
+        actor.lastTargetId=choice==null?0:choice.id;
         return choice;
     }
 
     private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
     private void steer(Ship s, Ship target) {
+        if(!s.orders.equals(BattleOrders.DEFAULT)){
+            orderedSteer(s,target);return;
+        }
         double dx = target.x - s.x, dy = target.y - s.y;
         double range = StrictMath.hypot(dx, dy);
         double heading = StrictMath.atan2(dy, dx);
@@ -400,6 +445,64 @@ public final class Battle {
         s.vx += (desiredVx - s.vx) * smoothing;
         s.vy += (desiredVy - s.vy) * smoothing;
         s.x += s.vx * DT; s.y += s.vy * DT;
+    }
+
+    private void orderedSteer(Ship ship,Ship target) {
+        BattleOrders.Orders orders=ship.orders;
+        if(orders.position()==BattleOrders.Position.HOLD){
+            ship.vx*=0.82;ship.vy*=0.82;
+            ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+            return;
+        }
+        if(orders.position()==BattleOrders.Position.CAUTIOUS &&
+                ship.hull<ship.maxHull*orders.retreatAtHullFraction()){
+            double dx=ship.x-target.x,dy=ship.y-target.y;
+            double length=StrictMath.max(1,StrictMath.hypot(dx,dy));
+            steerToward(ship,ship.x+dx/length*400,ship.y+dy/length*400,true);
+            return;
+        }
+        Ship parent=findShip(orders.anchorShipId());
+        if(parent!=null&&parent.team==ship.team&&parent.alive()&&parent!=ship){
+            if(orders.position()==BattleOrders.Position.FORMATION){
+                steerToward(ship,parent.x+ship.anchorOffsetX,
+                        parent.y+ship.anchorOffsetY,false);
+                return;
+            }
+            if(orders.position()==BattleOrders.Position.ESCORT){
+                double d=StrictMath.hypot(parent.x-ship.x,parent.y-ship.y);
+                if(d>orders.escortRadius()){
+                    steerToward(ship,parent.x,parent.y,false);
+                    return;
+                }
+            }
+        }
+        BattleOrders.Engagement engage=orders.forSize(BattleOrders.size(target));
+        double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
+        if(orders.position()!=BattleOrders.Position.KEEP_MOVING
+                &&distance>=engage.range()*0.5&&distance<=engage.range()){
+            ship.vx*=0.86;ship.vy*=0.86;
+            ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;return;
+        }
+        if(distance<engage.range()*0.5){
+            double dx=ship.x-target.x,dy=ship.y-target.y;
+            double denom=StrictMath.max(1,StrictMath.hypot(dx,dy));
+            steerToward(ship,ship.x+dx/denom*engage.range(),
+                    ship.y+dy/denom*engage.range(),false);
+        }else if(orders.position()==BattleOrders.Position.KEEP_MOVING
+                &&distance<engage.range()){
+            double dx=target.x-ship.x,dy=target.y-ship.y;
+            steerToward(ship,ship.x-dy,ship.y+dx,false);
+        }else steerToward(ship,target.x,target.y,false);
+    }
+    private void steerToward(Ship ship,double x,double y,boolean fleeing){
+        double desired=StrictMath.atan2(y-ship.y,x-ship.x);
+        double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
+        ship.facing=wrap(ship.facing+change);
+        double velocity=ship.speed*ship.engineCondition;
+        double smooth=Math.min(1,1.6*DT);
+        ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
+        ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
+        ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
     }
 
     private void fire(Ship s, Ship target) {
@@ -711,6 +814,7 @@ public final class Battle {
     private void hit(Ship defender, double raw, Ship attacker,DamageType kind,long shotId,
                      double impactX,double impactY) {
         if (!defender.alive()) return;
+        if(attacker!=null)defender.lastAttackerId=attacker.id;
         visual(shotId,VisualPhase.IMPACT,kind.name(),attacker==null?-1:attacker.team,
                 attacker==null?0:attacker.id,defender.id,impactX,impactY,
                 defender.x,defender.y);
