@@ -51,6 +51,7 @@ public final class Battle {
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
         public ProjectileModel.Spec torpedoProjectile=ProjectileModel.standard(ProjectileModel.Kind.TORPEDO);
         public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
+        public double pdCycle=1;
         public Shipyard.Weapons weapons=new Shipyard.Weapons(
                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);
         public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
@@ -105,14 +106,18 @@ public final class Battle {
         public double x, y, vx, vy, fuel, damage, integrity;
         public final boolean torpedo;
         public final ProjectileModel.Spec spec;
+        public final double guidanceQuality;
         Missile(long visualId,long spawnTick, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
-                boolean heavy, ProjectileModel.Spec profile) {
+                boolean heavy, ProjectileModel.Spec profile,double launchGuidance) {
             this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
             if(profile==null)throw new IllegalArgumentException("Missile properties missing");
-            spec=profile;fuel = heavy?14:10; damage = amount; integrity=profile.health();
+            if(!Double.isFinite(launchGuidance)||launchGuidance<0.2||launchGuidance>2.6)
+                throw new IllegalArgumentException("Invalid missile guidance quality");
+            spec=profile;guidanceQuality=launchGuidance;
+            fuel = heavy?14:10; damage = amount; integrity=profile.health();
         }
     }
 
@@ -323,6 +328,7 @@ public final class Battle {
         s.missileProjectile=machinery.missileProjectile();
         s.torpedoProjectile=machinery.torpedoProjectile();
         s.pointDefenseProfile=machinery.pointDefense();
+        s.pdCycle=machinery.pdCycle();
         s.weapons=machinery.weapons();
         s.support=machinery.support();
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
@@ -620,7 +626,8 @@ public final class Battle {
             s.power -= 13; s.heat += 5;
             long shotId=nextVisualShotId++;
             missiles.add(new Missile(shotId,tick,s.id, s.team, target.id, s.x, s.y,
-                    target.x - s.x, target.y - s.y, s.missileDamage,false,s.missileProjectile));
+                    target.x - s.x, target.y - s.y, s.missileDamage,false,s.missileProjectile,
+                    s.weapons.missileTracking()));
             visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             s.launched++;s.missileAmmo--;
         }
@@ -662,7 +669,8 @@ public final class Battle {
             s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
             long shotId=nextVisualShotId++;
             missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
-                    target.x-s.x,target.y-s.y,s.torpedoDamage,true,s.torpedoProjectile));
+                    target.x-s.x,target.y-s.y,s.torpedoDamage,true,s.torpedoProjectile,
+                    s.weapons.torpedoTracking()));
             visual(shotId,VisualPhase.FIRE,"TORPEDO",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
         }
     }
@@ -992,7 +1000,7 @@ public final class Battle {
             }
             if(chosenMissile==null && chosenShell==null)continue;
             defender.power-=1.5;defender.heat+=0.8;
-            defender.pdReload=0.16/defender.pointDefenseCondition;
+            defender.pdReload=0.16*defender.pdCycle/defender.pointDefenseCondition;
             double tx=chosenMissile!=null?chosenMissile.x:chosenShell.x;
             double ty=chosenMissile!=null?chosenMissile.y:chosenShell.y;
             int hostileSource=chosenMissile!=null?chosenMissile.sourceId:chosenShell.sourceId;
@@ -1035,7 +1043,7 @@ public final class Battle {
                 Craft craft=crafts.get(i);
                 if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange*weather.sensorFactor())continue;
                 defender.power-=1.5;defender.heat+=0.8;
-                defender.pdReload=0.18/defender.pointDefenseCondition;
+                defender.pdReload=0.18*defender.pdCycle/defender.pointDefenseCondition;
                 long defensiveShot=nextVisualShotId++;
                 visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                         defender.team,defender.id,craft.sourceId,
@@ -1070,7 +1078,8 @@ public final class Battle {
                 missiles.remove(i);continue;
             }
             if (range > 0) {
-                double guidance=(m.torpedo?0.025:0.04)*weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition);
+                double guidance=Math.min(0.35,(m.torpedo?0.025:0.04)*m.guidanceQuality
+                        *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition));
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
                 double magnitude = StrictMath.hypot(m.vx,m.vy);
@@ -1195,6 +1204,7 @@ public final class Battle {
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
             hash=mix(hash,Double.doubleToLongBits(m.x));
             hash=mix(hash,Double.doubleToLongBits(m.integrity));
+            hash=mix(hash,Double.doubleToLongBits(m.guidanceQuality));
         }
         for (Ballistic p : ballistics) {
             hash=mix(hash,p.visualId);hash=mix(hash,Double.doubleToLongBits(p.x));
