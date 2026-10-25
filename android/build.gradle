@@ -59,6 +59,7 @@ tasks.register('copyAndroidNatives') {
 tasks.configureEach { task ->
     if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
         task.dependsOn rootProject.tasks.named('prepareUiAssets')
+        task.dependsOn rootProject.tasks.named('verifyBattlefieldResources')
     }
     if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
         task.dependsOn(tasks.named('copyAndroidNatives'))
