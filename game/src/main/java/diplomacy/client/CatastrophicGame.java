@@ -30,6 +30,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private InstancedShipRenderer instanced;
     private TerranPlaceholderSprites terranSprites;
     private WeaponBeamSprites weaponBeams;
+    private ModularWeaponFxRenderer weaponFx;
     private TacticalUiIcons uiIcons;
     private Battle battle;
     private TechnologyCatalog technology;
@@ -56,6 +57,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
         terranSprites = new TerranPlaceholderSprites();
         weaponBeams = new WeaponBeamSprites();
+        weaponFx = new ModularWeaponFxRenderer();
         uiIcons = new TacticalUiIcons();
         font.getData().setScale(1.23f);
         try {
@@ -259,11 +261,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
-        if(weaponBeams!=null && weaponBeams.loaded()>0)weaponBeams.render(battle,batch);
+        if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams);
         drawArmorDamage();
+        // Query sprite availability before opening ShapeRenderer's GL batch.
+        java.util.Set<Long> texturedMissiles=new java.util.HashSet<>();
+        if(weaponFx!=null)for(Battle.Missile missile:battle.missiles())
+            if(weaponFx.hasMissilePayload(missile,battle.tick))
+                texturedMissiles.add(missile.visualId);
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Missile m : battle.missiles()) {
+            if(texturedMissiles.contains(m.visualId))continue;
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
             shapes.circle((float) m.x, (float) m.y, m.torpedo?4.4f:2.8f, 7);
         }
@@ -363,6 +371,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
+        if(weaponFx!=null)weaponFx.dispose();
         if(uiIcons!=null)uiIcons.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
