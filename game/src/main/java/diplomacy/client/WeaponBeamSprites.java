@@ -59,6 +59,15 @@ public final class WeaponBeamSprites implements Disposable {
         return texture(beam,tick)!=null;
     }
 
+    private Texture supportTexture(Battle.SupportLink link,long tick){
+        int color=link.kind==Battle.SupportKind.SHIELD?0:2; // approved blue / green beam art
+        int frame=(int)Math.min(FRAMES-1,Math.max(0,tick-link.spawnTick));
+        Texture image=beams[color][frame];
+        return image!=null?image:beams[color][0];
+    }
+    public boolean canDrawSupport(Battle.SupportLink link,long tick){
+        return supportTexture(link,tick)!=null;
+    }
     /** World-aligned textured beam geometry; its origin remains the actual simulation muzzle. */
     public void render(Battle battle,SpriteBatch batch) {
         if(loaded==0)return;
@@ -73,6 +82,18 @@ public final class WeaponBeamSprites implements Disposable {
             float thickness=beam.type==Battle.DamageType.KINETIC?4.0f:6.3f;
             float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
             batch.draw(image,(float)beam.x1,(float)beam.y1-thickness/2,
+                    0,thickness/2,length,thickness,1,1,rotation,
+                    0,0,image.getWidth(),image.getHeight(),false,false);
+        }
+        for(Battle.SupportLink link:battle.supportLinks()){
+            Texture image=supportTexture(link,battle.tick);
+            if(image==null)continue;
+            double dx=link.x2-link.x1,dy=link.y2-link.y1;
+            float length=(float)StrictMath.hypot(dx,dy);
+            if(length<0.01f)continue;
+            float thickness=link.kind==Battle.SupportKind.SHIELD?4.0f:2.8f;
+            float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
+            batch.draw(image,(float)link.x1,(float)link.y1-thickness/2,
                     0,thickness/2,length,thickness,1,1,rotation,
                     0,0,image.getWidth(),image.getHeight(),false,false);
         }
