@@ -48,7 +48,7 @@ def functional_tests():
     run(["gradle", ":core:smoke", ":desktop:classes", ":android:assembleDebug"])
 
 
-def verify_artifacts(record_path, apk_path, aab_path):
+def verify_artifacts(record_path, apk_path, aab_path, publish):
     record = json.loads(record_path.read_text(encoding="utf-8"))
     if record.get("distribution") != "play":
         raise ValueError("Play candidate evidence MUST declare distribution=play")
@@ -80,23 +80,43 @@ def verify_artifacts(record_path, apk_path, aab_path):
     sdk_line = next((line for line in badging.splitlines() if "targetSdkVersion:" in line), "")
     if not sdk_line:
         raise ValueError("APK target SDK could not be read")
-    if not (record.get("play_target_api_policy_review") and record.get("play_console_approval_evidence")
+    if not (record.get("play_target_api_policy_review")
+            and record.get("play_console_registration_evidence")
             and record.get("physical_device_upgrade_evidence")):
-        raise ValueError("Actual Play API, Console and physical-device evidence must be recorded")
-    jarsigner = tool("jarsigner") if shutil.which("jarsigner") else shutil.which("jarsigner")
+        raise ValueError("Play API review, Console registration and physical-device upgrade evidence required")
+    jarsigner = shutil.which("jarsigner")
     if not jarsigner:
         raise ValueError("JDK jarsigner unavailable for Play upload bundle verification")
     bundle = subprocess.run([jarsigner, "-verify", str(aab_path.resolve())],
                             cwd=ROOT, check=True, text=True, capture_output=True)
     if "jar verified" not in bundle.stdout.lower():
         raise ValueError("AAB jarsigner did not report a verified bundle")
-    print("PASS: required source tests and artifact-evidence checks completed.")
-    print("NOT A PLAY RELEASE AUTHORIZATION: provider approval and device/evidence attestation require independent review.")
+    if publish and not record.get("play_console_approval_evidence"):
+        raise ValueError("Publishing requires actual completed Play Console approval evidence")
+    if record.get("play_bundle_package_id_verified") != APP_ID:
+        raise ValueError("Independent AAB package-ID verification evidence is required")
+    if record.get("play_bundle_version_verified") != str(record.get("release_version")):
+        raise ValueError("Independent AAB release-version verification evidence required")
+    expected_upload_signer = record.get("play_upload_signer_sha256")
+    if not isinstance(expected_upload_signer, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_upload_signer):
+        raise ValueError("Separate Play upload certificate fingerprint missing")
+    keytool = shutil.which("keytool")
+    if not keytool:
+        raise ValueError("keytool required for AAB upload signing certificate verification")
+    cert = subprocess.run([keytool, "-printcert", "-jarfile", str(aab_path.resolve())],
+                          cwd=ROOT, check=True, text=True, capture_output=True).stdout
+    stamps = re.findall(r"SHA256:\\s*([0-9a-fA-F:]{64,95})", cert)
+    if not stamps or expected_upload_signer.lower() not in [
+            re.sub(r"[^0-9a-fA-F]", "", stamp).lower() for stamp in stamps]:
+        raise ValueError("AAB upload-signing certificate SHA-256 differs from expected")
+    print("PASS: functional suites and signed APK/AAB candidate checks; no publication performed.")
+    print("NOT YET PLAY-APPROVED: Google Play review, public rollout and external evidence still required.")
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--preflight", action="store_true", help="Run all functional suites; no artifact acceptance")
+    p.add_argument("--publish", action="store_true", help="Require actual Play Console approval in addition to candidate checks")
     p.add_argument("--evidence", type=Path)
     p.add_argument("--apk", type=Path)
     p.add_argument("--aab", type=Path)
@@ -108,7 +128,7 @@ def main():
         if args.preflight:
             print("PASS: Play-branch source-functional preflight only; release candidate still BLOCKED without artifact/Play/device proof")
         else:
-            verify_artifacts(args.evidence, args.apk, args.aab)
+            verify_artifacts(args.evidence, args.apk, args.aab, args.publish)
     except (ValueError, OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         print(f"BLOCKED: {exc}", file=sys.stderr)
         return 1
