@@ -22,6 +22,10 @@ an Android hardware acceptance claim.
 - **`:desktop`** is LWJGL3. **`:android`** is the Android launcher. Both share every rules implementation. Desktop/Android graphics and native APK packaging are not yet accepted on physical devices.
 - A headless 16-vs-16 Java 17 smoke test passed locally. The online repository must be inspected at the commit SHA before claiming deployment. Balance and large-fleet GPU performance remain unverified.
 
+## Tactical orders and point defense
+
+Ships now support switchable point-defense fire control: **Balanced**, **Intercept Only**, **Anti-Craft** and **Hold Fire**. While in battle press **P** (left fleet) or **O** (right fleet) to cycle PD modes, or open the **Tactical Command** menu and choose **Fleet Orders Editor** (keyboard **F**). The two-column editor controls per-fleet class priorities and engagement ranges, targeting doctrines (nearest/cooperate/vulture/retaliate/protect), movement stances and cautious retreat. These settings persist in `fleet/orders-v1.dat` independently of the existing ship-fitting saves. Per-ship escort and formation orders are supported in the simulation API; individual parent assignment and multi-select deployment UI remain work to do. See [Fleet Orders System](docs/FLEET_ORDERS_SYSTEM.md). Run `gradle :core:battleOrdersSmoke` for the new headless rule tests; desktop/Android visuals still need actual build verification.
+
 ## Modular weapon visuals
 
 Weapon animation is split into **three independently controlled stages**: a muzzle/firing clip, an authoritative moving beam/projectile payload, and a true hit/interception impact clip. Timing events and projectile IDs are emitted by the deterministic core; libGDX only renders existing textures. The initial four beam families have 63 original-atlas firing/impact cutouts plus 35 existing beam payload frames preserved in the project's binary transfer package (not yet GitHub PNG commits). No new artwork or procedural-pill replacement was generated. See [Modular Weapon FX](docs/MODULAR_WEAPON_FX.md); run `gradle :core:weaponFxSmoke` once the Java toolchain is available.
