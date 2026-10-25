@@ -68,7 +68,7 @@ public final class WeaponFxProfile {
                 new Profile("kinetic",Motion.HITSCAN,seq("kinetic","firing",8,1,20,20),beam("gold"),
                         seq("kinetic","impact",8,1,28,28),NONE));
         byType.put(Battle.DamageType.PLASMA,
-                new Profile("plasma",Motion.HITSCAN,seq("plasma","firing",7,1,28,28),beam("green"),
+                new Profile("plasma",Motion.HITSCAN,seq("plasma","firing",7,1,28,28),beam("red"),
                         seq("plasma","impact",8,1,42,42),NONE));
         byType.put(Battle.DamageType.PARTICLE,
                 new Profile("particle",Motion.HITSCAN,seq("particle","firing",8,1,25,25),beam("violet"),
