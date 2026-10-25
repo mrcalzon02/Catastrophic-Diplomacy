@@ -311,7 +311,8 @@ final class ShipyardPanel {
                         "PD TRACKING x%.2f  |  PD DAMAGE %.2f",
                         defense.tracking(),defense.damage()),342,158);
                 font.draw(batch,String.format(Locale.ROOT,
-                        "DETECTION MULT x%.2f (before sensors/weather)",
+                        "SCAN REACH %.0f u  |  SENSOR x%.2f",
+                        Shipyard.pointDefenseRangeAt(draft,catalog,selectedSlot),
                         defense.detectionMultiplier()),342,137);
             }
         }
