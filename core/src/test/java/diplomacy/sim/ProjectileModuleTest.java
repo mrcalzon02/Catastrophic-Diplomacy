@@ -52,6 +52,10 @@ public final class ProjectileModuleTest {
         check(installed.torpedoProjectile().health()>installed.missileProjectile().health(),
                 "torpedo payload armored better than missile");
         check(installed.pointDefense().tracking()>0,"PD module must fit actual fire control");
+        Shipyard.Fitted noSensor=Shipyard.fit(base.install(sensorSlot,null),catalog);
+        check(installed.pointDefense().detectionMultiplier()
+                        >noSensor.pointDefense().detectionMultiplier(),
+                "an installed sensor array must raise fitted PD acquisition range");
         ProjectileModel.Spec upgradedArmor=Shipyard.projectileAt(
                 base.stage(missileSlot,Shipyard.Track.RESILIENCE,2),catalog,missileSlot);
         ProjectileModel.Spec upgradedGuidance=Shipyard.projectileAt(
