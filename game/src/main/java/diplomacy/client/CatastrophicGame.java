@@ -71,7 +71,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
             saveFleets();
             reset();
-        },leftDesign,rightDesign);
+        },leftDesign,rightDesign,terranSprites);
         reset();
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
