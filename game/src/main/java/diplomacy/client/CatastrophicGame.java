@@ -16,6 +16,10 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.BattleOrders;
 import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
+import diplomacy.sim.DemonstrationBattle;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 import diplomacy.sim.SpaceWeather;
 import diplomacy.sim.LevelEnvironment;
 import diplomacy.shipyard.Shipyard;
@@ -65,6 +69,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
     private static final String ORDERS_FILE = "fleet/orders-v1.dat";
+    private final boolean verifyDemo;
+    private final Runnable updateCheck;
+    private long verifiedSequence;
+    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance;
+    private boolean verificationReported;
+    private final EnumSet<Battle.DamageType> verifiedTypes=EnumSet.noneOf(Battle.DamageType.class);
+    private final Set<Long> verifiedShotIds=new HashSet<>();
+    public CatastrophicGame(){this(null,false);}
+    public CatastrophicGame(boolean verifyDemo){this(null,verifyDemo);}
+    public CatastrophicGame(Runnable updater,boolean verifyDemo){
+        this.updateCheck=updater;this.verifyDemo=verifyDemo;
+        if(verifyDemo){fleetIndex=FLEET_SIZES.length-1;speed=8;}
+    }
 
     @Override public void create() {
         camera = new OrthographicCamera();
@@ -119,6 +136,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.U) { audio.toggleMusic(); audio.ui(); return true; }
                 if (key == Input.Keys.I) { audio.toggleEffects(); audio.ui(); return true; }
                 if (key == Input.Keys.J) { audio.toggleTrack(); audio.ui(); return true; }
+                if (key == Input.Keys.K && updateCheck!=null){updateCheck.run();return true;}
                 if(fleetOrdersPanel!=null && fleetOrdersPanel.open()) {
                     if(key==Input.Keys.ESCAPE || key==Input.Keys.F)closeFleetOrders();
                     return true;
@@ -156,6 +174,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return fleetOrdersPanel.tap(world.x,world.y);
                 }
                 if (tacticalMenuOpen) { tapTacticalMenu(world.x,world.y); return true; }
+                if(!shipyard.open() && updateCheck!=null
+                        && world.x>=1010 && world.x<1135
+                        && world.y>=71 && world.y<=124){
+                    updateCheck.run();return true;
+                }
                 if (!shipyard.open() && world.x >= 1140 && world.y >= 71 && world.y <= 124) {
                     openTacticalMenu(); return true;
                 }
@@ -444,7 +467,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void reset() {
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
-        battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
+        battle = verifyDemo?DemonstrationBattle.create(technology)
+                :Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         for(int side=0;side<2;side++)battle.setTeamOrders(side,fleetOrders[side]);
         if (weatherEnabled) battle.configureWeather(environment.weather());
         // The same validated stage index drives both GPU background and simulation.
@@ -452,6 +476,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         accumulator = 0;
         if (audio != null) audio.resetForBattle();
         running = true;
+        if(verifyDemo){
+            verifiedSequence=0;verifiedFrames=verifiedShots=verifiedImpacts=peakAnimations=peakCraft=peakOrdnance=0;
+            verificationReported=false;verifiedTypes.clear();verifiedShotIds.clear();
+            Gdx.app.log("CD-DEMO-VERIFY","START 200v200 module/weapon/service suite seed="+DemonstrationBattle.SEED);
+        }
     }
 
     @Override public void render() {
@@ -611,6 +640,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             uiIcons.drawButton(batch,"secondary",374,663,104,38);
             uiIcons.drawButton(batch,"special",1158,663,120,38);
             uiIcons.drawButton(batch,"primary",1138,78,132,41);
+            if(updateCheck!=null)uiIcons.drawButton(batch,"special",1010,78,124,41);
             uiIcons.draw(batch,"restart",139,669,23);
             uiIcons.draw(batch,"speed",378,669,23);
             uiIcons.draw(batch,"shipyard_ship",1165,669,23);
@@ -632,6 +662,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"SHIPYARD",1195,693);
         font.setColor(Color.WHITE);
         font.draw(batch,"MENU (M)",1174,107);
+        if(updateCheck!=null){
+            font.setColor(Color.CYAN);
+            font.draw(batch,"UPDATES (K)",1015,107);
+            font.setColor(Color.WHITE);
+        }
         font.setColor(Color.CYAN);
         font.draw(batch,"ZOOM +",24,106);
         font.draw(batch,"ZOOM -",133,106);
@@ -664,6 +699,63 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         batch.end();
         if (tacticalMenuOpen) drawTacticalMenu();
+        if(verifyDemo)verifyRenderedDemoFrame();
+    }
+
+    private void verifyRenderedDemoFrame(){
+        if(verificationReported)return;
+        verifiedFrames++;
+        if(weaponFx!=null)peakAnimations=Math.max(peakAnimations,weaponFx.activeAnimations());
+        peakCraft=Math.max(peakCraft,battle.crafts().size());
+        peakOrdnance=Math.max(peakOrdnance,battle.missiles().size()+battle.ballistics().size());
+        for(Battle.VisualEvent event:battle.visualEvents()){
+            if(event.sequence()<=verifiedSequence)continue;
+            verifiedSequence=event.sequence();
+            if(event.phase()==Battle.VisualPhase.FIRE){
+                verifiedShots++;verifiedShotIds.add(event.shotId());
+                try{verifiedTypes.add(Battle.DamageType.valueOf(event.weapon()));}
+                catch(IllegalArgumentException auxiliary){/* Distinct PD/fighter firing */ }
+            }
+            if(event.phase()==Battle.VisualPhase.IMPACT&&verifiedShotIds.contains(event.shotId()))
+                verifiedImpacts++;
+        }
+        if(battle.tick<480&&!battle.finished())return;
+        double self=0,remote=0,shield=0;
+        int serviceDrones=0;
+        for(Battle.Ship ship:battle.ships()){
+            self+=ship.hullRepaired;remote+=ship.remoteHullRepaired;
+            shield+=ship.shieldsTransferred;serviceDrones+=ship.repairDronesLaunched;
+        }
+        StringBuilder failure=new StringBuilder();
+        if(battle.ships().size()!=400)failure.append("ship count; ");
+        for(Battle.DamageType kind:new Battle.DamageType[]{
+                Battle.DamageType.LASER,Battle.DamageType.KINETIC,Battle.DamageType.PLASMA,
+                Battle.DamageType.PARTICLE,Battle.DamageType.MISSILE,Battle.DamageType.TORPEDO})
+            if(!verifiedTypes.contains(kind))failure.append("missing ").append(kind).append("; ");
+        if(verifiedFrames<6||verifiedShots==0||verifiedImpacts==0||battle.hitCount==0)
+            failure.append("unverified rendered combat; ");
+        if(peakOrdnance==0||peakCraft==0)failure.append("no ordnance/craft; ");
+        if(self<=0||remote<=0||shield<=0||serviceDrones==0)failure.append("inactive support; ");
+        if(peakAnimations==0)failure.append("VFX compositor unused; ");
+        verificationReported=true;
+        String facts=" tick="+battle.tick+" frames="+verifiedFrames+
+            " shots="+verifiedShots+" hits="+battle.hitCount+
+            " impacts="+verifiedImpacts+" weapons="+verifiedTypes+
+            " ordnance="+peakOrdnance+" craft="+peakCraft+
+            " self="+self+" remote="+remote+" shield="+shield+
+            " repairDrones="+serviceDrones+
+            " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
+            " VFX="+peakAnimations+" textureFrames="+
+            (weaponFx==null?0:weaponFx.loadedTextures())+
+            " beamFrames="+(weaponBeams==null?0:weaponBeams.loaded());
+        if(failure.length()>0){
+            Gdx.app.error("CD-DEMO-VERIFY","FAIL 200v200 "+failure+facts);
+            throw new IllegalStateException("CD 200v200 in-game validation failed: "+failure);
+        }
+        Gdx.app.log("CD-DEMO-VERIFY","PASS 200v200 mechanics+render-loop"+facts);
+        if(weaponFx==null||weaponFx.loadedTextures()==0||
+                weaponBeams==null||weaponBeams.loaded()==0)
+            Gdx.app.log("CD-DEMO-VERIFY","ART_PENDING: real atlas PNGs not packaged; fallback is not quality approval");
     }
 
     /** World camera follows the active engagement; UI coordinates never move. */

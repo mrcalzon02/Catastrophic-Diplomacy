@@ -201,3 +201,20 @@ tasks.register('fighterCraftSmoke', JavaExec) {
 }
 tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fighterCraftSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('fighterCraftSmoke') }
+
+tasks.register('demoWeaponSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test exact Android 200v200 combined six-weapon fitted fixture and deterministic replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.DemonstrationBattleTest'
+    dependsOn testClasses
+}
+
+tasks.register('updaterPolicySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate stable, prerelease and test-channel version, signature-origin and integrity policy.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.update.UpdatePolicyTest'
+    dependsOn testClasses
+}
+tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('updaterPolicySmoke')) }
