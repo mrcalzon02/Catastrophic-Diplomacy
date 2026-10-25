@@ -62,17 +62,17 @@ public final class WeaponFxProfile {
     private static Map<Battle.DamageType,Profile> build(){
         EnumMap<Battle.DamageType,Profile> byType=new EnumMap<>(Battle.DamageType.class);
         byType.put(Battle.DamageType.LASER,
-                new Profile("laser",Motion.HITSCAN,seq("laser","firing",6,1,24,24),beam("blue"),
+                new Profile("laser",Motion.HITSCAN,seq("laser","firing",8,1,24,24),beam("blue"),
                         seq("laser","impact",8,1,34,34),NONE));
         byType.put(Battle.DamageType.KINETIC,
-                new Profile("kinetic",Motion.HITSCAN,seq("kinetic","firing",5,1,20,20),beam("gold"),
+                new Profile("kinetic",Motion.HITSCAN,seq("kinetic","firing",8,1,20,20),beam("gold"),
                         seq("kinetic","impact",8,1,28,28),NONE));
         byType.put(Battle.DamageType.PLASMA,
                 new Profile("plasma",Motion.HITSCAN,seq("plasma","firing",7,1,28,28),beam("green"),
-                        seq("plasma","impact",10,1,42,42),NONE));
+                        seq("plasma","impact",8,1,42,42),NONE));
         byType.put(Battle.DamageType.PARTICLE,
-                new Profile("particle",Motion.HITSCAN,seq("particle","firing",6,1,25,25),beam("violet"),
-                        seq("particle","impact",10,1,36,36),NONE));
+                new Profile("particle",Motion.HITSCAN,seq("particle","firing",8,1,25,25),beam("violet"),
+                        seq("particle","impact",8,1,36,36),NONE));
         byType.put(Battle.DamageType.MISSILE,
                 new Profile("missile",Motion.GUIDED,seq("missile","firing",6,1,22,22),
                         seq("missile","payload",8,2,24,14),seq("missile","impact",10,1,42,42),
