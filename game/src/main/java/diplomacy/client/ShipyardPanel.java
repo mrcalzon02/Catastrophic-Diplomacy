@@ -150,6 +150,7 @@ final class ShipyardPanel {
             return true;
         }
         if(x>=335&&x<=796&&y>=110&&y<=580){
+            if(artPreview){notice="Switch to SHOW MAP to select physical module hardpoints";return true;}
             int hit=hitHardpoint(x,y);
             if(hit>=0)select(hit);
             return true;
