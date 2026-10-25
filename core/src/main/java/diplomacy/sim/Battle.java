@@ -109,13 +109,13 @@ public final class Battle {
     }
 
     public static final class Beam {
-        public final long visualId;
+        public final long visualId, spawnTick;
         public final double x1, y1, x2, y2;
         public final int team;
         public final DamageType type;
         public double lifetime = 0.13;
-        Beam(long visualId, double startX, double startY, double endX, double endY, int side, DamageType weapon) {
-            this.visualId=visualId;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
+        Beam(long visualId,long spawnTick, double startX, double startY, double endX, double endY, int side, DamageType weapon) {
+            this.visualId=visualId;this.spawnTick=spawnTick;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
         }
     }
 
@@ -319,7 +319,7 @@ public final class Battle {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
+            beams.add(new Beam(shotId,tick,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
             visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             double chance = Math.min(0.98, s.accuracy * (0.7 + lock * 0.45));
             if (random.nextDouble() < chance) hit(target,s.laserDamage,s,DamageType.LASER,shotId);
@@ -337,7 +337,7 @@ public final class Battle {
             s.kineticReload=0.75/Math.max(0.25,s.weaponsCondition);
             s.power-=5;s.heat+=4;
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
+            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             if(random.nextDouble()<Math.min(0.97,s.accuracy*(0.72+lock*0.4)))
                 hit(target,s.kineticDamage,s,DamageType.KINETIC,shotId);
@@ -346,7 +346,7 @@ public final class Battle {
             s.plasmaReload=1.8/Math.max(0.25,s.weaponsCondition);
             s.power-=14;s.heat+=17;
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
+            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
             visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             if(random.nextDouble()<Math.min(0.94,s.accuracy*(0.80+lock*0.4)))
                 hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
@@ -355,7 +355,7 @@ public final class Battle {
             s.particleReload=2.1/Math.max(0.25,s.weaponsCondition);
             s.power-=17;s.heat+=10;
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
+            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
             visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             if(random.nextDouble()<Math.min(0.98,s.accuracy*(0.76+lock*0.45)))
                 hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
