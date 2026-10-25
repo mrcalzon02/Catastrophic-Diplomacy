@@ -10,7 +10,7 @@ def signingAvailable = keyPath && secret('CD_ANDROID_KEYSTORE_PASSWORD', 'storeP
 
 android {
     namespace 'games.catastrophicdiplomacy.android'
-    compileSdk 35
+    compileSdk 36
     defaultConfig {
         applicationId 'games.catastrophicdiplomacy'
         minSdk 26
