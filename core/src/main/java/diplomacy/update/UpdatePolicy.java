@@ -15,6 +15,8 @@ public final class UpdatePolicy {
     public static final int SUPPORTED_DATA_SCHEMA = 1;
     private static final Pattern VERSION = Pattern.compile("(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})\\.(0|[1-9][0-9]{0,5})");
     private static final Pattern SHA = Pattern.compile("[a-fA-F0-9]{64}");
+    private static final Pattern TAG = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,119}");
+    private static final Pattern APK_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,179}\\.apk", Pattern.CASE_INSENSITIVE);
     private static final List<String> REDIRECT_HOSTS = List.of("github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com");
 
     public record Candidate(String tag, String version, long versionCode, String applicationId,
@@ -30,24 +32,38 @@ public final class UpdatePolicy {
         if (!match.matches()) throw new IllegalArgumentException("Expected stable MAJOR.MINOR.PATCH version");
         return new int[]{Integer.parseInt(match.group(1)), Integer.parseInt(match.group(2)), Integer.parseInt(match.group(3))};
     }
+    /** This gate deliberately uses Android's monotonic versionCode, NOT release channels or versionName. */
     public static void requireCandidate(Candidate candidate, String installedVersion, long installedCode) {
         if (candidate == null) throw new IllegalArgumentException("No update candidate");
-        if (!candidate.applicationId().equals(PACKAGE_ID)) throw new IllegalArgumentException("Unexpected Android package ID");
-        if (!candidate.tag().equals("cd-v" + candidate.version())) throw new IllegalArgumentException("Release tag/version mismatch");
-        if (compareVersions(candidate.version(), installedVersion) <= 0 || candidate.versionCode() <= installedCode)
-            throw new IllegalArgumentException("Not a newer version and build code");
+        requireAsset(candidate.tag(), candidate.fileName(), candidate.bytes(), candidate.sha256());
+        if (!PACKAGE_ID.equals(candidate.applicationId())) throw new IllegalArgumentException("Unexpected Android package ID");
+        if (candidate.version() == null || !candidate.version().matches("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,99}"))
+            throw new IllegalArgumentException("Malformed Android versionName");
+        if (candidate.versionCode() <= installedCode || candidate.versionCode() > Integer.MAX_VALUE)
+            throw new IllegalArgumentException("Not a newer Android versionCode");
         if (candidate.minDataSchema() < 1 || candidate.minDataSchema() > SUPPORTED_DATA_SCHEMA)
             throw new IllegalArgumentException("Unsupported local save schema");
-        String expected = "Catastrophic-Diplomacy-" + candidate.version() + "-Android.apk";
-        if (!candidate.fileName().equals(expected)) throw new IllegalArgumentException("Unexpected APK filename");
-        if (candidate.bytes() < 4096 || candidate.bytes() > MAX_APK_BYTES)
-            throw new IllegalArgumentException("APK outside bounded size limit");
-        if (candidate.sha256() == null || !SHA.matcher(candidate.sha256()).matches())
+    }
+    public static void requireAsset(String tag, String fileName, long bytes, String sha256) {
+        if (tag == null || !TAG.matcher(tag).matches()) throw new IllegalArgumentException("Unsafe release tag");
+        if (fileName == null || !APK_NAME.matcher(fileName).matches())
+            throw new IllegalArgumentException("Unsafe APK filename");
+        if (bytes < 4096 || bytes > MAX_APK_BYTES) throw new IllegalArgumentException("APK outside bounded size limit");
+        // GitHub digest and manifest are optional. Android signature verification is mandatory.
+        if (sha256 != null && !sha256.isBlank() && !SHA.matcher(sha256).matches())
             throw new IllegalArgumentException("Invalid SHA256 checksum");
+    }
+    /** Manifestless published APK: code and version are inspected after downloading. */
+    public static Candidate provisional(String tag, String name, long bytes, String sha256) {
+        requireAsset(tag, name, bytes, sha256);
+        return new Candidate(tag, tag, -1, PACKAGE_ID, SUPPORTED_DATA_SCHEMA, name, bytes,
+                sha256 == null ? "" : sha256);
     }
     public static void requireDownloadUrl(String url, String tag, String name) {
         URI uri = allowedUrl(url);
-        if (!"github.com".equals(uri.getHost()) || uri.getRawQuery() != null || uri.getRawFragment() != null ||
+        if (tag == null || !TAG.matcher(tag).matches() || name == null ||
+                !(APK_NAME.matcher(name).matches() || "release-manifest.json".equals(name)) ||
+                !"github.com".equals(uri.getHost()) || uri.getRawQuery() != null || uri.getRawFragment() != null ||
                 !uri.getRawPath().equals("/" + REPOSITORY + "/releases/download/" + tag + "/" + name))
             throw new IllegalArgumentException("Release asset must originate from this repository and tag");
     }

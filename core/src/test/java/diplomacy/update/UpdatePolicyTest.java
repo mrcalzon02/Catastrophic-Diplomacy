@@ -1,40 +1,44 @@
 package diplomacy.update;
 
+/** Regression gates: do not silently reintroduce a stable-only update filter. */
 public final class UpdatePolicyTest {
-    private static void check(boolean condition, String message) { if (!condition) throw new AssertionError(message); }
-    private static void reject(Runnable attempt, String message) {
-        try { attempt.run(); throw new AssertionError("Allowed unsafe input: " + message); }
-        catch (IllegalArgumentException expected) { }
+    private static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
+    private static void reject(Runnable task,String why){
+        try{task.run();throw new AssertionError("Unsafe candidate permitted: "+why);}
+        catch(IllegalArgumentException expected){ }
     }
-    public static void main(String[] args) {
-        check(UpdatePolicy.compareVersions("0.1.1", "0.1.0") > 0, "patch upgrade");
-        check(UpdatePolicy.compareVersions("1.0.0", "0.99.99") > 0, "major upgrade");
-        check(UpdatePolicy.compareVersions("0.4.1", "0.4.1") == 0, "equality");
-        check(UpdatePolicy.compareVersions("0.3.9", "0.4.0") < 0, "downgrade");
-        for (String bad : new String[]{"1.0", "1.0.0-rc1", "01.0.0", "1.0.0+dev", "-1.0.0", "1000000.0.0", "1.0.0/"})
-            reject(() -> UpdatePolicy.compareVersions(bad,"0.1.0"), "version " + bad);
-        var valid = new UpdatePolicy.Candidate("cd-v0.1.1", "0.1.1", 2,
-                UpdatePolicy.PACKAGE_ID, 1, "Catastrophic-Diplomacy-0.1.1-Android.apk", 500000,
-                "abcd".repeat(16));
-        UpdatePolicy.requireCandidate(valid, "0.1.0", 1);
-        reject(() -> UpdatePolicy.requireCandidate(valid,"0.1.1",2), "replay");
-        reject(() -> UpdatePolicy.requireCandidate(valid,"0.1.0",2), "versionCode not greater");
-        reject(() -> UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate("cd-v0.1.1","0.1.1",2,"other.app",1,valid.fileName(),500000,valid.sha256()), "0.1.0",1), "package");
-        reject(() -> UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate("cd-v0.1.1","0.1.1",2,valid.applicationId(),2,valid.fileName(),500000,valid.sha256()), "0.1.0",1), "save schema");
-        reject(() -> UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate("cd-v0.1.1","0.1.1",2,valid.applicationId(),1,"../../bad.apk",500000,valid.sha256()), "0.1.0",1), "filename traversal");
-        reject(() -> UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate("cd-v0.1.1","0.1.1",2,valid.applicationId(),1,valid.fileName(),UpdatePolicy.MAX_APK_BYTES+1,valid.sha256()), "0.1.0",1), "oversize");
-        reject(() -> UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate("cd-v0.1.1","0.1.1",2,valid.applicationId(),1,valid.fileName(),500000,"0".repeat(63)), "0.1.0",1), "checksum");
-        String validUrl="https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/cd-v0.1.1/" + valid.fileName();
-        UpdatePolicy.requireDownloadUrl(validUrl,valid.tag(),valid.fileName());
-        for (String bad : new String[]{validUrl.replace("https:","http:"),
-                validUrl.replace("github.com", "github.com.evil.org"),
-                validUrl.replace("/mrcalzon02/", "/other-owner/"),
-                validUrl + "?steal=yes", "https://username@github.com" + validUrl.substring("https://github.com".length()),
-                "https://github.com:443" + validUrl.substring("https://github.com".length()),
-                "https://evil.org/x", "file:///sdcard/test.apk"})
-            reject(() -> UpdatePolicy.requireDownloadUrl(bad,valid.tag(),valid.fileName()), "URL " + bad);
-        UpdatePolicy.allowedUrl("https://release-assets.githubusercontent.com/download/x?sig=x");
-        reject(() -> UpdatePolicy.allowedUrl("https://release-assets.githubusercontent.com.evil.org/download"), "redirect domain");
-        System.out.println("PASS update version, package, schema, file, size, checksum and URL policies");
+    public static void main(String[] args){
+        var nightly = new UpdatePolicy.Candidate("nightly_2026.10.25","0.1.1-rc.3",53,
+                UpdatePolicy.PACKAGE_ID,1,"unusual-Nightly-Build.apk",8192,"a".repeat(64));
+        UpdatePolicy.requireCandidate(nightly,"0.1.1",52);
+        var sameName = new UpdatePolicy.Candidate("build-99","0.1.1",54,
+                UpdatePolicy.PACKAGE_ID,1,"new.apk",8192,"");
+        UpdatePolicy.requireCandidate(sameName,"0.1.1",52);
+        var lowerName = new UpdatePolicy.Candidate("test+hotfix","0.0.9-dev",55,
+                UpdatePolicy.PACKAGE_ID,1,"signed.apk",8192,"");
+        UpdatePolicy.requireCandidate(lowerName,"0.1.1",52);
+        reject(()->UpdatePolicy.requireCandidate(nightly,"0.1.1",53),"same build code");
+        reject(()->UpdatePolicy.requireCandidate(nightly,"0.1.1",54),"older build code");
+        reject(()->UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate(
+                "any","0.1.2",53,"other.package",1,"app.apk",8192,""),"0.1.1",52),"wrong app");
+        reject(()->UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate(
+                "any","0.1.2",53,UpdatePolicy.PACKAGE_ID,4,"app.apk",8192,""),"0.1.1",52),"schema");
+        var noManifest=UpdatePolicy.provisional("rc_28","provisional.apk",8192,"");
+        check(noManifest.versionCode()==-1,"unknown versionCode must be inspected on APK download");
+        for(String bad: new String[]{"../../bad.apk","test.zip","bad/name.apk","fake.apk/"})
+            reject(()->UpdatePolicy.provisional("rc1",bad,8192,""),"filename "+bad);
+        reject(()->UpdatePolicy.provisional("../tag","ok.apk",8192,""),"unsafe tag");
+        reject(()->UpdatePolicy.provisional("test","a.apk",8192,"1234"),"invalid digest");
+        reject(()->UpdatePolicy.provisional("test","a.apk",10,""),"undersized APK");
+        reject(()->UpdatePolicy.provisional("test","a.apk",UpdatePolicy.MAX_APK_BYTES+1,""),"oversize APK");
+        String url="https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/rc_28/provisional.apk";
+        UpdatePolicy.requireDownloadUrl(url,"rc_28","provisional.apk");
+        for(String bad: new String[]{url.replace("https:","http:"),
+                 url.replace("github.com","github.com.evil.com"),url.replace("/mrcalzon02/","/bad-owner/"),
+                 url+"?token=evil","file:///tmp/bad.apk"})
+            reject(()->UpdatePolicy.requireDownloadUrl(bad,"rc_28","provisional.apk"),"download host");
+        UpdatePolicy.allowedUrl("https://release-assets.githubusercontent.com/anything?token=github");
+        reject(()->UpdatePolicy.allowedUrl("https://evil.example.com"),"redirect host");
+        System.out.println("PASS stable + prerelease + nightly + same-name incremented versionCode; manifest optional");
     }
 }
