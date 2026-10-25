@@ -8,13 +8,21 @@ def keyPath = secret('CD_ANDROID_KEYSTORE_PATH', 'storeFile')
 def signingAvailable = keyPath && secret('CD_ANDROID_KEYSTORE_PASSWORD', 'storePassword') &&
         secret('CD_ANDROID_KEY_ALIAS', 'keyAlias') && secret('CD_ANDROID_KEY_PASSWORD', 'keyPassword')
 
+// Dormant Google Play channel: independently provided upload signing identity.
+def playStore = (project.findProperty('playUploadKeystorePath') ?: '').toString()
+def playStorePass = (project.findProperty('playUploadStorePassword') ?: '').toString()
+def playAlias = (project.findProperty('playUploadKeyAlias') ?: '').toString()
+def playKeyPass = (project.findProperty('playUploadKeyPassword') ?: '').toString()
+def havePlaySigning = playStore && playStorePass && playKeyPass &&
+        playAlias == 'catastrophicdiplomacy-play-upload-v1' && file(playStore).isFile()
+
 android {
     namespace 'games.catastrophicdiplomacy.android'
-    compileSdk 35
+    compileSdk 36
     defaultConfig {
         applicationId 'games.catastrophicdiplomacy'
         minSdk 26
-        targetSdk 35
+        targetSdk 36
         versionCode 1
         versionName '0.1.0'
     }
@@ -32,11 +40,26 @@ android {
                 storeType 'pkcs12'
             }
         }
+        if (havePlaySigning) {
+            playUpload {
+                storeFile file(playStore)
+                storePassword playStorePass
+                keyAlias playAlias
+                keyPassword playKeyPass
+                storeType 'pkcs12'
+            }
+        }
     }
     buildTypes {
         release {
             minifyEnabled false
             if (signingAvailable) signingConfig signingConfigs.release
+        }
+        play {
+            initWith release
+            signingConfig = null
+            if (havePlaySigning) signingConfig signingConfigs.playUpload
+            matchingFallbacks = ['release']
         }
     }
     sourceSets { main { assets.srcDirs = ['../assets'] } }
@@ -74,5 +97,21 @@ dependencies {
 gradle.taskGraph.whenReady { graph ->
     if (graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') } && !signingAvailable) {
         throw new GradleException('Release signing unavailable. Run python tools/bootstrap_secrets.py and ensure local signing material exists.')
+    }
+}
+
+tasks.register('validatePlayUploadSigning') {
+    doLast {
+        if (!havePlaySigning) {
+            throw new GradleException('Play bundle blocked: supply NEW catastrophicdiplomacy-play-upload-v1 upload key')
+        }
+        if (playStore && keyPath && file(playStore).canonicalPath == rootProject.file(keyPath).canonicalPath) {
+            throw new GradleException('Play bundle blocked: legacy sideload keystore is not a Play upload identity')
+        }
+    }
+}
+tasks.configureEach { task ->
+    if (task.name in ['bundlePlay', 'assemblePlay']) {
+        task.dependsOn('validatePlayUploadSigning')
     }
 }
