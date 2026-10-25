@@ -27,8 +27,8 @@ public final class SupportSystemsTest {
         }
         if(active){
             medic.support=new Shipyard.Support(1.5,2.5,190,3.3,190,
-                    specialistDrone,2.0,1.2,1.15);
-            if(specialistDrone)medic.droneReserve=1;
+                    specialistDrone,2.0,1.2,1.15,specialistDrone?1:0);
+            if(specialistDrone)medic.repairDroneReserve=1;
         }
         medic.hull-=12;friend.hull-=35;
         // A physically depleted shield facing, not a fake HUD shield counter.
@@ -85,6 +85,14 @@ public final class SupportSystemsTest {
                 "DRN specialist converts specific controller's drones to repair craft");
         check(Shipyard.fit(service,tech).support().repairDroneRate()>0,
                 "Repair drones must gain actual finite service capability");
+        check(Shipyard.fit(service,tech).droneCapacity()==0
+                        &&Shipyard.fit(service,tech).support().repairDroneCapacity()>0,
+                "Specialist controller must count only its own service drones");
+        int secondDrone=slot(hull,Shipyard.Mount.SUPPORT,2);
+        Shipyard.Design mixed=service.install(secondDrone,"BASE-TER-DRN");
+        check(Shipyard.fit(mixed,tech).droneCapacity()>0
+                        &&Shipyard.fit(mixed,tech).support().repairDroneCapacity()>0,
+                "Distinct controllers must carry independent regular and repair drone stores");
         Shipyard.Design remote=base.stage(rep,Shipyard.Track.SPECIALIST,4);
         check(Shipyard.fit(remote,tech).support().repairRange()>fitted.support().repairRange(),
                 "Remote repair research must modify actual service reach");
@@ -125,7 +133,7 @@ public final class SupportSystemsTest {
 
         Battle repair=makeCombat(true,true);
         Battle.Ship controller=repair.ships().get(0);
-        controller.support=new Shipyard.Support(0,0,200,0,200,true,2,1.2,1);
+        controller.support=new Shipyard.Support(0,0,200,0,200,true,2,1.2,1,1);
         for(int i=0;i<140;i++)repair.step();
         check(controller.repairDronesLaunched>0,"service drone controller must launch craft");
         check(controller.remoteHullRepaired>0,
@@ -136,7 +144,7 @@ public final class SupportSystemsTest {
                 "a repair-only drone must not secretly refill shields");
 
         Battle copy=makeCombat(true,true);
-        copy.ships().get(0).support=new Shipyard.Support(0,0,200,0,200,true,2,1.2,1);
+        copy.ships().get(0).support=new Shipyard.Support(0,0,200,0,200,true,2,1.2,1,1);
         for(int i=0;i<140;i++)copy.step();
         check(repair.fingerprint()==copy.fingerprint(),
                 "repeated seeded service-drone sorties must be deterministic");
