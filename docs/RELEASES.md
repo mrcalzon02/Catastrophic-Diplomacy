@@ -1,6 +1,6 @@
 # Release and update contract
 
-The authoritative repository is `mrcalzon02/Catastrophic-Diplomacy` and the release namespace is `cd-vMAJOR.MINOR.PATCH`. Desktop and Android are built from exactly the same simulation commit. Each release must include a declared data-schema version, semantic application version and platform-specific asset names. Release archives and APKs are staged locally and verified before publication.
+The authoritative repository is `mrcalzon02/Catastrophic-Diplomacy`. Stable releases conventionally use `cd-vMAJOR.MINOR.PATCH`, **but the Android updater does not require that tag or stable channel**: any publicly published GitHub release with a safely named Android APK is discoverable, including test/nightly/prerelease builds. Desktop and Android are built from exactly the same simulation commit. Each release must include a declared data-schema version, semantic application version and platform-specific asset names. Release archives and APKs are staged locally and verified before publication.
 
 **Build artifacts:** `Catastrophic-Diplomacy-VERSION-Windows-x64.zip` containing a JRE-bundled runtime, `Catastrophic-Diplomacy-VERSION-Android.apk` signed with the per-project PKCS12 keystore, and `SHA256SUMS.txt`. Windows EXE/MSI via `jpackage` when tested on Windows; unsigned APKs are never a release. A release manifest must contain version, platform, minimum supported schema, exact filename, byte length and SHA-256. Stable releases exclude drafts/prereleases and are tagged only within the `cd-v` namespace.
 
