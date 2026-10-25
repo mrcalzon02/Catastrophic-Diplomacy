@@ -105,7 +105,7 @@ def verify_artifacts(record_path, apk_path, aab_path, publish):
         raise ValueError("keytool required for AAB upload signing certificate verification")
     cert = subprocess.run([keytool, "-printcert", "-jarfile", str(aab_path.resolve())],
                           cwd=ROOT, check=True, text=True, capture_output=True).stdout
-    stamps = re.findall(r"SHA256:\\s*([0-9a-fA-F:]{64,95})", cert)
+    stamps = re.findall(r"SHA256:\s*([0-9a-fA-F:]{64,95})", cert)
     if not stamps or expected_upload_signer.lower() not in [
             re.sub(r"[^0-9a-fA-F]", "", stamp).lower() for stamp in stamps]:
         raise ValueError("AAB upload-signing certificate SHA-256 differs from expected")
