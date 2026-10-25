@@ -14,6 +14,22 @@ public final class ProjectileModuleTest {
             if(position.mount()==mount && nth--==0)return position.index();
         throw new IllegalArgumentException("Missing "+mount);
     }
+    private static boolean shootsDownSignature(double cross,double signature){
+        Battle test=new Battle(1701);
+        Battle.Ship firing=test.addShip(0,Battle.Faction.TERRAN,230,340);
+        Battle.Ship defended=test.addShip(1,Battle.Faction.CARNELIAN,480,340);
+        firing.speed=0;defended.speed=0;
+        firing.laserDamage=firing.kineticDamage=firing.plasmaDamage=firing.particleDamage=0;
+        firing.torpedoDamage=0;firing.missileDamage=35;firing.missileAmmo=1;
+        firing.pdRange=0;
+        firing.missileProjectile=new ProjectileModel.Spec(220,2.5,cross,signature);
+        defended.laserDamage=defended.kineticDamage=defended.plasmaDamage
+                =defended.particleDamage=defended.missileDamage=defended.torpedoDamage=0;
+        defended.pdRange=140;
+        defended.pointDefenseProfile=ProjectileModel.STANDARD_PD;
+        test.step(); // missile spawns at 230; hostile PD acquires at 250 distance
+        return defended.pdReload>0;
+    }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Shipyard.Hull hull=Shipyard.Hull.DREADNOUGHT;
@@ -61,6 +77,10 @@ public final class ProjectileModuleTest {
                 new ProjectileModel.Spec(normal.speed(),normal.health(),2.1,2.1));
         check(lowSignature<shortReach&&shortReach<largeSignature,
                 "detection range must depend on projectile cross section AND signature");
+        check(shootsDownSignature(4,4),
+                "PD must begin tracking a big hot missile before it enters nominal range");
+        check(!shootsDownSignature(0.08,0.08),
+                "PD must NOT track a tiny low-signature missile beyond calculated detection range");
         check(ProjectileModel.acquisitionRange(150,0.40,1,pd,normal)<shortReach,
                 "sensor damage must affect missile detection range");
         check(ProjectileModel.acquisitionRange(150,1,0.55,pd,normal)<shortReach,
