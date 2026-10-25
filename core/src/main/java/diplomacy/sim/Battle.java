@@ -751,6 +751,14 @@ public final class Battle {
             if(chosenMissile==null && chosenShell==null)continue;
             defender.power-=1.5;defender.heat+=0.8;
             defender.pdReload=0.16/defender.pointDefenseCondition;
+            double tx=chosenMissile!=null?chosenMissile.x:chosenShell.x;
+            double ty=chosenMissile!=null?chosenMissile.y:chosenShell.y;
+            int hostileSource=chosenMissile!=null?chosenMissile.sourceId:chosenShell.sourceId;
+            long defensiveShot=nextVisualShotId++;
+            visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
+                    defender.team,defender.id,hostileSource,defender.x,defender.y,tx,ty);
+            beams.add(new Beam(defensiveShot,tick,defender.x,defender.y,
+                    tx,ty,defender.team,DamageType.LASER));
             // Fast shells are harder to track than guided ordnance, but genuinely
             // interceptable; visual glows alone cannot be shot down.
             double chance=(chosenShell==null?0.68:0.54)*defender.pointDefenseCondition
@@ -784,9 +792,20 @@ public final class Battle {
                 if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange*weather.sensorFactor())continue;
                 defender.power-=1.5;defender.heat+=0.8;
                 defender.pdReload=0.18/defender.pointDefenseCondition;
+                long defensiveShot=nextVisualShotId++;
+                visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
+                        defender.team,defender.id,craft.sourceId,
+                        defender.x,defender.y,craft.x,craft.y);
+                beams.add(new Beam(defensiveShot,tick,defender.x,defender.y,
+                        craft.x,craft.y,defender.team,DamageType.LASER));
                 if(random.nextDouble()<0.67*defender.pointDefenseCondition*weather.accuracyFactor()) {
                     craft.integrity-=20;
-                    if(craft.integrity<=0)crafts.remove(i);
+                    if(craft.integrity<=0) {
+                        crafts.remove(i);
+                        visual(defensiveShot,VisualPhase.INTERCEPT,"FIGHTER",
+                                defender.team,defender.id,craft.sourceId,
+                                craft.x,craft.y,craft.x,craft.y);
+                    }
                 }
                 break;
             }
