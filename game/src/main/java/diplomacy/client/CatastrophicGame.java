@@ -14,6 +14,8 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleView;
+import diplomacy.sim.SpaceWeather;
+import diplomacy.sim.LevelEnvironment;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
@@ -31,6 +33,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private TerranPlaceholderSprites terranSprites;
     private WeaponBeamSprites weaponBeams;
     private ModularWeaponFxRenderer weaponFx;
+    private ProceduralStarfield starfield;
+    private BattlefieldWeatherVfx weatherVfx;
+    private int battlefieldLevel = 1;
+    private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
     private Battle battle;
     private TechnologyCatalog technology;
@@ -61,6 +67,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
         weaponBeams = new WeaponBeamSprites();
         weaponFx = new ModularWeaponFxRenderer();
         uiIcons = new TacticalUiIcons();
+        try {
+            starfield = new ProceduralStarfield();
+            starfield.useLevel(battlefieldLevel);
+        } catch (RuntimeException error) {
+            Gdx.app.error("SKY", "Starfield disabled; continuing in plain background", error);
+            if (starfield != null) starfield.dispose();
+            starfield = null;
+        }
+        try {
+            weatherVfx = new BattlefieldWeatherVfx();
+        } catch (RuntimeException error) {
+            Gdx.app.error("WEATHER-FX", "Visual hazard renderer unavailable", error);
+            weatherVfx = null;
+        }
         font.getData().setScale(1.23f);
         try {
             instanced = new InstancedShipRenderer();
@@ -91,6 +111,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
+                if (key == Input.Keys.N) { changeBattlefieldLevel(1); return true; }
+                if (key == Input.Keys.B) { changeBattlefieldLevel(-1); return true; }
+                if (key == Input.Keys.W) { weatherEnabled = !weatherEnabled; reset(); return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
@@ -108,6 +131,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (shipyard.open()) {
                     shipyard.startTouch(world.x,world.y,pointer);
                     return true;
+                }
+                if (world.y >= 613 && world.y < 649) {
+                    if (world.x < 830) { weatherEnabled = !weatherEnabled; reset(); return true; }
+                    if (world.x >= 900 && world.x < 1040) { changeBattlefieldLevel(-1); return true; }
+                    if (world.x >= 1170) { changeBattlefieldLevel(1); return true; }
                 }
                 if (world.y > 650) {
                     if (world.x > 1160) { shipyard.show(); return true; }
@@ -186,6 +214,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.end();
     }
 
+    /**
+     * Actual environment selection. Every change restarts the current encounter
+     * with the newly selected level's weather; backgrounds never remain preview-only.
+     * Campaign waves/economy are separate future work.
+     */
+    private void changeBattlefieldLevel(int delta) {
+        int selected = Math.max(1,Math.min(500,battlefieldLevel+delta));
+        if (selected == battlefieldLevel) return;
+        battlefieldLevel = selected;
+        if (starfield != null) {
+            try { starfield.useLevel(selected); }
+            catch (RuntimeException err) { Gdx.app.error("SKY","Cannot select level background "+selected,err); }
+        }
+        reset();
+    }
+
     private void changeFleetSize(int delta) {
         int selected = Math.max(0,Math.min(FLEET_SIZES.length-1,fleetIndex+delta));
         if(selected!=fleetIndex){fleetIndex=selected;reset();}
@@ -253,7 +297,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void reset() {
+        LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
+        if (weatherEnabled) battle.configureWeather(environment.weather());
+        // The same validated stage index drives both GPU background and simulation.
+        if (starfield != null) starfield.useLevel(environment.level());
         accumulator = 0;
         running = true;
     }
@@ -278,6 +326,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         updateBattleCamera();
+        // World-space sky & hazard layers render before tactical grid, weapons and hulls.
+        if (starfield != null) starfield.render(batch,camera,battleCamera,W,H);
+        if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
@@ -322,6 +373,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams);
         drawArmorDamage();
+        if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
         // Query sprite availability before opening ShapeRenderer's GL batch.
         java.util.Set<Long> texturedMissiles=new java.util.HashSet<>();
         if(weaponFx!=null)for(Battle.Missile missile:battle.missiles())
@@ -338,8 +390,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(craft.team==0?Color.CYAN:Color.CORAL);
             shapes.circle((float)craft.x,(float)craft.y,craft.fighter?3.6f:2.4f,8);
         }
+        shapes.end();
+        // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
+        shapes.setProjectionMatrix(camera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(0.08f, 0.13f, 0.22f, 0.94f);
         shapes.rect(0, 649, W, 71);
+        shapes.setColor(0.035f, 0.085f, 0.15f, 0.93f);
+        shapes.rect(0, 613, W, 36);
         shapes.end();
         batch.setProjectionMatrix(camera.combined); batch.begin();
         if (uiIcons != null) {
@@ -366,6 +424,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"SHIPYARD",1166,693);
         font.setColor(Color.WHITE);
         font.draw(batch,"MENU (M)",1156,107);
+        font.setColor(Color.GOLD);
+        SpaceWeather.Preset activeWeather = battle.weather().preset();
+        String condition = activeWeather.enabled()
+                ? activeWeather.primary().name().replace('_',' ') : "CLEAR";
+        if (activeWeather.secondary() != SpaceWeather.Kind.CLEAR)
+            condition += " + " + activeWeather.secondary().name().replace('_',' ');
+        font.draw(batch,"ENV " + (weatherEnabled ? "ON" : "OFF") + "   " + condition +
+                "   (W / TAP TO TOGGLE)",22,638);
+        font.setColor(Color.CYAN);
+        font.draw(batch,"<",945,638);
+        font.draw(batch,"LEVEL " + battlefieldLevel + "/500",998,638);
+        font.draw(batch,">",1235,638);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
@@ -428,8 +498,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             float x = (float) s.x, y = (float) s.y;
             float scale=(float)s.visualScale();
-            // Software/OpenGL2 uses the SAME filled faction/class artwork geometry
-            // as the instanced GL3 path. This is not a collision or physics change.
+            // Keep Stage 2's distinct faction/class art in the GL2 fallback path.
             float angle=(float)(s.facing-Math.PI/2);
             float c=(float)Math.cos(angle), d=(float)Math.sin(angle);
             float[] triangles=HullSilhouette.of(s.faction,s.hullClass);
@@ -453,6 +522,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(weaponBeams!=null)weaponBeams.dispose();
         if(weaponFx!=null)weaponFx.dispose();
         if(uiIcons!=null)uiIcons.dispose();
+        if(starfield!=null)starfield.dispose();
+        if(weatherVfx!=null)weatherVfx.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }

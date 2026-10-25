@@ -28,7 +28,7 @@ public final class Battle {
     public enum Subsystem { REACTOR, ENGINES, WEAPONS, POINT_DEFENSE, SENSORS, COOLING, COMMAND, HANGAR, MAGAZINE, ELECTRONIC_WARFARE }
     public enum DamageType { LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, FIGHTER }
 
-    public static final class Ship {
+    public static final class Ship implements SpaceWeather.Target {
         public final int id, team;
         public final Faction faction;
         public final String name;
@@ -68,6 +68,9 @@ public final class Battle {
             defense=new DirectionalDefense(maxShields,maxArmor,maxHull);
         }
         public boolean alive() { return hull > 0 && !retired; }
+        public int weatherId() { return id; }
+        public double weatherX() { return x; }
+        public double weatherY() { return y; }
         /** Visible top-down hull scale; larger fitted capital hulls read as larger ships. */
         public double visualScale() { return Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0))); }
         public double combatReadiness() {
@@ -138,10 +141,17 @@ public final class Battle {
     private int nextId = 1;
     private final long seed;
     public long tick;
-    public int hitCount, missileIntercepts, destructions;
+    public int hitCount, missileIntercepts, destructions, environmentalHits;
+    private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
 
     public Battle(long initialSeed) { seed = initialSeed; random = new Random(initialSeed); }
     public long seed() { return seed; }
+    public SpaceWeather weather() { return weather; }
+    /** Select weather before step 1; default is CLEAR for backward compatibility. */
+    public void configureWeather(SpaceWeather.Preset preset) {
+        if (tick != 0) throw new IllegalStateException("Weather must be configured before battle starts");
+        weather = new SpaceWeather(preset);
+    }
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
@@ -242,6 +252,18 @@ public final class Battle {
         for (int i = beams.size() - 1; i >= 0; i--) {
             if ((beams.get(i).lifetime -= DT) <= 0) beams.remove(i);
         }
+        // Environment is deterministic, separately seeded, and uses the same damage rules.
+        for (SpaceWeather.Impact effect : weather.advance(tick, ships)) {
+            Ship victim = findShip(effect.targetId());
+            if (victim == null || !victim.alive()) continue;
+            DamageType kind = switch (effect.type()) {
+                case KINETIC -> DamageType.KINETIC;
+                case PARTICLE -> DamageType.PARTICLE;
+                case PLASMA -> DamageType.PLASMA;
+            };
+            hitAt(victim, effect.damage(), null, kind, effect.fromX(), effect.fromY());
+            environmentalHits++;
+        }
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             Ship target = chooseTarget(s);
@@ -249,15 +271,24 @@ public final class Battle {
                 steer(s, target);
                 fire(s, target);
                 launchAuxiliary(s, target);
-            } else { s.x += s.vx * DT; s.y += s.vy * DT; }
+            } else {
+                if (weather.preset().enabled()) {
+                    // Low sensor visibility must not cause a permanent standstill.
+                    double heading = s.team == 0 ? 1 : -1;
+                    s.vx += (heading * s.speed * s.engineCondition * 0.38 - s.vx) * 0.055;
+                }
+                s.x += s.vx * DT; s.y += s.vy * DT;
+            }
         }
         updateMissiles();
         updateCraft();
     }
 
     private void replenish(Ship s) {
-        s.power = Math.min(s.maxPower * s.reactorCondition, s.power + s.powerRegen * DT * s.reactorCondition);
-        s.heat = Math.max(0, s.heat + (s.passiveHeat - s.coolingRate * s.coolingCondition) * DT);
+        s.power = Math.max(0, Math.min(s.maxPower * s.reactorCondition,
+                s.power + s.powerRegen * DT * s.reactorCondition - weather.powerDrainPerSecond() * DT));
+        s.heat = Math.max(0, s.heat + (s.passiveHeat + weather.heatPerSecond()
+                - s.coolingRate * s.coolingCondition * weather.coolingFactor()) * DT);
         // Regenerate individual shield facings, subject to cooldown, reactor and power headroom.
         double rechargeCost=s.defense.recharge(DT,StrictMath.max(0,s.power-3),
                 s.reactorCondition>0.15 && s.heat<s.maxHeat*0.9);
@@ -286,6 +317,8 @@ public final class Battle {
         double best = Double.POSITIVE_INFINITY;
         for (Ship s : ships) if (s.team != actor.team && s.alive()) {
             double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
+            if (weather.preset().enabled() && distance > 1100.0 * actor.sensorsCondition
+                    * weather.sensorFactor()) continue;
             // Inexperienced commanders misjudge target resilience; tactical aggression
             // sometimes wins over a conservative point-value estimate.
             double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
@@ -314,14 +347,15 @@ public final class Battle {
     private void fire(Ship s, Ship target) {
         double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
         double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition
-                * (1 - target.ecmStrength*target.ecmCondition);
+                * weather.sensorFactor() * (1 - target.ecmStrength*target.ecmCondition);
+        double weatherAim = weather.accuracyFactor();
         if (s.laserDamage > 0 && distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
             visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            double chance = Math.min(0.98, s.accuracy * (0.7 + lock * 0.45));
+            double chance = Math.min(0.98, s.accuracy * weatherAim * (0.7 + lock * 0.45));
             if (random.nextDouble() < chance) hit(target,s.laserDamage,s,DamageType.LASER,shotId);
         }
         if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
@@ -339,7 +373,7 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.97,s.accuracy*(0.72+lock*0.4)))
+            if(random.nextDouble()<Math.min(0.97,s.accuracy*weatherAim*(0.72+lock*0.4)))
                 hit(target,s.kineticDamage,s,DamageType.KINETIC,shotId);
         }
         if (s.plasmaDamage > 0 && distance < 245 && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
@@ -348,7 +382,7 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
             visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.94,s.accuracy*(0.80+lock*0.4)))
+            if(random.nextDouble()<Math.min(0.94,s.accuracy*weatherAim*(0.80+lock*0.4)))
                 hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
         }
         if (s.particleDamage > 0 && distance < 565 && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
@@ -357,7 +391,7 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
             visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.98,s.accuracy*(0.76+lock*0.45)))
+            if(random.nextDouble()<Math.min(0.98,s.accuracy*weatherAim*(0.76+lock*0.45)))
                 hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
         }
         if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840 && distance>110
@@ -408,7 +442,7 @@ public final class Battle {
                 }
                 if((craft.reload-=DT)<=0 && range<115){
                     craft.reload=1.6;
-                    if(random.nextDouble()<0.64*(1-target.ecmStrength*target.ecmCondition))
+                    if(random.nextDouble()<0.64*weather.accuracyFactor()*(1-target.ecmStrength*target.ecmCondition))
                         hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
                 }
             } else {
@@ -448,11 +482,11 @@ public final class Battle {
             for (int i = missiles.size() - 1; i >= 0; i--) {
                 Missile missile = missiles.get(i);
                 if (missile.team == defender.team) continue;
-                if (StrictMath.hypot(missile.x - defender.x, missile.y - defender.y) > defender.pdRange) continue;
+                if (StrictMath.hypot(missile.x - defender.x, missile.y - defender.y) > defender.pdRange * weather.sensorFactor()) continue;
                 defender.pdReload = 0.16 / defender.pointDefenseCondition;
                 if (defender.power < 1.5) break;
                 defender.power -= 1.5; defender.heat += 0.8;
-                if (random.nextDouble() < 0.68 * defender.pointDefenseCondition) {
+                if (random.nextDouble() < 0.68 * defender.pointDefenseCondition * weather.accuracyFactor()) {
                     missile.integrity -= 2.7;
                     if (missile.integrity <= 0) {
                         missiles.remove(i); defender.intercepted++; missileIntercepts++;
@@ -468,10 +502,10 @@ public final class Battle {
                 &&defender.pointDefenseCondition>0.20&&defender.pdRange>0&&defender.power>1.5){
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
-                if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange)continue;
+                if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange*weather.sensorFactor())continue;
                 defender.power-=1.5;defender.heat+=0.8;
                 defender.pdReload=0.18/defender.pointDefenseCondition;
-                if(random.nextDouble()<0.67*defender.pointDefenseCondition) {
+                if(random.nextDouble()<0.67*defender.pointDefenseCondition*weather.accuracyFactor()) {
                     craft.integrity-=20;
                     if(craft.integrity<=0)crafts.remove(i);
                 }
@@ -494,7 +528,7 @@ public final class Battle {
                 missiles.remove(i);continue;
             }
             if (range > 0) {
-                double guidance=(m.torpedo?0.025:0.04)*(1-target.ecmStrength*target.ecmCondition);
+                double guidance=(m.torpedo?0.025:0.04)*weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition);
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
                 double magnitude = StrictMath.hypot(m.vx, m.vy);
@@ -513,10 +547,14 @@ public final class Battle {
         visual(shotId,VisualPhase.IMPACT,kind.name(),attacker==null?-1:attacker.team,
                 attacker==null?0:attacker.id,defender.id,defender.x,defender.y,
                 defender.x,defender.y);
-        hitCount++;
-        // Resolve incoming direction in defender-local coordinates (+X bow, +Y port).
         double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
+        hitAt(defender,raw,attacker,kind,dx,dy);
+    }
+    /** Environmental impacts share directional protection with actual weapons. */
+    private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,double dx,double dy) {
+        if (!defender.alive()) return;
+        hitCount++;
         double c=StrictMath.cos(defender.facing),s=StrictMath.sin(defender.facing);
         double localX=dx*c+dy*s, localY=-dx*s+dy*c;
         double distance=StrictMath.hypot(localX,localY);
@@ -568,6 +606,13 @@ public final class Battle {
     public long fingerprint() {
         long hash = 0xcbf29ce484222325L;
         hash = mix(hash, tick); hash = mix(hash, hitCount);
+        hash = mix(hash, environmentalHits); hash = mix(hash, weather.preset().seed());
+        hash = mix(hash, weather.meteorHits()); hash = mix(hash, weather.meteorMisses());
+        hash = mix(hash, weather.neutronHits());
+        for (SpaceWeather.Meteor meteor : weather.meteors()) {
+            hash = mix(hash, meteor.targetId()); hash = mix(hash, meteor.strikeTick());
+            hash = mix(hash, meteor.resolved() ? 1 : 0);
+        }
         for (Ship s : ships) {
             hash = mix(hash, s.id); hash = mix(hash, Double.doubleToLongBits(s.x));
             hash = mix(hash, Double.doubleToLongBits(s.y));

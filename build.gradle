@@ -50,3 +50,37 @@ tasks.register('prepareUiAssets') {
             throw new GradleException('Approved UI index must contain exactly 87 icons')
     }
 }
+
+/**
+ * Fail builds rather than silently shipping an APK/desktop distribution
+ * with placeholder-only weather assets. Both launchers consume assets/.
+ */
+tasks.register('verifyBattlefieldResources') {
+    group = 'verification'
+    description = 'Require the complete 49-PNG vetted weather library in the runtime asset root.'
+    doLast {
+        def inventory = ['asteroid_rock':8, 'asteroid_impact':8,
+                         'asteroid_shockwave':7, 'ion_lightning':8,
+                         'solar_beam':5, 'neutron_beam':5,
+                         'radiation_motes':4, 'nebula_haze':4]
+        def folder = file('assets/effects/weather')
+        int present = 0
+        inventory.each { prefix, count ->
+            (0..<count).each { i ->
+                def name = String.format(java.util.Locale.ROOT, '%s_%02d.png', prefix, i)
+                def png = new File(folder, name)
+                if (!png.isFile() || png.length() < 200) {
+                    throw new GradleException('Missing vetted battlefield resource: ' + png)
+                }
+                png.withInputStream { input ->
+                    byte[] header = new byte[8]
+                    if (input.read(header) != 8 || !java.util.Arrays.equals(header,
+                            [137,80,78,71,13,10,26,10].collect { (byte)it } as byte[]))
+                        throw new GradleException('Invalid PNG header: ' + png)
+                }
+                present++
+            }
+        }
+        println("PASS: ${present} approved battlefield PNG assets staged for packaging.")
+    }
+}

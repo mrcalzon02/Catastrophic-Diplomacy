@@ -118,3 +118,36 @@ tasks.register('levelEconomySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('levelEconomySmoke')) }
+
+tasks.register('skySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Reproduce all 500 seeded starfields without a graphics context.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelSkyTest'
+    dependsOn testClasses
+}
+tasks.register('spaceWeatherSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate deterministic asteroid, flare, radiation, ion and neutron weather.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SpaceWeatherTest'
+    dependsOn testClasses
+}
+tasks.register('battleWeatherSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify environmental impacts on real battle shields, aim and systems.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleWeatherTest'
+    dependsOn testClasses
+}
+tasks.register('levelEnvironmentSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Assert consistent level-to-background-to-weather mapping at 1..500.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelEnvironmentTest'
+    dependsOn testClasses
+}
+tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('skySmoke')) }
+tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
+tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
+tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }

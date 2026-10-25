@@ -10,6 +10,7 @@ application { mainClass = 'diplomacy.desktop.DesktopLauncher' }
 // Internal libGDX file paths must resolve identically on desktop and Android.
 tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareUiAssets')
+    dependsOn rootProject.tasks.named('verifyBattlefieldResources')
     from(rootProject.file('assets'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-ui'))
     into(layout.buildDirectory.dir('runtime-assets'))
