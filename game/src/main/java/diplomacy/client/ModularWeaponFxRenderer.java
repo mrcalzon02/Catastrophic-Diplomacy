@@ -126,8 +126,26 @@ final class ModularWeaponFxRenderer implements Disposable {
             drawCentered(batch,image,(float)missile.x,(float)missile.y,
                     clip.width(),clip.height(),angle);
         }
+        // Slow ballistic PAYLOADs use their real collision-tested world positions.
+        // The atlas frame is oriented by immutable launch velocity, not a fake
+        // interpolation between origin and target that would conceal PD hits.
+        Profile kinetic=WeaponFxProfile.forType(Battle.DamageType.KINETIC);
+        for(Battle.Ballistic shell:battle.ballistics()){
+            Clip clip=kinetic.payload();
+            Texture image=frame(clip,battle.tick-shell.spawnTick);
+            if(image==null)continue;
+            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(shell.vy,shell.vx));
+            drawCentered(batch,image,(float)shell.x,(float)shell.y,
+                    clip.width(),clip.height(),angle);
+        }
         batch.setColor(1,1,1,1);
         batch.end();
+    }
+
+    /** A missing ballistic payload also keeps live, positioned fallback geometry. */
+    public boolean hasBallisticPayload(Battle.Ballistic shell,long tick){
+        Profile kinetic=WeaponFxProfile.forType(Battle.DamageType.KINETIC);
+        return frame(kinetic.payload(),tick-shell.spawnTick)!=null;
     }
 
     /** A missing payload sprite keeps existing ordnance geometry visible. */
