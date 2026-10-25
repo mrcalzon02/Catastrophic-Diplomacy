@@ -68,7 +68,10 @@ public final class SupportSystemsTest {
         int shield=slot(hull,Shipyard.Mount.DEFENSE,0);
         Shipyard.Design base=Shipyard.starter(Battle.Faction.TERRAN,hull)
                 .install(rep,"BASE-TER-REP")
-                .install(drone,"BASE-TER-DRN");
+                .install(drone,"BASE-TER-DRN")
+                // The full support fit has meaningful reactor/cooling costs.
+                .install(slot(hull,Shipyard.Mount.SYSTEM,3),"BASE-TER-REA")
+                .install(slot(hull,Shipyard.Mount.SYSTEM,4),"BASE-TER-RAD");
         // Existing starter shield generator is already in first defense mount.
         Shipyard.Fitted fitted=Shipyard.fit(base,tech);
         check(fitted.support().selfRepairRate()>0
