@@ -38,9 +38,9 @@ public final class WeaponBeamSprites implements Disposable {
     private static int color(Battle.Beam beam){
         return switch(beam.type){
             case KINETIC -> 4; // gold
-            case PLASMA -> 2; // green
+            case PLASMA -> 1; // red, matching crimson plasma atlas
             case PARTICLE -> 3; // violet
-            case LASER -> beam.team==0?0:1;
+            case LASER -> 0; // blue, matching both firing and impact sprite rows
             case MISSILE,TORPEDO,FIGHTER -> -1;
         };
     }
