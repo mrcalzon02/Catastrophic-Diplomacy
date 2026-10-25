@@ -55,11 +55,11 @@ public final class ProjectileModel {
         double speed=1,armor=1,area=1,emissions=1;
         switch(faction){
             case TERRAN -> { }
-            case DRAXIAN -> {armor=1.10;area=1.12;emissions=1.08;}
-            case CARNELIAN -> {speed=0.88;armor=1.28;area=1.24;emissions=1.12;}
-            case ZIPPLEDROW -> {speed=1.20;armor=0.85;area=0.80;emissions=0.92;}
-            case UZIPT -> {speed=1.08;armor=0.95;area=0.88;emissions=0.82;}
-            case MANDRALLY -> {speed=0.94;armor=1.14;area=1.10;emissions=0.78;}
+            case DRAXIAN, VAERITH_PRISM -> {armor=1.10;area=1.12;emissions=1.08;}
+            case CARNELIAN, NYX_BIOLITH -> {speed=0.88;armor=1.28;area=1.24;emissions=1.12;}
+            case ZIPPLEDROW, UMBRA_FOUNDRY -> {speed=1.20;armor=0.85;area=0.80;emissions=0.92;}
+            case UZIPT, ZELTHAR_LUMINARI -> {speed=1.08;armor=0.95;area=0.88;emissions=0.82;}
+            case MANDRALLY, AUREATE_SYNOD -> {speed=0.94;armor=1.14;area=1.10;emissions=0.78;}
         }
         // Specialist improves guidance/propulsion; resilience armor slightly
         // increases physical cross section; high output makes warmer projectiles.
