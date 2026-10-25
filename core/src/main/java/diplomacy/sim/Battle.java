@@ -549,25 +549,59 @@ public final class Battle {
     }
 
     private void updateMissiles() {
-        // Defensive fire is evaluated before missile movement/impact.
-        for (Ship defender : ships) if (defender.alive() && defender.pdReload <= 0 && defender.pointDefenseCondition > 0.20) {
-            for (int i = missiles.size() - 1; i >= 0; i--) {
-                Missile missile = missiles.get(i);
-                if (missile.team == defender.team) continue;
-                if (StrictMath.hypot(missile.x - defender.x, missile.y - defender.y) > defender.pdRange * weather.sensorFactor()) continue;
-                defender.pdReload = 0.16 / defender.pointDefenseCondition;
-                if (defender.power < 1.5) break;
-                defender.power -= 1.5; defender.heat += 0.8;
-                if (random.nextDouble() < 0.68 * defender.pointDefenseCondition * weather.accuracyFactor()) {
-                    missile.integrity -= 2.7;
-                    if (missile.integrity <= 0) {
-                        missiles.remove(i); defender.intercepted++; missileIntercepts++;
-                        visual(missile.visualId,VisualPhase.INTERCEPT,
-                                missile.torpedo?"TORPEDO":"MISSILE",missile.team,missile.sourceId,
-                                missile.targetId,missile.x,missile.y,missile.x,missile.y);
+        // One tracking decision and one firing opportunity per mount/cooldown.
+        // Hostile missiles, torpedoes and slow ballistic shells share the same
+        // defensive attention. Threats are ranked by approximate time-to-range.
+        for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
+                && defender.pointDefenseCondition>0.20 && defender.pdRange>0
+                && defender.power>=1.5) {
+            double radius=defender.pdRange*weather.sensorFactor();
+            Missile chosenMissile=null;Ballistic chosenShell=null;
+            double quickest=Double.POSITIVE_INFINITY;
+            for(Missile m:missiles){
+                if(m.team==defender.team)continue;
+                double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
+                if(distance>radius)continue;
+                double eta=distance/(m.torpedo?135.0:220.0);
+                if(eta<quickest){
+                    quickest=eta;chosenMissile=m;chosenShell=null;
+                }
+            }
+            for(Ballistic p:ballistics){
+                if(p.team==defender.team)continue;
+                double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
+                if(distance>radius)continue;
+                double eta=distance/Ballistic.SPEED;
+                if(eta<quickest){
+                    quickest=eta;chosenShell=p;chosenMissile=null;
+                }
+            }
+            if(chosenMissile==null && chosenShell==null)continue;
+            defender.power-=1.5;defender.heat+=0.8;
+            defender.pdReload=0.16/defender.pointDefenseCondition;
+            // Fast shells are harder to track than guided ordnance, but genuinely
+            // interceptable; visual glows alone cannot be shot down.
+            double chance=(chosenShell==null?0.68:0.54)*defender.pointDefenseCondition
+                    *weather.accuracyFactor();
+            if(random.nextDouble()<chance){
+                if(chosenMissile!=null){
+                    chosenMissile.integrity-=2.7;
+                    if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
+                        defender.intercepted++;missileIntercepts++;
+                        visual(chosenMissile.visualId,VisualPhase.INTERCEPT,
+                                chosenMissile.torpedo?"TORPEDO":"MISSILE",
+                                chosenMissile.team,chosenMissile.sourceId,chosenMissile.targetId,
+                                chosenMissile.x,chosenMissile.y,chosenMissile.x,chosenMissile.y);
+                    }
+                }else{
+                    chosenShell.integrity-=2.7;
+                    if(chosenShell.integrity<=0 && ballistics.remove(chosenShell)){
+                        defender.intercepted++;ballisticIntercepts++;
+                        visual(chosenShell.visualId,VisualPhase.INTERCEPT,"KINETIC",
+                                chosenShell.team,chosenShell.sourceId,chosenShell.targetId,
+                                chosenShell.x,chosenShell.y,chosenShell.x,chosenShell.y);
                     }
                 }
-                break;
             }
         }
         for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
