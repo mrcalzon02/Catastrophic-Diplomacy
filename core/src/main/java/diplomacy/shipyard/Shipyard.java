@@ -414,7 +414,7 @@ public final class Shipyard {
         if(current==null)return 0;
         Part p=evaluate(current,catalog,design.faction);
         return p.base.subsystem.equals("PD")||p.base.subsystem.equals("FLK")
-                ?70+p.effect*2.8:0;
+                ?70+p.effect*2.8*p.tuning().reach():0;
     }
     /** Individual PD module profile before fleet sensors and stacked batteries contribute. */
     public static ProjectileModel.Defense defenseAt(Design design,TechnologyCatalog catalog,int slot) {
@@ -422,7 +422,8 @@ public final class Shipyard {
         if(current==null)return null;
         Part p=evaluate(current,catalog,design.faction);
         if(!p.base.subsystem.equals("PD")&&!p.base.subsystem.equals("FLK"))return null;
-        return ProjectileModel.defense(p.effect/p.base.effect,p.accuracy,1);
+        return ProjectileModel.defense(p.effect/p.base.effect*p.tuning().damage(),
+                p.accuracy*p.tuning().tracking(),p.tuning().reach());
     }
 
     /** Portable, deterministic blueprint text (no Java object deserialization). */
