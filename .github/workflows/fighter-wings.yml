@@ -1,0 +1,75 @@
+name: Fighter wings combat and multiplatform smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'game/**'
+      - 'android/**'
+      - 'desktop/**'
+      - '.github/workflows/fighter-wings.yml'
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'game/**'
+      - 'android/**'
+      - 'desktop/**'
+      - '.github/workflows/fighter-wings.yml'
+concurrency:
+  group: fighter-wings-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  desktop-core:
+    name: Craft/saves/weapon tests + desktop compile (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Test fighter machinery and compile desktop client
+        run: gradle :core:fighterCraftSmoke :core:combatMachinerySmoke :game:classes :desktop:classes --no-daemon --stacktrace
+
+  mass-battle:
+    name: Mixed 200v200 every fighter weapon and replay
+    needs: desktop-core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Exercise 1v1 through 200v200 and repeat mixed 400-ship carrier battle
+        run: gradle :core:massBattleSmoke --no-daemon --stacktrace
+
+  android-build:
+    name: Package shared fighter code in debug APK
+    needs: desktop-core
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install Android platform and build tools
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Build Android package from same core and game
+        run: gradle :android:assembleDebug --no-daemon --stacktrace

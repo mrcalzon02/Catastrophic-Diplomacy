@@ -16,13 +16,18 @@ public final class CombatAudioCue {
         if (event.phase() == Battle.VisualPhase.TIMEOUT) return null;
         if (event.phase() == Battle.VisualPhase.IMPACT) {
             return switch (event.weapon()) {
-                case "KINETIC", "TORPEDO", "MISSILE", "FIGHTER" -> Cue.HULL;
+                case "KINETIC", "TORPEDO", "MISSILE", "FIGHTER",
+                 "FIGHTER_CANNON", "FIGHTER_MISSILE", "FIGHTER_TORPEDO" -> Cue.HULL;
                 default -> Cue.SHIELD;
             };
         }
         if (event.phase() != Battle.VisualPhase.FIRE) return null;
         return switch (event.weapon()) {
-            case "LASER", "POINT_DEFENSE" -> Cue.LASER;
+            case "LASER", "POINT_DEFENSE", "FIGHTER_LASER" -> Cue.LASER;
+            case "FIGHTER_CANNON" -> Cue.KINETIC;
+            case "FIGHTER_PARTICLE" -> Cue.PARTICLE;
+            case "FIGHTER_MISSILE" -> Cue.MISSILE;
+            case "FIGHTER_TORPEDO" -> Cue.TORPEDO;
             case "KINETIC" -> Cue.KINETIC;
             case "PLASMA" -> Cue.PLASMA;
             case "PARTICLE" -> Cue.PARTICLE;

@@ -52,6 +52,7 @@ public final class Battle {
         public ProjectileModel.Spec torpedoProjectile=ProjectileModel.standard(ProjectileModel.Kind.TORPEDO);
         public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
         public double pdCycle=1;
+        public FighterModel.Profile fighterProfile=FighterModel.standard(FighterModel.Hull.ASSAULT_GUNSHIP);
         public Shipyard.Weapons weapons=new Shipyard.Weapons(
                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);
         public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
@@ -149,16 +150,26 @@ public final class Battle {
     public static final class Craft {
         public final int id, sourceId, team;
         public final boolean fighter,repair;
-        public double x, y, integrity, fuel, reload,repairReserve;
-        public int targetId;
+        public double x, y, integrity, maxIntegrity,armor,fuel,reload,repairReserve;
+        public int targetId,targetCraftId,ammunition,shotsFired;
+        /** Null for legacy defense and repair drones; non-null for autonomous fighters. */
+        public final FighterModel.Profile profile;
+        public ProjectileModel.Spec radarProfile(){
+            return profile!=null?profile.radarProfile()
+                    :new ProjectileModel.Spec(repair?145:205,maxIntegrity,repair?0.46:0.29,
+                            repair?0.67:0.98);
+        }
         Craft(int identifier, Ship source, boolean offensive, int target) {
             this(identifier,source,offensive,false,target);
         }
         Craft(int identifier, Ship source,boolean offensive,boolean service,int target) {
             id=identifier;sourceId=source.id;team=source.team;
             fighter=offensive;repair=service;targetId=target;x=source.x;y=source.y;
-            integrity=offensive?24:service?20:15;
-            fuel=offensive?28:service?26:22;
+            profile=offensive?source.fighterProfile:null;
+            integrity=offensive?profile.health():service?20:15;
+            maxIntegrity=integrity;armor=offensive?profile.armor():0;
+            fuel=offensive?profile.fuel():service?26:22;
+            ammunition=offensive?profile.ammunition():0;
             repairReserve=service?32*source.support.droneEndurance():0;
         }
     }
@@ -214,6 +225,9 @@ public final class Battle {
     private final long seed;
     public long tick;
     public int hitCount, missileIntercepts, ballisticIntercepts, destructions, environmentalHits;
+    /** Proof counters distinguish launched fighter rounds from mere animation. */
+    public int fighterGunShots,fighterLaserShots,fighterParticleShots,
+               fighterMissilesLaunched,fighterTorpedoesLaunched,craftLosses;
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
 
     public Battle(long initialSeed) { seed = initialSeed; random = new Random(initialSeed); }
@@ -312,6 +326,7 @@ public final class Battle {
         if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
+        s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
@@ -782,28 +797,114 @@ public final class Battle {
         }
     }
 
+    /** Small craft maintain independent sensor locks and fire real projectiles. */
+    private void updateArmedFighter(Craft craft){
+        FighterModel.Profile profile=craft.profile;
+        craft.reload=Math.max(0,craft.reload-DT);
+        Craft intercept=null;
+        if(profile.antiCraft()){
+            double best=Double.POSITIVE_INFINITY;
+            for(Craft enemy:crafts)if(enemy.team!=craft.team&&enemy.integrity>0){
+                double distance=StrictMath.hypot(enemy.x-craft.x,enemy.y-craft.y);
+                double detected=ProjectileModel.acquisitionRange(profile.sensors(),1,
+                        weather.sensorFactor(),ProjectileModel.STANDARD_PD,enemy.radarProfile());
+                if(distance<=detected && distance<best){intercept=enemy;best=distance;}
+            }
+            if(intercept!=null)craft.targetCraftId=intercept.id;
+        }
+        if(intercept==null)craft.targetCraftId=0;
+        Ship target=null;
+        if(intercept==null) {
+            target=findShip(craft.targetId);
+            if(target==null||!target.alive()){
+                Ship source=findShip(craft.sourceId);
+                target=source==null?null:chooseTarget(source);
+                craft.targetId=target==null?0:target.id;
+            }
+            if(target!=null){
+                double range=StrictMath.hypot(target.x-craft.x,target.y-craft.y);
+                // Carrier datalink supplies a coarse off-sensor intercept course.
+                // Local fighter sensors govern actual lock and firing below.
+                if(range>Math.max(600,profile.sensors()*weather.sensorFactor()*2))target=null;
+            }
+        }
+        if(target==null&&intercept==null)return;
+        double tx=intercept!=null?intercept.x:target.x;
+        double ty=intercept!=null?intercept.y:target.y;
+        double distance=StrictMath.hypot(tx-craft.x,ty-craft.y);
+        // Standoff craft do not fly through targets at their maximum thrust.
+        double desired=profile.range()*0.68;
+        if(distance>desired && distance>1){
+            double movement=Math.min(distance-desired,profile.speed()*DT);
+            craft.x+=(tx-craft.x)/distance*movement;
+            craft.y+=(ty-craft.y)/distance*movement;
+        }
+        if(craft.reload>0 || distance>profile.range()
+                || distance>profile.sensors()*weather.sensorFactor())return;
+        if(profile.ammunition()>0&&craft.ammunition<=0)return;
+        Ship carrier=findShip(craft.sourceId);
+        double accuracy=profile.accuracy()*weather.accuracyFactor();
+        if(target!=null)accuracy*=(1-target.ecmStrength*target.ecmCondition);
+        long shot=nextVisualShotId++;
+        String shotName="FIGHTER_"+profile.weapon().name();
+        if(profile.ammunition()>0)craft.ammunition--;
+        craft.reload=profile.cooldown();
+        craft.shotsFired++;
+        if(profile.weapon()==FighterModel.Weapon.CANNON){
+            double heading=StrictMath.atan2(ty-craft.y,tx-craft.x);
+            if(random.nextDouble()>accuracy)heading+=(shot%2==0?0.32:-0.32);
+            // Kinetic shot has its own flight time, integrity and swept collision.
+            ProjectileModel.Spec spec=ProjectileModel.module(
+                    carrier==null?Faction.TERRAN:carrier.faction,
+                    ProjectileModel.Kind.KINETIC,0.70,1,0.80);
+            ballistics.add(new Ballistic(shot,tick,craft.sourceId,craft.team,
+                    target==null?0:target.id,craft.x,craft.y,heading,profile.damage(),spec));
+            fighterGunShots++;
+        } else if(profile.weapon()==FighterModel.Weapon.LASER
+                || profile.weapon()==FighterModel.Weapon.PARTICLE){
+            DamageType kind=profile.weapon()==FighterModel.Weapon.LASER
+                    ?DamageType.LASER:DamageType.PARTICLE;
+            beams.add(new Beam(shot,tick,craft.x,craft.y,tx,ty,craft.team,kind));
+            if(random.nextDouble()<accuracy){
+                if(intercept!=null)hitCraft(intercept,profile.damage(),carrier,shot,shotName);
+                else hit(target,profile.damage(),carrier,kind,shot,tx,ty);
+            }
+            if(kind==DamageType.LASER)fighterLaserShots++;else fighterParticleShots++;
+        } else {
+            // Missile/torpedo bombers launch real guided, damageable payloads.
+            if(target==null)return;
+            boolean heavy=profile.weapon()==FighterModel.Weapon.TORPEDO;
+            ProjectileModel.Spec spec=ProjectileModel.module(
+                    carrier==null?Faction.TERRAN:carrier.faction,
+                    heavy?ProjectileModel.Kind.TORPEDO:ProjectileModel.Kind.MISSILE,
+                    0.84,1,0.88);
+            missiles.add(new Missile(shot,tick,craft.sourceId,craft.team,target.id,
+                    craft.x,craft.y,target.x-craft.x,target.y-craft.y,
+                    profile.damage(),heavy,spec,1));
+            if(heavy)fighterTorpedoesLaunched++;else fighterMissilesLaunched++;
+        }
+        visual(shot,VisualPhase.FIRE,shotName,craft.team,craft.sourceId,
+                target==null?0:target.id,craft.x,craft.y,tx,ty);
+    }
+
+    private void hitCraft(Craft target,double damage,Ship shooter,long shot,String weapon){
+        if(target.integrity<=0)return;
+        double absorbed=Math.min(target.armor,damage*0.48);
+        target.armor-=absorbed;
+        target.integrity-=Math.max(0,damage-absorbed);
+        visual(shot,VisualPhase.IMPACT,weapon,shooter==null?-1:shooter.team,
+                shooter==null?0:shooter.id,target.sourceId,target.x,target.y,target.x,target.y);
+    }
+
     private void updateCraft() {
         for(int i=crafts.size()-1;i>=0;i--) {
             Craft craft=crafts.get(i);
-            if((craft.fuel-=DT)<=0 || craft.integrity<=0){crafts.remove(i);continue;}
+            if((craft.fuel-=DT)<=0 || craft.integrity<=0){
+                if(craft.integrity<=0)craftLosses++;
+                crafts.remove(i);continue;
+            }
             if(craft.fighter) {
-                Ship target=findShip(craft.targetId);
-                if(target==null || !target.alive()) {
-                    Ship source=findShip(craft.sourceId);
-                    target=source==null?null:chooseTarget(source);
-                    if(target!=null)craft.targetId=target.id;
-                }
-                if(target==null)continue;
-                double dx=target.x-craft.x,dy=target.y-craft.y;
-                double range=StrictMath.hypot(dx,dy);
-                if(range>0) {
-                    craft.x+=dx/range*175*DT;craft.y+=dy/range*175*DT;
-                }
-                if((craft.reload-=DT)<=0 && range<115){
-                    craft.reload=1.6;
-                    if(random.nextDouble()<0.64*weather.accuracyFactor()*(1-target.ecmStrength*target.ecmCondition))
-                        hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
-                }
+                updateArmedFighter(craft);
             } else if(craft.repair){
                 Ship source=findShip(craft.sourceId);
                 if(source==null||!source.alive()){crafts.remove(i);continue;}
@@ -939,7 +1040,18 @@ public final class Battle {
                         12*candidate.visualScale());
                 if(contact<earliest){earliest=contact;closest=candidate;}
             }
-            if(closest!=null){
+            Craft closestCraft=null;
+            if(p.team==0||p.team==1)for(Craft craft:crafts)
+                if(craft.team!=p.team&&craft.integrity>0){
+                    double contact=segmentHit(p.x,p.y,nextX,nextY,craft.x,craft.y,
+                            craft.fighter?5.5:4.2);
+                    if(contact<earliest){earliest=contact;closest=null;closestCraft=craft;}
+                }
+            if(closestCraft!=null) {
+                p.x+=(nextX-p.x)*earliest;p.y+=(nextY-p.y)*earliest;
+                hitCraft(closestCraft,p.damage,findShip(p.sourceId),p.visualId,"KINETIC");
+                ballistics.remove(i);
+            }else if(closest!=null){
                 p.x+=(nextX-p.x)*earliest;p.y+=(nextY-p.y)*earliest;
                 hit(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
                         p.visualId,p.x,p.y);
@@ -1041,7 +1153,11 @@ public final class Battle {
                 &&defender.orders.pointDefense().craft()&&defender.power>1.5){
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
-                if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange*weather.sensorFactor())continue;
+                if(craft.team==defender.team
+                        || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>
+                        ProjectileModel.acquisitionRange(defender.pdRange,
+                                defender.sensorsCondition,weather.sensorFactor(),
+                                defender.pointDefenseProfile,craft.radarProfile()))continue;
                 defender.power-=1.5;defender.heat+=0.8;
                 defender.pdReload=0.18*defender.pdCycle/defender.pointDefenseCondition;
                 long defensiveShot=nextVisualShotId++;
@@ -1050,14 +1166,13 @@ public final class Battle {
                         defender.x,defender.y,craft.x,craft.y);
                 beams.add(new Beam(defensiveShot,tick,defender.x,defender.y,
                         craft.x,craft.y,defender.team,DamageType.LASER));
-                if(random.nextDouble()<0.67*defender.pointDefenseCondition*weather.accuracyFactor()) {
-                    craft.integrity-=20;
-                    if(craft.integrity<=0) {
-                        crafts.remove(i);
-                        visual(defensiveShot,VisualPhase.INTERCEPT,"FIGHTER",
-                                defender.team,defender.id,craft.sourceId,
-                                craft.x,craft.y,craft.x,craft.y);
-                    }
+                ProjectileModel.Spec signature=craft.radarProfile();
+                if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
+                        defender.pointDefenseProfile,defender.pointDefenseCondition,
+                        weather.accuracyFactor())) {
+                    hitCraft(craft,defender.pointDefenseProfile.damage()*6.5,
+                            defender,defensiveShot,"POINT_DEFENSE");
+                    if(craft.integrity<=0){crafts.remove(i);craftLosses++;}
                 }
                 break;
             }
@@ -1176,6 +1291,9 @@ public final class Battle {
         long hash = 0xcbf29ce484222325L;
         hash = mix(hash, tick); hash = mix(hash, hitCount);
         hash = mix(hash, environmentalHits); hash = mix(hash, weather.preset().seed());
+        hash = mix(hash,fighterGunShots);hash=mix(hash,fighterLaserShots);
+        hash = mix(hash,fighterParticleShots);hash=mix(hash,fighterMissilesLaunched);
+        hash = mix(hash,fighterTorpedoesLaunched);hash=mix(hash,craftLosses);
         hash = mix(hash, weather.meteorHits()); hash = mix(hash, weather.meteorMisses());
         hash = mix(hash, weather.neutronHits());
         for (SpaceWeather.Meteor meteor : weather.meteors()) {
@@ -1217,6 +1335,12 @@ public final class Battle {
             hash=mix(hash,craft.repair?1:0);
             hash=mix(hash,Double.doubleToLongBits(craft.repairReserve));
             hash=mix(hash,craft.targetId);
+            hash=mix(hash,craft.targetCraftId);hash=mix(hash,craft.ammunition);
+            hash=mix(hash,craft.profile==null?-1:craft.profile.hull().ordinal());
+            hash=mix(hash,Double.doubleToLongBits(craft.integrity));
+            hash=mix(hash,Double.doubleToLongBits(craft.armor));
+            hash=mix(hash,Double.doubleToLongBits(craft.fuel));
+            hash=mix(hash,Double.doubleToLongBits(craft.reload));
         }
         return hash;
     }
