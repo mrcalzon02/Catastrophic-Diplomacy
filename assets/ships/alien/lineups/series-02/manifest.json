@@ -1,0 +1,45 @@
+{
+  "schema": "catastrophic-diplomacy.alien-fleet-concept-series.v1",
+  "status": "approved_for_reference_not_runtime_integration",
+  "series": "02",
+  "note": "Concept art only. Racial design languages and hull-class shapes are reference material, not final sprite sheets or ship configurations.",
+  "drive_folder": "https://drive.google.com/drive/folders/1QBd3sLlxNeFUvTf58PqMf65vp785JGeW",
+  "classes": [
+    "interceptor",
+    "corvette",
+    "missile_corvette",
+    "frigate",
+    "destroyer",
+    "light_cruiser",
+    "heavy_cruiser",
+    "battlecruiser",
+    "carrier",
+    "dreadnought"
+  ],
+  "assets": [
+    {
+      "file": "palette-02-violet-organic-halo.png",
+      "drive_url": "https://drive.google.com/file/d/1UfKDS5YPtosu8VxGzGIHNPV-0si2fTdU/view"
+    },
+    {
+      "file": "palette-03-vaerith-concordant.png",
+      "drive_url": "https://drive.google.com/file/d/1EYyKixIW3lTPupGo-VzMjdNdu9WV8wOb/view"
+    },
+    {
+      "file": "palette-04-ivory-cyan-cathedral.png",
+      "drive_url": "https://drive.google.com/file/d/1wSkENLgy-S5ppr_bnr7JWKpe_KMr4rse/view"
+    },
+    {
+      "file": "palette-06-zelthar-harmonic.png",
+      "drive_url": "https://drive.google.com/file/d/1fUsrxlJO42G-m0_EgSAPe91XYvb1bFSz/view"
+    },
+    {
+      "file": "palette-07-heavy-modular-violet.png",
+      "drive_url": "https://drive.google.com/file/d/16z2bcKe-3Qkd1H_I0AUCzzvDKA6VTg9G/view"
+    }
+  ],
+  "excluded": [
+    "ten-faction sideways overview / mixed-race comparison sheet"
+  ],
+  "transfer_note": "Two additional previously generated single-fleet concepts could not be uploaded to Drive; not falsely represented as committed. They can be onboarded later if transfer becomes available."
+}
