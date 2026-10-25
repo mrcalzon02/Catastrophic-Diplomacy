@@ -153,6 +153,38 @@ public final class MassBattleCampaignTest {
                 +" beams="+beams+" kinetic="+kinetic+" missile="+missile+" torpedo="+torpedo);
         return validPairs;
     }
+    /**
+     * Shipyard legality is immutable: a test carrier must carry genuine reactors,
+     * heat sinks and hangars. Different factions can require different hull mass
+     * budgets, so select a valid fitted design rather than bypassing validation.
+     */
+    private static Shipyard.Design legalFighterCarrier(Battle.Faction faction,
+                         FighterModel.Hull craft,TechnologyCatalog catalog){
+        String id="BASE-"+Shipyard.factionId(faction)+"-";
+        Shipyard.Hull[] frames={Shipyard.Hull.CARRIER,Shipyard.Hull.DREADNOUGHT,
+                Shipyard.Hull.BATTLECRUISER,Shipyard.Hull.HEAVY_CRUISER,
+                Shipyard.Hull.CRUISER,Shipyard.Hull.FRIGATE};
+        for(Shipyard.Hull frame:frames) {
+            Shipyard.Design outfitted=Shipyard.starter(faction,frame)
+                    .install(slot(frame,Shipyard.Mount.SUPPORT,0),id+"FTR")
+                    .withFighterHull(craft);
+            if(Shipyard.inspect(outfitted,catalog).valid())return outfitted;
+            if(frame.slots.size()>0){
+                Shipyard.Design powered=outfitted.install(
+                        slot(frame,Shipyard.Mount.SYSTEM,3),id+"REA");
+                if(Shipyard.inspect(powered,catalog).valid())return powered;
+                if(frame==Shipyard.Hull.CARRIER||frame==Shipyard.Hull.DREADNOUGHT
+                        ||frame==Shipyard.Hull.BATTLECRUISER
+                        ||frame==Shipyard.Hull.HEAVY_CRUISER){
+                    Shipyard.Design cooled=powered.install(
+                            slot(frame,Shipyard.Mount.SYSTEM,4),id+"RAD");
+                    if(Shipyard.inspect(cooled,catalog).valid())return cooled;
+                }
+            }
+        }
+        throw new AssertionError("No legal fighter carrier for "+faction+" / "+craft+
+                " (all attempted loadouts were rejected by shipyard)");
+    }
     /** Six distinct arms and multiple hull/faction doctrines fight simultaneously at 200v200. */
     private static long mixedFleet(TechnologyCatalog catalog,long seed,int steps) {
         Battle b=new Battle(seed);
@@ -172,12 +204,7 @@ public final class MassBattleCampaignTest {
             // At least one real carrier of EVERY fighter hull on EACH team.
             // Keep the other 32/33 ships' original mixed weapon/support outfits.
             FighterModel.Hull craft=FighterModel.Hull.values()[group];
-            Shipyard.Design carrier=Shipyard.starter(faction,Shipyard.Hull.CRUISER)
-                    .install(slot(Shipyard.Hull.CRUISER,Shipyard.Mount.SUPPORT,0),
-                            "BASE-"+Shipyard.factionId(faction)+"-FTR")
-                    .withFighterHull(craft);
-            check(Shipyard.inspect(carrier,catalog).valid(),
-                    "Aircraft carrier fitting "+faction+" / "+craft);
+            Shipyard.Design carrier=legalFighterCarrier(faction,craft,catalog);
             b.spawnWing(team,carrier,catalog,1,centerX,centerY);
             b.spawnWing(team,design,catalog,qty-1,centerX+15,centerY);
         }
