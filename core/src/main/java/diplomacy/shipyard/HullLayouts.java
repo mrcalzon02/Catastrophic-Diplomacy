@@ -70,7 +70,7 @@ public final class HullLayouts {
                 }
                 case UZIPT -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*1.17);y+=4;}
-                    if(slot.mount()==Shipyard.Mount.DEFENSE) y+=12;
+                    if(slot.mount()==Shipyard.Mount.DEFENSE) y-=8;
                     if(slot.mount()==Shipyard.Mount.SYSTEM) x+=3;
                 }
                 case MANDRALLY -> {
