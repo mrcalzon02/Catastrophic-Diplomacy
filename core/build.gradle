@@ -91,3 +91,12 @@ tasks.register('directionalDefenseSmoke', JavaExec) {
 }
 // Preserve the existing routine smoke chain and include directional defenses.
 tasks.named('fleetScaleSmoke') { finalizedBy(tasks.named('directionalDefenseSmoke')) }
+
+tasks.register('levelEconomySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Proof of deterministic 500-stage specifications and exact credit payouts.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelEconomyTest'
+    dependsOn testClasses
+}
+tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('levelEconomySmoke')) }

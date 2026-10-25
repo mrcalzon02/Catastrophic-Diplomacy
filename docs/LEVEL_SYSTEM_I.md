@@ -15,3 +15,7 @@ Illustrative 20-capacity, 10,000-credit level: 20 deployed/20 survive = 10,000; 
 Research must be aggressively expensive to motivate refinement and grinding. Draft tier prices in credits: I 25,000; II 75,000; III 250,000; IV 900,000; V 3,500,000; VI 15,000,000. These are **not balanced or live prices**. Tie purchases to the existing 120 components / 2,880 technology upgrade catalog after verifying progression and save migration. Avoid treating ownership of a technology CSV entry as an already purchased upgrade.
 
 Implementation backlog: seeded level definitions and waves; fleet-size validation and underdeployment tracking; strict survivor registry; pure reward function and economy tests; bank persistence and schema upgrades; technology purchase ledger; replay UI; telemetry and balancing; regression of difficulty and performance under the new directional-protection model.
+
+## First committed code foundation
+
+`LevelEconomy.level(1..500)` now builds deterministic level metadata (ten 50-stage sectors, fixed per-level maximum fleet, seeded encounters, baseline rewards and initial wave counts). `victoryCredits` implements the exact integer-rational formula with overflow-checked credit output, invalid deployment rejection, and a zero payout for incomplete attempts. `draftResearchCost` supplies the six proposed prices. `LevelEconomyTest` covers the published 20-ship examples and progression boundaries. **Actual wave spawning, enemy composition, persistent credits, research purchases, UI and end-to-end gameplay are not yet connected.**
