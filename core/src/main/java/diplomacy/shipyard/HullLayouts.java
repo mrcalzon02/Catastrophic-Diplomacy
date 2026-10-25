@@ -3,6 +3,8 @@ package diplomacy.shipyard;
 import diplomacy.sim.Battle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Authoritative faction/hull-space hardpoint layout for the shared shipyard.
@@ -13,10 +15,16 @@ import java.util.List;
 public final class HullLayouts {
     private HullLayouts() { }
     public record Point(int x, int y) { }
+    private static final Map<String,List<Shipyard.Slot>> CACHE = new ConcurrentHashMap<>();
 
-    /** A protected central plant, side/forward weapon arcs, peripheral defense, aft support. */
+    /** Lazily cached; gameplay and per-frame rendering share identical immutable coordinates. */
     public static List<Shipyard.Slot> slots(Battle.Faction faction, Shipyard.Hull hull) {
-        if (faction == null || hull == null) throw new IllegalArgumentException("Missing faction or hull");
+        if(faction==null||hull==null)throw new IllegalArgumentException("Missing faction or hull");
+        return CACHE.computeIfAbsent(faction.name()+"/"+hull.name(),
+                key -> buildSlots(faction,hull));
+    }
+    /** A protected central plant, side/forward weapon arcs, peripheral defense, aft support. */
+    private static List<Shipyard.Slot> buildSlots(Battle.Faction faction, Shipyard.Hull hull) {
         int[] counts = new int[Shipyard.Mount.values().length];
         for (Shipyard.Slot slot : hull.slots) counts[slot.mount().ordinal()]++;
         int[] seen = new int[counts.length];
@@ -81,7 +89,67 @@ public final class HullLayouts {
             }
             answer.add(new Shipyard.Slot(slot.index(),slot.mount(),x,y));
         }
-        return List.copyOf(answer);
+        return projectToHull(answer,outline(faction,hull));
+    }
+
+    /**
+     * Ensure every hardpoint really belongs to the chosen silhouette, with 10 units
+     * of spacing. A marker may not float beside a narrow alien fuselage.
+     * Nearest-point search is deterministic and executes only once per faction/class.
+     */
+    private static List<Shipyard.Slot> projectToHull(List<Shipyard.Slot> requested,List<Point> border) {
+        List<Shipyard.Slot> placed=new ArrayList<>();
+        for(Shipyard.Slot slot:requested){
+            int bestX=0,bestY=0;
+            long bestDistance=Long.MAX_VALUE;
+            if(available(border,placed,slot.x(),slot.y())){
+                bestX=slot.x();bestY=slot.y();bestDistance=0;
+            }else{
+                // Every candidate uses the same integer lattice on desktop and Android.
+                for(int y=-73;y<=73;y+=2)for(int x=-73;x<=73;x+=2){
+                    long dx=x-slot.x(),dy=y-slot.y(),distance=dx*dx+dy*dy;
+                    if(distance>=bestDistance)continue;
+                    if(available(border,placed,x,y)){
+                        bestDistance=distance;bestX=x;bestY=y;
+                    }
+                }
+            }
+            if(bestDistance==Long.MAX_VALUE)
+                throw new IllegalStateException("No geometric room for "+slot.mount()+" #"+slot.index());
+            placed.add(new Shipyard.Slot(slot.index(),slot.mount(),bestX,bestY));
+        }
+        return List.copyOf(placed);
+    }
+
+    private static boolean available(List<Point> border,List<Shipyard.Slot> placed,int x,int y) {
+        if(!inside(border,x,y))return false;
+        for(int i=0;i<border.size();i++){
+            Point a=border.get(i), b=border.get((i+1)%border.size());
+            double dx=b.x-a.x,dy=b.y-a.y;
+            double t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(dx*dx+dy*dy)));
+            double px=a.x+t*dx,py=a.y+t*dy;
+            if((x-px)*(x-px)+(y-py)*(y-py)<9)return false;
+        }
+        for(Shipyard.Slot other:placed){
+            int dx=x-other.x(),dy=y-other.y();
+            if(dx*dx+dy*dy<100)return false;
+        }
+        return true;
+    }
+
+    /** Standard even-odd point-in-polygon test, with no rendering dependency. */
+    private static boolean inside(List<Point> border,int x,int y){
+        boolean found=false;
+        for(int i=0,j=border.size()-1;i<border.size();j=i++){
+            Point a=border.get(i),b=border.get(j);
+            if((a.y>y)!=(b.y>y) &&
+               x<(double)(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x)found=!found;
+        }
+        return found;
+    }
+    public static boolean contains(Battle.Faction faction,Shipyard.Hull hull,int x,int y){
+        if(faction==null||hull==null)throw new IllegalArgumentException("Missing faction or hull");
+        return inside(outline(faction,hull),x,y);
     }
 
     /** Pixel-space hit test shared by desktop pointer and Android touch. */
