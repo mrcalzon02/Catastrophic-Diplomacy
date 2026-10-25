@@ -58,7 +58,9 @@ final class ShipyardPanel {
         selectedSlot=0;scroll=0;
         notice="New "+next.displayName+" "+draft.hull+" frame; stock equipment installed";
     }
-    private String fileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)+".ship";}
+    private String legacyFileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)+".ship";}
+    private String fileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)
+            +"-"+draft.hull.name().toLowerCase(Locale.ROOT)+".ship";}
     private void save(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot save unserviceable ship: "+report.explanation();return;}
@@ -67,10 +69,12 @@ final class ShipyardPanel {
     }
     private void load(){
         try{
-            String content=Gdx.files.local(fileName()).readString("UTF-8");
-            Shipyard.Design loaded=Shipyard.decode(content,catalog);
-            if(loaded.faction!=draft.faction)throw new IllegalArgumentException("Wrong faction");
-            draft=loaded;selectedSlot=0;scroll=0;notice="Loaded blueprint; APPLY to deploy";
+            com.badlogic.gdx.files.FileHandle file=Gdx.files.local(fileName());
+            if(!file.exists())file=Gdx.files.local(legacyFileName());
+            Shipyard.Design loaded=Shipyard.decode(file.readString("UTF-8"),catalog);
+            if(loaded.faction!=draft.faction||loaded.hull!=draft.hull)
+                throw new IllegalArgumentException("Blueprint must match selected faction AND hull class");
+            draft=loaded;selectedSlot=0;scroll=0;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
     private void apply(){
@@ -205,7 +209,8 @@ final class ShipyardPanel {
         // Hardpoints are positioned in faction-specific normalized ship coordinates.
         for(Shipyard.Slot slot:layout){
             float px=MAP_CX+slot.x()*MAP_SCALE, py=MAP_CY+slot.y()*MAP_SCALE;
-            shapes.setColor(slot.index()==selectedSlot?Color.WHITE:mountColor(slot.mount()));
+            shapes.setColor(slot.index()==selectedSlot?Color.WHITE:
+                    draft.at(slot.index())==null?Color.GRAY:mountColor(slot.mount()));
             shapes.circle(px,py,slot.index()==selectedSlot?11:7,16);
             shapes.setColor(slot.index()==selectedSlot?Color.GOLD:new Color(0.035f,0.061f,0.09f,1));
             shapes.circle(px,py,slot.index()==selectedSlot?5:3,12);
