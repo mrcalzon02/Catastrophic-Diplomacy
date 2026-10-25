@@ -664,6 +664,83 @@ public final class Battle {
         }
     }
 
+    /** The neediest allied vessel within range, never an enemy or dead hull. */
+    private Ship mostDamagedAlly(Ship source,double radius,boolean includeShields) {
+        Ship best=null;double need=0;
+        for(Ship friend:ships)if(friend.team==source.team&&friend.alive()
+                &&friend!=source){
+            double distance=StrictMath.hypot(source.x-friend.x,source.y-friend.y);
+            if(distance>radius)continue;
+            double hullMissing=(friend.maxHull-friend.hull)/Math.max(1,friend.maxHull);
+            double shieldMissing=friend.maxShields>0
+                    ?(friend.maxShields-friend.defense.totalShields())/friend.maxShields:0;
+            double score=hullMissing+(includeShields?shieldMissing*0.28:0);
+            if(score>need+1e-8){need=score;best=friend;}
+        }
+        return best;
+    }
+    private Ship lowestShieldsAlly(Ship source,double radius){
+        Ship best=null;double need=0;
+        for(Ship friend:ships)if(friend.team==source.team&&friend.alive()&&friend!=source
+                &&friend.maxShields>0){
+            if(StrictMath.hypot(source.x-friend.x,source.y-friend.y)>radius)continue;
+            double missing=friend.maxShields-friend.defense.totalShields();
+            double value=missing/friend.maxShields;
+            if(missing>1e-8&&value>need){need=value;best=friend;}
+        }
+        return best;
+    }
+    /** Power is charged to the repairer, not the receiver. Only real
+     * missing hit points can be restored. No healing wrecks or enemies. */
+    private double healHull(Ship source,Ship target,double wanted) {
+        if(source==null||target==null||!source.alive()||!target.alive()
+                ||source.team!=target.team||wanted<=0||source.power<=5)return 0;
+        double efficiency=source.support.powerEfficiency();
+        double restored=Math.min(Math.min(wanted,target.maxHull-target.hull),
+                (source.power-5)*efficiency/1.0);
+        if(restored<=0)return 0;
+        target.hull+=restored;source.power-=restored/efficiency;
+        source.heat+=restored*0.18;
+        return restored;
+    }
+    private void updateSupport(){
+        // At 30Hz, 6 tick intervals make stable, limited 5Hz beam bursts,
+        // cheaper than searching all allies on every tick in 200v200 battles.
+        if(tick%6!=0)return;
+        double seconds=6*DT;
+        for(Ship source:ships)if(source.alive()&&source.reactorCondition>0.15
+                &&source.heat<source.maxHeat*0.93) {
+            Shipyard.Support support=source.support;
+            if(support.remoteRepairRate()>0&&source.power>6) {
+                Ship needy=mostDamagedAlly(source,support.repairRange(),false);
+                if(needy!=null) {
+                    double healed=healHull(source,needy,support.remoteRepairRate()*seconds);
+                    if(healed>0){
+                        source.remoteHullRepaired+=healed;
+                        supportLinks.add(new SupportLink(source,needy,SupportKind.HULL,
+                                tick,source.x,source.y));
+                    }
+                }
+            }
+            if(support.shieldTransferRate()>0 && source.power>6) {
+                Ship weakest=lowestShieldsAlly(source,support.shieldRange());
+                if(weakest!=null){
+                    double desired=support.shieldTransferRate()*seconds;
+                    double efficiency=support.powerEfficiency();
+                    double affordable=Math.min(desired,(source.power-5)*efficiency/1.1);
+                    double gained=weakest.defense.receiveShieldTransfer(affordable);
+                    if(gained>0){
+                        source.power-=gained*1.1/efficiency;source.heat+=gained*0.13;
+                        weakest.shields=weakest.defense.totalShields();
+                        source.shieldsTransferred+=gained;
+                        supportLinks.add(new SupportLink(source,weakest,SupportKind.SHIELD,
+                                tick,source.x,source.y));
+                    }
+                }
+            }
+        }
+    }
+
     private void launchAuxiliary(Ship ship, Ship enemy) {
         if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
         if(enemy!=null && ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
