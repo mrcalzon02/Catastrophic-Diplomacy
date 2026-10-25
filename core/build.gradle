@@ -63,6 +63,16 @@ tasks.register('weaponFxSmoke', JavaExec) {
 }
 tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('weaponFxSmoke')) }
 
+tasks.register('battleOrdersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify four PD modes, independent anti-ordnance/craft gating, class priorities and replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleOrdersTest'
+    dependsOn testClasses
+}
+tasks.named('weaponFxSmoke') { finalizedBy(tasks.named('battleOrdersSmoke')) }
+
+
 tasks.register('fleetScaleSmoke', JavaExec) {
     group = 'verification'
     classpath = sourceSets.test.runtimeClasspath
