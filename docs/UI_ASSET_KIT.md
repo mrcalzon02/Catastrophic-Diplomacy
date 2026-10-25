@@ -48,3 +48,26 @@ In this environment Java `ImageIO` was independently run on the source ZIP using
 - All original images are retained so future polygon masks, manual redraws and informed visual approvals can proceed without irreversible changes.
 
 No new gameplay systems, damage rules, touch actions, or GitHub Actions workflows were introduced by this asset implementation.
+
+
+## 2026-10-25 vetted-icon implementation sweep
+
+The current client now uses the 24 hash-pinned, v4-QC-pass icons **in the actual UI**, not merely in a resource manifest:
+
+- `CatastrophicGame`: battlefield header commands and tactical menu show `restart`, `speed`, `shipyard_ship`, `information`, `fleet`, `shield`, `back`, `next` and `close` where appropriate; compact icons sit inside existing button regions.
+- `ShipyardPanel`: hull navigation `back/next`, `complete` on APPLY, `close` on CLOSE, `energy` on the power readout, plus context-specific `weapons/laser/missile/turret/drone/squadron/emp/stealth/detect/shield/armor/repair/engine` for eligible module choices. No new module effects were added.
+- `FleetOrdersPanel`: point-defense, targeting, mobility, fighter, escort, capital-ship and retreat rows use relevant, named icons, with the same row hit boxes and gameplay behavior.
+- `TacticalUiIcons.drawButton`: the formerly missing method is implemented. It paints conservative procedural 1×1-pixel-based button chrome (not unreviewed button art), preserves Batch tint, and uses preallocated Color constants rather than per-frame Color allocations.
+- Vetted icons remain individually loaded with their original proportions. All existing text-control fallback, texture disposal and direct tap regions are preserved.
+
+Run the new source-level acceptance check from a checkout (stdlib-only):
+
+```bash
+python tools/verify_tactical_ui.py \
+  --source-zip /path/to/Catastrophic_Diplomacy_UI_Kit_v1.zip \
+  --selection-zip /path/to/Catastrophic_Diplomacy_UI_Repair_v5.zip
+```
+
+The check requires all 24 icon IDs to exist in the loader **and UI consumers**, validates manifest geometry and approved-only provenance, confirms desktop/Android Gradle packaging routes, forbids the rejected old atlas, and optionally SHA-256 verifies both source and selected asset archives and per-file checksums.
+
+**Execution evidence:** source/UI wiring checks passed for 24/24 IDs. Independently inspected the *actual* v5 ZIP locally: all 24 unique runtime source PNGs are marked `qc_pass_v4`; all 24 hashes and dimensions match the archived register; ZIP integrity passes. A full Gradle desktop/android build and screenshot/device acceptance were **not** executed here (Gradle and libGDX dependencies unavailable). Keep the build/visual acceptance gate open; do not claim a tested APK or approve any of the 37 held repairs.
