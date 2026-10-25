@@ -18,6 +18,7 @@ import diplomacy.sim.SpaceWeather;
 public final class BattlefieldWeatherVfx implements Disposable {
     private static final float W = 1280f, H = 720f;
     private final Texture halo;
+    private final WeatherFxAssets sprites;
 
     public BattlefieldWeatherVfx() {
         Pixmap p = new Pixmap(64, 64, Pixmap.Format.RGBA8888);
@@ -31,6 +32,7 @@ public final class BattlefieldWeatherVfx implements Disposable {
         halo = new Texture(p);
         halo.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         p.dispose();
+        sprites = new WeatherFxAssets();
     }
 
     /** Diffuse weather below hulls and weapons, including warning beams. */
@@ -50,9 +52,15 @@ public final class BattlefieldWeatherVfx implements Disposable {
                 float drift = (float) StrictMath.sin(tick * 0.003 + i * 1.13) * 21f;
                 float size = 190 + unit(mix(h + 2)) * 190;
                 boolean blue = (i & 1) == 0;
-                batch.setColor(blue ? .13f : .52f, blue ? .50f : .20f,
-                        blue ? .82f : .70f, .035f + .018f * unit(mix(h + 3)));
-                batch.draw(halo, x - size / 2 + drift, y - size / 2 - drift, size, size);
+                Texture cloud = sprites.nebula[i % sprites.nebula.length];
+                if (cloud != null) {
+                    batch.setColor(1f, 1f, 1f, .12f + .04f * unit(mix(h + 3)));
+                    batch.draw(cloud, x - size / 2 + drift, y - size / 2 - drift, size, size);
+                } else {
+                    batch.setColor(blue ? .13f : .52f, blue ? .50f : .20f,
+                            blue ? .82f : .70f, .035f + .018f * unit(mix(h + 3)));
+                    batch.draw(halo, x - size / 2 + drift, y - size / 2 - drift, size, size);
+                }
             }
         }
         if (weather.preset().includes(SpaceWeather.Kind.RADIATION)) {
@@ -61,14 +69,25 @@ public final class BattlefieldWeatherVfx implements Disposable {
                 float x = mod(unit(h) * 1340f + tick * (0.24f + i % 4 * .09f), 1340f) - 30;
                 float y = mod(unit(mix(h + 1)) * 780f + tick * .13f, 780f) - 30;
                 float size = 18f + 16f * unit(mix(h + 2));
-                batch.setColor(.39f, 1f, .34f, .045f);
-                batch.draw(halo, x - size / 2, y - size / 2, size, size);
+                Texture radiation = sprites.radiation[i % sprites.radiation.length];
+                batch.setColor(radiation == null ? .39f : 1f, 1f,
+                        radiation == null ? .34f : 1f, radiation == null ? .045f : .14f);
+                batch.draw(radiation == null ? halo : radiation,
+                        x - size / 2, y - size / 2, size, size);
             }
         }
         if (weather.solarActive()) {
             float pulse = .5f + .5f * (float) StrictMath.sin(tick * .047);
             batch.setColor(1f, .42f, .12f, .075f + .05f * pulse);
             batch.draw(halo, -400, -220, 1550, 1150);
+            Texture solar = sprites.solar[(int) ((tick / 8) % sprites.solar.length)];
+            if (solar != null) {
+                batch.setColor(1f, .85f, .63f, .45f + .16f * pulse);
+                for (int i = 0; i < 5; i++) {
+                    float y = 68 + i * 137 + (float) StrictMath.sin(tick * .022 + i) * 27;
+                    batch.draw(solar, -135, y - 45, 1550, 90);
+                }
+            }
         }
         if (weather.neutronActive()) {
             float cx = (float) SpaceWeather.CENTER_X, cy = (float) SpaceWeather.CENTER_Y;
@@ -80,6 +99,18 @@ public final class BattlefieldWeatherVfx implements Disposable {
                 batch.draw(halo, x - 110, y - 110, 220, 220);
             }
         }
+        if (weather.neutronActive()) {
+            Texture neutron = sprites.neutron[(int) ((tick / 6) % sprites.neutron.length)];
+            if (neutron != null) {
+                float cx = (float) SpaceWeather.CENTER_X, cy = (float) SpaceWeather.CENTER_Y;
+                float degrees = (float) StrictMath.toDegrees(weather.neutronAngle());
+                batch.setColor(.75f, .90f, 1f, .62f);
+                batch.draw(neutron, cx - 1400, cy - 52,
+                        1400, 52, 2800, 104, 1f, 1f, degrees,
+                        0, 0, neutron.getWidth(), neutron.getHeight(), false, false);
+            }
+        }
+        batch.setColor(1, 1, 1, 1);
         batch.end();
 
         shapes.setProjectionMatrix(camera.combined);
@@ -140,8 +171,9 @@ public final class BattlefieldWeatherVfx implements Disposable {
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        if (weather.preset().includes(SpaceWeather.Kind.ION_STORM)) {
-            // Broad translucent blue corona under narrow branching forked arcs.
+        if (weather.preset().includes(SpaceWeather.Kind.ION_STORM)
+                && sprites.lightning[0] == null) {
+            // Full procedural fallback whenever the accepted PNG pack is not installed.
             drawLightning(shapes, tick, seed, 9f, .13f);
             drawLightning(shapes, tick, seed, 2.1f, .62f);
         }
@@ -167,7 +199,10 @@ public final class BattlefieldWeatherVfx implements Disposable {
                 shapes.setColor(1f, .84f, .51f, .69f * v);
                 shapes.rectLine(bx - 17, by - 23, bx, by, 2.4f);
                 // No physical collision: a silhouette rising into the combat plane.
-                drawRock(shapes, bx, by, r * (.30f + .70f * travel), seed ^ m.arrivalTick(), v);
+                int rockIndex = (int) (mix(seed ^ m.arrivalTick()) & 7);
+                if (sprites.rocks[rockIndex] == null)
+                    drawRock(shapes, bx, by, r * (.30f + .70f * travel),
+                            seed ^ m.arrivalTick(), v);
             } else {
                 float life = clamp((m.expiryTick() - tick) /
                         (float) Math.max(1, m.expiryTick() - m.strikeTick()));
@@ -211,9 +246,59 @@ public final class BattlefieldWeatherVfx implements Disposable {
         shapes.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
 
+        // Opaque rock art must be alpha-blended, never additively blended like light.
         batch.setProjectionMatrix(camera.combined);
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        batch.begin();
+        for (SpaceWeather.Meteor m : weather.meteors()) if (!m.resolved()) {
+            Texture rock = sprites.rocks[(int) (mix(seed ^ m.arrivalTick()) & 7)];
+            if (rock == null) continue;
+            float travel = clamp((tick - m.arrivalTick()) /
+                    (float) Math.max(1, m.strikeTick() - m.arrivalTick()));
+            float r = (float) m.radius() * (.30f + .70f * travel);
+            float x = (float) m.x() - 75f * (1 - travel);
+            float y = (float) m.y() - 102f * (1 - travel);
+            batch.setColor(1f, 1f, 1f, .24f + .76f * travel);
+            batch.draw(rock, x - r, y - r, r * 2, r * 2);
+        }
+        batch.setColor(1f, 1f, 1f, 1f);
+        batch.end();
+
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
         batch.begin();
+        if (weather.preset().includes(SpaceWeather.Kind.ION_STORM)) {
+            int frame = (int) ((tick / 7) % sprites.lightning.length);
+            Texture arc = sprites.lightning[frame];
+            if (arc != null) for (int i = 0; i < 7; i++) {
+                long h = mix(seed + i * 983L + tick / 7 * 173L);
+                float x = 35 + unit(h) * 1150;
+                float y = 40 + unit(mix(h + 1)) * 550;
+                float sign = (i & 1) == 0 ? 1f : -1f;
+                batch.setColor(.72f, .88f, 1f, .45f);
+                batch.draw(arc, x, y, 105, 50, 210, 100,
+                        1f, 1f, sign * (i * 16 - 42), 0, 0,
+                        arc.getWidth(), arc.getHeight(), false, false);
+            }
+        }
+        for (SpaceWeather.Meteor m : weather.meteors()) if (m.resolved()) {
+            float life = clamp((m.expiryTick() - tick) /
+                    (float) Math.max(1, m.expiryTick() - m.strikeTick()));
+            int frame = Math.min(7, Math.max(0, (int) ((1f - life) * 8)));
+            Texture blast = sprites.impacts[frame];
+            Texture ring = sprites.shockwaves[Math.min(6, Math.max(0, (int) ((1f - life) * 7)))];
+            float x = (float) m.x(), y = (float) m.y();
+            float strength = m.hit() ? 1f : .3f;
+            if (blast != null) {
+                float size = (float) m.radius() * 6 + (1f - life) * 36;
+                batch.setColor(1f, .94f, .88f, strength * life);
+                batch.draw(blast, x - size / 2, y - size / 2, size, size);
+            }
+            if (ring != null) {
+                float size = 23f + (1f - life) * 116f;
+                batch.setColor(1f, 1f, 1f, .72f * life * strength);
+                batch.draw(ring, x - size / 2, y - size / 2, size, size);
+            }
+        }
         for (SpaceWeather.Meteor m : weather.meteors()) {
             float x = (float) m.x(), y = (float) m.y();
             if (m.resolved()) {
@@ -277,5 +362,5 @@ public final class BattlefieldWeatherVfx implements Disposable {
     private static float unit(long x) { return (float) ((x >>> 11) * 0x1.0p-53); }
     private static float clamp(float x) { return Math.max(0f, Math.min(1f, x)); }
     private static float mod(float x, float m) { return x - (float) StrictMath.floor(x / m) * m; }
-    @Override public void dispose() { halo.dispose(); }
+    @Override public void dispose() { halo.dispose(); sprites.dispose(); }
 }
