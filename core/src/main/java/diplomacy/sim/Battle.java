@@ -52,16 +52,16 @@ public final class Battle {
         public ProjectileModel.Spec torpedoProjectile=ProjectileModel.standard(ProjectileModel.Kind.TORPEDO);
         public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
         public Shipyard.Weapons weapons=new Shipyard.Weapons(1,1,1,1,1,1,1,1,1,1,1,1);
-        public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1);
+        public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
         public double hullRepaired,shieldRecharged,remoteHullRepaired,shieldsTransferred;
         public int repairDronesLaunched;
         /** Installed machinery determines operating headroom and thermal rejection. */
         public double powerRegen = 16, coolingRate = 19, passiveHeat;
         public double laserReload, missileReload, pdReload;
         public double kineticDamage, plasmaDamage, particleDamage, torpedoDamage, ecmStrength;
-        public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload;
+        public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload,repairDroneReload;
         public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
-        public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve;
+        public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
         public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
         public int commanderSkill;
@@ -328,6 +328,7 @@ public final class Battle {
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
         s.fighterReserve=machinery.fighterCapacity();s.droneReserve=machinery.droneCapacity();
+        s.repairDroneReserve=machinery.support().repairDroneCapacity();
         s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
         s.torpedoAmmo=s.torpedoDamage>0?3+machinery.magazineCapacity()/3:0;
         return s;
@@ -460,6 +461,7 @@ public final class Battle {
         s.torpedoReload=Math.max(0,s.torpedoReload-DT);
         s.fighterReload=Math.max(0,s.fighterReload-DT);
         s.droneReload=Math.max(0,s.droneReload-DT);
+        s.repairDroneReload=Math.max(0,s.repairDroneReload-DT);
     }
 
     private Ship chooseTarget(Ship actor) {
@@ -750,21 +752,24 @@ public final class Battle {
             ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
             ship.power-=7;ship.heat+=3;
         }
-        if(ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000) {
-            if(ship.support.repairDrones()){
-                Ship needy=mostDamagedAlly(ship,250,true);
-                if(needy==null)return; // conserve finite service-drone reserves
-                crafts.add(new Craft(nextCraftId++,ship,false,true,needy.id));
-                ship.repairDronesLaunched++;
-                visual(nextVisualShotId++,VisualPhase.FIRE,"REPAIR_DRONE",
-                        ship.team,ship.id,needy.id,ship.x,ship.y,needy.x,needy.y);
-            }else{
-                crafts.add(new Craft(nextCraftId++,ship,false,enemy==null?0:enemy.id));
-                visual(nextVisualShotId++,VisualPhase.FIRE,"DRONE",ship.team,ship.id,
-                        enemy==null?0:enemy.id,ship.x,ship.y,ship.x,ship.y);
-            }
+        if(ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000){
+            crafts.add(new Craft(nextCraftId++,ship,false,enemy==null?0:enemy.id));
+            visual(nextVisualShotId++,VisualPhase.FIRE,"DRONE",ship.team,ship.id,
+                    enemy==null?0:enemy.id,ship.x,ship.y,ship.x,ship.y);
             ship.droneReserve--;ship.dronesLaunched++;ship.droneReload=5.5/ship.hangarCondition;
             ship.power-=5;ship.heat+=2;
+        }
+        if(ship.repairDroneReserve>0 && ship.repairDroneReload<=0
+                && ship.power>=5 && crafts.size()<2000){
+            Ship needy=mostDamagedAlly(ship,250,true);
+            if(needy!=null){
+                crafts.add(new Craft(nextCraftId++,ship,false,true,needy.id));
+                visual(nextVisualShotId++,VisualPhase.FIRE,"REPAIR_DRONE",
+                        ship.team,ship.id,needy.id,ship.x,ship.y,needy.x,needy.y);
+                ship.repairDroneReserve--;ship.repairDronesLaunched++;
+                ship.repairDroneReload=5.5/ship.hangarCondition;
+                ship.power-=5;ship.heat+=2;
+            }
         }
     }
 
@@ -1177,6 +1182,8 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.power));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
+            hash=mix(hash,s.repairDroneReserve);
+            hash=mix(hash,Double.doubleToLongBits(s.repairDroneReload));
             hash=mix(hash,Double.doubleToLongBits(s.remoteHullRepaired));
             hash=mix(hash,Double.doubleToLongBits(s.shieldsTransferred));
             hash=mix(hash,Double.doubleToLongBits(s.hullRepaired));
