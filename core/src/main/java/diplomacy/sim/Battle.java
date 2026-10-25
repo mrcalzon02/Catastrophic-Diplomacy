@@ -774,6 +774,20 @@ public final class Battle {
         }
     }
 
+    /** Flight urgency uses the target's *actual* closing velocity rather than
+     * rewarding outbound ordnance merely because it is nearby. Receding shots
+     * remain legal targets after immediate threats, never acquire false negative ETAs. */
+    private static double approachEta(double targetX,double targetY,
+                                      double projectileX,double projectileY,
+                                      double velocityX,double velocityY,double speed) {
+        double dx=targetX-projectileX,dy=targetY-projectileY;
+        double distance=StrictMath.hypot(dx,dy);
+        if(distance<1)return 0;
+        double v=StrictMath.hypot(velocityX,velocityY);
+        if(v<1e-8)return Double.POSITIVE_INFINITY;
+        double closing=(dx*velocityX+dy*velocityY)/distance/v*speed;
+        return closing>0.1?distance/closing:1000+distance/speed;
+    }
     private void updateMissiles() {
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
@@ -791,7 +805,8 @@ public final class Battle {
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         defender.pointDefenseProfile,m.spec);
                 if(distance>detection)continue;
-                double eta=distance/m.spec.speed();
+                double eta=approachEta(defender.x,defender.y,
+                        m.x,m.y,m.vx,m.vy,m.spec.speed());
                 if(eta<quickest){
                     quickest=eta;chosenMissile=m;chosenShell=null;
                 }
@@ -803,7 +818,8 @@ public final class Battle {
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         defender.pointDefenseProfile,p.spec);
                 if(distance>detection)continue;
-                double eta=distance/p.spec.speed();
+                double eta=approachEta(defender.x,defender.y,
+                        p.x,p.y,p.vx,p.vy,p.spec.speed());
                 if(eta<quickest){
                     quickest=eta;chosenShell=p;chosenMissile=null;
                 }
