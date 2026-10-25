@@ -65,6 +65,21 @@ public final class TerranPlaceholderSprites implements Disposable {
         return result;
     }
     public int loaded() { return textures.size(); }
+    /** Preview is an art reference, not yet a source of fitted module UV anchors. */
+    public boolean hasHull(Battle.Faction faction, Shipyard.Hull hull) {
+        return faction==Battle.Faction.TERRAN && textures.containsKey(hull);
+    }
+    public boolean drawPreview(SpriteBatch batch,Battle.Faction faction,Shipyard.Hull hull,
+                               float centerX,float centerY,float maxWidth,float maxHeight) {
+        if(!hasHull(faction,hull))return false;
+        Texture texture=textures.get(hull);
+        float factor=Math.min(maxWidth/texture.getWidth(),maxHeight/texture.getHeight());
+        float w=texture.getWidth()*factor,h=texture.getHeight()*factor;
+        batch.setColor(1,1,1,0.94f);
+        batch.draw(texture,centerX-w/2,centerY-h/2,w,h);
+        batch.setColor(1,1,1,1);
+        return true;
+    }
     /** True only when this living vessel has an actual image, never for unapproved alien sheets. */
     public boolean hasSprite(Battle.Ship ship) {
         return ship != null && ship.alive() && ship.faction == Battle.Faction.TERRAN
