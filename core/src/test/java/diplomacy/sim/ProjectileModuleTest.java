@@ -70,6 +70,11 @@ public final class ProjectileModuleTest {
                 base.stage(pointDefenseSlot,Shipyard.Track.SPECIALIST,3),catalog,pointDefenseSlot);
         check(upgradedPd.tracking()>pd.tracking(),
                 "upgraded PD mount must track targets more accurately");
+        double pdScan=Shipyard.pointDefenseRangeAt(base,catalog,pointDefenseSlot);
+        double pdOutputScan=Shipyard.pointDefenseRangeAt(
+                base.stage(pointDefenseSlot,Shipyard.Track.OUTPUT,2),catalog,pointDefenseSlot);
+        check(pdScan>0 && pdOutputScan>pdScan,
+                "point-defense module must expose absolute detection range improved by output upgrades");
         double shortReach=ProjectileModel.acquisitionRange(150,1,1,pd,normal);
         double lowSignature=ProjectileModel.acquisitionRange(150,1,1,pd,
                 new ProjectileModel.Spec(normal.speed(),normal.health(),0.12,0.12));
