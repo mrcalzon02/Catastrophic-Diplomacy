@@ -189,7 +189,8 @@ public final class MassBattleCampaignTest {
     private static long mixedFleet(TechnologyCatalog catalog,long seed,int steps) {
         Battle b=new Battle(seed);
         for(int team=0;team<2;team++)for(int group=0;group<6;group++){
-            Battle.Faction faction=Battle.Faction.values()[(group+3*team)%6];
+            Battle.Faction faction=Battle.Faction.values()[
+                    (group+6*team)%Battle.Faction.values().length];
             Shipyard.Hull hull=group%2==0?Shipyard.Hull.CRUISER:Shipyard.Hull.FRIGATE;
             Shipyard.Design design=configure(faction,hull,WEAPONS[group],WEAPONS[(group+1)%6],0);
             check(Shipyard.inspect(design,catalog).valid(),"invalid massed mixed design "+group);
