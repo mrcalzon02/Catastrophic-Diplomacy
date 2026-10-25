@@ -907,9 +907,22 @@ public final class Battle {
                 double guidance=(m.torpedo?0.025:0.04)*weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition);
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
-                double magnitude = StrictMath.hypot(m.vx, m.vy);
-                m.x += (m.vx / magnitude) * m.spec.speed() * DT;
-                m.y += (m.vy / magnitude) * m.spec.speed() * DT;
+                double magnitude = StrictMath.hypot(m.vx,m.vy);
+                if(magnitude<1e-9)continue;
+                double nextX=m.x+(m.vx/magnitude)*m.spec.speed()*DT;
+                double nextY=m.y+(m.vy/magnitude)*m.spec.speed()*DT;
+                // Fast module-upgraded ordnance must never tunnel through the
+                // target between two 30 Hz ticks. Use the same swept test as
+                // independently tracked kinetic shells.
+                double contact=segmentHit(m.x,m.y,nextX,nextY,
+                        target.x,target.y,13*target.visualScale());
+                if(Double.isFinite(contact)){
+                    m.x+=(nextX-m.x)*contact;m.y+=(nextY-m.y)*contact;
+                    hit(target,m.damage,findShip(m.sourceId),
+                            m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,
+                            m.visualId,m.x,m.y);
+                    missiles.remove(i);
+                }else {m.x=nextX;m.y=nextY;}
             }
         }
     }
