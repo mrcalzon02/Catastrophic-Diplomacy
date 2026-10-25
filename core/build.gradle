@@ -90,6 +90,16 @@ tasks.register('moduleResearchSmoke', JavaExec) {
 }
 tasks.named('projectileModuleSmoke') { finalizedBy(tasks.named('moduleResearchSmoke')) }
 
+tasks.register('supportSystemsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove six-level exclusive module tuning, self repair, ranged hull/shield beams and finite service drones.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SupportSystemsTest'
+    dependsOn testClasses
+}
+tasks.named('moduleResearchSmoke') { finalizedBy(tasks.named('supportSystemsSmoke')) }
+
+
 
 
 tasks.register('fleetScaleSmoke', JavaExec) {
