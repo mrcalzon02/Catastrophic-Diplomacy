@@ -72,6 +72,16 @@ tasks.register('battleOrdersSmoke', JavaExec) {
 }
 tasks.named('weaponFxSmoke') { finalizedBy(tasks.named('battleOrdersSmoke')) }
 
+tasks.register('projectileModuleSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify fitted projectile speed/health/cross-section/signature and sensor-aware PD against live ordnance.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ProjectileModuleTest'
+    dependsOn testClasses
+}
+tasks.named('battleOrdersSmoke') { finalizedBy(tasks.named('projectileModuleSmoke')) }
+
+
 
 tasks.register('fleetScaleSmoke', JavaExec) {
     group = 'verification'
