@@ -138,6 +138,29 @@ public final class DirectionalDefense {
     public double totalShields() {
         double sum=0;for(Zone z:zones)sum+=z.shield;return sum;
     }
+    /**
+     * External shield-transfer energy replenishes depleted directional facings.
+     * It does not increase maximum capacity, ignore destruction of the ship, or
+     * force the ordinary recharge timer to expire. Returns actual shield gained.
+     * The caller must charge the originating support ship for that gain.
+     */
+    public double receiveShieldTransfer(double offered) {
+        valid(offered);
+        double left=offered;
+        for(int iteration=0;iteration<zones.length && left>1e-10;iteration++){
+            Zone chosen=null;
+            double lowestFraction=Double.POSITIVE_INFINITY;
+            for(Zone zone:zones){
+                if(zone.maxShield<=0||zone.shield>=zone.maxShield-1e-10)continue;
+                double fraction=zone.shield/zone.maxShield;
+                if(fraction<lowestFraction){lowestFraction=fraction;chosen=zone;}
+            }
+            if(chosen==null)break;
+            double added=StrictMath.min(left,chosen.maxShield-chosen.shield);
+            chosen.shield+=added;left-=added;
+        }
+        return offered-left;
+    }
     public double totalArmor() {
         double sum=0;for(Tile[] line:tiles)for(Tile t:line)sum+=t.armor;return sum;
     }
