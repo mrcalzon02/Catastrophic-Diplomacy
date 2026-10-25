@@ -80,14 +80,14 @@ public final class Battle {
     }
 
     public static final class Missile {
-        public final long visualId;
+        public final long visualId, spawnTick;
         public final int sourceId, team;
         public int targetId;
         public double x, y, vx, vy, fuel, damage, integrity;
         public final boolean torpedo;
-        Missile(long visualId, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
+        Missile(long visualId,long spawnTick, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
                 boolean heavy) {
-            this.visualId=visualId;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
+            this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
@@ -328,7 +328,7 @@ public final class Battle {
             s.missileReload = 3.2 / Math.max(0.4, s.weaponsCondition);
             s.power -= 13; s.heat += 5;
             long shotId=nextVisualShotId++;
-            missiles.add(new Missile(shotId,s.id, s.team, target.id, s.x, s.y,
+            missiles.add(new Missile(shotId,tick,s.id, s.team, target.id, s.x, s.y,
                     target.x - s.x, target.y - s.y, s.missileDamage,false));
             visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             s.launched++;s.missileAmmo--;
@@ -365,7 +365,7 @@ public final class Battle {
             s.torpedoReload=6.4/Math.max(0.25,s.weaponsCondition);
             s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
             long shotId=nextVisualShotId++;
-            missiles.add(new Missile(shotId,s.id,s.team,target.id,s.x,s.y,
+            missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
                     target.x-s.x,target.y-s.y,s.torpedoDamage,true));
             visual(shotId,VisualPhase.FIRE,"TORPEDO",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
         }
