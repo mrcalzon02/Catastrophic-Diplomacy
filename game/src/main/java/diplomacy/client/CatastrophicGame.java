@@ -22,6 +22,10 @@ import java.io.IOException;
 /** Same interactive client on Windows/Linux desktop and Android; no duplicate rules. */
 public final class CatastrophicGame extends ApplicationAdapter {
     private static final float W = 1280, H = 720;
+    /** Platform injection: only Android sideload builds expose a native update action. */
+    private final Runnable updateCheck;
+    public CatastrophicGame() { this(null); }
+    public CatastrophicGame(Runnable updateCheck) { this.updateCheck = updateCheck; }
     private OrthographicCamera camera, battleCamera;
     private FitViewport viewport;
     private ShapeRenderer shapes;
@@ -82,6 +86,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
+                if (key == Input.Keys.U && updateCheck != null) { updateCheck.run(); return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
@@ -95,6 +100,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (shipyard.open()) {
                     shipyard.startTouch(world.x,world.y,pointer);
                     return true;
+                }
+                if (updateCheck != null && world.x >= 1118 && world.y >= 56 && world.y <= 94) {
+                    updateCheck.run(); return true;
                 }
                 if (world.y > 650) {
                     if (world.x > 1160) { shipyard.show(); return true; }
@@ -274,6 +282,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.setColor(0.08f, 0.13f, 0.22f, 0.94f);
         shapes.rect(0, 649, W, 71);
         shapes.end();
+        if (updateCheck != null) {
+            // A screen-space action: stays in place when the battle camera zooms/pans.
+            shapes.setProjectionMatrix(camera.combined);
+            shapes.begin(ShapeRenderer.ShapeType.Filled);
+            shapes.setColor(.055f, .15f, .24f, .94f);
+            shapes.rect(1118, 56, 155, 38);
+            shapes.end();
+        }
         batch.setProjectionMatrix(camera.combined); batch.begin();
         font.setColor(Color.WHITE);
         font.draw(batch, running ? "PAUSE" : "RESUME", 15, 693);
@@ -290,6 +306,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"+",1112,693);
         font.draw(batch,"SHIPYARD",1166,693);
         font.setColor(Color.LIGHT_GRAY);
+        if (updateCheck != null) {
+            font.setColor(Color.CYAN);
+            font.draw(batch, "CHECK UPDATE", 1131, 82);
+            font.setColor(Color.LIGHT_GRAY);
+        }
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
                 + "   PD " + battle.missileIntercepts + "   CRAFT " + battle.crafts().size()

@@ -109,3 +109,11 @@ tasks.register('levelEconomySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('levelEconomySmoke')) }
+
+tasks.register('updaterPolicySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Pure Java 17 update policy, version, download-origin and integrity metadata acceptance.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.update.UpdatePolicyTest'
+    dependsOn testClasses
+}

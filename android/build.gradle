@@ -15,8 +15,8 @@ android {
         applicationId 'games.catastrophicdiplomacy'
         minSdk 26
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 2
+        versionName '0.1.1'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -64,6 +64,7 @@ tasks.configureEach { task ->
 
 dependencies {
     implementation project(':game')
+    implementation 'androidx.core:core:1.15.0'
     implementation 'com.badlogicgames.gdx:gdx-backend-android:1.14.2'
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-armeabi-v7a'
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-arm64-v8a'
