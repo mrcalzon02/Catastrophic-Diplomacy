@@ -24,6 +24,12 @@ final class FleetOrdersPanel {
     private final IntFunction<BattleOrders.Orders> get;
     private final BiConsumer<Integer,BattleOrders.Orders> apply;
     private boolean visible;
+    private TacticalUiIcons uiIcons;
+    private static final String[] ROW_ICONS={
+        "shield", "target", "engine", "drone", "speed",
+        "fleet", "speed", "armor", "weapons", "back"
+    };
+    void setIcons(TacticalUiIcons vetted) { uiIcons = vetted; }
     FleetOrdersPanel(IntFunction<BattleOrders.Orders> fetch,
                      BiConsumer<Integer,BattleOrders.Orders> commit){
         get=fetch;apply=commit;
@@ -121,9 +127,13 @@ final class FleetOrdersPanel {
         }
         shapes.end();
         batch.begin();
+        if(uiIcons != null){
+            uiIcons.drawButton(batch,"secondary",1116,629,150,55);
+            uiIcons.draw(batch,"close",1128,643,24);
+        }
         font.setColor(Color.WHITE);
         font.draw(batch,"FLEET TACTICAL ORDERS",39,687);
-        font.draw(batch,"CLOSE / BACK",1134,665);
+        font.draw(batch,"CLOSE / BACK",1159,665);
         for(int side=0;side<2;side++){
             float x=side==0?39:657;
             font.setColor(side==0?Color.CYAN:Color.CORAL);
@@ -131,8 +141,9 @@ final class FleetOrdersPanel {
             String[] values=values(get.apply(side));
             for(int i=0;i<ROWS;i++){
                 float y=550-i*44;
+                if(uiIcons != null) uiIcons.draw(batch,ROW_ICONS[i],x+12,y+7,24);
                 font.setColor(Color.LIGHT_GRAY);
-                font.draw(batch,"<  "+NAMES[i],x+10,y+25);
+                font.draw(batch,"<  "+NAMES[i],x+43,y+25);
                 font.setColor(Color.WHITE);
                 font.draw(batch,values[i]+"  >",x+305,y+25);
             }
