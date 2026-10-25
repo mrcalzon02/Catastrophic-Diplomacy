@@ -13,6 +13,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
+import diplomacy.sim.BattleOrders;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.SpaceWeather;
 import diplomacy.sim.LevelEnvironment;
@@ -44,6 +45,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ShipyardPanel shipyard;
     private Battle.Faction left = Battle.Faction.TERRAN, right = Battle.Faction.DRAXIAN;
     private long nextSeed = 2479;
+    private final BattleOrders.PointDefense[] pdMode={BattleOrders.PointDefense.BALANCED,
+            BattleOrders.PointDefense.BALANCED};
     private float accumulator;
     private boolean running = true;
     private boolean tacticalMenuOpen;
@@ -118,6 +121,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
                 if (key == Input.Keys.MINUS) { speed = Math.max(1, speed / 2); return true; }
+                if (key == Input.Keys.P) { togglePd(0); return true; }
+                if (key == Input.Keys.O) { togglePd(1); return true; }
                 if (key == Input.Keys.Q) { changeFaction(0); return true; }
                 if (key == Input.Keys.E) { changeFaction(1); return true; }
                 return false;
@@ -177,40 +182,54 @@ public final class CatastrophicGame extends ApplicationAdapter {
         tacticalMenuOpen = false;
         running = resumeAfterMenu;
     }
+    private void togglePd(int side) {
+        pdMode[side]=pdMode[side].next();
+        if(battle!=null)battle.setTeamPointDefense(side,pdMode[side]);
+    }
     private void tapTacticalMenu(float x, float y) {
-        if (x < 420 || x > 860) { closeTacticalMenu(); return; }
-        if (y >= 462 && y < 510) closeTacticalMenu();
-        else if (y >= 402 && y < 450) { reset(); closeTacticalMenu(); }
-        else if (y >= 342 && y < 390) {
-            closeTacticalMenu();
-            shipyard.show();
+        if(x<420||x>860){closeTacticalMenu();return;}
+        final float top=507, step=55;
+        for(int n=0;n<8;n++) {
+            float y0=top-step*n;
+            if(y<y0||y>=y0+44)continue;
+            switch(n){
+                case 0 -> closeTacticalMenu();
+                case 1 -> {reset();closeTacticalMenu();}
+                case 2 -> {closeTacticalMenu();shipyard.show();}
+                case 3 -> changeFleetSize(-1);
+                case 4 -> changeFleetSize(1);
+                case 5 -> togglePd(0);
+                case 6 -> togglePd(1);
+                case 7 -> closeTacticalMenu();
+            }
+            return;
         }
-        else if (y >= 282 && y < 330) changeFleetSize(-1);
-        else if (y >= 222 && y < 270) changeFleetSize(1);
-        else if (y >= 162 && y < 210) closeTacticalMenu();
     }
     private void drawTacticalMenu() {
         shapes.setProjectionMatrix(camera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(0.008f,0.014f,0.034f,0.97f);
-        shapes.rect(408,136,464,423);
+        shapes.rect(408,69,464,578);
         shapes.setColor(0.10f,0.20f,0.32f,1);
-        shapes.rect(421,536,438,2);
+        shapes.rect(421,616,438,2);
         shapes.end();
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         font.setColor(Color.WHITE);
-        font.draw(batch,"TACTICAL COMMAND",518,530);
-        String[] labels = {"RESUME ENGAGEMENT","RESTART ENGAGEMENT","OPEN SHIPYARD",
-                "REDUCE FLEET SIZE","INCREASE FLEET SIZE","CLOSE MENU"};
-        for (int i=0;i<labels.length;i++) {
-            float y=462-60*i;
-            if(uiIcons!=null) uiIcons.drawButton(batch,i==1?"danger":i==2?"special":"primary",438,y,405,46);
+        font.draw(batch,"TACTICAL COMMAND / FLEET PD ORDERS",449,604);
+        String[] labels={"RESUME ENGAGEMENT","RESTART ENGAGEMENT","OPEN SHIPYARD",
+                "REDUCE FLEET SIZE","INCREASE FLEET SIZE",
+                "LEFT PD: "+pdMode[0].name().replace('_',' '),
+                "RIGHT PD: "+pdMode[1].name().replace('_',' '),"CLOSE MENU"};
+        for(int n=0;n<labels.length;n++){
+            float y=507-55*n;
+            if(uiIcons!=null)uiIcons.drawButton(batch,n==1?"danger":n==5||n==6?"special":"primary",
+                    438,y,405,43);
             font.setColor(Color.WHITE);
-            font.draw(batch,labels[i],476,y+30);
+            font.draw(batch,labels[n],466,y+28);
         }
         font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch,"DEPLOYED " + FLEET_SIZES[fleetIndex] + " VERSUS " + FLEET_SIZES[fleetIndex],487,150);
+        font.draw(batch,"PD modes: BALANCED / INTERCEPT ONLY / ANTI CRAFT / HOLD FIRE",426,83);
         batch.end();
     }
 
@@ -299,6 +318,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void reset() {
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
+        for(int side=0;side<2;side++)battle.setTeamPointDefense(side,pdMode[side]);
         if (weatherEnabled) battle.configureWeather(environment.weather());
         // The same validated stage index drives both GPU background and simulation.
         if (starfield != null) starfield.useLevel(environment.level());
