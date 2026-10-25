@@ -269,7 +269,9 @@ public final class Shipyard {
                 }
                 case "SEN" -> {
                     accuracy+=0.12*p.accuracy;
-                    sensorRatio+=0.25*(p.accuracy-1);
+                    // Even an unupgraded sensor array improves PD acquisition.
+                    // SPECIALIST upgrades add further fire-control reach.
+                    sensorRatio+=0.08+0.25*(p.accuracy-1);
                 }
                 case "REP" -> repair+=p.effect*0.0004;
                 case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
