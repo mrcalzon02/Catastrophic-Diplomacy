@@ -84,6 +84,20 @@ public final class HullLayouts {
         return List.copyOf(answer);
     }
 
+    /** Pixel-space hit test shared by desktop pointer and Android touch. */
+    public static int pick(List<Shipyard.Slot> slots, float x, float y,
+                           float centerX, float centerY, float scale, float radius) {
+        if(slots==null||scale<=0||radius<=0)throw new IllegalArgumentException("Invalid hardpoint map");
+        double best=radius*radius;
+        int result=-1;
+        for(Shipyard.Slot slot:slots){
+            double dx=x-(centerX+slot.x()*scale),dy=y-(centerY+slot.y()*scale);
+            double distance=dx*dx+dy*dy;
+            if(distance<best){best=distance;result=slot.index();}
+        }
+        return result;
+    }
+
     /**
      * Schematic hull boundary for placement inspection, not a claim that unreleased
      * illustration assets are already cropped/usable game sprites.
@@ -105,19 +119,30 @@ public final class HullLayouts {
                     {23,-35},{13,-65},{-13,-65},{-23,-35},{-48,-44},{-64,-10},{-42,14},{-28,49}};
         };
         double width = switch(hull) {
-            case INTERCEPTOR -> 0.70;
-            case CORVETTE, MISSILE_CORVETTE -> 0.82;
-            case FRIGATE -> 0.90;
-            case DESTROYER -> 0.96;
-            case CARRIER -> 1.10;
-            default -> 1.0;
+            case INTERCEPTOR -> 0.68;
+            case CORVETTE -> 0.79;
+            case MISSILE_CORVETTE -> 0.91;
+            case FRIGATE -> 0.86;
+            case DESTROYER -> 0.88;
+            case LIGHT_CRUISER -> 0.93;
+            case CRUISER -> 1.0;
+            case HEAVY_CRUISER -> 1.08;
+            case BATTLECRUISER -> 1.03;
+            case CARRIER -> 1.17;
+            case DREADNOUGHT -> 1.14;
         };
         double length = switch(hull) {
-            case INTERCEPTOR -> 0.79;
-            case CORVETTE, MISSILE_CORVETTE -> 0.86;
-            case FRIGATE -> 0.94;
-            case CARRIER -> 1.04;
-            default -> 1.0;
+            case INTERCEPTOR -> 0.77;
+            case CORVETTE -> 0.86;
+            case MISSILE_CORVETTE -> 0.94;
+            case FRIGATE -> 0.95;
+            case DESTROYER -> 1.08;
+            case LIGHT_CRUISER -> 0.98;
+            case CRUISER -> 1.0;
+            case HEAVY_CRUISER -> 1.04;
+            case BATTLECRUISER -> 1.16;
+            case CARRIER -> 0.97;
+            case DREADNOUGHT -> 1.15;
         };
         List<Point> vertices=new ArrayList<>();
         for(int[] xy:shape)vertices.add(new Point((int)Math.round(xy[0]*width),
