@@ -52,6 +52,11 @@ public final class HullLayoutsTest {
                         case SUPPORT -> { }
                     }
                 }
+                for(int left=0;left<layout.size();left++)for(int right=left+1;right<layout.size();right++){
+                    Shipyard.Slot a=layout.get(left),b=layout.get(right);
+                    int dx=a.x()-b.x(),dy=a.y()-b.y();
+                    check(dx*dx+dy*dy>=100,"hardpoint markers overlap: "+faction+" "+hull+" "+left+"/"+right);
+                }
                 check(systems>=3&&weapons>=2&&defenses>=1,"missing vital module family");
                 check(HullLayouts.pick(layout,10000,10000,0,0,2.65f,10)==-1,"blank hull area selected a part");
                 check(HullLayouts.outline(faction,hull).size()>=9,"missing schematic silhouette");
