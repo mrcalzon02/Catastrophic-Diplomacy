@@ -378,7 +378,7 @@ public final class Battle {
 
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
-        if(actor.orders.equals(BattleOrders.DEFAULT)){
+        if(actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
             Ship choice = null;
             double best = Double.POSITIVE_INFINITY;
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
@@ -430,7 +430,7 @@ public final class Battle {
 
     private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
     private void steer(Ship s, Ship target) {
-        if(!s.orders.equals(BattleOrders.DEFAULT)){
+        if(!s.orders.equals(BattleOrders.DEFAULT.withPointDefense(s.orders.pointDefense()))){
             orderedSteer(s,target);return;
         }
         double dx = target.x - s.x, dy = target.y - s.y;
@@ -458,20 +458,20 @@ public final class Battle {
                 ship.hull<ship.maxHull*orders.retreatAtHullFraction()){
             double dx=ship.x-target.x,dy=ship.y-target.y;
             double length=StrictMath.max(1,StrictMath.hypot(dx,dy));
-            steerToward(ship,ship.x+dx/length*400,ship.y+dy/length*400,true);
+            steerToward(ship,ship.x+dx/length*400,ship.y+dy/length*400);
             return;
         }
         Ship parent=findShip(orders.anchorShipId());
         if(parent!=null&&parent.team==ship.team&&parent.alive()&&parent!=ship){
             if(orders.position()==BattleOrders.Position.FORMATION){
                 steerToward(ship,parent.x+ship.anchorOffsetX,
-                        parent.y+ship.anchorOffsetY,false);
+                        parent.y+ship.anchorOffsetY);
                 return;
             }
             if(orders.position()==BattleOrders.Position.ESCORT){
                 double d=StrictMath.hypot(parent.x-ship.x,parent.y-ship.y);
                 if(d>orders.escortRadius()){
-                    steerToward(ship,parent.x,parent.y,false);
+                    steerToward(ship,parent.x,parent.y);
                     return;
                 }
             }
@@ -487,14 +487,14 @@ public final class Battle {
             double dx=ship.x-target.x,dy=ship.y-target.y;
             double denom=StrictMath.max(1,StrictMath.hypot(dx,dy));
             steerToward(ship,ship.x+dx/denom*engage.range(),
-                    ship.y+dy/denom*engage.range(),false);
+                    ship.y+dy/denom*engage.range());
         }else if(orders.position()==BattleOrders.Position.KEEP_MOVING
                 &&distance<engage.range()){
             double dx=target.x-ship.x,dy=target.y-ship.y;
-            steerToward(ship,ship.x-dy,ship.y+dx,false);
-        }else steerToward(ship,target.x,target.y,false);
+            steerToward(ship,ship.x-dy,ship.y+dx);
+        }else steerToward(ship,target.x,target.y);
     }
-    private void steerToward(Ship ship,double x,double y,boolean fleeing){
+    private void steerToward(Ship ship,double x,double y){
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
         double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
         ship.facing=wrap(ship.facing+change);
