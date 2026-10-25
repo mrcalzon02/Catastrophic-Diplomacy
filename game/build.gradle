@@ -20,3 +20,12 @@ tasks.register('audioSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.CombatAudioCueTest'
 }
+
+tasks.register('spatialAudioSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless zoom/distance spatial-audio and deterministic WAV synthesis checks.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.SpatialAudioTest'
+}
+tasks.named('audioSmoke') { finalizedBy(tasks.named('spatialAudioSmoke')) }
