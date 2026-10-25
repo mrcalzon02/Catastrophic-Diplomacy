@@ -32,6 +32,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private TerranPlaceholderSprites terranSprites;
     private WeaponBeamSprites weaponBeams;
     private ProceduralStarfield starfield;
+    private BattlefieldWeatherVfx weatherVfx;
     private int skyPreviewLevel = 1;
     private boolean weatherEnabled = true;
     private Battle battle;
@@ -59,6 +60,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
         terranSprites = new TerranPlaceholderSprites();
         weaponBeams = new WeaponBeamSprites();
+        try { weatherVfx = new BattlefieldWeatherVfx(); }
+        catch (RuntimeException error) {
+            Gdx.app.error("WEATHER_FX", "Procedural effects unavailable; gameplay remains active", error);
+        }
         try {
             starfield = new ProceduralStarfield();
             starfield.useLevel(skyPreviewLevel);
@@ -252,6 +257,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         updateBattleCamera();
         if (starfield != null) starfield.render(batch, camera, battleCamera, W, H);
+        if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
@@ -275,7 +281,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     (float)(ship.x-dx*23*scale),(float)(ship.y-dy*23*scale));
         }
         shapes.end();
-        drawWeatherOverlay();
         if (instanced == null) drawShipsFallback();
         else {
             try {
@@ -297,6 +302,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
         if(weaponBeams!=null && weaponBeams.loaded()>0)weaponBeams.render(battle,batch);
         drawArmorDamage();
+        if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Missile m : battle.missiles()) {
@@ -360,80 +366,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.end();
     }
 
-    /**
-     * Environmental warnings are world-space effects; no asteroid is a physics collider.
-     * A meteor is an approaching translucent marker and a short resolved impact flash.
-     */
-    private void drawWeatherOverlay() {
-        SpaceWeather weather = battle.weather();
-        if (!weather.preset().enabled()) return;
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA,GL20.GL_ONE_MINUS_SRC_ALPHA);
-        shapes.setProjectionMatrix(battleCamera.combined);
-        shapes.begin(ShapeRenderer.ShapeType.Line);
-        if (weather.neutronActive()) {
-            double a = weather.neutronAngle();
-            float nx = (float)StrictMath.cos(a), ny = (float)StrictMath.sin(a);
-            float px = -ny, py = nx;
-            for (int stripe=-2; stripe<=2; stripe++) {
-                float d = stripe * 11f;
-                shapes.setColor(0.42f, 0.77f, 1f, stripe==0 ? 0.85f : 0.30f);
-                shapes.line((float)SpaceWeather.CENTER_X - nx * 1300 + px*d,
-                        (float)SpaceWeather.CENTER_Y - ny * 1300 + py*d,
-                        (float)SpaceWeather.CENTER_X + nx * 1300 + px*d,
-                        (float)SpaceWeather.CENTER_Y + ny * 1300 + py*d);
-            }
-        }
-        if (weather.solarActive()) {
-            for (int i=0; i<8; i++) {
-                float y = 75 + i * 83 + (float)StrictMath.sin(weather.tick()*0.055 + i)*18;
-                shapes.setColor(1f,0.46f,0.13f,0.22f);
-                shapes.line(0,y,1280,y+105);
-            }
-        }
-        if (weather.preset().includes(SpaceWeather.Kind.ION_STORM)) {
-            for (int i=0; i<5; i++) {
-                float x = 160 + i*238;
-                float y = 115 + (float)StrictMath.sin(weather.tick()*0.04+i*2)*90;
-                shapes.setColor(.25f,.91f,.99f,.18f);
-                shapes.line(x,y,x+54,y+22);
-                shapes.line(x+54,y+22,x+77,y-9);
-            }
-        }
-        for (SpaceWeather.Meteor meteor : weather.meteors()) {
-            float age = Math.max(0f,Math.min(1f,
-                    (weather.tick()-meteor.arrivalTick()) /
-                            (float)Math.max(1,meteor.strikeTick()-meteor.arrivalTick())));
-            float x = (float)meteor.x(),y = (float)meteor.y();
-            if (!meteor.resolved()) {
-                shapes.setColor(1f,.71f,.28f,.20f + age*.53f);
-                shapes.circle(x,y,(float)meteor.radius()+17*(1-age),18);
-            } else {
-                shapes.setColor(meteor.hit() ? 1f : .55f,
-                        meteor.hit() ? .48f : .68f,.30f,.62f);
-                shapes.circle(x,y,(float)meteor.radius()+8,18);
-            }
-        }
-        shapes.end();
-        shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for (SpaceWeather.Meteor meteor : weather.meteors()) {
-            float age = Math.max(0f,Math.min(1f,
-                    (weather.tick()-meteor.arrivalTick()) /
-                            (float)Math.max(1,meteor.strikeTick()-meteor.arrivalTick())));
-            float opacity = meteor.resolved()
-                    ? Math.max(0f, (meteor.expiryTick()-weather.tick()) /
-                            (float)Math.max(1,meteor.expiryTick()-meteor.strikeTick()))
-                    : age;
-            shapes.setColor(meteor.resolved() && meteor.hit() ? 1f : .70f,
-                    meteor.resolved() && meteor.hit() ? .61f : .73f,.47f,.65f*opacity);
-            shapes.circle((float)meteor.x(),
-                    (float)meteor.y() - (meteor.resolved()?0:18*(1-age)),
-                    (float)meteor.radius()*(meteor.resolved()?1.45f:0.20f+age*0.80f),12);
-        }
-        shapes.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-    }
-
     /** World camera follows the active engagement; UI coordinates never move. */
     private void updateBattleCamera() {
         BattleView.Frame shot=BattleView.of(battle);
@@ -489,6 +421,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(terranSprites!=null)terranSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
         if(starfield!=null)starfield.dispose();
+        if(weatherVfx!=null)weatherVfx.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }

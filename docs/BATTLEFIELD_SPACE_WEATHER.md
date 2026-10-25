@@ -24,6 +24,19 @@ Every eleventh campaign level combines two different weather types, with indepen
 - Missile launch guidance, point defense, fighter shots, direct-fire hit chances and initial target acquisition respond to weather, without mutating fitted baseline weapon stats.
 - `Battle.fingerprint()` includes environment seed, event outcomes and active meteor state for deterministic replay checks.
 
+## Visual effect implementation
+
+`game/src/main/java/diplomacy/client/BattlefieldWeatherVfx.java` supplies animated visual effects using a single reusable 64x64 radial-glow texture and seeded ShapeRenderer geometry. No static spritesheet, per-frame object spawning, or physics collider is required. An optional visual-renderer construction failure does not disable the environmental simulation.
+
+- **Asteroids:** irregular nine-wedge rotating-looking rock silhouettes, warm arrival tails, expanding targeting reticles; hit or miss triggers independently animated shock rings, light blooms and twelve seeded debris shards. Fade timing is sourced directly from the simulation's `arrivalTick`, `strikeTick`, `expiryTick`, and `hit` fields.
+- **Solar beams:** nine layered warm corona ribbons and narrow luminous cores, with a subdued 60-tick warning before the active three-second flare window.
+- **Neutron star:** persistent pre-sweep warning line, broad translucent energetic beam, feathered blue-white core and five soft radiation glows. Rotation and danger corridor share the actual simulation's angular formula; warning aligns to the beam's start angle.
+- **Ion storms:** seven independently branched jagged bolt chains, dual-pass broad glow plus fine bright arc. Pattern changes every seven **simulation** ticks, so pausing freezes the effect consistently.
+- **Radiation:** drifting green-white motes and small streaks; the pulse cadence and associated particle damage still come from `SpaceWeather`, never from the graphics renderer.
+- **Nebula:** nineteen translucent drifting cloud halos layered over the existing seeded starfield shader to emphasize line-of-sight interference.
+
+VFX renders in two explicitly separated passes: translucent phenomena **behind** ships, then asteroids, impacts and lightning **above** ships but below HUD. The graphics layer never samples or advances the combat RNG. Effects drawing has bounded loops independent of 500 levels and fleet size, and uses no per-level art assets. Visual rendering can be disabled without affecting the deterministic combat hazards.
+
 ## Current sandbox controls
 
 - **B / N** or the sky preview arrows: choose one of the 500 sky recipes, without interrupting the current battle.
@@ -38,4 +51,4 @@ These controls are a development preview. The campaign level UI, once implemente
 - Java 17 `SpaceWeatherTest` checks all 500 seeded definitions, reproducibility, asteroid hits/misses, storm timing, radiation and neutron strikes, and rejects invalid tick sequences.
 - Java 17 `BattleWeatherTest` checks real core integration for target acquisition, heat, damage, replay and default clear behavior.
 - Run with `gradle :core:spaceWeatherSmoke`. This does not validate OpenGL, Android touch handling or effects artwork.
-- Desktop/Android builds, visual acceptance, accessibility/flashing controls, performance on a 200v200 engagement, and longer-term hazard tuning still require device verification.
+- Desktop/Android builds, visual acceptance, accessibility/flashing controls, performance on a 200v200 engagement, and longer-term hazard tuning still require device verification. The VFX class passed a Java 17 syntax/API-surface check against small mock libGDX types; this **does not** establish actual mobile GPU compatibility or frame-time performance.
