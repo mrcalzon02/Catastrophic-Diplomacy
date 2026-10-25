@@ -32,6 +32,12 @@ an Android hardware acceptance claim.
 - **`:desktop`** is LWJGL3. **`:android`** is the Android launcher. Both share every rules implementation. Desktop/Android graphics and native APK packaging are not yet accepted on physical devices.
 - A headless 16-vs-16 Java 17 smoke test passed locally. The online repository must be inspected at the commit SHA before claiming deployment. Balance and large-fleet GPU performance remain unverified.
 
+## Exclusive six-rank module doctrines and fleet servicing
+
+Every installed module chooses **one** mutually exclusive technology tree from **OUTPUT, EFFICIENCY, RESILIENCE, SPECIALIST**, with six incremental ranks per path. Weapon and point-defense branches now change actual damage, firing interval, range, tracking and missile guidance in addition to the existing research cost, mass, power and heat tradeoffs. A second installed copy of the same base module may select a different branch without violating exclusivity.
+
+Functional support mechanics include **powered self hull repair**, **allied hull repair beams**, **allied directional shield charging beams**, and **finite autonomous repair drones** from Specialist drone-controller modules. Non-specialist controllers retain independently tracked interception drones; a mixed-fitting ship can launch both types. The support visual links reuse the existing curated green and blue beam atlases, with honest rendering fallbacks when assets are missing. [Module Support Branches](docs/MODULE_SUPPORT_BRANCHES.md) documents mechanics, balance parameters, ongoing limitations and the `:core:supportSystemsSmoke` acceptance suite. This source change is **not** proof of passing Java/desktop/Android regression tests.
+
 ## Projectile and point-defense module attributes
 
 Fitted kinetic, missile and torpedo modules now define **speed, projectile health, radar cross-section and signature**, including existing weapon-upgrade and faction modifiers. PD/FLK and sensor modules define **nominal detection reach, tracking ability and intercept damage**. Detection is based on the target's actual signature/cross-section and weather; intercept chance accounts for projectile speed and size; successful PD shots remove physical projectile health. Fast missiles and ballistic shells use swept collisions to avoid bypassing targets between ticks. The shipyard displays the installed module's values. See [Projectile Module Stats](docs/PROJECTILE_MODULE_STATS.md), and run `gradle :core:projectileModuleSmoke` for the new headless acceptance test.
