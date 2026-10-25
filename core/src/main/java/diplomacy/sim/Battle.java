@@ -46,6 +46,11 @@ public final class Battle {
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
+        /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
+        public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
+        public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
+        public ProjectileModel.Spec torpedoProjectile=ProjectileModel.standard(ProjectileModel.Kind.TORPEDO);
+        public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
         /** Installed machinery determines operating headroom and thermal rejection. */
         public double powerRegen = 16, coolingRate = 19, passiveHeat;
         public double laserReload, missileReload, pdReload;
@@ -94,13 +99,15 @@ public final class Battle {
         public int targetId;
         public double x, y, vx, vy, fuel, damage, integrity;
         public final boolean torpedo;
+        public final ProjectileModel.Spec spec;
         Missile(long visualId,long spawnTick, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
-                boolean heavy) {
+                boolean heavy, ProjectileModel.Spec profile) {
             this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
-            fuel = heavy?14:10; damage = amount; integrity = heavy?5.1:2.5;
+            if(profile==null)throw new IllegalArgumentException("Missile properties missing");
+            spec=profile;fuel = heavy?14:10; damage = amount; integrity=profile.health();
         }
     }
 
@@ -111,16 +118,20 @@ public final class Battle {
      * the firing ship at the instant it pulls the trigger.
      */
     public static final class Ballistic {
-        public static final double SPEED=285.0;
+        /** Firing modules define the actual ballistic velocity and PD cross section. */
+        public final ProjectileModel.Spec spec;
         public final long visualId,spawnTick;
         public final int sourceId,team,targetId;
         public final double vx,vy,damage;
-        public double x,y,life=2.50,integrity=1.60;
+        public double x,y,life,integrity;
         Ballistic(long id,long firedAt,int source,int side,int target,
-                  double px,double py,double heading,double amount){
+                  double px,double py,double heading,double amount,ProjectileModel.Spec profile){
+            if(profile==null)throw new IllegalArgumentException("Ballistic properties missing");
+            spec=profile;
             visualId=id;spawnTick=firedAt;sourceId=source;team=side;targetId=target;
-            x=px;y=py;vx=SPEED*StrictMath.cos(heading);
-            vy=SPEED*StrictMath.sin(heading);damage=amount;
+            x=px;y=py;vx=profile.speed()*StrictMath.cos(heading);
+            vy=profile.speed()*StrictMath.sin(heading);
+            life=Math.max(1.5,760.0/profile.speed());integrity=profile.health();damage=amount;
         }
     }
 
@@ -282,6 +293,10 @@ public final class Battle {
         s.speed = machinery.speed(); s.accuracy = machinery.accuracy();
         s.laserDamage = machinery.laserDamage(); s.missileDamage = machinery.missileDamage();
         s.pdRange = machinery.pdRange(); s.damageControl = machinery.damageControl();
+        s.kineticProjectile=machinery.kineticProjectile();
+        s.missileProjectile=machinery.missileProjectile();
+        s.torpedoProjectile=machinery.torpedoProjectile();
+        s.pointDefenseProfile=machinery.pointDefense();
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
@@ -563,7 +578,7 @@ public final class Battle {
             s.power -= 13; s.heat += 5;
             long shotId=nextVisualShotId++;
             missiles.add(new Missile(shotId,tick,s.id, s.team, target.id, s.x, s.y,
-                    target.x - s.x, target.y - s.y, s.missileDamage,false));
+                    target.x - s.x, target.y - s.y, s.missileDamage,false,s.missileProjectile));
             visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             s.launched++;s.missileAmmo--;
         }
@@ -577,7 +592,7 @@ public final class Battle {
             boolean onTarget=random.nextDouble()<Math.min(0.97,s.accuracy*weatherAim*(0.72+lock*0.4));
             if(!onTarget)angle+=(shotId%2==0?1:-1)*0.24;
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
-                    s.x,s.y,angle,s.kineticDamage));
+                    s.x,s.y,angle,s.kineticDamage,s.kineticProjectile));
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
                     s.x,s.y,target.x,target.y);
         }
@@ -605,7 +620,7 @@ public final class Battle {
             s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
             long shotId=nextVisualShotId++;
             missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
-                    target.x-s.x,target.y-s.y,s.torpedoDamage,true));
+                    target.x-s.x,target.y-s.y,s.torpedoDamage,true,s.torpedoProjectile));
             visual(shotId,VisualPhase.FIRE,"TORPEDO",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
         }
     }
@@ -760,7 +775,11 @@ public final class Battle {
                 if(m.team==defender.team)continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
                 if(distance>radius)continue;
-                double eta=distance/(m.torpedo?135.0:220.0);
+                double detection=ProjectileModel.acquisitionRange(
+                        defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
+                        defender.pointDefenseProfile,m.spec);
+                if(distance>detection)continue;
+                double eta=distance/m.spec.speed();
                 if(eta<quickest){
                     quickest=eta;chosenMissile=m;chosenShell=null;
                 }
@@ -769,7 +788,11 @@ public final class Battle {
                 if(p.team==defender.team)continue;
                 double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
                 if(distance>radius)continue;
-                double eta=distance/Ballistic.SPEED;
+                double detection=ProjectileModel.acquisitionRange(
+                        defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
+                        defender.pointDefenseProfile,p.spec);
+                if(distance>detection)continue;
+                double eta=distance/p.spec.speed();
                 if(eta<quickest){
                     quickest=eta;chosenShell=p;chosenMissile=null;
                 }
@@ -787,11 +810,13 @@ public final class Battle {
                     tx,ty,defender.team,DamageType.LASER));
             // Fast shells are harder to track than guided ordnance, but genuinely
             // interceptable; visual glows alone cannot be shot down.
-            double chance=(chosenShell==null?0.68:0.54)*defender.pointDefenseCondition
-                    *weather.accuracyFactor();
+            ProjectileModel.Spec incoming=chosenMissile!=null?chosenMissile.spec:chosenShell.spec;
+            double chance=ProjectileModel.interceptionChance(incoming,
+                    defender.pointDefenseProfile,defender.pointDefenseCondition,
+                    weather.accuracyFactor());
             if(random.nextDouble()<chance){
                 if(chosenMissile!=null){
-                    chosenMissile.integrity-=2.7;
+                    chosenMissile.integrity-=defender.pointDefenseProfile.damage();
                     if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
                         defender.intercepted++;missileIntercepts++;
                         visual(chosenMissile.visualId,VisualPhase.INTERCEPT,
@@ -800,7 +825,7 @@ public final class Battle {
                                 chosenMissile.x,chosenMissile.y,chosenMissile.x,chosenMissile.y);
                     }
                 }else{
-                    chosenShell.integrity-=2.7;
+                    chosenShell.integrity-=defender.pointDefenseProfile.damage();
                     if(chosenShell.integrity<=0 && ballistics.remove(chosenShell)){
                         defender.intercepted++;ballisticIntercepts++;
                         visual(chosenShell.visualId,VisualPhase.INTERCEPT,"KINETIC",
@@ -856,8 +881,8 @@ public final class Battle {
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
                 double magnitude = StrictMath.hypot(m.vx, m.vy);
-                m.x += (m.vx / magnitude) * (m.torpedo?135:220) * DT;
-                m.y += (m.vy / magnitude) * (m.torpedo?135:220) * DT;
+                m.x += (m.vx / magnitude) * m.spec.speed() * DT;
+                m.y += (m.vy / magnitude) * m.spec.speed() * DT;
             }
         }
     }
@@ -955,7 +980,11 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(s.hangarCondition));
             hash=mix(hash,Double.doubleToLongBits(s.magazineCondition));
         }
-        for (Missile m : missiles) { hash = mix(hash, m.sourceId); hash = mix(hash,Double.doubleToLongBits(m.y)); hash = mix(hash, Double.doubleToLongBits(m.x)); }
+        for (Missile m : missiles) {
+            hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
+            hash=mix(hash,Double.doubleToLongBits(m.x));
+            hash=mix(hash,Double.doubleToLongBits(m.integrity));
+        }
         for (Ballistic p : ballistics) {
             hash=mix(hash,p.visualId);hash=mix(hash,Double.doubleToLongBits(p.x));
             hash=mix(hash,Double.doubleToLongBits(p.y));
