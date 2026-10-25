@@ -118,3 +118,20 @@ tasks.register('skySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('skySmoke')) }
+
+tasks.register('spaceWeatherSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Seeded campaign space-weather and real battle integration (Java only).'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SpaceWeatherTest'
+    dependsOn testClasses
+}
+tasks.register('battleWeatherSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify environmental effects on real shield/armor and sensor/thermal combat.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleWeatherTest'
+    dependsOn testClasses
+}
+tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
+tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
