@@ -18,7 +18,6 @@ final class TacticalUiIcons {
     private static final String INDEX = "ui/tactical/icons.tsv";
     private Texture texture;
     private final Map<String, Texture> buttons = new HashMap<>();
-    private final Map<String, Texture> bars = new HashMap<>();
     private final Map<String, TextureRegion> regions = new HashMap<>();
 
     TacticalUiIcons() {
@@ -44,9 +43,7 @@ final class TacticalUiIcons {
             for (String id : new String[]{"primary","secondary","special","danger","confirm","cancel","info"}) {
                 loadLayer(buttons, "ui/tactical/buttons/" + id + ".png", id);
             }
-            for (String id : new String[]{"hull","shield","energy","heat","critical"}) {
-                loadLayer(bars, "ui/tactical/bars/" + id + ".png", id);
-            }
+            // Status-bar source slices are excluded until their cropped ends are revalidated.
         } catch (RuntimeException failed) {
             if (texture != null) texture.dispose();
             texture = null;
@@ -72,16 +69,9 @@ final class TacticalUiIcons {
         batch.setColor(1,1,1,1);
     }
 
-    void drawBar(SpriteBatch batch, String style, float x, float y, float width, float height) {
-        Texture layer = bars.get(style);
-        if (layer != null) batch.draw(layer, x, y, width, height);
-    }
-
     private void clearLayers() {
         for (Texture layer : buttons.values()) layer.dispose();
-        for (Texture layer : bars.values()) layer.dispose();
         buttons.clear();
-        bars.clear();
     }
 
     boolean available() {
