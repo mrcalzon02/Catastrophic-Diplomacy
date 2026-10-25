@@ -80,13 +80,14 @@ public final class Battle {
     }
 
     public static final class Missile {
+        public final long visualId;
         public final int sourceId, team;
         public int targetId;
         public double x, y, vx, vy, fuel, damage, integrity;
         public final boolean torpedo;
-        Missile(int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
+        Missile(long visualId, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
                 boolean heavy) {
-            sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
+            this.visualId=visualId;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
@@ -108,14 +109,22 @@ public final class Battle {
     }
 
     public static final class Beam {
+        public final long visualId;
         public final double x1, y1, x2, y2;
         public final int team;
         public final DamageType type;
         public double lifetime = 0.13;
-        Beam(double startX, double startY, double endX, double endY, int side, DamageType weapon) {
-            x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
+        Beam(long visualId, double startX, double startY, double endX, double endY, int side, DamageType weapon) {
+            this.visualId=visualId;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
         }
     }
+
+    /** Read-only transient visual notifications; never change damage or RNG. */
+    public enum VisualPhase { FIRE, IMPACT, INTERCEPT, TIMEOUT }
+    public record VisualEvent(long sequence, long shotId, long tick, VisualPhase phase,
+                              String weapon, int team, int sourceId, int targetId,
+                              double x, double y, double targetX, double targetY) { }
+    private static final int VISUAL_HISTORY_MAX=8192;
 
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
@@ -124,6 +133,8 @@ public final class Battle {
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
     private final List<String> events = new ArrayList<>();
+    private final List<VisualEvent> visualEvents=new ArrayList<>();
+    private long nextVisualShotId=1, nextVisualSequence=1;
     private int nextId = 1;
     private final long seed;
     public long tick;
@@ -136,6 +147,15 @@ public final class Battle {
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
     public List<String> events() { return Collections.unmodifiableList(events); }
+    /** History allows renderers to catch up when more than one tick elapses per frame. */
+    public List<VisualEvent> visualEvents() { return Collections.unmodifiableList(visualEvents); }
+    private void visual(long shotId, VisualPhase phase, String weapon, int team,
+                        int sourceId,int targetId,double x,double y,double tx,double ty) {
+        visualEvents.add(new VisualEvent(nextVisualSequence++,shotId,tick,phase,weapon,
+                team,sourceId,targetId,x,y,tx,ty));
+        if(visualEvents.size()>VISUAL_HISTORY_MAX)
+            visualEvents.subList(0,visualEvents.size()-VISUAL_HISTORY_MAX).clear();
+    }
 
     public Ship addShip(int team, Faction faction, double x, double y) {
         if (team != 0 && team != 1) throw new IllegalArgumentException("Only two teams in the skirmish mode");
@@ -298,44 +318,56 @@ public final class Battle {
         if (s.laserDamage > 0 && distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
             s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
-            beams.add(new Beam(s.x, s.y, target.x, target.y, s.team, DamageType.LASER));
+            long shotId=nextVisualShotId++;
+            beams.add(new Beam(shotId,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
+            visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             double chance = Math.min(0.98, s.accuracy * (0.7 + lock * 0.45));
-            if (random.nextDouble() < chance) hit(target, s.laserDamage, s, DamageType.LASER);
+            if (random.nextDouble() < chance) hit(target,s.laserDamage,s,DamageType.LASER,shotId);
         }
         if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
             s.missileReload = 3.2 / Math.max(0.4, s.weaponsCondition);
             s.power -= 13; s.heat += 5;
-            missiles.add(new Missile(s.id, s.team, target.id, s.x, s.y,
+            long shotId=nextVisualShotId++;
+            missiles.add(new Missile(shotId,s.id, s.team, target.id, s.x, s.y,
                     target.x - s.x, target.y - s.y, s.missileDamage,false));
+            visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             s.launched++;s.missileAmmo--;
         }
         if (s.kineticDamage > 0 && distance < 445 && s.kineticReload <= 0 && s.power>5 && s.heat<s.maxHeat*0.95) {
             s.kineticReload=0.75/Math.max(0.25,s.weaponsCondition);
             s.power-=5;s.heat+=4;
-            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
+            long shotId=nextVisualShotId++;
+            beams.add(new Beam(shotId,s.x,s.y,target.x,target.y,s.team,DamageType.KINETIC));
+            visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             if(random.nextDouble()<Math.min(0.97,s.accuracy*(0.72+lock*0.4)))
-                hit(target,s.kineticDamage,s,DamageType.KINETIC);
+                hit(target,s.kineticDamage,s,DamageType.KINETIC,shotId);
         }
         if (s.plasmaDamage > 0 && distance < 245 && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
             s.plasmaReload=1.8/Math.max(0.25,s.weaponsCondition);
             s.power-=14;s.heat+=17;
-            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
+            long shotId=nextVisualShotId++;
+            beams.add(new Beam(shotId,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
+            visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             if(random.nextDouble()<Math.min(0.94,s.accuracy*(0.80+lock*0.4)))
-                hit(target,s.plasmaDamage,s,DamageType.PLASMA);
+                hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
         }
         if (s.particleDamage > 0 && distance < 565 && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
             s.particleReload=2.1/Math.max(0.25,s.weaponsCondition);
             s.power-=17;s.heat+=10;
-            beams.add(new Beam(s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
+            long shotId=nextVisualShotId++;
+            beams.add(new Beam(shotId,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
+            visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             if(random.nextDouble()<Math.min(0.98,s.accuracy*(0.76+lock*0.45)))
-                hit(target,s.particleDamage,s,DamageType.PARTICLE);
+                hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
         }
         if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840 && distance>110
                 && s.torpedoReload<=0 && s.power>18 && s.magazineCondition>0.15) {
             s.torpedoReload=6.4/Math.max(0.25,s.weaponsCondition);
             s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
-            missiles.add(new Missile(s.id,s.team,target.id,s.x,s.y,
+            long shotId=nextVisualShotId++;
+            missiles.add(new Missile(shotId,s.id,s.team,target.id,s.x,s.y,
                     target.x-s.x,target.y-s.y,s.torpedoDamage,true));
+            visual(shotId,VisualPhase.FIRE,"TORPEDO",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
         }
     }
 
@@ -343,11 +375,15 @@ public final class Battle {
         if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
         if(ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
+            visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
+                    ship.x,ship.y,enemy.x,enemy.y);
             ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
             ship.power-=7;ship.heat+=3;
         }
         if(ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,false,enemy.id));
+            visual(nextVisualShotId++,VisualPhase.FIRE,"DRONE",ship.team,ship.id,enemy.id,
+                    ship.x,ship.y,enemy.x,enemy.y);
             ship.droneReserve--;ship.dronesLaunched++;ship.droneReload=5.5/ship.hangarCondition;
             ship.power-=5;ship.heat+=2;
         }
@@ -386,7 +422,12 @@ public final class Battle {
                     if(range>0){craft.x+=dx/range*205*DT;craft.y+=dy/range*205*DT;}
                     if(range<28){
                         nearest.integrity-=3;
-                        if(nearest.integrity<=0 && missiles.remove(nearest))missileIntercepts++;
+                        if(nearest.integrity<=0 && missiles.remove(nearest)){
+                            missileIntercepts++;
+                            visual(nearest.visualId,VisualPhase.INTERCEPT,
+                                    nearest.torpedo?"TORPEDO":"MISSILE",nearest.team,nearest.sourceId,
+                                    nearest.targetId,nearest.x,nearest.y,nearest.x,nearest.y);
+                        }
                         crafts.remove(i);
                     }
                 } else {
@@ -415,6 +456,9 @@ public final class Battle {
                     missile.integrity -= 2.7;
                     if (missile.integrity <= 0) {
                         missiles.remove(i); defender.intercepted++; missileIntercepts++;
+                        visual(missile.visualId,VisualPhase.INTERCEPT,
+                                missile.torpedo?"TORPEDO":"MISSILE",missile.team,missile.sourceId,
+                                missile.targetId,missile.x,missile.y,missile.x,missile.y);
                     }
                 }
                 break;
@@ -437,9 +481,18 @@ public final class Battle {
         for (int i = missiles.size() - 1; i >= 0; i--) {
             Missile m = missiles.get(i);
             Ship target = findShip(m.targetId);
-            if (target == null || !target.alive() || (m.fuel -= DT) <= 0) { missiles.remove(i); continue; }
+            if (target == null || !target.alive() || (m.fuel -= DT) <= 0) {
+                missiles.remove(i);
+                visual(m.visualId,VisualPhase.TIMEOUT,m.torpedo?"TORPEDO":"MISSILE",
+                        m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                continue;
+            }
             double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
-            if (range < 13) { hit(target, m.damage, findShip(m.sourceId),m.torpedo?DamageType.TORPEDO:DamageType.MISSILE); missiles.remove(i); continue; }
+            if (range < 13) {
+                hit(target,m.damage,findShip(m.sourceId),
+                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,m.visualId);
+                missiles.remove(i);continue;
+            }
             if (range > 0) {
                 double guidance=(m.torpedo?0.025:0.04)*(1-target.ecmStrength*target.ecmCondition);
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
@@ -452,8 +505,14 @@ public final class Battle {
     }
     private Ship findShip(int id) { for (Ship ship : ships) if (ship.id == id) return ship; return null; }
 
-    private void hit(Ship defender, double raw, Ship attacker,DamageType kind) {
+    private void hit(Ship defender, double raw, Ship attacker, DamageType kind) {
+        hit(defender,raw,attacker,kind,0);
+    }
+    private void hit(Ship defender, double raw, Ship attacker,DamageType kind,long shotId) {
         if (!defender.alive()) return;
+        visual(shotId,VisualPhase.IMPACT,kind.name(),attacker==null?-1:attacker.team,
+                attacker==null?0:attacker.id,defender.id,defender.x,defender.y,
+                defender.x,defender.y);
         hitCount++;
         // Resolve incoming direction in defender-local coordinates (+X bow, +Y port).
         double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
