@@ -36,6 +36,7 @@ tasks.register('prepareUiAssets') {
         project.copy {
             from(zipTree(archive)) {
                 include 'assets/ui/tactical/**'
+                exclude 'assets/ui/tactical/bars/**' // Incomplete source slices, not runtime assets
                 eachFile { detail -> detail.path = detail.path.substring('assets/'.length()) }
                 includeEmptyDirs = false
             }
