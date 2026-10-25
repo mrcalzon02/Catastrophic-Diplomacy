@@ -603,8 +603,8 @@ public final class Battle {
         double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition
                 * weather.sensorFactor() * (1 - target.ecmStrength*target.ecmCondition);
         double weatherAim = weather.accuracyFactor();
-        if (s.laserDamage > 0 && distance < 530 && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
-            s.laserReload = 1.05 / Math.max(0.3, s.weaponsCondition);
+        if (s.laserDamage > 0 && distance < 530*s.weapons.laserRange() && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
+            s.laserReload = 1.05*s.weapons.laserCycle() / Math.max(0.3, s.weaponsCondition);
             s.power -= 9; s.heat += 7;
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
@@ -612,8 +612,8 @@ public final class Battle {
             double chance = Math.min(0.98, s.accuracy * weatherAim * (0.7 + lock * 0.45));
             if (random.nextDouble() < chance) hit(target,s.laserDamage,s,DamageType.LASER,shotId);
         }
-        if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690 && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
-            s.missileReload = 3.2 / Math.max(0.4, s.weaponsCondition);
+        if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690*s.weapons.missileRange() && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
+            s.missileReload = 3.2*s.weapons.missileCycle() / Math.max(0.4, s.weaponsCondition);
             s.power -= 13; s.heat += 5;
             long shotId=nextVisualShotId++;
             missiles.add(new Missile(shotId,tick,s.id, s.team, target.id, s.x, s.y,
@@ -621,8 +621,8 @@ public final class Battle {
             visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
             s.launched++;s.missileAmmo--;
         }
-        if (s.kineticDamage > 0 && distance < 445 && s.kineticReload <= 0 && s.power>5 && s.heat<s.maxHeat*0.95) {
-            s.kineticReload=0.75/Math.max(0.25,s.weaponsCondition);
+        if (s.kineticDamage > 0 && distance < 445*s.weapons.kineticRange() && s.kineticReload <= 0 && s.power>5 && s.heat<s.maxHeat*0.95) {
+            s.kineticReload=0.75*s.weapons.kineticCycle()/Math.max(0.25,s.weaponsCondition);
             s.power-=5;s.heat+=4;
             long shotId=nextVisualShotId++;
             double angle=StrictMath.atan2(target.y-s.y,target.x-s.x);
@@ -635,8 +635,8 @@ public final class Battle {
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
                     s.x,s.y,target.x,target.y);
         }
-        if (s.plasmaDamage > 0 && distance < 245 && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
-            s.plasmaReload=1.8/Math.max(0.25,s.weaponsCondition);
+        if (s.plasmaDamage > 0 && distance < 245*s.weapons.plasmaRange() && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
+            s.plasmaReload=1.8*s.weapons.plasmaCycle()/Math.max(0.25,s.weaponsCondition);
             s.power-=14;s.heat+=17;
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
@@ -644,8 +644,8 @@ public final class Battle {
             if(random.nextDouble()<Math.min(0.94,s.accuracy*weatherAim*(0.80+lock*0.4)))
                 hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
         }
-        if (s.particleDamage > 0 && distance < 565 && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
-            s.particleReload=2.1/Math.max(0.25,s.weaponsCondition);
+        if (s.particleDamage > 0 && distance < 565*s.weapons.particleRange() && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
+            s.particleReload=2.1*s.weapons.particleCycle()/Math.max(0.25,s.weaponsCondition);
             s.power-=17;s.heat+=10;
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
@@ -653,9 +653,9 @@ public final class Battle {
             if(random.nextDouble()<Math.min(0.98,s.accuracy*weatherAim*(0.76+lock*0.45)))
                 hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
         }
-        if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840 && distance>110
+        if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840*s.weapons.torpedoRange() && distance>110
                 && s.torpedoReload<=0 && s.power>18 && s.magazineCondition>0.15) {
-            s.torpedoReload=6.4/Math.max(0.25,s.weaponsCondition);
+            s.torpedoReload=6.4*s.weapons.torpedoCycle()/Math.max(0.25,s.weaponsCondition);
             s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
             long shotId=nextVisualShotId++;
             missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
@@ -666,7 +666,7 @@ public final class Battle {
 
     private void launchAuxiliary(Ship ship, Ship enemy) {
         if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
-        if(ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
+        if(enemy!=null && ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
                     ship.x,ship.y,enemy.x,enemy.y);
@@ -674,9 +674,18 @@ public final class Battle {
             ship.power-=7;ship.heat+=3;
         }
         if(ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000) {
-            crafts.add(new Craft(nextCraftId++,ship,false,enemy.id));
-            visual(nextVisualShotId++,VisualPhase.FIRE,"DRONE",ship.team,ship.id,enemy.id,
-                    ship.x,ship.y,enemy.x,enemy.y);
+            if(ship.support.repairDrones()){
+                Ship needy=mostDamagedAlly(ship,250,true);
+                if(needy==null)return; // conserve finite service-drone reserves
+                crafts.add(new Craft(nextCraftId++,ship,false,true,needy.id));
+                ship.repairDronesLaunched++;
+                visual(nextVisualShotId++,VisualPhase.FIRE,"REPAIR_DRONE",
+                        ship.team,ship.id,needy.id,ship.x,ship.y,needy.x,needy.y);
+            }else{
+                crafts.add(new Craft(nextCraftId++,ship,false,enemy==null?0:enemy.id));
+                visual(nextVisualShotId++,VisualPhase.FIRE,"DRONE",ship.team,ship.id,
+                        enemy==null?0:enemy.id,ship.x,ship.y,ship.x,ship.y);
+            }
             ship.droneReserve--;ship.dronesLaunched++;ship.droneReload=5.5/ship.hangarCondition;
             ship.power-=5;ship.heat+=2;
         }
