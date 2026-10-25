@@ -19,3 +19,7 @@ Implementation backlog: seeded level definitions and waves; fleet-size validatio
 ## First committed code foundation
 
 `LevelEconomy.level(1..500)` now builds deterministic level metadata (ten 50-stage sectors, fixed per-level maximum fleet, seeded encounters, baseline rewards and initial wave counts). `victoryCredits` implements the exact integer-rational formula with overflow-checked credit output, invalid deployment rejection, and a zero payout for incomplete attempts. `draftResearchCost` supplies the six proposed prices. `LevelEconomyTest` covers the published 20-ship examples and progression boundaries. **Actual wave spawning, enemy composition, persistent credits, research purchases, UI and end-to-end gameplay are not yet connected.**
+
+## Level backgrounds now live in the combat sandbox
+
+The current 1..500 selector maps every level directly to `LevelSky.forLevel(level)` and `SpaceWeather.forLevel(level)`. First launch shows level 1 automatically; **B/N** and touchable < / > LEVEL controls change levels and restart the encounter with both the updated sky and environmental conditions. **W** and tapping the ENV bar toggle hazardous weather, and **R** restarts the encounter without changing its selected environment. Rendering runs before the 200v200 combat grid and ships; VFX occurs behind and above hulls with a stationary HUD. These are functioning playable level **environments**, not yet the separate wave-campaign/progression mode described above.

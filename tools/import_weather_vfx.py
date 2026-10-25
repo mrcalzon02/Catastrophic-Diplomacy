@@ -53,7 +53,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("archive", type=Path, help="catastrophic_weather_fx_verified.zip")
     parser.add_argument("--output", type=Path,
-                        default=Path("game/assets/effects/weather"))
+                        default=Path("assets/effects/weather"))
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     with zipfile.ZipFile(args.archive) as archive:

@@ -13,11 +13,11 @@ python tools/import_weather_vfx.py catastrophic_weather_fx_verified.zip --verify
 python tools/import_weather_vfx.py catastrophic_weather_fx_verified.zip
 ```
 
-Exactly 49 RGBA PNGs are installed under `game/assets/effects/weather/` with stable names, dimensions and 8px+ alpha margins. A missing/extra/mismatched frame fails verification before writing anything; the legacy flawed atlas format is explicitly rejected. Preserve the original manifest and all 49 sprites together.
+Exactly 49 RGBA PNGs are installed under `assets/effects/weather/` with stable names, dimensions and 8px+ alpha margins. A missing/extra/mismatched frame fails verification before writing anything; the legacy flawed atlas format is explicitly rejected. Preserve the original manifest and all 49 sprites together.
 
 The game-side `WeatherFxAssets` library auto-detects these files through LibGDX internal assets, loads each texture once, disposes correctly, and leaves `BattlefieldWeatherVfx`'s deterministic geometric fallback intact if files are absent. Rocks use normal alpha blending; luminous beams, particles, arcs and shockwave sprites use additive blending. The art does **not** control hit tests, projectile collision, or damage.
 
-The ZIP is currently an attached development artifact, **not yet committed as binary assets on the GitHub branch**. The runtime will therefore use procedural fallbacks until the approved PNGs are imported and committed. Do not report art as shipped simply because the loader exists.
+The 49 audited binaries are **not yet committed as binary assets**. They are provided in the verified ZIP. The runtime's procedural renderer remains fully functional without them, and Android packages source assets directly from the repository's `assets/` directory. The runtime will therefore use procedural fallbacks until the approved PNGs are imported and committed. Do not report art as shipped simply because the loader exists.
 
 ## Quality gates before production
 
