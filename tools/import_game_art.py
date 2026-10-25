@@ -63,7 +63,7 @@ def checked_archive(path, declared_sha, records):
             data = archive.read(member)
             if digest(data) != sha:
                 raise ValueError("Source PNG checksum mismatch: " + member)
-            if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            if not data.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise ValueError("Source file is not PNG: " + member)
             result[member] = data
     return result
@@ -102,7 +102,7 @@ def checked_materials(folder):
         if not source.exists():
             continue
         raw = base64.b64decode(source.read_text("ascii").strip(), validate=True)
-        if not raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        if not raw.startswith(b"\x89PNG\r\n\x1a\n"):
             raise ValueError("Not a PNG: " + str(source))
         found[f"assets/materials/{material}.png"] = raw
     return found
@@ -151,7 +151,7 @@ def main():
         "installedPaths": {k: digest(v) for k, v in sorted(entries.items())},
     }
     entries["art_source/IMPORT_MANIFEST.json"] = (
-        json.dumps(provenance, indent=2, sort_keys=True) + "\\n").encode("utf-8")
+        json.dumps(provenance, indent=2, sort_keys=True) + "\n").encode("utf-8")
     # Complete conflict pass BEFORE writing anything; no old art ever overwritten.
     for path, data in entries.items():
         target = ROOT / path
