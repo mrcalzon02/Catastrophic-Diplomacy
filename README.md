@@ -2,6 +2,19 @@
 
 *An Unreasonable Space Warfare Simulator* — six rival civilizations, engineering-driven fleet combat and entirely unnecessary quantities of ordnance.
 
+
+## Graphics stage 2 (faction hull silhouettes and source-backed UI)
+
+All six factions now receive class-specific fallback tactical silhouettes derived from the
+existing shipyard hull profiles (66 combinations; no runtime dependence on alien concept
+sheets). The approved HUD atlas, buttons, and new tactical menu are wired into shared
+desktop/Android code. The separate ten-Terran-ship runtime art pack is **not** yet
+committed to GitHub; a checksum-gated importer installs seven provisionally acceptable
+hull images and 35 beam frames, quarantining three severely clipped large hulls.
+See [graphics stage 2 and verification](docs/GRAPHICS_STAGE2.md) and run
+`gradle :game:geometrySmoke` once the build toolchain is available. This is not
+an Android hardware acceptance claim.
+
 ## Current scope and proof
 
 - **Java 17 shared `:core`** is deterministic, renderer independent and physically advances combat at 30 Hz. It has faction-specific ship stats, self-directed target selection with uncertainty, movement, power/heat/shield budgets, ablative armor, SIF, lasers, homing missiles, point defense, subsystem casualties and destruction.
