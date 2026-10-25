@@ -12,7 +12,7 @@ import java.util.Map;
 public final class WeaponFxProfile {
     private WeaponFxProfile() { }
     public enum Stage { FIRING, PAYLOAD, IMPACT }
-    public enum Motion { HITSCAN, GUIDED, CRAFT }
+    public enum Motion { HITSCAN, GUIDED, BALLISTIC, CRAFT }
     /**
      * Source path pattern inside Gdx.files.internal assets; "%02d" expands to 1-based frame.
      * An empty pattern disables this stage until its source-art cutouts are reviewed.
@@ -65,8 +65,10 @@ public final class WeaponFxProfile {
                 new Profile("laser",Motion.HITSCAN,seq("laser","firing",8,1,24,24),beam("blue"),
                         seq("laser","impact",8,1,34,34),NONE));
         byType.put(Battle.DamageType.KINETIC,
-                new Profile("kinetic",Motion.HITSCAN,seq("kinetic","firing",8,1,20,20),beam("gold"),
-                        seq("kinetic","impact",8,1,28,28),NONE));
+                new Profile("kinetic",Motion.BALLISTIC,seq("kinetic","firing",8,1,20,20),
+                        new Clip("effects/weapon_fx/kinetic/payload_%02d.png",8,2,true,25,10),
+                        seq("kinetic","impact",8,1,28,28),
+                        new Clip("effects/weapon_fx/kinetic/impact_%02d.png",8,1,false,17,17)));
         byType.put(Battle.DamageType.PLASMA,
                 new Profile("plasma",Motion.HITSCAN,seq("plasma","firing",7,1,28,28),beam("red"),
                         seq("plasma","impact",8,1,42,42),NONE));
@@ -89,6 +91,10 @@ public final class WeaponFxProfile {
     public static Profile forType(Battle.DamageType type){return DEFAULTS.get(type);}
     public static Profile forWeapon(String weapon){
         if(weapon==null)return null;
+        if(weapon.equals("POINT_DEFENSE"))
+            return new Profile("point_defense",Motion.HITSCAN,
+                    new Clip("effects/weapon_fx/laser/firing_%02d.png",8,1,false,14,14),
+                    NONE,NONE,NONE);
         if(weapon.equals("DRONE"))return new Profile("drone",Motion.CRAFT,
                 seq("drone","firing",8,1,22,22),NONE,NONE,NONE);
         try{return forType(Battle.DamageType.valueOf(weapon));}
