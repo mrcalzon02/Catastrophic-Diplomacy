@@ -39,8 +39,8 @@
       "singleFirePerLaneSeconds": 2,
       "simultaneousSeconds": 5,
       "staggeredSeconds": 6,
-      "cleanupSeconds": 3,
-      "sequenceForThreeWeaponsSeconds": 22,
+      "cleanupSeconds": 5,
+      "sequenceForThreeWeaponsSeconds": 24,
       "additionalTailRule": "Keep recording until last live missile/drone/impact/decay completes, capped at 30s; failure if still alive after cap"
     },
     "review": {
