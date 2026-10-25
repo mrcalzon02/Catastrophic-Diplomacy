@@ -161,7 +161,8 @@ public final class Shipyard {
     /** Aggregated multipliers are interpreted as total stage bonuses, NOT recursively multiplied stage-by-stage. */
     public record Part(Component base, double mass, double power, double heat, double effect,
                        double accuracy, double integrity, double shields, double thrust, double cooling,
-                       double maintenance, int industry, int research) { }
+                       double maintenance, int industry, int research,
+                       ModuleBranchEffects.Tuning tuning) { }
     private static Part evaluate(Installed installed,TechnologyCatalog catalog,Battle.Faction faction) {
         Component base=catalog.base(installed.component);
         if(base==null) throw new IllegalArgumentException("Missing base: "+installed.component);
@@ -189,8 +190,11 @@ public final class Shipyard {
                 }
             }
         }
+        Track branch=installed.branch();
+        int rank=branch==null?0:installed.stage(branch);
         return new Part(base,base.mass*mass,base.power*power,base.heat*heat,
-                base.effect*effect,accuracy,base.integrity*integrity,shields,thrust,cooling,maintenance,industry,research);
+                base.effect*effect,accuracy,base.integrity*integrity,shields,thrust,cooling,
+                maintenance,industry,research,ModuleBranchEffects.tune(base.subsystem,branch,rank));
     }
     private static List<Part> fittedParts(Design design,TechnologyCatalog catalog,List<String> errors) {
         List<Part> parts=new ArrayList<>();
@@ -234,6 +238,19 @@ public final class Shipyard {
         return new Report(List.copyOf(errors),mass,volume,draw,generation,heat,cooling,industry,research);
     }
 
+    /** Module-distinct six-rank offensive specialization; all ratios are bounded. */
+    public record Weapons(double laserRange,double kineticRange,double plasmaRange,
+                          double particleRange,double missileRange,double torpedoRange,
+                          double laserCycle,double kineticCycle,double plasmaCycle,
+                          double particleCycle,double missileCycle,double torpedoCycle) { }
+    /**
+     * Passive hull repair; remotely powered hull and shield beams; specialist
+     * repair-drone support. These are actual per-second combat capabilities.
+     */
+    public record Support(double selfRepairRate,double remoteRepairRate,double repairRange,
+                          double shieldTransferRate,double shieldRange,
+                          boolean repairDrones,double repairDroneRate,
+                          double droneEndurance,double powerEfficiency) { }
     /** Bounded combat parameters directly consumed by the authoritative Battle simulation. */
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
@@ -245,7 +262,8 @@ public final class Shipyard {
                          ProjectileModel.Spec kineticProjectile,
                          ProjectileModel.Spec missileProjectile,
                          ProjectileModel.Spec torpedoProjectile,
-                         ProjectileModel.Defense pointDefense) { }
+                         ProjectileModel.Defense pointDefense,
+                         Weapons weapons,Support support) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -257,38 +275,60 @@ public final class Shipyard {
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
         double pdWeight=0,pdOutput=0,pdTracking=0,sensorRatio=1;
+        double[] ranges=new double[6],cycles=new double[6];
+        int[] weaponCounts=new int[6];
+        double selfRate=0,remoteRate=0,remoteRange=180;
+        double shieldRate=0,shieldRange=175,efficiency=1;
+        boolean repairDrones=false;
+        double droneRepair=0,droneEndurance=1;
         for(Part p:fittedParts(design,catalog,new ArrayList<>())) {
+            ModuleBranchEffects.Tuning tuning=p.tuning();
+            int weaponIndex=switch(p.base.subsystem){
+                case "LAS" -> 0;case "KIN" -> 1;case "PLA" -> 2;
+                case "PAR" -> 3;case "MSL" -> 4;case "TOR" -> 5;
+                default -> -1;
+            };
+            if(weaponIndex>=0){
+                ranges[weaponIndex]+=tuning.reach();
+                cycles[weaponIndex]+=tuning.cycle();
+                weaponCounts[weaponIndex]++;
+            }
             switch(p.base.subsystem) {
                 case "ARM" -> armor+=p.effect*2.0*p.integrity/p.base.integrity;
-                case "SHD" -> shields+=p.effect*2.6*p.shields;
+                case "SHD" -> {
+                    shields+=p.effect*2.6*p.shields;
+                    shieldRate+=p.effect*0.028*tuning.shieldTransfer();
+                    shieldRange=Math.max(shieldRange,175*tuning.reach());
+                    efficiency=Math.max(efficiency,tuning.supportEfficiency());
+                }
                 case "SIF" -> sif+=p.effect*0.0065*p.integrity/p.base.integrity;
                 case "ENG" -> thrust+=p.effect*p.thrust;
                 case "KIN" -> {
-                    kinetic+=p.effect*0.75*p.accuracy;
+                    kinetic+=p.effect*0.75*p.accuracy*tuning.damage();
                     kineticModules.add(ProjectileModel.module(design.faction,
                             ProjectileModel.Kind.KINETIC,p.effect/p.base.effect,
                             p.accuracy,p.integrity/p.base.integrity));
                 }
-                case "LAS" -> laser+=p.effect*0.78*p.accuracy;
-                case "PAR" -> particle+=p.effect*0.82*p.accuracy;
-                case "PLA" -> plasma+=p.effect*1.05*p.accuracy;
+                case "LAS" -> laser+=p.effect*0.78*p.accuracy*tuning.damage();
+                case "PAR" -> particle+=p.effect*0.82*p.accuracy*tuning.damage();
+                case "PLA" -> plasma+=p.effect*1.05*p.accuracy*tuning.damage();
                 case "MSL" -> {
-                    missile+=p.effect*3.1;
+                    missile+=p.effect*3.1*tuning.damage();
                     missileModules.add(ProjectileModel.module(design.faction,
                             ProjectileModel.Kind.MISSILE,p.effect/p.base.effect,
                             p.accuracy,p.integrity/p.base.integrity));
                 }
                 case "TOR" -> {
-                    torpedo+=p.effect*5.4;
+                    torpedo+=p.effect*5.4*tuning.damage();
                     torpedoModules.add(ProjectileModel.module(design.faction,
                             ProjectileModel.Kind.TORPEDO,p.effect/p.base.effect,
                             p.accuracy,p.integrity/p.base.integrity));
                 }
                 case "PD", "FLK" -> {
-                    pd+=p.effect*2.8;
+                    pd+=p.effect*2.8*tuning.reach();
                     pdWeight++;
-                    pdOutput+=p.effect/p.base.effect;
-                    pdTracking+=p.accuracy;
+                    pdOutput+=p.effect/p.base.effect*tuning.damage();
+                    pdTracking+=p.accuracy*tuning.tracking();
                 }
                 case "SEN" -> {
                     accuracy+=0.12*p.accuracy;
@@ -296,10 +336,27 @@ public final class Shipyard {
                     // SPECIALIST upgrades add further fire-control reach.
                     sensorRatio+=0.08+0.25*(p.accuracy-1);
                 }
-                case "REP" -> repair+=p.effect*0.0004;
+                case "REP" -> {
+                    repair+=p.effect*0.0004;
+                    selfRate+=p.effect*0.028*tuning.selfRepair();
+                    remoteRate+=p.effect*0.019*tuning.remoteRepair();
+                    remoteRange=Math.max(remoteRange,180*tuning.reach());
+                    efficiency=Math.max(efficiency,tuning.supportEfficiency());
+                }
                 case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
                 case "FTR" -> fighters+=2+(int)(p.effect/18.0);
-                case "DRN" -> drones+=2+(int)(p.effect/18.0);
+                case "DRN" -> {
+                    drones+=2+(int)(p.effect/18.0);
+                    // Specialist converts the fitted controller's complement
+                    // from intercept drones to repair/service drones.
+                    if(p.base.id!=null && p.base.subsystem.equals("DRN")){
+                        droneEndurance=Math.max(droneEndurance,tuning.droneEndurance());
+                        if(p.tuning().remoteRepair()>1.0){
+                            repairDrones=true;
+                            droneRepair+=1.45*tuning.remoteRepair();
+                        }
+                    }
+                }
                 case "MAG" -> magazines+=(int)(p.effect/3.8);
                 default -> { }
             }
@@ -307,6 +364,10 @@ public final class Shipyard {
         }
         double mobility=(36+thrust*1.3)*design.hull.mobility*(1-0.35*report.mass()/design.hull.massCapacity);
         double charge=Math.max(2,(report.generation()-report.demand())*0.36);
+        for(int i=0;i<6;i++){
+            ranges[i]=weaponCounts[i]==0?1:ranges[i]/weaponCounts[i];
+            cycles[i]=weaponCounts[i]==0?1:cycles[i]/weaponCounts[i];
+        }
         return new Fitted(hull,shields,armor,Math.min(0.75,sif),Math.max(40,report.generation()*0.95),
                 110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
                 Math.max(9,mobility),Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
@@ -316,7 +377,11 @@ public final class Shipyard {
                 ProjectileModel.average(missileModules,ProjectileModel.Kind.MISSILE),
                 ProjectileModel.average(torpedoModules,ProjectileModel.Kind.TORPEDO),
                 ProjectileModel.defense(pdWeight==0?1:pdOutput/pdWeight,
-                        pdWeight==0?1:pdTracking/pdWeight,sensorRatio));
+                        pdWeight==0?1:pdTracking/pdWeight,sensorRatio),
+                new Weapons(ranges[0],ranges[1],ranges[2],ranges[3],ranges[4],ranges[5],
+                        cycles[0],cycles[1],cycles[2],cycles[3],cycles[4],cycles[5]),
+                new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
+                        repairDrones,droneRepair,droneEndurance,efficiency));
     }
 
     /** Expose the exact fitted projectile parameters for an individual shipyard socket.
