@@ -137,6 +137,7 @@ final class ModularWeaponFxRenderer implements Disposable {
         return frame(profile.payload(),tick-missile.spawnTick)!=null;
     }
     int activeAnimations(){return oneShots.size();}
+    int loadedTextures(){return textures.size();}
     @Override public void dispose(){
         for(Texture value:textures.values())value.dispose();
         textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
