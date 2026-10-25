@@ -250,7 +250,8 @@ public final class Shipyard {
     public record Support(double selfRepairRate,double remoteRepairRate,double repairRange,
                           double shieldTransferRate,double shieldRange,
                           boolean repairDrones,double repairDroneRate,
-                          double droneEndurance,double powerEfficiency) { }
+                          double droneEndurance,double powerEfficiency,
+                          int repairDroneCapacity) { }
     /** Bounded combat parameters directly consumed by the authoritative Battle simulation. */
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
@@ -281,6 +282,7 @@ public final class Shipyard {
         double shieldRate=0,shieldRange=175,efficiency=1;
         boolean repairDrones=false;
         double droneRepair=0,droneEndurance=1;
+        int repairDroneCapacity=0;
         for(Part p:fittedParts(design,catalog,new ArrayList<>())) {
             ModuleBranchEffects.Tuning tuning=p.tuning();
             int weaponIndex=switch(p.base.subsystem){
@@ -346,16 +348,15 @@ public final class Shipyard {
                 case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
                 case "FTR" -> fighters+=2+(int)(p.effect/18.0);
                 case "DRN" -> {
-                    drones+=2+(int)(p.effect/18.0);
-                    // Specialist converts the fitted controller's complement
-                    // from intercept drones to repair/service drones.
-                    if(p.base.id!=null && p.base.subsystem.equals("DRN")){
-                        droneEndurance=Math.max(droneEndurance,tuning.droneEndurance());
-                        if(p.tuning().remoteRepair()>1.0){
-                            repairDrones=true;
-                            droneRepair+=1.45*tuning.remoteRepair();
-                        }
-                    }
+                    int complement=2+(int)(p.effect/18.0);
+                    droneEndurance=Math.max(droneEndurance,tuning.droneEndurance());
+                    // Each physical controller owns its OWN specialist lineage.
+                    // A repair controller does not convert unrelated PD drones.
+                    if(tuning.remoteRepair()>1.0) {
+                        repairDrones=true;
+                        repairDroneCapacity+=complement;
+                        droneRepair+=1.45*tuning.remoteRepair();
+                    }else drones+=complement;
                 }
                 case "MAG" -> magazines+=(int)(p.effect/3.8);
                 default -> { }
@@ -381,7 +382,8 @@ public final class Shipyard {
                 new Weapons(ranges[0],ranges[1],ranges[2],ranges[3],ranges[4],ranges[5],
                         cycles[0],cycles[1],cycles[2],cycles[3],cycles[4],cycles[5]),
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
-                        repairDrones,droneRepair,droneEndurance,efficiency));
+                        repairDrones,droneRepair,droneEndurance,efficiency,
+                        repairDroneCapacity));
     }
 
     /** Current exclusive research branch effect of one selected installed module. */
