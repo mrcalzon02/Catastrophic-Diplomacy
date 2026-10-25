@@ -110,6 +110,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
+        fleetOrdersPanel.setIcons(uiIcons);
         reset();
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
@@ -269,12 +270,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "SOUND EFFECTS: "+(audio.effectsEnabled()?"ON":"MUTED")+" (I)",
                 "SOUNDTRACK: "+(audio.battleTrack()?"FINAL SURGE":"COLD DRONE")+" (J)",
                 "CLOSE MENU"};
+        // Semantic icons only, sourced from the approved 24-image selection.
+        final String[] menuIcons={
+                "speed","restart","shipyard_ship","fleet","back","next",
+                "shield","shield",null,null,null,"close"
+        };
         for(int n=0;n<labels.length;n++){
             float y=550-40*n;
-            if(uiIcons!=null)uiIcons.drawButton(batch,n==1?"danger":n==3?"special":"primary",
-                    438,y,405,36);
+            if(uiIcons!=null){
+                uiIcons.drawButton(batch,n==1?"danger":n==3?"special":"primary",438,y,405,36);
+                if(menuIcons[n]!=null)uiIcons.draw(batch,menuIcons[n],445,y+5,25);
+            }
             font.setColor(Color.WHITE);
-            font.draw(batch,labels[n],466,y+25);
+            font.draw(batch,labels[n],480,y+25);
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"P/O: point defense  |  F: fleet orders  |  U/I/J: audio",439,99);
@@ -528,12 +536,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
             uiIcons.drawButton(batch,"secondary",374,663,104,38);
             uiIcons.drawButton(batch,"special",1158,663,120,38);
             uiIcons.drawButton(batch,"primary",1138,78,132,41);
+            uiIcons.draw(batch,"restart",139,669,23);
+            uiIcons.draw(batch,"speed",378,669,23);
+            uiIcons.draw(batch,"shipyard_ship",1165,669,23);
+            uiIcons.draw(batch,"information",1145,86,23);
         }
         font.setColor(Color.WHITE);
         font.draw(batch, running ? "PAUSE" : "RESUME", 15, 693);
-        font.draw(batch, "RESTART", 139, 693);
+        font.draw(batch, "RESTART", 167, 693);
         font.draw(batch, "SLOW", 270, 693);
-        font.draw(batch, "FAST x" + speed, 378, 693);
+        font.draw(batch, "FAST x" + speed, 405, 693);
         font.setColor(left.r, left.g, left.b, 1);
         font.draw(batch, "< " + left.displayName, 505, 693);
         font.setColor(right.r, right.g, right.b, 1);
@@ -542,9 +554,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"-",1000,693);
         font.draw(batch,""+FLEET_SIZES[fleetIndex]+"v"+FLEET_SIZES[fleetIndex],1022,693);
         font.draw(batch,"+",1112,693);
-        font.draw(batch,"SHIPYARD",1166,693);
+        font.draw(batch,"SHIPYARD",1195,693);
         font.setColor(Color.WHITE);
-        font.draw(batch,"MENU (M)",1156,107);
+        font.draw(batch,"MENU (M)",1174,107);
         font.setColor(Color.GOLD);
         SpaceWeather.Preset activeWeather = battle.weather().preset();
         String condition = activeWeather.enabled()
@@ -563,13 +575,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 + "   PD " + (battle.missileIntercepts+battle.ballisticIntercepts)
                 + "   CRAFT " + battle.crafts().size()
                 + "   " + renderer + "   " + saveState, 22, 38);
-        // Optional source-backed ornamentation; labels and pointer hitboxes remain unchanged.
-        if (uiIcons != null && uiIcons.available()) {
-            uiIcons.draw(batch, "restart", 146, 652, 25);
-            uiIcons.draw(batch, "speed", 391, 652, 25);
-            uiIcons.draw(batch, "squadron", 1056, 652, 25);
-            uiIcons.draw(batch, "shipyard_ship", 1192, 652, 25);
-        }
         if (battle.finished()) {
             font.setColor(Color.GOLD);
             font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.alive(0) > 0 ? left.displayName : right.displayName)
