@@ -33,6 +33,8 @@ public final class Battle {
         public final Faction faction;
         public final String name;
         public Shipyard.Hull hullClass;
+        /** Directional powered shields, localized armor plates and exposed structure. */
+        public DirectionalDefense defense;
         public double x, y, vx, vy, facing;
         public double hull, maxHull, shields, maxShields, armor, maxArmor, sif, power, maxPower, heat, maxHeat;
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
@@ -63,6 +65,7 @@ public final class Battle {
                 default: break;
             }
             hull = maxHull; shields = maxShields; armor = maxArmor; power = maxPower;
+            defense=new DirectionalDefense(maxShields,maxArmor,maxHull);
         }
         public boolean alive() { return hull > 0 && !retired; }
         /** Visible top-down hull scale; larger fitted capital hulls read as larger ships. */
@@ -149,6 +152,7 @@ public final class Battle {
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
+        s.defense = new DirectionalDefense(s.maxShields,s.maxArmor,s.maxHull);
         s.maxPower = machinery.maxPower(); s.power = s.maxPower;
         s.maxHeat = machinery.maxHeat();
         s.powerRegen = machinery.powerRegen();
@@ -234,10 +238,11 @@ public final class Battle {
     private void replenish(Ship s) {
         s.power = Math.min(s.maxPower * s.reactorCondition, s.power + s.powerRegen * DT * s.reactorCondition);
         s.heat = Math.max(0, s.heat + (s.passiveHeat - s.coolingRate * s.coolingCondition) * DT);
-        if (s.power > 3 && s.shields < s.maxShields && s.heat < s.maxHeat * 0.9) {
-            double gain = Math.min(s.maxShields - s.shields, 5 * DT);
-            s.shields += gain; s.power -= gain * 0.6;
-        }
+        // Regenerate individual shield facings, subject to cooldown, reactor and power headroom.
+        double rechargeCost=s.defense.recharge(DT,StrictMath.max(0,s.power-3),
+                s.reactorCondition>0.15 && s.heat<s.maxHeat*0.9);
+        s.power-=rechargeCost;
+        s.shields=s.defense.totalShields();
         if (s.power > 5 && s.damageControl > 0) {
             // All repair-equipped fleets can restore hull slowly. Mandrally regenerative
             // ecology receives the established fivefold field-repair advantage.
@@ -450,15 +455,20 @@ public final class Battle {
     private void hit(Ship defender, double raw, Ship attacker,DamageType kind) {
         if (!defender.alive()) return;
         hitCount++;
-        double damage = raw;
-        double shieldEfficiency=kind==DamageType.KINETIC?0.82:kind==DamageType.PLASMA?1.2:1.0;
-        double shieldHit = Math.min(defender.shields, damage*shieldEfficiency);
-        defender.shields -= shieldHit; damage -= shieldHit/shieldEfficiency;
-        if (damage <= 0) return;
-        double absorption=kind==DamageType.KINETIC?0.18:kind==DamageType.TORPEDO?0.52:
-                kind==DamageType.PLASMA?0.27:0.35;
-        double armorAbsorb = Math.min(defender.armor, damage * absorption);
-        defender.armor -= armorAbsorb; damage -= armorAbsorb;
+        // Resolve incoming direction in defender-local coordinates (+X bow, +Y port).
+        double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
+        double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
+        double c=StrictMath.cos(defender.facing),s=StrictMath.sin(defender.facing);
+        double localX=dx*c+dy*s, localY=-dx*s+dy*c;
+        double distance=StrictMath.hypot(localX,localY);
+        if(distance<1e-9){localX=1;localY=0;distance=1;}
+        double radialX=localX/distance,radialY=localY/distance;
+        DirectionalDefense.Impact impact=defender.defense.impact(localX,localY,
+                radialX*0.85,radialY*0.65,raw,kind);
+        defender.shields=defender.defense.totalShields();
+        defender.armor=defender.defense.totalArmor();
+        double damage=impact.hullDamage();
+        if(damage<=0)return;
         if (defender.power > 3 && defender.sif > 0 && defender.reactorCondition > 0.15) {
             double fieldAbsorb = damage * defender.sif;
             defender.power -= Math.min(defender.power, fieldAbsorb * 0.6);
@@ -505,6 +515,7 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));
+            hash = mix(hash,s.defense.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.power));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);

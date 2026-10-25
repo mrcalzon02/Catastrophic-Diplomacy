@@ -34,7 +34,7 @@ public final class DirectionalDefenseTest {
                 Battle.DamageType.PLASMA,0.25);
         close(d.damageFactor(DirectionalDefense.Layer.SHIELD,DirectionalDefense.Facing.AFT,
                 Battle.DamageType.PLASMA),0.25,"typed resistance");
-        var aft=d.impact(-1,0,-.8,0,100,Battle.DamageType.PLASMA);
+        var aft=d.impact(-1,0,-.8,0,150,Battle.DamageType.PLASMA);
         ok(aft.hullDamage()>0,"armor collapse reveals structural/hull damage");
         ok(d.tile(aft.row(),aft.column()).exposure()>0,"visible localized armor loss");
         close(d.shields(DirectionalDefense.Facing.PORT),37,"another shield facing unaffected");
@@ -45,7 +45,7 @@ public final class DirectionalDefenseTest {
         same.recharge(1,100,true);same.recharge(1.1,100,true);
         same.setDamageFactor(DirectionalDefense.Layer.SHIELD,DirectionalDefense.Facing.AFT,
                 Battle.DamageType.PLASMA,0.25);
-        same.impact(-1,0,-.8,0,100,Battle.DamageType.PLASMA);
+        same.impact(-1,0,-.8,0,150,Battle.DamageType.PLASMA);
         ok(same.fingerprint()==d.fingerprint(),"deterministic replay");
         boolean rejected=false;
         try{d.addArmor(DirectionalDefense.Facing.AFT,Double.NaN);}

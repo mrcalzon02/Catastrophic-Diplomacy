@@ -81,3 +81,13 @@ tasks.register('massBattleCampaign') {
     description = 'Run all exhaustive fleet, framing and headless raster acceptance suites.'
     dependsOn(tasks.named('massBattleSmoke'),tasks.named('battleViewSmoke'),tasks.named('battleRasterSmoke'))
 }
+
+tasks.register('directionalDefenseSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test directional shields, tile armor, structure exposure and typed damage.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.DirectionalDefenseTest'
+    dependsOn testClasses
+}
+// Preserve the existing routine smoke chain and include directional defenses.
+tasks.named('fleetScaleSmoke') { finalizedBy(tasks.named('directionalDefenseSmoke')) }
