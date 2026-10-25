@@ -9,6 +9,10 @@
 - **`:desktop`** is LWJGL3. **`:android`** is the Android launcher. Both share every rules implementation. Desktop/Android graphics and native APK packaging are not yet accepted on physical devices.
 - A headless 16-vs-16 Java 17 smoke test passed locally. The online repository must be inspected at the commit SHA before claiming deployment. Balance and large-fleet GPU performance remain unverified.
 
+## Modular weapon visuals
+
+Weapon animation is split into **three independently controlled stages**: a muzzle/firing clip, an authoritative moving beam/projectile payload, and a true hit/interception impact clip. Timing events and projectile IDs are emitted by the deterministic core; libGDX only renders existing textures. The initial four beam families have 63 original-atlas firing/impact cutouts plus 35 existing beam payload frames preserved in the project's binary transfer package (not yet GitHub PNG commits). No new artwork or procedural-pill replacement was generated. See [Modular Weapon FX](docs/MODULAR_WEAPON_FX.md); run `gradle :core:weaponFxSmoke` once the Java toolchain is available.
+
 ## Requirements and commands
 
 Install **JDK 17**, **Gradle 8.11.1 or compatible AGP 8.9.2 toolchain**; Android builds also require Android SDK platform 35 and Android Build Tools. A checked-in Gradle wrapper has not yet been generated, so use an installed `gradle` executable rather than pretending `gradlew` is available.
