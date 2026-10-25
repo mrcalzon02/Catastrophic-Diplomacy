@@ -9,3 +9,7 @@ The current code supports only four fitted hull classes; temporary mapping is **
 All images face upward. Game coordinate direction +X means 0° faces right, so the renderer rotates nose-up sprites by ship heading - 90°. The current sprite layer overlays the existing GPU/geometry path. A production pass should remove duplicate underlying hull draws when sprite art is enabled, add normals/emissive/structure layers and use UV-synchronous tile masks and instanced shaders to expose actual interiors.
 
 Pending graphics verification: transparent edges, no label contamination, desired fleet scale, image filtering, transform orientation, asset packing, GL30 fallback, missing-art behavior, licensed source provenance, and Android loading.
+
+## Damage compositing proof
+
+The shared Terran drawing layer creates a procedural dark structural hull texture at startup. Undamaged sprites render as a single image. Ships with damaged tiles draw that underlayer, then render each affected RGBA exterior tile with armor-dependent alpha. This is a real localized transparency path for testing, not merely orange indicators. The internal hull texture is deliberately generic and must be replaced by authored structure and correct UV-aligned normal/emissive material layers in a later art pass. Run desktop/Android rendering tests before accepting device performance.
