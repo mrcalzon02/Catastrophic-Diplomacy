@@ -51,7 +51,8 @@ public final class Battle {
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
         public ProjectileModel.Spec torpedoProjectile=ProjectileModel.standard(ProjectileModel.Kind.TORPEDO);
         public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
-        public Shipyard.Weapons weapons=new Shipyard.Weapons(1,1,1,1,1,1,1,1,1,1,1,1);
+        public Shipyard.Weapons weapons=new Shipyard.Weapons(
+                1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);
         public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
         public double hullRepaired,shieldRecharged,remoteHullRepaired,shieldsTransferred;
         public int repairDronesLaunched;
@@ -611,7 +612,7 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
             visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            double chance = Math.min(0.98, s.accuracy * weatherAim * (0.7 + lock * 0.45));
+            double chance = Math.min(0.98, s.accuracy*s.weapons.laserTracking() * weatherAim * (0.7 + lock * 0.45));
             if (random.nextDouble() < chance) hit(target,s.laserDamage,s,DamageType.LASER,shotId);
         }
         if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690*s.weapons.missileRange() && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
@@ -630,7 +631,7 @@ public final class Battle {
             double angle=StrictMath.atan2(target.y-s.y,target.x-s.x);
             // Preserve the existing one-roll accuracy model, but a miss now has a
             // genuinely displaced trajectory rather than an unexplained failed hit.
-            boolean onTarget=random.nextDouble()<Math.min(0.97,s.accuracy*weatherAim*(0.72+lock*0.4));
+            boolean onTarget=random.nextDouble()<Math.min(0.97,s.accuracy*s.weapons.kineticTracking()*weatherAim*(0.72+lock*0.4));
             if(!onTarget)angle+=(shotId%2==0?1:-1)*0.24;
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
                     s.x,s.y,angle,s.kineticDamage,s.kineticProjectile));
@@ -643,7 +644,7 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
             visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.94,s.accuracy*weatherAim*(0.80+lock*0.4)))
+            if(random.nextDouble()<Math.min(0.94,s.accuracy*s.weapons.plasmaTracking()*weatherAim*(0.80+lock*0.4)))
                 hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
         }
         if (s.particleDamage > 0 && distance < 565*s.weapons.particleRange() && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
@@ -652,7 +653,7 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
             visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.98,s.accuracy*weatherAim*(0.76+lock*0.45)))
+            if(random.nextDouble()<Math.min(0.98,s.accuracy*s.weapons.particleTracking()*weatherAim*(0.76+lock*0.45)))
                 hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
         }
         if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840*s.weapons.torpedoRange() && distance>110
