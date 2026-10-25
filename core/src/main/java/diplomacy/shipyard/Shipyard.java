@@ -242,7 +242,9 @@ public final class Shipyard {
     public record Weapons(double laserRange,double kineticRange,double plasmaRange,
                           double particleRange,double missileRange,double torpedoRange,
                           double laserCycle,double kineticCycle,double plasmaCycle,
-                          double particleCycle,double missileCycle,double torpedoCycle) { }
+                          double particleCycle,double missileCycle,double torpedoCycle,
+                          double laserTracking,double kineticTracking,double plasmaTracking,
+                          double particleTracking,double missileTracking,double torpedoTracking) { }
     /**
      * Passive hull repair; remotely powered hull and shield beams; specialist
      * repair-drone support. These are actual per-second combat capabilities.
@@ -276,7 +278,7 @@ public final class Shipyard {
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
         double pdWeight=0,pdOutput=0,pdTracking=0,sensorRatio=1;
-        double[] ranges=new double[6],cycles=new double[6];
+        double[] ranges=new double[6],cycles=new double[6],trackers=new double[6];
         int[] weaponCounts=new int[6];
         double selfRate=0,remoteRate=0,remoteRange=180;
         double shieldRate=0,shieldRange=175,efficiency=1;
@@ -293,6 +295,7 @@ public final class Shipyard {
             if(weaponIndex>=0){
                 ranges[weaponIndex]+=tuning.reach();
                 cycles[weaponIndex]+=tuning.cycle();
+                trackers[weaponIndex]+=tuning.tracking();
                 weaponCounts[weaponIndex]++;
             }
             switch(p.base.subsystem) {
@@ -368,6 +371,7 @@ public final class Shipyard {
         for(int i=0;i<6;i++){
             ranges[i]=weaponCounts[i]==0?1:ranges[i]/weaponCounts[i];
             cycles[i]=weaponCounts[i]==0?1:cycles[i]/weaponCounts[i];
+            trackers[i]=weaponCounts[i]==0?1:trackers[i]/weaponCounts[i];
         }
         return new Fitted(hull,shields,armor,Math.min(0.75,sif),Math.max(40,report.generation()*0.95),
                 110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
@@ -380,7 +384,8 @@ public final class Shipyard {
                 ProjectileModel.defense(pdWeight==0?1:pdOutput/pdWeight,
                         pdWeight==0?1:pdTracking/pdWeight,sensorRatio),
                 new Weapons(ranges[0],ranges[1],ranges[2],ranges[3],ranges[4],ranges[5],
-                        cycles[0],cycles[1],cycles[2],cycles[3],cycles[4],cycles[5]),
+                        cycles[0],cycles[1],cycles[2],cycles[3],cycles[4],cycles[5],
+                        trackers[0],trackers[1],trackers[2],trackers[3],trackers[4],trackers[5]),
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
                         repairDrones,droneRepair,droneEndurance,efficiency,
                         repairDroneCapacity));
