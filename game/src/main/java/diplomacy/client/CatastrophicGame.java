@@ -14,6 +14,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleOrders;
+import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.SpaceWeather;
 import diplomacy.sim.LevelEnvironment;
@@ -60,6 +61,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
+    private static final String ORDERS_FILE = "fleet/orders-v1.dat";
 
     @Override public void create() {
         camera = new OrthographicCamera();
@@ -98,6 +100,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
         rightDesign=Shipyard.starter(right,Shipyard.Hull.CORVETTE);
         restoreFleets();
+        restoreOrderPresets();
         shipyard = new ShipyardPanel(technology,(team,design)->{
             if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
             saveFleets();
@@ -198,6 +201,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(side<0||side>1||orders==null)throw new IllegalArgumentException("Invalid fleet orders");
         fleetOrders[side]=orders;
         if(battle!=null)battle.setTeamOrders(side,orders);
+        saveOrderPresets();
     }
     private void togglePd(int side){
         BattleOrders.Orders current=fleetOrders[side];
@@ -315,6 +319,40 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         }
         saveState="SAVES INVALID - STARTER FLEETS USED";
+    }
+    private void restoreOrderPresets(){
+        for(FileHandle candidate:new FileHandle[]{
+                Gdx.files.local(ORDERS_FILE),Gdx.files.local(ORDERS_FILE+".bak")}){
+            if(!candidate.exists())continue;
+            try{
+                BattleOrdersCodec.Pair result=BattleOrdersCodec.decode(candidate.readString("UTF-8"));
+                fleetOrders[0]=result.left();fleetOrders[1]=result.right();
+                return;
+            }catch(RuntimeException broken){
+                Gdx.app.error("ORDERS","Rejected invalid fleet orders "+candidate.path(),broken);
+            }
+        }
+    }
+    private void saveOrderPresets(){
+        try{
+            String payload=BattleOrdersCodec.encode(fleetOrders[0],fleetOrders[1]);
+            FileHandle output=Gdx.files.local(ORDERS_FILE);
+            FileHandle temp=Gdx.files.local(ORDERS_FILE+".tmp");
+            FileHandle backup=Gdx.files.local(ORDERS_FILE+".bak");
+            temp.writeString(payload,false,"UTF-8");
+            BattleOrdersCodec.decode(temp.readString("UTF-8"));
+            if(output.exists()){
+                try {
+                    BattleOrdersCodec.decode(output.readString("UTF-8"));
+                    output.copyTo(backup);
+                }catch(IllegalArgumentException invalid){
+                    Gdx.app.log("ORDERS","Retained previous valid backup");
+                }
+            }
+            temp.moveTo(output);
+        }catch(RuntimeException failed){
+            Gdx.app.error("ORDERS","Unable to persist tactical settings",failed);
+        }
     }
     private void saveFleets() {
         try {
