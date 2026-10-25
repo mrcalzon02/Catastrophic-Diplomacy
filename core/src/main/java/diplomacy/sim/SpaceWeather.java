@@ -93,12 +93,12 @@ public final class SpaceWeather {
     }
     public double heatPerSecond() {
         double heat=0;
-        if(solarActive())heat+=6.0*preset.severity();
+        if(solarActive())heat+=25.0*preset.severity();
         if(preset.includes(Kind.ION_STORM))heat+=1.1*preset.severity();
         return heat;
     }
     public double powerDrainPerSecond() {
-        return preset.includes(Kind.ION_STORM)?1.6*preset.severity():0;
+        return preset.includes(Kind.ION_STORM)?8.0*preset.severity():0;
     }
     /** Solar activity: three seconds of flare per eighteen-second cycle. */
     public boolean solarActive() {
