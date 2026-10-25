@@ -16,6 +16,8 @@ public final class AndroidLauncher extends AndroidApplication {
         config.numSamples = 0;
         config.useImmersiveMode = true;
         initialize(new CatastrophicGame(updater::checkForUpdates), config);
+        // Silent background check: failures do not interrupt gameplay or disable manual checks.
+        updater.checkForUpdates(false);
     }
 
     @Override protected void onDestroy() {

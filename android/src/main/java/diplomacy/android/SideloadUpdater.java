@@ -106,7 +106,9 @@ final class SideloadUpdater {
                     if (assets == null) continue;
 
                     JSONObject manifest = null;
-                    JSONObject manifestAsset = findAsset(assets, MANIFEST_NAME);
+                    JSONObject manifestAsset;
+                    try { manifestAsset = findAsset(assets, MANIFEST_NAME); }
+                    catch (JSONException malformed) { manifestAsset = null; rejected++; }
                     if (manifestAsset != null && manifestAsset.optLong("size", 0) > 0
                             && manifestAsset.optLong("size") <= MAX_MANIFEST_JSON) {
                         try {
@@ -130,21 +132,29 @@ final class SideloadUpdater {
                             String apkUrl = asset.getString("browser_download_url");
                             UpdatePolicy.requireDownloadUrl(apkUrl, tag, name);
                             String githubDigest = asset.optString("digest", "");
+                            if (!githubDigest.isEmpty() && !githubDigest.startsWith("sha256:"))
+                                throw new IOException("Unsupported GitHub asset digest");
                             String sha = githubDigest.startsWith("sha256:") ? githubDigest.substring(7) : "";
                             UpdatePolicy.Candidate candidate = UpdatePolicy.provisional(tag, name, bytes, sha);
                             if (manifest != null && manifest.optInt("schema") == 1) {
                                 JSONObject item = manifest.optJSONObject("apk");
                                 if (item != null && name.equals(item.optString("name"))) {
-                                    candidate = new UpdatePolicy.Candidate(tag,
-                                            manifest.getString("version"), manifest.getLong("versionCode"),
-                                            manifest.getString("applicationId"), manifest.getInt("minDataSchema"),
-                                            name, item.getLong("bytes"), item.getString("sha256"));
-                                    if (candidate.versionCode() <= installedCode) continue;
-                                    UpdatePolicy.requireCandidate(candidate, installed.versionName, installedCode);
-                                    if (candidate.bytes() != bytes)
-                                        throw new IOException("Manifest APK length differs from GitHub release");
-                                    if (!sha.isEmpty() && !sha.equalsIgnoreCase(candidate.sha256()))
-                                        throw new IOException("Manifest checksum differs from GitHub asset digest");
+                                    // Stale manifests cannot hide valid test APKs. Archive
+                                    // identity, versionCode and signature are verified after download.
+                                    try {
+                                        UpdatePolicy.Candidate described = new UpdatePolicy.Candidate(tag,
+                                                manifest.getString("version"), manifest.getLong("versionCode"),
+                                                manifest.getString("applicationId"), manifest.getInt("minDataSchema"),
+                                                name, item.getLong("bytes"), item.getString("sha256"));
+                                        UpdatePolicy.requireCandidate(described, installed.versionName, installedCode);
+                                        if (described.bytes() != bytes)
+                                            throw new IOException("Manifest size differs from GitHub asset");
+                                        if (!sha.isEmpty() && !sha.equalsIgnoreCase(described.sha256()))
+                                            throw new IOException("Manifest checksum differs from GitHub digest");
+                                        candidate = described;
+                                    } catch (Exception invalidManifest) {
+                                        rejected++; // Keep provisional candidate for APK inspection.
+                                    }
                                 }
                             }
                             available.add(new Release(candidate, apkUrl, release.optBoolean("prerelease")));
