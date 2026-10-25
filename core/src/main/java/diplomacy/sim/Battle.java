@@ -666,15 +666,23 @@ public final class Battle {
                         hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
                 }
             } else {
+                Ship controller=findShip(craft.sourceId);
+                ProjectileModel.Defense suite=controller==null?ProjectileModel.STANDARD_PD
+                        :controller.pointDefenseProfile;
+                double sensor=controller==null?1:controller.sensorsCondition;
                 Missile missileTarget=null;Ballistic shellTarget=null;
-                double nearest=150;
+                double nearest=Double.POSITIVE_INFINITY;
                 for(Missile m:missiles)if(m.team!=craft.team){
                     double d=StrictMath.hypot(m.x-craft.x,m.y-craft.y);
-                    if(d<nearest){nearest=d;missileTarget=m;shellTarget=null;}
+                    double detection=ProjectileModel.acquisitionRange(150,sensor,
+                            weather.sensorFactor(),suite,m.spec);
+                    if(d<nearest&&d<=detection){nearest=d;missileTarget=m;shellTarget=null;}
                 }
                 for(Ballistic p:ballistics)if(p.team!=craft.team){
                     double d=StrictMath.hypot(p.x-craft.x,p.y-craft.y);
-                    if(d<nearest){nearest=d;shellTarget=p;missileTarget=null;}
+                    double detection=ProjectileModel.acquisitionRange(150,sensor,
+                            weather.sensorFactor(),suite,p.spec);
+                    if(d<nearest&&d<=detection){nearest=d;shellTarget=p;missileTarget=null;}
                 }
                 if(missileTarget!=null||shellTarget!=null){
                     double x=missileTarget!=null?missileTarget.x:shellTarget.x;
@@ -684,8 +692,13 @@ public final class Battle {
                         craft.y+=(y-craft.y)/nearest*205*DT;
                     }
                     if(StrictMath.hypot(x-craft.x,y-craft.y)<28){
+                        ProjectileModel.Spec incoming=missileTarget!=null
+                                ?missileTarget.spec:shellTarget.spec;
+                        if(random.nextDouble()<ProjectileModel.interceptionChance(
+                                incoming,suite,controller==null?1:controller.pointDefenseCondition,
+                                weather.accuracyFactor())){
                         if(missileTarget!=null){
-                            missileTarget.integrity-=3;
+                            missileTarget.integrity-=Math.max(3,suite.damage());
                             if(missileTarget.integrity<=0 && missiles.remove(missileTarget)){
                                 missileIntercepts++;
                                 visual(missileTarget.visualId,VisualPhase.INTERCEPT,
@@ -694,13 +707,14 @@ public final class Battle {
                                         missileTarget.x,missileTarget.y,missileTarget.x,missileTarget.y);
                             }
                         }else{
-                            shellTarget.integrity-=3;
+                            shellTarget.integrity-=Math.max(3,suite.damage());
                             if(shellTarget.integrity<=0 && ballistics.remove(shellTarget)){
                                 ballisticIntercepts++;
                                 visual(shellTarget.visualId,VisualPhase.INTERCEPT,"KINETIC",
                                         shellTarget.team,shellTarget.sourceId,shellTarget.targetId,
                                         shellTarget.x,shellTarget.y,shellTarget.x,shellTarget.y);
                             }
+                        }
                         }
                         crafts.remove(i);
                     }
