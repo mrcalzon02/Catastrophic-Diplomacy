@@ -2,6 +2,8 @@ package diplomacy.sim;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -155,6 +157,7 @@ public final class Battle {
 
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
+    private final Map<Integer,Integer> focusCounts=new HashMap<>();
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
     private final List<Craft> crafts = new ArrayList<>();
@@ -312,6 +315,9 @@ public final class Battle {
 
     public void step() {
         tick++;
+        focusCounts.clear();
+        for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0)
+            focusCounts.merge(ship.lastTargetId,1,Integer::sum);
         for (int i = beams.size() - 1; i >= 0; i--) {
             if ((beams.get(i).lifetime -= DT) <= 0) beams.remove(i);
         }
@@ -389,7 +395,7 @@ public final class Battle {
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
             }
-            actor.lastTargetId=choice==null?0:choice.id;
+            updateFocus(actor,choice);
             return choice;
         }
         BattleOrders.Orders orders=actor.orders;
@@ -409,10 +415,9 @@ public final class Battle {
                 case NEAREST -> { }
                 case VULTURE -> assessed-=(1-Math.max(0,candidate.hull/candidate.maxHull))*160;
                 case COOPERATE -> {
-                    int allies=0;
-                    for(Ship friend:ships)if(friend.team==actor.team && friend!=actor
-                            && friend.alive()&&friend.lastTargetId==candidate.id)allies++;
-                    assessed-=Math.min(6,allies)*25;
+                    int allies=focusCounts.getOrDefault(candidate.id,0)
+                            -(actor.lastTargetId==candidate.id?1:0);
+                    assessed-=Math.min(6,Math.max(0,allies))*25;
                 }
                 case RETALIATE -> {
                     if(candidate.id==actor.lastAttackerId)assessed-=225;
@@ -424,8 +429,16 @@ public final class Battle {
             }
             if(assessed<best){best=assessed;choice=candidate;}
         }
-        actor.lastTargetId=choice==null?0:choice.id;
+        updateFocus(actor,choice);
         return choice;
+    }
+    private void updateFocus(Ship actor,Ship selected){
+        int old=actor.lastTargetId,next=selected==null?0:selected.id;
+        if(old!=next){
+            if(old!=0)focusCounts.merge(old,-1,Integer::sum);
+            if(next!=0)focusCounts.merge(next,1,Integer::sum);
+            actor.lastTargetId=next;
+        }
     }
 
     private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
