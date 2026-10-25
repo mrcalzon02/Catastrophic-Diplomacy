@@ -26,7 +26,9 @@ public final class ProjectileModuleTest {
                 .install(kineticSlot,"BASE-TER-KIN")
                 .install(torpedoSlot,"BASE-TER-TOR")
                 .install(pointDefenseSlot,"BASE-TER-PD")
-                .install(sensorSlot,"BASE-TER-SEN");
+                .install(sensorSlot,"BASE-TER-SEN")
+                .install(slot(hull,Shipyard.Mount.SYSTEM,4),"BASE-TER-REA")
+                .install(slot(hull,Shipyard.Mount.SYSTEM,5),"BASE-TER-RAD");
         check(Shipyard.inspect(base,catalog).valid(),"physical projectile test loadout must fit");
         Shipyard.Fitted installed=Shipyard.fit(base,catalog);
         check(installed.kineticProjectile().speed()>installed.missileProjectile().speed(),
