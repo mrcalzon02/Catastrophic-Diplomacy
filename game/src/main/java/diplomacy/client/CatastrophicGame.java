@@ -37,6 +37,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ModularWeaponFxRenderer weaponFx;
     private ProceduralStarfield starfield;
     private BattlefieldWeatherVfx weatherVfx;
+    private CombatAudio audio;
     private int battlefieldLevel = 1;
     private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
@@ -70,6 +71,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         viewport = new FitViewport(W, H, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
+        audio = new CombatAudio();
         terranSprites = new TerranPlaceholderSprites();
         weaponBeams = new WeaponBeamSprites();
         weaponFx = new ModularWeaponFxRenderer();
@@ -111,6 +113,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         reset();
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
+                if (key == Input.Keys.U) { audio.toggleMusic(); audio.ui(); return true; }
+                if (key == Input.Keys.I) { audio.toggleEffects(); audio.ui(); return true; }
+                if (key == Input.Keys.J) { audio.toggleTrack(); audio.ui(); return true; }
                 if(fleetOrdersPanel!=null && fleetOrdersPanel.open()) {
                     if(key==Input.Keys.ESCAPE || key==Input.Keys.F)closeFleetOrders();
                     return true;
@@ -178,7 +183,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
-                return shipyard.endTouch(world.x,world.y,pointer);
+                boolean activated = shipyard.endTouch(world.x,world.y,pointer);
+                if (activated && audio != null) audio.ui();
+                return activated;
             }
             @Override public boolean scrolled(float amountX,float amountY) {
                 return shipyard.scroll(amountY);
@@ -191,6 +198,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         resumeAfterMenu = running;
         running = false;
         tacticalMenuOpen = true;
+        if (audio != null) audio.ui();
     }
     private void closeTacticalMenu() {
         if (!tacticalMenuOpen) return;
@@ -219,10 +227,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void tapTacticalMenu(float x, float y) {
         if(x<420||x>860){closeTacticalMenu();return;}
-        final float top=513, step=48;
-        for(int n=0;n<9;n++) {
+        final float top=550, step=40;
+        for(int n=0;n<12;n++) {
             float y0=top-step*n;
-            if(y<y0||y>=y0+42)continue;
+            if(y<y0||y>=y0+36)continue;
+            if (audio != null) audio.ui();
             switch(n){
                 case 0 -> closeTacticalMenu();
                 case 1 -> {reset();closeTacticalMenu();}
@@ -232,7 +241,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 5 -> changeFleetSize(1);
                 case 6 -> togglePd(0);
                 case 7 -> togglePd(1);
-                case 8 -> closeTacticalMenu();
+                case 8 -> audio.toggleMusic();
+                case 9 -> audio.toggleEffects();
+                case 10 -> audio.toggleTrack();
+                case 11 -> closeTacticalMenu();
             }
             return;
         }
@@ -253,16 +265,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "FLEET ORDERS EDITOR","REDUCE FLEET SIZE","INCREASE FLEET SIZE",
                 "LEFT PD: "+fleetOrders[0].pointDefense().name().replace('_',' '),
                 "RIGHT PD: "+fleetOrders[1].pointDefense().name().replace('_',' '),
+                "MUSIC: "+(audio.musicEnabled()?"ON":"MUTED")+" (U)",
+                "SOUND EFFECTS: "+(audio.effectsEnabled()?"ON":"MUTED")+" (I)",
+                "SOUNDTRACK: "+(audio.battleTrack()?"FINAL SURGE":"COLD DRONE")+" (J)",
                 "CLOSE MENU"};
         for(int n=0;n<labels.length;n++){
-            float y=513-48*n;
+            float y=550-40*n;
             if(uiIcons!=null)uiIcons.drawButton(batch,n==1?"danger":n==3?"special":"primary",
-                    438,y,405,41);
+                    438,y,405,36);
             font.setColor(Color.WHITE);
-            font.draw(batch,labels[n],466,y+27);
+            font.draw(batch,labels[n],466,y+25);
         }
         font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch,"P/O: cycle fleet PD  |  F: orders editor",439,106);
+        font.draw(batch,"P/O: point defense  |  F: fleet orders  |  U/I/J: audio",439,99);
         batch.end();
     }
 
@@ -390,6 +405,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // The same validated stage index drives both GPU background and simulation.
         if (starfield != null) starfield.useLevel(environment.level());
         accumulator = 0;
+        if (audio != null) audio.resetForBattle();
         running = true;
     }
 
@@ -403,6 +419,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
+        if (audio != null) audio.advance(battle);
         Gdx.gl.glClearColor(0.015f, 0.025f, 0.055f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
         viewport.apply(); camera.update();
@@ -621,7 +638,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     @Override public void resize(int width, int height) { viewport.update(width, height, true); }
+    @Override public void pause() {
+        if (audio != null) audio.pause();
+    }
+    @Override public void resume() {
+        if (audio != null) audio.resume();
+    }
     @Override public void dispose() {
+        if (audio != null) audio.close();
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();

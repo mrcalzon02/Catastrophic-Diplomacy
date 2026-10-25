@@ -11,3 +11,12 @@ tasks.register('geometrySmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.HullSilhouetteTest'
 }
+
+
+// Headless verification of deterministic event-to-sound routing on the shared client.
+tasks.register('audioSmoke', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatAudioCueTest'
+}

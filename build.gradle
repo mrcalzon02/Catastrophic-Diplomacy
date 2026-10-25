@@ -128,3 +128,73 @@ tasks.register('verifyBattlefieldResources') {
         println("PASS: ${present} approved battlefield PNG assets staged for packaging.")
     }
 }
+
+/**
+ * Restore the Drive-sourced ambient MP3 from byte-exact Git parts.
+ * The decoded file is an internal asset in both desktop and Android builds.
+ */
+def coldMusicParts = (0..<4).collect {
+    file('asset_packs/music/cold-unresolved-' + String.format('%02d', it) + '.bin')
+}
+def coldMusicOutput = layout.buildDirectory.file('generated/cd-music/audio/music/cold_unresolved_drone.mp3')
+tasks.register('prepareMusicAssets') {
+    inputs.files coldMusicParts
+    outputs.file coldMusicOutput
+    doLast {
+        coldMusicParts.each {
+            if (!it.isFile()) throw new GradleException('Missing music transfer part: ' + it.name)
+        }
+        def target = coldMusicOutput.get().asFile
+        target.parentFile.mkdirs()
+        target.withOutputStream { output ->
+            coldMusicParts.each { part -> part.withInputStream { input -> input.transferTo(output) } }
+        }
+        def sha = java.security.MessageDigest.getInstance('SHA-256')
+        target.withInputStream { stream ->
+            byte[] bytes = new byte[65536]
+            int n
+            while ((n = stream.read(bytes)) != -1) sha.update(bytes, 0, n)
+        }
+        def actual = sha.digest().encodeHex().toString()
+        if (target.length() != 3558384 ||
+                actual != '0e0b0e5bbad299d733938f907aa63fd62de9abad3dc61a00a8ee287fbe10a293') {
+            target.delete()
+            throw new GradleException('Drive music failed byte-level checksum verification')
+        }
+    }
+}
+
+/** Fail packaging when combat sound or soundtrack is missing. */
+tasks.register('verifyBattleAudioResources') {
+    dependsOn tasks.named('prepareMusicAssets')
+    doLast {
+        def sfx = ['laser_zap', 'metal_wonk', 'plasma_pulse',
+                   'particle_arc', 'missile_launch', 'torpedo_launch',
+                   'shield_hit', 'hollow_metal', 'grenade', 'ui_confirm']
+        sfx.each { name ->
+            def source = file('assets/audio/sfx/' + name + '.wav')
+            if (!source.isFile() || source.length() < 44)
+                throw new GradleException('Missing combat WAV: ' + source)
+            source.withInputStream { input ->
+                byte[] header = new byte[12]
+                if (input.read(header) != 12 ||
+                        new String(header, 0, 4, 'US-ASCII') != 'RIFF' ||
+                        new String(header, 8, 4, 'US-ASCII') != 'WAVE')
+                    throw new GradleException('Malformed combat WAV: ' + source)
+            }
+        }
+        def music = file('assets/audio/music/final_surge.mp3')
+        if (!music.isFile() || music.length() != 2686806)
+            throw new GradleException('Missing or truncated battle soundtrack: ' + music)
+        def sha = java.security.MessageDigest.getInstance('SHA-256')
+        music.withInputStream { input ->
+            byte[] data = new byte[65536]
+            int n
+            while ((n = input.read(data)) != -1) sha.update(data, 0, n)
+        }
+        if (sha.digest().encodeHex().toString() !=
+                'fd1c8c713604f9bbe8f93b37e324f0918f2ddd62e1dc3bdbb4bb3543a6217c87')
+            throw new GradleException('Battle soundtrack checksum mismatch')
+        println('PASS: 10 combat/UI sound assets and two soundtrack recordings')
+    }
+}
