@@ -270,21 +270,30 @@ final class ShipyardPanel {
         }
         if(artPreview&&fleetArt!=null)
             fleetArt.drawPreview(batch,draft.faction,draft.hull,MAP_CX,MAP_CY,330,402);
-        if (uiIcons != null && uiIcons.available()) {
-            uiIcons.draw(batch, "complete", 743, 674, 25);
-            uiIcons.draw(batch, "information", 841, 674, 25);
-            uiIcons.draw(batch, "restart", 950, 674, 25);
-            uiIcons.draw(batch, "close", 1152, 674, 25);
+        if (uiIcons != null) {
+            uiIcons.draw(batch, "back", 344, 649, 25);
+            uiIcons.draw(batch, "next", 650, 649, 25);
+            uiIcons.draw(batch, "complete", 713, 648, 25);
+            uiIcons.draw(batch, "close", 1142, 649, 25);
+            // Selected mount icon remains data-driven; never imply a weapon on a support slot.
+            String mountIcon = switch(selected.mount()) {
+                case SYSTEM -> "engine";
+                case WEAPON -> "weapons";
+                case DEFENSE -> "shield";
+                case SUPPORT -> "repair";
+            };
+            uiIcons.draw(batch,mountIcon,1218,357,23);
+            uiIcons.draw(batch, "energy", 1213,148,22);
         }
         font.setColor(Color.WHITE);font.draw(batch,"SHIPYARD",22,702);
         font.setColor(team==0?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"LEFT FLEET",35,660);
         font.setColor(team==1?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"RIGHT FLEET",175,660);
         font.setColor(Color.WHITE);
-        font.draw(batch,"<",345,660);
+        if(uiIcons == null || !uiIcons.has("back"))font.draw(batch,"<",345,660);
         font.draw(batch,draft.hull.name().replace('_',' '),392,660);
-        font.draw(batch,">",657,660);
-        font.draw(batch,"APPLY",711,660);font.draw(batch,"SAVE",833,660);
-        font.draw(batch,"LOAD",940,660);font.draw(batch,"FACTION >",1023,660);font.draw(batch,"CLOSE",1140,660);
+        if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);
+        font.draw(batch,"APPLY",745,660);font.draw(batch,"SAVE",833,660);
+        font.draw(batch,"LOAD",940,660);font.draw(batch,"FACTION >",1023,660);font.draw(batch,"CLOSE",1174,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);
         font.draw(batch,artPreview?"HULL ART PREVIEW":"FACTION HULL SCHEMATIC",345,590);
