@@ -42,6 +42,9 @@ public final class MassBattleCampaignTest {
             check(s.missileAmmo>=0&&s.torpedoAmmo>=0&&s.fighterReserve>=0&&s.droneReserve>=0,label+": ammunition underrun");
         }
         for(Battle.Missile m:b.missiles())check(Double.isFinite(m.x)&&Double.isFinite(m.y)&&Double.isFinite(m.damage),label+": projectile finite");
+        for(Battle.Ballistic p:b.ballistics())
+            check(Double.isFinite(p.x)&&Double.isFinite(p.y)&&Double.isFinite(p.vx)
+                    &&Double.isFinite(p.vy)&&p.integrity>0,label+": tracked kinetic finite");
         for(Battle.Craft c:b.crafts())check(Double.isFinite(c.x)&&Double.isFinite(c.y)&&Double.isFinite(c.fuel),label+": craft finite");
         for(Battle.Beam beam:b.beams())check(Double.isFinite(beam.x1)&&Double.isFinite(beam.y2)&&beam.type!=null,label+": beam render payload");
     }
@@ -60,7 +63,7 @@ public final class MassBattleCampaignTest {
     }
     private static int weaponProof(TechnologyCatalog catalog){
         EnumSet<Battle.DamageType> beams=EnumSet.noneOf(Battle.DamageType.class);
-        boolean missile=false,torpedo=false,fastEngine=false,smallEngine=false;
+        boolean missile=false,torpedo=false,kinetic=false,fastEngine=false,smallEngine=false;
         int validPairs=0,invalidPairs=0,validEngineStages=0,validWeaponTech=0;
         boolean[] engineTracks=new boolean[Shipyard.Track.values().length];
         boolean[] weaponTracks=new boolean[Shipyard.Track.values().length];
@@ -82,6 +85,7 @@ public final class MassBattleCampaignTest {
                 one.spawnWing(1,Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE),catalog,1,620,335);
                 run(one,4,"weapon "+faction+" "+hull+" "+left+"/"+right);
                 for(Battle.Beam effect:one.beams())beams.add(effect.type);
+                kinetic|=!one.ballistics().isEmpty();
                 for(Battle.Missile ordnance:one.missiles()){
                     if(ordnance.torpedo)torpedo=true;else missile=true;
                 }
@@ -140,12 +144,13 @@ public final class MassBattleCampaignTest {
             check(engineTracks[track.ordinal()],"unused engine track "+track);
             check(weaponTracks[track.ordinal()],"unused weapon track "+track);
         }
-        for(Battle.DamageType type:new Battle.DamageType[]{Battle.DamageType.LASER,Battle.DamageType.KINETIC,
-                Battle.DamageType.PLASMA,Battle.DamageType.PARTICLE})check(beams.contains(type),"missing visible shot effect for "+type);
+        for(Battle.DamageType type:new Battle.DamageType[]{Battle.DamageType.LASER,
+                Battle.DamageType.PLASMA,Battle.DamageType.PARTICLE})check(beams.contains(type),"missing visible beam for "+type);
+        check(kinetic,"slow kinetic batteries must launch tracked interceptable shells, not hitscan beams");
         check(missile&&torpedo,"both missile and torpedo projectiles must physically spawn");
         System.out.println("PASS weapon/thruster matrix: valid="+validPairs+" rejected="+invalidPairs
                 +" upgraded-drives="+validEngineStages+" upgraded-weapons="+validWeaponTech
-                +" beams="+beams+" missile="+missile+" torpedo="+torpedo);
+                +" beams="+beams+" kinetic="+kinetic+" missile="+missile+" torpedo="+torpedo);
         return validPairs;
     }
     /** Six distinct arms and multiple hull/faction doctrines fight simultaneously at 200v200. */
@@ -168,26 +173,28 @@ public final class MassBattleCampaignTest {
         }
         initiallyVisible(b,400,"200v200 combined-arms deployment");
         EnumSet<Battle.DamageType> visible=EnumSet.noneOf(Battle.DamageType.class);
-        boolean missiles=false,torpedoes=false,craft=false;
+        boolean missiles=false,torpedoes=false,kinetics=false,craft=false;
         int peakOrdnance=0,peakCraft=0;
         for(int tick=0;tick<steps;tick++){
             b.step();
             for(Battle.Beam effect:b.beams())visible.add(effect.type);
             for(Battle.Missile payload:b.missiles())if(payload.torpedo)torpedoes=true;else missiles=true;
-            peakOrdnance=Math.max(peakOrdnance,b.missiles().size());
+            kinetics|=!b.ballistics().isEmpty();
+            peakOrdnance=Math.max(peakOrdnance,b.missiles().size()+b.ballistics().size());
             peakCraft=Math.max(peakCraft,b.crafts().size());
             craft|=!b.crafts().isEmpty();
         }
         sane(b,"200v200 combined-arms "+steps);
         check(b.hitCount>0&&b.destructions>0,"mixed fleet must exchange lethal fire");
-        check(visible.contains(Battle.DamageType.LASER)&&visible.contains(Battle.DamageType.KINETIC)
+        check(visible.contains(Battle.DamageType.LASER)&&kinetics
                 &&visible.contains(Battle.DamageType.PLASMA)&&visible.contains(Battle.DamageType.PARTICLE),
-                "all directed energy and kinetic visible-shot effects in live mass engagement: "+visible);
+                "all energy beams and kinetic tracked payloads in live mass engagement: "+visible);
         check(missiles&&torpedoes,"mixed fleet must fire both ordnance classes");
         check(craft,"mixed fleet carrier or defensive drone should launch craft");
         System.out.println("PASS 200v200 combined arms: ticks="+steps+" hits="+b.hitCount
                 +" destroyed="+b.destructions+" peak-missiles="+peakOrdnance+" peak-craft="+peakCraft
-                +" visible-beam-types="+visible+" fingerprint="+Long.toHexString(b.fingerprint()));
+                +" visible-beam-types="+visible+" tracked-kinetics="+kinetics
+                +" fingerprint="+Long.toHexString(b.fingerprint()));
         return b.fingerprint();
     }
 
