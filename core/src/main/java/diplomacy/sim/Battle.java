@@ -32,6 +32,9 @@ public final class Battle {
         public final int id, team;
         public final Faction faction;
         public final String name;
+        /** Per-hull doctrine. POINT DEFENSE is independent of main gun fire orders. */
+        public BattleOrders.Orders orders=BattleOrders.DEFAULT;
+        public int lastTargetId;
         public Shipyard.Hull hullClass;
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
@@ -160,6 +163,9 @@ public final class Battle {
     private final List<VisualEvent> visualEvents=new ArrayList<>();
     private long nextVisualShotId=1, nextVisualSequence=1;
     private int nextId = 1;
+    private final BattleOrders.Orders[] teamOrders={
+            BattleOrders.DEFAULT,BattleOrders.DEFAULT
+    };
     private final long seed;
     public long tick;
     public int hitCount, missileIntercepts, ballisticIntercepts, destructions, environmentalHits;
@@ -181,6 +187,34 @@ public final class Battle {
     public List<String> events() { return Collections.unmodifiableList(events); }
     /** History allows renderers to catch up when more than one tick elapses per frame. */
     public List<VisualEvent> visualEvents() { return Collections.unmodifiableList(visualEvents); }
+    public BattleOrders.Orders teamOrders(int team) {
+        if(team<0||team>1)throw new IllegalArgumentException("Invalid team");
+        return teamOrders[team];
+    }
+    /**
+     * Team-wide edits update existing combatants and future fleet deployments.
+     * Later UI can edit individual ship orders with setShipOrders below.
+     */
+    public void setTeamOrders(int team,BattleOrders.Orders value) {
+        if(team<0||team>1||value==null)throw new IllegalArgumentException("Invalid fleet order");
+        teamOrders[team]=value;
+        for(Ship ship:ships)if(ship.team==team)ship.orders=value;
+    }
+    public void setShipOrders(int shipId,BattleOrders.Orders value) {
+        if(value==null)throw new IllegalArgumentException("Orders missing");
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship not found");
+        if(value.anchorShipId()!=0) {
+            Ship parent=findShip(value.anchorShipId());
+            if(parent==null||parent.team!=ship.team||parent.id==ship.id)
+                throw new IllegalArgumentException("Escort parent must be a different allied ship");
+        }
+        ship.orders=value;
+    }
+    public void setTeamPointDefense(int team,BattleOrders.PointDefense mode) {
+        if(mode==null)throw new IllegalArgumentException("PD mode missing");
+        setTeamOrders(team,teamOrders(team).withPointDefense(mode));
+    }
     private void visual(long shotId, VisualPhase phase, String weapon, int team,
                         int sourceId,int targetId,double x,double y,double tx,double ty) {
         visualEvents.add(new VisualEvent(nextVisualSequence++,shotId,tick,phase,weapon,
@@ -193,6 +227,7 @@ public final class Battle {
         if (team != 0 && team != 1) throw new IllegalArgumentException("Only two teams in the skirmish mode");
         Ship ship = new Ship(nextId++, team, faction, faction.name().substring(0, 3) + "-" + nextId);
         ship.x = x; ship.y = y; ship.facing = team == 0 ? 0 : Math.PI;
+        ship.orders=teamOrders[team];
         ships.add(ship); return ship;
     }
     /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
@@ -574,6 +609,7 @@ public final class Battle {
         // defensive attention. Threats are ranked by approximate time-to-range.
         for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
                 && defender.pointDefenseCondition>0.20 && defender.pdRange>0
+                && defender.orders.pointDefense().ordnance()
                 && defender.power>=1.5) {
             double radius=defender.pdRange*weather.sensorFactor();
             Missile chosenMissile=null;Ballistic chosenShell=null;
@@ -625,7 +661,8 @@ public final class Battle {
             }
         }
         for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
-                &&defender.pointDefenseCondition>0.20&&defender.pdRange>0&&defender.power>1.5){
+                &&defender.pointDefenseCondition>0.20&&defender.pdRange>0
+                &&defender.orders.pointDefense().craft()&&defender.power>1.5){
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
                 if(craft.team==defender.team || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>defender.pdRange*weather.sensorFactor())continue;
