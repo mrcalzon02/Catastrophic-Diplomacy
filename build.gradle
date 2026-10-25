@@ -16,7 +16,7 @@ def approvedUiOutput = layout.buildDirectory.dir('generated/cd-ui')
 tasks.register('prepareUiAssets') {
     inputs.files approvedUiParts
     inputs.file file('assets/ui/tactical/selected_manifest.json')
-    inputs.dir file('assets/ui/tactical/selected')
+    inputs.files fileTree('assets/ui/tactical/selected')
     outputs.dir approvedUiOutput
     doLast {
         approvedUiParts.each { if (!it.isFile()) throw new GradleException('Missing UI source part: ' + it.name) }
