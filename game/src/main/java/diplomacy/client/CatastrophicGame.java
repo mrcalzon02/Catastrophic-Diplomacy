@@ -14,6 +14,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleView;
+import diplomacy.sim.SpaceWeather;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
@@ -32,6 +33,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private WeaponBeamSprites weaponBeams;
     private ProceduralStarfield starfield;
     private int skyPreviewLevel = 1;
+    private boolean weatherEnabled = true;
     private Battle battle;
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
@@ -89,6 +91,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
+                if (key == Input.Keys.W) { weatherEnabled = !weatherEnabled; reset(); return true; }
                 if (key == Input.Keys.N) { previewSky(1); return true; }
                 if (key == Input.Keys.B) { previewSky(-1); return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
@@ -116,6 +119,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else if (world.x < 745) changeFaction(0);
                     else changeFaction(1);
                     return true;
+                }
+                // Weather toggle is touch-accessible; selecting a sky stays preview-only.
+                if (world.y >= 616 && world.y <= 649 && world.x >= 10 && world.x < 640) {
+                    weatherEnabled = !weatherEnabled; reset(); return true;
                 }
                 // On-device sky preview; does not restart or alter the active battle.
                 if (starfield != null && world.y >= 616 && world.y <= 649) {
@@ -219,6 +226,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void reset() {
         battle = Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
+        if (weatherEnabled) battle.configureWeather(SpaceWeather.forLevel(skyPreviewLevel));
         accumulator = 0;
         running = true;
     }
@@ -267,6 +275,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     (float)(ship.x-dx*23*scale),(float)(ship.y-dy*23*scale));
         }
         shapes.end();
+        drawWeatherOverlay();
         if (instanced == null) drawShipsFallback();
         else {
             try {
@@ -308,6 +317,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(0.045f, 0.075f, 0.15f, 0.88f);
             shapes.rect(1000, 616, 280, 33);
         }
+        shapes.setColor(0.045f, 0.075f, 0.15f, 0.88f);
+        shapes.rect(10, 616, 920, 33);
         shapes.end();
         batch.setProjectionMatrix(camera.combined); batch.begin();
         font.setColor(Color.WHITE);
@@ -324,6 +335,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,""+FLEET_SIZES[fleetIndex]+"v"+FLEET_SIZES[fleetIndex],1022,693);
         font.draw(batch,"+",1112,693);
         font.draw(batch,"SHIPYARD",1166,693);
+        font.setColor(Color.GOLD);
+        SpaceWeather.Preset skyCondition = battle.weather().preset();
+        String weatherName = skyCondition.enabled() ? skyCondition.primary().name().replace('_',' ') : "CLEAR";
+        if (skyCondition.secondary() != SpaceWeather.Kind.CLEAR)
+            weatherName += " + " + skyCondition.secondary().name().replace('_',' ');
+        font.draw(batch, "ENV " + (weatherEnabled ? "ON" : "OFF") + "  " + weatherName
+                + "   [W: TOGGLE]  [R: APPLY SKY]", 24, 638);
         font.setColor(Color.LIGHT_GRAY);
         if (starfield != null) {
             font.draw(batch, "<", 1016, 638);
@@ -340,6 +358,80 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     + " HOLDS THE FIELD", 330, 617);
         }
         batch.end();
+    }
+
+    /**
+     * Environmental warnings are world-space effects; no asteroid is a physics collider.
+     * A meteor is an approaching translucent marker and a short resolved impact flash.
+     */
+    private void drawWeatherOverlay() {
+        SpaceWeather weather = battle.weather();
+        if (!weather.preset().enabled()) return;
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA,GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.setProjectionMatrix(battleCamera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        if (weather.neutronActive()) {
+            double a = weather.neutronAngle();
+            float nx = (float)StrictMath.cos(a), ny = (float)StrictMath.sin(a);
+            float px = -ny, py = nx;
+            for (int stripe=-2; stripe<=2; stripe++) {
+                float d = stripe * 11f;
+                shapes.setColor(0.42f, 0.77f, 1f, stripe==0 ? 0.85f : 0.30f);
+                shapes.line((float)SpaceWeather.CENTER_X - nx * 1300 + px*d,
+                        (float)SpaceWeather.CENTER_Y - ny * 1300 + py*d,
+                        (float)SpaceWeather.CENTER_X + nx * 1300 + px*d,
+                        (float)SpaceWeather.CENTER_Y + ny * 1300 + py*d);
+            }
+        }
+        if (weather.solarActive()) {
+            for (int i=0; i<8; i++) {
+                float y = 75 + i * 83 + (float)StrictMath.sin(weather.tick()*0.055 + i)*18;
+                shapes.setColor(1f,0.46f,0.13f,0.22f);
+                shapes.line(0,y,1280,y+105);
+            }
+        }
+        if (weather.preset().includes(SpaceWeather.Kind.ION_STORM)) {
+            for (int i=0; i<5; i++) {
+                float x = 160 + i*238;
+                float y = 115 + (float)StrictMath.sin(weather.tick()*0.04+i*2)*90;
+                shapes.setColor(.25f,.91f,.99f,.18f);
+                shapes.line(x,y,x+54,y+22);
+                shapes.line(x+54,y+22,x+77,y-9);
+            }
+        }
+        for (SpaceWeather.Meteor meteor : weather.meteors()) {
+            float age = Math.max(0f,Math.min(1f,
+                    (weather.tick()-meteor.arrivalTick()) /
+                            (float)Math.max(1,meteor.strikeTick()-meteor.arrivalTick())));
+            float x = (float)meteor.x(),y = (float)meteor.y();
+            if (!meteor.resolved()) {
+                shapes.setColor(1f,.71f,.28f,.20f + age*.53f);
+                shapes.circle(x,y,(float)meteor.radius()+17*(1-age),18);
+            } else {
+                shapes.setColor(meteor.hit() ? 1f : .55f,
+                        meteor.hit() ? .48f : .68f,.30f,.62f);
+                shapes.circle(x,y,(float)meteor.radius()+8,18);
+            }
+        }
+        shapes.end();
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for (SpaceWeather.Meteor meteor : weather.meteors()) {
+            float age = Math.max(0f,Math.min(1f,
+                    (weather.tick()-meteor.arrivalTick()) /
+                            (float)Math.max(1,meteor.strikeTick()-meteor.arrivalTick())));
+            float opacity = meteor.resolved()
+                    ? Math.max(0f, (meteor.expiryTick()-weather.tick()) /
+                            (float)Math.max(1,meteor.expiryTick()-meteor.strikeTick()))
+                    : age;
+            shapes.setColor(meteor.resolved() && meteor.hit() ? 1f : .70f,
+                    meteor.resolved() && meteor.hit() ? .61f : .73f,.47f,.65f*opacity);
+            shapes.circle((float)meteor.x(),
+                    (float)meteor.y() - (meteor.resolved()?0:18*(1-age)),
+                    (float)meteor.radius()*(meteor.resolved()?1.45f:0.20f+age*0.80f),12);
+        }
+        shapes.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     /** World camera follows the active engagement; UI coordinates never move. */
