@@ -768,13 +768,11 @@ public final class Battle {
                 && defender.pointDefenseCondition>0.20 && defender.pdRange>0
                 && defender.orders.pointDefense().ordnance()
                 && defender.power>=1.5) {
-            double radius=defender.pdRange*weather.sensorFactor();
             Missile chosenMissile=null;Ballistic chosenShell=null;
             double quickest=Double.POSITIVE_INFINITY;
             for(Missile m:missiles){
                 if(m.team==defender.team)continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
-                if(distance>radius)continue;
                 double detection=ProjectileModel.acquisitionRange(
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         defender.pointDefenseProfile,m.spec);
@@ -787,7 +785,6 @@ public final class Battle {
             for(Ballistic p:ballistics){
                 if(p.team==defender.team)continue;
                 double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
-                if(distance>radius)continue;
                 double detection=ProjectileModel.acquisitionRange(
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         defender.pointDefenseProfile,p.spec);
