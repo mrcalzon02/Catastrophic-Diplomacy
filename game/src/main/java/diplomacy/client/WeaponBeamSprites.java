@@ -47,7 +47,9 @@ public final class WeaponBeamSprites implements Disposable {
     private Texture texture(Battle.Beam beam,long tick) {
         int color=color(beam);
         if(color<0)return null;
-        int frame=(int)((tick/3+color*2)%FRAMES);
+        // A fresh shot starts at its own first frame; never cycle from a global
+        // clock (which could make a new muzzle flash appear mid-animation).
+        int frame=(int)Math.min(FRAMES-1,Math.max(0,tick-beam.spawnTick));
         Texture selected=beams[color][frame];
         if(selected!=null)return selected;
         // A partial installation degrades to the first frame without producing blank shots.
