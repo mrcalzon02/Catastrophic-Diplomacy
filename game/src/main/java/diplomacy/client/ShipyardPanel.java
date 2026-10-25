@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.sim.ProjectileModel;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
@@ -355,6 +356,30 @@ final class ShipyardPanel {
                         "SCAN REACH %.0f u  |  SENSOR x%.2f",
                         Shipyard.pointDefenseRangeAt(draft,catalog,selectedSlot),
                         defense.detectionMultiplier()),342,137);
+            }else {
+                ModuleBranchEffects.Tuning tuning=Shipyard.tuningAt(draft,catalog,selectedSlot);
+                String kind=catalog.base(installed.component).subsystem;
+                String heading=switch(kind){
+                    case "REP" -> String.format(Locale.ROOT,
+                            "SELF REPAIR x%.2f  |  ALLY REPAIR x%.2f",
+                            tuning.selfRepair(),tuning.remoteRepair());
+                    case "SHD" -> String.format(Locale.ROOT,
+                            "SHIELD CHARGE x%.2f  |  TRANSFER RANGE x%.2f",
+                            tuning.shieldTransfer(),tuning.reach());
+                    case "DRN" -> tuning.remoteRepair()>1
+                            ?"SPECIALIST SERVICE / REPAIR DRONES"
+                            :"INTERCEPTOR / POINT DEFENSE DRONES";
+                    case "LAS","PLA","PAR" -> String.format(Locale.ROOT,
+                            "DAMAGE x%.2f  |  RANGE x%.2f",
+                            tuning.damage(),tuning.reach());
+                    default -> String.format(Locale.ROOT,
+                            "OUTPUT x%.2f  |  RANGE x%.2f",
+                            tuning.damage(),tuning.reach());
+                };
+                font.draw(batch,heading,342,158);
+                font.draw(batch,String.format(Locale.ROOT,
+                        "CYCLE x%.2f  TRACK x%.2f  EFFICIENCY x%.2f",
+                        tuning.cycle(),tuning.tracking(),tuning.supportEfficiency()),342,137);
             }
         }
         if(!artPreview && draft.slots()<=18){
