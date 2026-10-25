@@ -474,21 +474,41 @@ public final class Battle {
                         hit(target,9,findShip(craft.sourceId),DamageType.FIGHTER);
                 }
             } else {
-                Missile nearest=null;double range=150;
-                for(Missile missile:missiles)if(missile.team!=craft.team){
-                    double d=StrictMath.hypot(missile.x-craft.x,missile.y-craft.y);
-                    if(d<range){range=d;nearest=missile;}
+                Missile missileTarget=null;Ballistic shellTarget=null;
+                double nearest=150;
+                for(Missile m:missiles)if(m.team!=craft.team){
+                    double d=StrictMath.hypot(m.x-craft.x,m.y-craft.y);
+                    if(d<nearest){nearest=d;missileTarget=m;shellTarget=null;}
                 }
-                if(nearest!=null){
-                    double dx=nearest.x-craft.x,dy=nearest.y-craft.y;
-                    if(range>0){craft.x+=dx/range*205*DT;craft.y+=dy/range*205*DT;}
-                    if(range<28){
-                        nearest.integrity-=3;
-                        if(nearest.integrity<=0 && missiles.remove(nearest)){
-                            missileIntercepts++;
-                            visual(nearest.visualId,VisualPhase.INTERCEPT,
-                                    nearest.torpedo?"TORPEDO":"MISSILE",nearest.team,nearest.sourceId,
-                                    nearest.targetId,nearest.x,nearest.y,nearest.x,nearest.y);
+                for(Ballistic p:ballistics)if(p.team!=craft.team){
+                    double d=StrictMath.hypot(p.x-craft.x,p.y-craft.y);
+                    if(d<nearest){nearest=d;shellTarget=p;missileTarget=null;}
+                }
+                if(missileTarget!=null||shellTarget!=null){
+                    double x=missileTarget!=null?missileTarget.x:shellTarget.x;
+                    double y=missileTarget!=null?missileTarget.y:shellTarget.y;
+                    if(nearest>0){
+                        craft.x+=(x-craft.x)/nearest*205*DT;
+                        craft.y+=(y-craft.y)/nearest*205*DT;
+                    }
+                    if(StrictMath.hypot(x-craft.x,y-craft.y)<28){
+                        if(missileTarget!=null){
+                            missileTarget.integrity-=3;
+                            if(missileTarget.integrity<=0 && missiles.remove(missileTarget)){
+                                missileIntercepts++;
+                                visual(missileTarget.visualId,VisualPhase.INTERCEPT,
+                                        missileTarget.torpedo?"TORPEDO":"MISSILE",
+                                        missileTarget.team,missileTarget.sourceId,missileTarget.targetId,
+                                        missileTarget.x,missileTarget.y,missileTarget.x,missileTarget.y);
+                            }
+                        }else{
+                            shellTarget.integrity-=3;
+                            if(shellTarget.integrity<=0 && ballistics.remove(shellTarget)){
+                                ballisticIntercepts++;
+                                visual(shellTarget.visualId,VisualPhase.INTERCEPT,"KINETIC",
+                                        shellTarget.team,shellTarget.sourceId,shellTarget.targetId,
+                                        shellTarget.x,shellTarget.y,shellTarget.x,shellTarget.y);
+                            }
                         }
                         crafts.remove(i);
                     }
