@@ -1,4 +1,4 @@
-# Catastrophic Diplomacy tactical UI 1.0; 80px cells, zero-indexed col/row
+# Catastrophic Diplomacy tactical UI 1.0; 80px square, zero-indexed cols and rows
 back	0	0
 next	1	0
 restart	2	0
