@@ -29,6 +29,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private BitmapFont font;
     private InstancedShipRenderer instanced;
     private TerranPlaceholderSprites terranSprites;
+    private WeaponBeamSprites weaponBeams;
     private Battle battle;
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
@@ -53,6 +54,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
         terranSprites = new TerranPlaceholderSprites();
+        weaponBeams = new WeaponBeamSprites();
         font.getData().setScale(1.23f);
         try {
             instanced = new InstancedShipRenderer();
@@ -218,6 +220,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
         for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
         for (Battle.Beam beam : battle.beams()) {
+            if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
             shapes.setColor(switch(beam.type) {
                 case KINETIC -> Color.GOLD;
                 case PLASMA -> Color.ORANGE;
@@ -237,9 +240,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced == null) drawShipsFallback();
         else {
             try {
-                instanced.render(battle, battleCamera);
-                if(instanced.instances!=battle.alive(0)+battle.alive(1))
-                    throw new IllegalStateException("GPU instance count disagrees with living ships");
+                instanced.render(battle,battleCamera,ship -> terranSprites!=null && terranSprites.hasSprite(ship));
+                int expected=0;
+                for(Battle.Ship ship:battle.ships())
+                    if(ship.alive() && (terranSprites==null || !terranSprites.hasSprite(ship)))expected++;
+                if(instanced.instances!=expected)
+                    throw new IllegalStateException("GPU instance count disagrees with non-sprite ships");
             }
             catch (RuntimeException error) {
                 Gdx.app.error("GPU", "Switching to per-ship rendering", error);
@@ -248,10 +254,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         }
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
-        if(terranSprites!=null && terranSprites.loaded()>0) {
-            batch.setProjectionMatrix(battleCamera.combined);
-            terranSprites.render(battle,batch);
-        }
+        batch.setProjectionMatrix(battleCamera.combined);
+        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
+        if(weaponBeams!=null && weaponBeams.loaded()>0)weaponBeams.render(battle,batch);
         drawArmorDamage();
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -330,7 +335,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     private void drawShipsFallback() {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for (Battle.Ship s : battle.ships()) if (s.alive()) {
+        for (Battle.Ship s : battle.ships()) if (s.alive()
+                && (terranSprites==null||!terranSprites.hasSprite(s))) {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             float x = (float) s.x, y = (float) s.y;
             float scale=(float)s.visualScale();
@@ -346,6 +352,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     @Override public void dispose() {
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
+        if(weaponBeams!=null)weaponBeams.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }
