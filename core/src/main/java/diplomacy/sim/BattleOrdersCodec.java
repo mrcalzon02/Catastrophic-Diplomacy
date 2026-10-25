@@ -37,7 +37,13 @@ public final class BattleOrdersCodec {
         if(!MessageDigest.isEqual(digest(body).getBytes(StandardCharsets.US_ASCII),
                 lines[3].getBytes(StandardCharsets.US_ASCII)))
             throw new IllegalArgumentException("Orders checksum mismatch");
-        return new Pair(decodeOne(lines[1]),decodeOne(lines[2]));
+        BattleOrders.Orders left=decodeOne(lines[1]),right=decodeOne(lines[2]);
+        if(left.position()==BattleOrders.Position.ESCORT
+                ||left.position()==BattleOrders.Position.FORMATION
+                ||right.position()==BattleOrders.Position.ESCORT
+                ||right.position()==BattleOrders.Position.FORMATION)
+            throw new IllegalArgumentException("Fleet orders require anchor-free movement doctrine");
+        return new Pair(left,right);
     }
     private static BattleOrders.Orders decodeOne(String s){
         String[] p=s.split(",",-1);
