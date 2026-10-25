@@ -1,6 +1,7 @@
 package diplomacy.shipyard;
 
 import diplomacy.sim.Battle;
+import diplomacy.sim.ProjectileModel;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 import diplomacy.tech.TechnologyCatalog.Upgrade;
@@ -217,7 +218,11 @@ public final class Shipyard {
                          double pdRange, double damageControl,
                          double kineticDamage, double plasmaDamage, double particleDamage,
                          double torpedoDamage, double ecmStrength, int fighterCapacity,
-                         int droneCapacity, int magazineCapacity) { }
+                         int droneCapacity, int magazineCapacity,
+                         ProjectileModel.Spec kineticProjectile,
+                         ProjectileModel.Spec missileProjectile,
+                         ProjectileModel.Spec torpedoProjectile,
+                         ProjectileModel.Defense pointDefense) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -225,20 +230,47 @@ public final class Shipyard {
         double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0.001;
         double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
         int fighters=0,drones=0,magazines=0;
+        List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
+        List<ProjectileModel.Spec> missileModules=new ArrayList<>();
+        List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
+        double pdWeight=0,pdOutput=0,pdTracking=0,sensorRatio=1;
         for(Part p:fittedParts(design,catalog,new ArrayList<>())) {
             switch(p.base.subsystem) {
                 case "ARM" -> armor+=p.effect*2.0*p.integrity/p.base.integrity;
                 case "SHD" -> shields+=p.effect*2.6*p.shields;
                 case "SIF" -> sif+=p.effect*0.0065*p.integrity/p.base.integrity;
                 case "ENG" -> thrust+=p.effect*p.thrust;
-                case "KIN" -> kinetic+=p.effect*0.75*p.accuracy;
+                case "KIN" -> {
+                    kinetic+=p.effect*0.75*p.accuracy;
+                    kineticModules.add(ProjectileModel.module(design.faction,
+                            ProjectileModel.Kind.KINETIC,p.effect/p.base.effect,
+                            p.accuracy,p.integrity/p.base.integrity));
+                }
                 case "LAS" -> laser+=p.effect*0.78*p.accuracy;
                 case "PAR" -> particle+=p.effect*0.82*p.accuracy;
                 case "PLA" -> plasma+=p.effect*1.05*p.accuracy;
-                case "MSL" -> missile+=p.effect*3.1;
-                case "TOR" -> torpedo+=p.effect*5.4;
-                case "PD", "FLK" -> pd+=p.effect*2.8;
-                case "SEN" -> accuracy+=0.12*p.accuracy;
+                case "MSL" -> {
+                    missile+=p.effect*3.1;
+                    missileModules.add(ProjectileModel.module(design.faction,
+                            ProjectileModel.Kind.MISSILE,p.effect/p.base.effect,
+                            p.accuracy,p.integrity/p.base.integrity));
+                }
+                case "TOR" -> {
+                    torpedo+=p.effect*5.4;
+                    torpedoModules.add(ProjectileModel.module(design.faction,
+                            ProjectileModel.Kind.TORPEDO,p.effect/p.base.effect,
+                            p.accuracy,p.integrity/p.base.integrity));
+                }
+                case "PD", "FLK" -> {
+                    pd+=p.effect*2.8;
+                    pdWeight++;
+                    pdOutput+=p.effect/p.base.effect;
+                    pdTracking+=p.accuracy;
+                }
+                case "SEN" -> {
+                    accuracy+=0.12*p.accuracy;
+                    sensorRatio+=0.25*(p.accuracy-1);
+                }
                 case "REP" -> repair+=p.effect*0.0004;
                 case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
                 case "FTR" -> fighters+=2+(int)(p.effect/18.0);
@@ -254,7 +286,12 @@ public final class Shipyard {
                 110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
                 Math.max(9,mobility),Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
                 repair,kinetic,plasma,particle,torpedo,Math.min(0.65,ecm),
-                fighters,drones,magazines);
+                fighters,drones,magazines,
+                ProjectileModel.average(kineticModules,ProjectileModel.Kind.KINETIC),
+                ProjectileModel.average(missileModules,ProjectileModel.Kind.MISSILE),
+                ProjectileModel.average(torpedoModules,ProjectileModel.Kind.TORPEDO),
+                ProjectileModel.defense(pdWeight==0?1:pdOutput/pdWeight,
+                        pdWeight==0?1:pdTracking/pdWeight,sensorRatio));
     }
 
     /** Portable, deterministic blueprint text (no Java object deserialization). */
