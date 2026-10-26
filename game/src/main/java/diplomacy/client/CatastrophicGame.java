@@ -19,6 +19,7 @@ import diplomacy.sim.BattleView;
 import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
+import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
@@ -59,6 +60,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int campaignPage,selectedMission=1,activeMission;
     private int deployedAtLaunch,survivorsAtEnd;
     private CampaignEncounter campaignEncounter;
+    private CampaignDeployment.Loadout deployment=CampaignDeployment.defaultFor(LevelEconomy.level(1));
     private long lastReward;
     private boolean playedCampaign,lastWon;
     private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
@@ -156,6 +158,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
+                        else if(screen==GameMenuPanel.Screen.DEPLOYMENT)screen=GameMenuPanel.Screen.CAMPAIGN;
                         else screen=GameMenuPanel.Screen.HOME;
                         return true;
                     }
@@ -200,6 +203,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             selectScenario(values[Math.floorMod(scenario.ordinal()+step,values.length)]);
                             return true;
                         }
+                    }
+                    if(screen==GameMenuPanel.Screen.DEPLOYMENT){
+                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
+                            int delta=key==Input.Keys.LEFT?-1:1;
+                            deployment=deployment.withShips(delta,LevelEconomy.level(activeMission));
+                        }
+                        if(key==Input.Keys.UP||key==Input.Keys.DOWN){
+                            deployment=deployment.withFormation(key==Input.Keys.UP?-1:1);
+                        }
+                        if(key==Input.Keys.TAB||key==Input.Keys.S)shipyard.show();
+                        if(key==Input.Keys.ENTER)openDeployment();
+                        return true;
                     }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN){
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
@@ -370,20 +385,33 @@ public final class CatastrophicGame extends ApplicationAdapter {
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
-    private void launchCampaignMission(){
+    private void openDeployment(){
         if(campaign==null||!campaign.available(selectedMission))return;
         activeMission=selectedMission;
+        LevelEconomy.Level stage=LevelEconomy.level(activeMission);
+        left=campaign.faction();
+        if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
+        shipyard.sync(0,leftDesign);
+        deployment=CampaignDeployment.defaultFor(stage);
+        screen=GameMenuPanel.Screen.DEPLOYMENT;
+        Gdx.app.log("CD-GAME-FLOW","DEPLOYMENT "+activeMission);
+    }
+    private void launchCampaignMission(){
+        if(campaign==null||!campaign.available(activeMission))return;
+        if(screen!=GameMenuPanel.Screen.DEPLOYMENT&&screen!=GameMenuPanel.Screen.RESULTS)return;
         LevelEconomy.Level stage=LevelEconomy.level(activeMission);
         var node=CampaignMap.page(CampaignMap.pageOf(activeMission)).get((activeMission-1)%10);
         left=campaign.faction();right=node.opponent();
         if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
+        // The opposing fleet is authored by the mission, never by the shipyard editor.
         rightDesign=Shipyard.starter(right,stage.index()<15?
                 Shipyard.Hull.CORVETTE:stage.index()<75?Shipyard.Hull.FRIGATE:Shipyard.Hull.CRUISER);
         shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
-        deployedAtLaunch=Math.min(stage.maximumFleet(),4+(stage.index()-1)/2);
+        deployedAtLaunch=deployment.ships();
         battlefieldLevel=activeMission;
         playedCampaign=true;screen=GameMenuPanel.Screen.BATTLE;
         reset();
+        Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_BATTLE "+activeMission+" "+deployment.ships()+" "+deployment.formation());
     }
     private void finishEngagement(){
         lastWon=battle.alive(0)>0&&battle.alive(1)==0;
@@ -451,9 +479,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,35,35,165,50)){screen=GameMenuPanel.Screen.HOME;return;}
             if(GameMenuPanel.hit(x,y,214,35,136,50)){campaignPage=Math.max(0,campaignPage-1);selectedMission=campaignPage*10+1;return;}
             if(GameMenuPanel.hit(x,y,366,35,136,50)){campaignPage=Math.min(CampaignMap.PAGE_COUNT-1,campaignPage+1);selectedMission=campaignPage*10+1;return;}
-            if(GameMenuPanel.hit(x,y,964,35,278,50)){launchCampaignMission();return;}
+            if(GameMenuPanel.hit(x,y,964,35,278,50)){openDeployment();return;}
             int mission=GameMenuPanel.mapHit(x,y,campaignPage);
             if(mission>=1)selectedMission=mission;
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.DEPLOYMENT){
+            if(GameMenuPanel.hit(x,y,35,35,175,55)){
+                screen=GameMenuPanel.Screen.CAMPAIGN;return;
+            }
+            if(GameMenuPanel.hit(x,y,845,430,99,51)){
+                deployment=deployment.withShips(-1,LevelEconomy.level(activeMission));return;
+            }
+            if(GameMenuPanel.hit(x,y,1098,430,99,51)){
+                deployment=deployment.withShips(1,LevelEconomy.level(activeMission));return;
+            }
+            if(GameMenuPanel.hit(x,y,845,321,99,51)){
+                deployment=deployment.withFormation(-1);return;
+            }
+            if(GameMenuPanel.hit(x,y,1098,321,99,51)){
+                deployment=deployment.withFormation(1);return;
+            }
+            if(GameMenuPanel.hit(x,y,845,214,352,55)){shipyard.show();return;}
+            if(GameMenuPanel.hit(x,y,913,35,302,55)){launchCampaignMission();return;}
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -730,7 +778,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         if(verifyDemo)battle=DemonstrationBattle.create(technology);
         else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign) {
-            campaignEncounter=CampaignEncounter.start(activeMission,deployedAtLaunch,
+            campaignEncounter=CampaignEncounter.start(activeMission,deployment,
                     leftDesign,rightDesign,technology);
             battle=campaignEncounter.battle();
         }
@@ -768,7 +816,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             batch.setProjectionMatrix(camera.combined);
             if(shipyard.open())shipyard.draw(shapes,batch,font);
             else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,pendingFaction,
-                    FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,selectedMission,
+                    FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,
+                    screen==GameMenuPanel.Screen.DEPLOYMENT?activeMission:selectedMission,
+                    deployment,leftDesign.hull.name(),
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;
