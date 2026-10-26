@@ -265,3 +265,12 @@ tasks.register('ammunitionTypesSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.AmmunitionTableTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionTypesSmoke') }
+
+tasks.register('ammunitionResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Gate physical ammunition by each installed module research path/rank across all factions and real salvo loading.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionResearchTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionResearchSmoke') }
