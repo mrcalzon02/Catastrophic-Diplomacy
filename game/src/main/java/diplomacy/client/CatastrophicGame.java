@@ -149,7 +149,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel();
         if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
-        else{running=false;screen=GameMenuPanel.Screen.HOME;}
+        else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");}
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
@@ -352,6 +352,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         deployedAtLaunch=scenario==ScenarioCatalog.Preset.CUSTOM?
                 FLEET_SIZES[fleetIndex]:scenario.ships;
         reset();
+        Gdx.app.log("CD-GAME-FLOW","BATTLE "+scenario.name());
     }
     private void openCampaignSetup(){
         pendingFaction=campaign==null?left:campaign.faction();
@@ -394,7 +395,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             lastReward=campaign.credits()-before;
             saveCampaign();
         }
-        running=false;screen=GameMenuPanel.Screen.RESULTS;
+        running=false;screen=GameMenuPanel.Screen.RESULTS;Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
     }
     private void leaveResults(){
         if(playedCampaign){campaignPage=CampaignMap.pageOf(selectedMission);screen=GameMenuPanel.Screen.CAMPAIGN;}
@@ -405,7 +406,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             switch(GameMenuPanel.homeHit(x,y)){
                 case 0 -> showCampaign();
                 case 1 -> openCampaignSetup();
-                case 2 -> screen=GameMenuPanel.Screen.SKIRMISH;
+                case 2 -> {screen=GameMenuPanel.Screen.SKIRMISH;Gdx.app.log("CD-GAME-FLOW","SKIRMISH_SETUP");}
                 case 3 -> shipyard.show();
                 case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
                 case 5 -> Gdx.app.exit();
