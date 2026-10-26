@@ -7,6 +7,7 @@ on:
       - 'game/**'
       - 'android/**'
       - 'desktop/**'
+      - 'tools/package_desktop.py'
       - '.github/workflows/fighter-wings.yml'
   pull_request:
     paths:
@@ -14,6 +15,7 @@ on:
       - 'game/**'
       - 'android/**'
       - 'desktop/**'
+      - 'tools/package_desktop.py'
       - '.github/workflows/fighter-wings.yml'
 concurrency:
   group: fighter-wings-${{ github.event.pull_request.number || github.ref }}
@@ -37,8 +39,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Test fighter machinery and compile desktop client
-        run: gradle :core:fighterCraftSmoke :core:combatMachinerySmoke :game:menuFlowSmoke :game:classes :desktop:classes --no-daemon --stacktrace
+      - name: Test fighter machinery, menu navigation and compile installed desktop application
+        run: gradle :core:fighterCraftSmoke :core:combatMachinerySmoke :core:gameFlowSmoke :game:menuFlowSmoke :game:classes :desktop:installDist --no-daemon --stacktrace
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Package actual Windows/Linux executable and bundled Java 17 runtime
+        run: python tools/package_desktop.py
+      - name: Upload runnable desktop package and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-desktop-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            desktop/build/platform-packages/*.zip
+            desktop/build/platform-packages/*.sha256
+          if-no-files-found: error
+          retention-days: 30
 
   mass-battle:
     name: Mixed 200v200 every fighter weapon and replay
