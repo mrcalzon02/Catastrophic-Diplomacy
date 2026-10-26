@@ -130,10 +130,10 @@ public final class Shipyard {
     public static String factionId(Battle.Faction faction) {
         return switch(faction) {
             case TERRAN -> "TER"; case DRAXIAN -> "DRA"; case CARNELIAN -> "CAR";
-            case ZIPPLEDROW, UMBRA_FOUNDRY -> "ZIP";
-            case UZIPT, ZELTHAR_LUMINARI -> "UZI";
-            case MANDRALLY, AUREATE_SYNOD -> "MAN";
-            case VAERITH_PRISM -> "DRA"; case NYX_BIOLITH -> "CAR";
+            case ZIPPLEDROW -> "ZIP"; case UMBRA_FOUNDRY -> "UMB";
+            case UZIPT -> "UZI"; case ZELTHAR_LUMINARI -> "ZEL";
+            case MANDRALLY -> "MAN"; case AUREATE_SYNOD -> "AUR";
+            case VAERITH_PRISM -> "VAE"; case NYX_BIOLITH -> "NYX";
         };
     }
     public static Mount requiredMount(Component component) {
@@ -244,7 +244,8 @@ public final class Shipyard {
         if(reactors==0)errors.add("A reactor is required");
         if(engines==0)errors.add("An engine is required");
         if(radiators==0)errors.add("A radiator is required");
-        if(weapons==0)errors.add("At least one main weapon required");
+        // A hull may be an unarmed scout, transport or support vessel.
+        // Main batteries, point defense and fighter payloads require modules.
         if(mass>design.hull.massCapacity+1e-8)errors.add("Hull displacement exceeded");
         if(volume>design.hull.volumeCapacity+1e-8)errors.add("Hull internal volume exceeded");
         if(draw>generation+1e-8)errors.add("Insufficient reactor output");
@@ -281,14 +282,18 @@ public final class Shipyard {
                          ProjectileModel.Spec missileProjectile,
                          ProjectileModel.Spec torpedoProjectile,
                          ProjectileModel.Defense pointDefense,
-                         Weapons weapons,Support support,double pdCycle) { }
+                         Weapons weapons,Support support,double pdCycle,
+                         HullBaseline.Stats baseline) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
-        double hull=design.hull.baseHull,shields=0,armor=0,sif=0;
-        double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0.001;
+        HullBaseline.Stats baseline=HullBaseline.forHull(design.faction,design.hull);
+        double hull=baseline.structure(),shields=baseline.shields(),
+                armor=baseline.armor(),sif=0;
+        // Bare fitted hulls have no implicit repair module.
+        double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0;
         double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
-        int fighters=0,drones=0,magazines=0;
+        int fighters=baseline.fighterBay(),drones=0,magazines=0;
         List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
@@ -382,16 +387,22 @@ public final class Shipyard {
             }
             hull+=p.integrity*0.08;
         }
-        double mobility=(36+thrust*1.3)*design.hull.mobility*(1-0.35*report.mass()/design.hull.massCapacity);
-        double charge=Math.max(2,(report.generation()-report.demand())*0.36);
+        // Every hull can move and power essential avionics on its own.
+        // Engines/reactors improve this baseline; neither supplies a weapon.
+        double mobility=(36+thrust*1.3)*design.hull.mobility
+                *(1-0.35*report.mass()/design.hull.massCapacity);
+        double charge=baseline.powerRegen()
+                +Math.max(2,(report.generation()-report.demand())*0.36);
         for(int i=0;i<6;i++){
             ranges[i]=weaponCounts[i]==0?1:ranges[i]/weaponCounts[i];
             cycles[i]=weaponCounts[i]==0?1:cycles[i]/weaponCounts[i];
             trackers[i]=weaponCounts[i]==0?1:trackers[i]/weaponCounts[i];
         }
-        return new Fitted(hull,shields,armor,Math.min(0.75,sif),Math.max(40,report.generation()*0.95),
+        return new Fitted(hull,shields,armor,Math.min(0.75,sif),
+                baseline.power()+report.generation()*0.95,
                 110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
-                Math.max(9,mobility),Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
+                baseline.speed()+Math.max(0,mobility)*0.65,
+                Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
                 repair,kinetic,plasma,particle,torpedo,Math.min(0.65,ecm),
                 fighters,drones,magazines,
                 ProjectileModel.average(kineticModules,ProjectileModel.Kind.KINETIC),
@@ -405,7 +416,7 @@ public final class Shipyard {
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
                         repairDrones,droneRepair,droneEndurance,efficiency,
                         repairDroneCapacity),
-                pdWeight==0?1:pdCycle/pdWeight);
+                pdWeight==0?1:pdCycle/pdWeight,baseline);
     }
 
     /** Current exclusive research branch effect of one selected installed module. */
