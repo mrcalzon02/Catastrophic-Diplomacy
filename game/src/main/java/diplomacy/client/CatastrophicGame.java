@@ -157,7 +157,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         else screen=GameMenuPanel.Screen.HOME;
                         return true;
                     }
+                    if(screen==GameMenuPanel.Screen.HOME){
+                        if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_6)
+                            tapFrontEnd(610,512-(key-Input.Keys.NUM_1)*64);
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.OPTIONS){
+                        if(key==Input.Keys.U)audio.toggleMusic();
+                        if(key==Input.Keys.I)audio.toggleEffects();
+                        if(key==Input.Keys.K&&updateCheck!=null)updateCheck.run();
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.RESULTS){
+                        if(key==Input.Keys.R){
+                            if(playedCampaign)launchCampaignMission();else launchSkirmish();
+                        }else if(key==Input.Keys.ENTER)leaveResults();
+                        return true;
+                    }
                     if(screen==GameMenuPanel.Screen.SKIRMISH){
+                        if(key==Input.Keys.Q)changeFaction(0);
+                        if(key==Input.Keys.E)changeFaction(1);
+                        if(key==Input.Keys.LEFT_BRACKET)changeFleetSize(-1);
+                        if(key==Input.Keys.RIGHT_BRACKET)changeFleetSize(1);
+                        if(key==Input.Keys.S||key==Input.Keys.TAB)shipyard.show();
                         if(key==Input.Keys.ENTER){launchSkirmish();return true;}
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             int step=key==Input.Keys.UP?-1:1;
@@ -166,8 +188,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             return true;
                         }
                     }
-                    if(screen==GameMenuPanel.Screen.CAMPAIGN&&key==Input.Keys.ENTER){
-                        launchCampaignMission();return true;
+                    if(screen==GameMenuPanel.Screen.CAMPAIGN){
+                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
+                            selectedMission=Math.max(1,Math.min(LevelEconomy.LEVEL_COUNT,
+                                    selectedMission+(key==Input.Keys.LEFT?-1:1)));
+                            campaignPage=CampaignMap.pageOf(selectedMission);
+                        }
+                        if(key==Input.Keys.ENTER)launchCampaignMission();
+                        return true;
                     }
                     return true;
                 }
