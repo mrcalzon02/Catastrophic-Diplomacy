@@ -44,6 +44,33 @@ public final class GameMenuFlowTest {
         }
         check(GameMenuPanel.deploymentAction(605,480)==-1,
                 "Deployment preview area must not trigger a button");
+        check(GameMenuPanel.deploymentAction(1000,171)==7,
+                "Fleet order editor has no real touch target");
+        check(GameMenuPanel.Screen.valueOf("SHIP_ORDERS")!=null,
+                "Per-ship order editor state missing");
+        float[][] orderTargets={{890,555},{1140,555},{1000,484},{1000,412},
+                {1000,343},{1000,275},{1000,202},{1050,58}};
+        for(int i=0;i<orderTargets.length;i++){
+            float[] point=orderTargets[i];
+            check(GameMenuPanel.ordersAction(point[0],point[1])==i,
+                    "Per-ship queued command button unavailable: "+i);
+        }
+        var formation=new diplomacy.sim.CampaignDeployment.Loadout(8,
+                diplomacy.sim.CampaignDeployment.Formation.LINE);
+        for(int i=0;i<formation.ships();i++){
+            var point=formation.at(i);
+            check(GameMenuPanel.shipHit(GameMenuPanel.placementUiX(point.x()),
+                    GameMenuPanel.placementUiY(point.y()),formation,false)==i,
+                    "Ship not selectable on drag-and-place canvas: "+i);
+            check(GameMenuPanel.shipHit(GameMenuPanel.ordersUiX(point.x()),
+                    GameMenuPanel.ordersUiY(point.y()),formation,true)==i,
+                    "Ship not selectable in its command plan: "+i);
+        }
+        check(Math.abs(GameMenuPanel.placementWorldX(GameMenuPanel.placementUiX(280))-280)<.01,
+                "Deployment drag projection has no accurate inverse");
+        check(Math.abs(GameMenuPanel.ordersWorldY(GameMenuPanel.ordersUiY(540))-540)<.01,
+                "Waypoint projection inverse failed");
+
         for(int page=0;page<CampaignMap.PAGE_COUNT;page++)
             for(var node:CampaignMap.page(page))
                 check(GameMenuPanel.mapHit(node.x(),node.y(),page)==node.level(),
