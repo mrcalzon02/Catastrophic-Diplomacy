@@ -201,7 +201,7 @@ jobs:
             release/release-manifest.json release/SHA256SUMS.txt \
             release/signature-verification.txt release/package-identity.txt \
             --repo "$GH_REPO" --target "$GITHUB_SHA" \
-            --title "Catastrophic Diplomacy 0.1.2 RC1 — signed Android 200v200" \
+            --title "Catastrophic Diplomacy 0.1.3 RC1 — integrated Android 200v200" \
             --prerelease \
             --notes "Cryptographically signed 200v200 Android release candidate. This is a published PRERELEASE, not a stable or Play Store release. Headless combat, six fighter classes, per-module research, hull repair and shield/drone support, and prerelease-updater policy pass CI. The debug 200v200 simulation and signed-release startup passed Android emulator verification; physical-device install, same-signer upgrade/save retention, and hardware graphics quality remain outstanding. Existing runtime curated weapon VFX binaries are not certified. No production/Play approval is implied."
           echo "PASS: signed Android prerelease published after functional emulator evidence"
