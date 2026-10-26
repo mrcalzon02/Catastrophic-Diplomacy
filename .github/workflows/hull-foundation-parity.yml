@@ -1,0 +1,35 @@
+name: Physical hulls and all-race module parity
+on:
+  push:
+    branches: ['feature/hull-baselines-faction-technology-20261025']
+  pull_request:
+    paths:
+      - 'core/src/**'
+      - 'core/build.gradle'
+      - 'game/src/**'
+      - '.github/workflows/hull-foundation-parity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  engineering:
+    name: Eleven races and player/AI equipment parity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Run full native technology, physical hull and combat suites
+        run: |
+          gradle --no-daemon --stacktrace \
+            :core:technologySmoke :core:shipyardSmoke \
+            :core:hullFoundationSmoke :core:alienFactionSmoke \
+            :core:moduleResearchSmoke :core:projectileModuleSmoke \
+            :core:supportSystemsSmoke :core:fighterCraftSmoke \
+            :core:massBattleCampaign :game:classes :desktop:classes
