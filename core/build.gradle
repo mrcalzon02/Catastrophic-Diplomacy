@@ -300,3 +300,12 @@ tasks.register('updaterPolicySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('updaterPolicySmoke')) }
+
+tasks.register('gameFlowSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check playable skirmish fixtures, campaign map nodes, save recovery and rewards.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.GameFlowTest'
+    dependsOn testClasses
+}
+tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
