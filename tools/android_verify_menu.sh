@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Functional signed-APK navigation acceptance, not a cosmetic pixel-perfect test.
-# Real taps must lead normal menu -> skirmish combat AND new campaign -> deployment -> multiwave combat.
+# Actual taps: free-placed skirmish hull + individual orders, then full campaign route.
 set -euo pipefail
 report="${1:-test-output/android}"
 mkdir -p "$report"
@@ -11,10 +11,9 @@ capture(){
 }
 # FitViewport(1280x720) maps our virtual UI into the actual landscape surface.
 # Decode only the 24-byte PNG header; no OCR or image matching heuristics.
-touch_ui(){
+map_ui(){
   local frame="$1" uix="$2" uiy="$3"
-  local point
-  point="$(python3 - "$report/$frame.png" "$uix" "$uiy" <<'PY'
+  python3 - "$report/$frame.png" "$uix" "$uiy" <<'PY'
 import struct,sys
 with open(sys.argv[1],'rb') as png:
     header=png.read(24)
@@ -25,9 +24,17 @@ ox=(w-1280*scale)/2
 oy=(h-720*scale)/2
 print(round(ox+float(sys.argv[2])*scale),round(h-oy-float(sys.argv[3])*scale))
 PY
-)"
-  read -r x y <<< "$point"
+}
+touch_ui(){
+  local x y
+  read -r x y <<< "$(map_ui "$1" "$2" "$3")"
   adb shell input tap "$x" "$y"
+}
+swipe_ui(){
+  local from_x from_y to_x to_y
+  read -r from_x from_y <<< "$(map_ui "$1" "$2" "$3")"
+  read -r to_x to_y <<< "$(map_ui "$1" "$4" "$5")"
+  adb shell input swipe "$from_x" "$from_y" "$to_x" "$to_y" 520
 }
 assert_step(){
   adb logcat -d -v time > "$report/signed-menu-logcat.txt"
@@ -53,6 +60,30 @@ sleep 3
 capture skirmish-menu
 assert_step SKIRMISH_SETUP
 touch_ui skirmish-menu 1107 60
+sleep 3
+capture skirmish-deployment
+assert_step 'SKIRMISH_DEPLOYMENT CUSTOM'
+# Drag a real hull to a different valid coordinate, not an icon-only gesture.
+touch_ui skirmish-deployment 500 319
+swipe_ui skirmish-deployment 500 319 180 334
+sleep 2
+capture skirmish-placement
+assert_step 'PLACED ship=1'
+# Program three ordered commands for that individual vessel.
+touch_ui skirmish-placement 1000 171
+sleep 2
+capture skirmish-ship-orders
+touch_ui skirmish-ship-orders 1000 484
+touch_ui skirmish-ship-orders 620 370
+touch_ui skirmish-ship-orders 1000 413
+touch_ui skirmish-ship-orders 1000 344
+sleep 2
+capture skirmish-orders-programmed
+assert_step 'ORDER ship=1 count=3 command=ENGAGE'
+touch_ui skirmish-orders-programmed 1050 60
+sleep 1
+capture skirmish-ready
+touch_ui skirmish-ready 1050 62
 sleep 6
 capture skirmish-battle
 assert_step 'BATTLE CUSTOM'
@@ -96,4 +127,4 @@ touch_ui campaign-deployment-configured 1050 62
 sleep 5
 capture campaign-battle
 assert_step 'CAMPAIGN_BATTLE 1 5 WEDGE'
-echo "PASS: signed APK functional flow: main -> skirmish battle, faction -> map -> five-ship wedge deployment -> multiwave campaign battle."
+echo "PASS: signed APK real skirmish hull drag + three individual queued commands, and campaign five-ship wedge -> multiwave combat."
