@@ -145,8 +145,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel();
-        reset();
-        if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;}
+        if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
         else{running=false;screen=GameMenuPanel.Screen.HOME;}
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
@@ -673,6 +672,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void reset() {
+        // Menus and the shipyard must not instantiate a combat sandbox on startup.
+        if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE)return;
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         if(verifyDemo)battle=DemonstrationBattle.create(technology);
         else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign)
@@ -698,13 +699,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     @Override public void render() {
         if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished())finishEngagement();
-        if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+        if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE){
             Gdx.gl.glClearColor(.018f,.029f,.064f,1);
             Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
             viewport.apply();camera.update();
             shapes.setProjectionMatrix(camera.combined);
             batch.setProjectionMatrix(camera.combined);
-            menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
+            if(shipyard.open())shipyard.draw(shapes,batch,font);
+            else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,selectedMission,
                     audio.musicEnabled(),audio.effectsEnabled(),lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
