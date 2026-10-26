@@ -16,8 +16,7 @@ adb logcat -c
 adb shell am start -W -n "$package/$activity" --ez cd.verify_200v200 true
 # Capture a real framebuffer early, and again after the weapon proving ground runs.
 sleep 6
-adb shell screencap -p /sdcard/cd-early.png
-adb pull /sdcard/cd-early.png "$report/early.png" >/dev/null
+adb exec-out screencap -p > "$report/early.png"
 completed=0
 for attempt in $(seq 1 75); do
     adb logcat -d -v time > "$report/logcat.txt"
@@ -44,8 +43,7 @@ if (( !completed )); then
     echo "FAIL: 200v200 proof never completed within timeout" >&2
     exit 1
 fi
-adb shell screencap -p /sdcard/cd-late.png
-adb pull /sdcard/cd-late.png "$report/late.png" >/dev/null
+adb exec-out screencap -p > "$report/late.png"
 test "$(wc -c < "$report/early.png")" -gt 2000
 test "$(wc -c < "$report/late.png")" -gt 2000
 if cmp -s "$report/early.png" "$report/late.png"; then
