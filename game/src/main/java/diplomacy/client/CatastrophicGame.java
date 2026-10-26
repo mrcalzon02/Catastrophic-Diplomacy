@@ -55,6 +55,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private CampaignProgress.State campaign;
+    private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
     private int deployedAtLaunch,survivorsAtEnd;
     private CampaignEncounter campaignEncounter;
@@ -174,6 +175,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.R){
                             if(playedCampaign)launchCampaignMission();else launchSkirmish();
                         }else if(key==Input.Keys.ENTER)leaveResults();
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
+                        if(key==Input.Keys.ENTER){newCampaign();return true;}
+                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT||
+                                key==Input.Keys.UP||key==Input.Keys.DOWN){
+                            Battle.Faction[] choices=Battle.Faction.values();
+                            int delta=(key==Input.Keys.RIGHT||key==Input.Keys.DOWN)?1:-1;
+                            pendingFaction=choices[Math.floorMod(pendingFaction.ordinal()+delta,choices.length)];
+                        }
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.SKIRMISH){
@@ -342,14 +353,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 FLEET_SIZES[fleetIndex]:scenario.ships;
         reset();
     }
+    private void openCampaignSetup(){
+        pendingFaction=campaign==null?left:campaign.faction();
+        screen=GameMenuPanel.Screen.CAMPAIGN_SETUP;
+    }
     private void newCampaign(){
-        campaign=CampaignProgress.start(left);
+        campaign=CampaignProgress.start(pendingFaction);
         saveCampaign();
         campaignPage=0;selectedMission=1;
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
     private void showCampaign(){
-        if(campaign==null){newCampaign();return;}
+        if(campaign==null){openCampaignSetup();return;}
         selectedMission=campaign.unlocked();
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
@@ -389,12 +404,23 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(screen==GameMenuPanel.Screen.HOME){
             switch(GameMenuPanel.homeHit(x,y)){
                 case 0 -> showCampaign();
-                case 1 -> newCampaign();
+                case 1 -> openCampaignSetup();
                 case 2 -> screen=GameMenuPanel.Screen.SKIRMISH;
                 case 3 -> shipyard.show();
                 case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
                 case 5 -> Gdx.app.exit();
             }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
+            if(GameMenuPanel.hit(x,y,80,35,230,54)){
+                screen=GameMenuPanel.Screen.HOME;return;
+            }
+            if(GameMenuPanel.hit(x,y,892,35,308,54)){
+                newCampaign();return;
+            }
+            Battle.Faction selected=GameMenuPanel.factionHit(x,y);
+            if(selected!=null)pendingFaction=selected;
             return;
         }
         if(screen==GameMenuPanel.Screen.SKIRMISH){
@@ -740,7 +766,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setProjectionMatrix(camera.combined);
             batch.setProjectionMatrix(camera.combined);
             if(shipyard.open())shipyard.draw(shapes,batch,font);
-            else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
+            else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,pendingFaction,
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,selectedMission,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
