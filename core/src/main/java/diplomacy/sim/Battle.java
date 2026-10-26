@@ -51,6 +51,14 @@ public final class Battle {
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
+        /** Manned hulls have NO intrinsic complement; berths/oxygen are installed. */
+        public double crewCount;
+        public int crewRequired, crewBerths, lifeSupport;
+        public boolean fittedCrewSystems;
+        public double crewReadiness(){
+            if(!fittedCrewSystems)return 1; // legacy unfitted simulation fixtures
+            return Math.max(0,Math.min(1,crewCount/Math.max(1,crewRequired)));
+        }
         /** Ship hull sensor and cross-section, independent from fitted scanner modules. */
         public double sensorRange=1100, radarCrossSection=1;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
@@ -99,7 +107,8 @@ public final class Battle {
         /** Visible top-down hull scale; larger fitted capital hulls read as larger ships. */
         public double visualScale() { return Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0))); }
         public double combatReadiness() {
-            return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition);
+            return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition)
+                    * crewReadiness();
         }
         public String status() {
             return String.format(Locale.ROOT, "%s hull=%.0f shield=%.0f armor=%.0f heat=%.0f",
@@ -334,6 +343,11 @@ public final class Battle {
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
+        s.fittedCrewSystems=true;
+        s.crewRequired=machinery.crew().minimum();
+        s.crewBerths=machinery.crew().berths();
+        s.lifeSupport=machinery.crew().lifeSupport();
+        s.crewCount=Math.min(s.crewBerths,s.lifeSupport);
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
         s.sensorRange=machinery.baseline().sensorRange();
         s.radarCrossSection=machinery.baseline().radarCrossSection();
@@ -449,7 +463,8 @@ public final class Battle {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
                     double heading = s.team == 0 ? 1 : -1;
-                    s.vx += (heading * s.speed * s.engineCondition * 0.38 - s.vx) * 0.055;
+                    s.vx += (heading * s.speed * s.engineCondition
+                            * s.crewReadiness() * 0.38 - s.vx) * 0.055;
                 }
                 s.x += s.vx * DT; s.y += s.vy * DT;
             }
@@ -463,7 +478,8 @@ public final class Battle {
 
     private void replenish(Ship s) {
         s.power = Math.max(0, Math.min(s.maxPower * s.reactorCondition,
-                s.power + s.powerRegen * DT * s.reactorCondition - weather.powerDrainPerSecond() * DT));
+                s.power + s.powerRegen * DT * s.reactorCondition
+                        * s.crewReadiness() - weather.powerDrainPerSecond() * DT));
         s.heat = Math.max(0, s.heat + (s.passiveHeat + weather.heatPerSecond()
                 - s.coolingRate * s.coolingCondition * weather.coolingFactor()) * DT);
         // Regenerate individual shield facings, subject to cooldown, reactor and power headroom.
@@ -574,7 +590,7 @@ public final class Battle {
         if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
-        double thrust = s.speed * s.engineCondition;
+        double thrust = s.speed * s.engineCondition * s.crewReadiness();
         double desiredVx = StrictMath.cos(s.facing) * thrust, desiredVy = StrictMath.sin(s.facing) * thrust;
         double smoothing = Math.min(1, 1.6 * DT);
         s.vx += (desiredVx - s.vx) * smoothing;
@@ -633,7 +649,7 @@ public final class Battle {
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
         double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
         ship.facing=wrap(ship.facing+change);
-        double velocity=ship.speed*ship.engineCondition;
+        double velocity=ship.speed*ship.engineCondition*ship.crewReadiness();
         double smooth=Math.min(1,1.6*DT);
         ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
         ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
@@ -641,8 +657,10 @@ public final class Battle {
     }
 
     private void fire(Ship s, Ship target) {
+        if(s.crewReadiness()<0.05)return; // no operator, no weapons fire
         double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
-        double lock = Math.max(0, 1 - distance / Math.max(1,s.sensorRange)) * s.sensorsCondition
+        double lock = Math.max(0, 1 - distance / Math.max(1,s.sensorRange))
+                * s.crewReadiness() * s.sensorsCondition
                 * weather.sensorFactor() * (1 - target.ecmStrength*target.ecmCondition);
         double weatherAim = weather.accuracyFactor();
         if (s.laserDamage > 0 && distance < 530*s.weapons.laserRange() && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
@@ -753,6 +771,7 @@ public final class Battle {
         if(tick%6!=0)return;
         double seconds=6*DT;
         for(Ship source:ships)if(source.alive()&&source.reactorCondition>0.15
+                &&source.crewReadiness()>=0.05
                 &&source.heat<source.maxHeat*0.93) {
             Shipyard.Support support=source.support;
             if(support.remoteRepairRate()>0&&source.power>6) {
@@ -786,7 +805,8 @@ public final class Battle {
     }
 
     private void launchAuxiliary(Ship ship, Ship enemy) {
-        if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
+        if(ship.crewReadiness()<0.05 || ship.hangarCondition<0.20
+                || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
         if(enemy!=null && ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
@@ -1097,6 +1117,7 @@ public final class Battle {
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
         for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
+                && defender.crewReadiness()>=0.05
                 && defender.pointDefenseCondition>0.20 && defender.pdRange>0
                 && defender.orders.pointDefense().ordnance()
                 && defender.power>=1.5) {
@@ -1167,6 +1188,7 @@ public final class Battle {
             }
         }
         for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
+                &&defender.crewReadiness()>=0.05
                 &&defender.pointDefenseCondition>0.20&&defender.pdRange>0
                 &&defender.orders.pointDefense().craft()&&defender.power>1.5){
             for(int i=crafts.size()-1;i>=0;i--) {
@@ -1274,6 +1296,12 @@ public final class Battle {
             damage -= fieldAbsorb;
         }
         defender.hull -= damage;
+        if(defender.fittedCrewSystems){
+            // Penetrating hits may kill personnel or disrupt occupied decks.
+            // No random free crew is conjured when shields subsequently recharge.
+            defender.crewCount=Math.max(0,defender.crewCount
+                    -damage/Math.max(1,defender.maxHull)*defender.crewRequired*0.38);
+        }
         if(kind==DamageType.PARTICLE){
             defender.power=Math.max(0,defender.power-damage*0.45);
             defender.sensorsCondition=Math.max(0,defender.sensorsCondition-damage/defender.maxHull*0.15);
@@ -1322,6 +1350,7 @@ public final class Battle {
             hash = mix(hash, s.id); hash = mix(hash, Double.doubleToLongBits(s.x));
             hash = mix(hash, Double.doubleToLongBits(s.y));
             hash = mix(hash, Double.doubleToLongBits(s.hull));
+            hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));
             hash = mix(hash,s.defense.fingerprint());

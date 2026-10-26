@@ -61,7 +61,7 @@ public final class TechnologyCatalog {
             mass = positive(row.get(6)); power = positive(row.get(7));
             heat = positive(row.get(8)); integrity = positive(row.get(9));
             industryCost = integer(row.get(10), "component cost"); effect = positive(row.get(11));
-            if (!FACTIONS.contains(faction) || !Set.of("weapons", "defense", "systems", "support").contains(category)
+            if (!FACTIONS.contains(faction) || !Set.of("weapons", "defense", "systems", "support", "habitat").contains(category)
                     || !id.equals("BASE-" + faction + "-" + subsystem) || name.isBlank()
                     || industryCost <= 0) throw new IllegalArgumentException("Invalid base component: " + id);
         }
@@ -97,7 +97,10 @@ public final class TechnologyCatalog {
         if (upgradeStream == null || componentStream == null) throw new IllegalArgumentException("Both inputs required");
         List<List<String>> bases = readCsv(componentStream, 13);
         List<List<String>> rows = readCsv(upgradeStream, COLS);
-        if(includeNewCivilizations)expandNativeFactions(bases,rows);
+        if(includeNewCivilizations){
+            expandNativeFactions(bases,rows);
+            addHabitatFamilies(bases,rows);
+        }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
                 || !rows.get(0).get(6).equals("Prerequisite ID") || !rows.get(0).get(19).equals("Tradeoff"))
@@ -189,6 +192,64 @@ public final class TechnologyCatalog {
                         1+(f.integrity-1)*0.12));
                 row.set(19,f.name+" branch: "+row.get(19));
                 upgrades.add(row);
+            }
+        }
+    }
+
+    /**
+     * Dedicated habitat modules are not native crew capacity. The two new
+     * append-only HABITAT sockets require actual installed accommodation AND
+     * life support, with independent per-module research for all 11 races.
+     * Older six-race CSV files remain stable for blueprint compatibility.
+     */
+    private static void addHabitatFamilies(List<List<String>> bases,List<List<String>> upgrades){
+        String[][] families={
+            {"TER","Terran"},{"DRA","Draxian"},{"CAR","Carnelian"},
+            {"ZIP","Zippledrow"},{"UZI","Uzipt"},{"MAN","Mandrally"},
+            {"VAE","Vaerith"},{"ZEL","Zelthar"},{"AUR","Aureate"},
+            {"NYX","Nyx"},{"UMB","Umbra"}
+        };
+        String[][] modules={
+            {"CRW","Crew Accommodation","1.20","0.80","0.32","17.5","2.05"},
+            {"LFS","Life Support","1.15","0.90","0.38","16.0","2.12"}
+        };
+        String[] paths={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
+        String[] grades={"Primitive","Refined","Advanced","Masterwork","Exotic","Transcendent"};
+        for(String[] family:families)for(String[] module:modules){
+            String id=family[0],subsystem=module[0];
+            String baseId="BASE-"+id+"-"+subsystem;
+            double nativeVariation=1.0+((id.charAt(0)+id.charAt(1))%7-3)*0.008;
+            String output=ratio(Double.parseDouble(module[6]),nativeVariation);
+            bases.add(List.of(baseId,id,subsystem,family[1]+" "+module[1],
+                    "habitat","Manned fleet operations require explicit accommodation and oxygen support",
+                    module[2],module[3],module[4],module[5],"120",output,
+                    "Provides no weapon or crew unless physically mounted"));
+            for(String branch:paths)for(int rank=1;rank<=6;rank++){
+                String level=String.format(Locale.ROOT,"%02d",rank);
+                String techId="TECH-"+id+"-"+subsystem+"-"+branch+"-"+level;
+                String parent=rank==1?baseId:"TECH-"+id+"-"+subsystem+"-"+branch+"-"+
+                        String.format(Locale.ROOT,"%02d",rank-1);
+                double outputBoost=switch(branch){
+                    case "OUTPUT" -> 1+0.045*rank;
+                    case "EFFICIENCY" -> 1;
+                    case "RESILIENCE" -> 1+0.012*rank;
+                    default -> 1+0.025*rank;
+                };
+                double mass=switch(branch){
+                    case "EFFICIENCY" -> 1-0.020*rank;
+                    case "RESILIENCE" -> 1+0.025*rank;
+                    default -> 1+0.008*rank;
+                };
+                double power=branch.equals("EFFICIENCY")?1-0.035*rank:1+0.014*rank;
+                double integrity=branch.equals("RESILIENCE")?1+0.045*rank:1;
+                upgrades.add(List.of(techId,id,subsystem,branch,level,
+                        family[1]+" "+module[1]+" — "+branch+" "+grades[rank-1],
+                        parent,Integer.toString(115*rank*rank),
+                        Integer.toString(100*rank),ratio(mass,1),ratio(power,1),
+                        ratio(branch.equals("EFFICIENCY")?1-0.026*rank:1+0.012*rank,1),
+                        ratio(outputBoost,1),"1.0",ratio(integrity,1),
+                        "1.0","1.0","1.0",ratio(1+0.016*rank,1),
+                        branch+" improves a physical habitat module with costs and tradeoffs"));
             }
         }
     }

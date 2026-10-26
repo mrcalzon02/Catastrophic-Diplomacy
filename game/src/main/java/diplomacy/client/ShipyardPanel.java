@@ -249,6 +249,7 @@ final class ShipyardPanel {
             case WEAPON -> Color.ORANGE;
             case DEFENSE -> Color.GREEN;
             case SUPPORT -> Color.VIOLET;
+            case HABITAT -> Color.SKY;
         };
     }
     /** Display-only category lookup; does not grant or change any module behavior. */
@@ -272,6 +273,7 @@ final class ShipyardPanel {
             case WEAPON -> "weapons";
             case DEFENSE -> "shield";
             case SUPPORT -> "repair";
+            case HABITAT -> "shield";
         };
     }
     private static int count(List<Shipyard.Slot> slots,Shipyard.Mount mount){
@@ -377,7 +379,8 @@ final class ShipyardPanel {
         font.draw(batch,"SYS "+count(layout,Shipyard.Mount.SYSTEM)+
                 "  WPN "+count(layout,Shipyard.Mount.WEAPON)+
                 "  DEF "+count(layout,Shipyard.Mount.DEFENSE)+
-                "  SUP "+count(layout,Shipyard.Mount.SUPPORT),343,100);
+                "  SUP "+count(layout,Shipyard.Mount.SUPPORT)+
+                "  HAB "+count(layout,Shipyard.Mount.HABITAT),343,100);
         if(installed!=null){
             ProjectileModel.Spec projectile=Shipyard.projectileAt(draft,catalog,selectedSlot);
             ProjectileModel.Defense defense=Shipyard.defenseAt(draft,catalog,selectedSlot);
