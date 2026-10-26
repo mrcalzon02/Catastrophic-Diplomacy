@@ -1,0 +1,36 @@
+name: Alien faction sprite integrity and 200v200
+on:
+  pull_request:
+    paths:
+      - 'assets/ships/factions/**'
+      - 'tools/install_alien_fleets.py'
+      - 'tools/verify_faction_ship_assets.py'
+      - 'core/src/main/java/diplomacy/shipyard/FactionArt.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
+      - '.github/workflows/alien-faction-art.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  art-integrity:
+    name: Require 50 committed original PNGs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all five fleets are physically present, transparent and unchanged
+        run: python3 tools/verify_faction_ship_assets.py
+  combat-regression:
+    name: Playable new factions and 200v200 headless regression
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Exercise all 11 faction loadouts, art identity, fighters and 400 ship fleet
+        run: gradle --no-daemon :core:alienFactionSmoke :core:massBattleSmoke :game:classes :desktop:classes

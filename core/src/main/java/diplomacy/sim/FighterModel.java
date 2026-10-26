@@ -76,11 +76,11 @@ public final class FighterModel {
         double speedRatio=1,defenseRatio=1,crossRatio=1,emissionRatio=1,sensorRatio=1;
         switch(faction) {
             case TERRAN -> {}
-            case DRAXIAN -> {defenseRatio=1.12;emissionRatio=1.06;}
-            case CARNELIAN -> {speedRatio=0.87;defenseRatio=1.3;crossRatio=1.20;}
-            case ZIPPLEDROW -> {speedRatio=1.17;defenseRatio=0.82;crossRatio=0.8;}
-            case UZIPT -> {speedRatio=1.08;sensorRatio=1.22;emissionRatio=0.8;}
-            case MANDRALLY -> {defenseRatio=1.16;emissionRatio=0.78;}
+            case DRAXIAN, VAERITH_PRISM -> {defenseRatio=1.12;emissionRatio=1.06;}
+            case CARNELIAN, NYX_BIOLITH -> {speedRatio=0.87;defenseRatio=1.3;crossRatio=1.20;}
+            case ZIPPLEDROW, UMBRA_FOUNDRY -> {speedRatio=1.17;defenseRatio=0.82;crossRatio=0.8;}
+            case UZIPT, ZELTHAR_LUMINARI -> {speedRatio=1.08;sensorRatio=1.22;emissionRatio=0.8;}
+            case MANDRALLY, AUREATE_SYNOD -> {defenseRatio=1.16;emissionRatio=0.78;}
         }
         return new Profile(hull,weapon,hp*defenseRatio,armor*defenseRatio,
                 speed*speedRatio,sensors*sensorRatio,cross*crossRatio,

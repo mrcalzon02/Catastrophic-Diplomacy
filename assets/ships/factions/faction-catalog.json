@@ -1,0 +1,62 @@
+{
+  "schema": "catastrophic-diplomacy-faction-art-v1",
+  "status": "import-required: sprites bundled in separately preserved checksum-verified archive, not yet committed as binaries",
+  "source_bundle": "Catastrophic_Diplomacy_50_Alien_Ship_Sprites_20261025.zip",
+  "slicing_method": "nearest-alpha64-component partition of 10 independent silhouettes per 1672x941 RGBA sheet",
+  "sprite_layout": "assets/ships/factions/<faction>/<hull>.png",
+  "hulls": [
+    "interceptor",
+    "corvette",
+    "missile_corvette",
+    "frigate",
+    "destroyer",
+    "light_cruiser",
+    "cruiser",
+    "heavy_cruiser",
+    "battlecruiser",
+    "carrier"
+  ],
+  "dreadnought_fallback": "carrier.png (until unique eleventh hull art)",
+  "factions": [
+    {
+      "id": "vaerith_prism",
+      "enum": "VAERITH_PRISM",
+      "name": "Vaerith Prism Dominion",
+      "archetype": "DRAXIAN",
+      "source": "alien_crystal_fleet_spritesheet.png",
+      "sha256": "be885ee6688741cd7b0b346b8629107ee6c34139289f3f2e2e7009e4d9d4a7d4"
+    },
+    {
+      "id": "zelthar_luminari",
+      "enum": "ZELTHAR_LUMINARI",
+      "name": "Zelthar Luminari Accord",
+      "archetype": "UZIPT",
+      "source": "futuristic_alien_ship_sprite_sheet.png",
+      "sha256": "418ca4039c1b0c67c0738bbba6b1866752bedae090477513a3a72ad8c1b517e0"
+    },
+    {
+      "id": "aureate_synod",
+      "enum": "AUREATE_SYNOD",
+      "name": "Aureate Cathedral Synod",
+      "archetype": "MANDRALLY",
+      "source": "gothic_sci_fi_fleet_sprite_sheet.png",
+      "sha256": "2268ef2e202797657b30f14cc4f208144222aa1058d96410407ffbbc7f3043cb"
+    },
+    {
+      "id": "nyx_biolith",
+      "enum": "NYX_BIOLITH",
+      "name": "Nyx Biolith Enclave",
+      "archetype": "CARNELIAN",
+      "source": "purple_bioluminescent_alien_fleet_sprite_sheet.png",
+      "sha256": "5202acfe9e87a9e7fad41b2ea7b82fc2b87b657189cc062c66b5908c81ea1d45"
+    },
+    {
+      "id": "umbra_foundry",
+      "enum": "UMBRA_FOUNDRY",
+      "name": "Umbra Foundry Compact",
+      "archetype": "ZIPPLEDROW",
+      "source": "sci_fi_fleet_sprite_asset_sheet.png",
+      "sha256": "9e6e5e22a1cccea114bed972b1ece6dc09d29f8dab26f1bc8926aecf05b30def"
+    }
+  ]
+}

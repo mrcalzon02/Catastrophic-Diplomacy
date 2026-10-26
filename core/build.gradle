@@ -201,3 +201,12 @@ tasks.register('fighterCraftSmoke', JavaExec) {
 }
 tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fighterCraftSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('fighterCraftSmoke') }
+
+tasks.register('alienFactionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate all five new independent alien races, 50 hull sprite paths, saved fleets and live combat.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AlienFactionArtTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('alienFactionSmoke') }

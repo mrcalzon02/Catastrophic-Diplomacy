@@ -19,7 +19,12 @@ public final class Battle {
         CARNELIAN("Carnelian Furlongs", 0.85f, 0.22f, 0.48f),
         ZIPPLEDROW("Zippledrow", 0.15f, 0.88f, 0.98f),
         UZIPT("Uzipt", 0.32f, 0.64f, 0.85f),
-        MANDRALLY("Mandrally", 0.43f, 0.77f, 0.42f);
+        MANDRALLY("Mandrally", 0.43f, 0.77f, 0.42f),
+        VAERITH_PRISM("Vaerith Prism Dominion",0.61f,0.35f,0.90f),
+        ZELTHAR_LUMINARI("Zelthar Luminari Accord",0.12f,0.84f,0.86f),
+        AUREATE_SYNOD("Aureate Cathedral Synod",0.95f,0.80f,0.53f),
+        NYX_BIOLITH("Nyx Biolith Enclave",0.78f,0.32f,0.83f),
+        UMBRA_FOUNDRY("Umbra Foundry Compact",0.45f,0.34f,0.59f);
         public final String displayName;
         public final float r, g, b;
         Faction(String label, float red, float green, float blue) {
@@ -75,11 +80,11 @@ public final class Battle {
             pdRange = 115; damageControl = 0.014; commanderSkill = 2;
             switch (group) {
                 case TERRAN: maxPower *= 1.13; pdRange *= 1.13; break;
-                case DRAXIAN: maxShields *= 1.45; sif += 0.08; laserDamage *= 1.18; break;
-                case CARNELIAN: maxHull *= 1.36; maxArmor *= 1.60; speed *= 0.74; break;
-                case ZIPPLEDROW: speed *= 1.65; maxHull *= 0.72; maxShields *= 0.68; break;
-                case UZIPT: accuracy += 0.17; pdRange *= 1.34; commanderSkill = 4; break;
-                case MANDRALLY: damageControl *= 3.0; maxHull *= 1.11; maxHeat *= 0.85; break;
+                case DRAXIAN: case VAERITH_PRISM: maxShields *= 1.45; sif += 0.08; laserDamage *= 1.18; break;
+                case CARNELIAN: case NYX_BIOLITH: maxHull *= 1.36; maxArmor *= 1.60; speed *= 0.74; break;
+                case ZIPPLEDROW: case UMBRA_FOUNDRY: speed *= 1.65; maxHull *= 0.72; maxShields *= 0.68; break;
+                case UZIPT: case ZELTHAR_LUMINARI: accuracy += 0.17; pdRange *= 1.34; commanderSkill = 4; break;
+                case MANDRALLY: case AUREATE_SYNOD: damageControl *= 3.0; maxHull *= 1.11; maxHeat *= 0.85; break;
                 default: break;
             }
             hull = maxHull; shields = maxShields; armor = maxArmor; power = maxPower;
