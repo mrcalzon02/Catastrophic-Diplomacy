@@ -44,3 +44,51 @@ All orders are defined in `core/src/main/java/diplomacy/sim/BattleOrders.java` a
 6. Visual acceptance on desktop and Android still requires actual rendering and device checks; **not verified by this document or the presence of source code**.
 
 Next integration priorities: **individual ship selection on a prebattle fleet deployment canvas**, parent/escort formation assignment, per-module targeting doctrine, and stackable ordered rules with visible priority resolution. Avoid shipping the words “complete GSB orders” until these are demonstrably working.
+
+
+## Individual persistent standing orders (2026-10-26 integration)
+
+**Distinction:** The primary *Ship Orders* deployment screen is for persistent **standing combat doctrines**,
+not a linear waypoint/task sequence. Select any commissioned ship on the tactical canvas (or use
+Previous/Next) and change independent rules. All configured rules remain in effect simultaneously
+through an engagement and subsequent campaign reinforcement waves.
+
+13 editable settings per individual ship:
+
+- Aggression (0–100): higher values close to shorter target engagement distances.
+- Caution (0–100): higher values preserve longer separation, competing with aggression.
+- Hull withdrawal minimum (0–100% remaining HP) and separate shield fall-back minimum (0–100%).
+- Movement policy: free attack, hold, keep moving, cautious, last stand.
+- Target-selection policy: nearest, cooperate, vulture, retaliate, protect.
+- Point-defense policy: balanced, intercept-only, anti-craft, or hold fire.
+- Independent fighter, escort and capital target priorities (0–100; zero suppresses offensive selection).
+- Independent preferred range for fighter, escort and capital targets (30–1500 world units).
+
+Both hull and shield triggers currently command a vessel to *fall back to its own side*, suppressing
+its offensive battery while the threshold condition holds; defensive weapons stay independent.
+**Withdrawal/escape accounting at a map boundary, repair/return rules, persistent casualty
+statistics and tactical victory resolution for retreats are not finished.** Do not claim that
+ships physically escape the engagement or automatically survive because they retreat.
+
+Settings are stored for each faction and numbered commissioned fleet slot in
+`fleet/standing-FACTION-v1.dat`, with checksum, temporary writes and last-valid backup
+recovery. This preserves legacy `fleet/orders-v1.dat` team templates and ship blueprints.
+Saved policies automatically reload when preparing the same faction's next campaign or
+skirmish battle. Fleet-wide policy changes serve as defaults and must **not** overwrite
+explicit captain-specific standing orders, including during battle resets.
+
+The earlier sequential MOVE/HOLD/ENGAGE `ShipCommandQueue` machinery is separate.
+It is no longer exposed as the primary standing-orders UI. It does not substitute
+for orders that should remain effective all battle long.
+
+**Functional acceptance:** `:core:shipStandingOrdersSmoke` tests all 13 fields,
+checksum round trips of 200 independently indexed ship profiles, tamper rejection,
+actual commissioned ship doctrine, wave retention and precedence over fleet-wide orders.
+`:game:menuFlowSmoke` checks all standing editor hit targets; the signed Android
+navigation script edits multiple simultaneous per-ship standing policies and checks the
+live client's resulting state. Hardware visual/behavioral verification is a separate gate.
+
+Still to build: group selection and apply-to-group controls, separate *physical module
+hardpoint* fire-control doctrines, direct escort-parent selection, full retreat/escape
+accounting, deeper behavior for aggression and caution beyond engagement separation,
+and device-verified tuning against the 200v200 battle.
