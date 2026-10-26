@@ -44,9 +44,9 @@ public final class AmmunitionTable {
             return StrictMath.max(lo,StrictMath.min(hi,x));
         }
     }
-    private static final Map<Kinetic,Profile> KINETIC=kinetics();
-    private static final Map<Warhead,Profile> WARHEADS=warheads();
-    private static Map<Kinetic,Profile> kinetics(){
+    private static final Map<Kinetic,Profile> KINETIC=buildKinetics();
+    private static final Map<Warhead,Profile> WARHEADS=buildWarheads();
+    private static Map<Kinetic,Profile> buildKinetics(){
         EnumMap<Kinetic,Profile> m=new EnumMap<>(Kinetic.class);
         m.put(Kinetic.STANDARD,new Profile(1,1,1,1,1,0,0,0,0,0,1,1,1));
         m.put(Kinetic.ARMOR_PIERCING,new Profile(.90,1.13,1.25,.72,.86,.55,0,0,0,0,1.15,1.10,1.18));
@@ -57,7 +57,7 @@ public final class AmmunitionTable {
         m.put(Kinetic.RELATIVISTIC,new Profile(1.80,2.4,2.3,.66,1.65,.68,0,0,0,0,2.65,2.50,3.6));
         return Map.copyOf(m);
     }
-    private static Map<Warhead,Profile> warheads(){
+    private static Map<Warhead,Profile> buildWarheads(){
         EnumMap<Warhead,Profile> m=new EnumMap<>(Warhead.class);
         m.put(Warhead.STANDARD,new Profile(1,1,1,1,1,0,0,0,0,0,1,1,1));
         m.put(Warhead.ARMOR_PIERCING,new Profile(.88,1.08,1.12,.89,.93,.52,0,0,0,0,1.10,1.10,1.12));
