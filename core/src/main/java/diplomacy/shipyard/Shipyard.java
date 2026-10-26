@@ -130,10 +130,10 @@ public final class Shipyard {
     public static String factionId(Battle.Faction faction) {
         return switch(faction) {
             case TERRAN -> "TER"; case DRAXIAN -> "DRA"; case CARNELIAN -> "CAR";
-            case ZIPPLEDROW, UMBRA_FOUNDRY -> "ZIP";
-            case UZIPT, ZELTHAR_LUMINARI -> "UZI";
-            case MANDRALLY, AUREATE_SYNOD -> "MAN";
-            case VAERITH_PRISM -> "DRA"; case NYX_BIOLITH -> "CAR";
+            case ZIPPLEDROW -> "ZIP"; case UMBRA_FOUNDRY -> "UMB";
+            case UZIPT -> "UZI"; case ZELTHAR_LUMINARI -> "ZEL";
+            case MANDRALLY -> "MAN"; case AUREATE_SYNOD -> "AUR";
+            case VAERITH_PRISM -> "VAE"; case NYX_BIOLITH -> "NYX";
         };
     }
     public static Mount requiredMount(Component component) {
