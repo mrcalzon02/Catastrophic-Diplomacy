@@ -802,18 +802,26 @@ public final class Battle {
                 salvosStarted++;
             }
         }
+        AmmunitionTable.Profile shell=AmmunitionTable.kinetic(s.kineticType);
         if(kinetic.available(s.kineticDamage,0,distance,s.weapons.kineticRange(),
                 s.kineticReload,s.power,s.heat,s.maxHeat,
-                s.weaponsCondition,s.magazineCondition)){
-            s.kineticReload=kinetic.reload(s.weapons.kineticCycle(),s.weaponsCondition);
-            chargeGun(s,kinetic);
+                s.weaponsCondition,s.magazineCondition)
+                &&s.kineticAmmo>0
+                &&s.power>kinetic.powerPerShot()*shell.powerCost()
+                &&s.heat+kinetic.heatPerShot()*shell.heatCost()<=s.maxHeat){
+            s.kineticReload=kinetic.reload(s.weapons.kineticCycle(),s.weaponsCondition)
+                    *shell.reloadCost();
+            s.power-=kinetic.powerPerShot()*shell.powerCost();
+            s.heat+=kinetic.heatPerShot()*shell.heatCost();
+            s.kineticAmmo--;
             long shotId=nextVisualShotId++;
             double angle=StrictMath.atan2(target.y-s.y,target.x-s.x);
             boolean onTarget=random.nextDouble()<kinetic.aim(
                     s.accuracy,s.weapons.kineticTracking(),weatherAim,lock);
             if(!onTarget)angle+=(shotId%2==0?1:-1)*WeaponBehaviorTable.BALLISTIC_MISS_ANGLE_RADIANS;
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
-                    s.x,s.y,angle,s.kineticDamage,s.kineticProjectile));
+                    s.x,s.y,angle,s.kineticDamage*shell.damage(),
+                    shell.physical(s.kineticProjectile),s.kineticType));
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
                     s.x,s.y,target.x,target.y);
         }
@@ -884,6 +892,9 @@ public final class Battle {
             boolean decoy=order.pattern.isDecoy(index);
             ProjectileModel.Spec standard=heavy?source.torpedoProjectile:source.missileProjectile;
             ProjectileModel.Spec actual=OrdnanceDoctrine.derived(standard,order.pattern,decoy);
+            AmmunitionTable.Warhead warhead=source.warhead(order.family);
+            AmmunitionTable.Profile payload=AmmunitionTable.warhead(warhead);
+            if(!decoy)actual=payload.physical(actual);
             OrdnanceDoctrine.Payload subtype=decoy?OrdnanceDoctrine.Payload.DECOY
                     :order.pattern.payload();
             double spread=(index-(order.pattern.count()-1)*0.5)*0.045;
@@ -892,8 +903,13 @@ public final class Battle {
             double velocityX=StrictMath.cos(angle)*Math.max(1,distance);
             double velocityY=StrictMath.sin(angle)*Math.max(1,distance);
             double baseDamage=heavy?source.torpedoDamage:source.missileDamage;
-            double damage=decoy?0:baseDamage*order.pattern.damageMultiplier();
-            chargeGun(source,gun);
+            double damage=decoy?0:baseDamage*order.pattern.damageMultiplier()*payload.damage();
+            if(source.power<=gun.powerPerShot()*payload.powerCost()
+                    ||source.heat+gun.heatPerShot()*payload.heatCost()>source.maxHeat){
+                launchQueue.remove(i);continue;
+            }
+            source.power-=gun.powerPerShot()*payload.powerCost();
+            source.heat+=gun.heatPerShot()*payload.heatCost();
             if(heavy)source.torpedoAmmo--;else source.missileAmmo--;
             source.launched++;roundsFiredBySalvos++;
             if(decoy)decoysLaunched++;
@@ -901,7 +917,7 @@ public final class Battle {
             Missile body=new Missile(shot,tick,source.id,source.team,target.id,
                     source.x,source.y,velocityX,velocityY,damage,heavy,actual,
                     heavy?source.weapons.torpedoTracking():source.weapons.missileTracking(),
-                    subtype,order.pattern.ignitionDelayTicks());
+                    subtype,order.pattern.ignitionDelayTicks(),warhead);
             missiles.add(body);
             visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
                     source.team,source.id,target.id,source.x,source.y,target.x,target.y);
