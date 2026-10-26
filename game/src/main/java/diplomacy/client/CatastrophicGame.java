@@ -326,8 +326,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void selectScenario(ScenarioCatalog.Preset choice){
         scenario=choice;
         if(choice!=ScenarioCatalog.Preset.CUSTOM&&!choice.demonstration){
-            leftDesign=Shipyard.starter(left,choice.leftHull);
-            rightDesign=Shipyard.starter(right,choice.rightHull);
+            leftDesign=ScenarioCatalog.defaultDesign(choice,left,true,technology);
+            rightDesign=ScenarioCatalog.defaultDesign(choice,right,false,technology);
             shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         }
     }
