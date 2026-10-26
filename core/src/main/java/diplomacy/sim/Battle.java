@@ -134,7 +134,8 @@ public final class Battle {
             if(!Double.isFinite(launchGuidance)||launchGuidance<0.2||launchGuidance>2.6)
                 throw new IllegalArgumentException("Invalid missile guidance quality");
             spec=profile;guidanceQuality=launchGuidance;
-            fuel = heavy?14:10; damage = amount; integrity=profile.health();
+            fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds();
+            damage=amount;integrity=profile.health();
         }
     }
 
@@ -1140,11 +1141,12 @@ public final class Battle {
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
+        var pdLaw=WeaponBehaviorTable.POINT_DEFENSE;
         for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
                 && defender.crewReadiness()>=0.05
-                && defender.pointDefenseCondition>0.20 && defender.pdRange>0
-                && defender.orders.pointDefense().ordnance()
-                && defender.power>=1.5) {
+                && defender.pointDefenseCondition>pdLaw.minimumCondition()
+                && defender.pdRange>0 && defender.orders.pointDefense().ordnance()
+                && defender.power>=pdLaw.minimumPower()) {
             Missile chosenMissile=null;Ballistic chosenShell=null;
             double quickest=Double.POSITIVE_INFINITY;
             for(Missile m:missiles){
@@ -1174,8 +1176,8 @@ public final class Battle {
                 }
             }
             if(chosenMissile==null && chosenShell==null)continue;
-            defender.power-=1.5;defender.heat+=0.8;
-            defender.pdReload=0.16*defender.pdCycle/defender.pointDefenseCondition;
+            defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
+            defender.pdReload=pdLaw.reload(false,defender.pdCycle,defender.pointDefenseCondition);
             double tx=chosenMissile!=null?chosenMissile.x:chosenShell.x;
             double ty=chosenMissile!=null?chosenMissile.y:chosenShell.y;
             int hostileSource=chosenMissile!=null?chosenMissile.sourceId:chosenShell.sourceId;
@@ -1213,8 +1215,10 @@ public final class Battle {
         }
         for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
                 &&defender.crewReadiness()>=0.05
-                &&defender.pointDefenseCondition>0.20&&defender.pdRange>0
-                &&defender.orders.pointDefense().craft()&&defender.power>1.5){
+                &&defender.pointDefenseCondition>pdLaw.minimumCondition()
+                &&defender.pdRange>0
+                &&defender.orders.pointDefense().craft()
+                &&defender.power>pdLaw.minimumPower()){
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
                 if(craft.team==defender.team
@@ -1222,8 +1226,8 @@ public final class Battle {
                         ProjectileModel.acquisitionRange(defender.pdRange,
                                 defender.sensorsCondition,weather.sensorFactor(),
                                 defender.pointDefenseProfile,craft.radarProfile()))continue;
-                defender.power-=1.5;defender.heat+=0.8;
-                defender.pdReload=0.18*defender.pdCycle/defender.pointDefenseCondition;
+                defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
+                defender.pdReload=pdLaw.reload(true,defender.pdCycle,defender.pointDefenseCondition);
                 long defensiveShot=nextVisualShotId++;
                 visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                         defender.team,defender.id,craft.sourceId,
@@ -1234,7 +1238,7 @@ public final class Battle {
                 if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
                         defender.pointDefenseProfile,defender.pointDefenseCondition,
                         weather.accuracyFactor())) {
-                    hitCraft(craft,defender.pointDefenseProfile.damage()*6.5,
+                    hitCraft(craft,defender.pointDefenseProfile.damage()*pdLaw.craftDamageMultiplier(),
                             defender,defensiveShot,"POINT_DEFENSE");
                     if(craft.integrity<=0){crafts.remove(i);craftLosses++;}
                 }
@@ -1257,7 +1261,9 @@ public final class Battle {
                 missiles.remove(i);continue;
             }
             if (range > 0) {
-                double guidance=Math.min(0.35,(m.torpedo?0.025:0.04)*m.guidanceQuality
+                double guidance=Math.min(0.35,WeaponBehaviorTable.gun(
+                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE).guidancePerTick()
+                        *m.guidanceQuality
                         *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition));
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
