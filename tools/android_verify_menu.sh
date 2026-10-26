@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Functional signed-APK navigation acceptance, not a cosmetic pixel-perfect test.
-# Real taps must lead MAIN_MENU -> SKIRMISH_SETUP -> BATTLE on the same APK.
+# Real taps must lead normal menu -> skirmish combat AND new campaign -> deployment -> multiwave combat.
 set -euo pipefail
 report="${1:-test-output/android}"
 mkdir -p "$report"
@@ -64,4 +64,36 @@ if cmp -s "$report/skirmish-menu.png" "$report/skirmish-battle.png"; then
   echo "FAIL: battle navigation produced an unchanged screen" >&2
   exit 1
 fi
-echo "PASS: signed APK launched a normal main menu, entered skirmish and began real battle."
+# Relaunch the same installed signed APK and use its real interactive controls.
+# This is a state transition/gameplay smoke, not a cosmetic pixel comparison.
+adb shell am force-stop "$package"
+adb logcat -c
+adb shell am start -W -n "$package/diplomacy.android.AndroidLauncher"
+sleep 5
+capture campaign-main-menu
+assert_step MAIN_MENU
+# HOME's second item: NEW CAMPAIGN.
+touch_ui campaign-main-menu 640 448
+sleep 2
+capture campaign-faction
+assert_step CAMPAIGN_FACTION_SETUP
+# Explicitly accept faction/setup (never silently replace an existing save).
+touch_ui campaign-faction 1050 60
+sleep 2
+capture campaign-map
+assert_step 'CAMPAIGN_MAP 1'
+# First campaign system is unlocked, and its bottom-right action opens deployment.
+touch_ui campaign-map 1080 60
+sleep 2
+capture campaign-deployment
+assert_step 'DEPLOYMENT 1'
+# Select five real ships and switch from battle line to attack wedge.
+touch_ui campaign-deployment 1145 452
+touch_ui campaign-deployment 1145 345
+sleep 1
+capture campaign-deployment-configured
+touch_ui campaign-deployment-configured 1050 62
+sleep 5
+capture campaign-battle
+assert_step 'CAMPAIGN_BATTLE 1 5 WEDGE'
+echo "PASS: signed APK functional flow: main -> skirmish battle, faction -> map -> five-ship wedge deployment -> multiwave campaign battle."
