@@ -290,7 +290,8 @@ public final class Shipyard {
         HullBaseline.Stats baseline=HullBaseline.forHull(design.faction,design.hull);
         double hull=baseline.structure(),shields=baseline.shields(),
                 armor=baseline.armor(),sif=0;
-        double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0.001;
+        // Bare fitted hulls have no implicit repair module.
+        double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0;
         double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
         int fighters=baseline.fighterBay(),drones=0,magazines=0;
         List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
