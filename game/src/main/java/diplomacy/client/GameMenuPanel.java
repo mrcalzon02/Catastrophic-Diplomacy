@@ -7,13 +7,14 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DEPLOYMENT, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -68,6 +69,7 @@ final class GameMenuPanel {
     void draw(Screen screen,ShapeRenderer shapes,SpriteBatch batch,BitmapFont font,
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
+              CampaignDeployment.Loadout deployment,String friendlyHull,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -124,6 +126,25 @@ final class GameMenuPanel {
                 button(shapes,214,35,136,50,false);
                 button(shapes,366,35,136,50,false);
                 button(shapes,964,35,278,50,true);
+            }
+            case DEPLOYMENT -> {
+                rectangle(shapes,39,135,760,472,PANEL);
+                rectangle(shapes,819,135,425,472,PANEL);
+                // Every marker corresponds to a real ship deployed at this battle coordinate.
+                // The same pure loadout.at() is used by CampaignEncounter to place vessels.
+                for(int i=0;i<deployment.ships();i++){
+                    CampaignDeployment.Point ship=deployment.at(i);
+                    shapes.setColor(.20f,.77f,.90f,1);
+                    shapes.circle(30+(float)ship.x()*1.4f,125+(float)ship.y()*.8f,
+                                  deployment.ships()>80?3:5,10);
+                }
+                button(shapes,845,430,99,51,false);
+                button(shapes,1098,430,99,51,false);
+                button(shapes,845,321,99,51,false);
+                button(shapes,1098,321,99,51,false);
+                button(shapes,845,214,352,55,false);
+                button(shapes,35,35,175,55,false);
+                button(shapes,913,35,302,55,true);
             }
             case OPTIONS -> {
                 for(int i=0;i<5;i++)
@@ -184,6 +205,29 @@ final class GameMenuPanel {
                 label(batch,font,"LAUNCH BATTLE",998,67,Color.WHITE);
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
+            case DEPLOYMENT -> {
+                LevelEconomy.Level stage=LevelEconomy.level(selectedLevel);
+                CampaignMap.SystemNode enemy=CampaignMap.page(CampaignMap.pageOf(selectedLevel))
+                        .get((selectedLevel-1)%CampaignMap.PAGE_SIZE);
+                title(batch,font,"FLEET DEPLOYMENT","MISSION "+selectedLevel+"  |  SET YOUR SHIP COUNT AND FORMATION");
+                label(batch,font,"YOUR "+progress.faction().displayName+" BATTLE GROUP",58,580,Color.CYAN);
+                label(batch,font,"TACTICAL STARTING POSITIONS",58,161,MUTED);
+                label(batch,font,"ENEMY: "+enemy.opponent().displayName,846,563,Color.WHITE);
+                label(batch,font,"HULL: "+friendlyHull,846,532,MUTED);
+                label(batch,font,"WAVES: "+stage.waves(),846,505,Color.WHITE);
+                label(batch,font,"DEPLOYED: "+deployment.ships()+" / "+stage.maximumFleet(),963,464,Color.GOLD);
+                label(batch,font,"-",886,464,Color.WHITE);
+                label(batch,font,"+",1141,464,Color.WHITE);
+                label(batch,font,deployment.formation().title,959,355,Color.CYAN);
+                label(batch,font,"<",887,355,Color.WHITE);
+                label(batch,font,">",1139,355,Color.WHITE);
+                label(batch,font,"MAX VICTORY PAYOUT: "+
+                        LevelEconomy.victoryCredits(stage,deployment.ships(),deployment.ships(),true),
+                        843,290,Color.GOLD);
+                label(batch,font,"EDIT FITTED SHIP",896,249,Color.WHITE);
+                label(batch,font,"BACK TO MAP",68,68,Color.WHITE);
+                label(batch,font,"BEGIN MISSION",978,68,Color.WHITE);
+            }
             case OPTIONS -> {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
                 label(batch,font,"MUSIC: "+(music?"ON":"OFF"),445,510,Color.WHITE);
