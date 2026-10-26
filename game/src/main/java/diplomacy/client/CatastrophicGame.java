@@ -21,6 +21,11 @@ import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.ShipCommandQueue;
+import diplomacy.sim.ShipStandingOrders;
+import diplomacy.sim.ShipStandingOrdersCodec;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Locale;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
@@ -65,6 +70,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int selectedDeploymentShip;
     private int placementDragPointer=-1;
     private boolean waitingForWaypoint;
+    private int selectedStandingSetting;
+    private final Map<Integer,ShipStandingOrders> savedStanding=new HashMap<>();
+    private Battle.Faction savedStandingFaction;
     private boolean preparingCampaign=true,preparedSkirmish;
     private String deploymentNotice="Tap a ship then drag it anywhere within the non-overlapping deployment zone.";
     private long lastReward;
@@ -214,14 +222,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         }
                     }
                     if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
-                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT)
+                        if(key==Input.Keys.A||key==Input.Keys.D)
                             selectedDeploymentShip=Math.floorMod(selectedDeploymentShip+
-                                    (key==Input.Keys.LEFT?-1:1),deployment.ships());
-                        if(key==Input.Keys.M)waitingForWaypoint=true;
-                        if(key==Input.Keys.H)appendShipCommand(ShipCommandQueue.Command.hold(300));
-                        if(key==Input.Keys.E)appendShipCommand(ShipCommandQueue.Command.engage(300));
-                        if(key==Input.Keys.Z)deployment=deployment.undoOrder(selectedDeploymentShip);
-                        if(key==Input.Keys.C)deployment=deployment.clearOrders(selectedDeploymentShip);
+                                    (key==Input.Keys.A?-1:1),deployment.ships());
+                        if(key==Input.Keys.UP||key==Input.Keys.DOWN)
+                            selectedStandingSetting=Math.floorMod(selectedStandingSetting+
+                                    (key==Input.Keys.UP?-1:1),ShipStandingOrders.SETTINGS.length);
+                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT)
+                            adjustStandingOrders(selectedStandingSetting,key==Input.Keys.LEFT?-1:1);
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.DEPLOYMENT){
@@ -304,16 +312,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         }
                     }
                     if(screen==GameMenuPanel.Screen.SHIP_ORDERS &&
-                            world.x>=60&&world.x<=776&&world.y>=161&&world.y<=593){
-                        if(waitingForWaypoint){
-                            appendShipCommand(ShipCommandQueue.Command.move(
-                                    GameMenuPanel.ordersWorldX(world.x),
-                                    GameMenuPanel.ordersWorldY(world.y)));
-                            waitingForWaypoint=false;
-                        }else{
-                            int hit=GameMenuPanel.shipHit(world.x,world.y,deployment,true);
-                            if(hit>=0)selectedDeploymentShip=hit;
-                        }
+                            world.x>=39&&world.x<630&&world.y>=135&&world.y<=607){
+                        int hit=GameMenuPanel.shipHit(world.x,world.y,deployment,true);
+                        if(hit>=0)selectedDeploymentShip=hit;
                         return true;
                     }
                     tapFrontEnd(world.x,world.y);
@@ -442,6 +443,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         deployment=new CampaignDeployment.Loadout(
                 scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships,
                 CampaignDeployment.Formation.LINE);
+        loadStandingOrders(left);
+        deployment=deployment.withStandingProfiles(savedStanding);
+        selectedStandingSetting=0;
         selectedDeploymentShip=0;
         placementDragPointer=-1;
         waitingForWaypoint=false;
@@ -485,12 +489,73 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shipyard.sync(0,leftDesign);
         preparingCampaign=true;
         deployment=CampaignDeployment.defaultFor(stage);
+        loadStandingOrders(left);
+        deployment=deployment.withStandingProfiles(savedStanding);
+        selectedStandingSetting=0;
         selectedDeploymentShip=0;
         placementDragPointer=-1;
         waitingForWaypoint=false;
         deploymentNotice="Drag ships inside the deployment zone. No overlaps allowed.";
         screen=GameMenuPanel.Screen.DEPLOYMENT;
         Gdx.app.log("CD-GAME-FLOW","DEPLOYMENT "+activeMission);
+    }
+    private String standingFile(Battle.Faction faction){
+        return "fleet/standing-"+faction.name().toLowerCase(Locale.ROOT)+"-v1.dat";
+    }
+    private void loadStandingOrders(Battle.Faction faction){
+        savedStanding.clear();
+        savedStandingFaction=faction;
+        String path=standingFile(faction);
+        for(FileHandle candidate:new FileHandle[]{Gdx.files.local(path),Gdx.files.local(path+".bak")}){
+            if(!candidate.exists())continue;
+            try{
+                ShipStandingOrdersCodec.File data=ShipStandingOrdersCodec.decode(
+                        candidate.readString("UTF-8"));
+                if(data.faction()!=faction)
+                    throw new IllegalArgumentException("Ship doctrine faction mismatch");
+                savedStanding.putAll(data.policies());
+                return;
+            }catch(RuntimeException corrupt){
+                Gdx.app.error("STANDING","Invalid per-ship doctrine at "+candidate.path(),corrupt);
+            }
+        }
+    }
+    private void saveStandingOrders(){
+        if(savedStandingFaction==null)return;
+        String path=standingFile(savedStandingFaction);
+        try{
+            FileHandle primary=Gdx.files.local(path);
+            FileHandle backup=Gdx.files.local(path+".bak");
+            FileHandle temp=Gdx.files.local(path+".tmp");
+            temp.writeString(ShipStandingOrdersCodec.encode(savedStandingFaction,savedStanding),
+                    false,"UTF-8");
+            ShipStandingOrdersCodec.decode(temp.readString("UTF-8"));
+            if(primary.exists()){
+                try{
+                    ShipStandingOrdersCodec.File old=ShipStandingOrdersCodec.decode(
+                            primary.readString("UTF-8"));
+                    if(old.faction()==savedStandingFaction)primary.copyTo(backup);
+                }catch(RuntimeException corrupt){
+                    Gdx.app.log("STANDING","Preserving last known good doctrine backup");
+                }
+            }
+            temp.moveTo(primary);
+        }catch(RuntimeException e){
+            Gdx.app.error("STANDING","Unable to save individual ship doctrines",e);
+            deploymentNotice="Cannot save standing orders; check application storage";
+        }
+    }
+    private void adjustStandingOrders(int setting,int direction){
+        ShipStandingOrders current=deployment.standingFor(selectedDeploymentShip);
+        ShipStandingOrders revised=current.adjust(setting,direction);
+        if(revised.equals(current))return;
+        deployment=deployment.withStanding(selectedDeploymentShip,revised);
+        savedStanding.put(selectedDeploymentShip,revised);
+        saveStandingOrders();
+        deploymentNotice="Standing doctrine saved for ship #"+(selectedDeploymentShip+1);
+        Gdx.app.log("CD-GAME-FLOW","STANDING ship="+(selectedDeploymentShip+1)+
+                " setting="+ShipStandingOrders.SETTINGS[setting]+
+                " value="+revised.display(setting));
     }
     private void appendShipCommand(ShipCommandQueue.Command command){
         deployment=deployment.appendOrder(selectedDeploymentShip,command);
@@ -618,23 +683,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
-            switch(GameMenuPanel.ordersAction(x,y)){
-                case 0 -> selectedDeploymentShip=Math.floorMod(selectedDeploymentShip-1,deployment.ships());
-                case 1 -> selectedDeploymentShip=(selectedDeploymentShip+1)%deployment.ships();
-                case 2 -> {
-                    waitingForWaypoint=true;
-                    deploymentNotice="Tap anywhere on the battlefield to append a MOVE waypoint.";
-                }
-                case 3 -> appendShipCommand(ShipCommandQueue.Command.hold(300));
-                case 4 -> appendShipCommand(ShipCommandQueue.Command.engage(300));
-                case 5 -> deployment=deployment.undoOrder(selectedDeploymentShip);
-                case 6 -> deployment=deployment.clearOrders(selectedDeploymentShip);
-                case 7 -> {
-                    waitingForWaypoint=false;
-                    screen=GameMenuPanel.Screen.DEPLOYMENT;
-                }
-                default -> { }
-            }
+            int action=GameMenuPanel.ordersAction(x,y);
+            if(action==0)selectedDeploymentShip=Math.floorMod(selectedDeploymentShip-1,deployment.ships());
+            else if(action==1)selectedDeploymentShip=(selectedDeploymentShip+1)%deployment.ships();
+            else if(action>=2&&action<2+ShipStandingOrders.SETTINGS.length){
+                selectedStandingSetting=action-2;
+                adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
+            }else if(action==15)screen=GameMenuPanel.Screen.DEPLOYMENT;
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -922,6 +977,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         for(int side=0;side<2;side++)battle.setTeamOrders(side,fleetOrders[side]);
+        // Team policies are defaults; individual captain doctrines take precedence.
+        // Apply after team orders so a restart cannot silently erase per-ship intent.
+        if(!verifyDemo&&(playedCampaign||(preparedSkirmish&&!scenario.demonstration)))
+            deployment.apply(battle);
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
         // The same validated stage index drives both GPU background and simulation.
         if (starfield != null) starfield.useLevel(environment.level());
