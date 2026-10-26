@@ -258,6 +258,7 @@ public final class Shipyard {
         List<Part> parts=fittedParts(design,catalog,errors);
         double mass=0,volume=0,draw=0,generation=0,heat=0,cooling=0;
         int industry=0,research=0,reactors=0,engines=0,radiators=0,weapons=0;
+        double crewBerths=0,lifeSupport=0;
         for(Part p:parts){
             mass+=p.mass;volume+=p.mass*1.5;heat+=p.heat;industry=Math.addExact(industry,p.industry);research=Math.addExact(research,p.research);
             draw+=p.power;
@@ -265,6 +266,8 @@ public final class Shipyard {
                 case "REA" -> {generation+=p.effect*3.0;reactors++;}
                 case "RAD" -> {cooling+=p.effect*p.cooling*2.3;radiators++;}
                 case "ENG" -> engines++;
+                case "CRW" -> crewBerths+=p.effect*design.hull.massCapacity*0.12;
+                case "LFS" -> lifeSupport+=p.effect*design.hull.massCapacity*0.12;
                 case "KIN", "LAS", "MSL", "TOR", "PAR", "PLA" -> weapons++;
                 default -> { }
             }
@@ -272,6 +275,9 @@ public final class Shipyard {
         if(reactors==0)errors.add("A reactor is required");
         if(engines==0)errors.add("An engine is required");
         if(radiators==0)errors.add("A radiator is required");
+        int staff=minimumCrew(design);
+        if(crewBerths+1e-8<staff)errors.add("Insufficient fitted crew accommodation");
+        if(lifeSupport+1e-8<staff)errors.add("Insufficient fitted life support");
         // A hull may be an unarmed scout, transport or support vessel.
         // Main batteries, point defense and fighter payloads require modules.
         if(mass>design.hull.massCapacity+1e-8)errors.add("Hull displacement exceeded");
@@ -282,6 +288,23 @@ public final class Shipyard {
         return new Report(List.copyOf(errors),mass,volume,draw,generation,heat,cooling,industry,research);
     }
 
+    /** Base staffing demand is derived from equipment and displacement, never
+     * an intrinsic complement or an invisible hull accommodation allowance. */
+    public static int minimumCrew(Design design){
+        int installed=0;
+        for(int i=0;i<design.slots();i++){
+            Installed p=design.at(i);
+            if(p!=null && !p.component.endsWith("-CRW") && !p.component.endsWith("-LFS"))
+                installed++;
+        }
+        return (int)StrictMath.ceil(5+design.hull.massCapacity*0.11+installed*0.75);
+    }
+    public record Crew(int minimum,int berths,int lifeSupport){
+        public Crew {
+            if(minimum<=0||berths<0||lifeSupport<0)
+                throw new IllegalArgumentException("Invalid crew support");
+        }
+    }
     /** Module-distinct six-rank offensive specialization; all ratios are bounded. */
     public record Weapons(double laserRange,double kineticRange,double plasmaRange,
                           double particleRange,double missileRange,double torpedoRange,
@@ -311,7 +334,7 @@ public final class Shipyard {
                          ProjectileModel.Spec torpedoProjectile,
                          ProjectileModel.Defense pointDefense,
                          Weapons weapons,Support support,double pdCycle,
-                         HullBaseline.Stats baseline) { }
+                         HullBaseline.Stats baseline,Crew crew) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -322,6 +345,7 @@ public final class Shipyard {
         double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0;
         double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
         int fighters=baseline.fighterBay(),drones=0,magazines=0;
+        double accommodation=0,breathing=0;
         List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
@@ -411,6 +435,8 @@ public final class Shipyard {
                     }else drones+=complement;
                 }
                 case "MAG" -> magazines+=(int)(p.effect/3.8);
+                case "CRW" -> accommodation+=p.effect*design.hull.massCapacity*0.12;
+                case "LFS" -> breathing+=p.effect*design.hull.massCapacity*0.12;
                 default -> { }
             }
             hull+=p.integrity*0.08;
@@ -444,7 +470,9 @@ public final class Shipyard {
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
                         repairDrones,droneRepair,droneEndurance,efficiency,
                         repairDroneCapacity),
-                pdWeight==0?1:pdCycle/pdWeight,baseline);
+                pdWeight==0?1:pdCycle/pdWeight,baseline,
+                new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
+                        (int)StrictMath.floor(breathing)));
     }
 
     /** Current exclusive research branch effect of one selected installed module. */
