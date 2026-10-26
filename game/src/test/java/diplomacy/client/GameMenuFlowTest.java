@@ -48,13 +48,21 @@ public final class GameMenuFlowTest {
                 "Fleet order editor has no real touch target");
         check(GameMenuPanel.Screen.valueOf("SHIP_ORDERS")!=null,
                 "Per-ship order editor state missing");
-        float[][] orderTargets={{890,555},{1140,555},{1000,484},{1000,412},
-                {1000,343},{1000,275},{1000,202},{1050,58}};
-        for(int i=0;i<orderTargets.length;i++){
-            float[] point=orderTargets[i];
-            check(GameMenuPanel.ordersAction(point[0],point[1])==i,
-                    "Per-ship queued command button unavailable: "+i);
+        check(GameMenuPanel.ordersAction(700,580)==0,
+                "Previous ship standing-orders control unavailable");
+        check(GameMenuPanel.ordersAction(1160,580)==1,
+                "Next ship standing-orders control unavailable");
+        for(int i=0;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
+            float y=534-i*29;
+            check(GameMenuPanel.ordersAction(700,y)==2+i,
+                    "Cannot reduce standing doctrine row "+i);
+            check(GameMenuPanel.ordersAction(1150,y)==2+i,
+                    "Cannot increase standing doctrine row "+i);
         }
+        check(GameMenuPanel.ordersAction(1050,60)==15,
+                "Cannot return from standing-orders editor");
+        check(GameMenuPanel.ordersAction(385,376)==-1,
+                "Map selection must not alter a doctrine setting");
         var formation=new diplomacy.sim.CampaignDeployment.Loadout(8,
                 diplomacy.sim.CampaignDeployment.Formation.LINE);
         for(int i=0;i<formation.ships();i++){
@@ -64,12 +72,12 @@ public final class GameMenuFlowTest {
                     "Ship not selectable on drag-and-place canvas: "+i);
             check(GameMenuPanel.shipHit(GameMenuPanel.ordersUiX(point.x()),
                     GameMenuPanel.ordersUiY(point.y()),formation,true)==i,
-                    "Ship not selectable in its command plan: "+i);
+                    "Ship not selectable for persistent standing doctrine: "+i);
         }
         check(Math.abs(GameMenuPanel.placementWorldX(GameMenuPanel.placementUiX(280))-280)<.01,
                 "Deployment drag projection has no accurate inverse");
         check(Math.abs(GameMenuPanel.ordersWorldY(GameMenuPanel.ordersUiY(540))-540)<.01,
-                "Waypoint projection inverse failed");
+                "Standing orders map projection inverse failed");
 
         for(int page=0;page<CampaignMap.PAGE_COUNT;page++)
             for(var node:CampaignMap.page(page))
