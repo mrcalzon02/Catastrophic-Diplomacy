@@ -20,6 +20,7 @@ import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignDeployment;
+import diplomacy.sim.ShipCommandQueue;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
@@ -61,6 +62,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int deployedAtLaunch,survivorsAtEnd;
     private CampaignEncounter campaignEncounter;
     private CampaignDeployment.Loadout deployment=CampaignDeployment.defaultFor(LevelEconomy.level(1));
+    private int selectedDeploymentShip;
+    private int placementDragPointer=-1;
+    private boolean waitingForWaypoint;
+    private String deploymentNotice="Tap a ship then drag it anywhere within the non-overlapping deployment zone.";
     private long lastReward;
     private boolean playedCampaign,lastWon;
     private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
@@ -158,7 +163,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
-                        else if(screen==GameMenuPanel.Screen.DEPLOYMENT)screen=GameMenuPanel.Screen.CAMPAIGN;
+                        else if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
+                            screen=GameMenuPanel.Screen.DEPLOYMENT;waitingForWaypoint=false;
+                        }else if(screen==GameMenuPanel.Screen.DEPLOYMENT)screen=GameMenuPanel.Screen.CAMPAIGN;
                         else screen=GameMenuPanel.Screen.HOME;
                         return true;
                     }
@@ -204,7 +211,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             return true;
                         }
                     }
+                    if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
+                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT)
+                            selectedDeploymentShip=Math.floorMod(selectedDeploymentShip+
+                                    (key==Input.Keys.LEFT?-1:1),deployment.ships());
+                        if(key==Input.Keys.M)waitingForWaypoint=true;
+                        if(key==Input.Keys.H)appendShipCommand(ShipCommandQueue.Command.hold(300));
+                        if(key==Input.Keys.E)appendShipCommand(ShipCommandQueue.Command.engage(300));
+                        if(key==Input.Keys.Z)deployment=deployment.undoOrder(selectedDeploymentShip);
+                        if(key==Input.Keys.C)deployment=deployment.clearOrders(selectedDeploymentShip);
+                        return true;
+                    }
                     if(screen==GameMenuPanel.Screen.DEPLOYMENT){
+                        if(key==Input.Keys.O)screen=GameMenuPanel.Screen.SHIP_ORDERS;
+                        if(key==Input.Keys.A||key==Input.Keys.D)
+                            selectedDeploymentShip=Math.floorMod(selectedDeploymentShip+
+                                    (key==Input.Keys.A?-1:1),deployment.ships());
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
                             int delta=key==Input.Keys.LEFT?-1:1;
                             deployment=deployment.withShips(delta,LevelEconomy.level(activeMission));
@@ -264,6 +286,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+                    if(screen==GameMenuPanel.Screen.DEPLOYMENT &&
+                            world.x>=45&&world.x<=795&&world.y>=155&&world.y<=606){
+                        int hit=GameMenuPanel.shipHit(world.x,world.y,deployment,false);
+                        if(hit>=0){
+                            selectedDeploymentShip=hit;
+                            placementDragPointer=pointer;
+                            deploymentNotice="Selected ship #"+(hit+1)+"; drag inside deployment zone.";
+                            return true;
+                        }
+                    }
+                    if(screen==GameMenuPanel.Screen.SHIP_ORDERS &&
+                            world.x>=60&&world.x<=776&&world.y>=161&&world.y<=593){
+                        if(waitingForWaypoint){
+                            appendShipCommand(ShipCommandQueue.Command.move(
+                                    GameMenuPanel.ordersWorldX(world.x),
+                                    GameMenuPanel.ordersWorldY(world.y)));
+                            waitingForWaypoint=false;
+                        }else{
+                            int hit=GameMenuPanel.shipHit(world.x,world.y,deployment,true);
+                            if(hit>=0)selectedDeploymentShip=hit;
+                        }
+                        return true;
+                    }
                     tapFrontEnd(world.x,world.y);
                     return true;
                 }
@@ -315,11 +360,26 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return false;
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
-                if(!shipyard.open())return false;
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
+                if(screen==GameMenuPanel.Screen.DEPLOYMENT&&pointer==placementDragPointer){
+                    try{
+                        deployment=deployment.withPlacement(selectedDeploymentShip,
+                                GameMenuPanel.placementWorldX(world.x),
+                                GameMenuPanel.placementWorldY(world.y));
+                        deploymentNotice="Ship #"+(selectedDeploymentShip+1)+" position accepted.";
+                    }catch(IllegalArgumentException invalid){
+                        deploymentNotice="Position rejected: overlap or outside deployment zone.";
+                    }
+                    return true;
+                }
+                if(!shipyard.open())return false;
                 return shipyard.drag(world.x,world.y,pointer);
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
+                if(pointer==placementDragPointer){
+                    placementDragPointer=-1;
+                    return true;
+                }
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
                 boolean activated = shipyard.endTouch(world.x,world.y,pointer);
                 if (activated && audio != null) audio.ui();
@@ -395,8 +455,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
         shipyard.sync(0,leftDesign);
         deployment=CampaignDeployment.defaultFor(stage);
+        selectedDeploymentShip=0;
+        placementDragPointer=-1;
+        waitingForWaypoint=false;
+        deploymentNotice="Drag ships inside the deployment zone. No overlaps allowed.";
         screen=GameMenuPanel.Screen.DEPLOYMENT;
         Gdx.app.log("CD-GAME-FLOW","DEPLOYMENT "+activeMission);
+    }
+    private void appendShipCommand(ShipCommandQueue.Command command){
+        deployment=deployment.appendOrder(selectedDeploymentShip,command);
+        deploymentNotice="Ship #"+(selectedDeploymentShip+1)+" has "+
+                deployment.ordersFor(selectedDeploymentShip).size()+" sequential orders.";
     }
     private void launchCampaignMission(){
         if(campaign==null||!campaign.available(activeMission))return;
@@ -495,6 +564,31 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 4 -> deployment=deployment.withFormation(1);
                 case 5 -> shipyard.showCampaignFleet();
                 case 6 -> launchCampaignMission();
+                case 7 -> {
+                    screen=GameMenuPanel.Screen.SHIP_ORDERS;
+                    waitingForWaypoint=false;
+                    deploymentNotice="Select a vessel and append as many orders as needed.";
+                }
+                default -> { }
+            }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
+            switch(GameMenuPanel.ordersAction(x,y)){
+                case 0 -> selectedDeploymentShip=Math.floorMod(selectedDeploymentShip-1,deployment.ships());
+                case 1 -> selectedDeploymentShip=(selectedDeploymentShip+1)%deployment.ships();
+                case 2 -> {
+                    waitingForWaypoint=true;
+                    deploymentNotice="Tap anywhere on the battlefield to append a MOVE waypoint.";
+                }
+                case 3 -> appendShipCommand(ShipCommandQueue.Command.hold(300));
+                case 4 -> appendShipCommand(ShipCommandQueue.Command.engage(300));
+                case 5 -> deployment=deployment.undoOrder(selectedDeploymentShip);
+                case 6 -> deployment=deployment.clearOrders(selectedDeploymentShip);
+                case 7 -> {
+                    waitingForWaypoint=false;
+                    screen=GameMenuPanel.Screen.DEPLOYMENT;
+                }
                 default -> { }
             }
             return;
@@ -813,7 +907,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,pendingFaction,
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,
                     screen==GameMenuPanel.Screen.DEPLOYMENT?activeMission:selectedMission,
-                    deployment,leftDesign.hull.name(),
+                    deployment,leftDesign.hull.name(),selectedDeploymentShip,
+                    waitingForWaypoint,deploymentNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;
