@@ -374,6 +374,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                 GameMenuPanel.placementWorldX(world.x),
                                 GameMenuPanel.placementWorldY(world.y));
                         deploymentNotice="Ship #"+(selectedDeploymentShip+1)+" position accepted.";
+                        Gdx.app.log("CD-GAME-FLOW","PLACED ship="+(selectedDeploymentShip+1)+
+                                " x="+(int)deployment.at(selectedDeploymentShip).x()+
+                                " y="+(int)deployment.at(selectedDeploymentShip).y());
                     }catch(IllegalArgumentException invalid){
                         deploymentNotice="Position rejected: overlap or outside deployment zone.";
                     }
@@ -493,6 +496,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         deployment=deployment.appendOrder(selectedDeploymentShip,command);
         deploymentNotice="Ship #"+(selectedDeploymentShip+1)+" has "+
                 deployment.ordersFor(selectedDeploymentShip).size()+" sequential orders.";
+        Gdx.app.log("CD-GAME-FLOW","ORDER ship="+(selectedDeploymentShip+1)+
+                " count="+deployment.ordersFor(selectedDeploymentShip).size()+
+                " command="+command.type());
     }
     private void launchCampaignMission(){
         if(campaign==null||!campaign.available(activeMission))return;
