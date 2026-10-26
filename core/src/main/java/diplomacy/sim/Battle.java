@@ -42,6 +42,8 @@ public final class Battle {
         public final String name;
         /** Per-hull doctrine. POINT DEFENSE is independent of main gun fire orders. */
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
+        /** Per-hull sequential mission plan, independent of weapons and fleet doctrine. */
+        public ShipCommandQueue commandQueue=new ShipCommandQueue(List.of());
         public int lastTargetId,lastAttackerId;
         public double anchorOffsetX,anchorOffsetY;
         public Shipyard.Hull hullClass;
@@ -414,6 +416,12 @@ public final class Battle {
             ship.orders=current;
         }
     }
+    /** Replace this vessel's entire ordered tactical program before or during combat. */
+    public void setShipCommandQueue(int shipId,List<ShipCommandQueue.Command> commands) {
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship not found");
+        ship.commandQueue=new ShipCommandQueue(commands);
+    }
     public void setShipOrders(int shipId,BattleOrders.Orders value) {
         if(value==null)throw new IllegalArgumentException("Orders missing");
         Ship ship=findShip(shipId);
@@ -575,10 +583,11 @@ public final class Battle {
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             Ship target = chooseTarget(s);
+            boolean navigated=executeShipCommands(s,target);
             if (target != null) {
-                steer(s, target);
+                if(!navigated)steer(s, target);
                 fire(s, target);
-            } else {
+            } else if(!navigated) {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
                     double heading = s.team == 0 ? 1 : -1;
@@ -699,6 +708,37 @@ public final class Battle {
         }
     }
 
+    /**
+     * Execute one step of a vessel's preplanned command program each simulation
+     * tick. Navigation overrides only steering; main weapons, PD, aircraft,
+     * damage and target acquisition continue using the real Battle model.
+     */
+    private boolean executeShipCommands(Ship ship,Ship target) {
+        ShipCommandQueue.Command command=ship.commandQueue.current();
+        if(command==null)return false;
+        switch(command.type()){
+            case MOVE -> {
+                double distance=StrictMath.hypot(command.x()-ship.x,command.y()-ship.y);
+                if(distance<=12) {
+                    ship.vx=0;ship.vy=0;
+                    ship.commandQueue.complete();
+                }else steerToward(ship,command.x(),command.y());
+                return true;
+            }
+            case HOLD -> {
+                ship.vx*=0.82;ship.vy*=0.82;
+                ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+                ship.commandQueue.tickTimed();
+                return true;
+            }
+            case ENGAGE -> {
+                // Autonomous tactics continue for the specified duration.
+                ship.commandQueue.tickTimed();
+                return false;
+            }
+        }
+        return false;
+    }
     private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
     private void steer(Ship s, Ship target) {
         if(!s.orders.equals(BattleOrders.DEFAULT.withPointDefense(s.orders.pointDefense()))){
