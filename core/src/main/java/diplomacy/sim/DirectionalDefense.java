@@ -48,16 +48,12 @@ public final class DirectionalDefense {
             z.shield = z.maxShield = shieldCapacity/4.0;
             for (Layer layer:Layer.values())
                 Arrays.fill(damageFactor[layer.ordinal()][f.ordinal()],1.0);
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.KINETIC.ordinal()]=1.3;
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.PLASMA.ordinal()]=0.65;
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.PARTICLE.ordinal()]=1.4;
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.TORPEDO.ordinal()]=1.5;
-            damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][Battle.DamageType.KINETIC.ordinal()]=1.25;
-            damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][Battle.DamageType.TORPEDO.ordinal()]=1.5;
-            damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][Battle.DamageType.LASER.ordinal()]=0.8;
-            damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][Battle.DamageType.PLASMA.ordinal()]=1.15;
-            damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][Battle.DamageType.PARTICLE.ordinal()]=1.3;
-            damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][Battle.DamageType.TORPEDO.ordinal()]=1.3;
+            for(Battle.DamageType type:Battle.DamageType.values()){
+                var law=WeaponBehaviorTable.damage(type);
+                damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][type.ordinal()]=law.shield();
+                damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][type.ordinal()]=law.armor();
+                damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][type.ordinal()]=law.structure();
+            }
         }
         int[] counts = new int[4];
         for (int row=0;row<GRID;row++) for(int col=0;col<GRID;col++) {
