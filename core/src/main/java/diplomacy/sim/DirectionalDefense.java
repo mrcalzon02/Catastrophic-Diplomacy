@@ -157,6 +157,20 @@ public final class DirectionalDefense {
         }
         return offered-left;
     }
+    /** Shields can be disrupted by an energy-focused warhead without magically
+     * damaging armor or hull. Current facing integrity is reduced proportionally.
+     */
+    public double disruptShields(double energy){
+        valid(energy);
+        double remaining=energy;
+        for(Zone zone:zones){
+            double drained=StrictMath.min(zone.shield,remaining);
+            zone.shield-=drained;remaining-=drained;
+            if(drained>0)zone.delayRemaining=zone.rechargeDelay;
+            if(remaining<=0)break;
+        }
+        return energy-remaining;
+    }
     public double totalArmor() {
         double sum=0;for(Tile[] line:tiles)for(Tile t:line)sum+=t.armor;return sum;
     }
