@@ -18,6 +18,7 @@ import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
+import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
@@ -56,6 +57,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private CampaignProgress.State campaign;
     private int campaignPage,selectedMission=1,activeMission;
     private int deployedAtLaunch,survivorsAtEnd;
+    private CampaignEncounter campaignEncounter;
     private long lastReward;
     private boolean playedCampaign,lastWon;
     private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
@@ -578,6 +580,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
      * Campaign waves/economy are separate future work.
      */
     private void changeBattlefieldLevel(int delta) {
+        if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         int selected = Math.max(1,Math.min(500,battlefieldLevel+delta));
         if (selected == battlefieldLevel) return;
         battlefieldLevel = selected;
@@ -589,11 +592,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     private void changeFleetSize(int delta) {
+        if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         int selected = Math.max(0,Math.min(FLEET_SIZES.length-1,fleetIndex+delta));
         if(selected!=fleetIndex){fleetIndex=selected;reset();}
     }
 
     private void changeFaction(int team) {
+        if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         if(team==0) {
             left=next(left);
             leftDesign=screen==GameMenuPanel.Screen.SKIRMISH && scenario!=ScenarioCatalog.Preset.CUSTOM?
@@ -697,9 +702,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE)return;
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         if(verifyDemo)battle=DemonstrationBattle.create(technology);
-        else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign)
-            battle=Battle.duel(LevelEconomy.level(activeMission).seed(),deployedAtLaunch,
+        else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign) {
+            campaignEncounter=CampaignEncounter.start(activeMission,deployedAtLaunch,
                     leftDesign,rightDesign,technology);
+            battle=campaignEncounter.battle();
+        }
         else if(screen==GameMenuPanel.Screen.BATTLE)
             battle=ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
                     FLEET_SIZES[fleetIndex]);
@@ -719,7 +726,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     @Override public void render() {
-        if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished())finishEngagement();
+        if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished()) {
+            if(playedCampaign && campaignEncounter!=null) {
+                CampaignEncounter.Advance advance=campaignEncounter.advance();
+                if(advance==CampaignEncounter.Advance.VICTORY ||
+                        advance==CampaignEncounter.Advance.DEFEAT)finishEngagement();
+            }else finishEngagement();
+        }
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE){
             Gdx.gl.glClearColor(.018f,.029f,.064f,1);
             Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
@@ -933,7 +946,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "   (W / TAP TO TOGGLE)",22,638);
         font.setColor(Color.CYAN);
         font.draw(batch,"<",945,638);
-        font.draw(batch,"LEVEL " + battlefieldLevel + "/500",998,638);
+        font.draw(batch,playedCampaign && campaignEncounter!=null
+                ?"MISSION "+activeMission+" WAVE "+campaignEncounter.wave()+"/"+campaignEncounter.waves()
+                :"LEVEL " + battlefieldLevel + "/500",998,638);
         font.draw(batch,">",1235,638);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
