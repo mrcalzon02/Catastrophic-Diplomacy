@@ -1291,8 +1291,8 @@ public final class Battle {
                 ballistics.remove(i);
             }else if(closest!=null){
                 p.x+=(nextX-p.x)*earliest;p.y+=(nextY-p.y)*earliest;
-                hit(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
-                        p.visualId,p.x,p.y);
+                hitPayload(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
+                        p.visualId,p.x,p.y,AmmunitionTable.kinetic(p.ammunition));
                 ballistics.remove(i);
             }else{p.x=nextX;p.y=nextY;}
         }
@@ -1441,8 +1441,9 @@ public final class Battle {
                     // A decoy has NO warhead and may never apply hull damage.
                     visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
                             m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
-                }else hit(target,m.damage,findShip(m.sourceId),
-                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,m.visualId);
+                }else hitPayload(target,m.damage,findShip(m.sourceId),
+                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,m.visualId,
+                        m.x,m.y,AmmunitionTable.warhead(m.warhead));
                 missiles.remove(i);continue;
             }
             if (range > 0) {
@@ -1466,9 +1467,9 @@ public final class Battle {
                     if(m.decoy)
                         visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
                                 m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
-                    else hit(target,m.damage,findShip(m.sourceId),
+                    else hitPayload(target,m.damage,findShip(m.sourceId),
                             m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,
-                            m.visualId,m.x,m.y);
+                            m.visualId,m.x,m.y,AmmunitionTable.warhead(m.warhead));
                     missiles.remove(i);
                 }else {m.x=nextX;m.y=nextY;}
             }
@@ -1493,8 +1494,47 @@ public final class Battle {
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
         hitAt(defender,raw,attacker,kind,dx,dy);
     }
+    /** Physical warheads resolve AFTER collision. Shields, tile armor, and
+     * secondary blast/EMP all operate on real actual impact coordinates.
+     */
+    private void hitPayload(Ship defender,double raw,Ship attacker,DamageType kind,
+                            long shotId,double impactX,double impactY,
+                            AmmunitionTable.Profile payload){
+        if(!defender.alive())return;
+        if(attacker!=null)defender.lastAttackerId=attacker.id;
+        visual(shotId,VisualPhase.IMPACT,kind.name(),attacker==null?-1:attacker.team,
+                attacker==null?0:attacker.id,defender.id,impactX,impactY,defender.x,defender.y);
+        double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
+        double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
+        hitAt(defender,raw,attacker,kind,dx,dy,payload.armorBypass());
+        if(payload.shieldDrain()>0){
+            defender.defense.disruptShields(raw*payload.shieldDrain());
+            defender.shields=defender.defense.totalShields();
+        }
+        if(payload.energyDrain()>0){
+            defender.power=StrictMath.max(0,defender.power-raw*payload.energyDrain());
+            defender.sensorsCondition=StrictMath.max(0,defender.sensorsCondition-
+                    raw/StrictMath.max(1,defender.maxHull)*payload.energyDrain()*.16);
+        }
+        if(payload.blastRadius()>0){
+            for(Ship nearby:ships){
+                if(nearby==defender||!nearby.alive())continue;
+                // Blast is indiscriminate: friendly ships also take real damage.
+                double distance=StrictMath.hypot(impactX-nearby.x,impactY-nearby.y);
+                if(distance>=payload.blastRadius())continue;
+                double splash=raw*payload.blastFraction()
+                        *(1-distance/payload.blastRadius());
+                if(splash>1e-8)
+                    hit(nearby,splash,attacker,kind,shotId,impactX,impactY);
+            }
+        }
+    }
     /** Environmental impacts share directional protection with actual weapons. */
     private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,double dx,double dy) {
+        hitAt(defender,raw,attacker,kind,dx,dy,0);
+    }
+    private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,
+                       double dx,double dy,double armorBypass) {
         if (!defender.alive()) return;
         hitCount++;
         double c=StrictMath.cos(defender.facing),s=StrictMath.sin(defender.facing);
@@ -1503,7 +1543,7 @@ public final class Battle {
         if(distance<1e-9){localX=1;localY=0;distance=1;}
         double radialX=localX/distance,radialY=localY/distance;
         DirectionalDefense.Impact impact=defender.defense.impact(localX,localY,
-                radialX*0.85,radialY*0.65,raw,kind);
+                radialX*0.85,radialY*0.65,raw,kind,armorBypass);
         defender.shields=defender.defense.totalShields();
         defender.armor=defender.defense.totalArmor();
         double damage=impact.hullDamage();
@@ -1577,6 +1617,10 @@ public final class Battle {
             hash = mix(hash,s.defense.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.power));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
+            hash=mix(hash,s.kineticAmmo);
+            hash=mix(hash,s.kineticType.ordinal());
+            hash=mix(hash,s.warhead(DamageType.MISSILE).ordinal());
+            hash=mix(hash,s.warhead(DamageType.TORPEDO).ordinal());
             hash=mix(hash,s.launchMode(DamageType.MISSILE).ordinal());
             hash=mix(hash,s.launchMode(DamageType.TORPEDO).ordinal());
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
@@ -1602,6 +1646,7 @@ public final class Battle {
         hash=mix(hash,roundsFiredBySalvos);
         for (Missile m : missiles) {
             hash=mix(hash,m.payload.ordinal());
+            hash=mix(hash,m.warhead.ordinal());
             hash=mix(hash,m.ignitionDelayTicks);
             hash=mix(hash,m.visualId);
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
@@ -1610,7 +1655,9 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(m.guidanceQuality));
         }
         for (Ballistic p : ballistics) {
-            hash=mix(hash,p.visualId);hash=mix(hash,Double.doubleToLongBits(p.x));
+            hash=mix(hash,p.visualId);
+            hash=mix(hash,p.ammunition.ordinal());
+            hash=mix(hash,Double.doubleToLongBits(p.x));
             hash=mix(hash,Double.doubleToLongBits(p.y));
             hash=mix(hash,Double.doubleToLongBits(p.integrity));
         }
