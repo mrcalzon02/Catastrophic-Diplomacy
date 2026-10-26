@@ -56,6 +56,11 @@ public final class HullLayouts {
                     x=total==1?0:(int)Math.round(-30.0+60.0*(n%4)/Math.max(1,Math.min(total,4)-1));
                     y=-47-(n/4)*12;
                 }
+                case HABITAT -> {
+                    // Internal crew decks lie on either side of the engine spine.
+                    x=n%2==0?-17:17;
+                    y=-10;
+                }
                 default -> throw new IllegalStateException("Unhandled mount");
             }
             // Each civilization has a different spatial doctrine, not merely a different tint.
