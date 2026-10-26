@@ -47,7 +47,7 @@ def main():
                 expected=f"assets/ships/factions/{name}/{ship['hull']}.png"
                 if path!=expected:raise ValueError("invalid sprite path")
                 data=z.read(path)
-                if not data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+                if not data.startswith(b"\x89PNG\r\n\x1a\n"):
                     raise ValueError("not a PNG: "+path)
                 if sha(data)!=ship["sha256"]:raise ValueError("hash mismatch "+path)
                 # PNG color type 6 denotes RGBA. Source sheet extraction must retain it.
@@ -63,7 +63,7 @@ def main():
             if not target.exists():target.write_bytes(data)
         # Commit this exact per-image SHA-256 contract beside the binary artwork.
         index=root/"assets/ships/factions/approved-sprites.json"
-        serialized=json.dumps(manifest,indent=2,sort_keys=True)+"\\n"
+        serialized=json.dumps(manifest,indent=2,sort_keys=True)+"\n"
         if index.exists() and index.read_text()!=serialized:
             raise ValueError("Existing art approval index differs; review before replacing")
         index.write_text(serialized)
