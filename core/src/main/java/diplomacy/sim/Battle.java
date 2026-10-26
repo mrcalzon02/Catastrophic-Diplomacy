@@ -390,7 +390,9 @@ public final class Battle {
     public void setTeamOrders(int team,BattleOrders.Orders value) {
         if(team<0||team>1||value==null)throw new IllegalArgumentException("Invalid fleet order");
         teamOrders[team]=value;
-        for(Ship ship:ships)if(ship.team==team)ship.orders=value;
+        // Fleet orders are defaults. Never erase a selected captain's
+        // independent standing doctrine when a team policy changes.
+        for(Ship ship:ships)if(ship.team==team&&ship.standingOrders==null)ship.orders=value;
     }
     /**
      * Apply only the fields changed in a fleet editor operation. A PD toggle
@@ -400,7 +402,7 @@ public final class Battle {
         if(team<0||team>1||revised==null)throw new IllegalArgumentException("Invalid fleet order");
         BattleOrders.Orders old=teamOrders[team];
         teamOrders[team]=revised;
-        for(Ship ship:ships)if(ship.team==team){
+        for(Ship ship:ships)if(ship.team==team&&ship.standingOrders==null){
             BattleOrders.Orders current=ship.orders;
             if(old.pointDefense()!=revised.pointDefense())
                 current=current.withPointDefense(revised.pointDefense());
