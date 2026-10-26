@@ -29,3 +29,11 @@ tasks.register('spatialAudioSmoke', JavaExec) {
     mainClass = 'diplomacy.client.SpatialAudioTest'
 }
 tasks.named('audioSmoke') { finalizedBy(tasks.named('spatialAudioSmoke')) }
+
+tasks.register('menuFlowSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify playable main-menu, skirmish, campaign faction and star-map touch routing.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.GameMenuFlowTest'
+}
