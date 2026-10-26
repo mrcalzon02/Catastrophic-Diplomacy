@@ -34,6 +34,7 @@ final class ShipyardPanel {
     private int team, selectedSlot, scroll;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
+    private boolean playerOnly;
     private boolean artPreview;
     private final TouchGesture gesture = new TouchGesture();
     private boolean scrollGesture;
@@ -45,8 +46,15 @@ final class ShipyardPanel {
     }
     void setIcons(TacticalUiIcons icons) { uiIcons = icons; }
     boolean open() { return open; }
-    void show() { open=true; draft=active[team]; selectedSlot=0; scroll=0; artPreview=false; }
-    void close() { open=false; gesture.cancel(); }
+    void show() { open=true; playerOnly=false; draft=active[team]; selectedSlot=0; scroll=0; artPreview=false; }
+    /** Campaign equipment is edited for its commissioned fleet only. */
+    void showCampaignFleet() {
+        side(0);
+        show();
+        playerOnly=true;
+        notice="Campaign fleet only: edit, save or load your commissioned hull.";
+    }
+    void close() { open=false; playerOnly=false; gesture.cancel(); }
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
@@ -198,13 +206,13 @@ final class ShipyardPanel {
         if(!open)return false;
         if(y>638){
             if(x<160){side(0);return true;}
-            if(x<310){side(1);return true;}
+            if(x<310){if(!playerOnly)side(1);return true;}
             if(x>=338&&x<377){hull(-1);return true;}
             if(x>=647&&x<699){hull(1);return true;}
             if(x>=705&&x<810){apply();return true;}
             if(x>=819&&x<910){save();return true;}
             if(x>=923&&x<1017){load();return true;}
-            if(x>=1018&&x<=1120){faction(1);return true;}
+            if(x>=1018&&x<=1120){if(!playerOnly)faction(1);return true;}
             if(x>1120){close();return true;}
             return true;
         }
@@ -368,13 +376,13 @@ final class ShipyardPanel {
         batch.begin();
         if (uiIcons != null) {
             uiIcons.drawButton(batch,team==0?"primary":"secondary",24,642,137,42);
-            uiIcons.drawButton(batch,team==1?"primary":"secondary",169,642,139,42);
+            if(!playerOnly)uiIcons.drawButton(batch,team==1?"primary":"secondary",169,642,139,42);
             uiIcons.drawButton(batch,"secondary",338,642,39,42);
             uiIcons.drawButton(batch,"secondary",643,642,51,42);
             uiIcons.drawButton(batch,"confirm",706,642,107,42);
             uiIcons.drawButton(batch,"secondary",819,642,96,42);
             uiIcons.drawButton(batch,"secondary",924,642,94,42);
-            uiIcons.drawButton(batch,"special",1019,642,109,42);
+            if(!playerOnly)uiIcons.drawButton(batch,"special",1019,642,109,42);
             uiIcons.drawButton(batch,"cancel",1135,642,116,42);
             uiIcons.drawButton(batch,"info",697,579,102,41);
         }
@@ -394,13 +402,18 @@ final class ShipyardPanel {
         }
         font.setColor(Color.WHITE);font.draw(batch,"SHIPYARD",22,702);
         font.setColor(team==0?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"LEFT FLEET",35,660);
-        font.setColor(team==1?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"RIGHT FLEET",175,660);
+        if(!playerOnly){
+            font.setColor(team==1?Color.CYAN:Color.LIGHT_GRAY);
+            font.draw(batch,"RIGHT FLEET",175,660);
+        }
         font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("back"))font.draw(batch,"<",345,660);
         font.draw(batch,draft.hull.name().replace('_',' '),392,660);
         if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);
         font.draw(batch,"APPLY",745,660);font.draw(batch,"SAVE",833,660);
-        font.draw(batch,"LOAD",940,660);font.draw(batch,"FACTION >",1023,660);font.draw(batch,"CLOSE",1174,660);
+        font.draw(batch,"LOAD",940,660);
+        if(!playerOnly)font.draw(batch,"FACTION >",1023,660);
+        font.draw(batch,"CLOSE",1174,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);
         font.draw(batch,artPreview?"HULL ART PREVIEW":"FACTION HULL SCHEMATIC",345,590);
