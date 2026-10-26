@@ -72,6 +72,20 @@ public final class CrewAccommodationTest {
             }
         }
         check(observed==121,"11 factions x 11 hulls");
-        System.out.println("PASS crew habitat: 121 staffed hulls, 22 new module families, 528 upgrade nodes, zero free berths, version-1 fleet migration");
+        var staffed=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
+        Battle collapse=new Battle(5028);
+        collapse.spawnWing(0,staffed,catalog,1,340,335);
+        collapse.spawnWing(1,staffed,catalog,1,740,335);
+        Battle.Ship empty=collapse.ships().get(0);
+        empty.crewCount=0;
+        check(empty.laserDamage>0&&empty.crewReadiness()==0,
+                "Empty bridge retains fitted weapon hardware but cannot operate it");
+        for(int frame=0;frame<45;frame++)collapse.step();
+        check(collapse.visualEvents().stream().noneMatch(
+                event->event.phase()==Battle.VisualPhase.FIRE&&event.sourceId()==empty.id),
+                "Crewless ship must not fire guns or launch combat craft");
+        check(empty.vx==0&&empty.vy==0,
+                "Crewless ship cannot maneuver under power");
+        System.out.println("PASS crew habitat: 121 staffed hulls, 22 new module families, 528 upgrade nodes, zero free berths, no unmanned gunfire and version-1 fleet migration");
     }
 }
