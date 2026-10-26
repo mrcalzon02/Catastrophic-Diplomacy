@@ -176,6 +176,12 @@ final class GameMenuPanel {
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
                 rectangle(shapes,819,135,425,472,PANEL);
+                // Boundary displayed is exactly the same box that placement rejects outside.
+                shapes.setColor(.18f,.42f,.51f,1);
+                shapes.rect(59,165,611,2);
+                shapes.rect(59,566,611,2);
+                shapes.rect(59,165,2,402);
+                shapes.rect(668,165,2,402);
                 // Every marker corresponds to a real ship deployed at this battle coordinate.
                 // The same pure loadout.at() is used by CampaignEncounter to place vessels.
                 for(int i=0;i<deployment.ships();i++){
@@ -184,8 +190,10 @@ final class GameMenuPanel {
                     shapes.circle(placementUiX(ship.x()),placementUiY(ship.y()),
                                   i==selectedShip?9:deployment.ships()>80?3:5,12);
                 }
-                button(shapes,845,430,99,51,false);
-                button(shapes,1098,430,99,51,false);
+                if(preparingCampaign||preset==ScenarioCatalog.Preset.CUSTOM){
+                    button(shapes,845,430,99,51,false);
+                    button(shapes,1098,430,99,51,false);
+                }
                 button(shapes,845,321,99,51,false);
                 button(shapes,1098,321,99,51,false);
                 button(shapes,845,214,352,55,false);
@@ -274,7 +282,7 @@ final class GameMenuPanel {
                 label(batch,font,"BACK",70,67,Color.WHITE);
                 if(preset!=ScenarioCatalog.Preset.PROVING_GROUND)
                     label(batch,font,"SHIPYARD",743,67,Color.WHITE);
-                label(batch,font,"LAUNCH BATTLE",998,67,Color.WHITE);
+                label(batch,font,preset.demonstration?"LAUNCH TEST":"DEPLOY FLEET",998,67,Color.WHITE);
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
             case DEPLOYMENT -> {
@@ -292,8 +300,10 @@ final class GameMenuPanel {
                 label(batch,font,preparingCampaign?"WAVES: "+stage.waves():"SINGLE ENGAGEMENT",846,505,Color.WHITE);
                 label(batch,font,"DEPLOYED: "+deployment.ships()+
                         (preparingCampaign?" / "+stage.maximumFleet():" FLEET"),963,464,Color.GOLD);
-                label(batch,font,"-",886,464,Color.WHITE);
-                label(batch,font,"+",1141,464,Color.WHITE);
+                if(preparingCampaign||preset==ScenarioCatalog.Preset.CUSTOM){
+                    label(batch,font,"-",886,464,Color.WHITE);
+                    label(batch,font,"+",1141,464,Color.WHITE);
+                }
                 label(batch,font,deployment.formation().title,959,355,Color.CYAN);
                 label(batch,font,"<",887,355,Color.WHITE);
                 label(batch,font,">",1139,355,Color.WHITE);
