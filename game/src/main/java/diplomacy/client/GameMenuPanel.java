@@ -48,6 +48,17 @@ final class GameMenuPanel {
         }
         return null;
     }
+    /** The deployment input map is shared by UI, controller and functional tests. */
+    static int deploymentAction(float x,float y) {
+        if(hit(x,y,35,35,175,55))return 0;
+        if(hit(x,y,845,430,99,51))return 1;
+        if(hit(x,y,1098,430,99,51))return 2;
+        if(hit(x,y,845,321,99,51))return 3;
+        if(hit(x,y,1098,321,99,51))return 4;
+        if(hit(x,y,845,214,352,55))return 5;
+        if(hit(x,y,913,35,302,55))return 6;
+        return -1;
+    }
     static int mapHit(float x,float y,int page){
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             if(Math.hypot(x-node.x(),y-node.y())<=26)return node.level();
