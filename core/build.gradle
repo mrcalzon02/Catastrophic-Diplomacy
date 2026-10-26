@@ -202,6 +202,88 @@ tasks.register('fighterCraftSmoke', JavaExec) {
 tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fighterCraftSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('fighterCraftSmoke') }
 
+tasks.register('alienFactionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate all five new independent alien races, 50 hull sprite paths, saved fleets and live combat.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AlienFactionArtTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('alienFactionSmoke') }
+
+tasks.register('hullFoundationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Require 11 physical hull baselines, 11 native technologies, unarmed support hulls and player/AI equipment parity.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullFoundationTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('hullFoundationSmoke') }
+
+tasks.register('moduleVersionsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove 4400 alternative manufactured module models with per-socket revisions and lossless CD-SHIP-1/2 save compatibility.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ModuleVersionsTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('moduleVersionsSmoke') }
+
+tasks.register('crewAccommodationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove explicit crew quarters and life-support modules for all 121 faction hulls, with legacy blueprint migration.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CrewAccommodationTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('crewAccommodationSmoke') }
+
+tasks.register('weaponBehaviorSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Certify all authoritative main battery firing gates, PD modes, fighter weapons, ordnance physics and FX type consistency.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WeaponBehaviorTableTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('weaponBehaviorSmoke') }
+
+tasks.register('ordnanceDoctrineSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove physical 7-mode guided missiles and torpedoes, decoys, cold ignition, ammunition and seeded replay.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceDoctrineTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnanceDoctrineSmoke') }
+
+
+tasks.register('ammunitionTypesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test five real ballistic ammunition types and six missile warheads, physics, AP, splash, EMP and deterministic replay.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionTableTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionTypesSmoke') }
+
+tasks.register('ammunitionResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Gate physical ammunition by each installed module research path/rank across all factions and real salvo loading.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionResearchTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionResearchSmoke') }
+
+tasks.register('ammunitionSelectionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify actual selected loadout, anti-forgery, CD-SHIP-3 saved ammo and live AI/player use.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionSelectionTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionSelectionSmoke') }
+
 tasks.register('demoWeaponSmoke', JavaExec) {
     group = 'verification'
     description = 'Test exact Android 200v200 combined six-weapon fitted fixture and deterministic replay.'

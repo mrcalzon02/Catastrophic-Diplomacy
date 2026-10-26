@@ -11,9 +11,9 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 2880, "full technology count");
-        require(c.componentCount() == 120, "all base components");
-        for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN")) {
+        require(c.upgradeCount() == 5808, "full technology count");
+        require(c.componentCount() == 242, "all base components");
+        for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for (String track : Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST")) {
                 for (int stage = 1; stage <= 6; stage++) {
                     String id = "TECH-" + faction + "-KIN-" + track + "-" + String.format(java.util.Locale.ROOT, "%02d", stage);
@@ -32,6 +32,6 @@ public final class TechnologyCatalogTest {
         } catch (IllegalArgumentException expected) { rejected = true; }
         require(rejected, "broken prerequisites must be rejected");
         System.out.println("PASS technology catalog | components=" + c.componentCount()
-                + " upgrades=" + c.upgradeCount() + " verified branches=" + (6*4));
+                + " upgrades=" + c.upgradeCount() + " verified branches=" + (11*4));
     }
 }

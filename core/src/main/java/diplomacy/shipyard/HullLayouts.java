@@ -56,32 +56,37 @@ public final class HullLayouts {
                     x=total==1?0:(int)Math.round(-30.0+60.0*(n%4)/Math.max(1,Math.min(total,4)-1));
                     y=-47-(n/4)*12;
                 }
+                case HABITAT -> {
+                    // Internal crew decks lie on either side of the engine spine.
+                    x=n%2==0?-17:17;
+                    y=-10;
+                }
                 default -> throw new IllegalStateException("Unhandled mount");
             }
             // Each civilization has a different spatial doctrine, not merely a different tint.
             switch(faction) {
                 case TERRAN -> { /* axial reactor spine with paired broadside batteries */ }
-                case DRAXIAN -> {
+                case DRAXIAN, VAERITH_PRISM -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) x=(int)Math.round(x*1.24);
                     if(slot.mount()==Shipyard.Mount.SYSTEM) y+=5;
                     if(slot.mount()==Shipyard.Mount.DEFENSE) y+=3;
                 }
-                case CARNELIAN -> {
+                case CARNELIAN, NYX_BIOLITH -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) x=(int)Math.round(x*0.85);
                     if(slot.mount()==Shipyard.Mount.DEFENSE) {x=(int)Math.round(x*1.20);y-=4;}
                     if(slot.mount()==Shipyard.Mount.SYSTEM) y-=6;
                 }
-                case ZIPPLEDROW -> {
+                case ZIPPLEDROW, UMBRA_FOUNDRY -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*0.93);y+=9;}
                     if(slot.mount()==Shipyard.Mount.SUPPORT) y-=2;
                     if(slot.mount()==Shipyard.Mount.SYSTEM) y+=3;
                 }
-                case UZIPT -> {
+                case UZIPT, ZELTHAR_LUMINARI -> {
                     if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*1.17);y+=4;}
                     // Defense remains on the separated aft perimeter.
                     if(slot.mount()==Shipyard.Mount.SYSTEM) x+=3;
                 }
-                case MANDRALLY -> {
+                case MANDRALLY, AUREATE_SYNOD -> {
                     if(slot.mount()==Shipyard.Mount.SYSTEM) x=(int)Math.round(x*1.35);
                     if(slot.mount()==Shipyard.Mount.SUPPORT) {x=(int)Math.round(x*1.16);y+=2;}
                     if(slot.mount()==Shipyard.Mount.WEAPON) {x=(int)Math.round(x*1.30);y-=6;}
@@ -175,15 +180,15 @@ public final class HullLayouts {
         int[][] shape = switch(faction) {
             case TERRAN -> new int[][]{{0,77},{16,53},{26,31},{39,-6},{48,-29},{25,-59},
                     {-25,-59},{-48,-29},{-39,-6},{-26,31},{-16,53}};
-            case DRAXIAN -> new int[][]{{0,77},{14,52},{36,34},{58,-2},{64,-40},
+            case DRAXIAN, VAERITH_PRISM -> new int[][]{{0,77},{14,52},{36,34},{58,-2},{64,-40},
                     {34,-27},{17,-58},{0,-62},{-17,-58},{-34,-27},{-64,-40},{-58,-2},{-36,34},{-14,52}};
-            case CARNELIAN -> new int[][]{{0,77},{26,52},{49,25},{57,-34},
+            case CARNELIAN, NYX_BIOLITH -> new int[][]{{0,77},{26,52},{49,25},{57,-34},
                     {36,-61},{-36,-61},{-57,-34},{-49,25},{-26,52}};
-            case ZIPPLEDROW -> new int[][]{{0,86},{13,38},{24,10},{52,-33},{22,-28},
+            case ZIPPLEDROW, UMBRA_FOUNDRY -> new int[][]{{0,86},{13,38},{24,10},{52,-33},{22,-28},
                     {12,-65},{-12,-65},{-22,-28},{-52,-33},{-24,10},{-13,38}};
-            case UZIPT -> new int[][]{{0,46},{15,46},{25,77},{43,55},{43,0},
+            case UZIPT, ZELTHAR_LUMINARI -> new int[][]{{0,46},{15,46},{25,77},{43,55},{43,0},
                     {53,-21},{33,-60},{-33,-60},{-53,-21},{-43,0},{-43,55},{-25,77},{-15,46}};
-            case MANDRALLY -> new int[][]{{0,78},{28,49},{42,14},{64,-10},{48,-44},
+            case MANDRALLY, AUREATE_SYNOD -> new int[][]{{0,78},{28,49},{42,14},{64,-10},{48,-44},
                     {23,-35},{13,-65},{-13,-65},{-23,-35},{-48,-44},{-64,-10},{-42,14},{-28,49}};
         };
         double width = switch(hull) {

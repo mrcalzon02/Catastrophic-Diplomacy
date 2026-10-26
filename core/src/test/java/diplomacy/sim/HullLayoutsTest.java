@@ -25,7 +25,7 @@ public final class HullLayoutsTest {
         check(Shipyard.Hull.values()[1]==Shipyard.Hull.FRIGATE,"legacy frigate ID");
         check(Shipyard.Hull.values()[2]==Shipyard.Hull.CRUISER,"legacy cruiser ID");
         check(Shipyard.Hull.values()[3]==Shipyard.Hull.DREADNOUGHT,"legacy dreadnought ID");
-        int[] expectedTotals={7,6,10,10,14,16,16,20,23,27,27};
+        int[] expectedTotals={9,8,12,12,16,18,18,22,25,29,29};
         int count=0;
         for(int i=0;i<display.length;i++){
             Shipyard.Hull hull=display[i];
@@ -49,7 +49,7 @@ public final class HullLayoutsTest {
                         case SYSTEM -> systems++;
                         case WEAPON -> weapons++;
                         case DEFENSE -> defenses++;
-                        case SUPPORT -> { }
+                        case SUPPORT,HABITAT -> { }
                     }
                 }
                 for(int left=0;left<layout.size();left++)for(int right=left+1;right<layout.size();right++){
@@ -72,7 +72,8 @@ public final class HullLayoutsTest {
                 count++;
             }
         }
-        check(count==66,"missing hull/faction permutations");
+        check(count==display.length*Battle.Faction.values().length,
+                "missing hull/faction permutations");
         System.out.println("PASS hull layouts: "+count+" valid faction/class fittings, distinct placements and hit tests");
     }
 }

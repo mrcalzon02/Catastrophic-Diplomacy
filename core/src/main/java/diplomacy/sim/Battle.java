@@ -3,6 +3,7 @@ package diplomacy.sim;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Locale;
@@ -19,7 +20,12 @@ public final class Battle {
         CARNELIAN("Carnelian Furlongs", 0.85f, 0.22f, 0.48f),
         ZIPPLEDROW("Zippledrow", 0.15f, 0.88f, 0.98f),
         UZIPT("Uzipt", 0.32f, 0.64f, 0.85f),
-        MANDRALLY("Mandrally", 0.43f, 0.77f, 0.42f);
+        MANDRALLY("Mandrally", 0.43f, 0.77f, 0.42f),
+        VAERITH_PRISM("Vaerith Prism Dominion",0.61f,0.35f,0.90f),
+        ZELTHAR_LUMINARI("Zelthar Luminari Accord",0.12f,0.84f,0.86f),
+        AUREATE_SYNOD("Aureate Cathedral Synod",0.95f,0.80f,0.53f),
+        NYX_BIOLITH("Nyx Biolith Enclave",0.78f,0.32f,0.83f),
+        UMBRA_FOUNDRY("Umbra Foundry Compact",0.45f,0.34f,0.59f);
         public final String displayName;
         public final float r, g, b;
         Faction(String label, float red, float green, float blue) {
@@ -46,6 +52,16 @@ public final class Battle {
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
+        /** Manned hulls have NO intrinsic complement; berths/oxygen are installed. */
+        public double crewCount;
+        public int crewRequired, crewBerths, lifeSupport;
+        public boolean fittedCrewSystems;
+        public double crewReadiness(){
+            if(!fittedCrewSystems)return 1; // legacy unfitted simulation fixtures
+            return Math.max(0,Math.min(1,crewCount/Math.max(1,crewRequired)));
+        }
+        /** Ship hull sensor and cross-section, independent from fitted scanner modules. */
+        public double sensorRange=1100, radarCrossSection=1;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
         public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
@@ -65,6 +81,43 @@ public final class Battle {
         public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload,repairDroneReload;
         public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
         public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
+        public int kineticAmmo=100;
+        public AmmunitionTable.Kinetic kineticType=AmmunitionTable.Kinetic.STANDARD;
+        /** Null only on legacy addShip(faction) test fixtures; real fitted ships
+         * are governed by the per-socket research intersection. */
+        public AmmunitionResearch.Access ammoAccess;
+        public final EnumMap<DamageType,AmmunitionTable.Warhead> warheads=
+                new EnumMap<>(DamageType.class);
+        public AmmunitionTable.Warhead warhead(DamageType family){
+            if(family!=DamageType.MISSILE&&family!=DamageType.TORPEDO)
+                throw new IllegalArgumentException("Warheads require guided payloads");
+            return warheads.getOrDefault(family,AmmunitionTable.Warhead.STANDARD);
+        }
+        public void setWarhead(DamageType family,AmmunitionTable.Warhead kind){
+            warhead(family);AmmunitionTable.warhead(kind);
+            if(ammoAccess!=null&&!ammoAccess.allows(family,kind))
+                throw new IllegalArgumentException(
+                        "Guided payload "+kind+" is locked for this fitted "+family+" weapon research");
+            warheads.put(family,kind);
+        }
+        public void setKineticType(AmmunitionTable.Kinetic kind){
+            AmmunitionTable.kinetic(kind);
+            if(ammoAccess!=null&&!ammoAccess.allows(kind))
+                throw new IllegalArgumentException(
+                        "Kinetic ammunition "+kind+" is locked for this fitted weapon research");
+            kineticType=kind;
+        }
+        /** Independent selectable guided firing schematic for each weapon family.
+         * Defaults preserve all existing single-shot ammunition behavior. */
+        public final EnumMap<DamageType,OrdnanceDoctrine.Mode> launchModes=
+                new EnumMap<>(DamageType.class);
+        public OrdnanceDoctrine.Mode launchMode(DamageType family){
+            OrdnanceDoctrine.patterns(family); // reject unguided requests
+            return launchModes.getOrDefault(family,OrdnanceDoctrine.Mode.SINGLE);
+        }
+        public void setLaunchMode(DamageType family,OrdnanceDoctrine.Mode mode){
+            OrdnanceDoctrine.forWeapon(family,mode);launchModes.put(family,mode);
+        }
         public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
         public int commanderSkill;
@@ -75,11 +128,11 @@ public final class Battle {
             pdRange = 115; damageControl = 0.014; commanderSkill = 2;
             switch (group) {
                 case TERRAN: maxPower *= 1.13; pdRange *= 1.13; break;
-                case DRAXIAN: maxShields *= 1.45; sif += 0.08; laserDamage *= 1.18; break;
-                case CARNELIAN: maxHull *= 1.36; maxArmor *= 1.60; speed *= 0.74; break;
-                case ZIPPLEDROW: speed *= 1.65; maxHull *= 0.72; maxShields *= 0.68; break;
-                case UZIPT: accuracy += 0.17; pdRange *= 1.34; commanderSkill = 4; break;
-                case MANDRALLY: damageControl *= 3.0; maxHull *= 1.11; maxHeat *= 0.85; break;
+                case DRAXIAN: case VAERITH_PRISM: maxShields *= 1.45; sif += 0.08; laserDamage *= 1.18; break;
+                case CARNELIAN: case NYX_BIOLITH: maxHull *= 1.36; maxArmor *= 1.60; speed *= 0.74; break;
+                case ZIPPLEDROW: case UMBRA_FOUNDRY: speed *= 1.65; maxHull *= 0.72; maxShields *= 0.68; break;
+                case UZIPT: case ZELTHAR_LUMINARI: accuracy += 0.17; pdRange *= 1.34; commanderSkill = 4; break;
+                case MANDRALLY: case AUREATE_SYNOD: damageControl *= 3.0; maxHull *= 1.11; maxHeat *= 0.85; break;
                 default: break;
             }
             hull = maxHull; shields = maxShields; armor = maxArmor; power = maxPower;
@@ -92,7 +145,8 @@ public final class Battle {
         /** Visible top-down hull scale; larger fitted capital hulls read as larger ships. */
         public double visualScale() { return Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0))); }
         public double combatReadiness() {
-            return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition);
+            return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition)
+                    * crewReadiness();
         }
         public String status() {
             return String.format(Locale.ROOT, "%s hull=%.0f shield=%.0f armor=%.0f heat=%.0f",
@@ -108,8 +162,31 @@ public final class Battle {
         public final boolean torpedo;
         public final ProjectileModel.Spec spec;
         public final double guidanceQuality;
+        /** Payload kind controls actual warhead/countermeasure effects. */
+        public final OrdnanceDoctrine.Payload payload;
+        public final AmmunitionTable.Warhead warhead;
+        public final boolean decoy;
+        /** Cold launches wait before ignition and can be killed by PD while coasting. */
+        public int ignitionDelayTicks;
+        Missile(long visualId,long spawnTick, int source, int owner, int target,
+                double sx,double sy,double dx,double dy,double amount,
+                boolean heavy,ProjectileModel.Spec profile,double launchGuidance){
+            this(visualId,spawnTick,source,owner,target,sx,sy,dx,dy,amount,
+                    heavy,profile,launchGuidance,OrdnanceDoctrine.Payload.STANDARD,0,
+                    AmmunitionTable.Warhead.STANDARD);
+        }
         Missile(long visualId,long spawnTick, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
-                boolean heavy, ProjectileModel.Spec profile,double launchGuidance) {
+                boolean heavy, ProjectileModel.Spec profile,double launchGuidance,
+                OrdnanceDoctrine.Payload launchPayload,int ignitionTicks) {
+            this(visualId,spawnTick,source,owner,target,sx,sy,dx,dy,amount,
+                    heavy,profile,launchGuidance,launchPayload,ignitionTicks,
+                    AmmunitionTable.Warhead.STANDARD);
+        }
+        Missile(long visualId,long spawnTick,int source,int owner,int target,
+                double sx,double sy,double dx,double dy,double amount,
+                boolean heavy,ProjectileModel.Spec profile,double launchGuidance,
+                OrdnanceDoctrine.Payload launchPayload,int ignitionTicks,
+                AmmunitionTable.Warhead warheadType) {
             this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
@@ -117,8 +194,17 @@ public final class Battle {
             if(profile==null)throw new IllegalArgumentException("Missile properties missing");
             if(!Double.isFinite(launchGuidance)||launchGuidance<0.2||launchGuidance>2.6)
                 throw new IllegalArgumentException("Invalid missile guidance quality");
+            if(launchPayload==null||ignitionTicks<0||ignitionTicks>90)
+                throw new IllegalArgumentException("Invalid guided payload");
+            payload=launchPayload;decoy=launchPayload==OrdnanceDoctrine.Payload.DECOY;
+            AmmunitionTable.warhead(warheadType);warhead=warheadType;
+            if(decoy && amount!=0)
+                throw new IllegalArgumentException("Countermeasures are forbidden from damaging ships");
+            ignitionDelayTicks=ignitionTicks;
             spec=profile;guidanceQuality=launchGuidance;
-            fuel = heavy?14:10; damage = amount; integrity=profile.health();
+            fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds()
+                    +ignitionTicks*DT;
+            damage=amount;integrity=profile.health();
         }
     }
 
@@ -134,10 +220,18 @@ public final class Battle {
         public final long visualId,spawnTick;
         public final int sourceId,team,targetId;
         public final double vx,vy,damage;
+        public final AmmunitionTable.Kinetic ammunition;
         public double x,y,life,integrity;
         Ballistic(long id,long firedAt,int source,int side,int target,
                   double px,double py,double heading,double amount,ProjectileModel.Spec profile){
+            this(id,firedAt,source,side,target,px,py,heading,amount,profile,
+                    AmmunitionTable.Kinetic.STANDARD);
+        }
+        Ballistic(long id,long firedAt,int source,int side,int target,
+                  double px,double py,double heading,double amount,ProjectileModel.Spec profile,
+                  AmmunitionTable.Kinetic type){
             if(profile==null)throw new IllegalArgumentException("Ballistic properties missing");
+            AmmunitionTable.kinetic(type);ammunition=type;
             spec=profile;
             visualId=id;spawnTick=firedAt;sourceId=source;team=side;targetId=target;
             x=px;y=py;vx=profile.speed()*StrictMath.cos(heading);
@@ -211,6 +305,23 @@ public final class Battle {
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
+    /** A single family-level launch sequencer, until true per-hardpoint guns exist. */
+    private static final class PendingLaunch {
+        final int sourceId,targetId;
+        final DamageType family;
+        final OrdnanceDoctrine.Pattern pattern;
+        final AmmunitionTable.Warhead loadedWarhead;
+        int nextIndex;
+        long nextTick;
+        PendingLaunch(int source,int target,DamageType type,
+                      OrdnanceDoctrine.Pattern doctrine,long start,
+                      AmmunitionTable.Warhead loaded){
+            sourceId=source;targetId=target;family=type;pattern=doctrine;
+            loadedWarhead=loaded;nextTick=start;
+        }
+    }
+    private final List<PendingLaunch> launchQueue=new ArrayList<>();
+    public int decoysLaunched,decoysIntercepted,salvosStarted,roundsFiredBySalvos;
     private final List<Craft> crafts = new ArrayList<>();
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
@@ -240,6 +351,23 @@ public final class Battle {
     }
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
+    public int pendingSalvoCount(){return launchQueue.size();}
+    public void setShipKineticAmmunition(int id,AmmunitionTable.Kinetic type){
+        Ship ship=findShip(id);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setKineticType(type);
+    }
+    public void setShipWarhead(int id,DamageType family,AmmunitionTable.Warhead type){
+        Ship ship=findShip(id);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setWarhead(family,type);
+    }
+    /** Applies to a real fitted ship or to legacy fixture ships. */
+    public void setShipLaunchMode(int shipId,DamageType family,OrdnanceDoctrine.Mode mode){
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setLaunchMode(family,mode);
+    }
     public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
@@ -327,11 +455,22 @@ public final class Battle {
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
+        s.fittedCrewSystems=true;
+        s.crewRequired=machinery.crew().minimum();
+        s.crewBerths=machinery.crew().berths();
+        s.lifeSupport=machinery.crew().lifeSupport();
+        s.crewCount=Math.min(s.crewBerths,s.lifeSupport);
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
+        s.sensorRange=machinery.baseline().sensorRange();
+        s.radarCrossSection=machinery.baseline().radarCrossSection();
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
         s.defense = new DirectionalDefense(s.maxShields,s.maxArmor,s.maxHull);
+        if(machinery.baseline().shieldRecharge()>0)
+            for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values())
+                s.defense.configureRecharge(face,
+                        1.25+machinery.baseline().shieldRecharge()/4,2);
         s.maxPower = machinery.maxPower(); s.power = s.maxPower;
         s.maxHeat = machinery.maxHeat();
         s.powerRegen = machinery.powerRegen();
@@ -345,12 +484,19 @@ public final class Battle {
         s.pointDefenseProfile=machinery.pointDefense();
         s.pdCycle=machinery.pdCycle();
         s.weapons=machinery.weapons();
+        s.ammoAccess=machinery.ammunition();
+        // A fleet blueprint owns the chosen, research-licensed physical loads.
+        // Stock ammo remains the exact default for legacy CD-SHIP-1/2 fleets.
+        s.setKineticType(design.ammoSelection.kinetic());
+        s.setWarhead(DamageType.MISSILE,design.ammoSelection.missile());
+        s.setWarhead(DamageType.TORPEDO,design.ammoSelection.torpedo());
         s.support=machinery.support();
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
         s.fighterReserve=machinery.fighterCapacity();s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
+        s.kineticAmmo=s.kineticDamage>0?64+machinery.magazineCapacity()*4:0;
         s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
         s.torpedoAmmo=s.torpedoDamage>0?3+machinery.magazineCapacity()/3:0;
         return s;
@@ -436,13 +582,15 @@ public final class Battle {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
                     double heading = s.team == 0 ? 1 : -1;
-                    s.vx += (heading * s.speed * s.engineCondition * 0.38 - s.vx) * 0.055;
+                    s.vx += (heading * s.speed * s.engineCondition
+                            * s.crewReadiness() * 0.38 - s.vx) * 0.055;
                 }
                 s.x += s.vx * DT; s.y += s.vy * DT;
             }
             launchAuxiliary(s,target);
         }
         updateSupport();
+        updateQueuedLaunches();
         updateMissiles();
         updateBallistics();
         updateCraft();
@@ -450,7 +598,8 @@ public final class Battle {
 
     private void replenish(Ship s) {
         s.power = Math.max(0, Math.min(s.maxPower * s.reactorCondition,
-                s.power + s.powerRegen * DT * s.reactorCondition - weather.powerDrainPerSecond() * DT));
+                s.power + s.powerRegen * DT * s.reactorCondition
+                        * s.crewReadiness() - weather.powerDrainPerSecond() * DT));
         s.heat = Math.max(0, s.heat + (s.passiveHeat + weather.heatPerSecond()
                 - s.coolingRate * s.coolingCondition * weather.coolingFactor()) * DT);
         // Regenerate individual shield facings, subject to cooldown, reactor and power headroom.
@@ -486,6 +635,12 @@ public final class Battle {
         s.repairDroneReload=Math.max(0,s.repairDroneReload-DT);
     }
 
+    /** Built-in radar and target cross-section matter without art-scale coupling. */
+    private double targetAcquisitionRange(Ship observer,Ship target){
+        double rcs=StrictMath.max(0.15,StrictMath.min(4.0,target.radarCrossSection));
+        return observer.sensorRange*observer.sensorsCondition*weather.sensorFactor()
+                *StrictMath.sqrt(StrictMath.sqrt(rcs));
+    }
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
         if(actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
@@ -493,8 +648,8 @@ public final class Battle {
             double best = Double.POSITIVE_INFINITY;
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
                 double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
-                if (weather.preset().enabled() && distance > 1100.0 * actor.sensorsCondition
-                        * weather.sensorFactor()) continue;
+                if (weather.preset().enabled() &&
+                        distance > targetAcquisitionRange(actor,s))continue;
                 double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
@@ -510,8 +665,7 @@ public final class Battle {
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
             double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
-            if(weather.preset().enabled() && distance>1100.0*actor.sensorsCondition
-                    *weather.sensorFactor())continue;
+            if(weather.preset().enabled() && distance>targetAcquisitionRange(actor,candidate))continue;
             double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
@@ -556,7 +710,7 @@ public final class Battle {
         if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
-        double thrust = s.speed * s.engineCondition;
+        double thrust = s.speed * s.engineCondition * s.crewReadiness();
         double desiredVx = StrictMath.cos(s.facing) * thrust, desiredVy = StrictMath.sin(s.facing) * thrust;
         double smoothing = Math.min(1, 1.6 * DT);
         s.vx += (desiredVx - s.vx) * smoothing;
@@ -615,78 +769,183 @@ public final class Battle {
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
         double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
         ship.facing=wrap(ship.facing+change);
-        double velocity=ship.speed*ship.engineCondition;
+        double velocity=ship.speed*ship.engineCondition*ship.crewReadiness();
         double smooth=Math.min(1,1.6*DT);
         ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
         ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
         ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
     }
 
+    /** Cost transfer occurs only for real FIRE events. All costs and rates
+     * are shared with the public authoritative WeaponBehaviorTable. */
+    private static void chargeGun(Ship s,WeaponBehaviorTable.Gun behavior){
+        s.power-=behavior.powerPerShot();
+        s.heat+=behavior.heatPerShot();
+    }
     private void fire(Ship s, Ship target) {
-        double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
-        double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition
-                * weather.sensorFactor() * (1 - target.ecmStrength*target.ecmCondition);
-        double weatherAim = weather.accuracyFactor();
-        if (s.laserDamage > 0 && distance < 530*s.weapons.laserRange() && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
-            s.laserReload = 1.05*s.weapons.laserCycle() / Math.max(0.3, s.weaponsCondition);
-            s.power -= 9; s.heat += 7;
+        if(s.crewReadiness()<0.05)return;
+        double distance=StrictMath.hypot(target.x-s.x,target.y-s.y);
+        double lock=Math.max(0,1-distance/Math.max(1,s.sensorRange))
+                *s.crewReadiness()*s.sensorsCondition*weather.sensorFactor()
+                *(1-target.ecmStrength*target.ecmCondition);
+        double weatherAim=weather.accuracyFactor();
+        var laser=WeaponBehaviorTable.gun(DamageType.LASER);
+        var missile=WeaponBehaviorTable.gun(DamageType.MISSILE);
+        var kinetic=WeaponBehaviorTable.gun(DamageType.KINETIC);
+        var plasma=WeaponBehaviorTable.gun(DamageType.PLASMA);
+        var particle=WeaponBehaviorTable.gun(DamageType.PARTICLE);
+        var torpedo=WeaponBehaviorTable.gun(DamageType.TORPEDO);
+        // Preserve firing-family ordering: LASER, MISSILE, KINETIC, PLASMA,
+        // PARTICLE, TORPEDO. No extra RNG calls or synthetic salvo events.
+        if(laser.available(s.laserDamage,0,distance,s.weapons.laserRange(),
+                s.laserReload,s.power,s.heat,s.maxHeat,
+                s.weaponsCondition,s.magazineCondition)){
+            s.laserReload=laser.reload(s.weapons.laserCycle(),s.weaponsCondition);
+            chargeGun(s,laser);
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,tick,s.x, s.y, target.x, target.y, s.team,DamageType.LASER));
+            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.LASER));
             visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            double chance = Math.min(0.98, s.accuracy*s.weapons.laserTracking() * weatherAim * (0.7 + lock * 0.45));
-            if (random.nextDouble() < chance) hit(target,s.laserDamage,s,DamageType.LASER,shotId);
+            if(random.nextDouble()<laser.aim(s.accuracy,s.weapons.laserTracking(),weatherAim,lock))
+                hit(target,s.laserDamage,s,DamageType.LASER,shotId);
         }
-        if (s.missileDamage > 0 && s.missileAmmo > 0 && distance < 690*s.weapons.missileRange() && distance > 80 && s.missileReload == 0 && s.power > 13 && s.weaponsCondition > 0.15 && s.magazineCondition > 0.15) {
-            s.missileReload = 3.2*s.weapons.missileCycle() / Math.max(0.4, s.weaponsCondition);
-            s.power -= 13; s.heat += 5;
-            long shotId=nextVisualShotId++;
-            missiles.add(new Missile(shotId,tick,s.id, s.team, target.id, s.x, s.y,
-                    target.x - s.x, target.y - s.y, s.missileDamage,false,s.missileProjectile,
-                    s.weapons.missileTracking()));
-            visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            s.launched++;s.missileAmmo--;
+        if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
+                s.missileReload,s.power,s.heat,s.maxHeat,
+                s.weaponsCondition,s.magazineCondition)
+                &&!hasPendingGuided(s.id,DamageType.MISSILE)){
+            OrdnanceDoctrine.Pattern doctrine=OrdnanceDoctrine.forWeapon(
+                    DamageType.MISSILE,s.launchMode(DamageType.MISSILE));
+            if(s.missileAmmo>=doctrine.ammoNeeded()){
+                s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition)
+                        *doctrine.reloadMultiplier();
+                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,
+                        doctrine,tick,s.warhead(DamageType.MISSILE)));
+                salvosStarted++;
+            }
         }
-        if (s.kineticDamage > 0 && distance < 445*s.weapons.kineticRange() && s.kineticReload <= 0 && s.power>5 && s.heat<s.maxHeat*0.95) {
-            s.kineticReload=0.75*s.weapons.kineticCycle()/Math.max(0.25,s.weaponsCondition);
-            s.power-=5;s.heat+=4;
+        AmmunitionTable.Profile shell=AmmunitionTable.kinetic(s.kineticType);
+        if(kinetic.available(s.kineticDamage,0,distance,s.weapons.kineticRange(),
+                s.kineticReload,s.power,s.heat,s.maxHeat,
+                s.weaponsCondition,s.magazineCondition)
+                &&s.kineticAmmo>0
+                &&s.power>kinetic.powerPerShot()*shell.powerCost()
+                &&s.heat+kinetic.heatPerShot()*shell.heatCost()<=s.maxHeat){
+            s.kineticReload=kinetic.reload(s.weapons.kineticCycle(),s.weaponsCondition)
+                    *shell.reloadCost();
+            s.power-=kinetic.powerPerShot()*shell.powerCost();
+            s.heat+=kinetic.heatPerShot()*shell.heatCost();
+            s.kineticAmmo--;
             long shotId=nextVisualShotId++;
             double angle=StrictMath.atan2(target.y-s.y,target.x-s.x);
-            // Preserve the existing one-roll accuracy model, but a miss now has a
-            // genuinely displaced trajectory rather than an unexplained failed hit.
-            boolean onTarget=random.nextDouble()<Math.min(0.97,s.accuracy*s.weapons.kineticTracking()*weatherAim*(0.72+lock*0.4));
-            if(!onTarget)angle+=(shotId%2==0?1:-1)*0.24;
+            boolean onTarget=random.nextDouble()<kinetic.aim(
+                    s.accuracy,s.weapons.kineticTracking(),weatherAim,lock);
+            if(!onTarget)angle+=(shotId%2==0?1:-1)*WeaponBehaviorTable.BALLISTIC_MISS_ANGLE_RADIANS;
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
-                    s.x,s.y,angle,s.kineticDamage,s.kineticProjectile));
+                    s.x,s.y,angle,s.kineticDamage*shell.damage(),
+                    shell.physical(s.kineticProjectile),s.kineticType));
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
                     s.x,s.y,target.x,target.y);
         }
-        if (s.plasmaDamage > 0 && distance < 245*s.weapons.plasmaRange() && s.plasmaReload <= 0 && s.power>14 && s.heat<s.maxHeat*0.86) {
-            s.plasmaReload=1.8*s.weapons.plasmaCycle()/Math.max(0.25,s.weaponsCondition);
-            s.power-=14;s.heat+=17;
+        if(plasma.available(s.plasmaDamage,0,distance,s.weapons.plasmaRange(),
+                s.plasmaReload,s.power,s.heat,s.maxHeat,
+                s.weaponsCondition,s.magazineCondition)){
+            s.plasmaReload=plasma.reload(s.weapons.plasmaCycle(),s.weaponsCondition);
+            chargeGun(s,plasma);
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
             visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.94,s.accuracy*s.weapons.plasmaTracking()*weatherAim*(0.80+lock*0.4)))
+            if(random.nextDouble()<plasma.aim(s.accuracy,s.weapons.plasmaTracking(),weatherAim,lock))
                 hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
         }
-        if (s.particleDamage > 0 && distance < 565*s.weapons.particleRange() && s.particleReload <= 0 && s.power>17 && s.heat<s.maxHeat*0.9) {
-            s.particleReload=2.1*s.weapons.particleCycle()/Math.max(0.25,s.weaponsCondition);
-            s.power-=17;s.heat+=10;
+        if(particle.available(s.particleDamage,0,distance,s.weapons.particleRange(),
+                s.particleReload,s.power,s.heat,s.maxHeat,
+                s.weaponsCondition,s.magazineCondition)){
+            s.particleReload=particle.reload(s.weapons.particleCycle(),s.weaponsCondition);
+            chargeGun(s,particle);
             long shotId=nextVisualShotId++;
             beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
             visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<Math.min(0.98,s.accuracy*s.weapons.particleTracking()*weatherAim*(0.76+lock*0.45)))
+            if(random.nextDouble()<particle.aim(s.accuracy,s.weapons.particleTracking(),weatherAim,lock))
                 hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
         }
-        if (s.torpedoDamage > 0 && s.torpedoAmmo>0 && distance<840*s.weapons.torpedoRange() && distance>110
-                && s.torpedoReload<=0 && s.power>18 && s.magazineCondition>0.15) {
-            s.torpedoReload=6.4*s.weapons.torpedoCycle()/Math.max(0.25,s.weaponsCondition);
-            s.power-=18;s.heat+=9;s.torpedoAmmo--;s.launched++;
-            long shotId=nextVisualShotId++;
-            missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
-                    target.x-s.x,target.y-s.y,s.torpedoDamage,true,s.torpedoProjectile,
-                    s.weapons.torpedoTracking()));
-            visual(shotId,VisualPhase.FIRE,"TORPEDO",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
+        if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
+                s.torpedoReload,s.power,s.heat,s.maxHeat,
+                s.weaponsCondition,s.magazineCondition)
+                &&!hasPendingGuided(s.id,DamageType.TORPEDO)){
+            OrdnanceDoctrine.Pattern doctrine=OrdnanceDoctrine.forWeapon(
+                    DamageType.TORPEDO,s.launchMode(DamageType.TORPEDO));
+            if(s.torpedoAmmo>=doctrine.ammoNeeded()){
+                s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition)
+                        *doctrine.reloadMultiplier();
+                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,
+                        doctrine,tick,s.warhead(DamageType.TORPEDO)));
+                salvosStarted++;
+            }
+        }
+    }
+
+    private boolean hasPendingGuided(int sourceId,DamageType family){
+        for(PendingLaunch pending:launchQueue)
+            if(pending.sourceId==sourceId && pending.family==family)return true;
+        return false;
+    }
+    /** Never create simulated hits or visuals from a mere scheduled shot.
+     * Each actual launched body pays an ammunition AND power/heat cost. */
+    private void updateQueuedLaunches(){
+        for(int i=launchQueue.size()-1;i>=0;i--){
+            PendingLaunch order=launchQueue.get(i);
+            if(order.nextTick>tick)continue;
+            Ship source=findShip(order.sourceId);
+            Ship target=findShip(order.targetId);
+            var gun=WeaponBehaviorTable.gun(order.family);
+            boolean heavy=order.family==DamageType.TORPEDO;
+            if(source==null||!source.alive()||source.crewReadiness()<0.05
+                    ||target==null||!target.alive()
+                    ||source.weaponsCondition<=gun.requiredWeaponCondition()
+                    ||source.magazineCondition<=gun.requiredMagazineCondition()
+                    ||source.power<=gun.powerPerShot()
+                    ||(heavy?source.torpedoAmmo:source.missileAmmo)<=0){
+                launchQueue.remove(i);
+                continue;
+            }
+            // Bounded deployment protects large fleets from unbounded salvo queues.
+            if(missiles.size()>=12000)continue;
+            int index=order.nextIndex;
+            boolean decoy=order.pattern.isDecoy(index);
+            ProjectileModel.Spec standard=heavy?source.torpedoProjectile:source.missileProjectile;
+            ProjectileModel.Spec actual=OrdnanceDoctrine.derived(standard,order.pattern,decoy);
+            // A preloaded salvo retains its warhead even if the player changes
+            // the next salvo's selection while these bodies are still queued.
+            AmmunitionTable.Warhead warhead=order.loadedWarhead;
+            AmmunitionTable.Profile payload=AmmunitionTable.warhead(warhead);
+            if(!decoy)actual=payload.physical(actual);
+            OrdnanceDoctrine.Payload subtype=decoy?OrdnanceDoctrine.Payload.DECOY
+                    :order.pattern.payload();
+            double spread=(index-(order.pattern.count()-1)*0.5)*0.045;
+            double angle=StrictMath.atan2(target.y-source.y,target.x-source.x)+spread;
+            double distance=StrictMath.hypot(target.y-source.y,target.x-source.x);
+            double velocityX=StrictMath.cos(angle)*Math.max(1,distance);
+            double velocityY=StrictMath.sin(angle)*Math.max(1,distance);
+            double baseDamage=heavy?source.torpedoDamage:source.missileDamage;
+            double damage=decoy?0:baseDamage*order.pattern.damageMultiplier()*payload.damage();
+            if(source.power<=gun.powerPerShot()*payload.powerCost()
+                    ||source.heat+gun.heatPerShot()*payload.heatCost()>source.maxHeat){
+                launchQueue.remove(i);continue;
+            }
+            source.power-=gun.powerPerShot()*payload.powerCost();
+            source.heat+=gun.heatPerShot()*payload.heatCost();
+            if(heavy)source.torpedoAmmo--;else source.missileAmmo--;
+            source.launched++;roundsFiredBySalvos++;
+            if(decoy)decoysLaunched++;
+            long shot=nextVisualShotId++;
+            Missile body=new Missile(shot,tick,source.id,source.team,target.id,
+                    source.x,source.y,velocityX,velocityY,damage,heavy,actual,
+                    heavy?source.weapons.torpedoTracking():source.weapons.missileTracking(),
+                    subtype,order.pattern.ignitionDelayTicks(),warhead);
+            missiles.add(body);
+            visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
+                    source.team,source.id,target.id,source.x,source.y,target.x,target.y);
+            if(++order.nextIndex>=order.pattern.count())launchQueue.remove(i);
+            else order.nextTick=tick+order.pattern.intervalTicks();
         }
     }
 
@@ -735,6 +994,7 @@ public final class Battle {
         if(tick%6!=0)return;
         double seconds=6*DT;
         for(Ship source:ships)if(source.alive()&&source.reactorCondition>0.15
+                &&source.crewReadiness()>=0.05
                 &&source.heat<source.maxHeat*0.93) {
             Shipyard.Support support=source.support;
             if(support.remoteRepairRate()>0&&source.power>6) {
@@ -768,7 +1028,8 @@ public final class Battle {
     }
 
     private void launchAuxiliary(Ship ship, Ship enemy) {
-        if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
+        if(ship.crewReadiness()<0.05 || ship.hangarCondition<0.20
+                || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
         if(enemy!=null && ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
@@ -1053,8 +1314,8 @@ public final class Battle {
                 ballistics.remove(i);
             }else if(closest!=null){
                 p.x+=(nextX-p.x)*earliest;p.y+=(nextY-p.y)*earliest;
-                hit(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
-                        p.visualId,p.x,p.y);
+                hitPayload(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
+                        p.visualId,p.x,p.y,AmmunitionTable.kinetic(p.ammunition));
                 ballistics.remove(i);
             }else{p.x=nextX;p.y=nextY;}
         }
@@ -1078,10 +1339,12 @@ public final class Battle {
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
+        var pdLaw=WeaponBehaviorTable.POINT_DEFENSE;
         for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
-                && defender.pointDefenseCondition>0.20 && defender.pdRange>0
-                && defender.orders.pointDefense().ordnance()
-                && defender.power>=1.5) {
+                && defender.crewReadiness()>=0.05
+                && defender.pointDefenseCondition>pdLaw.minimumCondition()
+                && defender.pdRange>0 && defender.orders.pointDefense().ordnance()
+                && defender.power>=pdLaw.minimumPower()) {
             Missile chosenMissile=null;Ballistic chosenShell=null;
             double quickest=Double.POSITIVE_INFINITY;
             for(Missile m:missiles){
@@ -1111,8 +1374,8 @@ public final class Battle {
                 }
             }
             if(chosenMissile==null && chosenShell==null)continue;
-            defender.power-=1.5;defender.heat+=0.8;
-            defender.pdReload=0.16*defender.pdCycle/defender.pointDefenseCondition;
+            defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
+            defender.pdReload=pdLaw.reload(false,defender.pdCycle,defender.pointDefenseCondition);
             double tx=chosenMissile!=null?chosenMissile.x:chosenShell.x;
             double ty=chosenMissile!=null?chosenMissile.y:chosenShell.y;
             int hostileSource=chosenMissile!=null?chosenMissile.sourceId:chosenShell.sourceId;
@@ -1132,8 +1395,9 @@ public final class Battle {
                     chosenMissile.integrity-=defender.pointDefenseProfile.damage();
                     if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
                         defender.intercepted++;missileIntercepts++;
+                        if(chosenMissile.decoy)decoysIntercepted++;
                         visual(chosenMissile.visualId,VisualPhase.INTERCEPT,
-                                chosenMissile.torpedo?"TORPEDO":"MISSILE",
+                                chosenMissile.decoy?"DECOY":chosenMissile.torpedo?"TORPEDO":"MISSILE",
                                 chosenMissile.team,chosenMissile.sourceId,chosenMissile.targetId,
                                 chosenMissile.x,chosenMissile.y,chosenMissile.x,chosenMissile.y);
                     }
@@ -1149,8 +1413,11 @@ public final class Battle {
             }
         }
         for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
-                &&defender.pointDefenseCondition>0.20&&defender.pdRange>0
-                &&defender.orders.pointDefense().craft()&&defender.power>1.5){
+                &&defender.crewReadiness()>=0.05
+                &&defender.pointDefenseCondition>pdLaw.minimumCondition()
+                &&defender.pdRange>0
+                &&defender.orders.pointDefense().craft()
+                &&defender.power>pdLaw.minimumPower()){
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
                 if(craft.team==defender.team
@@ -1158,8 +1425,8 @@ public final class Battle {
                         ProjectileModel.acquisitionRange(defender.pdRange,
                                 defender.sensorsCondition,weather.sensorFactor(),
                                 defender.pointDefenseProfile,craft.radarProfile()))continue;
-                defender.power-=1.5;defender.heat+=0.8;
-                defender.pdReload=0.18*defender.pdCycle/defender.pointDefenseCondition;
+                defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
+                defender.pdReload=pdLaw.reload(true,defender.pdCycle,defender.pointDefenseCondition);
                 long defensiveShot=nextVisualShotId++;
                 visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                         defender.team,defender.id,craft.sourceId,
@@ -1170,7 +1437,7 @@ public final class Battle {
                 if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
                         defender.pointDefenseProfile,defender.pointDefenseCondition,
                         weather.accuracyFactor())) {
-                    hitCraft(craft,defender.pointDefenseProfile.damage()*6.5,
+                    hitCraft(craft,defender.pointDefenseProfile.damage()*pdLaw.craftDamageMultiplier(),
                             defender,defensiveShot,"POINT_DEFENSE");
                     if(craft.integrity<=0){crafts.remove(i);craftLosses++;}
                 }
@@ -1182,18 +1449,30 @@ public final class Battle {
             Ship target = findShip(m.targetId);
             if (target == null || !target.alive() || (m.fuel -= DT) <= 0) {
                 missiles.remove(i);
-                visual(m.visualId,VisualPhase.TIMEOUT,m.torpedo?"TORPEDO":"MISSILE",
+                visual(m.visualId,VisualPhase.TIMEOUT,m.decoy?"DECOY":m.torpedo?"TORPEDO":"MISSILE",
                         m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                continue;
+            }
+            if(m.ignitionDelayTicks>0){
+                // Cold-launch canisters are live PD targets while ignition is delayed.
+                m.ignitionDelayTicks--;
                 continue;
             }
             double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
             if (range < 13) {
-                hit(target,m.damage,findShip(m.sourceId),
-                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,m.visualId);
+                if(m.decoy){
+                    // A decoy has NO warhead and may never apply hull damage.
+                    visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
+                            m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                }else hitPayload(target,m.damage,findShip(m.sourceId),
+                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,m.visualId,
+                        m.x,m.y,AmmunitionTable.warhead(m.warhead));
                 missiles.remove(i);continue;
             }
             if (range > 0) {
-                double guidance=Math.min(0.35,(m.torpedo?0.025:0.04)*m.guidanceQuality
+                double guidance=Math.min(0.35,WeaponBehaviorTable.gun(
+                        m.torpedo?DamageType.TORPEDO:DamageType.MISSILE).guidancePerTick()
+                        *m.guidanceQuality
                         *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition));
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
@@ -1208,9 +1487,12 @@ public final class Battle {
                         target.x,target.y,13*target.visualScale());
                 if(Double.isFinite(contact)){
                     m.x+=(nextX-m.x)*contact;m.y+=(nextY-m.y)*contact;
-                    hit(target,m.damage,findShip(m.sourceId),
+                    if(m.decoy)
+                        visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
+                                m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                    else hitPayload(target,m.damage,findShip(m.sourceId),
                             m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,
-                            m.visualId,m.x,m.y);
+                            m.visualId,m.x,m.y,AmmunitionTable.warhead(m.warhead));
                     missiles.remove(i);
                 }else {m.x=nextX;m.y=nextY;}
             }
@@ -1235,8 +1517,47 @@ public final class Battle {
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
         hitAt(defender,raw,attacker,kind,dx,dy);
     }
+    /** Physical warheads resolve AFTER collision. Shields, tile armor, and
+     * secondary blast/EMP all operate on real actual impact coordinates.
+     */
+    private void hitPayload(Ship defender,double raw,Ship attacker,DamageType kind,
+                            long shotId,double impactX,double impactY,
+                            AmmunitionTable.Profile payload){
+        if(!defender.alive())return;
+        if(attacker!=null)defender.lastAttackerId=attacker.id;
+        visual(shotId,VisualPhase.IMPACT,kind.name(),attacker==null?-1:attacker.team,
+                attacker==null?0:attacker.id,defender.id,impactX,impactY,defender.x,defender.y);
+        double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
+        double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
+        hitAt(defender,raw,attacker,kind,dx,dy,payload.armorBypass());
+        if(payload.shieldDrain()>0){
+            defender.defense.disruptShields(raw*payload.shieldDrain());
+            defender.shields=defender.defense.totalShields();
+        }
+        if(payload.energyDrain()>0){
+            defender.power=StrictMath.max(0,defender.power-raw*payload.energyDrain());
+            defender.sensorsCondition=StrictMath.max(0,defender.sensorsCondition-
+                    raw/StrictMath.max(1,defender.maxHull)*payload.energyDrain()*.16);
+        }
+        if(payload.blastRadius()>0){
+            for(Ship nearby:ships){
+                if(nearby==defender||!nearby.alive())continue;
+                // Blast is indiscriminate: friendly ships also take real damage.
+                double distance=StrictMath.hypot(impactX-nearby.x,impactY-nearby.y);
+                if(distance>=payload.blastRadius())continue;
+                double splash=raw*payload.blastFraction()
+                        *(1-distance/payload.blastRadius());
+                if(splash>1e-8)
+                    hit(nearby,splash,attacker,kind,shotId,impactX,impactY);
+            }
+        }
+    }
     /** Environmental impacts share directional protection with actual weapons. */
     private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,double dx,double dy) {
+        hitAt(defender,raw,attacker,kind,dx,dy,0);
+    }
+    private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,
+                       double dx,double dy,double armorBypass) {
         if (!defender.alive()) return;
         hitCount++;
         double c=StrictMath.cos(defender.facing),s=StrictMath.sin(defender.facing);
@@ -1245,7 +1566,7 @@ public final class Battle {
         if(distance<1e-9){localX=1;localY=0;distance=1;}
         double radialX=localX/distance,radialY=localY/distance;
         DirectionalDefense.Impact impact=defender.defense.impact(localX,localY,
-                radialX*0.85,radialY*0.65,raw,kind);
+                radialX*0.85,radialY*0.65,raw,kind,armorBypass);
         defender.shields=defender.defense.totalShields();
         defender.armor=defender.defense.totalArmor();
         double damage=impact.hullDamage();
@@ -1256,11 +1577,20 @@ public final class Battle {
             damage -= fieldAbsorb;
         }
         defender.hull -= damage;
-        if(kind==DamageType.PARTICLE){
-            defender.power=Math.max(0,defender.power-damage*0.45);
-            defender.sensorsCondition=Math.max(0,defender.sensorsCondition-damage/defender.maxHull*0.15);
+        if(defender.fittedCrewSystems){
+            // Penetrating hits may kill personnel or disrupt occupied decks.
+            // No random free crew is conjured when shields subsequently recharge.
+            defender.crewCount=Math.max(0,defender.crewCount
+                    -damage/Math.max(1,defender.maxHull)*defender.crewRequired*0.38);
         }
-        if(kind==DamageType.PLASMA)defender.heat+=damage*0.35;
+        var secondary=WeaponBehaviorTable.damage(kind);
+        if(secondary.energyDrain()>0)
+            defender.power=Math.max(0,defender.power-damage*secondary.energyDrain());
+        if(secondary.sensorDegradation()>0)
+            defender.sensorsCondition=Math.max(0,defender.sensorsCondition-
+                    damage/defender.maxHull*secondary.sensorDegradation());
+        if(secondary.addedHeat()>0)
+            defender.heat+=damage*secondary.addedHeat();
         if (damage > 5 && random.nextDouble() < 0.24) {
             Subsystem part = Subsystem.values()[random.nextInt(Subsystem.values().length)];
             double loss = Math.min(0.36, damage / defender.maxHull * 0.7);
@@ -1304,11 +1634,18 @@ public final class Battle {
             hash = mix(hash, s.id); hash = mix(hash, Double.doubleToLongBits(s.x));
             hash = mix(hash, Double.doubleToLongBits(s.y));
             hash = mix(hash, Double.doubleToLongBits(s.hull));
+            hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));
             hash = mix(hash,s.defense.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.power));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
+            hash=mix(hash,s.kineticAmmo);
+            hash=mix(hash,s.kineticType.ordinal());
+            hash=mix(hash,s.warhead(DamageType.MISSILE).ordinal());
+            hash=mix(hash,s.warhead(DamageType.TORPEDO).ordinal());
+            hash=mix(hash,s.launchMode(DamageType.MISSILE).ordinal());
+            hash=mix(hash,s.launchMode(DamageType.TORPEDO).ordinal());
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
             hash=mix(hash,s.repairDroneReserve);
             hash=mix(hash,Double.doubleToLongBits(s.repairDroneReload));
@@ -1318,14 +1655,33 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(s.hangarCondition));
             hash=mix(hash,Double.doubleToLongBits(s.magazineCondition));
         }
+        for(PendingLaunch pending:launchQueue){
+            hash=mix(hash,pending.sourceId);
+            hash=mix(hash,pending.targetId);
+            hash=mix(hash,pending.family.ordinal());
+            hash=mix(hash,pending.pattern.mode().ordinal());
+            hash=mix(hash,pending.loadedWarhead.ordinal());
+            hash=mix(hash,pending.nextIndex);
+            hash=mix(hash,pending.nextTick);
+        }
+        hash=mix(hash,decoysLaunched);
+        hash=mix(hash,decoysIntercepted);
+        hash=mix(hash,salvosStarted);
+        hash=mix(hash,roundsFiredBySalvos);
         for (Missile m : missiles) {
+            hash=mix(hash,m.payload.ordinal());
+            hash=mix(hash,m.warhead.ordinal());
+            hash=mix(hash,m.ignitionDelayTicks);
+            hash=mix(hash,m.visualId);
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
             hash=mix(hash,Double.doubleToLongBits(m.x));
             hash=mix(hash,Double.doubleToLongBits(m.integrity));
             hash=mix(hash,Double.doubleToLongBits(m.guidanceQuality));
         }
         for (Ballistic p : ballistics) {
-            hash=mix(hash,p.visualId);hash=mix(hash,Double.doubleToLongBits(p.x));
+            hash=mix(hash,p.visualId);
+            hash=mix(hash,p.ammunition.ordinal());
+            hash=mix(hash,Double.doubleToLongBits(p.x));
             hash=mix(hash,Double.doubleToLongBits(p.y));
             hash=mix(hash,Double.doubleToLongBits(p.integrity));
         }

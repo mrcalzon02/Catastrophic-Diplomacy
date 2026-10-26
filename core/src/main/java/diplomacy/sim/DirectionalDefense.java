@@ -48,16 +48,12 @@ public final class DirectionalDefense {
             z.shield = z.maxShield = shieldCapacity/4.0;
             for (Layer layer:Layer.values())
                 Arrays.fill(damageFactor[layer.ordinal()][f.ordinal()],1.0);
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.KINETIC.ordinal()]=1.3;
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.PLASMA.ordinal()]=0.65;
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.PARTICLE.ordinal()]=1.4;
-            damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][Battle.DamageType.TORPEDO.ordinal()]=1.5;
-            damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][Battle.DamageType.KINETIC.ordinal()]=1.25;
-            damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][Battle.DamageType.TORPEDO.ordinal()]=1.5;
-            damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][Battle.DamageType.LASER.ordinal()]=0.8;
-            damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][Battle.DamageType.PLASMA.ordinal()]=1.15;
-            damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][Battle.DamageType.PARTICLE.ordinal()]=1.3;
-            damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][Battle.DamageType.TORPEDO.ordinal()]=1.3;
+            for(Battle.DamageType type:Battle.DamageType.values()){
+                var law=WeaponBehaviorTable.damage(type);
+                damageFactor[Layer.SHIELD.ordinal()][f.ordinal()][type.ordinal()]=law.shield();
+                damageFactor[Layer.ARMOR.ordinal()][f.ordinal()][type.ordinal()]=law.armor();
+                damageFactor[Layer.STRUCTURE.ordinal()][f.ordinal()][type.ordinal()]=law.structure();
+            }
         }
         int[] counts = new int[4];
         for (int row=0;row<GRID;row++) for(int col=0;col<GRID;col++) {
@@ -161,6 +157,20 @@ public final class DirectionalDefense {
         }
         return offered-left;
     }
+    /** Shields can be disrupted by an energy-focused warhead without magically
+     * damaging armor or hull. Current facing integrity is reduced proportionally.
+     */
+    public double disruptShields(double energy){
+        valid(energy);
+        double remaining=energy;
+        for(Zone zone:zones){
+            double drained=StrictMath.min(zone.shield,remaining);
+            zone.shield-=drained;remaining-=drained;
+            if(drained>0)zone.delayRemaining=zone.rechargeDelay;
+            if(remaining<=0)break;
+        }
+        return energy-remaining;
+    }
     public double totalArmor() {
         double sum=0;for(Tile[] line:tiles)for(Tile t:line)sum+=t.armor;return sum;
     }
@@ -193,7 +203,14 @@ public final class DirectionalDefense {
      */
     public Impact impact(double incomingX,double incomingY,double hitLocalX,double hitLocalY,
                          double raw,Battle.DamageType kind) {
+        return impact(incomingX,incomingY,hitLocalX,hitLocalY,raw,kind,0);
+    }
+    /** Bounded armor bypass after shield absorption, not free extra damage. */
+    public Impact impact(double incomingX,double incomingY,double hitLocalX,double hitLocalY,
+                         double raw,Battle.DamageType kind,double bypass) {
         valid(raw);
+        if(!Double.isFinite(bypass)||bypass<0||bypass>0.85)
+            throw new IllegalArgumentException("Invalid physical armor bypass");
         Facing facing=facingFor(incomingX,incomingY);
         Tile t=tileAt(hitLocalX,hitLocalY);
         // The impacted geometric tile, not a whole global armor pool, absorbs damage.
@@ -204,9 +221,11 @@ public final class DirectionalDefense {
         if(raw>0)z.delayRemaining=z.rechargeDelay;
         double remaining=StrictMath.max(0,raw-shieldUsed/shieldFactor);
         double armorFactor=damageFactor(Layer.ARMOR,t.facing,kind);
-        double armorUsed=StrictMath.min(t.armor,remaining*armorFactor);
+        double penetrating=remaining*bypass;
+        double stopped=remaining-penetrating;
+        double armorUsed=StrictMath.min(t.armor,stopped*armorFactor);
         t.armor-=armorUsed;
-        remaining=StrictMath.max(0,remaining-armorUsed/armorFactor);
+        remaining=penetrating+StrictMath.max(0,stopped-armorUsed/armorFactor);
         double structural=remaining*damageFactor(Layer.STRUCTURE,t.facing,kind);
         double tileLoss=StrictMath.min(t.structure,structural);
         t.structure-=tileLoss;

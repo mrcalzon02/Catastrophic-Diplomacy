@@ -2,6 +2,8 @@ package diplomacy.shipyard;
 
 import diplomacy.sim.Battle;
 import diplomacy.sim.ProjectileModel;
+import diplomacy.sim.AmmunitionResearch;
+import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
@@ -12,14 +14,16 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /** Shared desktop/Android hull fitting and deterministic engineering calculations. */
 public final class Shipyard {
     private Shipyard() { }
-    public enum Mount { SYSTEM, WEAPON, DEFENSE, SUPPORT }
+    public enum Mount { SYSTEM, WEAPON, DEFENSE, SUPPORT, HABITAT }
     public enum Track { OUTPUT, EFFICIENCY, RESILIENCE, SPECIALIST }
     public enum Hull {
         CORVETTE(120, 180, 155, 0.96, 3, 2, 1, 0),
@@ -48,6 +52,9 @@ public final class Shipyard {
             for (int i=0;i<weapons;i++) positions.add(new Slot(positions.size(), Mount.WEAPON, (i%2==0?-27:27), -25+(i/2)*19));
             for (int i=0;i<defenses;i++) positions.add(new Slot(positions.size(), Mount.DEFENSE, -20+i*18, 35));
             for (int i=0;i<supports;i++) positions.add(new Slot(positions.size(), Mount.SUPPORT, -16+i*17, 15));
+            // Append crew and life-support sockets, never renumber legacy hardpoints.
+            positions.add(new Slot(positions.size(),Mount.HABITAT,-13,-12));
+            positions.add(new Slot(positions.size(),Mount.HABITAT,13,-12));
             slots = Collections.unmodifiableList(positions);
         }
     }
@@ -56,9 +63,16 @@ public final class Shipyard {
     public static final class Installed {
         public final String component;
         private final Map<Track,Integer> stages;
-        private Installed(String id, Map<Track,Integer> upgrades) {
+        public final ModuleVersions.Pattern pattern;
+        public final int mark;
+        private Installed(String id,Map<Track,Integer> upgrades){
+            this(id,upgrades,ModuleVersions.Pattern.STANDARD,1);
+        }
+        private Installed(String id,Map<Track,Integer> upgrades,
+                          ModuleVersions.Pattern version,int generation) {
             if(id==null || upgrades==null)throw new IllegalArgumentException("Module identity required");
-            component=id;
+            ModuleVersions.of(version,generation); // validates both fields
+            component=id;pattern=version;mark=generation;
             Map<Track,Integer> copy = new EnumMap<>(Track.class);
             Track chosen=null;
             for(Map.Entry<Track,Integer> entry:upgrades.entrySet()) {
@@ -78,6 +92,20 @@ public final class Shipyard {
         public int stage(Track track) { return stages.getOrDefault(track,0); }
         public Map<Track,Integer> stages() { return stages; }
     }
+    /** Selected shared-family ammunition, never a free hull characteristic. */
+    public record AmmoSelection(AmmunitionTable.Kinetic kinetic,
+                                AmmunitionTable.Warhead missile,
+                                AmmunitionTable.Warhead torpedo) {
+        public static final AmmoSelection STANDARD=new AmmoSelection(
+                AmmunitionTable.Kinetic.STANDARD,
+                AmmunitionTable.Warhead.STANDARD,
+                AmmunitionTable.Warhead.STANDARD);
+        public AmmoSelection {
+            AmmunitionTable.kinetic(kinetic);
+            AmmunitionTable.warhead(missile);
+            AmmunitionTable.warhead(torpedo);
+        }
+    }
     public static final class Design {
         public final Battle.Faction faction;
         public final Hull hull;
@@ -85,20 +113,63 @@ public final class Shipyard {
         private final List<Installed> parts;
         /** Hangar payload is a separately chosen launch loadout, not a cosmetic sprite. */
         public final FighterModel.Hull fighterHull;
-        private Design(Battle.Faction group, Hull frame, String callSign, List<Installed> mounted) {
-            this(group,frame,callSign,mounted,FighterModel.Hull.ASSAULT_GUNSHIP);
+        public final AmmoSelection ammoSelection;
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted){
+            this(group,frame,callSign,mounted,FighterModel.Hull.ASSAULT_GUNSHIP,
+                    AmmoSelection.STANDARD);
         }
-        private Design(Battle.Faction group, Hull frame, String callSign, List<Installed> mounted,
-                       FighterModel.Hull craftType) {
-            if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70) throw new IllegalArgumentException("Invalid vessel identity");
-            if(mounted.size()!=frame.slots.size()) throw new IllegalArgumentException("Incorrect hardpoint count");
-            if(craftType==null)throw new IllegalArgumentException("Fighter type required");
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
+                       FighterModel.Hull craftType){
+            this(group,frame,callSign,mounted,craftType,AmmoSelection.STANDARD);
+        }
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
+                       FighterModel.Hull craftType,AmmoSelection loadout){
+            if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70)
+                throw new IllegalArgumentException("Invalid vessel identity");
+            if(mounted.size()!=frame.slots.size())
+                throw new IllegalArgumentException("Incorrect hardpoint count");
+            if(craftType==null||loadout==null)
+                throw new IllegalArgumentException("Ship equipment selections required");
             faction=group;hull=frame;name=callSign;fighterHull=craftType;
+            ammoSelection=loadout;
             parts=Collections.unmodifiableList(new ArrayList<>(mounted));
         }
+        private Design verifyAmmo(){
+            AmmunitionResearch.Access available=Shipyard.ammunitionAccess(this);
+            if(!available.allows(ammoSelection.kinetic())
+                    ||!available.allows(Battle.DamageType.MISSILE,ammoSelection.missile())
+                    ||!available.allows(Battle.DamageType.TORPEDO,ammoSelection.torpedo()))
+                throw new IllegalArgumentException(
+                        "Selected ammunition locked: change it to STANDARD before changing its weapon research");
+            return this;
+        }
+        public Design withAmmoSelection(AmmoSelection selected){
+            return new Design(faction,hull,name,parts,fighterHull,selected).verifyAmmo();
+        }
+        public Design withKineticAmmunition(AmmunitionTable.Kinetic selected){
+            return withAmmoSelection(new AmmoSelection(selected,
+                    ammoSelection.missile(),ammoSelection.torpedo()));
+        }
+        public Design withGuidedWarhead(Battle.DamageType family,AmmunitionTable.Warhead selected){
+            if(family==Battle.DamageType.MISSILE)
+                return withAmmoSelection(new AmmoSelection(ammoSelection.kinetic(),selected,
+                        ammoSelection.torpedo()));
+            if(family==Battle.DamageType.TORPEDO)
+                return withAmmoSelection(new AmmoSelection(ammoSelection.kinetic(),
+                        ammoSelection.missile(),selected));
+            throw new IllegalArgumentException("Weapon family has no guided warheads");
+        }
         /** Changing a hangar's launched craft does not overwrite ship module research. */
+        /** Physical hardware mark is independent of the exclusive research path. */
+        public Design withModuleVersion(int slot,ModuleVersions.Pattern pattern,int mark){
+            Installed existing=at(slot);
+            if(existing==null)throw new IllegalArgumentException("Empty socket cannot be versioned");
+            List<Installed> changed=new ArrayList<>(parts);
+            changed.set(slot,new Installed(existing.component,existing.stages,pattern,mark));
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
+        }
         public Design withFighterHull(FighterModel.Hull type) {
-            return new Design(faction,hull,name,parts,type);
+            return new Design(faction,hull,name,parts,type,ammoSelection).verifyAmmo();
         }
         public Installed at(int slot) { return parts.get(slot); }
         public int slots() { return parts.size(); }
@@ -109,7 +180,7 @@ public final class Shipyard {
                 throw new IllegalArgumentException("Invalid base component ID");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,baseId==null?null:new Installed(baseId, Map.of()));
-            return new Design(faction,hull,name,changed,fighterHull);
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
         }
         public Design stage(int slot, Track track, int level) {
             if(level<0||level>6||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..6");
@@ -123,20 +194,24 @@ public final class Shipyard {
             updated.putAll(current.stages);
             if(level==0) updated.remove(track); else updated.put(track,level);
             List<Installed> changed=new ArrayList<>(parts);
-            changed.set(slot,new Installed(current.component,updated));
-            return new Design(faction,hull,name,changed,fighterHull);
+            changed.set(slot,new Installed(current.component,updated,current.pattern,current.mark));
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
         }
     }
     public static String factionId(Battle.Faction faction) {
         return switch(faction) {
             case TERRAN -> "TER"; case DRAXIAN -> "DRA"; case CARNELIAN -> "CAR";
-            case ZIPPLEDROW -> "ZIP"; case UZIPT -> "UZI"; case MANDRALLY -> "MAN";
+            case ZIPPLEDROW -> "ZIP"; case UMBRA_FOUNDRY -> "UMB";
+            case UZIPT -> "UZI"; case ZELTHAR_LUMINARI -> "ZEL";
+            case MANDRALLY -> "MAN"; case AUREATE_SYNOD -> "AUR";
+            case VAERITH_PRISM -> "VAE"; case NYX_BIOLITH -> "NYX";
         };
     }
     public static Mount requiredMount(Component component) {
         return switch(component.category) {
             case "systems" -> Mount.SYSTEM; case "weapons" -> Mount.WEAPON;
             case "defense" -> Mount.DEFENSE; case "support" -> Mount.SUPPORT;
+            case "habitat" -> Mount.HABITAT;
             default -> throw new IllegalArgumentException("Unknown mounting class " + component.category);
         };
     }
@@ -151,7 +226,9 @@ public final class Shipyard {
                  .install(slotOf(hull,Mount.SYSTEM,2),"BASE-"+id+"-RAD")
                  .install(slotOf(hull,Mount.WEAPON,0),"BASE-"+id+"-LAS")
                  .install(slotOf(hull,Mount.WEAPON,1),"BASE-"+id+"-MSL")
-                 .install(slotOf(hull,Mount.DEFENSE,0),"BASE-"+id+"-SHD");
+                 .install(slotOf(hull,Mount.DEFENSE,0),"BASE-"+id+"-SHD")
+                 .install(slotOf(hull,Mount.HABITAT,0),"BASE-"+id+"-CRW")
+                 .install(slotOf(hull,Mount.HABITAT,1),"BASE-"+id+"-LFS");
         return ship;
     }
     private static int slotOf(Hull hull,Mount mount,int nth) {
@@ -204,9 +281,16 @@ public final class Shipyard {
         }
         Track branch=installed.branch();
         int rank=branch==null?0:installed.stage(branch);
-        return new Part(base,base.mass*mass,base.power*power,base.heat*heat,
-                base.effect*effect,accuracy,base.integrity*integrity,shields,thrust,cooling,
-                maintenance,industry,research,ModuleBranchEffects.tune(base.subsystem,branch,rank));
+        ModuleVersions.Modifiers generation=ModuleVersions.of(installed.pattern,installed.mark);
+        industry=Math.toIntExact((long)StrictMath.ceil(industry*generation.cost()));
+        return new Part(base,base.mass*mass*generation.mass(),
+                base.power*power*generation.power(),
+                base.heat*heat*generation.heat(),
+                base.effect*effect*generation.output(),
+                accuracy*generation.precision(),
+                base.integrity*integrity*generation.integrity(),
+                shields,thrust,cooling,maintenance*generation.maintenance(),
+                industry,research,ModuleBranchEffects.tune(base.subsystem,branch,rank));
     }
     private static List<Part> fittedParts(Design design,TechnologyCatalog catalog,List<String> errors) {
         List<Part> parts=new ArrayList<>();
@@ -227,6 +311,7 @@ public final class Shipyard {
         List<Part> parts=fittedParts(design,catalog,errors);
         double mass=0,volume=0,draw=0,generation=0,heat=0,cooling=0;
         int industry=0,research=0,reactors=0,engines=0,radiators=0,weapons=0;
+        double crewBerths=0,lifeSupport=0;
         for(Part p:parts){
             mass+=p.mass;volume+=p.mass*1.5;heat+=p.heat;industry=Math.addExact(industry,p.industry);research=Math.addExact(research,p.research);
             draw+=p.power;
@@ -234,6 +319,8 @@ public final class Shipyard {
                 case "REA" -> {generation+=p.effect*3.0;reactors++;}
                 case "RAD" -> {cooling+=p.effect*p.cooling*2.3;radiators++;}
                 case "ENG" -> engines++;
+                case "CRW" -> crewBerths+=p.effect*design.hull.massCapacity*0.12;
+                case "LFS" -> lifeSupport+=p.effect*design.hull.massCapacity*0.12;
                 case "KIN", "LAS", "MSL", "TOR", "PAR", "PLA" -> weapons++;
                 default -> { }
             }
@@ -241,7 +328,11 @@ public final class Shipyard {
         if(reactors==0)errors.add("A reactor is required");
         if(engines==0)errors.add("An engine is required");
         if(radiators==0)errors.add("A radiator is required");
-        if(weapons==0)errors.add("At least one main weapon required");
+        int staff=minimumCrew(design);
+        if(crewBerths+1e-8<staff)errors.add("Insufficient fitted crew accommodation");
+        if(lifeSupport+1e-8<staff)errors.add("Insufficient fitted life support");
+        // A hull may be an unarmed scout, transport or support vessel.
+        // Main batteries, point defense and fighter payloads require modules.
         if(mass>design.hull.massCapacity+1e-8)errors.add("Hull displacement exceeded");
         if(volume>design.hull.volumeCapacity+1e-8)errors.add("Hull internal volume exceeded");
         if(draw>generation+1e-8)errors.add("Insufficient reactor output");
@@ -250,6 +341,23 @@ public final class Shipyard {
         return new Report(List.copyOf(errors),mass,volume,draw,generation,heat,cooling,industry,research);
     }
 
+    /** Base staffing demand is derived from equipment and displacement, never
+     * an intrinsic complement or an invisible hull accommodation allowance. */
+    public static int minimumCrew(Design design){
+        int installed=0;
+        for(int i=0;i<design.slots();i++){
+            Installed p=design.at(i);
+            if(p!=null && !p.component.endsWith("-CRW") && !p.component.endsWith("-LFS"))
+                installed++;
+        }
+        return (int)StrictMath.ceil(5+design.hull.massCapacity*0.11+installed*0.75);
+    }
+    public record Crew(int minimum,int berths,int lifeSupport){
+        public Crew {
+            if(minimum<=0||berths<0||lifeSupport<0)
+                throw new IllegalArgumentException("Invalid crew support");
+        }
+    }
     /** Module-distinct six-rank offensive specialization; all ratios are bounded. */
     public record Weapons(double laserRange,double kineticRange,double plasmaRange,
                           double particleRange,double missileRange,double torpedoRange,
@@ -278,14 +386,20 @@ public final class Shipyard {
                          ProjectileModel.Spec missileProjectile,
                          ProjectileModel.Spec torpedoProjectile,
                          ProjectileModel.Defense pointDefense,
-                         Weapons weapons,Support support,double pdCycle) { }
+                         Weapons weapons,Support support,double pdCycle,
+                         HullBaseline.Stats baseline,Crew crew,
+                         AmmunitionResearch.Access ammunition) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
-        double hull=design.hull.baseHull,shields=0,armor=0,sif=0;
-        double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0.001;
+        HullBaseline.Stats baseline=HullBaseline.forHull(design.faction,design.hull);
+        double hull=baseline.structure(),shields=baseline.shields(),
+                armor=baseline.armor(),sif=0;
+        // Bare fitted hulls have no implicit repair module.
+        double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0;
         double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
-        int fighters=0,drones=0,magazines=0;
+        int fighters=baseline.fighterBay(),drones=0,magazines=0;
+        double accommodation=0,breathing=0;
         List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
@@ -375,20 +489,28 @@ public final class Shipyard {
                     }else drones+=complement;
                 }
                 case "MAG" -> magazines+=(int)(p.effect/3.8);
+                case "CRW" -> accommodation+=p.effect*design.hull.massCapacity*0.12;
+                case "LFS" -> breathing+=p.effect*design.hull.massCapacity*0.12;
                 default -> { }
             }
             hull+=p.integrity*0.08;
         }
-        double mobility=(36+thrust*1.3)*design.hull.mobility*(1-0.35*report.mass()/design.hull.massCapacity);
-        double charge=Math.max(2,(report.generation()-report.demand())*0.36);
+        // Every hull can move and power essential avionics on its own.
+        // Engines/reactors improve this baseline; neither supplies a weapon.
+        double mobility=(36+thrust*1.3)*design.hull.mobility
+                *(1-0.35*report.mass()/design.hull.massCapacity);
+        double charge=baseline.powerRegen()
+                +Math.max(2,(report.generation()-report.demand())*0.36);
         for(int i=0;i<6;i++){
             ranges[i]=weaponCounts[i]==0?1:ranges[i]/weaponCounts[i];
             cycles[i]=weaponCounts[i]==0?1:cycles[i]/weaponCounts[i];
             trackers[i]=weaponCounts[i]==0?1:trackers[i]/weaponCounts[i];
         }
-        return new Fitted(hull,shields,armor,Math.min(0.75,sif),Math.max(40,report.generation()*0.95),
+        return new Fitted(hull,shields,armor,Math.min(0.75,sif),
+                baseline.power()+report.generation()*0.95,
                 110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
-                Math.max(9,mobility),Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
+                baseline.speed()+Math.max(0,mobility)*0.65,
+                Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
                 repair,kinetic,plasma,particle,torpedo,Math.min(0.65,ecm),
                 fighters,drones,magazines,
                 ProjectileModel.average(kineticModules,ProjectileModel.Kind.KINETIC),
@@ -402,7 +524,60 @@ public final class Shipyard {
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
                         repairDrones,droneRepair,droneEndurance,efficiency,
                         repairDroneCapacity),
-                pdWeight==0?1:pdCycle/pdWeight);
+                pdWeight==0?1:pdCycle/pdWeight,baseline,
+                new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
+                        (int)StrictMath.floor(breathing)),
+                ammunitionAccess(design));
+    }
+
+    /**
+     * We still simulate one firing controller per family/ship, not individual
+     * mounts. Consequently shared-family ammunition must be compatible with
+     * EVERY fitted launcher of that family. Intersection prevents a Specialist
+     * gun granting its research ammo to an unrelated basic gun.
+     */
+    public static AmmunitionResearch.Access ammunitionAccess(Design design){
+        if(design==null)throw new IllegalArgumentException("Missing vessel design");
+        EnumSet<AmmunitionTable.Kinetic> k=EnumSet.allOf(AmmunitionTable.Kinetic.class);
+        EnumSet<AmmunitionTable.Warhead> m=EnumSet.allOf(AmmunitionTable.Warhead.class);
+        EnumSet<AmmunitionTable.Warhead> t=EnumSet.allOf(AmmunitionTable.Warhead.class);
+        int kc=0,mc=0,tc=0;
+        for(int i=0;i<design.slots();i++){
+            Installed component=design.at(i);
+            if(component==null)continue;
+            Track path=component.branch();
+            int rank=path==null?0:component.stage(path);
+            if(component.component.endsWith("-KIN")){
+                k.retainAll(AmmunitionResearch.kinetic(path,rank));kc++;
+            }else if(component.component.endsWith("-MSL")){
+                m.retainAll(AmmunitionResearch.warheads(Battle.DamageType.MISSILE,path,rank));mc++;
+            }else if(component.component.endsWith("-TOR")){
+                t.retainAll(AmmunitionResearch.warheads(Battle.DamageType.TORPEDO,path,rank));tc++;
+            }
+        }
+        if(kc==0)k=EnumSet.of(AmmunitionTable.Kinetic.STANDARD);
+        if(mc==0)m=EnumSet.of(AmmunitionTable.Warhead.STANDARD);
+        if(tc==0)t=EnumSet.of(AmmunitionTable.Warhead.STANDARD);
+        return new AmmunitionResearch.Access(k,m,t);
+    }
+    /** Research unlocks for exactly the selected socket, never another gun. */
+    public static AmmunitionResearch.Access ammunitionAt(Design design,int slot){
+        Installed component=design.at(slot);
+        if(component==null)return AmmunitionResearch.STOCK;
+        Track path=component.branch();
+        int rank=path==null?0:component.stage(path);
+        if(component.component.endsWith("-KIN"))
+            return new AmmunitionResearch.Access(AmmunitionResearch.kinetic(path,rank),
+                    AmmunitionResearch.STOCK.missiles(),AmmunitionResearch.STOCK.torpedoes());
+        if(component.component.endsWith("-MSL"))
+            return new AmmunitionResearch.Access(AmmunitionResearch.STOCK.kinetics(),
+                    AmmunitionResearch.warheads(Battle.DamageType.MISSILE,path,rank),
+                    AmmunitionResearch.STOCK.torpedoes());
+        if(component.component.endsWith("-TOR"))
+            return new AmmunitionResearch.Access(AmmunitionResearch.STOCK.kinetics(),
+                    AmmunitionResearch.STOCK.missiles(),
+                    AmmunitionResearch.warheads(Battle.DamageType.TORPEDO,path,rank));
+        return AmmunitionResearch.STOCK;
     }
 
     /** Current exclusive research branch effect of one selected installed module. */
@@ -449,11 +624,26 @@ public final class Shipyard {
 
     /** Portable, deterministic blueprint text (no Java object deserialization). */
     public static String encode(Design design) {
-        StringBuilder out=new StringBuilder("CD-SHIP-1|").append(design.faction.name()).append('|')
-            .append(design.hull.name()).append('|')
-            .append(Base64.getUrlEncoder().withoutPadding().encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
-        // Preserve byte-for-byte legacy CD-SHIP-1 for default gunship fits.
-        if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
+        boolean newer=false;
+        for(int i=0;i<design.slots();i++){
+            Installed equipped=design.at(i);
+            if(equipped!=null&&(equipped.pattern!=ModuleVersions.Pattern.STANDARD || equipped.mark!=1))
+                newer=true;
+        }
+        boolean specializedAmmo=!design.ammoSelection.equals(AmmoSelection.STANDARD);
+        StringBuilder out=new StringBuilder(specializedAmmo?"CD-SHIP-3|"
+                :newer?"CD-SHIP-2|":"CD-SHIP-1|")
+                .append(design.faction.name()).append('|')
+                .append(design.hull.name()).append('|')
+                .append(Base64.getUrlEncoder().withoutPadding()
+                        .encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
+        // Preserve exact legacy CD-SHIP-1/2 when no purpose-loaded ammo.
+        if(specializedAmmo)
+            out.append('|').append(design.fighterHull.name())
+                    .append('|').append(design.ammoSelection.kinetic().name())
+                    .append('|').append(design.ammoSelection.missile().name())
+                    .append('|').append(design.ammoSelection.torpedo().name());
+        else if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
             out.append('|').append(design.fighterHull.name());
         out.append('\n');
         for(int i=0;i<design.slots();i++) {
@@ -461,6 +651,8 @@ public final class Shipyard {
             if(installed==null)continue;
             out.append(i).append('|').append(installed.component);
             for(Track track:Track.values())out.append('|').append(installed.stage(track));
+            if(newer||specializedAmmo)out.append('|').append(installed.pattern.name())
+                    .append('|').append(installed.mark);
             out.append('\n');
         }
         return out.toString();
@@ -470,13 +662,16 @@ public final class Shipyard {
         String[] lines=encoded.split("\\n",-1);
         if(lines.length<2||lines.length>70)throw new IllegalArgumentException("Invalid blueprint lines");
         String[] header=lines[0].split("\\|",-1);
-        if((header.length!=4&&header.length!=5)||!header[0].equals("CD-SHIP-1"))
+        boolean hasAmmo=header.length>=1&&"CD-SHIP-3".equals(header[0]);
+        boolean hasVersions=hasAmmo||header.length>=1&&"CD-SHIP-2".equals(header[0]);
+        if((hasAmmo?header.length!=8:(header.length!=4&&header.length!=5))
+                ||(!hasVersions&&!"CD-SHIP-1".equals(header[0])))
             throw new IllegalArgumentException("Wrong ship file version");
         final Design base;
         try{
             Battle.Faction faction=Battle.Faction.valueOf(header[1]);Hull hull=Hull.valueOf(header[2]);
             String name=new String(Base64.getUrlDecoder().decode(header[3]),StandardCharsets.UTF_8);
-            FighterModel.Hull aircraft=header.length==5
+            FighterModel.Hull aircraft=(hasAmmo||header.length==5)
                     ?FighterModel.Hull.valueOf(header[4]):FighterModel.Hull.ASSAULT_GUNSHIP;
             base=new Design(faction,hull,name,
                     new ArrayList<>(Collections.nCopies(hull.slots.size(),null)),aircraft);
@@ -486,7 +681,8 @@ public final class Shipyard {
         for(int n=1;n<lines.length;n++) {
             if(lines[n].isEmpty())continue;
             String[] p=lines[n].split("\\|",-1);
-            if(p.length!=6)throw new IllegalArgumentException("Invalid slot record");
+            if(p.length!=(hasVersions?8:6))
+                throw new IllegalArgumentException("Invalid slot record");
             final int index;
             try{index=Integer.parseInt(p[0]);}catch(NumberFormatException bad){throw new IllegalArgumentException("Invalid slot",bad);}
             if(index<0||index>=seen.length||seen[index])throw new IllegalArgumentException("Duplicate/out-of-range slot");
@@ -511,6 +707,38 @@ public final class Shipyard {
             }
             design=design.install(index,p[1]);
             if(chosen!=null)design=design.stage(index,chosen,levels[chosen.ordinal()]);
+            if(hasVersions){
+                try{
+                    design=design.withModuleVersion(index,
+                            ModuleVersions.Pattern.valueOf(p[6]),Integer.parseInt(p[7]));
+                }catch(RuntimeException invalid){
+                    throw new IllegalArgumentException("Invalid physical module version in slot "+index,invalid);
+                }
+            }
+        }
+        // CD-SHIP-1 files created before the append-only habitat migration
+        // legitimately had no accommodation sockets. Install the new physical
+        // modules only for those older records, never rewrite an occupied slot
+        // or bypass invalid CD-SHIP-2 crew engineering.
+        if(!hasVersions){
+            int quarters=slotOf(design.hull,Mount.HABITAT,0);
+            int breathing=slotOf(design.hull,Mount.HABITAT,1);
+            if(!seen[quarters] && !seen[breathing]){
+                String id=factionId(design.faction);
+                design=design.install(quarters,"BASE-"+id+"-CRW")
+                        .install(breathing,"BASE-"+id+"-LFS");
+            }
+        }
+        if(hasAmmo){
+            try{
+                design=design.withAmmoSelection(new AmmoSelection(
+                        AmmunitionTable.Kinetic.valueOf(header[5]),
+                        AmmunitionTable.Warhead.valueOf(header[6]),
+                        AmmunitionTable.Warhead.valueOf(header[7])));
+            }catch(IllegalArgumentException invalid){
+                throw new IllegalArgumentException(
+                        "Blueprint ammo is not licensed by the fitted module research",invalid);
+            }
         }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
         return design;

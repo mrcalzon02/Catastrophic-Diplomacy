@@ -1,0 +1,74 @@
+name: Alien faction sprite integrity and 200v200
+on:
+  push:
+    branches: ['feature/save-selectable-research-ammo-20261025']
+    paths:
+      - 'asset_packs/alien-fleets/**'
+      - 'tools/install_alien_fleets.py'
+      - '.github/workflows/alien-faction-art.yml'
+  pull_request:
+    paths:
+      - 'assets/ships/factions/**'
+      - 'asset_packs/alien-fleets/**'
+      - 'tools/install_alien_fleets.py'
+      - 'tools/verify_faction_ship_assets.py'
+      - 'core/src/main/java/diplomacy/shipyard/FactionArt.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
+      - '.github/workflows/alien-faction-art.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sprite-import:
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    name: Install exactly 50 approved original sprites into Git
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reassemble checksum-pinned original archive and install source pixels
+        run: |
+          mkdir -p build/alien-fleets
+          cat asset_packs/alien-fleets/part-*.bin > build/alien-fleets/approved.zip
+          echo '2e2937a66daa62233b748d2d7a6aade45988a03c5ddc9869fd9ebb1c49fcf47f  build/alien-fleets/approved.zip' | sha256sum --check
+          python3 tools/install_alien_fleets.py build/alien-fleets/approved.zip .
+          python3 tools/verify_faction_ship_assets.py
+      - name: Commit every checked original PNG and checksum index
+        run: |
+          git add -- assets/ships/factions/
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'assets: install all 50 approved alien faction ship sprites'
+            git push origin HEAD:"$GITHUB_REF_NAME"
+          fi
+  art-integrity:
+    needs: sprite-import
+    if: ${{ always() && (needs.sprite-import.result == 'success' || needs.sprite-import.result == 'skipped') }}
+    name: Require 50 committed original PNGs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
+      - name: Verify all five fleets are physically present, transparent and unchanged
+        run: python3 tools/verify_faction_ship_assets.py
+  combat-regression:
+    needs: sprite-import
+    if: ${{ always() && (needs.sprite-import.result == 'success' || needs.sprite-import.result == 'skipped') }}
+    name: Playable new factions and 200v200 headless regression
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Exercise all 11 faction loadouts, art identity, fighters and 400 ship fleet
+        run: gradle --no-daemon :core:alienFactionSmoke :core:massBattleSmoke :game:classes :desktop:classes

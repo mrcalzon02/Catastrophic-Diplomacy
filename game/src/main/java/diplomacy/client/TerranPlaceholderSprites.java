@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.FactionArt;
 import diplomacy.sim.Battle;
 import diplomacy.sim.DirectionalDefense;
 import java.util.EnumMap;
@@ -16,7 +17,8 @@ import java.util.EnumMap;
  */
 public final class TerranPlaceholderSprites implements Disposable {
     private static final int GRID=DirectionalDefense.GRID;
-    private final EnumMap<Shipyard.Hull,Texture> textures = new EnumMap<>(Shipyard.Hull.class);
+    private final EnumMap<Battle.Faction,EnumMap<Shipyard.Hull,Texture>> textures=
+            new EnumMap<>(Battle.Faction.class);
     private final Texture innerHull;
     private final Texture severeHull;
     private final Texture shieldHull;
@@ -39,16 +41,29 @@ public final class TerranPlaceholderSprites implements Disposable {
         severeHull=createGenericStructure("materials/structure_destroyed.png");
         shieldHull=Gdx.files.internal("materials/shield_energy_blue.png").exists()
                 ? createGenericStructure("materials/shield_energy_blue.png") : null;
-        for (Shipyard.Hull hull:Shipyard.Hull.values()) {
-            String file="ships/terran/"+spriteName(hull)+".png";
-            if (!Gdx.files.internal(file).exists())continue;
-            try {
-                Texture tex=new Texture(Gdx.files.internal(file));
-                tex.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-                textures.put(hull,tex);
-            }catch(RuntimeException ex) {
-                Gdx.app.error("SPRITES","Unable to load optional Terran placeholder: "+file,ex);
+        for(Battle.Faction faction:Battle.Faction.values()){
+            EnumMap<Shipyard.Hull,Texture> fleet=new EnumMap<>(Shipyard.Hull.class);
+            for(Shipyard.Hull hull:Shipyard.Hull.values()){
+                String file=faction==Battle.Faction.TERRAN
+                        ?"ships/terran/"+spriteName(hull)+".png"
+                        :FactionArt.runtimePath(faction,hull);
+                if(file==null||!Gdx.files.internal(file).exists())continue;
+                // Carrier/dreadnought share one atlas ship until an eleventh
+                // capital image exists. Avoid loading duplicate GPU textures.
+                if(hull==Shipyard.Hull.DREADNOUGHT &&
+                        fleet.containsKey(Shipyard.Hull.CARRIER)){
+                    fleet.put(hull,fleet.get(Shipyard.Hull.CARRIER));
+                    continue;
+                }
+                try{
+                    Texture tex=new Texture(Gdx.files.internal(file));
+                    tex.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                    fleet.put(hull,tex);
+                }catch(RuntimeException ex){
+                    Gdx.app.error("SPRITES","Unable to load selected faction sprite: "+file,ex);
+                }
             }
+            if(!fleet.isEmpty())textures.put(faction,fleet);
         }
     }
     /** Procedural generic plating, lattice ribs and longitudinal inner structure. */
@@ -80,15 +95,23 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(source!=null)source.dispose();
         return result;
     }
-    public int loaded() { return textures.size(); }
+    public int loaded() {
+        int count=0;
+        for(var fleet:textures.values())count+=fleet.size();
+        return count;
+    }
+    private Texture texture(Battle.Faction faction,Shipyard.Hull hull) {
+        var fleet=textures.get(faction);
+        return fleet==null?null:fleet.get(hull);
+    }
     /** Preview is an art reference, not yet a source of fitted module UV anchors. */
     public boolean hasHull(Battle.Faction faction, Shipyard.Hull hull) {
-        return faction==Battle.Faction.TERRAN && textures.containsKey(hull);
+        return texture(faction,hull)!=null;
     }
     public boolean drawPreview(SpriteBatch batch,Battle.Faction faction,Shipyard.Hull hull,
                                float centerX,float centerY,float maxWidth,float maxHeight) {
         if(!hasHull(faction,hull))return false;
-        Texture texture=textures.get(hull);
+        Texture texture=texture(faction,hull);
         float factor=Math.min(maxWidth/texture.getWidth(),maxHeight/texture.getHeight());
         float w=texture.getWidth()*factor,h=texture.getHeight()*factor;
         batch.setColor(1,1,1,0.94f);
@@ -98,15 +121,15 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     /** True only when this living vessel has an actual image, never for unapproved alien sheets. */
     public boolean hasSprite(Battle.Ship ship) {
-        return ship != null && ship.alive() && ship.faction == Battle.Faction.TERRAN
-                && ship.hullClass != null && textures.containsKey(ship.hullClass);
+        return ship != null && ship.alive() && ship.hullClass != null
+                && texture(ship.faction,ship.hullClass)!=null;
     }
     public void render(Battle battle,SpriteBatch batch) {
         if(textures.isEmpty())return;
         batch.begin();
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship))continue;
-            Texture tex=textures.get(ship.hullClass);
+            Texture tex=texture(ship.faction,ship.hullClass);
             if(tex==null)continue;
             float height=(float)(34*ship.visualScale());
             float width=height*tex.getWidth()/(float)tex.getHeight();
@@ -165,7 +188,10 @@ public final class TerranPlaceholderSprites implements Disposable {
                 0,0,tex.getWidth(),tex.getHeight(),false,false);
     }
     @Override public void dispose() {
-        for(Texture texture:textures.values())texture.dispose();
+        java.util.Set<Texture> disposed=java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Texture,Boolean>());
+        for(var fleet:textures.values())
+            for(Texture image:fleet.values())if(disposed.add(image))image.dispose();
         textures.clear();
         innerHull.dispose();
         severeHull.dispose();

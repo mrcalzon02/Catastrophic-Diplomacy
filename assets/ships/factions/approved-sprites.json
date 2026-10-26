@@ -1,0 +1,966 @@
+{
+  "factions": [
+    {
+      "display_name": "Vaerith Prism Dominion",
+      "dreadnought_fallback": "carrier",
+      "id": "vaerith_prism",
+      "mechanical_archetype": "DRAXIAN",
+      "ships": [
+        {
+          "alpha_nonzero": 17902,
+          "crop": [
+            0,
+            12,
+            328,
+            378
+          ],
+          "hull": "interceptor",
+          "opaque_core_pixels": 7688,
+          "orientation": "nose_up",
+          "sha256": "e23043c57aa4e08bdb97d261ab40bfa16d6e14f43a2bc2e9cc9fadebf9fc3924",
+          "size": [
+            328,
+            366
+          ],
+          "sprite": "ships/factions/vaerith_prism/interceptor.png"
+        },
+        {
+          "alpha_nonzero": 22292,
+          "crop": [
+            307,
+            25,
+            628,
+            378
+          ],
+          "hull": "corvette",
+          "opaque_core_pixels": 12300,
+          "orientation": "nose_up",
+          "sha256": "30dd517dcfb4b96569b85c8cb93f4041e0e4b63cc24cfdc76d264d2d083471a9",
+          "size": [
+            321,
+            353
+          ],
+          "sprite": "ships/factions/vaerith_prism/corvette.png"
+        },
+        {
+          "alpha_nonzero": 27406,
+          "crop": [
+            595,
+            18,
+            946,
+            382
+          ],
+          "hull": "missile_corvette",
+          "opaque_core_pixels": 16784,
+          "orientation": "nose_up",
+          "sha256": "a27e874b09fb01365ab358b00ea3413f3f0dba018794de294bf0b36ab725fdb2",
+          "size": [
+            351,
+            364
+          ],
+          "sprite": "ships/factions/vaerith_prism/missile_corvette.png"
+        },
+        {
+          "alpha_nonzero": 40605,
+          "crop": [
+            942,
+            12,
+            1301,
+            380
+          ],
+          "hull": "frigate",
+          "opaque_core_pixels": 27911,
+          "orientation": "nose_up",
+          "sha256": "33dbdb5ea25c2a6f06bc122af45160710bc2ecc585d66058dc88f4f937f9a8a3",
+          "size": [
+            359,
+            368
+          ],
+          "sprite": "ships/factions/vaerith_prism/frigate.png"
+        },
+        {
+          "alpha_nonzero": 44692,
+          "crop": [
+            1273,
+            4,
+            1653,
+            346
+          ],
+          "hull": "destroyer",
+          "opaque_core_pixels": 32427,
+          "orientation": "nose_up",
+          "sha256": "e1a532d99d7a55f894b9706d828296ef3b5ccfa7f0687e8a04540ae1572719e5",
+          "size": [
+            380,
+            342
+          ],
+          "sprite": "ships/factions/vaerith_prism/destroyer.png"
+        },
+        {
+          "alpha_nonzero": 65524,
+          "crop": [
+            0,
+            351,
+            317,
+            941
+          ],
+          "hull": "light_cruiser",
+          "opaque_core_pixels": 46734,
+          "orientation": "nose_up",
+          "sha256": "be79fc755f33feee12e61bd7a61946263e1d67d43830d5af7dcdd12ffd21da08",
+          "size": [
+            317,
+            590
+          ],
+          "sprite": "ships/factions/vaerith_prism/light_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 91840,
+          "crop": [
+            277,
+            345,
+            604,
+            941
+          ],
+          "hull": "cruiser",
+          "opaque_core_pixels": 68446,
+          "orientation": "nose_up",
+          "sha256": "43a40fb435cd55cd7b060e019dc56f11e2c62f5ff2aa7403f0017af95849ff58",
+          "size": [
+            327,
+            596
+          ],
+          "sprite": "ships/factions/vaerith_prism/cruiser.png"
+        },
+        {
+          "alpha_nonzero": 109646,
+          "crop": [
+            585,
+            329,
+            954,
+            941
+          ],
+          "hull": "heavy_cruiser",
+          "opaque_core_pixels": 86718,
+          "orientation": "nose_up",
+          "sha256": "1d5bc461bfd96411cfc508e49fa75cd362edcee7237bf8bab8905c8cb57788d8",
+          "size": [
+            369,
+            612
+          ],
+          "sprite": "ships/factions/vaerith_prism/heavy_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 123588,
+          "crop": [
+            884,
+            351,
+            1310,
+            941
+          ],
+          "hull": "battlecruiser",
+          "opaque_core_pixels": 101067,
+          "orientation": "nose_up",
+          "sha256": "bb06f503a576ee1aa19123557af7c0efb62dd90d8f8e82df20e8847ac8bd09f4",
+          "size": [
+            426,
+            590
+          ],
+          "sprite": "ships/factions/vaerith_prism/battlecruiser.png"
+        },
+        {
+          "alpha_nonzero": 141550,
+          "crop": [
+            1297,
+            317,
+            1672,
+            941
+          ],
+          "hull": "carrier",
+          "opaque_core_pixels": 119709,
+          "orientation": "nose_up",
+          "sha256": "f3a642ab5d06dccf3918132358795801a86bb6bb037f55e2f0fa2fff38db7c14",
+          "size": [
+            375,
+            624
+          ],
+          "sprite": "ships/factions/vaerith_prism/carrier.png"
+        }
+      ],
+      "source": "alien_crystal_fleet_spritesheet.png",
+      "source_sha256": "be885ee6688741cd7b0b346b8629107ee6c34139289f3f2e2e7009e4d9d4a7d4",
+      "status": "sliced_and_qa_passed",
+      "visual_identity": "independent_faction"
+    },
+    {
+      "display_name": "Zelthar Luminari Accord",
+      "dreadnought_fallback": "carrier",
+      "id": "zelthar_luminari",
+      "mechanical_archetype": "UZIPT",
+      "ships": [
+        {
+          "alpha_nonzero": 19365,
+          "crop": [
+            0,
+            13,
+            296,
+            388
+          ],
+          "hull": "interceptor",
+          "opaque_core_pixels": 11752,
+          "orientation": "nose_up",
+          "sha256": "46f78638990a3852245880789d169f9eab36a035a4243edc5ed2738a1c86ef6a",
+          "size": [
+            296,
+            375
+          ],
+          "sprite": "ships/factions/zelthar_luminari/interceptor.png"
+        },
+        {
+          "alpha_nonzero": 36196,
+          "crop": [
+            277,
+            19,
+            606,
+            384
+          ],
+          "hull": "corvette",
+          "opaque_core_pixels": 24194,
+          "orientation": "nose_up",
+          "sha256": "07d2dd3c87bae92464a477a1e5d2974be3975cecea04667fe7f117ba97e79b2d",
+          "size": [
+            329,
+            365
+          ],
+          "sprite": "ships/factions/zelthar_luminari/corvette.png"
+        },
+        {
+          "alpha_nonzero": 40254,
+          "crop": [
+            573,
+            32,
+            895,
+            386
+          ],
+          "hull": "missile_corvette",
+          "opaque_core_pixels": 27518,
+          "orientation": "nose_up",
+          "sha256": "636814a8cf1cd4444f576b284c153cdffbac591da28ae4b9ace094f667f1854e",
+          "size": [
+            322,
+            354
+          ],
+          "sprite": "ships/factions/zelthar_luminari/missile_corvette.png"
+        },
+        {
+          "alpha_nonzero": 55695,
+          "crop": [
+            868,
+            14,
+            1241,
+            400
+          ],
+          "hull": "frigate",
+          "opaque_core_pixels": 38024,
+          "orientation": "nose_up",
+          "sha256": "889f9a3b4d90f3121c30ad446f417f013a630dcf626ab79b0adef650939bb4c0",
+          "size": [
+            373,
+            386
+          ],
+          "sprite": "ships/factions/zelthar_luminari/frigate.png"
+        },
+        {
+          "alpha_nonzero": 59129,
+          "crop": [
+            1242,
+            0,
+            1663,
+            372
+          ],
+          "hull": "destroyer",
+          "opaque_core_pixels": 45695,
+          "orientation": "nose_up",
+          "sha256": "1ee60c1f167c848e81160dbdc818d98852dc3411e7b7fcba69b1e58ebdb8b93a",
+          "size": [
+            421,
+            372
+          ],
+          "sprite": "ships/factions/zelthar_luminari/destroyer.png"
+        },
+        {
+          "alpha_nonzero": 65124,
+          "crop": [
+            0,
+            374,
+            294,
+            941
+          ],
+          "hull": "light_cruiser",
+          "opaque_core_pixels": 49754,
+          "orientation": "nose_up",
+          "sha256": "b6ad56bb94748822c77e3e82dbc8ebc23d3e57378aee78d13cedb4a05cb55424",
+          "size": [
+            294,
+            567
+          ],
+          "sprite": "ships/factions/zelthar_luminari/light_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 82498,
+          "crop": [
+            274,
+            375,
+            594,
+            941
+          ],
+          "hull": "cruiser",
+          "opaque_core_pixels": 65989,
+          "orientation": "nose_up",
+          "sha256": "461393010d1010853a0043c687f5bbd8bd4369a27ff169377b3831dc835de349",
+          "size": [
+            320,
+            566
+          ],
+          "sprite": "ships/factions/zelthar_luminari/cruiser.png"
+        },
+        {
+          "alpha_nonzero": 111026,
+          "crop": [
+            565,
+            357,
+            948,
+            941
+          ],
+          "hull": "heavy_cruiser",
+          "opaque_core_pixels": 85951,
+          "orientation": "nose_up",
+          "sha256": "60e34e3c6acd235ffb60b4409b196f1a4079dff7b9b240eecd8bbe79a6758ff6",
+          "size": [
+            383,
+            584
+          ],
+          "sprite": "ships/factions/zelthar_luminari/heavy_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 117567,
+          "crop": [
+            871,
+            364,
+            1257,
+            941
+          ],
+          "hull": "battlecruiser",
+          "opaque_core_pixels": 83021,
+          "orientation": "nose_up",
+          "sha256": "6396c2456e033b26b2f68100925c32add8f92444fcd9881c7ee29407eff34494",
+          "size": [
+            386,
+            577
+          ],
+          "sprite": "ships/factions/zelthar_luminari/battlecruiser.png"
+        },
+        {
+          "alpha_nonzero": 155377,
+          "crop": [
+            1214,
+            327,
+            1664,
+            941
+          ],
+          "hull": "carrier",
+          "opaque_core_pixels": 120620,
+          "orientation": "nose_up",
+          "sha256": "c916df78f638090ff941f84cb62b6cc86e945276e4d3c2e0592ff76d34dd99cb",
+          "size": [
+            450,
+            614
+          ],
+          "sprite": "ships/factions/zelthar_luminari/carrier.png"
+        }
+      ],
+      "source": "futuristic_alien_ship_sprite_sheet.png",
+      "source_sha256": "418ca4039c1b0c67c0738bbba6b1866752bedae090477513a3a72ad8c1b517e0",
+      "status": "sliced_and_qa_passed",
+      "visual_identity": "independent_faction"
+    },
+    {
+      "display_name": "Aureate Cathedral Synod",
+      "dreadnought_fallback": "carrier",
+      "id": "aureate_synod",
+      "mechanical_archetype": "MANDRALLY",
+      "ships": [
+        {
+          "alpha_nonzero": 19560,
+          "crop": [
+            0,
+            14,
+            314,
+            437
+          ],
+          "hull": "interceptor",
+          "opaque_core_pixels": 11167,
+          "orientation": "nose_up",
+          "sha256": "5928b2921cb9bcf26017f5652be57200a5c9ac6e90cc19f147b046cc22f8367c",
+          "size": [
+            314,
+            423
+          ],
+          "sprite": "ships/factions/aureate_synod/interceptor.png"
+        },
+        {
+          "alpha_nonzero": 29852,
+          "crop": [
+            303,
+            0,
+            626,
+            439
+          ],
+          "hull": "corvette",
+          "opaque_core_pixels": 19269,
+          "orientation": "nose_up",
+          "sha256": "52a118800d07111122d0311b0e0c68a6849bdfcfc4abfbfaeddcd1ae9b0c981c",
+          "size": [
+            323,
+            439
+          ],
+          "sprite": "ships/factions/aureate_synod/corvette.png"
+        },
+        {
+          "alpha_nonzero": 33660,
+          "crop": [
+            589,
+            36,
+            942,
+            461
+          ],
+          "hull": "missile_corvette",
+          "opaque_core_pixels": 24922,
+          "orientation": "nose_up",
+          "sha256": "fa8d19deaee02de8110009e1aea8653a81ca690ca6d9237898246f89a995e837",
+          "size": [
+            353,
+            425
+          ],
+          "sprite": "ships/factions/aureate_synod/missile_corvette.png"
+        },
+        {
+          "alpha_nonzero": 46315,
+          "crop": [
+            912,
+            26,
+            1277,
+            416
+          ],
+          "hull": "frigate",
+          "opaque_core_pixels": 35227,
+          "orientation": "nose_up",
+          "sha256": "e185198a670edba1d8ff1241429cfd7a61268d17fb6e10f50d6bfbcf39fdaff7",
+          "size": [
+            365,
+            390
+          ],
+          "sprite": "ships/factions/aureate_synod/frigate.png"
+        },
+        {
+          "alpha_nonzero": 58247,
+          "crop": [
+            1262,
+            0,
+            1641,
+            428
+          ],
+          "hull": "destroyer",
+          "opaque_core_pixels": 44848,
+          "orientation": "nose_up",
+          "sha256": "90c2e0b8b316450baa5ba34e1f2fffc1dc6a64af430c0474683e12abe79779bd",
+          "size": [
+            379,
+            428
+          ],
+          "sprite": "ships/factions/aureate_synod/destroyer.png"
+        },
+        {
+          "alpha_nonzero": 78375,
+          "crop": [
+            0,
+            400,
+            356,
+            941
+          ],
+          "hull": "light_cruiser",
+          "opaque_core_pixels": 59905,
+          "orientation": "nose_up",
+          "sha256": "717b76613a0ca4ff2e05cfb288ee010906f040a32f8b99a9c84875f3a32fa642",
+          "size": [
+            356,
+            541
+          ],
+          "sprite": "ships/factions/aureate_synod/light_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 90589,
+          "crop": [
+            309,
+            404,
+            661,
+            941
+          ],
+          "hull": "cruiser",
+          "opaque_core_pixels": 70120,
+          "orientation": "nose_up",
+          "sha256": "4ca0a3aa35fb02078fc931b5c17eef5e1004c1f9c8b31600dcac9129a89f55dc",
+          "size": [
+            352,
+            537
+          ],
+          "sprite": "ships/factions/aureate_synod/cruiser.png"
+        },
+        {
+          "alpha_nonzero": 103281,
+          "crop": [
+            636,
+            418,
+            978,
+            941
+          ],
+          "hull": "heavy_cruiser",
+          "opaque_core_pixels": 77764,
+          "orientation": "nose_up",
+          "sha256": "3ebdbab95f11378f5678820bce6eee9619a4c239b228a0d1d73d58bab70f1b85",
+          "size": [
+            342,
+            523
+          ],
+          "sprite": "ships/factions/aureate_synod/heavy_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 125701,
+          "crop": [
+            945,
+            370,
+            1321,
+            941
+          ],
+          "hull": "battlecruiser",
+          "opaque_core_pixels": 103596,
+          "orientation": "nose_up",
+          "sha256": "8d50e9289542a070041d905f443b7e3691e559932634b31fd84486b85a5096ad",
+          "size": [
+            376,
+            571
+          ],
+          "sprite": "ships/factions/aureate_synod/battlecruiser.png"
+        },
+        {
+          "alpha_nonzero": 150627,
+          "crop": [
+            1296,
+            362,
+            1672,
+            941
+          ],
+          "hull": "carrier",
+          "opaque_core_pixels": 122927,
+          "orientation": "nose_up",
+          "sha256": "7982c111c67d0633792590cce40558f4da323f6fd20d2e102618c3c5ca9593d4",
+          "size": [
+            376,
+            579
+          ],
+          "sprite": "ships/factions/aureate_synod/carrier.png"
+        }
+      ],
+      "source": "gothic_sci_fi_fleet_sprite_sheet.png",
+      "source_sha256": "2268ef2e202797657b30f14cc4f208144222aa1058d96410407ffbbc7f3043cb",
+      "status": "sliced_and_qa_passed",
+      "visual_identity": "independent_faction"
+    },
+    {
+      "display_name": "Nyx Biolith Enclave",
+      "dreadnought_fallback": "carrier",
+      "id": "nyx_biolith",
+      "mechanical_archetype": "CARNELIAN",
+      "ships": [
+        {
+          "alpha_nonzero": 26630,
+          "crop": [
+            20,
+            12,
+            317,
+            404
+          ],
+          "hull": "interceptor",
+          "opaque_core_pixels": 11114,
+          "orientation": "nose_up",
+          "sha256": "2b352efd3a325eabd43b60be621e851f891b6dfb135e65e4708de01230a83178",
+          "size": [
+            297,
+            392
+          ],
+          "sprite": "ships/factions/nyx_biolith/interceptor.png"
+        },
+        {
+          "alpha_nonzero": 44053,
+          "crop": [
+            259,
+            0,
+            590,
+            396
+          ],
+          "hull": "corvette",
+          "opaque_core_pixels": 22397,
+          "orientation": "nose_up",
+          "sha256": "d1e0d1c3d8281b07b801771664e18054b9e825d6faa6e79c59605d97bb96b566",
+          "size": [
+            331,
+            396
+          ],
+          "sprite": "ships/factions/nyx_biolith/corvette.png"
+        },
+        {
+          "alpha_nonzero": 50554,
+          "crop": [
+            571,
+            12,
+            895,
+            412
+          ],
+          "hull": "missile_corvette",
+          "opaque_core_pixels": 33057,
+          "orientation": "nose_up",
+          "sha256": "672f21676c992cc4ea78a4bc2285d24fbe5f9c31e9f55061ac99f6307e2ed367",
+          "size": [
+            324,
+            400
+          ],
+          "sprite": "ships/factions/nyx_biolith/missile_corvette.png"
+        },
+        {
+          "alpha_nonzero": 66533,
+          "crop": [
+            890,
+            4,
+            1259,
+            388
+          ],
+          "hull": "frigate",
+          "opaque_core_pixels": 41187,
+          "orientation": "nose_up",
+          "sha256": "18b34b08ed9d1fb421039685a29059e88dc8458a2564993606cd76f87ee440d7",
+          "size": [
+            369,
+            384
+          ],
+          "sprite": "ships/factions/nyx_biolith/frigate.png"
+        },
+        {
+          "alpha_nonzero": 91704,
+          "crop": [
+            1246,
+            0,
+            1672,
+            385
+          ],
+          "hull": "destroyer",
+          "opaque_core_pixels": 61955,
+          "orientation": "nose_up",
+          "sha256": "21216cd9991d3cf48dda607795eda648694af0488c02b44e761f0acfbd32a59d",
+          "size": [
+            426,
+            385
+          ],
+          "sprite": "ships/factions/nyx_biolith/destroyer.png"
+        },
+        {
+          "alpha_nonzero": 86264,
+          "crop": [
+            0,
+            385,
+            319,
+            926
+          ],
+          "hull": "light_cruiser",
+          "opaque_core_pixels": 54372,
+          "orientation": "nose_up",
+          "sha256": "a205b1b87a263dc9af46a38131783e4ad3e41882144308cad0dd2473d17ad05d",
+          "size": [
+            319,
+            541
+          ],
+          "sprite": "ships/factions/nyx_biolith/light_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 100859,
+          "crop": [
+            293,
+            351,
+            616,
+            941
+          ],
+          "hull": "cruiser",
+          "opaque_core_pixels": 69019,
+          "orientation": "nose_up",
+          "sha256": "cbbe935cf2bafe55902f88e3bb56fc90ad46fb7bc6f0cb85836c6d9877d54104",
+          "size": [
+            323,
+            590
+          ],
+          "sprite": "ships/factions/nyx_biolith/cruiser.png"
+        },
+        {
+          "alpha_nonzero": 110714,
+          "crop": [
+            595,
+            360,
+            946,
+            941
+          ],
+          "hull": "heavy_cruiser",
+          "opaque_core_pixels": 77085,
+          "orientation": "nose_up",
+          "sha256": "aa3c73506ecadfb4e9d049548028ed44e4e5f1d93c409d37f5312569c937eb4e",
+          "size": [
+            351,
+            581
+          ],
+          "sprite": "ships/factions/nyx_biolith/heavy_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 128315,
+          "crop": [
+            898,
+            351,
+            1280,
+            941
+          ],
+          "hull": "battlecruiser",
+          "opaque_core_pixels": 87602,
+          "orientation": "nose_up",
+          "sha256": "1eb9109c7dd69ac9bbb19ac356d801cf5619e07133e0a8c63ead93b1e510577c",
+          "size": [
+            382,
+            590
+          ],
+          "sprite": "ships/factions/nyx_biolith/battlecruiser.png"
+        },
+        {
+          "alpha_nonzero": 168462,
+          "crop": [
+            1264,
+            352,
+            1672,
+            941
+          ],
+          "hull": "carrier",
+          "opaque_core_pixels": 120881,
+          "orientation": "nose_up",
+          "sha256": "830b9ec0b0fc3120c582854d5e5c6cc0f050bb0bfcfce4fed35562de3af68a83",
+          "size": [
+            408,
+            589
+          ],
+          "sprite": "ships/factions/nyx_biolith/carrier.png"
+        }
+      ],
+      "source": "purple_bioluminescent_alien_fleet_sprite_sheet.png",
+      "source_sha256": "5202acfe9e87a9e7fad41b2ea7b82fc2b87b657189cc062c66b5908c81ea1d45",
+      "status": "sliced_and_qa_passed",
+      "visual_identity": "independent_faction"
+    },
+    {
+      "display_name": "Umbra Foundry Compact",
+      "dreadnought_fallback": "carrier",
+      "id": "umbra_foundry",
+      "mechanical_archetype": "ZIPPLEDROW",
+      "ships": [
+        {
+          "alpha_nonzero": 14783,
+          "crop": [
+            26,
+            4,
+            270,
+            408
+          ],
+          "hull": "interceptor",
+          "opaque_core_pixels": 10743,
+          "orientation": "nose_up",
+          "sha256": "9e413a85880d7db0a98426338db60b00ea7517087bb05b203f63989b94eecbb6",
+          "size": [
+            244,
+            404
+          ],
+          "sprite": "ships/factions/umbra_foundry/interceptor.png"
+        },
+        {
+          "alpha_nonzero": 24302,
+          "crop": [
+            259,
+            21,
+            554,
+            425
+          ],
+          "hull": "corvette",
+          "opaque_core_pixels": 18967,
+          "orientation": "nose_up",
+          "sha256": "030537f113431a05ef9361693b50dab45207e8965633f9081fe4b6fb41a7c293",
+          "size": [
+            295,
+            404
+          ],
+          "sprite": "ships/factions/umbra_foundry/corvette.png"
+        },
+        {
+          "alpha_nonzero": 32733,
+          "crop": [
+            539,
+            12,
+            873,
+            407
+          ],
+          "hull": "missile_corvette",
+          "opaque_core_pixels": 27250,
+          "orientation": "nose_up",
+          "sha256": "460b8b0d3b00a8886ed0061e8018036ac107c4d400004b0750351a21c66c70a5",
+          "size": [
+            334,
+            395
+          ],
+          "sprite": "ships/factions/umbra_foundry/missile_corvette.png"
+        },
+        {
+          "alpha_nonzero": 44823,
+          "crop": [
+            842,
+            18,
+            1239,
+            390
+          ],
+          "hull": "frigate",
+          "opaque_core_pixels": 38025,
+          "orientation": "nose_up",
+          "sha256": "1f906e5fb5d621614fbcfd47ec8a3f3f090f092bfd2446335c4ea0aa6f73dbe5",
+          "size": [
+            397,
+            372
+          ],
+          "sprite": "ships/factions/umbra_foundry/frigate.png"
+        },
+        {
+          "alpha_nonzero": 59367,
+          "crop": [
+            1228,
+            7,
+            1567,
+            409
+          ],
+          "hull": "destroyer",
+          "opaque_core_pixels": 50934,
+          "orientation": "nose_up",
+          "sha256": "b9bf94dbfb66f2220b95452438be435c9a30a92018429bd764f96cf994b84634",
+          "size": [
+            339,
+            402
+          ],
+          "sprite": "ships/factions/umbra_foundry/destroyer.png"
+        },
+        {
+          "alpha_nonzero": 68393,
+          "crop": [
+            25,
+            398,
+            294,
+            928
+          ],
+          "hull": "light_cruiser",
+          "opaque_core_pixels": 59092,
+          "orientation": "nose_up",
+          "sha256": "12557cf0ab57f22a9464647ea24b4e79a0ca76c3e514fdeb1445e6995b8d221f",
+          "size": [
+            269,
+            530
+          ],
+          "sprite": "ships/factions/umbra_foundry/light_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 74785,
+          "crop": [
+            295,
+            391,
+            570,
+            889
+          ],
+          "hull": "cruiser",
+          "opaque_core_pixels": 66555,
+          "orientation": "nose_up",
+          "sha256": "af434751e64a183f72d81ef8d173570901a0073900494ad6e1cc73273feabdd1",
+          "size": [
+            275,
+            498
+          ],
+          "sprite": "ships/factions/umbra_foundry/cruiser.png"
+        },
+        {
+          "alpha_nonzero": 99298,
+          "crop": [
+            599,
+            351,
+            931,
+            924
+          ],
+          "hull": "heavy_cruiser",
+          "opaque_core_pixels": 89311,
+          "orientation": "nose_up",
+          "sha256": "3bc606915352329a3067e8a02a5342e73be9065859aaa25efcb7b4570a0a01d1",
+          "size": [
+            332,
+            573
+          ],
+          "sprite": "ships/factions/umbra_foundry/heavy_cruiser.png"
+        },
+        {
+          "alpha_nonzero": 117754,
+          "crop": [
+            916,
+            333,
+            1293,
+            927
+          ],
+          "hull": "battlecruiser",
+          "opaque_core_pixels": 106747,
+          "orientation": "nose_up",
+          "sha256": "c4422cab99f57e192f9ae4ae0fead53a12d3416896895411e3663c47ed1fe13a",
+          "size": [
+            377,
+            594
+          ],
+          "sprite": "ships/factions/umbra_foundry/battlecruiser.png"
+        },
+        {
+          "alpha_nonzero": 143265,
+          "crop": [
+            1276,
+            364,
+            1664,
+            941
+          ],
+          "hull": "carrier",
+          "opaque_core_pixels": 129561,
+          "orientation": "nose_up",
+          "sha256": "8d72388d9cf45d71d705cc43131c1d30f2b0634534c0bce0e7ee5890d7065f75",
+          "size": [
+            388,
+            577
+          ],
+          "sprite": "ships/factions/umbra_foundry/carrier.png"
+        }
+      ],
+      "source": "sci_fi_fleet_sprite_asset_sheet.png",
+      "source_sha256": "9e6e5e22a1cccea114bed972b1ece6dc09d29f8dab26f1bc8926aecf05b30def",
+      "status": "sliced_and_qa_passed",
+      "visual_identity": "independent_faction"
+    }
+  ],
+  "render_scale": "hull_visualScale_preserved",
+  "schema": "cd-faction-art-v1"
+}
