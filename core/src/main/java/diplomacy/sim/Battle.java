@@ -485,6 +485,11 @@ public final class Battle {
         s.pdCycle=machinery.pdCycle();
         s.weapons=machinery.weapons();
         s.ammoAccess=machinery.ammunition();
+        // A fleet blueprint owns the chosen, research-licensed physical loads.
+        // Stock ammo remains the exact default for legacy CD-SHIP-1/2 fleets.
+        s.setKineticType(design.ammoSelection.kinetic());
+        s.setWarhead(DamageType.MISSILE,design.ammoSelection.missile());
+        s.setWarhead(DamageType.TORPEDO,design.ammoSelection.torpedo());
         s.support=machinery.support();
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
