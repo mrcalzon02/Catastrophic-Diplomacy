@@ -32,6 +32,18 @@ public final class GameMenuFlowTest {
         }
         check(GameMenuPanel.factionHit(1250,650)==null,"Invalid faction hit region");
 
+        check(GameMenuPanel.Screen.valueOf("DEPLOYMENT")!=null,
+                "Pre-battle deployment screen missing");
+        float[][] deploymentTargets={
+                {90,61},{894,452},{1151,452},{895,344},
+                {1142,344},{990,242},{1076,60}};
+        for(int i=0;i<deploymentTargets.length;i++){
+            float[] point=deploymentTargets[i];
+            check(GameMenuPanel.deploymentAction(point[0],point[1])==i,
+                    "Deployment control has no functional touch target "+i);
+        }
+        check(GameMenuPanel.deploymentAction(605,480)==-1,
+                "Deployment preview area must not trigger a button");
         for(int page=0;page<CampaignMap.PAGE_COUNT;page++)
             for(var node:CampaignMap.page(page))
                 check(GameMenuPanel.mapHit(node.x(),node.y(),page)==node.level(),
