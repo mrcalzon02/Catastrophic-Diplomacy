@@ -602,6 +602,19 @@ public final class Shipyard {
                 }
             }
         }
+        // CD-SHIP-1 files created before the append-only habitat migration
+        // legitimately had no accommodation sockets. Install the new physical
+        // modules only for those older records, never rewrite an occupied slot
+        // or bypass invalid CD-SHIP-2 crew engineering.
+        if(!hasVersions){
+            int quarters=slotOf(design.hull,Mount.HABITAT,0);
+            int breathing=slotOf(design.hull,Mount.HABITAT,1);
+            if(!seen[quarters] && !seen[breathing]){
+                String id=factionId(design.faction);
+                design=design.install(quarters,"BASE-"+id+"-CRW")
+                        .install(breathing,"BASE-"+id+"-LFS");
+            }
+        }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
         return design;
     }
