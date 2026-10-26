@@ -1,6 +1,8 @@
 package diplomacy.android;
 
 import android.os.Bundle;
+import android.app.ActivityManager;
+import android.content.Context;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import diplomacy.client.CatastrophicGame;
@@ -11,7 +13,13 @@ public final class AndroidLauncher extends AndroidApplication {
         super.onCreate(state);
         updater=new SideloadUpdater(this);
         AndroidApplicationConfiguration config = new AndroidApplicationConfiguration();
-        config.useGL30 = true;
+        // Fire tablets and older Android GPUs may provide GLES 2 only. Keep
+        // the existing GL3 instanced renderer when available, otherwise let
+        // CatastrophicGame use its already-implemented GLES2 hull/FX fallback.
+        ActivityManager manager=(ActivityManager)getSystemService(Context.ACTIVITY_SERVICE);
+        boolean gl3=manager!=null&&manager.getDeviceConfigurationInfo()!=null
+                &&manager.getDeviceConfigurationInfo().reqGlEsVersion>=0x30000;
+        config.useGL30 = gl3;
         config.numSamples = 0;
         config.useImmersiveMode = true;
         boolean debug=(getApplicationInfo().flags &
