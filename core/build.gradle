@@ -246,3 +246,13 @@ tasks.register('weaponBehaviorSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.WeaponBehaviorTableTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('weaponBehaviorSmoke') }
+
+tasks.register('ordnanceDoctrineSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove physical 7-mode guided missiles and torpedoes, decoys, cold ignition, ammunition and seeded replay.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceDoctrineTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnanceDoctrineSmoke') }
+
