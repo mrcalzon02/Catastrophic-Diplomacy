@@ -274,3 +274,12 @@ tasks.register('ammunitionResearchSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.AmmunitionResearchTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionResearchSmoke') }
+
+tasks.register('ammunitionSelectionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify actual selected loadout, anti-forgery, CD-SHIP-3 saved ammo and live AI/player use.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionSelectionTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionSelectionSmoke') }
