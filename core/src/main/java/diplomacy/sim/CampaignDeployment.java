@@ -57,7 +57,11 @@ public final class CampaignDeployment {
         }
         public Loadout withShips(int change,LevelEconomy.Level mission) {
             if(mission==null)throw new IllegalArgumentException("Mission required");
-            int selected=Math.max(1,Math.min(mission.maximumFleet(),ships+change));
+            return withShips(change,mission.maximumFleet());
+        }
+        public Loadout withShips(int change,int fleetLimit) {
+            if(fleetLimit<1||fleetLimit>200)throw new IllegalArgumentException("Invalid fleet cap");
+            int selected=Math.max(1,Math.min(fleetLimit,ships+change));
             Map<Integer,Point> positions=new HashMap<>(placements);
             positions.keySet().removeIf(i->i>=selected);
             Map<Integer,List<ShipCommandQueue.Command>> queues=new HashMap<>(orders);
