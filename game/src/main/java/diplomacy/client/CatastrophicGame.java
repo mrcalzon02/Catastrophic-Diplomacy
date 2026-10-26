@@ -17,6 +17,10 @@ import diplomacy.sim.BattleOrders;
 import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.DemonstrationBattle;
+import diplomacy.sim.CampaignMap;
+import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.LevelEconomy;
+import diplomacy.sim.ScenarioCatalog;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -46,6 +50,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
     private Battle battle;
+    private GameMenuPanel menuPanel;
+    private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
+    private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
+    private CampaignProgress.State campaign;
+    private int campaignPage,selectedMission=1,activeMission;
+    private int deployedAtLaunch,survivorsAtEnd;
+    private long lastReward;
+    private boolean playedCampaign,lastWon;
+    private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
     private ShipyardPanel shipyard;
@@ -122,6 +135,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         rightDesign=Shipyard.starter(right,Shipyard.Hull.CORVETTE);
         restoreFleets();
         restoreOrderPresets();
+        restoreCampaign();
         shipyard = new ShipyardPanel(technology,(team,design)->{
             if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
             saveFleets();
@@ -130,9 +144,33 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shipyard.setIcons(uiIcons);
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
         fleetOrdersPanel.setIcons(uiIcons);
+        menuPanel=new GameMenuPanel();
         reset();
+        if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;}
+        else{running=false;screen=GameMenuPanel.Screen.HOME;}
+        Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
+                if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+                    if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
+                        if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
+                        else screen=GameMenuPanel.Screen.HOME;
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.SKIRMISH){
+                        if(key==Input.Keys.ENTER){launchSkirmish();return true;}
+                        if(key==Input.Keys.UP||key==Input.Keys.DOWN){
+                            int step=key==Input.Keys.UP?-1:1;
+                            var values=ScenarioCatalog.Preset.values();
+                            selectScenario(values[Math.floorMod(scenario.ordinal()+step,values.length)]);
+                            return true;
+                        }
+                    }
+                    if(screen==GameMenuPanel.Screen.CAMPAIGN&&key==Input.Keys.ENTER){
+                        launchCampaignMission();return true;
+                    }
+                    return true;
+                }
                 if (key == Input.Keys.U) { audio.toggleMusic(); audio.ui(); return true; }
                 if (key == Input.Keys.I) { audio.toggleEffects(); audio.ui(); return true; }
                 if (key == Input.Keys.J) { audio.toggleTrack(); audio.ui(); return true; }
@@ -146,7 +184,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return true;
                 }
                 if (shipyard.open()) return shipyard.key(key);
-                if (key == Input.Keys.M || key == Input.Keys.ESCAPE) { openTacticalMenu(); return true; }
+                if (key == Input.Keys.M || key == Input.Keys.ESCAPE || key == Input.Keys.BACK) { openTacticalMenu(); return true; }
                 if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
                 if (key == Input.Keys.F) { openFleetOrders(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
@@ -169,6 +207,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
+                if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+                    tapFrontEnd(world.x,world.y);
+                    return true;
+                }
                 if (fleetOrdersPanel!=null&&fleetOrdersPanel.open()) {
                     if(world.y>=622){closeFleetOrders();return true;}
                     return fleetOrdersPanel.tap(world.x,world.y);
