@@ -309,3 +309,12 @@ tasks.register('gameFlowSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
+
+tasks.register('campaignDeploymentSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Exercise selectable prebattle formation coordinates and fleet-size limits in live combat.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignDeploymentTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignDeploymentSmoke')) }
