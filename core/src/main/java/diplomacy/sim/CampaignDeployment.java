@@ -22,12 +22,17 @@ public final class CampaignDeployment {
     public record Point(double x,double y) { }
     public record Loadout(int ships, Formation formation,
                           Map<Integer,Point> placements,
-                          Map<Integer,List<ShipCommandQueue.Command>> orders) {
+                          Map<Integer,List<ShipCommandQueue.Command>> orders,
+                          Map<Integer,ShipStandingOrders> standings) {
         public Loadout(int ships,Formation formation) {
-            this(ships,formation,Map.of(),Map.of());
+            this(ships,formation,Map.of(),Map.of(),Map.of());
+        }
+        public Loadout(int ships,Formation formation,Map<Integer,Point> placements,
+                       Map<Integer,List<ShipCommandQueue.Command>> orders) {
+            this(ships,formation,placements,orders,Map.of());
         }
         public Loadout {
-            if(ships<1||ships>200||formation==null||placements==null||orders==null)
+            if(ships<1||ships>200||formation==null||placements==null||orders==null||standings==null)
                 throw new IllegalArgumentException("Invalid campaign deployment");
             placements=Map.copyOf(placements);
             Map<Integer,List<ShipCommandQueue.Command>> sequences=new HashMap<>();
@@ -38,6 +43,11 @@ public final class CampaignDeployment {
                 sequences.put(entry.getKey(),List.copyOf(entry.getValue()));
             }
             orders=Map.copyOf(sequences);
+            standings=Map.copyOf(standings);
+            for(var entry:standings.entrySet()){
+                if(entry.getKey()==null||entry.getKey()<0||entry.getKey()>=ships||entry.getValue()==null)
+                    throw new IllegalArgumentException("Standing doctrine refers to absent ship");
+            }
             for(var entry:placements.entrySet()){
                 if(entry.getKey()==null||entry.getKey()<0||entry.getKey()>=ships)
                     throw new IllegalArgumentException("Placement refers to absent ship");
@@ -66,20 +76,22 @@ public final class CampaignDeployment {
             positions.keySet().removeIf(i->i>=selected);
             Map<Integer,List<ShipCommandQueue.Command>> queues=new HashMap<>(orders);
             queues.keySet().removeIf(i->i>=selected);
-            return new Loadout(selected,formation,positions,queues);
+            Map<Integer,ShipStandingOrders> standing=new HashMap<>(standings);
+            standing.keySet().removeIf(i->i>=selected);
+            return new Loadout(selected,formation,positions,queues,standing);
         }
         public Loadout withFormation(int steps) {
             Formation[] options=Formation.values();
             // Changing to a new preset explicitly resets any custom positions
             // but retains existing orders for surviving vessels.
             return new Loadout(ships,options[Math.floorMod(formation.ordinal()+steps,options.length)],
-                    Map.of(),orders);
+                    Map.of(),orders,standings);
         }
         public Loadout withPlacement(int ship,double x,double y) {
             if(ship<0||ship>=ships)throw new IllegalArgumentException("Ship index out of range");
             Map<Integer,Point> copy=new HashMap<>(placements);
             copy.put(ship,new Point(x,y));
-            return new Loadout(ships,formation,copy,orders);
+            return new Loadout(ships,formation,copy,orders,standings);
         }
         public Loadout appendOrder(int ship,ShipCommandQueue.Command command) {
             if(ship<0||ship>=ships||command==null)
@@ -88,7 +100,7 @@ public final class CampaignDeployment {
             java.util.ArrayList<ShipCommandQueue.Command> items=new java.util.ArrayList<>(ordersFor(ship));
             items.add(command);
             copy.put(ship,List.copyOf(items));
-            return new Loadout(ships,formation,placements,copy);
+            return new Loadout(ships,formation,placements,copy,standings);
         }
         public Loadout undoOrder(int ship) {
             if(ship<0||ship>=ships)throw new IllegalArgumentException("Missing ship");
@@ -96,17 +108,35 @@ public final class CampaignDeployment {
             if(current.isEmpty())return this;
             Map<Integer,List<ShipCommandQueue.Command>> copy=new HashMap<>(orders);
             copy.put(ship,List.copyOf(current.subList(0,current.size()-1)));
-            return new Loadout(ships,formation,placements,copy);
+            return new Loadout(ships,formation,placements,copy,standings);
         }
         public Loadout clearOrders(int ship) {
             if(ship<0||ship>=ships)throw new IllegalArgumentException("Missing ship");
             Map<Integer,List<ShipCommandQueue.Command>> copy=new HashMap<>(orders);
             copy.remove(ship);
-            return new Loadout(ships,formation,placements,copy);
+            return new Loadout(ships,formation,placements,copy,standings);
         }
         public List<ShipCommandQueue.Command> ordersFor(int ship) {
             if(ship<0||ship>=ships)throw new IllegalArgumentException("Missing ship");
             return orders.getOrDefault(ship,List.of());
+        }
+        public ShipStandingOrders standingFor(int ship){
+            if(ship<0||ship>=ships)throw new IllegalArgumentException("Missing ship");
+            return standings.getOrDefault(ship,ShipStandingOrders.DEFAULT);
+        }
+        public Loadout withStanding(int ship,ShipStandingOrders policy) {
+            if(ship<0||ship>=ships||policy==null)throw new IllegalArgumentException("Missing ship doctrine");
+            Map<Integer,ShipStandingOrders> copy=new HashMap<>(standings);
+            copy.put(ship,policy);
+            return new Loadout(ships,formation,placements,orders,copy);
+        }
+        /** Restore only the policies belonging to currently commissioned hull slots. */
+        public Loadout withStandingProfiles(Map<Integer,ShipStandingOrders> policies) {
+            if(policies==null)throw new IllegalArgumentException("Missing profiles");
+            Map<Integer,ShipStandingOrders> selected=new HashMap<>();
+            for(var entry:policies.entrySet())if(entry.getKey()>=0&&entry.getKey()<ships)
+                selected.put(entry.getKey(),entry.getValue());
+            return new Loadout(ships,formation,placements,orders,selected);
         }
         public Point at(int index) {
             if(index<0||index>=ships)throw new IllegalArgumentException("Unknown deployed ship");
@@ -121,6 +151,8 @@ public final class CampaignDeployment {
                 ship.x=point.x();ship.y=point.y();
                 ship.vx=0;ship.vy=0;
                 battle.setShipCommandQueue(ship.id,ordersFor(i));
+                ShipStandingOrders policy=standings.get(i);
+                if(policy!=null)battle.setShipStandingOrders(ship.id,policy);
                 i++;
             }
             if(i!=ships)throw new IllegalArgumentException("Insufficient allied ships in battle");
