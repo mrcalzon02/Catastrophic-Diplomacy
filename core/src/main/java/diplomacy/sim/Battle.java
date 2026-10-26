@@ -463,7 +463,8 @@ public final class Battle {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
                     double heading = s.team == 0 ? 1 : -1;
-                    s.vx += (heading * s.speed * s.engineCondition * 0.38 - s.vx) * 0.055;
+                    s.vx += (heading * s.speed * s.engineCondition
+                            * s.crewReadiness() * 0.38 - s.vx) * 0.055;
                 }
                 s.x += s.vx * DT; s.y += s.vy * DT;
             }
@@ -589,7 +590,7 @@ public final class Battle {
         if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
-        double thrust = s.speed * s.engineCondition;
+        double thrust = s.speed * s.engineCondition * s.crewReadiness();
         double desiredVx = StrictMath.cos(s.facing) * thrust, desiredVy = StrictMath.sin(s.facing) * thrust;
         double smoothing = Math.min(1, 1.6 * DT);
         s.vx += (desiredVx - s.vx) * smoothing;
