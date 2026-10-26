@@ -8,13 +8,14 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignDeployment;
+import diplomacy.sim.ShipCommandQueue;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DEPLOYMENT, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -57,6 +58,39 @@ final class GameMenuPanel {
         if(hit(x,y,1098,321,99,51))return 4;
         if(hit(x,y,845,214,352,55))return 5;
         if(hit(x,y,913,35,302,55))return 6;
+        if(hit(x,y,845,143,352,55))return 7;
+        return -1;
+    }
+    // Deployment preview uses the exact same world-to-screen projection
+    // for rendering, click selection and dragging a physical hull.
+    static float placementUiX(double worldX){return 60+(float)(worldX-70)*1.24f;}
+    static float placementUiY(double worldY){return 166+(float)(worldY-90)*.80f;}
+    static double placementWorldX(float uiX){return 70+(uiX-60)/1.24;}
+    static double placementWorldY(float uiY){return 90+(uiY-166)/.80;}
+    static float ordersUiX(double worldX){return 60+(float)worldX*.56f;}
+    static float ordersUiY(double worldY){return 161+(float)worldY*.60f;}
+    static double ordersWorldX(float uiX){return (uiX-60)/.56;}
+    static double ordersWorldY(float uiY){return (uiY-161)/.60;}
+    static int shipHit(float x,float y,CampaignDeployment.Loadout deployment,boolean fullBattle){
+        int result=-1;double nearest=22*22;
+        for(int i=0;i<deployment.ships();i++){
+            var p=deployment.at(i);
+            double sx=fullBattle?ordersUiX(p.x()):placementUiX(p.x());
+            double sy=fullBattle?ordersUiY(p.y()):placementUiY(p.y());
+            double dist=(x-sx)*(x-sx)+(y-sy)*(y-sy);
+            if(dist<nearest){nearest=dist;result=i;}
+        }
+        return result;
+    }
+    static int ordersAction(float x,float y){
+        if(hit(x,y,845,530,105,50))return 0;
+        if(hit(x,y,1095,530,105,50))return 1;
+        if(hit(x,y,845,457,355,52))return 2;
+        if(hit(x,y,845,387,355,52))return 3;
+        if(hit(x,y,845,317,355,52))return 4;
+        if(hit(x,y,845,247,355,52))return 5;
+        if(hit(x,y,845,177,355,52))return 6;
+        if(hit(x,y,900,32,300,55))return 7;
         return -1;
     }
     static int mapHit(float x,float y,int page){
@@ -80,7 +114,8 @@ final class GameMenuPanel {
     void draw(Screen screen,ShapeRenderer shapes,SpriteBatch batch,BitmapFont font,
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
-              CampaignDeployment.Loadout deployment,String friendlyHull,
+              CampaignDeployment.Loadout deployment,String friendlyHull,int selectedShip,
+              boolean awaitingWaypoint,String editNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -145,17 +180,43 @@ final class GameMenuPanel {
                 // The same pure loadout.at() is used by CampaignEncounter to place vessels.
                 for(int i=0;i<deployment.ships();i++){
                     CampaignDeployment.Point ship=deployment.at(i);
-                    shapes.setColor(.20f,.77f,.90f,1);
-                    shapes.circle(30+(float)ship.x()*1.4f,125+(float)ship.y()*.8f,
-                                  deployment.ships()>80?3:5,10);
+                    shapes.setColor(i==selectedShip?Color.GOLD:Color.CYAN);
+                    shapes.circle(placementUiX(ship.x()),placementUiY(ship.y()),
+                                  i==selectedShip?9:deployment.ships()>80?3:5,12);
                 }
                 button(shapes,845,430,99,51,false);
                 button(shapes,1098,430,99,51,false);
                 button(shapes,845,321,99,51,false);
                 button(shapes,1098,321,99,51,false);
                 button(shapes,845,214,352,55,false);
+                button(shapes,845,143,352,55,false);
                 button(shapes,35,35,175,55,false);
                 button(shapes,913,35,302,55,true);
+            }
+            case SHIP_ORDERS -> {
+                rectangle(shapes,39,135,760,472,PANEL);
+                rectangle(shapes,819,135,425,472,PANEL);
+                shapes.setColor(.11f,.16f,.24f,1);
+                shapes.rectLine(ordersUiX(640),160,ordersUiX(640),594,2);
+                // Display all commissioned hulls plus selected ship's programmed route.
+                var path=deployment.ordersFor(selectedShip);
+                var previous=deployment.at(selectedShip);
+                for(var order:path)if(order.type()==ShipCommandQueue.Type.MOVE){
+                    shapes.setColor(Color.GOLD);
+                    shapes.rectLine(ordersUiX(previous.x()),ordersUiY(previous.y()),
+                                    ordersUiX(order.x()),ordersUiY(order.y()),2);
+                    previous=new CampaignDeployment.Point(order.x(),order.y());
+                }
+                for(int i=0;i<deployment.ships();i++){
+                    var position=deployment.at(i);
+                    shapes.setColor(i==selectedShip?Color.GOLD:Color.CYAN);
+                    shapes.circle(ordersUiX(position.x()),ordersUiY(position.y()),
+                            i==selectedShip?9:deployment.ships()>80?3:5,12);
+                }
+                button(shapes,845,530,105,50,false);
+                button(shapes,1095,530,105,50,false);
+                for(int y:new int[]{457,387,317,247,177})button(shapes,845,y,355,52,false);
+                button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
                 for(int i=0;i<5;i++)
@@ -236,8 +297,36 @@ final class GameMenuPanel {
                         LevelEconomy.victoryCredits(stage,deployment.ships(),deployment.ships(),true),
                         843,290,Color.GOLD);
                 label(batch,font,"EDIT FITTED SHIP",896,249,Color.WHITE);
+                label(batch,font,"SHIP ORDERS",945,180,Color.WHITE);
+                label(batch,font,"SELECT AND DRAG A VESSEL TO REPOSITION",61,139,MUTED);
+                label(batch,font,"SELECTED VESSEL #"+(selectedShip+1),846,120,Color.GOLD);
+                label(batch,font,editNotice,61,115,MUTED);
                 label(batch,font,"BACK TO MAP",68,68,Color.WHITE);
                 label(batch,font,"BEGIN MISSION",978,68,Color.WHITE);
+            }
+            case SHIP_ORDERS -> {
+                title(batch,font,"SHIP ORDERS","EACH VESSEL HAS ITS OWN UNLIMITED SEQUENTIAL COMMAND QUEUE");
+                label(batch,font,"SHIP "+(selectedShip+1)+"/"+deployment.ships()+
+                        " - "+deployment.ordersFor(selectedShip).size()+" ORDERS",855,597,Color.GOLD);
+                label(batch,font,"< PREV",865,558,Color.WHITE);
+                label(batch,font,"NEXT >",1118,558,Color.WHITE);
+                label(batch,font,awaitingWaypoint?"TAP MAP FOR DESTINATION":"ADD MOVE WAYPOINT",901,487,Color.WHITE);
+                label(batch,font,"ADD HOLD 10 SECONDS",901,417,Color.WHITE);
+                label(batch,font,"ADD ENGAGE 10 SECONDS",901,347,Color.WHITE);
+                label(batch,font,"UNDO LAST ORDER",901,277,Color.WHITE);
+                label(batch,font,"CLEAR THIS SHIP'S ORDERS",880,207,Color.WHITE);
+                label(batch,font,"BACK TO DEPLOYMENT",949,66,Color.WHITE);
+                label(batch,font,"FLEET STARTS LEFT OF THE ZONE DIVIDER",55,585,MUTED);
+                label(batch,font,editNotice,54,117,Color.GOLD);
+                var commandList=deployment.ordersFor(selectedShip);
+                int start=Math.max(0,commandList.size()-8);
+                for(int i=start;i<commandList.size();i++){
+                    var command=commandList.get(i);
+                    String description=command.type()==ShipCommandQueue.Type.MOVE?
+                            "MOVE TO "+(int)command.x()+", "+(int)command.y():
+                            command.type().name()+" "+(command.ticks()/30)+"s";
+                    label(batch,font,(i+1)+". "+description,60,560-(i-start)*26,Color.WHITE);
+                }
             }
             case OPTIONS -> {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
