@@ -42,6 +42,8 @@ public final class Battle {
         public final String name;
         /** Per-hull doctrine. POINT DEFENSE is independent of main gun fire orders. */
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
+        /** Optional individual standing policy, continuously enforced, not consumed. */
+        public ShipStandingOrders standingOrders;
         /** Per-hull sequential mission plan, independent of weapons and fleet doctrine. */
         public ShipCommandQueue commandQueue=new ShipCommandQueue(List.of());
         public int lastTargetId,lastAttackerId;
@@ -422,6 +424,13 @@ public final class Battle {
         if(ship==null)throw new IllegalArgumentException("Ship not found");
         ship.commandQueue=new ShipCommandQueue(commands);
     }
+    public void setShipStandingOrders(int shipId,ShipStandingOrders profile) {
+        if(profile==null)throw new IllegalArgumentException("Standing orders required");
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship not found");
+        ship.standingOrders=profile;
+        setShipOrders(shipId,profile.tactics());
+    }
     public void setShipOrders(int shipId,BattleOrders.Orders value) {
         if(value==null)throw new IllegalArgumentException("Orders missing");
         Ship ship=findShip(shipId);
@@ -586,7 +595,8 @@ public final class Battle {
             boolean navigated=executeShipCommands(s,target);
             if (target != null) {
                 if(!navigated)steer(s, target);
-                fire(s, target);
+                if(s.standingOrders==null||!s.standingOrders.mustWithdraw(s))
+                    fire(s, target);
             } else if(!navigated) {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
@@ -741,7 +751,8 @@ public final class Battle {
     }
     private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
     private void steer(Ship s, Ship target) {
-        if(!s.orders.equals(BattleOrders.DEFAULT.withPointDefense(s.orders.pointDefense()))){
+        if(s.standingOrders!=null||
+                !s.orders.equals(BattleOrders.DEFAULT.withPointDefense(s.orders.pointDefense()))){
             orderedSteer(s,target);return;
         }
         double dx = target.x - s.x, dy = target.y - s.y;
@@ -760,6 +771,13 @@ public final class Battle {
 
     private void orderedSteer(Ship ship,Ship target) {
         BattleOrders.Orders orders=ship.orders;
+        if(ship.standingOrders!=null&&ship.standingOrders.mustWithdraw(ship)){
+            // Disengage toward the appropriate friendly rear. Repair/shield
+            // recovery may permit re-engagement; PD remains independently active.
+            steerToward(ship,ship.team==0?75:1205,
+                    Math.max(100,Math.min(575,ship.y)));
+            return;
+        }
         if(orders.position()==BattleOrders.Position.HOLD){
             ship.vx*=0.82;ship.vy*=0.82;
             ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
@@ -788,19 +806,21 @@ public final class Battle {
             }
         }
         BattleOrders.Engagement engage=orders.forSize(BattleOrders.size(target));
+        double preferredRange=engage.range()*(ship.standingOrders==null?
+                1:ship.standingOrders.engagementRangeMultiplier());
         double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
         if(orders.position()!=BattleOrders.Position.KEEP_MOVING
-                &&distance>=engage.range()*0.5&&distance<=engage.range()){
+                &&distance>=preferredRange*0.5&&distance<=preferredRange){
             ship.vx*=0.86;ship.vy*=0.86;
             ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;return;
         }
-        if(distance<engage.range()*0.5){
+        if(distance<preferredRange*0.5){
             double dx=ship.x-target.x,dy=ship.y-target.y;
             double denom=StrictMath.max(1,StrictMath.hypot(dx,dy));
-            steerToward(ship,ship.x+dx/denom*engage.range(),
-                    ship.y+dy/denom*engage.range());
+            steerToward(ship,ship.x+dx/denom*preferredRange,
+                    ship.y+dy/denom*preferredRange);
         }else if(orders.position()==BattleOrders.Position.KEEP_MOVING
-                &&distance<engage.range()){
+                &&distance<preferredRange){
             double dx=target.x-ship.x,dy=target.y-ship.y;
             steerToward(ship,ship.x-dy,ship.y+dx);
         }else steerToward(ship,target.x,target.y);
