@@ -59,7 +59,7 @@ public final class WeaponBehaviorTable {
                                  double availablePower,double heat,double maxHeat,
                                  double weaponCondition,double magazineCondition){
             return installedDamage>0 && (!consumesAmmunition||ammo>0)
-                    && Double.isFinite(distance) && distance>minimumRange
+                    && Double.isFinite(distance) && (minimumRange==0||distance>minimumRange)
                     && distance<range(fittedReach) && remainingCooldown<=0
                     && availablePower>powerPerShot
                     && (heatFractionLimit==1.0 || heat<maxHeat*heatFractionLimit)
