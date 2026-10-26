@@ -39,6 +39,38 @@ public final class GameFlowTest {
             for(int n=0;n<page.size();n++)
                 verify(page.get(n).level()==index*10+n+1,"Wrong stage for map node");
         }
-        System.out.println("PASS game flow: real skirmishes, map, campaign save and victory unlocks");
+        // Campaign does not silently award success after the first wave.
+        // Reinforcements enter the SAME battle, preserving hull damage and spent ammunition.
+        Shipyard.Design player=ScenarioCatalog.defaultDesign(
+                ScenarioCatalog.Preset.DUEL,Battle.Faction.TERRAN,true,tech);
+        Shipyard.Design enemy=ScenarioCatalog.defaultDesign(
+                ScenarioCatalog.Preset.DUEL,Battle.Faction.DRAXIAN,false,tech);
+        CampaignEncounter encounter=CampaignEncounter.start(1,4,player,enemy,tech);
+        Battle live=encounter.battle();
+        verify(live.alive(0)==4&&live.alive(1)==4,"Campaign initial deployment");
+        Battle.Ship surviving=live.ships().get(0);
+        surviving.hull=surviving.maxHull/2;
+        surviving.missileAmmo=2;
+        for(int wave=1;wave<=encounter.waves();wave++) {
+            verify(encounter.wave()==wave,"Wrong active campaign wave");
+            for(Battle.Ship ship:live.ships())
+                if(ship.team==1)ship.hull=0;
+            CampaignEncounter.Advance result=encounter.advance();
+            if(wave<encounter.waves()){
+                verify(result==CampaignEncounter.Advance.NEXT_WAVE,
+                        "Campaign ended before all mandatory waves");
+                verify(live.alive(1)==CampaignEncounter.enemyCount(LevelEconomy.level(1),4,wave+1),
+                        "Campaign reinforcements did not spawn");
+                verify(live.ships().get(0)==surviving
+                        && surviving.hull==surviving.maxHull/2
+                        && surviving.missileAmmo==2,
+                        "Campaign wave incorrectly reset friendly hull or ammunition");
+            }else verify(result==CampaignEncounter.Advance.VICTORY,
+                    "Campaign final wave not credited");
+        }
+        CampaignEncounter lost=CampaignEncounter.start(1,4,player,enemy,tech);
+        for(Battle.Ship ship:lost.battle().ships())if(ship.team==0)ship.hull=0;
+        verify(lost.advance()==CampaignEncounter.Advance.DEFEAT,"Dead fleet earned victory");
+        System.out.println("PASS game flow: real skirmishes, sequential campaign waves, map, saves and rewards");
     }
 }
