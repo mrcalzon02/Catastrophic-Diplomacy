@@ -10,6 +10,7 @@ on:
       - 'game/**'
       - 'assets/**'
       - 'tools/android_verify_demo.sh'
+      - 'tools/android_verify_menu.sh'
   workflow_dispatch:
 
 permissions:
@@ -33,6 +34,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - name: Validate functional Android navigation scripts
+        run: bash -n tools/android_verify_demo.sh tools/android_verify_menu.sh
       - name: Verify release gate checklist coverage
         run: python3 tools/verify_apk_release_gate.py --checklist-only
       - name: Run updater manifest unit tests
