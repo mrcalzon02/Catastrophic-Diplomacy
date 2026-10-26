@@ -228,3 +228,12 @@ tasks.register('moduleVersionsSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.ModuleVersionsTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('moduleVersionsSmoke') }
+
+tasks.register('crewAccommodationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove explicit crew quarters and life-support modules for all 121 faction hulls, with legacy blueprint migration.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CrewAccommodationTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('crewAccommodationSmoke') }
