@@ -24,7 +24,7 @@ jobs:
       - name: Verify every missile mode with actual objects, ammo, point defense and deterministic replay
         run: |
           gradle --no-daemon --stacktrace \
-            :core:ordnanceDoctrineSmoke :core:weaponBehaviorSmoke \
+            :core:ordnanceDoctrineSmoke :core:ammunitionTypesSmoke :core:weaponBehaviorSmoke \
             :core:projectileModuleSmoke :core:moduleResearchSmoke \
             :core:moduleVersionsSmoke :core:crewAccommodationSmoke \
             :core:fighterCraftSmoke :core:supportSystemsSmoke \
