@@ -63,8 +63,8 @@ public final class WeaponBehaviorTable {
                     && distance<range(fittedReach) && remainingCooldown<=0
                     && availablePower>powerPerShot
                     && (heatFractionLimit==1.0 || heat<maxHeat*heatFractionLimit)
-                    && weaponCondition>requiredWeaponCondition
-                    && magazineCondition>requiredMagazineCondition;
+                    && (requiredWeaponCondition==0 || weaponCondition>requiredWeaponCondition)
+                    && (requiredMagazineCondition==0 || magazineCondition>requiredMagazineCondition);
         }
         public double reload(double fittedCycle,double weaponCondition){
             if(!Double.isFinite(fittedCycle)||fittedCycle<=0)
