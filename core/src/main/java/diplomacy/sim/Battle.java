@@ -83,6 +83,9 @@ public final class Battle {
         public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
         public int kineticAmmo=100;
         public AmmunitionTable.Kinetic kineticType=AmmunitionTable.Kinetic.STANDARD;
+        /** Null only on legacy addShip(faction) test fixtures; real fitted ships
+         * are governed by the per-socket research intersection. */
+        public AmmunitionResearch.Access ammoAccess;
         public final EnumMap<DamageType,AmmunitionTable.Warhead> warheads=
                 new EnumMap<>(DamageType.class);
         public AmmunitionTable.Warhead warhead(DamageType family){
@@ -92,10 +95,17 @@ public final class Battle {
         }
         public void setWarhead(DamageType family,AmmunitionTable.Warhead kind){
             warhead(family);AmmunitionTable.warhead(kind);
+            if(ammoAccess!=null&&!ammoAccess.allows(family,kind))
+                throw new IllegalArgumentException(
+                        "Guided payload "+kind+" is locked for this fitted "+family+" weapon research");
             warheads.put(family,kind);
         }
         public void setKineticType(AmmunitionTable.Kinetic kind){
-            AmmunitionTable.kinetic(kind);kineticType=kind;
+            AmmunitionTable.kinetic(kind);
+            if(ammoAccess!=null&&!ammoAccess.allows(kind))
+                throw new IllegalArgumentException(
+                        "Kinetic ammunition "+kind+" is locked for this fitted weapon research");
+            kineticType=kind;
         }
         /** Independent selectable guided firing schematic for each weapon family.
          * Defaults preserve all existing single-shot ammunition behavior. */
@@ -300,11 +310,14 @@ public final class Battle {
         final int sourceId,targetId;
         final DamageType family;
         final OrdnanceDoctrine.Pattern pattern;
+        final AmmunitionTable.Warhead loadedWarhead;
         int nextIndex;
         long nextTick;
         PendingLaunch(int source,int target,DamageType type,
-                      OrdnanceDoctrine.Pattern doctrine,long start){
-            sourceId=source;targetId=target;family=type;pattern=doctrine;nextTick=start;
+                      OrdnanceDoctrine.Pattern doctrine,long start,
+                      AmmunitionTable.Warhead loaded){
+            sourceId=source;targetId=target;family=type;pattern=doctrine;
+            loadedWarhead=loaded;nextTick=start;
         }
     }
     private final List<PendingLaunch> launchQueue=new ArrayList<>();
@@ -471,6 +484,7 @@ public final class Battle {
         s.pointDefenseProfile=machinery.pointDefense();
         s.pdCycle=machinery.pdCycle();
         s.weapons=machinery.weapons();
+        s.ammoAccess=machinery.ammunition();
         s.support=machinery.support();
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
@@ -798,7 +812,8 @@ public final class Battle {
             if(s.missileAmmo>=doctrine.ammoNeeded()){
                 s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
-                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,doctrine,tick));
+                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,
+                        doctrine,tick,s.warhead(DamageType.MISSILE)));
                 salvosStarted++;
             }
         }
@@ -856,7 +871,8 @@ public final class Battle {
             if(s.torpedoAmmo>=doctrine.ammoNeeded()){
                 s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
-                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,doctrine,tick));
+                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,
+                        doctrine,tick,s.warhead(DamageType.TORPEDO)));
                 salvosStarted++;
             }
         }
@@ -892,7 +908,9 @@ public final class Battle {
             boolean decoy=order.pattern.isDecoy(index);
             ProjectileModel.Spec standard=heavy?source.torpedoProjectile:source.missileProjectile;
             ProjectileModel.Spec actual=OrdnanceDoctrine.derived(standard,order.pattern,decoy);
-            AmmunitionTable.Warhead warhead=source.warhead(order.family);
+            // A preloaded salvo retains its warhead even if the player changes
+            // the next salvo's selection while these bodies are still queued.
+            AmmunitionTable.Warhead warhead=order.loadedWarhead;
             AmmunitionTable.Profile payload=AmmunitionTable.warhead(warhead);
             if(!decoy)actual=payload.physical(actual);
             OrdnanceDoctrine.Payload subtype=decoy?OrdnanceDoctrine.Payload.DECOY
@@ -1637,6 +1655,7 @@ public final class Battle {
             hash=mix(hash,pending.targetId);
             hash=mix(hash,pending.family.ordinal());
             hash=mix(hash,pending.pattern.mode().ordinal());
+            hash=mix(hash,pending.loadedWarhead.ordinal());
             hash=mix(hash,pending.nextIndex);
             hash=mix(hash,pending.nextTick);
         }

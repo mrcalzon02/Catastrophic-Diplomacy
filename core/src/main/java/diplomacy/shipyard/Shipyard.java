@@ -2,6 +2,8 @@ package diplomacy.shipyard;
 
 import diplomacy.sim.Battle;
 import diplomacy.sim.ProjectileModel;
+import diplomacy.sim.AmmunitionResearch;
+import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
@@ -12,9 +14,11 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /** Shared desktop/Android hull fitting and deterministic engineering calculations. */
 public final class Shipyard {
@@ -334,7 +338,8 @@ public final class Shipyard {
                          ProjectileModel.Spec torpedoProjectile,
                          ProjectileModel.Defense pointDefense,
                          Weapons weapons,Support support,double pdCycle,
-                         HullBaseline.Stats baseline,Crew crew) { }
+                         HullBaseline.Stats baseline,Crew crew,
+                         AmmunitionResearch.Access ammunition) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -472,7 +477,58 @@ public final class Shipyard {
                         repairDroneCapacity),
                 pdWeight==0?1:pdCycle/pdWeight,baseline,
                 new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
-                        (int)StrictMath.floor(breathing)));
+                        (int)StrictMath.floor(breathing)),
+                ammunitionAccess(design));
+    }
+
+    /**
+     * We still simulate one firing controller per family/ship, not individual
+     * mounts. Consequently shared-family ammunition must be compatible with
+     * EVERY fitted launcher of that family. Intersection prevents a Specialist
+     * gun granting its research ammo to an unrelated basic gun.
+     */
+    public static AmmunitionResearch.Access ammunitionAccess(Design design){
+        if(design==null)throw new IllegalArgumentException("Missing vessel design");
+        EnumSet<AmmunitionTable.Kinetic> k=EnumSet.allOf(AmmunitionTable.Kinetic.class);
+        EnumSet<AmmunitionTable.Warhead> m=EnumSet.allOf(AmmunitionTable.Warhead.class);
+        EnumSet<AmmunitionTable.Warhead> t=EnumSet.allOf(AmmunitionTable.Warhead.class);
+        int kc=0,mc=0,tc=0;
+        for(int i=0;i<design.slots();i++){
+            Installed component=design.at(i);
+            if(component==null)continue;
+            Track path=component.branch();
+            int rank=path==null?0:component.stage(path);
+            if(component.component.endsWith("-KIN")){
+                k.retainAll(AmmunitionResearch.kinetic(path,rank));kc++;
+            }else if(component.component.endsWith("-MSL")){
+                m.retainAll(AmmunitionResearch.warheads(Battle.DamageType.MISSILE,path,rank));mc++;
+            }else if(component.component.endsWith("-TOR")){
+                t.retainAll(AmmunitionResearch.warheads(Battle.DamageType.TORPEDO,path,rank));tc++;
+            }
+        }
+        if(kc==0)k=EnumSet.of(AmmunitionTable.Kinetic.STANDARD);
+        if(mc==0)m=EnumSet.of(AmmunitionTable.Warhead.STANDARD);
+        if(tc==0)t=EnumSet.of(AmmunitionTable.Warhead.STANDARD);
+        return new AmmunitionResearch.Access(k,m,t);
+    }
+    /** Research unlocks for exactly the selected socket, never another gun. */
+    public static AmmunitionResearch.Access ammunitionAt(Design design,int slot){
+        Installed component=design.at(slot);
+        if(component==null)return AmmunitionResearch.STOCK;
+        Track path=component.branch();
+        int rank=path==null?0:component.stage(path);
+        if(component.component.endsWith("-KIN"))
+            return new AmmunitionResearch.Access(AmmunitionResearch.kinetic(path,rank),
+                    AmmunitionResearch.STOCK.missiles(),AmmunitionResearch.STOCK.torpedoes());
+        if(component.component.endsWith("-MSL"))
+            return new AmmunitionResearch.Access(AmmunitionResearch.STOCK.kinetics(),
+                    AmmunitionResearch.warheads(Battle.DamageType.MISSILE,path,rank),
+                    AmmunitionResearch.STOCK.torpedoes());
+        if(component.component.endsWith("-TOR"))
+            return new AmmunitionResearch.Access(AmmunitionResearch.STOCK.kinetics(),
+                    AmmunitionResearch.STOCK.missiles(),
+                    AmmunitionResearch.warheads(Battle.DamageType.TORPEDO,path,rank));
+        return AmmunitionResearch.STOCK;
     }
 
     /** Current exclusive research branch effect of one selected installed module. */
