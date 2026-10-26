@@ -396,13 +396,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.SKIRMISH){
             if(GameMenuPanel.hit(x,y,30,35,160,49)){screen=GameMenuPanel.Screen.HOME;return;}
-            if(GameMenuPanel.hit(x,y,702,35,225,49)){shipyard.show();return;}
+            if(GameMenuPanel.hit(x,y,702,35,225,49)){
+                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)shipyard.show();
+                return;
+            }
             if(GameMenuPanel.hit(x,y,969,35,277,49)){launchSkirmish();return;}
             int selected=GameMenuPanel.skirmishHit(x,y);
             if(selected>=0){selectScenario(ScenarioCatalog.Preset.values()[selected]);return;}
-            if(GameMenuPanel.hit(x,y,661,332,545,42)){changeFaction(0);return;}
-            if(GameMenuPanel.hit(x,y,661,271,545,42)){changeFaction(1);return;}
-            if(GameMenuPanel.hit(x,y,661,210,545,42)){changeFleetSize(x<934?-1:1);return;}
+            if(GameMenuPanel.hit(x,y,661,332,545,42)){
+                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(0);
+                return;
+            }
+            if(GameMenuPanel.hit(x,y,661,271,545,42)){
+                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(1);
+                return;
+            }
+            if(GameMenuPanel.hit(x,y,661,210,545,42)){
+                if(scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(x<934?-1:1);
+                return;
+            }
             return;
         }
         if(screen==GameMenuPanel.Screen.CAMPAIGN){
@@ -579,11 +591,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void changeFaction(int team) {
         if(team==0) {
             left=next(left);
-            leftDesign=Shipyard.starter(left,leftDesign.hull);
+            leftDesign=screen==GameMenuPanel.Screen.SKIRMISH && scenario!=ScenarioCatalog.Preset.CUSTOM?
+                    ScenarioCatalog.defaultDesign(scenario,left,true,technology):
+                    Shipyard.starter(left,leftDesign.hull);
             shipyard.sync(0,leftDesign);
         } else {
             right=next(right);
-            rightDesign=Shipyard.starter(right,rightDesign.hull);
+            rightDesign=screen==GameMenuPanel.Screen.SKIRMISH && scenario!=ScenarioCatalog.Preset.CUSTOM?
+                    ScenarioCatalog.defaultDesign(scenario,right,false,technology):
+                    Shipyard.starter(right,rightDesign.hull);
             shipyard.sync(1,rightDesign);
         }
         saveFleets();
