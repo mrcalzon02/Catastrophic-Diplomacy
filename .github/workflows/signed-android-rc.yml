@@ -11,6 +11,7 @@ on:
       - 'assets/**'
       - 'tools/android_verify_demo.sh'
       - 'tools/android_verify_menu.sh'
+      - 'tools/verify_fire_tablet_target.py'
   workflow_dispatch:
 
 permissions:
@@ -110,6 +111,17 @@ jobs:
           python3 tools/prepare_android_update_manifest.py "$apk" --output release/release-manifest.json
           (cd release && sha256sum Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk > SHA256SUMS.txt)
           echo "PASS: signed release artifact verified (identity, APK signature, digest, updater metadata)"
+      - name: Verify Amazon Fire tablet sideload compatibility using the actual signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
+          python3 tools/verify_fire_tablet_target.py --apk "$apk"
+          mkdir -p fireos
+          cp "$apk" fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk
+          (cd fireos && sha256sum Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk > SHA256SUMS.txt)
+          cmp "$apk" fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk
+          echo "PASS: Fire OS tablet sideload candidate uses the exact retained Android signer and game build"
       - name: Remove restored private signing identity
         if: always()
         shell: bash
@@ -119,6 +131,13 @@ jobs:
         with:
           name: cd-signed-android-0.1.4-rc.1-${{ github.sha }}
           path: release/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Amazon Fire tablet compatible signed sideload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-fire-tablet-sideload-0.1.4-rc.1-${{ github.sha }}
+          path: fireos/
           if-no-files-found: error
           retention-days: 30
 
