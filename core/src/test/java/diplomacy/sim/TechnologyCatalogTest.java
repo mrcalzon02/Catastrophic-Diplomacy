@@ -11,8 +11,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 5280, "full technology count");
-        require(c.componentCount() == 220, "all base components");
+        require(c.upgradeCount() == 5808, "full technology count");
+        require(c.componentCount() == 242, "all base components");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for (String track : Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST")) {
                 for (int stage = 1; stage <= 6; stage++) {
