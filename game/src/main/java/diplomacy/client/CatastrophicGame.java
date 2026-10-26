@@ -241,7 +241,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             int delta=key==Input.Keys.LEFT?-1:1;
                             if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
                                 deployment=deployment.withShips(delta,
-                                        preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200);
+                                        preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
+                                        .withStandingProfiles(savedStanding);
                             selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                         }
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
@@ -659,13 +660,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 1 -> {
                     if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
                         deployment=deployment.withShips(-1,
-                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200);
+                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
+                                .withStandingProfiles(savedStanding);
                     selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                 }
                 case 2 -> {
                     if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
                         deployment=deployment.withShips(1,
-                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200);
+                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
+                                .withStandingProfiles(savedStanding);
                 }
                 case 3 -> deployment=deployment.withFormation(-1);
                 case 4 -> deployment=deployment.withFormation(1);
@@ -676,7 +679,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 7 -> {
                     screen=GameMenuPanel.Screen.SHIP_ORDERS;
                     waitingForWaypoint=false;
-                    deploymentNotice="Select a vessel and append as many orders as needed.";
+                    deploymentNotice="Select a vessel; all standing policies remain active throughout battle.";
                 }
                 default -> { }
             }
