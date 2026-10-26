@@ -33,10 +33,19 @@ Until then, designers can acquire a special warhead by upgrading all participati
 
 Changing a selected missile/torpedo warhead during a multi-tick RIPPLE, SATURATION, MICRO_SWARM, HEAVY_STRIKE, COLD_LAUNCH or DECOY_CLOUD salvo affects *the next* loaded salvo, not the already queued one. `PendingLaunch.loadedWarhead` snapshots the intended payload at launch scheduling and is included in the deterministic battle fingerprint. Decoy hardware still consumes real finite ordnance count and has zero terminal damage. The existing launch pattern controls are separate from payload entitlement: this initial increment **does not** claim that all seven guided firing modes are individually researched or that ammo is purchased from an actual campaign wallet.
 
-## UI and persistence limits
+## Shipyard ammunition selection and saved fleet preferences
 
-The shipyard now displays the selected socket's permitted payload types as a read-only unlock preview. `Battle.setShipKineticAmmunition` and `Battle.setShipWarhead` provide validated runtime load changes. **Choosing, storing, and restoring ammunition preference in a saved fleet blueprint has not been implemented here**; subsequent work should add a versioned per-socket loadout schema and battle UI, in tandem with real per-hardpoint ammunition inventory and targeting. Do not describe this code as a finished player-facing ammo picker.
+Select a fitted KIN, MSL or TOR module in the shipyard and tap the **A / TAP AMMO** row or press **A** to cycle the currently researched rounds. The list is based on the **shared-family intersection** of all installed launchers of that type. The current selection appears next to the available rounds; switching to a locked payload is rejected, and the user must explicitly select STANDARD before downgrading or replacing a supporting researched launcher.
+
+The selected physical rounds are part of the immutable `Shipyard.Design.ammoSelection`. On deployment, `Battle.addShip(design,...)` equips the **player and AI** with exactly those permitted missile/torpedo/kinetic types. The same combat APIs enforce any subsequent changes. When a nonstandard load is saved, `Shipyard.encode` writes **`CD-SHIP-3`**, preserving the fighter loadout, six-stage exclusive research, Mk I–IV manufacturing variants, and all three selected ammunition families. `Shipyard.decode` verifies the payload against installed modules, rejects forged/off-tree saved loads, and does not silently downgrade them. Old default `CD-SHIP-1` and `CD-SHIP-2` saves continue to serialize **unchanged**, with STANDARD ammunition.
+
+**Remaining limitation:** These are per-ship *family bank* selections, not truly independent per-hardpoint magazines. Until individual socket fire-control is implemented, two KIN modules share one selected kinetic round, and two MSL modules share one selected missile warhead. Designing distinct loads on simultaneous independent guns still requires per-hardpoint controllers and a later save schema; the current system refuses to lend an advanced research unlock to a stock gun. Campaign research purchase/unlock wallets are also separate work, so the choice is research-rank-bound but not yet campaign-inventory-gated.
 
 ## Regression
 
 `gradle :core:ammunitionResearchSmoke` proves rank thresholds for 4 branches × 3 ammunition families, independent research along all 11 races' module IDs, mixed-module bank restrictions, rejection of unauthorized loads, live kinetic projectiles, real multi-shot guided volleys, deterministic state and snapshot integrity. This task gates `:core:massBattleCampaign` and is run with `:core:ammunitionTypesSmoke`, `:core:ordnanceDoctrineSmoke`, desktop classes in `research-ammunition.yml`. Android-device UI and independently mounted magazine verification are still required before release.
+
+
+### Extended saved-ammunition regression
+
+`:core:ammunitionSelectionSmoke` validates CD-SHIP-1/2/3 roundtrips, unchanged legacy format, actual loaded shells on both combat teams, live EMP missile bodies, researched load persistence on all eleven races, resistance to malicious/invalid blueprint ammo, anti-downgrade rules, mixed launcher bank restrictions and simultaneous Mk/branch/ammunition preservation.

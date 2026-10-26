@@ -1,7 +1,7 @@
 name: Research-gated physical ammunition and salvos
 on:
   push:
-    branches: ['feature/research-locked-ammunition-20261025']
+    branches: ['feature/research-locked-ammunition-20261025', 'feature/save-selectable-research-ammo-20261025']
   pull_request:
     paths:
       - 'core/src/main/java/diplomacy/sim/AmmunitionResearch.java'
@@ -32,7 +32,7 @@ jobs:
       - name: Verify 11-faction research-gated ammo, physical payload effects and 200v200 replay
         run: |
           gradle --no-daemon --stacktrace \
-            :core:ammunitionResearchSmoke :core:ammunitionTypesSmoke \
+            :core:ammunitionResearchSmoke :core:ammunitionSelectionSmoke :core:ammunitionTypesSmoke \
             :core:ordnanceDoctrineSmoke :core:moduleResearchSmoke \
             :core:crewAccommodationSmoke :core:massBattleCampaign \
             :game:classes :desktop:classes

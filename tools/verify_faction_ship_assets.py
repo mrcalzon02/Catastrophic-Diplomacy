@@ -32,7 +32,7 @@ def main():
             content=path.read_bytes()
             if hashlib.sha256(content).hexdigest()!=entry["sha256"]:
                 fail("unapproved or damaged sprite "+str(path.relative_to(ROOT)))
-            if not content.startswith(b"\\x89PNG\\r\\n\\x1a\\n") or content[25]!=6:
+            if not content.startswith(b"\x89PNG\r\n\x1a\n") or content[25]!=6:
                 fail("invalid RGBA PNG "+str(path.relative_to(ROOT)))
             width=int.from_bytes(content[16:20],"big")
             height=int.from_bytes(content[20:24],"big")

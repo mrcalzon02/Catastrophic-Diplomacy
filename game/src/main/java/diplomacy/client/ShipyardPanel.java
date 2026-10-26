@@ -9,6 +9,7 @@ import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.ProjectileModel;
+import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
@@ -95,6 +96,38 @@ final class ShipyardPanel {
         notice="Fighter hangars now carry "+draft.fighterHull.name().replace('_',' ')
                 +"; APPLY to launch the new fighter loadout";
     }
+    /** A shared-family controller can use only ammunition researched by all
+     * of its installed guns. The blueprint stores this exact choice. */
+    private void cycleAmmunition(){
+        Shipyard.Installed module=draft.at(selectedSlot);
+        if(module==null){notice="Select an installed kinetic, missile or torpedo module";return;}
+        var available=Shipyard.ammunitionAccess(draft);
+        try{
+            if(module.component.endsWith("-KIN")){
+                var options=new java.util.ArrayList<AmmunitionTable.Kinetic>();
+                for(var kind:AmmunitionTable.Kinetic.values())
+                    if(available.kinetics().contains(kind))options.add(kind);
+                var current=draft.ammoSelection.kinetic();
+                draft=draft.withKineticAmmunition(
+                        options.get((options.indexOf(current)+1)%options.size()));
+                notice="Shared kinetic magazine now carries "+draft.ammoSelection.kinetic();
+            }else if(module.component.endsWith("-MSL")||module.component.endsWith("-TOR")){
+                boolean missile=module.component.endsWith("-MSL");
+                var options=new java.util.ArrayList<AmmunitionTable.Warhead>();
+                var accepted=missile?available.missiles():available.torpedoes();
+                for(var kind:AmmunitionTable.Warhead.values())
+                    if(accepted.contains(kind))options.add(kind);
+                var family=missile?Battle.DamageType.MISSILE:Battle.DamageType.TORPEDO;
+                var current=missile?draft.ammoSelection.missile():draft.ammoSelection.torpedo();
+                draft=draft.withGuidedWarhead(family,
+                        options.get((options.indexOf(current)+1)%options.size()));
+                notice=family+" magazine now carries "+
+                        (missile?draft.ammoSelection.missile():draft.ammoSelection.torpedo());
+            }else{
+                notice="This module has no physical ammunition selection";
+            }
+        }catch(IllegalArgumentException problem){notice=problem.getMessage();}
+    }
     private void cyclePattern(){
         Shipyard.Installed p=draft.at(selectedSlot);
         if(p==null){notice="Install a module first";return;}
@@ -127,6 +160,7 @@ final class ShipyardPanel {
         if(code==com.badlogic.gdx.Input.Keys.K){cycleFighter();return true;}
         if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
         if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.A){cycleAmmunition();return true;}
         if(code==com.badlogic.gdx.Input.Keys.UP){selectedSlot=Math.max(0,selectedSlot-1);scroll=Math.min(scroll,selectedSlot);return true;}
         if(code==com.badlogic.gdx.Input.Keys.DOWN){selectedSlot=Math.min(draft.slots()-1,selectedSlot+1);scroll=Math.max(scroll,selectedSlot-SLOT_ROWS+1);return true;}
         return true;
@@ -194,6 +228,10 @@ final class ShipyardPanel {
                 &&draft.at(selectedSlot).component.endsWith("-FTR")){
             cycleFighter();return true;
         }
+        if(x>=335&&x<=796&&y>=107&&y<=131
+                &&draft.at(selectedSlot)!=null){
+            cycleAmmunition();return true;
+        }
         if(x>=335&&x<=796&&y>=110&&y<=580){
             if(artPreview){notice="Switch to SHOW MAP to select physical module hardpoints";return true;}
             int hit=hitHardpoint(x,y);
@@ -204,10 +242,15 @@ final class ShipyardPanel {
             int index=(int)((575-y)/25);
             Shipyard.Mount mount=draft.placements().get(selectedSlot).mount();
             List<Component> options=Shipyard.choices(catalog,draft.faction,mount);
-            if(index==0){draft=draft.install(selectedSlot,null);notice="Mount cleared";return true;}
+            if(index==0){
+                try{draft=draft.install(selectedSlot,null);notice="Mount cleared";}
+                catch(IllegalArgumentException blocked){notice=blocked.getMessage();}
+                return true;
+            }
             if(index>0&&index<=options.size()){
                 Component part=options.get(index-1);
-                draft=draft.install(selectedSlot,part.id);
+                try{draft=draft.install(selectedSlot,part.id);}
+                catch(IllegalArgumentException blocked){notice=blocked.getMessage();return true;}
                 notice="Installed "+part.name+" (upgrades reset for this mount)";
             }
             return true;
@@ -405,7 +448,13 @@ final class ShipyardPanel {
                         :installed.component.endsWith("-MSL")
                         ?ammo.missiles().toString():ammo.torpedoes().toString();
                 font.setColor(Color.CYAN);
-                font.draw(batch,shortText("AMMO UNLOCKS: "+enabled,67),342,116);
+                String selectedAmmo=installed.component.endsWith("-KIN")
+                        ?draft.ammoSelection.kinetic().name()
+                        :installed.component.endsWith("-MSL")
+                        ?draft.ammoSelection.missile().name()
+                        :draft.ammoSelection.torpedo().name();
+                font.draw(batch,shortText("A / TAP AMMO: "+selectedAmmo+
+                        "  AVAILABLE "+enabled,64),342,116);
                 font.setColor(Color.GOLD);
             }else if(defense!=null){
                 font.draw(batch,String.format(Locale.ROOT,
