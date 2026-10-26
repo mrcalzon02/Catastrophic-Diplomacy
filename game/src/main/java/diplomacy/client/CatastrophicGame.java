@@ -296,6 +296,143 @@ public final class CatastrophicGame extends ApplicationAdapter {
         focusedShipId=chosen;
     }
 
+    private void selectScenario(ScenarioCatalog.Preset choice){
+        scenario=choice;
+        if(choice!=ScenarioCatalog.Preset.CUSTOM&&!choice.demonstration){
+            leftDesign=Shipyard.starter(left,choice.leftHull);
+            rightDesign=Shipyard.starter(right,choice.rightHull);
+            shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+        }
+    }
+    private void launchSkirmish(){
+        playedCampaign=false;
+        battlefieldLevel=scenario.environmentLevel;
+        screen=GameMenuPanel.Screen.BATTLE;
+        deployedAtLaunch=scenario==ScenarioCatalog.Preset.CUSTOM?
+                FLEET_SIZES[fleetIndex]:scenario.ships;
+        reset();
+    }
+    private void newCampaign(){
+        campaign=CampaignProgress.start(left);
+        saveCampaign();
+        campaignPage=0;selectedMission=1;
+        screen=GameMenuPanel.Screen.CAMPAIGN;
+    }
+    private void showCampaign(){
+        if(campaign==null){newCampaign();return;}
+        selectedMission=campaign.unlocked();
+        campaignPage=CampaignMap.pageOf(selectedMission);
+        screen=GameMenuPanel.Screen.CAMPAIGN;
+    }
+    private void launchCampaignMission(){
+        if(campaign==null||!campaign.available(selectedMission))return;
+        activeMission=selectedMission;
+        LevelEconomy.Level stage=LevelEconomy.level(activeMission);
+        var node=CampaignMap.page(CampaignMap.pageOf(activeMission)).get((activeMission-1)%10);
+        left=campaign.faction();right=node.opponent();
+        if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
+        rightDesign=Shipyard.starter(right,stage.index()<15?
+                Shipyard.Hull.CORVETTE:stage.index()<75?Shipyard.Hull.FRIGATE:Shipyard.Hull.CRUISER);
+        shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+        deployedAtLaunch=Math.min(stage.maximumFleet(),4+(stage.index()-1)/2);
+        battlefieldLevel=activeMission;
+        playedCampaign=true;screen=GameMenuPanel.Screen.BATTLE;
+        reset();
+    }
+    private void finishEngagement(){
+        lastWon=battle.alive(0)>0&&battle.alive(1)==0;
+        survivorsAtEnd=battle.alive(0);
+        lastReward=0;
+        if(playedCampaign&&lastWon){
+            long before=campaign.credits();
+            campaign=campaign.complete(activeMission,deployedAtLaunch,survivorsAtEnd);
+            lastReward=campaign.credits()-before;
+            saveCampaign();
+        }
+        running=false;screen=GameMenuPanel.Screen.RESULTS;
+    }
+    private void leaveResults(){
+        if(playedCampaign){campaignPage=CampaignMap.pageOf(selectedMission);screen=GameMenuPanel.Screen.CAMPAIGN;}
+        else screen=GameMenuPanel.Screen.SKIRMISH;
+    }
+    private void tapFrontEnd(float x,float y){
+        if(screen==GameMenuPanel.Screen.HOME){
+            switch(GameMenuPanel.homeHit(x,y)){
+                case 0 -> showCampaign();
+                case 1 -> newCampaign();
+                case 2 -> screen=GameMenuPanel.Screen.SKIRMISH;
+                case 3 -> shipyard.show();
+                case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
+                case 5 -> Gdx.app.exit();
+            }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.SKIRMISH){
+            if(GameMenuPanel.hit(x,y,30,35,160,49)){screen=GameMenuPanel.Screen.HOME;return;}
+            if(GameMenuPanel.hit(x,y,702,35,225,49)){shipyard.show();return;}
+            if(GameMenuPanel.hit(x,y,969,35,277,49)){launchSkirmish();return;}
+            int selected=GameMenuPanel.skirmishHit(x,y);
+            if(selected>=0){selectScenario(ScenarioCatalog.Preset.values()[selected]);return;}
+            if(GameMenuPanel.hit(x,y,661,332,545,42)){changeFaction(0);return;}
+            if(GameMenuPanel.hit(x,y,661,271,545,42)){changeFaction(1);return;}
+            if(GameMenuPanel.hit(x,y,661,210,545,42)){changeFleetSize(x<934?-1:1);return;}
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.CAMPAIGN){
+            if(GameMenuPanel.hit(x,y,35,35,165,50)){screen=GameMenuPanel.Screen.HOME;return;}
+            if(GameMenuPanel.hit(x,y,214,35,136,50)){campaignPage=Math.max(0,campaignPage-1);selectedMission=campaignPage*10+1;return;}
+            if(GameMenuPanel.hit(x,y,366,35,136,50)){campaignPage=Math.min(CampaignMap.PAGE_COUNT-1,campaignPage+1);selectedMission=campaignPage*10+1;return;}
+            if(GameMenuPanel.hit(x,y,964,35,278,50)){launchCampaignMission();return;}
+            int mission=GameMenuPanel.mapHit(x,y,campaignPage);
+            if(mission>=1)selectedMission=mission;
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.OPTIONS){
+            if(GameMenuPanel.hit(x,y,405,472,470,59)){audio.toggleMusic();return;}
+            if(GameMenuPanel.hit(x,y,405,394,470,59)){audio.toggleEffects();return;}
+            if(GameMenuPanel.hit(x,y,405,316,470,59)){if(updateCheck!=null)updateCheck.run();return;}
+            if(GameMenuPanel.hit(x,y,405,238,470,59))screen=GameMenuPanel.Screen.HOME;
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.RESULTS){
+            if(GameMenuPanel.hit(x,y,351,122,254,58)){
+                if(playedCampaign)launchCampaignMission();else launchSkirmish();
+            }else if(GameMenuPanel.hit(x,y,673,122,254,58))leaveResults();
+        }
+    }
+    private void restoreCampaign(){
+        for(FileHandle f:new FileHandle[]{Gdx.files.local(CAMPAIGN_FILE),Gdx.files.local(CAMPAIGN_FILE+".bak")}){
+            if(!f.exists())continue;
+            try{
+                campaign=CampaignProgress.decode(f.readString("UTF-8"));
+                return;
+            }catch(RuntimeException damaged){
+                Gdx.app.error("CAMPAIGN","Rejected invalid campaign progress: "+f.path(),damaged);
+            }
+        }
+    }
+    private void saveCampaign(){
+        if(campaign==null)return;
+        try{
+            FileHandle primary=Gdx.files.local(CAMPAIGN_FILE);
+            FileHandle backup=Gdx.files.local(CAMPAIGN_FILE+".bak");
+            FileHandle temp=Gdx.files.local(CAMPAIGN_FILE+".tmp");
+            temp.writeString(CampaignProgress.encode(campaign),false,"UTF-8");
+            CampaignProgress.decode(temp.readString("UTF-8"));
+            if(primary.exists()){
+                try{
+                    CampaignProgress.decode(primary.readString("UTF-8"));
+                    primary.copyTo(backup);
+                }catch(RuntimeException corrupted){
+                    Gdx.app.log("CAMPAIGN","Preserving last good backup instead of corrupt primary");
+                }
+            }
+            temp.moveTo(primary);
+        }catch(RuntimeException error){
+            Gdx.app.error("CAMPAIGN","Unable to save campaign progress",error);
+        }
+    }
+
     private void openTacticalMenu() {
         if (tacticalMenuOpen || shipyard.open()) return;
         resumeAfterMenu = running;
@@ -540,7 +677,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setProjectionMatrix(camera.combined);
             batch.setProjectionMatrix(camera.combined);
             menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
-                    FLEET_SIZES[fleetIndex],campaign,campaignPage,selectedMission,
+                    FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,selectedMission,
                     audio.musicEnabled(),audio.effectsEnabled(),lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;
