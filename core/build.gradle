@@ -219,3 +219,12 @@ tasks.register('hullFoundationSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.HullFoundationTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('hullFoundationSmoke') }
+
+tasks.register('moduleVersionsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove 4400 alternative manufactured module models with per-socket revisions and lossless CD-SHIP-1/2 save compatibility.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ModuleVersionsTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('moduleVersionsSmoke') }

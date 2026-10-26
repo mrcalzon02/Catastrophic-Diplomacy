@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.ModuleBranchEffects;
+import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.FighterModel;
 import diplomacy.shipyard.HullLayouts;
@@ -94,6 +95,23 @@ final class ShipyardPanel {
         notice="Fighter hangars now carry "+draft.fighterHull.name().replace('_',' ')
                 +"; APPLY to launch the new fighter loadout";
     }
+    private void cyclePattern(){
+        Shipyard.Installed p=draft.at(selectedSlot);
+        if(p==null){notice="Install a module first";return;}
+        ModuleVersions.Pattern[] versions=ModuleVersions.Pattern.values();
+        ModuleVersions.Pattern next=versions[(p.pattern.ordinal()+1)%versions.length];
+        draft=draft.withModuleVersion(selectedSlot,next,p.mark);
+        notice="Hardware: "+next.name().replace('_',' ')+" Mk "+p.mark+
+                " (research branch preserved)";
+    }
+    private void cycleMark(){
+        Shipyard.Installed p=draft.at(selectedSlot);
+        if(p==null){notice="Install a module first";return;}
+        int next=p.mark%4+1;
+        draft=draft.withModuleVersion(selectedSlot,p.pattern,next);
+        notice="Hardware: "+p.pattern.name().replace('_',' ')+" Mk "+next+
+                " (separate from six-rank research)";
+    }
     private void apply(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot deploy: "+report.explanation();return;}
@@ -107,6 +125,8 @@ final class ShipyardPanel {
         if(code==com.badlogic.gdx.Input.Keys.ESCAPE||code==com.badlogic.gdx.Input.Keys.TAB){close();return true;}
         if(code==com.badlogic.gdx.Input.Keys.ENTER){apply();return true;}
         if(code==com.badlogic.gdx.Input.Keys.K){cycleFighter();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
         if(code==com.badlogic.gdx.Input.Keys.UP){selectedSlot=Math.max(0,selectedSlot-1);scroll=Math.min(scroll,selectedSlot);return true;}
         if(code==com.badlogic.gdx.Input.Keys.DOWN){selectedSlot=Math.min(draft.slots()-1,selectedSlot+1);scroll=Math.max(scroll,selectedSlot-SLOT_ROWS+1);return true;}
         return true;
@@ -152,6 +172,10 @@ final class ShipyardPanel {
             if(x>=923&&x<1017){load();return true;}
             if(x>=1018&&x<=1120){faction(1);return true;}
             if(x>1120){close();return true;}
+            return true;
+        }
+        if(x>=807&&x<=1256&&y>=62&&y<=103){
+            if(x<1085)cyclePattern();else cycleMark();
             return true;
         }
         if(x>=690&&x<=795&&y>=580&&y<=635) {
@@ -443,6 +467,14 @@ final class ShipyardPanel {
         font.draw(batch,"POWER "+units(report.demand())+" / "+units(report.generation())+" MW",813,161);
         font.draw(batch,"HEAT  "+units(report.generatedHeat())+" / "+units(report.cooling())+" MW",813,137);
         font.draw(batch,"COST "+report.industry()+" | RESEARCH "+report.research(),813,112);
+        if(installed!=null){
+            font.setColor(Color.GOLD);
+            font.draw(batch,"V: "+installed.pattern.name().replace('_',' '),813,84);
+            font.draw(batch,"B: Mk "+installed.mark+" / 4",1087,84);
+        }else{
+            font.setColor(Color.GRAY);
+            font.draw(batch,"V: HARDWARE PATTERN     B: GENERATION",813,84);
+        }
         font.setColor(report.valid()?Color.GREEN:Color.SCARLET);
         font.draw(batch,shortText(report.explanation(),74),331,61);
         font.setColor(Color.LIGHT_GRAY);
