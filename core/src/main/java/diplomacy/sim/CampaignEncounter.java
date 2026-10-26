@@ -15,27 +15,37 @@ public final class CampaignEncounter {
     private final Shipyard.Design opponent;
     private final TechnologyCatalog catalog;
     private final Battle battle;
+    private final CampaignDeployment.Loadout deployment;
     private int wave = 1;
 
-    private CampaignEncounter(LevelEconomy.Level level,int deployed,
+    private CampaignEncounter(LevelEconomy.Level level,CampaignDeployment.Loadout deployment,
                               Shipyard.Design friendly,Shipyard.Design hostile,
                               TechnologyCatalog catalog) {
-        if(level==null||friendly==null||hostile==null||catalog==null)
+        if(level==null||deployment==null||friendly==null||hostile==null||catalog==null)
             throw new IllegalArgumentException("Campaign requires a stage and fitted fleets");
-        if(deployed<1||deployed>level.maximumFleet())
+        int deployed=deployment.ships();
+        if(deployed>level.maximumFleet())
             throw new IllegalArgumentException("Deployment exceeds mission fleet capacity");
         this.level=level;
         this.deployed=deployed;
+        this.deployment=deployment;
         this.opponent=hostile;
         this.catalog=catalog;
         battle=new Battle(level.seed());
         battle.spawnWing(0,friendly,catalog,deployed,310,335);
+        deployment.apply(battle);
         deployHostiles();
     }
 
     public static CampaignEncounter start(int level,int deployed,Shipyard.Design friendly,
                                           Shipyard.Design hostile,TechnologyCatalog catalog) {
-        return new CampaignEncounter(LevelEconomy.level(level),deployed,friendly,hostile,catalog);
+        return start(level,new CampaignDeployment.Loadout(deployed,CampaignDeployment.Formation.LINE),
+                friendly,hostile,catalog);
+    }
+    public static CampaignEncounter start(int level,CampaignDeployment.Loadout deployment,
+                                          Shipyard.Design friendly,Shipyard.Design hostile,
+                                          TechnologyCatalog catalog) {
+        return new CampaignEncounter(LevelEconomy.level(level),deployment,friendly,hostile,catalog);
     }
 
     private void deployHostiles(){
@@ -54,6 +64,7 @@ public final class CampaignEncounter {
     public int wave(){return wave;}
     public int waves(){return level.waves();}
     public int deployed(){return deployed;}
+    public CampaignDeployment.Loadout deployment(){return deployment;}
     public int level(){return level.index();}
 
     /**
