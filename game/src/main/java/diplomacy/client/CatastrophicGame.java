@@ -232,7 +232,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.R) { reset(); return true; }
                 if (key == Input.Keys.N) { changeBattlefieldLevel(1); return true; }
                 if (key == Input.Keys.B) { changeBattlefieldLevel(-1); return true; }
-                if (key == Input.Keys.W) { weatherEnabled = !weatherEnabled; reset(); return true; }
+                if (key == Input.Keys.W) { if(!playedCampaign){weatherEnabled = !weatherEnabled; reset();} return true; }
                 if (key == Input.Keys.Z) { zoomBy(-1); return true; }
                 if (key == Input.Keys.X) { zoomBy(1); return true; }
                 if (key == Input.Keys.C) { manualZoom=1f; focusedShipId=-1; return true; }
@@ -277,7 +277,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }
                 }
                 if (world.y >= 613 && world.y < 649) {
-                    if (world.x < 830) { weatherEnabled = !weatherEnabled; reset(); return true; }
+                    if (world.x < 830) { if(!playedCampaign){weatherEnabled = !weatherEnabled; reset();} return true; }
                     if (world.x >= 900 && world.x < 1040) { changeBattlefieldLevel(-1); return true; }
                     if (world.x >= 1170) { changeBattlefieldLevel(1); return true; }
                 }
@@ -738,7 +738,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     FLEET_SIZES[fleetIndex]);
         else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         for(int side=0;side<2;side++)battle.setTeamOrders(side,fleetOrders[side]);
-        if (weatherEnabled) battle.configureWeather(environment.weather());
+        if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
         // The same validated stage index drives both GPU background and simulation.
         if (starfield != null) starfield.useLevel(environment.level());
         accumulator = 0;
@@ -940,13 +940,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch, "SLOW", 270, 693);
         font.draw(batch, "FAST x" + speed, 405, 693);
         font.setColor(left.r, left.g, left.b, 1);
-        font.draw(batch, "< " + left.displayName, 505, 693);
+        font.draw(batch, (playedCampaign?"":"< ") + left.displayName, 505, 693);
         font.setColor(right.r, right.g, right.b, 1);
-        font.draw(batch, "< " + right.displayName, 751, 693);
+        font.draw(batch, (playedCampaign?"":"< ") + right.displayName, 751, 693);
         font.setColor(Color.GOLD);
-        font.draw(batch,"-",1000,693);
-        font.draw(batch,""+FLEET_SIZES[fleetIndex]+"v"+FLEET_SIZES[fleetIndex],1022,693);
-        font.draw(batch,"+",1112,693);
+        if(playedCampaign)font.draw(batch,"FLEET "+deployedAtLaunch,1003,693);
+        else {
+            font.draw(batch,"-",1000,693);
+            font.draw(batch,""+FLEET_SIZES[fleetIndex]+"v"+FLEET_SIZES[fleetIndex],1022,693);
+            font.draw(batch,"+",1112,693);
+        }
         font.draw(batch,"SHIPYARD",1195,693);
         font.setColor(Color.WHITE);
         font.draw(batch,"MENU (M)",1174,107);
@@ -968,14 +971,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 ? activeWeather.primary().name().replace('_',' ') : "CLEAR";
         if (activeWeather.secondary() != SpaceWeather.Kind.CLEAR)
             condition += " + " + activeWeather.secondary().name().replace('_',' ');
-        font.draw(batch,"ENV " + (weatherEnabled ? "ON" : "OFF") + "   " + condition +
+        font.draw(batch,playedCampaign?"MISSION CONDITIONS   "+condition:
+                "ENV " + (weatherEnabled ? "ON" : "OFF") + "   " + condition +
                 "   (W / TAP TO TOGGLE)",22,638);
         font.setColor(Color.CYAN);
-        font.draw(batch,"<",945,638);
-        font.draw(batch,playedCampaign && campaignEncounter!=null
-                ?"MISSION "+activeMission+" WAVE "+campaignEncounter.wave()+"/"+campaignEncounter.waves()
-                :"LEVEL " + battlefieldLevel + "/500",998,638);
-        font.draw(batch,">",1235,638);
+        if(playedCampaign && campaignEncounter!=null)
+            font.draw(batch,"MISSION "+activeMission+" WAVE "+campaignEncounter.wave()+"/"+campaignEncounter.waves(),948,638);
+        else {
+            font.draw(batch,"<",945,638);
+            font.draw(batch,"LEVEL " + battlefieldLevel + "/500",998,638);
+            font.draw(batch,">",1235,638);
+        }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
