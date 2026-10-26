@@ -1,0 +1,29 @@
+name: Crew modules and life-support combat acceptance
+on:
+  push:
+    branches: ['feature/crew-life-support-fittings-20261025']
+  pull_request:
+    paths: ['core/src/**', 'core/build.gradle', 'game/src/**', '.github/workflows/crew-life-support.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  simulation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Validate powered crew, complete technology catalog, retrofit saves, 200v200
+        run: |
+          gradle --no-daemon --stacktrace \
+            :core:crewAccommodationSmoke :core:moduleVersionsSmoke \
+            :core:hullFoundationSmoke :core:moduleResearchSmoke \
+            :core:shipyardSmoke :core:technologySmoke \
+            :core:massBattleCampaign :game:classes :desktop:classes
