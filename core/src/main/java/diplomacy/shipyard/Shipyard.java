@@ -92,6 +92,20 @@ public final class Shipyard {
         public int stage(Track track) { return stages.getOrDefault(track,0); }
         public Map<Track,Integer> stages() { return stages; }
     }
+    /** Selected shared-family ammunition, never a free hull characteristic. */
+    public record AmmoSelection(AmmunitionTable.Kinetic kinetic,
+                                AmmunitionTable.Warhead missile,
+                                AmmunitionTable.Warhead torpedo) {
+        public static final AmmoSelection STANDARD=new AmmoSelection(
+                AmmunitionTable.Kinetic.STANDARD,
+                AmmunitionTable.Warhead.STANDARD,
+                AmmunitionTable.Warhead.STANDARD);
+        public AmmoSelection {
+            AmmunitionTable.kinetic(kinetic);
+            AmmunitionTable.warhead(missile);
+            AmmunitionTable.warhead(torpedo);
+        }
+    }
     public static final class Design {
         public final Battle.Faction faction;
         public final Hull hull;
@@ -99,16 +113,51 @@ public final class Shipyard {
         private final List<Installed> parts;
         /** Hangar payload is a separately chosen launch loadout, not a cosmetic sprite. */
         public final FighterModel.Hull fighterHull;
-        private Design(Battle.Faction group, Hull frame, String callSign, List<Installed> mounted) {
-            this(group,frame,callSign,mounted,FighterModel.Hull.ASSAULT_GUNSHIP);
+        public final AmmoSelection ammoSelection;
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted){
+            this(group,frame,callSign,mounted,FighterModel.Hull.ASSAULT_GUNSHIP,
+                    AmmoSelection.STANDARD);
         }
-        private Design(Battle.Faction group, Hull frame, String callSign, List<Installed> mounted,
-                       FighterModel.Hull craftType) {
-            if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70) throw new IllegalArgumentException("Invalid vessel identity");
-            if(mounted.size()!=frame.slots.size()) throw new IllegalArgumentException("Incorrect hardpoint count");
-            if(craftType==null)throw new IllegalArgumentException("Fighter type required");
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
+                       FighterModel.Hull craftType){
+            this(group,frame,callSign,mounted,craftType,AmmoSelection.STANDARD);
+        }
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
+                       FighterModel.Hull craftType,AmmoSelection loadout){
+            if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70)
+                throw new IllegalArgumentException("Invalid vessel identity");
+            if(mounted.size()!=frame.slots.size())
+                throw new IllegalArgumentException("Incorrect hardpoint count");
+            if(craftType==null||loadout==null)
+                throw new IllegalArgumentException("Ship equipment selections required");
             faction=group;hull=frame;name=callSign;fighterHull=craftType;
+            ammoSelection=loadout;
             parts=Collections.unmodifiableList(new ArrayList<>(mounted));
+        }
+        private Design verifyAmmo(){
+            AmmunitionResearch.Access available=Shipyard.ammunitionAccess(this);
+            if(!available.allows(ammoSelection.kinetic())
+                    ||!available.allows(Battle.DamageType.MISSILE,ammoSelection.missile())
+                    ||!available.allows(Battle.DamageType.TORPEDO,ammoSelection.torpedo()))
+                throw new IllegalArgumentException(
+                        "Selected ammunition locked: change it to STANDARD before changing its weapon research");
+            return this;
+        }
+        public Design withAmmoSelection(AmmoSelection selected){
+            return new Design(faction,hull,name,parts,fighterHull,selected).verifyAmmo();
+        }
+        public Design withKineticAmmunition(AmmunitionTable.Kinetic selected){
+            return withAmmoSelection(new AmmoSelection(selected,
+                    ammoSelection.missile(),ammoSelection.torpedo()));
+        }
+        public Design withGuidedWarhead(Battle.DamageType family,AmmunitionTable.Warhead selected){
+            if(family==Battle.DamageType.MISSILE)
+                return withAmmoSelection(new AmmoSelection(ammoSelection.kinetic(),selected,
+                        ammoSelection.torpedo()));
+            if(family==Battle.DamageType.TORPEDO)
+                return withAmmoSelection(new AmmoSelection(ammoSelection.kinetic(),
+                        ammoSelection.missile(),selected));
+            throw new IllegalArgumentException("Weapon family has no guided warheads");
         }
         /** Changing a hangar's launched craft does not overwrite ship module research. */
         /** Physical hardware mark is independent of the exclusive research path. */
@@ -117,10 +166,10 @@ public final class Shipyard {
             if(existing==null)throw new IllegalArgumentException("Empty socket cannot be versioned");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(existing.component,existing.stages,pattern,mark));
-            return new Design(faction,hull,name,changed,fighterHull);
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
         }
         public Design withFighterHull(FighterModel.Hull type) {
-            return new Design(faction,hull,name,parts,type);
+            return new Design(faction,hull,name,parts,type,ammoSelection).verifyAmmo();
         }
         public Installed at(int slot) { return parts.get(slot); }
         public int slots() { return parts.size(); }
@@ -131,7 +180,7 @@ public final class Shipyard {
                 throw new IllegalArgumentException("Invalid base component ID");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,baseId==null?null:new Installed(baseId, Map.of()));
-            return new Design(faction,hull,name,changed,fighterHull);
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
         }
         public Design stage(int slot, Track track, int level) {
             if(level<0||level>6||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..6");
@@ -146,7 +195,7 @@ public final class Shipyard {
             if(level==0) updated.remove(track); else updated.put(track,level);
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(current.component,updated,current.pattern,current.mark));
-            return new Design(faction,hull,name,changed,fighterHull);
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
         }
     }
     public static String factionId(Battle.Faction faction) {
