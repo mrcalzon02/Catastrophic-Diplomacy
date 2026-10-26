@@ -114,6 +114,33 @@ public final class WeaponBehaviorTableTest {
         same(565,WeaponBehaviorTable.gun(Battle.DamageType.PARTICLE).maximumRange(),"Particle baseline reach");
         same(690,WeaponBehaviorTable.gun(Battle.DamageType.MISSILE).maximumRange(),"Missile baseline reach");
         same(840,WeaponBehaviorTable.gun(Battle.DamageType.TORPEDO).maximumRange(),"Torpedo baseline reach");
+        check(WeaponBehaviorTable.damageTable().size()==Battle.DamageType.values().length,
+                "Every damage type, including fighter attacks, requires complete defense tables");
+        DirectionalDefense baseline=new DirectionalDefense(80,100,200);
+        for(Battle.DamageType kind:Battle.DamageType.values()){
+            var consequences=WeaponBehaviorTable.damage(kind);
+            for(DirectionalDefense.Facing facing:DirectionalDefense.Facing.values()){
+                same(consequences.shield(),
+                        baseline.damageFactor(DirectionalDefense.Layer.SHIELD,facing,kind),
+                        "Directional shield behavior must come from its weapon table");
+                same(consequences.armor(),
+                        baseline.damageFactor(DirectionalDefense.Layer.ARMOR,facing,kind),
+                        "Directional armor response must come from weapon table");
+                same(consequences.structure(),
+                        baseline.damageFactor(DirectionalDefense.Layer.STRUCTURE,facing,kind),
+                        "Directional structure response must come from weapon table");
+            }
+        }
+        check(WeaponBehaviorTable.damage(Battle.DamageType.PARTICLE).energyDrain()>0
+                        &&WeaponBehaviorTable.damage(Battle.DamageType.PARTICLE).sensorDegradation()>0
+                        &&WeaponBehaviorTable.damage(Battle.DamageType.PLASMA).addedHeat()>0,
+                "Particle suppression and plasma heating must exist in the impact table");
+        same(1.5,WeaponBehaviorTable.damage(Battle.DamageType.TORPEDO).shield(),
+                "Heavy torpedo shield damage");
+        same(1.25,WeaponBehaviorTable.damage(Battle.DamageType.KINETIC).armor(),
+                "Kinetic penetrator armor damage");
+        same(0.8,WeaponBehaviorTable.damage(Battle.DamageType.LASER).armor(),
+                "Armor resilience against lasers");
         var pd=WeaponBehaviorTable.POINT_DEFENSE;
         same(0.16,pd.reload(false,1,1),"PD ordinance cycle");
         same(0.18,pd.reload(true,1,1),"PD anti-craft cycle");
