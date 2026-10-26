@@ -62,7 +62,7 @@ public final class WeaponBehaviorTable {
                     && Double.isFinite(distance) && distance>minimumRange
                     && distance<range(fittedReach) && remainingCooldown<=0
                     && availablePower>powerPerShot
-                    && heat<maxHeat*heatFractionLimit
+                    && (heatFractionLimit==1.0 || heat<maxHeat*heatFractionLimit)
                     && weaponCondition>requiredWeaponCondition
                     && magazineCondition>requiredMagazineCondition;
         }
@@ -93,6 +93,7 @@ public final class WeaponBehaviorTable {
             return (craft?craftCycle:ordnanceCycle)*installedCycle/condition;
         }
     }
+    public static final double BALLISTIC_MISS_ANGLE_RADIANS=0.24;
     public static final Defense POINT_DEFENSE=new Defense(0.16,0.18,1.5,0.8,0.20,1.5,6.5);
     private static final Map<Battle.DamageType,Gun> MAIN=build();
     private static Map<Battle.DamageType,Gun> build(){
