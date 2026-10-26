@@ -327,3 +327,12 @@ tasks.register('shipPlacementOrdersSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignDeploymentSmoke') { finalizedBy(tasks.named('shipPlacementOrdersSmoke')) }
+
+tasks.register('shipStandingOrdersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify persistent independent captain doctrines, withdrawal, 200-hull checksum saves and live combat.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipStandingOrdersTest'
+    dependsOn testClasses
+}
+tasks.named('shipPlacementOrdersSmoke') { finalizedBy(tasks.named('shipStandingOrdersSmoke')) }
