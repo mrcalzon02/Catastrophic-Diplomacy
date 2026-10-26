@@ -51,6 +51,8 @@ public final class Battle {
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
+        /** Ship hull sensor and cross-section, independent from fitted scanner modules. */
+        public double sensorRange=1100, radarCrossSection=1;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
         public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
@@ -333,10 +335,16 @@ public final class Battle {
         s.hullClass = design.hull;
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
+        s.sensorRange=machinery.baseline().sensorRange();
+        s.radarCrossSection=machinery.baseline().radarCrossSection();
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
         s.defense = new DirectionalDefense(s.maxShields,s.maxArmor,s.maxHull);
+        if(machinery.baseline().shieldRecharge()>0)
+            for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values())
+                s.defense.configureRecharge(face,
+                        1.25+machinery.baseline().shieldRecharge()/4,2);
         s.maxPower = machinery.maxPower(); s.power = s.maxPower;
         s.maxHeat = machinery.maxHeat();
         s.powerRegen = machinery.powerRegen();
@@ -491,6 +499,12 @@ public final class Battle {
         s.repairDroneReload=Math.max(0,s.repairDroneReload-DT);
     }
 
+    /** Built-in radar and target cross-section matter without art-scale coupling. */
+    private double targetAcquisitionRange(Ship observer,Ship target){
+        double rcs=StrictMath.max(0.15,StrictMath.min(4.0,target.radarCrossSection));
+        return observer.sensorRange*observer.sensorsCondition*weather.sensorFactor()
+                *StrictMath.sqrt(StrictMath.sqrt(rcs));
+    }
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
         if(actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
@@ -498,8 +512,8 @@ public final class Battle {
             double best = Double.POSITIVE_INFINITY;
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
                 double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
-                if (weather.preset().enabled() && distance > 1100.0 * actor.sensorsCondition
-                        * weather.sensorFactor()) continue;
+                if (weather.preset().enabled() &&
+                        distance > targetAcquisitionRange(actor,s))continue;
                 double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
@@ -515,8 +529,7 @@ public final class Battle {
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
             double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
-            if(weather.preset().enabled() && distance>1100.0*actor.sensorsCondition
-                    *weather.sensorFactor())continue;
+            if(weather.preset().enabled() && distance>targetAcquisitionRange(actor,candidate))continue;
             double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
@@ -629,7 +642,7 @@ public final class Battle {
 
     private void fire(Ship s, Ship target) {
         double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
-        double lock = Math.max(0, 1 - distance / 1000) * s.sensorsCondition
+        double lock = Math.max(0, 1 - distance / Math.max(1,s.sensorRange)) * s.sensorsCondition
                 * weather.sensorFactor() * (1 - target.ecmStrength*target.ecmCondition);
         double weatherAim = weather.accuracyFactor();
         if (s.laserDamage > 0 && distance < 530*s.weapons.laserRange() && s.laserReload == 0 && s.power > 9 && s.heat < s.maxHeat * 0.91) {
