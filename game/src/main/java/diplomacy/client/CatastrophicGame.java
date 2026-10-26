@@ -485,23 +485,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.DEPLOYMENT){
-            if(GameMenuPanel.hit(x,y,35,35,175,55)){
-                screen=GameMenuPanel.Screen.CAMPAIGN;return;
+            switch(GameMenuPanel.deploymentAction(x,y)){
+                case 0 -> screen=GameMenuPanel.Screen.CAMPAIGN;
+                case 1 -> deployment=deployment.withShips(-1,LevelEconomy.level(activeMission));
+                case 2 -> deployment=deployment.withShips(1,LevelEconomy.level(activeMission));
+                case 3 -> deployment=deployment.withFormation(-1);
+                case 4 -> deployment=deployment.withFormation(1);
+                case 5 -> shipyard.show();
+                case 6 -> launchCampaignMission();
+                default -> { }
             }
-            if(GameMenuPanel.hit(x,y,845,430,99,51)){
-                deployment=deployment.withShips(-1,LevelEconomy.level(activeMission));return;
-            }
-            if(GameMenuPanel.hit(x,y,1098,430,99,51)){
-                deployment=deployment.withShips(1,LevelEconomy.level(activeMission));return;
-            }
-            if(GameMenuPanel.hit(x,y,845,321,99,51)){
-                deployment=deployment.withFormation(-1);return;
-            }
-            if(GameMenuPanel.hit(x,y,1098,321,99,51)){
-                deployment=deployment.withFormation(1);return;
-            }
-            if(GameMenuPanel.hit(x,y,845,214,352,55)){shipyard.show();return;}
-            if(GameMenuPanel.hit(x,y,913,35,302,55)){launchCampaignMission();return;}
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
