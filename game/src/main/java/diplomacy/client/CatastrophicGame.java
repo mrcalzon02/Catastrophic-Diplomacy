@@ -372,12 +372,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void openCampaignSetup(){
         pendingFaction=campaign==null?left:campaign.faction();
         screen=GameMenuPanel.Screen.CAMPAIGN_SETUP;
+        Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_FACTION_SETUP");
     }
     private void newCampaign(){
         campaign=CampaignProgress.start(pendingFaction);
         saveCampaign();
         campaignPage=0;selectedMission=1;
         screen=GameMenuPanel.Screen.CAMPAIGN;
+        Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_MAP 1");
     }
     private void showCampaign(){
         if(campaign==null){openCampaignSetup();return;}
