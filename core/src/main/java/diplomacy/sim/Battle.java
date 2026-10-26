@@ -1309,8 +1309,9 @@ public final class Battle {
                     chosenMissile.integrity-=defender.pointDefenseProfile.damage();
                     if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
                         defender.intercepted++;missileIntercepts++;
+                        if(chosenMissile.decoy)decoysIntercepted++;
                         visual(chosenMissile.visualId,VisualPhase.INTERCEPT,
-                                chosenMissile.torpedo?"TORPEDO":"MISSILE",
+                                chosenMissile.decoy?"DECOY":chosenMissile.torpedo?"TORPEDO":"MISSILE",
                                 chosenMissile.team,chosenMissile.sourceId,chosenMissile.targetId,
                                 chosenMissile.x,chosenMissile.y,chosenMissile.x,chosenMissile.y);
                     }
@@ -1362,13 +1363,22 @@ public final class Battle {
             Ship target = findShip(m.targetId);
             if (target == null || !target.alive() || (m.fuel -= DT) <= 0) {
                 missiles.remove(i);
-                visual(m.visualId,VisualPhase.TIMEOUT,m.torpedo?"TORPEDO":"MISSILE",
+                visual(m.visualId,VisualPhase.TIMEOUT,m.decoy?"DECOY":m.torpedo?"TORPEDO":"MISSILE",
                         m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                continue;
+            }
+            if(m.ignitionDelayTicks>0){
+                // Cold-launch canisters are live PD targets while ignition is delayed.
+                m.ignitionDelayTicks--;
                 continue;
             }
             double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
             if (range < 13) {
-                hit(target,m.damage,findShip(m.sourceId),
+                if(m.decoy){
+                    // A decoy has NO warhead and may never apply hull damage.
+                    visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
+                            m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                }else hit(target,m.damage,findShip(m.sourceId),
                         m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,m.visualId);
                 missiles.remove(i);continue;
             }
@@ -1390,7 +1400,10 @@ public final class Battle {
                         target.x,target.y,13*target.visualScale());
                 if(Double.isFinite(contact)){
                     m.x+=(nextX-m.x)*contact;m.y+=(nextY-m.y)*contact;
-                    hit(target,m.damage,findShip(m.sourceId),
+                    if(m.decoy)
+                        visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
+                                m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                    else hit(target,m.damage,findShip(m.sourceId),
                             m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,
                             m.visualId,m.x,m.y);
                     missiles.remove(i);
@@ -1501,6 +1514,8 @@ public final class Battle {
             hash = mix(hash,s.defense.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.power));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
+            hash=mix(hash,s.launchMode(DamageType.MISSILE).ordinal());
+            hash=mix(hash,s.launchMode(DamageType.TORPEDO).ordinal());
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
             hash=mix(hash,s.repairDroneReserve);
             hash=mix(hash,Double.doubleToLongBits(s.repairDroneReload));
@@ -1510,7 +1525,22 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(s.hangarCondition));
             hash=mix(hash,Double.doubleToLongBits(s.magazineCondition));
         }
+        for(PendingLaunch pending:launchQueue){
+            hash=mix(hash,pending.sourceId);
+            hash=mix(hash,pending.targetId);
+            hash=mix(hash,pending.family.ordinal());
+            hash=mix(hash,pending.pattern.mode().ordinal());
+            hash=mix(hash,pending.nextIndex);
+            hash=mix(hash,pending.nextTick);
+        }
+        hash=mix(hash,decoysLaunched);
+        hash=mix(hash,decoysIntercepted);
+        hash=mix(hash,salvosStarted);
+        hash=mix(hash,roundsFiredBySalvos);
         for (Missile m : missiles) {
+            hash=mix(hash,m.payload.ordinal());
+            hash=mix(hash,m.ignitionDelayTicks);
+            hash=mix(hash,m.visualId);
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
             hash=mix(hash,Double.doubleToLongBits(m.x));
             hash=mix(hash,Double.doubleToLongBits(m.integrity));
