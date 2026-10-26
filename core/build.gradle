@@ -210,3 +210,12 @@ tasks.register('alienFactionSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.AlienFactionArtTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('alienFactionSmoke') }
+
+tasks.register('hullFoundationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Require 11 physical hull baselines, 11 native technologies, unarmed support hulls and player/AI equipment parity.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullFoundationTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('hullFoundationSmoke') }
