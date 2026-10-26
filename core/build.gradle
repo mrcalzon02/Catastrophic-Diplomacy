@@ -237,3 +237,12 @@ tasks.register('crewAccommodationSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.CrewAccommodationTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('crewAccommodationSmoke') }
+
+tasks.register('weaponBehaviorSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Certify all authoritative main battery firing gates, PD modes, fighter weapons, ordnance physics and FX type consistency.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WeaponBehaviorTableTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('weaponBehaviorSmoke') }
