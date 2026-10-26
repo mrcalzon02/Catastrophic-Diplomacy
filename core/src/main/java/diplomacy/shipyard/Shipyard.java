@@ -223,7 +223,7 @@ public final class Shipyard {
         Track branch=installed.branch();
         int rank=branch==null?0:installed.stage(branch);
         ModuleVersions.Modifiers generation=ModuleVersions.of(installed.pattern,installed.mark);
-        industry=Math.toIntExact(StrictMath.ceil(industry*generation.cost()));
+        industry=Math.toIntExact((long)StrictMath.ceil(industry*generation.cost()));
         return new Part(base,base.mass*mass*generation.mass(),
                 base.power*power*generation.power(),
                 base.heat*heat*generation.heat(),
