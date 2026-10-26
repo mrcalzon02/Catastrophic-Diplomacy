@@ -62,9 +62,10 @@ def main() -> int:
     expected_launcher = (image / (NAME + ".exe")) if system == "Windows" else (image / "bin" / NAME)
     if not expected_launcher.is_file():
         raise SystemExit(f"Missing platform executable: {expected_launcher}")
-    runtime_java = image / "runtime" / "bin" / ("java.exe" if system == "Windows" else "java")
-    if not runtime_java.is_file():
-        raise SystemExit("Portable package does not contain its own Java runtime")
+    runtime_root = image / "runtime" if system == "Windows" else image / "lib" / "runtime"
+    runtime_java = runtime_root / "bin" / ("java.exe" if system == "Windows" else "java")
+    if not (runtime_root / "release").is_file() or not (runtime_root / "lib" / "modules").is_file():
+        raise SystemExit("Portable package does not contain its own linked Java runtime")
     target = OUT / f"Catastrophic-Diplomacy-{system}-x64.zip"
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for source in sorted(image.rglob("*")):
