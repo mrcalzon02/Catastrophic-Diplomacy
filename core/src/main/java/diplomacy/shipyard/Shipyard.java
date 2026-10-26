@@ -19,7 +19,7 @@ import java.util.Map;
 /** Shared desktop/Android hull fitting and deterministic engineering calculations. */
 public final class Shipyard {
     private Shipyard() { }
-    public enum Mount { SYSTEM, WEAPON, DEFENSE, SUPPORT }
+    public enum Mount { SYSTEM, WEAPON, DEFENSE, SUPPORT, HABITAT }
     public enum Track { OUTPUT, EFFICIENCY, RESILIENCE, SPECIALIST }
     public enum Hull {
         CORVETTE(120, 180, 155, 0.96, 3, 2, 1, 0),
@@ -48,6 +48,9 @@ public final class Shipyard {
             for (int i=0;i<weapons;i++) positions.add(new Slot(positions.size(), Mount.WEAPON, (i%2==0?-27:27), -25+(i/2)*19));
             for (int i=0;i<defenses;i++) positions.add(new Slot(positions.size(), Mount.DEFENSE, -20+i*18, 35));
             for (int i=0;i<supports;i++) positions.add(new Slot(positions.size(), Mount.SUPPORT, -16+i*17, 15));
+            // Append crew and life-support sockets, never renumber legacy hardpoints.
+            positions.add(new Slot(positions.size(),Mount.HABITAT,-13,-12));
+            positions.add(new Slot(positions.size(),Mount.HABITAT,13,-12));
             slots = Collections.unmodifiableList(positions);
         }
     }
@@ -155,6 +158,7 @@ public final class Shipyard {
         return switch(component.category) {
             case "systems" -> Mount.SYSTEM; case "weapons" -> Mount.WEAPON;
             case "defense" -> Mount.DEFENSE; case "support" -> Mount.SUPPORT;
+            case "habitat" -> Mount.HABITAT;
             default -> throw new IllegalArgumentException("Unknown mounting class " + component.category);
         };
     }
@@ -169,7 +173,9 @@ public final class Shipyard {
                  .install(slotOf(hull,Mount.SYSTEM,2),"BASE-"+id+"-RAD")
                  .install(slotOf(hull,Mount.WEAPON,0),"BASE-"+id+"-LAS")
                  .install(slotOf(hull,Mount.WEAPON,1),"BASE-"+id+"-MSL")
-                 .install(slotOf(hull,Mount.DEFENSE,0),"BASE-"+id+"-SHD");
+                 .install(slotOf(hull,Mount.DEFENSE,0),"BASE-"+id+"-SHD")
+                 .install(slotOf(hull,Mount.HABITAT,0),"BASE-"+id+"-CRW")
+                 .install(slotOf(hull,Mount.HABITAT,1),"BASE-"+id+"-LFS");
         return ship;
     }
     private static int slotOf(Hull hull,Mount mount,int nth) {
