@@ -318,3 +318,12 @@ tasks.register('campaignDeploymentSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignDeploymentSmoke')) }
+
+tasks.register('shipPlacementOrdersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify 200-ship collision-free free deployment and arbitrarily long per-ship combat order queues.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipPlacementOrdersTest'
+    dependsOn testClasses
+}
+tasks.named('campaignDeploymentSmoke') { finalizedBy(tasks.named('shipPlacementOrdersSmoke')) }
