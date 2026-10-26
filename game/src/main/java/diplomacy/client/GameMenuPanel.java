@@ -8,7 +8,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignDeployment;
-import diplomacy.sim.ShipCommandQueue;
+import diplomacy.sim.ShipStandingOrders;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import java.util.List;
@@ -67,10 +67,10 @@ final class GameMenuPanel {
     static float placementUiY(double worldY){return 166+(float)(worldY-90)*.80f;}
     static double placementWorldX(float uiX){return 70+(uiX-60)/1.24;}
     static double placementWorldY(float uiY){return 90+(uiY-166)/.80;}
-    static float ordersUiX(double worldX){return 60+(float)worldX*.56f;}
-    static float ordersUiY(double worldY){return 161+(float)worldY*.60f;}
-    static double ordersWorldX(float uiX){return (uiX-60)/.56;}
-    static double ordersWorldY(float uiY){return (uiY-161)/.60;}
+    static float ordersUiX(double worldX){return 69+(float)(worldX-70)*1.05f;}
+    static float ordersUiY(double worldY){return 170+(float)(worldY-90)*.75f;}
+    static double ordersWorldX(float uiX){return 70+(uiX-69)/1.05;}
+    static double ordersWorldY(float uiY){return 90+(uiY-170)/.75;}
     static int shipHit(float x,float y,CampaignDeployment.Loadout deployment,boolean fullBattle){
         int result=-1;double nearest=22*22;
         for(int i=0;i<deployment.ships();i++){
@@ -82,15 +82,13 @@ final class GameMenuPanel {
         }
         return result;
     }
+    /** 0/1 switch ships; 2..14 edit one standing-policy field; 15 returns. */
     static int ordersAction(float x,float y){
-        if(hit(x,y,845,530,105,50))return 0;
-        if(hit(x,y,1095,530,105,50))return 1;
-        if(hit(x,y,845,457,355,52))return 2;
-        if(hit(x,y,845,387,355,52))return 3;
-        if(hit(x,y,845,317,355,52))return 4;
-        if(hit(x,y,845,247,355,52))return 5;
-        if(hit(x,y,845,177,355,52))return 6;
-        if(hit(x,y,900,32,300,55))return 7;
+        if(hit(x,y,650,561,110,40))return 0;
+        if(hit(x,y,1108,561,112,40))return 1;
+        for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
+            if(hit(x,y,650,519-i*29,570,27))return 2+i;
+        if(hit(x,y,900,32,300,55))return 15;
         return -1;
     }
     static int mapHit(float x,float y,int page){
@@ -202,28 +200,23 @@ final class GameMenuPanel {
                 button(shapes,913,35,302,55,true);
             }
             case SHIP_ORDERS -> {
-                rectangle(shapes,39,135,760,472,PANEL);
-                rectangle(shapes,819,135,425,472,PANEL);
-                shapes.setColor(.11f,.16f,.24f,1);
-                shapes.rectLine(ordersUiX(640),160,ordersUiX(640),594,2);
-                // Display all commissioned hulls plus selected ship's programmed route.
-                var path=deployment.ordersFor(selectedShip);
-                var previous=deployment.at(selectedShip);
-                for(var order:path)if(order.type()==ShipCommandQueue.Type.MOVE){
-                    shapes.setColor(Color.GOLD);
-                    shapes.rectLine(ordersUiX(previous.x()),ordersUiY(previous.y()),
-                                    ordersUiX(order.x()),ordersUiY(order.y()),2);
-                    previous=new CampaignDeployment.Point(order.x(),order.y());
-                }
+                rectangle(shapes,39,135,582,472,PANEL);
+                rectangle(shapes,633,135,612,472,PANEL);
+                shapes.setColor(.16f,.42f,.55f,1);
+                shapes.rect(ordersUiX(CampaignDeployment.MIN_X),ordersUiY(CampaignDeployment.MIN_Y),
+                        ordersUiX(CampaignDeployment.MAX_X)-ordersUiX(CampaignDeployment.MIN_X),2);
+                shapes.rect(ordersUiX(CampaignDeployment.MIN_X),ordersUiY(CampaignDeployment.MAX_Y),
+                        ordersUiX(CampaignDeployment.MAX_X)-ordersUiX(CampaignDeployment.MIN_X),2);
                 for(int i=0;i<deployment.ships();i++){
                     var position=deployment.at(i);
                     shapes.setColor(i==selectedShip?Color.GOLD:Color.CYAN);
                     shapes.circle(ordersUiX(position.x()),ordersUiY(position.y()),
                             i==selectedShip?9:deployment.ships()>80?3:5,12);
                 }
-                button(shapes,845,530,105,50,false);
-                button(shapes,1095,530,105,50,false);
-                for(int y:new int[]{457,387,317,247,177})button(shapes,845,y,355,52,false);
+                button(shapes,650,561,110,40,false);
+                button(shapes,1108,561,112,40,false);
+                for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
+                    button(shapes,650,519-i*29,570,27,false);
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
@@ -320,28 +313,21 @@ final class GameMenuPanel {
                 label(batch,font,"BEGIN MISSION",978,68,Color.WHITE);
             }
             case SHIP_ORDERS -> {
-                title(batch,font,"SHIP ORDERS","EACH VESSEL HAS ITS OWN UNLIMITED SEQUENTIAL COMMAND QUEUE");
-                label(batch,font,"SHIP "+(selectedShip+1)+"/"+deployment.ships()+
-                        " - "+deployment.ordersFor(selectedShip).size()+" ORDERS",855,597,Color.GOLD);
-                label(batch,font,"< PREV",865,558,Color.WHITE);
-                label(batch,font,"NEXT >",1118,558,Color.WHITE);
-                label(batch,font,awaitingWaypoint?"TAP MAP FOR DESTINATION":"ADD MOVE WAYPOINT",901,487,Color.WHITE);
-                label(batch,font,"ADD HOLD 10 SECONDS",901,417,Color.WHITE);
-                label(batch,font,"ADD ENGAGE 10 SECONDS",901,347,Color.WHITE);
-                label(batch,font,"UNDO LAST ORDER",901,277,Color.WHITE);
-                label(batch,font,"CLEAR THIS SHIP'S ORDERS",880,207,Color.WHITE);
-                label(batch,font,"BACK TO DEPLOYMENT",949,66,Color.WHITE);
-                label(batch,font,"FLEET STARTS LEFT OF THE ZONE DIVIDER",55,585,MUTED);
-                label(batch,font,editNotice,54,117,Color.GOLD);
-                var commandList=deployment.ordersFor(selectedShip);
-                int start=Math.max(0,commandList.size()-8);
-                for(int i=start;i<commandList.size();i++){
-                    var command=commandList.get(i);
-                    String description=command.type()==ShipCommandQueue.Type.MOVE?
-                            "MOVE TO "+(int)command.x()+", "+(int)command.y():
-                            command.type().name()+" "+(command.ticks()/30)+"s";
-                    label(batch,font,(i+1)+". "+description,60,560-(i-start)*26,Color.WHITE);
+                title(batch,font,"PER-SHIP STANDING ORDERS",
+                        "PERSISTENT COMBAT DOCTRINE - ALL RULES OPERATE TOGETHER");
+                ShipStandingOrders policy=deployment.standingFor(selectedShip);
+                label(batch,font,"SHIP "+(selectedShip+1)+" / "+deployment.ships(),822,585,Color.GOLD);
+                label(batch,font,"< PREVIOUS",656,584,Color.WHITE);
+                label(batch,font,"NEXT >",1122,584,Color.WHITE);
+                for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++){
+                    float y=538-i*29;
+                    label(batch,font,"< "+ShipStandingOrders.SETTINGS[i],661,y,MUTED);
+                    label(batch,font,policy.display(i)+" >",1006,y,Color.WHITE);
                 }
+                label(batch,font,"BACK TO DEPLOYMENT",927,68,Color.WHITE);
+                label(batch,font,"SELECT SHIP ON MAP; TAP LEFT/RIGHT SIDE TO CHANGE VALUE",48,114,MUTED);
+                label(batch,font,editNotice,48,86,Color.GOLD);
+                label(batch,font,"STANDING DOCTRINE ACTIVE THROUGHOUT BATTLE",48,592,Color.CYAN);
             }
             case OPTIONS -> {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
