@@ -53,7 +53,21 @@ public final class ScenarioCatalog {
                 break;
             }
         Shipyard.Report quality=Shipyard.inspect(d,tech);
-        if(!quality.valid())throw new IllegalStateException("Invalid scenario fitting: "+quality.explanation());
+        // Larger batteries and hangars require real reactor/cooling equipment.
+        // Fill spare system hardpoints and reject any hull that cannot power itself.
+        for(Shipyard.Slot slot:hull.slots){
+            if(quality.valid())break;
+            if(slot.mount()!=Shipyard.Mount.SYSTEM||d.at(slot.index())!=null)continue;
+            String defects=quality.explanation();
+            String machinery=defects.contains("Insufficient reactor output")?"REA":
+                    defects.contains("Thermal rejection insufficient")?"RAD":null;
+            if(machinery==null)break;
+            d=d.install(slot.index(),"BASE-"+Shipyard.factionId(faction)+"-"+machinery);
+            quality=Shipyard.inspect(d,tech);
+        }
+        if(!quality.valid())throw new IllegalStateException(
+                "Invalid scenario fitting "+p+"/"+faction+"/"+(first?"LEFT":"RIGHT")+
+                ": "+quality.explanation());
         return d;
     }
 
