@@ -43,8 +43,8 @@ public final class AmmunitionTableTest {
                 "EMP warhead attacks systems");
         check(AmmunitionTable.warhead(AmmunitionTable.Warhead.SHIELD_BREAKER).shieldDrain()>0,
                 "Shield breaker directly drains shield pool");
-        var ordinary=new DirectionalDefense(0,1000,300);
-        var penetrated=new DirectionalDefense(0,1000,300);
+        var ordinary=new DirectionalDefense(0,20000,300);
+        var penetrated=new DirectionalDefense(0,20000,300);
         var standard=ordinary.impact(1,0,0.8,0,35,Battle.DamageType.KINETIC);
         var ap=penetrated.impact(1,0,0.8,0,35,Battle.DamageType.KINETIC,.55);
         check(ap.hullDamage()>standard.hullDamage(),
