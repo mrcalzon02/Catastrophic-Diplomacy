@@ -13,7 +13,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, SKIRMISH, CAMPAIGN, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -37,6 +37,16 @@ final class GameMenuPanel {
             if(hit(x,y,30,592-i*48,550,44))return i;
         return -1;
     }
+    static Battle.Faction factionHit(float x,float y){
+        Battle.Faction[] factions=Battle.Faction.values();
+        int rows=(factions.length+1)/2;
+        for(int i=0;i<factions.length;i++){
+            float bx=80+(i/rows)*570;
+            float by=502-(i%rows)*62;
+            if(hit(x,y,bx,by,520,49))return factions[i];
+        }
+        return null;
+    }
     static int mapHit(float x,float y,int page){
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             if(Math.hypot(x-node.x(),y-node.y())<=26)return node.level();
@@ -56,7 +66,7 @@ final class GameMenuPanel {
         label(batch,font,subtitle,38,650,MUTED);
     }
     void draw(Screen screen,ShapeRenderer shapes,SpriteBatch batch,BitmapFont font,
-              ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,
+              ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed){
@@ -67,6 +77,15 @@ final class GameMenuPanel {
         switch(screen){
             case HOME -> {
                 for(int i=0;i<HOME_ACTIONS.length;i++)button(shapes,438,487-i*64,404,50,false);
+            }
+            case CAMPAIGN_SETUP -> {
+                Battle.Faction[] factions=Battle.Faction.values();
+                int rows=(factions.length+1)/2;
+                for(int i=0;i<factions.length;i++)
+                    button(shapes,80+(i/rows)*570,502-(i%rows)*62,520,49,
+                            factions[i]==selectedFaction);
+                button(shapes,80,35,230,54,false);
+                button(shapes,892,35,308,54,true);
             }
             case SKIRMISH -> {
                 rectangle(shapes,610,113,638,524,PANEL);
@@ -125,6 +144,18 @@ final class GameMenuPanel {
                 for(int i=0;i<HOME_ACTIONS.length;i++)
                     label(batch,font,HOME_ACTIONS[i],474,520-i*64,Color.WHITE);
                 label(batch,font,"CAMPAIGN  /  SKIRMISH  /  SHIP ENGINEERING",438,73,MUTED);
+            }
+            case CAMPAIGN_SETUP -> {
+                title(batch,font,"NEW CAMPAIGN","SELECT THE FACTION YOU WILL COMMAND");
+                Battle.Faction[] factions=Battle.Faction.values();
+                int rows=(factions.length+1)/2;
+                for(int i=0;i<factions.length;i++)
+                    label(batch,font,factions[i].displayName,
+                          101+(i/rows)*570,536-(i%rows)*62,Color.WHITE);
+                if(progress!=null)
+                    label(batch,font,"STARTING WILL REPLACE THE EXISTING CAMPAIGN SAVE",325,133,Color.SCARLET);
+                label(batch,font,"CANCEL",132,69,Color.WHITE);
+                label(batch,font,progress==null?"BEGIN CAMPAIGN":"REPLACE AND BEGIN",919,69,Color.WHITE);
             }
             case SKIRMISH -> {
                 title(batch,font,"SKIRMISH","CHOOSE A SCENARIO AND DEPLOY A FITTED FLEET");
