@@ -60,17 +60,29 @@ final class SideloadUpdater {
     void checkForUpdates(boolean manual) {
         if (closed || !busy.compareAndSet(false, true)) return;
         activity.runOnUiThread(() -> {
-            if (isPlayInstall()) {
+            String managedStore=managedStore();
+            if (managedStore != null) {
                 busy.set(false);
-                new AlertDialog.Builder(activity).setTitle("Updates managed by Google Play")
-                        .setMessage("This installation was obtained through Google Play. Update it using Play Store, not the GitHub sideload installer.")
-                        .setNegativeButton("Close", null)
-                        .setPositiveButton("Open Play Store", (dialog, which) -> {
-                            Intent intent = new Intent(Intent.ACTION_VIEW,
-                                    Uri.parse("market://details?id=" + activity.getPackageName()));
-                            try { activity.startActivity(intent); }
-                            catch (RuntimeException ignored) { show("Could not open Play Store"); }
-                        }).show();
+                // Store-managed installations must not offer a competing GitHub
+                // APK signer/update channel, particularly on Amazon Fire tablets.
+                // A background check also must not display a startup modal.
+                if (manual) {
+                    if ("amazon".equals(managedStore) || "unknown".equals(managedStore)) {
+                        new AlertDialog.Builder(activity).setTitle("Updates managed by Amazon Appstore")
+                                .setMessage("This Fire tablet installation came from the Amazon Appstore. Update it through the Amazon Appstore, not the GitHub sideload installer.")
+                                .setPositiveButton("Close", null).show();
+                    } else {
+                        new AlertDialog.Builder(activity).setTitle("Updates managed by Google Play")
+                                .setMessage("This installation was obtained through Google Play. Update it using Play Store, not the GitHub sideload installer.")
+                                .setNegativeButton("Close", null)
+                                .setPositiveButton("Open Play Store", (dialog, which) -> {
+                                    Intent intent = new Intent(Intent.ACTION_VIEW,
+                                            Uri.parse("market://details?id=" + activity.getPackageName()));
+                                    try { activity.startActivity(intent); }
+                                    catch (RuntimeException ignored) { show("Could not open Play Store"); }
+                                }).show();
+                    }
+                }
                 return;
             }
             if (manual) Toast.makeText(activity, "Checking all published GitHub releases…", Toast.LENGTH_SHORT).show();
@@ -78,9 +90,24 @@ final class SideloadUpdater {
         });
     }
 
-    private boolean isPlayInstall() {
-        String installer = activity.getPackageManager().getInstallerPackageName(activity.getPackageName());
-        return "com.android.vending".equals(installer);
+    private String managedStore() {
+        String installer;
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.content.pm.InstallSourceInfo info =
+                        activity.getPackageManager().getInstallSourceInfo(activity.getPackageName());
+                installer=info.getInstallingPackageName();
+            } else {
+                installer=activity.getPackageManager().getInstallerPackageName(activity.getPackageName());
+            }
+        } catch (PackageManager.NameNotFoundException missing) {
+            // Fail closed rather than offering an unverified cross-store upgrade.
+            return "unknown";
+        }
+        if ("com.android.vending".equals(installer))return "google";
+        if ("com.amazon.venezia".equals(installer))return "amazon";
+        if (installer == null) return null;
+        return null; // Sideloaded APKs retain the existing signed GitHub updater.
     }
 
     private void findUpdate(boolean manual) {
