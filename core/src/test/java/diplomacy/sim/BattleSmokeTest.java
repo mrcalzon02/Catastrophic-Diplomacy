@@ -28,7 +28,7 @@ public final class BattleSmokeTest {
             Battle b = Battle.duel(17L, 1, faction, Battle.Faction.TERRAN);
             distinct |= Math.abs(b.ships().get(0).maxHull - 195) > 0.01 || Math.abs(b.ships().get(0).maxShields - 95) > 0.01;
         }
-        require(Battle.Faction.values().length == 6 && distinct, "six materially distinct factions");
+        require(Battle.Faction.values().length == 11 && distinct, "eleven playable factions with materially distinct combat profiles");
         System.out.println("PASS deterministic battles | ticks=" + first.tick
                 + " hits=" + first.hitCount + " intercepts=" + first.missileIntercepts
                 + " destroyed=" + first.destructions + " fingerprint=" + Long.toHexString(first.fingerprint()));
