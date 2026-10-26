@@ -36,7 +36,7 @@ public final class CampaignDeployment {
             int rows=(ships+columns-1)/columns;
             int col=index%columns, row=index/columns;
             double spacingX=Math.min(25.0,280.0/Math.max(1,rows-1));
-            double spacingY=Math.min(34.0,480.0/Math.max(1,columns-1));
+            double spacingY=Math.min(27.0,430.0/Math.max(1,columns-1));
             double centered=col-(columns-1)*0.5;
             double x,y;
             switch(formation) {
