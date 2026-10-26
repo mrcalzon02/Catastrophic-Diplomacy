@@ -174,11 +174,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.SKIRMISH){
-                        if(key==Input.Keys.Q)changeFaction(0);
-                        if(key==Input.Keys.E)changeFaction(1);
-                        if(key==Input.Keys.LEFT_BRACKET)changeFleetSize(-1);
-                        if(key==Input.Keys.RIGHT_BRACKET)changeFleetSize(1);
-                        if(key==Input.Keys.S||key==Input.Keys.TAB)shipyard.show();
+                        if(key==Input.Keys.Q&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(0);
+                        if(key==Input.Keys.E&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(1);
+                        if(key==Input.Keys.LEFT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(-1);
+                        if(key==Input.Keys.RIGHT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(1);
+                        if((key==Input.Keys.S||key==Input.Keys.TAB)&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)shipyard.show();
                         if(key==Input.Keys.ENTER){launchSkirmish();return true;}
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             int step=key==Input.Keys.UP?-1:1;
