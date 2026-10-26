@@ -88,6 +88,14 @@ public final class ShipStandingOrdersTest {
                 "Individual policies did not reach real ships");
         check(a.orders.equals(retreat.tactics())&&b.orders.equals(attack.tactics()),
                 "Standing policy did not alter actual battle AI tactical orders");
+        battle.setTeamOrders(0,BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD));
+        check(a.orders.equals(retreat.tactics())&&b.orders.equals(attack.tactics())
+                        &&c.orders.position()==BattleOrders.Position.HOLD,
+                "Changing fleet doctrine erased an independent captain policy");
+        battle.patchTeamOrders(0,BattleOrders.DEFAULT.withPosition(
+                BattleOrders.Position.KEEP_MOVING));
+        check(a.orders.equals(retreat.tactics())&&b.orders.equals(attack.tactics()),
+                "Patching fleet doctrine overwrote per-ship persistent settings");
         a.shields=a.maxShields*.4;
         check(retreat.mustWithdraw(a),"Low shields did not activate standing withdrawal");
         a.shields=a.maxShields;
