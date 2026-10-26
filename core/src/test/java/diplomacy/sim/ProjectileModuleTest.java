@@ -30,6 +30,14 @@ public final class ProjectileModuleTest {
         test.step(); // missile spawns at 230; hostile PD acquires at 250 distance
         return defended.pdReload>0;
     }
+    /** Different fighter launchers intentionally create alternate missile specs.
+     * Validate ONLY the fitted ship's main battery, not armed fighter payloads. */
+    private static boolean mainBattery(Battle world,long shotId,String family){
+        for(Battle.VisualEvent e:world.visualEvents())
+            if(e.shotId()==shotId && e.phase()==Battle.VisualPhase.FIRE
+                    &&e.weapon().equals(family))return true;
+        return false;
+    }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Shipyard.Hull hull=Shipyard.Hull.DREADNOUGHT;
@@ -120,8 +128,7 @@ public final class ProjectileModuleTest {
         for(int t=0;t<15;t++){
             b.step();
             for(Battle.Missile m:b.missiles()){
-                // Other ships carry DIFFERENT faction/module ordnance in this live duel.
-                if(m.sourceId!=launcher.id)continue;
+                if(m.sourceId!=launcher.id||!mainBattery(b,m.visualId,m.torpedo?"TORPEDO":"MISSILE"))continue;
                 if(m.torpedo){
                     check(m.spec.equals(installed.torpedoProjectile()),
                             "live torpedo must inherit launch module configuration");
@@ -133,7 +140,7 @@ public final class ProjectileModuleTest {
                 }
             }
             for(Battle.Ballistic shell:b.ballistics()){
-                if(shell.sourceId!=launcher.id)continue;
+                if(shell.sourceId!=launcher.id||!mainBattery(b,shell.visualId,"KINETIC"))continue;
                 check(shell.spec.equals(installed.kineticProjectile()),
                         "live shell must inherit actual kinetic module speed, health and RCS");
                 hasShell=true;
