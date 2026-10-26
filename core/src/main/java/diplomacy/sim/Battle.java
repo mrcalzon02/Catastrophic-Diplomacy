@@ -3,6 +3,7 @@ package diplomacy.sim;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.List;
 import java.util.Locale;
@@ -80,6 +81,17 @@ public final class Battle {
         public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload,repairDroneReload;
         public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
         public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
+        /** Independent selectable guided firing schematic for each weapon family.
+         * Defaults preserve all existing single-shot ammunition behavior. */
+        public final EnumMap<DamageType,OrdnanceDoctrine.Mode> launchModes=
+                new EnumMap<>(DamageType.class);
+        public OrdnanceDoctrine.Mode launchMode(DamageType family){
+            OrdnanceDoctrine.patterns(family); // reject unguided requests
+            return launchModes.getOrDefault(family,OrdnanceDoctrine.Mode.SINGLE);
+        }
+        public void setLaunchMode(DamageType family,OrdnanceDoctrine.Mode mode){
+            OrdnanceDoctrine.forWeapon(family,mode);launchModes.put(family,mode);
+        }
         public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
         public int commanderSkill;
@@ -124,8 +136,20 @@ public final class Battle {
         public final boolean torpedo;
         public final ProjectileModel.Spec spec;
         public final double guidanceQuality;
+        /** Payload kind controls actual warhead/countermeasure effects. */
+        public final OrdnanceDoctrine.Payload payload;
+        public final boolean decoy;
+        /** Cold launches wait before ignition and can be killed by PD while coasting. */
+        public int ignitionDelayTicks;
+        Missile(long visualId,long spawnTick, int source, int owner, int target,
+                double sx,double sy,double dx,double dy,double amount,
+                boolean heavy,ProjectileModel.Spec profile,double launchGuidance){
+            this(visualId,spawnTick,source,owner,target,sx,sy,dx,dy,amount,
+                    heavy,profile,launchGuidance,OrdnanceDoctrine.Payload.STANDARD,0);
+        }
         Missile(long visualId,long spawnTick, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
-                boolean heavy, ProjectileModel.Spec profile,double launchGuidance) {
+                boolean heavy, ProjectileModel.Spec profile,double launchGuidance,
+                OrdnanceDoctrine.Payload launchPayload,int ignitionTicks) {
             this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
@@ -133,8 +157,15 @@ public final class Battle {
             if(profile==null)throw new IllegalArgumentException("Missile properties missing");
             if(!Double.isFinite(launchGuidance)||launchGuidance<0.2||launchGuidance>2.6)
                 throw new IllegalArgumentException("Invalid missile guidance quality");
+            if(launchPayload==null||ignitionTicks<0||ignitionTicks>90)
+                throw new IllegalArgumentException("Invalid guided payload");
+            payload=launchPayload;decoy=launchPayload==OrdnanceDoctrine.Payload.DECOY;
+            if(decoy && amount!=0)
+                throw new IllegalArgumentException("Countermeasures are forbidden from damaging ships");
+            ignitionDelayTicks=ignitionTicks;
             spec=profile;guidanceQuality=launchGuidance;
-            fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds();
+            fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds()
+                    +ignitionTicks*DT;
             damage=amount;integrity=profile.health();
         }
     }
@@ -228,6 +259,20 @@ public final class Battle {
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
+    /** A single family-level launch sequencer, until true per-hardpoint guns exist. */
+    private static final class PendingLaunch {
+        final int sourceId,targetId;
+        final DamageType family;
+        final OrdnanceDoctrine.Pattern pattern;
+        int nextIndex;
+        long nextTick;
+        PendingLaunch(int source,int target,DamageType type,
+                      OrdnanceDoctrine.Pattern doctrine,long start){
+            sourceId=source;targetId=target;family=type;pattern=doctrine;nextTick=start;
+        }
+    }
+    private final List<PendingLaunch> launchQueue=new ArrayList<>();
+    public int decoysLaunched,decoysIntercepted,salvosStarted,roundsFiredBySalvos;
     private final List<Craft> crafts = new ArrayList<>();
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
@@ -257,6 +302,13 @@ public final class Battle {
     }
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
+    public int pendingSalvoCount(){return launchQueue.size();}
+    /** Applies to a real fitted ship or to legacy fixture ships. */
+    public void setShipLaunchMode(int shipId,DamageType family,OrdnanceDoctrine.Mode mode){
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setLaunchMode(family,mode);
+    }
     public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
@@ -472,6 +524,7 @@ public final class Battle {
             launchAuxiliary(s,target);
         }
         updateSupport();
+        updateQueuedLaunches();
         updateMissiles();
         updateBallistics();
         updateCraft();
@@ -691,15 +744,16 @@ public final class Battle {
         }
         if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
                 s.missileReload,s.power,s.heat,s.maxHeat,
-                s.weaponsCondition,s.magazineCondition)){
-            s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition);
-            chargeGun(s,missile);
-            long shotId=nextVisualShotId++;
-            missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
-                    target.x-s.x,target.y-s.y,s.missileDamage,false,s.missileProjectile,
-                    s.weapons.missileTracking()));
-            visual(shotId,VisualPhase.FIRE,"MISSILE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            s.launched++;s.missileAmmo--;
+                s.weaponsCondition,s.magazineCondition)
+                &&!hasPendingGuided(s.id,DamageType.MISSILE)){
+            OrdnanceDoctrine.Pattern doctrine=OrdnanceDoctrine.forWeapon(
+                    DamageType.MISSILE,s.launchMode(DamageType.MISSILE));
+            if(s.missileAmmo>=doctrine.ammoNeeded()){
+                s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition)
+                        *doctrine.reloadMultiplier();
+                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,doctrine,tick));
+                salvosStarted++;
+            }
         }
         if(kinetic.available(s.kineticDamage,0,distance,s.weapons.kineticRange(),
                 s.kineticReload,s.power,s.heat,s.maxHeat,
@@ -740,14 +794,72 @@ public final class Battle {
         }
         if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
                 s.torpedoReload,s.power,s.heat,s.maxHeat,
-                s.weaponsCondition,s.magazineCondition)){
-            s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition);
-            chargeGun(s,torpedo);s.torpedoAmmo--;s.launched++;
-            long shotId=nextVisualShotId++;
-            missiles.add(new Missile(shotId,tick,s.id,s.team,target.id,s.x,s.y,
-                    target.x-s.x,target.y-s.y,s.torpedoDamage,true,s.torpedoProjectile,
-                    s.weapons.torpedoTracking()));
-            visual(shotId,VisualPhase.FIRE,"TORPEDO",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
+                s.weaponsCondition,s.magazineCondition)
+                &&!hasPendingGuided(s.id,DamageType.TORPEDO)){
+            OrdnanceDoctrine.Pattern doctrine=OrdnanceDoctrine.forWeapon(
+                    DamageType.TORPEDO,s.launchMode(DamageType.TORPEDO));
+            if(s.torpedoAmmo>=doctrine.ammoNeeded()){
+                s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition)
+                        *doctrine.reloadMultiplier();
+                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,doctrine,tick));
+                salvosStarted++;
+            }
+        }
+    }
+
+    private boolean hasPendingGuided(int sourceId,DamageType family){
+        for(PendingLaunch pending:launchQueue)
+            if(pending.sourceId==sourceId && pending.family==family)return true;
+        return false;
+    }
+    /** Never create simulated hits or visuals from a mere scheduled shot.
+     * Each actual launched body pays an ammunition AND power/heat cost. */
+    private void updateQueuedLaunches(){
+        for(int i=launchQueue.size()-1;i>=0;i--){
+            PendingLaunch order=launchQueue.get(i);
+            if(order.nextTick>tick)continue;
+            Ship source=findShip(order.sourceId);
+            Ship target=findShip(order.targetId);
+            var gun=WeaponBehaviorTable.gun(order.family);
+            boolean heavy=order.family==DamageType.TORPEDO;
+            if(source==null||!source.alive()||source.crewReadiness()<0.05
+                    ||target==null||!target.alive()
+                    ||source.weaponsCondition<=gun.requiredWeaponCondition()
+                    ||source.magazineCondition<=gun.requiredMagazineCondition()
+                    ||source.power<=gun.powerPerShot()
+                    ||(heavy?source.torpedoAmmo:source.missileAmmo)<=0){
+                launchQueue.remove(i);
+                continue;
+            }
+            // Bounded deployment protects large fleets from unbounded salvo queues.
+            if(missiles.size()>=12000)continue;
+            int index=order.nextIndex;
+            boolean decoy=order.pattern.isDecoy(index);
+            ProjectileModel.Spec standard=heavy?source.torpedoProjectile:source.missileProjectile;
+            ProjectileModel.Spec actual=OrdnanceDoctrine.derived(standard,order.pattern,decoy);
+            OrdnanceDoctrine.Payload subtype=decoy?OrdnanceDoctrine.Payload.DECOY
+                    :order.pattern.payload();
+            double spread=(index-(order.pattern.count()-1)*0.5)*0.045;
+            double angle=StrictMath.atan2(target.y-source.y,target.x-source.x)+spread;
+            double distance=StrictMath.hypot(target.y-source.y,target.x-source.x);
+            double velocityX=StrictMath.cos(angle)*Math.max(1,distance);
+            double velocityY=StrictMath.sin(angle)*Math.max(1,distance);
+            double baseDamage=heavy?source.torpedoDamage:source.missileDamage;
+            double damage=decoy?0:baseDamage*order.pattern.damageMultiplier();
+            chargeGun(source,gun);
+            if(heavy)source.torpedoAmmo--;else source.missileAmmo--;
+            source.launched++;roundsFiredBySalvos++;
+            if(decoy)decoysLaunched++;
+            long shot=nextVisualShotId++;
+            Missile body=new Missile(shot,tick,source.id,source.team,target.id,
+                    source.x,source.y,velocityX,velocityY,damage,heavy,actual,
+                    heavy?source.weapons.torpedoTracking():source.weapons.missileTracking(),
+                    subtype,order.pattern.ignitionDelayTicks());
+            missiles.add(body);
+            visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
+                    source.team,source.id,target.id,source.x,source.y,target.x,target.y);
+            if(++order.nextIndex>=order.pattern.count())launchQueue.remove(i);
+            else order.nextTick=tick+order.pattern.intervalTicks();
         }
     }
 
