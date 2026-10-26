@@ -1092,14 +1092,18 @@ public final class Battle {
     private void launchAuxiliary(Ship ship, Ship enemy) {
         if(ship.crewReadiness()<0.05 || ship.hangarCondition<0.20
                 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
-        if(enemy!=null && ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
+        boolean withdrawing=ship.standingOrders!=null&&ship.standingOrders.mustWithdraw(ship);
+        // A withdrawing captain conserves fighter and attack-drone sorties.
+        // Repair drones and actual point defense remain independently operational.
+        if(!withdrawing&&enemy!=null && ship.fighterReserve>0 &&
+                ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
                     ship.x,ship.y,enemy.x,enemy.y);
             ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
             ship.power-=7;ship.heat+=3;
         }
-        if(ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000){
+        if(!withdrawing&&ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000){
             crafts.add(new Craft(nextCraftId++,ship,false,enemy==null?0:enemy.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"DRONE",ship.team,ship.id,
                     enemy==null?0:enemy.id,ship.x,ship.y,ship.x,ship.y);
