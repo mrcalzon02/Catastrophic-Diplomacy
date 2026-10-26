@@ -29,6 +29,34 @@ public final class ScenarioCatalog {
             this.rightHull=rightHull;this.demonstration=demonstration;
         }
     }
+    public static Shipyard.Design defaultDesign(Preset p,Battle.Faction faction,
+                                                 boolean first,TechnologyCatalog tech){
+        Shipyard.Hull hull=first?p.leftHull:p.rightHull;
+        Shipyard.Design d=Shipyard.starter(faction,hull);
+        String weapon=switch(p){
+            case CUSTOM,DUEL -> "LAS";
+            case PATROL -> first?"LAS":"KIN";
+            case ESCORT -> first?"KIN":"MSL";
+            case CRUISERS -> first?"PLA":"KIN";
+            case CARRIERS -> first?"LAS":"TOR";
+            case CAPITALS -> first?"PAR":"TOR";
+            case STORM -> first?"PAR":"PLA";
+            case ARMADA,PROVING_GROUND -> first?"KIN":"MSL";
+        };
+        for(Shipyard.Slot slot:hull.slots)if(slot.mount()==Shipyard.Mount.WEAPON){
+            d=d.install(slot.index(),"BASE-"+Shipyard.factionId(faction)+"-"+weapon);
+            break;
+        }
+        if(p==Preset.CARRIERS)for(Shipyard.Slot slot:hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){
+                d=d.install(slot.index(),"BASE-"+Shipyard.factionId(faction)+"-FTR");
+                break;
+            }
+        Shipyard.Report quality=Shipyard.inspect(d,tech);
+        if(!quality.valid())throw new IllegalStateException("Invalid scenario fitting: "+quality.explanation());
+        return d;
+    }
+
     public static Battle create(Preset preset,Shipyard.Design left,Shipyard.Design right,
                                 TechnologyCatalog technology,int customShips) {
         if(preset==null||left==null||right==null||technology==null)
