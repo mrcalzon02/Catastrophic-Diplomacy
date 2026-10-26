@@ -72,7 +72,8 @@ public final class HullLayoutsTest {
                 count++;
             }
         }
-        check(count==66,"missing hull/faction permutations");
+        check(count==display.length*Battle.Faction.values().length,
+                "missing hull/faction permutations");
         System.out.println("PASS hull layouts: "+count+" valid faction/class fittings, distinct placements and hit tests");
     }
 }
