@@ -399,6 +399,14 @@ final class ShipyardPanel {
                 font.draw(batch,String.format(Locale.ROOT,
                         "CROSS SECTION %.2f  |  SIGNATURE %.2f",projectile.crossSection(),
                         projectile.signature()),342,137);
+                var ammo=Shipyard.ammunitionAt(draft,selectedSlot);
+                String enabled=installed.component.endsWith("-KIN")
+                        ?ammo.kinetics().toString()
+                        :installed.component.endsWith("-MSL")
+                        ?ammo.missiles().toString():ammo.torpedoes().toString();
+                font.setColor(Color.CYAN);
+                font.draw(batch,shortText("AMMO UNLOCKS: "+enabled,67),342,116);
+                font.setColor(Color.GOLD);
             }else if(defense!=null){
                 font.draw(batch,String.format(Locale.ROOT,
                         "PD TRACKING x%.2f  |  PD DAMAGE %.2f",
