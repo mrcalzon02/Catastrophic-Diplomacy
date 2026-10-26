@@ -65,6 +65,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int selectedDeploymentShip;
     private int placementDragPointer=-1;
     private boolean waitingForWaypoint;
+    private boolean preparingCampaign=true,preparedSkirmish;
     private String deploymentNotice="Tap a ship then drag it anywhere within the non-overlapping deployment zone.";
     private long lastReward;
     private boolean playedCampaign,lastWon;
@@ -165,7 +166,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
                         else if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
                             screen=GameMenuPanel.Screen.DEPLOYMENT;waitingForWaypoint=false;
-                        }else if(screen==GameMenuPanel.Screen.DEPLOYMENT)screen=GameMenuPanel.Screen.CAMPAIGN;
+                        }else if(screen==GameMenuPanel.Screen.DEPLOYMENT)
+                            screen=preparingCampaign?GameMenuPanel.Screen.CAMPAIGN:GameMenuPanel.Screen.SKIRMISH;
                         else screen=GameMenuPanel.Screen.HOME;
                         return true;
                     }
@@ -203,7 +205,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.LEFT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(-1);
                         if(key==Input.Keys.RIGHT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(1);
                         if((key==Input.Keys.S||key==Input.Keys.TAB)&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)shipyard.show();
-                        if(key==Input.Keys.ENTER){launchSkirmish();return true;}
+                        if(key==Input.Keys.ENTER){openSkirmishDeployment();return true;}
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             int step=key==Input.Keys.UP?-1:1;
                             var values=ScenarioCatalog.Preset.values();
@@ -229,13 +231,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                     (key==Input.Keys.A?-1:1),deployment.ships());
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
                             int delta=key==Input.Keys.LEFT?-1:1;
-                            deployment=deployment.withShips(delta,LevelEconomy.level(activeMission));
+                            if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
+                                deployment=deployment.withShips(delta,
+                                        preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200);
+                            selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                         }
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             deployment=deployment.withFormation(key==Input.Keys.UP?-1:1);
                         }
                         if(key==Input.Keys.TAB||key==Input.Keys.S)shipyard.showCampaignFleet();
-                        if(key==Input.Keys.ENTER)openDeployment();
+                        if(key==Input.Keys.ENTER){
+                            if(preparingCampaign)launchCampaignMission();else launchSkirmish();
+                        }
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN){
@@ -413,6 +420,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     private void selectScenario(ScenarioCatalog.Preset choice){
+        preparedSkirmish=false;
         scenario=choice;
         if(choice!=ScenarioCatalog.Preset.CUSTOM&&!choice.demonstration){
             leftDesign=ScenarioCatalog.defaultDesign(choice,left,true,technology);
@@ -420,12 +428,30 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         }
     }
+    private void openSkirmishDeployment(){
+        if(scenario.demonstration){
+            preparedSkirmish=false;
+            launchSkirmish(); // Canonical 200v200 verification never receives player overrides.
+            return;
+        }
+        preparingCampaign=false;
+        preparedSkirmish=true;
+        deployment=new CampaignDeployment.Loadout(
+                scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships,
+                CampaignDeployment.Formation.LINE);
+        selectedDeploymentShip=0;
+        placementDragPointer=-1;
+        waitingForWaypoint=false;
+        deploymentNotice="Drag your fleet within the zone. Each hull has its own ordered commands.";
+        screen=GameMenuPanel.Screen.DEPLOYMENT;
+        Gdx.app.log("CD-GAME-FLOW","SKIRMISH_DEPLOYMENT "+scenario.name());
+    }
     private void launchSkirmish(){
         playedCampaign=false;
         battlefieldLevel=scenario.environmentLevel;
         screen=GameMenuPanel.Screen.BATTLE;
-        deployedAtLaunch=scenario==ScenarioCatalog.Preset.CUSTOM?
-                FLEET_SIZES[fleetIndex]:scenario.ships;
+        deployedAtLaunch=preparedSkirmish?deployment.ships():
+                scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships;
         reset();
         Gdx.app.log("CD-GAME-FLOW","BATTLE "+scenario.name());
     }
@@ -454,6 +480,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         left=campaign.faction();
         if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
         shipyard.sync(0,leftDesign);
+        preparingCampaign=true;
         deployment=CampaignDeployment.defaultFor(stage);
         selectedDeploymentShip=0;
         placementDragPointer=-1;
@@ -529,7 +556,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)shipyard.show();
                 return;
             }
-            if(GameMenuPanel.hit(x,y,969,35,277,49)){launchSkirmish();return;}
+            if(GameMenuPanel.hit(x,y,969,35,277,49)){openSkirmishDeployment();return;}
             int selected=GameMenuPanel.skirmishHit(x,y);
             if(selected>=0){selectScenario(ScenarioCatalog.Preset.values()[selected]);return;}
             if(GameMenuPanel.hit(x,y,661,332,545,42)){
@@ -557,13 +584,24 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.DEPLOYMENT){
             switch(GameMenuPanel.deploymentAction(x,y)){
-                case 0 -> screen=GameMenuPanel.Screen.CAMPAIGN;
-                case 1 -> deployment=deployment.withShips(-1,LevelEconomy.level(activeMission));
-                case 2 -> deployment=deployment.withShips(1,LevelEconomy.level(activeMission));
+                case 0 -> screen=preparingCampaign?GameMenuPanel.Screen.CAMPAIGN:GameMenuPanel.Screen.SKIRMISH;
+                case 1 -> {
+                    if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
+                        deployment=deployment.withShips(-1,
+                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200);
+                    selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
+                }
+                case 2 -> {
+                    if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
+                        deployment=deployment.withShips(1,
+                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200);
+                }
                 case 3 -> deployment=deployment.withFormation(-1);
                 case 4 -> deployment=deployment.withFormation(1);
                 case 5 -> shipyard.showCampaignFleet();
-                case 6 -> launchCampaignMission();
+                case 6 -> {
+                    if(preparingCampaign)launchCampaignMission();else launchSkirmish();
+                }
                 case 7 -> {
                     screen=GameMenuPanel.Screen.SHIP_ORDERS;
                     waitingForWaypoint=false;
@@ -871,9 +909,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     leftDesign,rightDesign,technology);
             battle=campaignEncounter.battle();
         }
-        else if(screen==GameMenuPanel.Screen.BATTLE)
+        else if(screen==GameMenuPanel.Screen.BATTLE) {
             battle=ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
-                    FLEET_SIZES[fleetIndex]);
+                    preparedSkirmish?deployment.ships():FLEET_SIZES[fleetIndex]);
+            if(preparedSkirmish && !scenario.demonstration)deployment.apply(battle);
+        }
         else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         for(int side=0;side<2;side++)battle.setTeamOrders(side,fleetOrders[side]);
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
@@ -908,7 +948,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,
                     screen==GameMenuPanel.Screen.DEPLOYMENT?activeMission:selectedMission,
                     deployment,leftDesign.hull.name(),selectedDeploymentShip,
-                    waitingForWaypoint,deploymentNotice,
+                    preparingCampaign,waitingForWaypoint,deploymentNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;
