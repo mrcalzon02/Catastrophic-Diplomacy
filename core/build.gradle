@@ -256,3 +256,12 @@ tasks.register('ordnanceDoctrineSmoke', JavaExec) {
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnanceDoctrineSmoke') }
 
+
+tasks.register('ammunitionTypesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test five real ballistic ammunition types and six missile warheads, physics, AP, splash, EMP and deterministic replay.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionTableTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionTypesSmoke') }
