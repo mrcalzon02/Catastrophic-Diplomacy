@@ -648,7 +648,7 @@ public final class Battle {
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
         double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
         ship.facing=wrap(ship.facing+change);
-        double velocity=ship.speed*ship.engineCondition;
+        double velocity=ship.speed*ship.engineCondition*ship.crewReadiness();
         double smooth=Math.min(1,1.6*DT);
         ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
         ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
@@ -656,6 +656,7 @@ public final class Battle {
     }
 
     private void fire(Ship s, Ship target) {
+        if(s.crewReadiness()<0.05)return; // no operator, no weapons fire
         double distance = StrictMath.hypot(target.x - s.x, target.y - s.y);
         double lock = Math.max(0, 1 - distance / Math.max(1,s.sensorRange))
                 * s.crewReadiness() * s.sensorsCondition
@@ -769,6 +770,7 @@ public final class Battle {
         if(tick%6!=0)return;
         double seconds=6*DT;
         for(Ship source:ships)if(source.alive()&&source.reactorCondition>0.15
+                &&source.crewReadiness()>=0.05
                 &&source.heat<source.maxHeat*0.93) {
             Shipyard.Support support=source.support;
             if(support.remoteRepairRate()>0&&source.power>6) {
@@ -802,7 +804,8 @@ public final class Battle {
     }
 
     private void launchAuxiliary(Ship ship, Ship enemy) {
-        if(ship.hangarCondition<0.20 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
+        if(ship.crewReadiness()<0.05 || ship.hangarCondition<0.20
+                || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
         if(enemy!=null && ship.fighterReserve>0 && ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
@@ -1113,6 +1116,7 @@ public final class Battle {
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
         for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
+                && defender.crewReadiness()>=0.05
                 && defender.pointDefenseCondition>0.20 && defender.pdRange>0
                 && defender.orders.pointDefense().ordnance()
                 && defender.power>=1.5) {
@@ -1183,6 +1187,7 @@ public final class Battle {
             }
         }
         for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
+                &&defender.crewReadiness()>=0.05
                 &&defender.pointDefenseCondition>0.20&&defender.pdRange>0
                 &&defender.orders.pointDefense().craft()&&defender.power>1.5){
             for(int i=crafts.size()-1;i>=0;i--) {
