@@ -22,7 +22,9 @@ public final class AmmunitionResearchTest {
     private static Shipyard.Design design(Battle.Faction faction,String kind,Shipyard.Track track,int stage){
         Shipyard.Hull hull=Shipyard.Hull.DREADNOUGHT;
         String code=Shipyard.factionId(faction);
-        var result=Shipyard.starter(faction,hull).install(weapon(hull,0),"BASE-"+code+"-"+kind);
+        var result=Shipyard.starter(faction,hull)
+                .install(weapon(hull,0),"BASE-"+code+"-"+kind)
+                .install(weapon(hull,1),null); // one physical launcher under test
         return stage>0?result.stage(weapon(hull,0),track,stage):result;
     }
     public static void main(String[] args)throws Exception {
