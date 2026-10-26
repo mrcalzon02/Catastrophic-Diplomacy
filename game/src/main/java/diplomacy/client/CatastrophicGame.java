@@ -164,6 +164,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(screen==GameMenuPanel.Screen.OPTIONS){
                         if(key==Input.Keys.U)audio.toggleMusic();
                         if(key==Input.Keys.I)audio.toggleEffects();
+                        if(key==Input.Keys.J)audio.toggleTrack();
                         if(key==Input.Keys.K&&updateCheck!=null)updateCheck.run();
                         return true;
                     }
@@ -429,8 +430,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(screen==GameMenuPanel.Screen.OPTIONS){
             if(GameMenuPanel.hit(x,y,405,472,470,59)){audio.toggleMusic();return;}
             if(GameMenuPanel.hit(x,y,405,394,470,59)){audio.toggleEffects();return;}
-            if(GameMenuPanel.hit(x,y,405,316,470,59)){if(updateCheck!=null)updateCheck.run();return;}
-            if(GameMenuPanel.hit(x,y,405,238,470,59))screen=GameMenuPanel.Screen.HOME;
+            if(GameMenuPanel.hit(x,y,405,316,470,59)){audio.toggleTrack();return;}
+            if(GameMenuPanel.hit(x,y,405,238,470,59)){
+                if(updateCheck!=null)updateCheck.run();
+                return;
+            }
+            if(GameMenuPanel.hit(x,y,405,160,470,59))screen=GameMenuPanel.Screen.HOME;
             return;
         }
         if(screen==GameMenuPanel.Screen.RESULTS){
@@ -724,7 +729,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(shipyard.open())shipyard.draw(shapes,batch,font);
             else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,selectedMission,
-                    audio.musicEnabled(),audio.effectsEnabled(),lastWon,lastReward,
+                    audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;
         }
