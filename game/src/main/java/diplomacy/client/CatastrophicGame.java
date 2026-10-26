@@ -212,7 +212,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             deployment=deployment.withFormation(key==Input.Keys.UP?-1:1);
                         }
-                        if(key==Input.Keys.TAB||key==Input.Keys.S)shipyard.show();
+                        if(key==Input.Keys.TAB||key==Input.Keys.S)shipyard.showCampaignFleet();
                         if(key==Input.Keys.ENTER)openDeployment();
                         return true;
                     }
@@ -491,7 +491,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 2 -> deployment=deployment.withShips(1,LevelEconomy.level(activeMission));
                 case 3 -> deployment=deployment.withFormation(-1);
                 case 4 -> deployment=deployment.withFormation(1);
-                case 5 -> shipyard.show();
+                case 5 -> shipyard.showCampaignFleet();
                 case 6 -> launchCampaignMission();
                 default -> { }
             }
