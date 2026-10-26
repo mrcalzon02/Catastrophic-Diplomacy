@@ -630,12 +630,20 @@ public final class Shipyard {
             if(equipped!=null&&(equipped.pattern!=ModuleVersions.Pattern.STANDARD || equipped.mark!=1))
                 newer=true;
         }
-        StringBuilder out=new StringBuilder(newer?"CD-SHIP-2|":"CD-SHIP-1|")
+        boolean specializedAmmo=!design.ammoSelection.equals(AmmoSelection.STANDARD);
+        StringBuilder out=new StringBuilder(specializedAmmo?"CD-SHIP-3|"
+                :newer?"CD-SHIP-2|":"CD-SHIP-1|")
                 .append(design.faction.name()).append('|')
-            .append(design.hull.name()).append('|')
-            .append(Base64.getUrlEncoder().withoutPadding().encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
-        // Preserve byte-for-byte legacy CD-SHIP-1 for default gunship fits.
-        if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
+                .append(design.hull.name()).append('|')
+                .append(Base64.getUrlEncoder().withoutPadding()
+                        .encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
+        // Preserve exact legacy CD-SHIP-1/2 when no purpose-loaded ammo.
+        if(specializedAmmo)
+            out.append('|').append(design.fighterHull.name())
+                    .append('|').append(design.ammoSelection.kinetic().name())
+                    .append('|').append(design.ammoSelection.missile().name())
+                    .append('|').append(design.ammoSelection.torpedo().name());
+        else if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
             out.append('|').append(design.fighterHull.name());
         out.append('\n');
         for(int i=0;i<design.slots();i++) {
@@ -643,7 +651,7 @@ public final class Shipyard {
             if(installed==null)continue;
             out.append(i).append('|').append(installed.component);
             for(Track track:Track.values())out.append('|').append(installed.stage(track));
-            if(newer)out.append('|').append(installed.pattern.name())
+            if(newer||specializedAmmo)out.append('|').append(installed.pattern.name())
                     .append('|').append(installed.mark);
             out.append('\n');
         }
@@ -654,15 +662,16 @@ public final class Shipyard {
         String[] lines=encoded.split("\\n",-1);
         if(lines.length<2||lines.length>70)throw new IllegalArgumentException("Invalid blueprint lines");
         String[] header=lines[0].split("\\|",-1);
-        boolean hasVersions=header.length>=1&&"CD-SHIP-2".equals(header[0]);
-        if((header.length!=4&&header.length!=5)
+        boolean hasAmmo=header.length>=1&&"CD-SHIP-3".equals(header[0]);
+        boolean hasVersions=hasAmmo||header.length>=1&&"CD-SHIP-2".equals(header[0]);
+        if((hasAmmo?header.length!=8:(header.length!=4&&header.length!=5))
                 ||(!hasVersions&&!"CD-SHIP-1".equals(header[0])))
             throw new IllegalArgumentException("Wrong ship file version");
         final Design base;
         try{
             Battle.Faction faction=Battle.Faction.valueOf(header[1]);Hull hull=Hull.valueOf(header[2]);
             String name=new String(Base64.getUrlDecoder().decode(header[3]),StandardCharsets.UTF_8);
-            FighterModel.Hull aircraft=header.length==5
+            FighterModel.Hull aircraft=(hasAmmo||header.length==5)
                     ?FighterModel.Hull.valueOf(header[4]):FighterModel.Hull.ASSAULT_GUNSHIP;
             base=new Design(faction,hull,name,
                     new ArrayList<>(Collections.nCopies(hull.slots.size(),null)),aircraft);
@@ -718,6 +727,17 @@ public final class Shipyard {
                 String id=factionId(design.faction);
                 design=design.install(quarters,"BASE-"+id+"-CRW")
                         .install(breathing,"BASE-"+id+"-LFS");
+            }
+        }
+        if(hasAmmo){
+            try{
+                design=design.withAmmoSelection(new AmmoSelection(
+                        AmmunitionTable.Kinetic.valueOf(header[5]),
+                        AmmunitionTable.Warhead.valueOf(header[6]),
+                        AmmunitionTable.Warhead.valueOf(header[7])));
+            }catch(IllegalArgumentException invalid){
+                throw new IllegalArgumentException(
+                        "Blueprint ammo is not licensed by the fitted module research",invalid);
             }
         }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
