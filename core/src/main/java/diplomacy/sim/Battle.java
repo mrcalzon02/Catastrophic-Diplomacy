@@ -1332,11 +1332,14 @@ public final class Battle {
             defender.crewCount=Math.max(0,defender.crewCount
                     -damage/Math.max(1,defender.maxHull)*defender.crewRequired*0.38);
         }
-        if(kind==DamageType.PARTICLE){
-            defender.power=Math.max(0,defender.power-damage*0.45);
-            defender.sensorsCondition=Math.max(0,defender.sensorsCondition-damage/defender.maxHull*0.15);
-        }
-        if(kind==DamageType.PLASMA)defender.heat+=damage*0.35;
+        var secondary=WeaponBehaviorTable.damage(kind);
+        if(secondary.energyDrain()>0)
+            defender.power=Math.max(0,defender.power-damage*secondary.energyDrain());
+        if(secondary.sensorDegradation()>0)
+            defender.sensorsCondition=Math.max(0,defender.sensorsCondition-
+                    damage/defender.maxHull*secondary.sensorDegradation());
+        if(secondary.addedHeat()>0)
+            defender.heat+=damage*secondary.addedHeat();
         if (damage > 5 && random.nextDouble() < 0.24) {
             Subsystem part = Subsystem.values()[random.nextInt(Subsystem.values().length)];
             double loss = Math.min(0.36, damage / defender.maxHull * 0.7);
