@@ -58,7 +58,8 @@ final class GameMenuPanel {
     void draw(Screen screen,ShapeRenderer shapes,SpriteBatch batch,BitmapFont font,
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
-              boolean music,boolean effects,boolean won,long reward,int surviving,int deployed){
+              boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
+              boolean won,long reward,int surviving,int deployed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,W,H,BG);
         // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
@@ -106,7 +107,8 @@ final class GameMenuPanel {
                 button(shapes,964,35,278,50,true);
             }
             case OPTIONS -> {
-                for(int i=0;i<4;i++)button(shapes,405,472-i*78,470,59,false);
+                for(int i=0;i<5;i++)
+                    if(i!=3||updaterAvailable)button(shapes,405,472-i*78,470,59,false);
             }
             case RESULTS -> {
                 rectangle(shapes,300,240,680,270,PANEL);
@@ -155,8 +157,9 @@ final class GameMenuPanel {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
                 label(batch,font,"MUSIC: "+(music?"ON":"OFF"),445,510,Color.WHITE);
                 label(batch,font,"SOUND EFFECTS: "+(effects?"ON":"OFF"),445,432,Color.WHITE);
-                label(batch,font,"CHECK FOR UPDATES",445,354,Color.WHITE);
-                label(batch,font,"BACK",445,276,Color.WHITE);
+                label(batch,font,"SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),445,354,Color.WHITE);
+                label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES: NOT AVAILABLE ON DESKTOP",445,276,Color.WHITE);
+                label(batch,font,"BACK",445,198,Color.WHITE);
             }
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");
