@@ -49,7 +49,11 @@ public record ShipStandingOrders(
                 var modes=BattleOrders.Targeting.values();
                 next=next.withTargeting(modes[Math.floorMod(next.targeting().ordinal()+step,modes.length)]);
             }
-            case 6 -> next=next.withPointDefense(next.pointDefense().next());
+            case 6 -> {
+                var modes=BattleOrders.PointDefense.values();
+                next=next.withPointDefense(modes[Math.floorMod(
+                        next.pointDefense().ordinal()+step,modes.length)]);
+            }
             case 7,8,9 -> {
                 var size=BattleOrders.Size.values()[setting-7];
                 var priority=next.forSize(size);
