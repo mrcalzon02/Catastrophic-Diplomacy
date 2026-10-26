@@ -10,6 +10,8 @@ package="games.catastrophicdiplomacy"
 activity="diplomacy.android.AndroidLauncher"
 adb wait-for-device
 adb shell input keyevent KEYCODE_WAKEUP || true
+# Dismiss the operating system's immersive-mode tutorial before framebuffer verification.
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb install -r "$apk"
 adb shell am force-stop "$package" || true
 adb logcat -c
@@ -29,8 +31,12 @@ for attempt in $(seq 1 75); do
         completed=1
         break
     fi
-    if grep -q 'FATAL EXCEPTION\|Force finishing activity.*catastrophicdiplomacy' "$report/logcat.txt"; then
-        echo "FAIL: Android application crashed during demonstration" >&2
+    if grep -q 'AndroidRuntime.*Process: games.catastrophicdiplomacy\\|Force finishing activity.*catastrophicdiplomacy' "$report/logcat.txt"; then
+        echo "FAIL: Catastrophic Diplomacy process crashed during demonstration" >&2
+        exit 1
+    fi
+    if grep -q 'Exit zygote because system server.*terminated' "$report/logcat.txt"; then
+        echo "FAIL: emulator system_server died (infrastructure failure, not an app exception)" >&2
         exit 1
     fi
     if ! adb shell pidof "$package" >/dev/null 2>&1; then
