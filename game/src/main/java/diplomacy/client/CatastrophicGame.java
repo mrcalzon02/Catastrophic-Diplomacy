@@ -347,7 +347,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 8 -> audio.toggleMusic();
                 case 9 -> audio.toggleEffects();
                 case 10 -> audio.toggleTrack();
-                case 11 -> closeTacticalMenu();
+                case 11 -> {tacticalMenuOpen=false;running=false;screen=GameMenuPanel.Screen.HOME;}
             }
             return;
         }
@@ -371,11 +371,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "MUSIC: "+(audio.musicEnabled()?"ON":"MUTED")+" (U)",
                 "SOUND EFFECTS: "+(audio.effectsEnabled()?"ON":"MUTED")+" (I)",
                 "SOUNDTRACK: "+(audio.battleTrack()?"FINAL SURGE":"COLD DRONE")+" (J)",
-                "CLOSE MENU"};
+                "RETURN TO MAIN MENU"};
         // Semantic icons only, sourced from the approved 24-image selection.
         final String[] menuIcons={
                 "speed","restart","shipyard_ship","fleet","back","next",
-                "shield","shield",null,null,null,"close"
+                "shield","shield",null,null,null,"back"
         };
         for(int n=0;n<labels.length;n++){
             float y=550-40*n;
@@ -509,8 +509,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void reset() {
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
-        battle = verifyDemo?DemonstrationBattle.create(technology)
-                :Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
+        if(verifyDemo)battle=DemonstrationBattle.create(technology);
+        else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign)
+            battle=Battle.duel(LevelEconomy.level(activeMission).seed(),deployedAtLaunch,
+                    leftDesign,rightDesign,technology);
+        else if(screen==GameMenuPanel.Screen.BATTLE)
+            battle=ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
+                    FLEET_SIZES[fleetIndex]);
+        else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         for(int side=0;side<2;side++)battle.setTeamOrders(side,fleetOrders[side]);
         if (weatherEnabled) battle.configureWeather(environment.weather());
         // The same validated stage index drives both GPU background and simulation.
@@ -526,6 +532,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     @Override public void render() {
+        if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished())finishEngagement();
+        if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+            Gdx.gl.glClearColor(.018f,.029f,.064f,1);
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
+            viewport.apply();camera.update();
+            shapes.setProjectionMatrix(camera.combined);
+            batch.setProjectionMatrix(camera.combined);
+            menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
+                    FLEET_SIZES[fleetIndex],campaign,campaignPage,selectedMission,
+                    audio.musicEnabled(),audio.effectsEnabled(),lastWon,lastReward,
+                    survivorsAtEnd,deployedAtLaunch);
+            return;
+        }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
         if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
             accumulator += delta * speed;
