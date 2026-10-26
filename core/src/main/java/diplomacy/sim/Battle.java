@@ -81,6 +81,22 @@ public final class Battle {
         public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload,repairDroneReload;
         public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
         public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
+        public int kineticAmmo=100;
+        public AmmunitionTable.Kinetic kineticType=AmmunitionTable.Kinetic.STANDARD;
+        public final EnumMap<DamageType,AmmunitionTable.Warhead> warheads=
+                new EnumMap<>(DamageType.class);
+        public AmmunitionTable.Warhead warhead(DamageType family){
+            if(family!=DamageType.MISSILE&&family!=DamageType.TORPEDO)
+                throw new IllegalArgumentException("Warheads require guided payloads");
+            return warheads.getOrDefault(family,AmmunitionTable.Warhead.STANDARD);
+        }
+        public void setWarhead(DamageType family,AmmunitionTable.Warhead kind){
+            warhead(family);AmmunitionTable.warhead(kind);
+            warheads.put(family,kind);
+        }
+        public void setKineticType(AmmunitionTable.Kinetic kind){
+            AmmunitionTable.kinetic(kind);kineticType=kind;
+        }
         /** Independent selectable guided firing schematic for each weapon family.
          * Defaults preserve all existing single-shot ammunition behavior. */
         public final EnumMap<DamageType,OrdnanceDoctrine.Mode> launchModes=
@@ -138,6 +154,7 @@ public final class Battle {
         public final double guidanceQuality;
         /** Payload kind controls actual warhead/countermeasure effects. */
         public final OrdnanceDoctrine.Payload payload;
+        public final AmmunitionTable.Warhead warhead;
         public final boolean decoy;
         /** Cold launches wait before ignition and can be killed by PD while coasting. */
         public int ignitionDelayTicks;
@@ -145,11 +162,21 @@ public final class Battle {
                 double sx,double sy,double dx,double dy,double amount,
                 boolean heavy,ProjectileModel.Spec profile,double launchGuidance){
             this(visualId,spawnTick,source,owner,target,sx,sy,dx,dy,amount,
-                    heavy,profile,launchGuidance,OrdnanceDoctrine.Payload.STANDARD,0);
+                    heavy,profile,launchGuidance,OrdnanceDoctrine.Payload.STANDARD,0,
+                    AmmunitionTable.Warhead.STANDARD);
         }
         Missile(long visualId,long spawnTick, int source, int owner, int target, double sx, double sy, double dx, double dy, double amount,
                 boolean heavy, ProjectileModel.Spec profile,double launchGuidance,
                 OrdnanceDoctrine.Payload launchPayload,int ignitionTicks) {
+            this(visualId,spawnTick,source,owner,target,sx,sy,dx,dy,amount,
+                    heavy,profile,launchGuidance,launchPayload,ignitionTicks,
+                    AmmunitionTable.Warhead.STANDARD);
+        }
+        Missile(long visualId,long spawnTick,int source,int owner,int target,
+                double sx,double sy,double dx,double dy,double amount,
+                boolean heavy,ProjectileModel.Spec profile,double launchGuidance,
+                OrdnanceDoctrine.Payload launchPayload,int ignitionTicks,
+                AmmunitionTable.Warhead warheadType) {
             this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
@@ -160,6 +187,7 @@ public final class Battle {
             if(launchPayload==null||ignitionTicks<0||ignitionTicks>90)
                 throw new IllegalArgumentException("Invalid guided payload");
             payload=launchPayload;decoy=launchPayload==OrdnanceDoctrine.Payload.DECOY;
+            AmmunitionTable.warhead(warheadType);warhead=warheadType;
             if(decoy && amount!=0)
                 throw new IllegalArgumentException("Countermeasures are forbidden from damaging ships");
             ignitionDelayTicks=ignitionTicks;
@@ -182,10 +210,18 @@ public final class Battle {
         public final long visualId,spawnTick;
         public final int sourceId,team,targetId;
         public final double vx,vy,damage;
+        public final AmmunitionTable.Kinetic ammunition;
         public double x,y,life,integrity;
         Ballistic(long id,long firedAt,int source,int side,int target,
                   double px,double py,double heading,double amount,ProjectileModel.Spec profile){
+            this(id,firedAt,source,side,target,px,py,heading,amount,profile,
+                    AmmunitionTable.Kinetic.STANDARD);
+        }
+        Ballistic(long id,long firedAt,int source,int side,int target,
+                  double px,double py,double heading,double amount,ProjectileModel.Spec profile,
+                  AmmunitionTable.Kinetic type){
             if(profile==null)throw new IllegalArgumentException("Ballistic properties missing");
+            AmmunitionTable.kinetic(type);ammunition=type;
             spec=profile;
             visualId=id;spawnTick=firedAt;sourceId=source;team=side;targetId=target;
             x=px;y=py;vx=profile.speed()*StrictMath.cos(heading);
@@ -303,6 +339,16 @@ public final class Battle {
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
     public int pendingSalvoCount(){return launchQueue.size();}
+    public void setShipKineticAmmunition(int id,AmmunitionTable.Kinetic type){
+        Ship ship=findShip(id);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setKineticType(type);
+    }
+    public void setShipWarhead(int id,DamageType family,AmmunitionTable.Warhead type){
+        Ship ship=findShip(id);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setWarhead(family,type);
+    }
     /** Applies to a real fitted ship or to legacy fixture ships. */
     public void setShipLaunchMode(int shipId,DamageType family,OrdnanceDoctrine.Mode mode){
         Ship ship=findShip(shipId);
@@ -431,6 +477,7 @@ public final class Battle {
         s.ecmStrength=machinery.ecmStrength();
         s.fighterReserve=machinery.fighterCapacity();s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
+        s.kineticAmmo=s.kineticDamage>0?64+machinery.magazineCapacity()*4:0;
         s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
         s.torpedoAmmo=s.torpedoDamage>0?3+machinery.magazineCapacity()/3:0;
         return s;
