@@ -56,9 +56,16 @@ public final class Shipyard {
     public static final class Installed {
         public final String component;
         private final Map<Track,Integer> stages;
-        private Installed(String id, Map<Track,Integer> upgrades) {
+        public final ModuleVersions.Pattern pattern;
+        public final int mark;
+        private Installed(String id,Map<Track,Integer> upgrades){
+            this(id,upgrades,ModuleVersions.Pattern.STANDARD,1);
+        }
+        private Installed(String id,Map<Track,Integer> upgrades,
+                          ModuleVersions.Pattern version,int generation) {
             if(id==null || upgrades==null)throw new IllegalArgumentException("Module identity required");
-            component=id;
+            ModuleVersions.of(version,generation); // validates both fields
+            component=id;pattern=version;mark=generation;
             Map<Track,Integer> copy = new EnumMap<>(Track.class);
             Track chosen=null;
             for(Map.Entry<Track,Integer> entry:upgrades.entrySet()) {
@@ -97,6 +104,14 @@ public final class Shipyard {
             parts=Collections.unmodifiableList(new ArrayList<>(mounted));
         }
         /** Changing a hangar's launched craft does not overwrite ship module research. */
+        /** Physical hardware mark is independent of the exclusive research path. */
+        public Design withModuleVersion(int slot,ModuleVersions.Pattern pattern,int mark){
+            Installed existing=at(slot);
+            if(existing==null)throw new IllegalArgumentException("Empty socket cannot be versioned");
+            List<Installed> changed=new ArrayList<>(parts);
+            changed.set(slot,new Installed(existing.component,existing.stages,pattern,mark));
+            return new Design(faction,hull,name,changed,fighterHull);
+        }
         public Design withFighterHull(FighterModel.Hull type) {
             return new Design(faction,hull,name,parts,type);
         }
@@ -123,7 +138,7 @@ public final class Shipyard {
             updated.putAll(current.stages);
             if(level==0) updated.remove(track); else updated.put(track,level);
             List<Installed> changed=new ArrayList<>(parts);
-            changed.set(slot,new Installed(current.component,updated));
+            changed.set(slot,new Installed(current.component,updated,current.pattern,current.mark));
             return new Design(faction,hull,name,changed,fighterHull);
         }
     }
@@ -207,9 +222,16 @@ public final class Shipyard {
         }
         Track branch=installed.branch();
         int rank=branch==null?0:installed.stage(branch);
-        return new Part(base,base.mass*mass,base.power*power,base.heat*heat,
-                base.effect*effect,accuracy,base.integrity*integrity,shields,thrust,cooling,
-                maintenance,industry,research,ModuleBranchEffects.tune(base.subsystem,branch,rank));
+        ModuleVersions.Modifiers generation=ModuleVersions.of(installed.pattern,installed.mark);
+        industry=Math.toIntExact(StrictMath.ceil(industry*generation.cost()));
+        return new Part(base,base.mass*mass*generation.mass(),
+                base.power*power*generation.power(),
+                base.heat*heat*generation.heat(),
+                base.effect*effect*generation.output(),
+                accuracy*generation.precision(),
+                base.integrity*integrity*generation.integrity(),
+                shields,thrust,cooling,maintenance*generation.maintenance(),
+                industry,research,ModuleBranchEffects.tune(base.subsystem,branch,rank));
     }
     private static List<Part> fittedParts(Design design,TechnologyCatalog catalog,List<String> errors) {
         List<Part> parts=new ArrayList<>();
@@ -463,7 +485,14 @@ public final class Shipyard {
 
     /** Portable, deterministic blueprint text (no Java object deserialization). */
     public static String encode(Design design) {
-        StringBuilder out=new StringBuilder("CD-SHIP-1|").append(design.faction.name()).append('|')
+        boolean newer=false;
+        for(int i=0;i<design.slots();i++){
+            Installed equipped=design.at(i);
+            if(equipped!=null&&(equipped.pattern!=ModuleVersions.Pattern.STANDARD || equipped.mark!=1))
+                newer=true;
+        }
+        StringBuilder out=new StringBuilder(newer?"CD-SHIP-2|":"CD-SHIP-1|")
+                .append(design.faction.name()).append('|')
             .append(design.hull.name()).append('|')
             .append(Base64.getUrlEncoder().withoutPadding().encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
         // Preserve byte-for-byte legacy CD-SHIP-1 for default gunship fits.
@@ -475,6 +504,8 @@ public final class Shipyard {
             if(installed==null)continue;
             out.append(i).append('|').append(installed.component);
             for(Track track:Track.values())out.append('|').append(installed.stage(track));
+            if(newer)out.append('|').append(installed.pattern.name())
+                    .append('|').append(installed.mark);
             out.append('\n');
         }
         return out.toString();
@@ -484,7 +515,9 @@ public final class Shipyard {
         String[] lines=encoded.split("\\n",-1);
         if(lines.length<2||lines.length>70)throw new IllegalArgumentException("Invalid blueprint lines");
         String[] header=lines[0].split("\\|",-1);
-        if((header.length!=4&&header.length!=5)||!header[0].equals("CD-SHIP-1"))
+        boolean hasVersions=header.length>=1&&"CD-SHIP-2".equals(header[0]);
+        if((header.length!=4&&header.length!=5)
+                ||(!hasVersions&&!"CD-SHIP-1".equals(header[0])))
             throw new IllegalArgumentException("Wrong ship file version");
         final Design base;
         try{
@@ -500,7 +533,8 @@ public final class Shipyard {
         for(int n=1;n<lines.length;n++) {
             if(lines[n].isEmpty())continue;
             String[] p=lines[n].split("\\|",-1);
-            if(p.length!=6)throw new IllegalArgumentException("Invalid slot record");
+            if(p.length!=(hasVersions?8:6))
+                throw new IllegalArgumentException("Invalid slot record");
             final int index;
             try{index=Integer.parseInt(p[0]);}catch(NumberFormatException bad){throw new IllegalArgumentException("Invalid slot",bad);}
             if(index<0||index>=seen.length||seen[index])throw new IllegalArgumentException("Duplicate/out-of-range slot");
@@ -525,6 +559,14 @@ public final class Shipyard {
             }
             design=design.install(index,p[1]);
             if(chosen!=null)design=design.stage(index,chosen,levels[chosen.ordinal()]);
+            if(hasVersions){
+                try{
+                    design=design.withModuleVersion(index,
+                            ModuleVersions.Pattern.valueOf(p[6]),Integer.parseInt(p[7]));
+                }catch(RuntimeException invalid){
+                    throw new IllegalArgumentException("Invalid physical module version in slot "+index,invalid);
+                }
+            }
         }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
         return design;
