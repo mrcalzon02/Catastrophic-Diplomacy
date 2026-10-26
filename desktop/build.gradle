@@ -22,3 +22,15 @@ run {
     dependsOn tasks.named('stageDesktopAssets')
     workingDir layout.buildDirectory.dir('runtime-assets').get().asFile
 }
+
+// Embed precisely the same verified runtime resources in the application JAR.
+// LWJGL3's internal file loader can then resolve them from the classpath even
+// when a Windows/Linux launcher is started outside the installation directory.
+tasks.named('jar') {
+    dependsOn tasks.named('stageDesktopAssets')
+    from(layout.buildDirectory.dir('runtime-assets'))
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
+    }
+}
