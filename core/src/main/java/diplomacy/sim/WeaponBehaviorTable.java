@@ -95,6 +95,45 @@ public final class WeaponBehaviorTable {
     }
     public static final double BALLISTIC_MISS_ANGLE_RADIANS=0.24;
     public static final Defense POINT_DEFENSE=new Defense(0.16,0.18,1.5,0.8,0.20,1.5,6.5);
+    /**
+     * Baseline damage behavior against the directional defensive layers.
+     * This is the shared source for DirectionalDefense's initial facings.
+     * Individual facings can later be tuned by armor/technology modules.
+     * The last three fields represent confirmed secondary effects of
+     * penetrating STRUCTURE damage, not free extra raw damage.
+     */
+    public record Damage(double shield,double armor,double structure,
+                         double energyDrain,double sensorDegradation,
+                         double addedHeat){
+        public Damage {
+            for(double value:new double[]{shield,armor,structure}){
+                if(!Double.isFinite(value)||value<=0||value>5)
+                    throw new IllegalArgumentException("Invalid directional damage multiplier");
+            }
+            for(double value:new double[]{energyDrain,sensorDegradation,addedHeat}){
+                if(!Double.isFinite(value)||value<0||value>5)
+                    throw new IllegalArgumentException("Invalid secondary effect");
+            }
+        }
+    }
+    private static final Map<Battle.DamageType,Damage> DAMAGE=buildDamage();
+    private static Map<Battle.DamageType,Damage> buildDamage(){
+        EnumMap<Battle.DamageType,Damage> table=new EnumMap<>(Battle.DamageType.class);
+        table.put(Battle.DamageType.LASER,new Damage(1,0.8,1,0,0,0));
+        table.put(Battle.DamageType.KINETIC,new Damage(1.3,1.25,1,0,0,0));
+        table.put(Battle.DamageType.PLASMA,new Damage(0.65,1,1.15,0,0,0.35));
+        table.put(Battle.DamageType.PARTICLE,new Damage(1.4,1,1.3,0.45,0.15,0));
+        table.put(Battle.DamageType.MISSILE,new Damage(1,1,1,0,0,0));
+        table.put(Battle.DamageType.TORPEDO,new Damage(1.5,1.5,1.3,0,0,0));
+        table.put(Battle.DamageType.FIGHTER,new Damage(1,1,1,0,0,0));
+        return Map.copyOf(table);
+    }
+    public static Map<Battle.DamageType,Damage> damageTable(){return DAMAGE;}
+    public static Damage damage(Battle.DamageType kind){
+        Damage behavior=DAMAGE.get(kind);
+        if(behavior==null)throw new IllegalArgumentException("Unknown damage behavior "+kind);
+        return behavior;
+    }
     private static final Map<Battle.DamageType,Gun> MAIN=build();
     private static Map<Battle.DamageType,Gun> build(){
         EnumMap<Battle.DamageType,Gun> m=new EnumMap<>(Battle.DamageType.class);
