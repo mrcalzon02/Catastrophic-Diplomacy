@@ -38,7 +38,7 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Test fighter machinery and compile desktop client
-        run: gradle :core:fighterCraftSmoke :core:combatMachinerySmoke :game:classes :desktop:classes --no-daemon --stacktrace
+        run: gradle :core:fighterCraftSmoke :core:combatMachinerySmoke :game:menuFlowSmoke :game:classes :desktop:classes --no-daemon --stacktrace
 
   mass-battle:
     name: Mixed 200v200 every fighter weapon and replay
