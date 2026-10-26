@@ -115,7 +115,7 @@ final class GameMenuPanel {
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
               CampaignDeployment.Loadout deployment,String friendlyHull,int selectedShip,
-              boolean awaitingWaypoint,String editNotice,
+              boolean preparingCampaign,boolean awaitingWaypoint,String editNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -278,30 +278,35 @@ final class GameMenuPanel {
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
             case DEPLOYMENT -> {
-                LevelEconomy.Level stage=LevelEconomy.level(selectedLevel);
-                CampaignMap.SystemNode enemy=CampaignMap.page(CampaignMap.pageOf(selectedLevel))
-                        .get((selectedLevel-1)%CampaignMap.PAGE_SIZE);
-                title(batch,font,"FLEET DEPLOYMENT","MISSION "+selectedLevel+"  |  SET YOUR SHIP COUNT AND FORMATION");
-                label(batch,font,"YOUR "+progress.faction().displayName+" BATTLE GROUP",58,580,Color.CYAN);
+                LevelEconomy.Level stage=preparingCampaign?LevelEconomy.level(selectedLevel):null;
+                Battle.Faction opponent=preparingCampaign?
+                        CampaignMap.page(CampaignMap.pageOf(selectedLevel))
+                                .get((selectedLevel-1)%CampaignMap.PAGE_SIZE).opponent():right;
+                title(batch,font,"FLEET DEPLOYMENT",preparingCampaign?
+                        "MISSION "+selectedLevel+"  |  SET YOUR SHIP COUNT AND FORMATION":
+                        "SKIRMISH  |  PLACE EACH VESSEL AND PROGRAM INDIVIDUAL ORDERS");
+                label(batch,font,"YOUR "+left.displayName+" BATTLE GROUP",58,580,Color.CYAN);
                 label(batch,font,"TACTICAL STARTING POSITIONS",58,161,MUTED);
-                label(batch,font,"ENEMY: "+enemy.opponent().displayName,846,563,Color.WHITE);
+                label(batch,font,"ENEMY: "+opponent.displayName,846,563,Color.WHITE);
                 label(batch,font,"HULL: "+friendlyHull,846,532,MUTED);
-                label(batch,font,"WAVES: "+stage.waves(),846,505,Color.WHITE);
-                label(batch,font,"DEPLOYED: "+deployment.ships()+" / "+stage.maximumFleet(),963,464,Color.GOLD);
+                label(batch,font,preparingCampaign?"WAVES: "+stage.waves():"SINGLE ENGAGEMENT",846,505,Color.WHITE);
+                label(batch,font,"DEPLOYED: "+deployment.ships()+
+                        (preparingCampaign?" / "+stage.maximumFleet():" FLEET"),963,464,Color.GOLD);
                 label(batch,font,"-",886,464,Color.WHITE);
                 label(batch,font,"+",1141,464,Color.WHITE);
                 label(batch,font,deployment.formation().title,959,355,Color.CYAN);
                 label(batch,font,"<",887,355,Color.WHITE);
                 label(batch,font,">",1139,355,Color.WHITE);
-                label(batch,font,"MAX VICTORY PAYOUT: "+
-                        LevelEconomy.victoryCredits(stage,deployment.ships(),deployment.ships(),true),
-                        843,290,Color.GOLD);
+                label(batch,font,preparingCampaign?
+                        "MAX VICTORY PAYOUT: "+
+                                LevelEconomy.victoryCredits(stage,deployment.ships(),deployment.ships(),true):
+                        "FITTED SHIPS: "+deployment.ships(),843,290,Color.GOLD);
                 label(batch,font,"EDIT FITTED SHIP",896,249,Color.WHITE);
                 label(batch,font,"SHIP ORDERS",945,180,Color.WHITE);
                 label(batch,font,"SELECT AND DRAG A VESSEL TO REPOSITION",61,139,MUTED);
                 label(batch,font,"SELECTED VESSEL #"+(selectedShip+1),846,120,Color.GOLD);
                 label(batch,font,editNotice,61,115,MUTED);
-                label(batch,font,"BACK TO MAP",68,68,Color.WHITE);
+                label(batch,font,preparingCampaign?"BACK TO MAP":"BACK TO SKIRMISH",68,68,Color.WHITE);
                 label(batch,font,"BEGIN MISSION",978,68,Color.WHITE);
             }
             case SHIP_ORDERS -> {
