@@ -16,8 +16,8 @@ public final class HullFoundationTest {
     }
     public static void main(String[] args)throws Exception {
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
-        check(technology.componentCount()==220,"11 factions x 20 native module chassis");
-        check(technology.upgradeCount()==5280,"11 x 20 x four exclusive six-rank tech branches");
+        check(technology.componentCount()==242,"11 factions x 22 native module chassis");
+        check(technology.upgradeCount()==5808,"11 x 22 x four exclusive six-rank tech branches");
         Set<String> factionIds=new HashSet<>();
         int hulls=0;
         for(Battle.Faction faction:Battle.Faction.values()){
@@ -84,6 +84,6 @@ public final class HullFoundationTest {
         check(one.maxHull==other.maxHull&&one.maxShields==other.maxShields
                         &&one.laserDamage==other.laserDamage&&one.sensorRange==other.sensorRange,
                 "No private enemy-only guns or stat overrides");
-        System.out.println("PASS physical hull baseline: 121 hulls, 11 native module rosters, 5280 tech upgrades, unarmed fits, symmetric combat");
+        System.out.println("PASS physical hull baseline: 121 hulls, 11 native module rosters, 5808 tech upgrades, unarmed fits, symmetric combat");
     }
 }
