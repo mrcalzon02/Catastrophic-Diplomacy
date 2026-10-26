@@ -18,6 +18,7 @@ import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
+import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
@@ -54,8 +55,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private CampaignProgress.State campaign;
+    private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
     private int deployedAtLaunch,survivorsAtEnd;
+    private CampaignEncounter campaignEncounter;
     private long lastReward;
     private boolean playedCampaign,lastWon;
     private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
@@ -146,10 +149,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel();
         if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
-        else{
-            running=false;screen=GameMenuPanel.Screen.HOME;
-            Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
-        }
+        else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");}
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
@@ -175,6 +175,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.R){
                             if(playedCampaign)launchCampaignMission();else launchSkirmish();
                         }else if(key==Input.Keys.ENTER)leaveResults();
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
+                        if(key==Input.Keys.ENTER){newCampaign();return true;}
+                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT||
+                                key==Input.Keys.UP||key==Input.Keys.DOWN){
+                            Battle.Faction[] choices=Battle.Faction.values();
+                            int delta=(key==Input.Keys.RIGHT||key==Input.Keys.DOWN)?1:-1;
+                            pendingFaction=choices[Math.floorMod(pendingFaction.ordinal()+delta,choices.length)];
+                        }
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.SKIRMISH){
@@ -344,14 +354,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
         reset();
         Gdx.app.log("CD-GAME-FLOW","BATTLE "+scenario.name());
     }
+    private void openCampaignSetup(){
+        pendingFaction=campaign==null?left:campaign.faction();
+        screen=GameMenuPanel.Screen.CAMPAIGN_SETUP;
+    }
     private void newCampaign(){
-        campaign=CampaignProgress.start(left);
+        campaign=CampaignProgress.start(pendingFaction);
         saveCampaign();
         campaignPage=0;selectedMission=1;
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
     private void showCampaign(){
-        if(campaign==null){newCampaign();return;}
+        if(campaign==null){openCampaignSetup();return;}
         selectedMission=campaign.unlocked();
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
@@ -381,8 +395,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             lastReward=campaign.credits()-before;
             saveCampaign();
         }
-        running=false;screen=GameMenuPanel.Screen.RESULTS;
-        Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
+        running=false;screen=GameMenuPanel.Screen.RESULTS;Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
     }
     private void leaveResults(){
         if(playedCampaign){campaignPage=CampaignMap.pageOf(selectedMission);screen=GameMenuPanel.Screen.CAMPAIGN;}
@@ -392,15 +405,23 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(screen==GameMenuPanel.Screen.HOME){
             switch(GameMenuPanel.homeHit(x,y)){
                 case 0 -> showCampaign();
-                case 1 -> newCampaign();
-                case 2 -> {
-                    screen=GameMenuPanel.Screen.SKIRMISH;
-                    Gdx.app.log("CD-GAME-FLOW","SKIRMISH_SETUP");
-                }
+                case 1 -> openCampaignSetup();
+                case 2 -> {screen=GameMenuPanel.Screen.SKIRMISH;Gdx.app.log("CD-GAME-FLOW","SKIRMISH_SETUP");}
                 case 3 -> shipyard.show();
                 case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
                 case 5 -> Gdx.app.exit();
             }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
+            if(GameMenuPanel.hit(x,y,80,35,230,54)){
+                screen=GameMenuPanel.Screen.HOME;return;
+            }
+            if(GameMenuPanel.hit(x,y,892,35,308,54)){
+                newCampaign();return;
+            }
+            Battle.Faction selected=GameMenuPanel.factionHit(x,y);
+            if(selected!=null)pendingFaction=selected;
             return;
         }
         if(screen==GameMenuPanel.Screen.SKIRMISH){
@@ -586,6 +607,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
      * Campaign waves/economy are separate future work.
      */
     private void changeBattlefieldLevel(int delta) {
+        if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         int selected = Math.max(1,Math.min(500,battlefieldLevel+delta));
         if (selected == battlefieldLevel) return;
         battlefieldLevel = selected;
@@ -597,11 +619,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     private void changeFleetSize(int delta) {
+        if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         int selected = Math.max(0,Math.min(FLEET_SIZES.length-1,fleetIndex+delta));
         if(selected!=fleetIndex){fleetIndex=selected;reset();}
     }
 
     private void changeFaction(int team) {
+        if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         if(team==0) {
             left=next(left);
             leftDesign=screen==GameMenuPanel.Screen.SKIRMISH && scenario!=ScenarioCatalog.Preset.CUSTOM?
@@ -705,9 +729,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE)return;
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
         if(verifyDemo)battle=DemonstrationBattle.create(technology);
-        else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign)
-            battle=Battle.duel(LevelEconomy.level(activeMission).seed(),deployedAtLaunch,
+        else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign) {
+            campaignEncounter=CampaignEncounter.start(activeMission,deployedAtLaunch,
                     leftDesign,rightDesign,technology);
+            battle=campaignEncounter.battle();
+        }
         else if(screen==GameMenuPanel.Screen.BATTLE)
             battle=ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
                     FLEET_SIZES[fleetIndex]);
@@ -727,7 +753,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     @Override public void render() {
-        if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished())finishEngagement();
+        if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished()) {
+            if(playedCampaign && campaignEncounter!=null) {
+                CampaignEncounter.Advance advance=campaignEncounter.advance();
+                if(advance==CampaignEncounter.Advance.VICTORY ||
+                        advance==CampaignEncounter.Advance.DEFEAT)finishEngagement();
+            }else finishEngagement();
+        }
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE){
             Gdx.gl.glClearColor(.018f,.029f,.064f,1);
             Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
@@ -735,7 +767,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setProjectionMatrix(camera.combined);
             batch.setProjectionMatrix(camera.combined);
             if(shipyard.open())shipyard.draw(shapes,batch,font);
-            else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,
+            else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,pendingFaction,
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,selectedMission,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
@@ -941,7 +973,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "   (W / TAP TO TOGGLE)",22,638);
         font.setColor(Color.CYAN);
         font.draw(batch,"<",945,638);
-        font.draw(batch,"LEVEL " + battlefieldLevel + "/500",998,638);
+        font.draw(batch,playedCampaign && campaignEncounter!=null
+                ?"MISSION "+activeMission+" WAVE "+campaignEncounter.wave()+"/"+campaignEncounter.waves()
+                :"LEVEL " + battlefieldLevel + "/500",998,638);
         font.draw(batch,">",1235,638);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
