@@ -49,7 +49,7 @@ public final class AmmunitionTableTest {
         var ap=penetrated.impact(1,0,0.8,0,35,Battle.DamageType.KINETIC,.55);
         check(ap.hullDamage()>standard.hullDamage(),
                 "Armor-piercing projectile bypasses real protective tile, not a fake number");
-        check(ordinary.totalArmor()>penetrated.totalArmor(),
+        check(penetrated.totalArmor()>ordinary.totalArmor(),
                 "Penetration must divert energy past, not magically remove more armor");
 
         for(AmmunitionTable.Kinetic round:AmmunitionTable.Kinetic.values()){
