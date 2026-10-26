@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Functional signed-APK navigation acceptance, not a cosmetic pixel-perfect test.
-# Actual taps: free-placed skirmish hull + individual orders, then full campaign route.
+# Functional signed-APK taps: free-placed skirmish hull + permanent per-ship doctrine, then campaign.
 set -euo pipefail
 report="${1:-test-output/android}"
 mkdir -p "$report"
@@ -69,17 +69,23 @@ swipe_ui skirmish-deployment 500 319 180 334
 sleep 2
 capture skirmish-placement
 assert_step 'PLACED ship=1'
-# Program three ordered commands for that individual vessel.
+# Set multiple persistent, simultaneously active combat doctrines on ship 1.
+# All controls act on the same selected ship, not a consumed waypoint queue.
 touch_ui skirmish-placement 1000 171
 sleep 2
 capture skirmish-ship-orders
-touch_ui skirmish-ship-orders 1000 484
-touch_ui skirmish-ship-orders 620 370
-touch_ui skirmish-ship-orders 1000 413
-touch_ui skirmish-ship-orders 1000 344
+touch_ui skirmish-ship-orders 1120 534
+touch_ui skirmish-ship-orders 1120 505
+touch_ui skirmish-ship-orders 1120 476
+touch_ui skirmish-ship-orders 1120 447
+touch_ui skirmish-ship-orders 1120 360
 sleep 2
 capture skirmish-orders-programmed
-assert_step 'ORDER ship=1 count=3 command=ENGAGE'
+assert_step 'STANDING ship=1 setting=AGGRESSION'
+assert_step 'STANDING ship=1 setting=CAUTION'
+assert_step 'STANDING ship=1 setting=RETREAT BELOW HULL'
+assert_step 'STANDING ship=1 setting=FALL BACK BELOW SHIELDS'
+assert_step 'STANDING ship=1 setting=POINT DEFENSE'
 touch_ui skirmish-orders-programmed 1050 60
 sleep 1
 capture skirmish-ready
@@ -127,4 +133,4 @@ touch_ui campaign-deployment-configured 1050 62
 sleep 5
 capture campaign-battle
 assert_step 'CAMPAIGN_BATTLE 1 5 WEDGE'
-echo "PASS: signed APK real skirmish hull drag + three individual queued commands, and campaign five-ship wedge -> multiwave combat."
+echo "PASS: signed APK real skirmish hull drag + five persistent standing-order policies, and campaign five-ship wedge -> multiwave combat."
