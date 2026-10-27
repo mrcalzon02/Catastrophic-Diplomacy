@@ -369,6 +369,7 @@ final class GameMenuPanel {
                 label(batch,font,progress.researchRank()==6?"ALL RESEARCH RANKS PURCHASED":
                                 "NEXT RANK COST: "+progress.nextResearchCost()+" CREDITS",
                         151,248,Color.GOLD);
+                label(batch,font,dockNotice,151,194,Color.CYAN);
                 label(batch,font,"BACK TO CAMPAIGN",69,67,Color.WHITE);
                 label(batch,font,progress.researchRank()==6?"RESEARCH COMPLETE":"PURCHASE NEXT RANK",
                         923,67,Color.WHITE);
