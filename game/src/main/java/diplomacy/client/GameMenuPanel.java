@@ -115,8 +115,12 @@ final class GameMenuPanel {
         for(int i=0;i<9;i++)
             if(hit(x,y,45,521-i*43,746,38)&&page*9+i<ownedCount)
                 return 100+page*9+i;
-        for(int i=0;i<10;i++)
-            if(hit(x,y,840,525-i*46,374,42))return 4+i;
+        for(int i=0;i<10;i++){
+            if(i==8){
+                if(hit(x,y,840,525-i*46,180,42))return 12; // generated rename
+                if(hit(x,y,1028,525-i*46,186,42))return 14; // manual rename
+            }else if(hit(x,y,840,525-i*46,374,42))return 4+i;
+        }
         return -1;
     }
     static int mapHit(float x,float y,int page){
@@ -216,7 +220,12 @@ final class GameMenuPanel {
                         if(index>=ownedFleet.ships().size())break;
                         button(shapes,45,521-i*43,746,38,index==dockSelected);
                     }
-                for(int i=0;i<10;i++)button(shapes,840,525-i*46,374,42,false);
+                for(int i=0;i<10;i++){
+                    if(i==8){
+                        button(shapes,840,525-i*46,180,42,false);
+                        button(shapes,1028,525-i*46,186,42,false);
+                    }else button(shapes,840,525-i*46,374,42,false);
+                }
             }
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
@@ -362,7 +371,10 @@ final class GameMenuPanel {
                                 "  "+dockCosts[i-1]+" cr":
                                 i==6?"  "+purchaseCost+" cr":
                                 i==9&&dockCosts!=null?"  "+java.util.Arrays.stream(dockCosts).sum()+" cr":"";
-                        label(batch,font,names[i]+cost,847,553-i*46,
+                        if(i==8){
+                            label(batch,font,"GENERATE NAME",847,553-i*46,Color.WHITE);
+                            label(batch,font,"MANUAL RENAME",1036,553-i*46,Color.WHITE);
+                        }else label(batch,font,names[i]+cost,847,553-i*46,
                                 (i==6||i==9)?Color.GOLD:Color.WHITE);
                     }
                 }
