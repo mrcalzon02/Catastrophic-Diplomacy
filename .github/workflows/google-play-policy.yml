@@ -34,12 +34,14 @@ jobs:
         with:
           gradle-version: '9.6.1'
       - name: Install Android SDK and native build prerequisites
+        id: sdk
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
           if [[ ! -x "$SDKMANAGER" ]]; then SDKMANAGER="$(command -v sdkmanager)"; fi
-          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
+          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0' 2>&1 | tee "$RUNNER_TEMP/play-ci/sdk.log"
       - name: Create isolated, disposable test-only Play signing certificate
         shell: bash
         run: |
@@ -55,13 +57,19 @@ jobs:
             echo "ORG_GRADLE_PROJECT_playUploadKeyPassword=ci-test-only-never-publish"
           } >> "$GITHUB_ENV"
       - name: Prepare ReverieVR pinned third-party game sources
+        id: bootstrap
+        continue-on-error: true
         if: false
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/play-ci"
+          {
           echo 'Not applicable'
+          } 2>&1 | tee "$RUNNER_TEMP/play-ci/bootstrap.log"
       - name: Build Play variant installable APK and Play submission AAB
         id: build
+        if: steps.sdk.outcome == 'success' && (steps.bootstrap.outcome == 'success' || steps.bootstrap.outcome == 'skipped')
         continue-on-error: true
         shell: bash
         run: |
@@ -99,6 +107,8 @@ jobs:
         if: always()
         env:
           PLAY_SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          PLAY_SDK_OUTCOME: ${{ steps.sdk.outcome }}
+          PLAY_BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
           PLAY_BUILD_OUTCOME: ${{ steps.build.outcome }}
           PLAY_ARTIFACT_OUTCOME: ${{ steps.artifact.outcome }}
           PLAY_REVIEW_OUTCOME: ${{ steps.review.outcome }}
