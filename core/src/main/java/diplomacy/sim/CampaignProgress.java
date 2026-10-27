@@ -15,14 +15,6 @@ public final class CampaignProgress {
     private static final String V1="CD-CAMPAIGN-1";
     private static final int[] ACCELERATOR_WORK={0,2,3,4,5};
     private CampaignProgress() { }
-    private static int effectiveDuration(Project project,int rank,int speed){
-        int base=switch(project){
-            case NONE -> 0;
-            case LICENSE -> rank==6?0:LevelEconomy.researchMissionCost(rank+1);
-            case ACCELERATOR -> speed==4?0:ACCELERATOR_WORK[speed+1];
-        };
-        return Math.max(0,base-speed);
-    }
 
     public enum Project { NONE, LICENSE, ACCELERATOR }
     public record State(Battle.Faction faction,int unlocked,long credits,int victories,
@@ -42,7 +34,11 @@ public final class CampaignProgress {
                     ||unlocked!=Math.min(LevelEconomy.LEVEL_COUNT,highestCompleted+1)
                     ||speedUpgrades<0||speedUpgrades>4||activeProject==null||projectProgress<0)
                 throw new IllegalArgumentException("Invalid campaign progression");
-            int maxWork=effectiveDuration(activeProject,researchRank,speedUpgrades);
+            int maxWork=switch(activeProject){
+                case NONE -> 0;
+                case LICENSE -> researchRank==6?0:LevelEconomy.researchMissionCost(researchRank+1);
+                case ACCELERATOR -> speedUpgrades==4?0:ACCELERATOR_WORK[speedUpgrades+1];
+            };
             if((activeProject==Project.NONE&&projectProgress!=0)
                     ||(activeProject!=Project.NONE&&
                     (maxWork==0||projectProgress>=maxWork)))
@@ -64,7 +60,7 @@ public final class CampaignProgress {
             return researchRank==6?0:LevelEconomy.draftResearchCost(researchRank+1);
         }
         public int nextResearchMissions(){
-            return effectiveDuration(Project.LICENSE,researchRank,speedUpgrades);
+            return researchRank==6?0:LevelEconomy.researchMissionCost(researchRank+1);
         }
         public long nextAccelerationCost(){
             return speedUpgrades==4?0:LevelEconomy.researchSpeedCost(speedUpgrades+1);
@@ -73,7 +69,7 @@ public final class CampaignProgress {
             return speedUpgrades==4?0:LevelEconomy.researchSpeedMilestone(speedUpgrades+1);
         }
         public int nextAccelerationMissions(){
-            return effectiveDuration(Project.ACCELERATOR,researchRank,speedUpgrades);
+            return speedUpgrades==4?0:ACCELERATOR_WORK[speedUpgrades+1];
         }
         public int currentProjectMissions(){
             return switch(activeProject){
@@ -82,10 +78,11 @@ public final class CampaignProgress {
                 case ACCELERATOR -> nextAccelerationMissions();
             };
         }
-        public int researchPerVictory(){return 1;}
+        public int researchPerVictory(){return 1+speedUpgrades;}
         public int missionsUntilResearchComplete(){
-            return activeProject==Project.NONE?0:Math.max(0,
-                    currentProjectMissions()-projectProgress);
+            if(activeProject==Project.NONE)return 0;
+            int missing=currentProjectMissions()-projectProgress;
+            return (missing+researchPerVictory()-1)/researchPerVictory();
         }
         // Compatibility for saved-world/editor code referencing the original
         // project-based research interface introduced with CD-CAMPAIGN-3.
@@ -107,7 +104,7 @@ public final class CampaignProgress {
                         completed(nextAccelerationMilestone())&&credits>=nextAccelerationCost();
             };
         }
-        /** Pay once: a project with zero remaining time completes instantly. */
+        /** Pay up front for a single active project; no instant completion. */
         public State beginResearch(Project desired){
             if(desired==null||desired==Project.NONE)
                 throw new IllegalArgumentException("Select a research project");
@@ -125,16 +122,12 @@ public final class CampaignProgress {
             long price=desired==Project.LICENSE?nextResearchCost():nextAccelerationCost();
             if(price>credits)
                 throw new IllegalArgumentException("Insufficient campaign credits for research");
-            int duration=effectiveDuration(desired,researchRank,speedUpgrades);
-            return new State(faction,unlocked,credits-price,victories,
-                    duration==0&&desired==Project.LICENSE?researchRank+1:researchRank,
-                    highestCompleted,
-                    duration==0&&desired==Project.ACCELERATOR?speedUpgrades+1:speedUpgrades,
-                    duration==0?Project.NONE:desired,0);
+            return new State(faction,unlocked,credits-price,victories,researchRank,
+                    highestCompleted,speedUpgrades,desired,0);
         }
         /** Historical entrypoint now starts paid work instead of granting a rank. */
         public State purchaseNextResearch(){return beginResearch(Project.LICENSE);}
-        /** Lab projects require victory time unless their required duration reaches zero. */
+        /** Lab speed upgrades themselves must be researched, not purchased instantly. */
         public State purchaseResearchSpeed(){return beginResearch(Project.ACCELERATOR);}
         public State complete(int level,int deployed,int survivors){
             if(!available(level))throw new IllegalArgumentException("Mission is locked");
@@ -147,7 +140,7 @@ public final class CampaignProgress {
             int nextProgress=projectProgress;
             int nextLicense=researchRank,nextSpeed=speedUpgrades;
             if(activeProject!=Project.NONE){
-                nextProgress=Math.addExact(projectProgress,1);
+                nextProgress=Math.addExact(projectProgress,researchPerVictory());
                 if(nextProgress>=currentProjectMissions()){
                     if(activeProject==Project.LICENSE)nextLicense++;
                     else nextSpeed++;
@@ -158,18 +151,6 @@ public final class CampaignProgress {
                     Math.addExact(credits,reward),Math.addExact(victories,1),
                     nextLicense,nextHigh,nextSpeed,nextProject,nextProgress);
         }
-    }
-    /** Preserve progress when shorter requirements complete an old saved job. */
-    private static State normalized(Battle.Faction faction,int unlocked,long credits,
-            int victories,int rank,int high,int speed,Project project,int progress){
-        if(speed<0||speed>4||project==null||progress<0||progress>5)
-            throw new IllegalArgumentException("Invalid saved research progress");
-        int required=effectiveDuration(project,rank,speed);
-        boolean finished=project!=Project.NONE&&progress>=required;
-        return new State(faction,unlocked,credits,victories,
-                finished&&project==Project.LICENSE?rank+1:rank,high,
-                finished&&project==Project.ACCELERATOR?speed+1:speed,
-                finished?Project.NONE:project,finished?0:progress);
     }
     public static State start(Battle.Faction faction){return new State(faction,1,0,0);}
     public static String encode(State state){
@@ -201,33 +182,32 @@ public final class CampaignProgress {
             int reached=Integer.parseInt(rows[2]);
             int high=(v3||v4)?Integer.parseInt(rows[6]):Math.max(0,reached-1);
             int licensed=v1?0:Integer.parseInt(rows[5]);
-            if(v4)return normalized(Battle.Faction.valueOf(rows[1]),reached,
+            if(v4)return new State(Battle.Faction.valueOf(rows[1]),reached,
                     Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,high,
                     Integer.parseInt(rows[7]),Project.valueOf(rows[8]),
                     Integer.parseInt(rows[9]));
             if(v3){
-                // Both experimental v3 representations are readable, so a
-                // previous save never resets a purchased research investment.
-                Project named=null;
-                for(Project p:Project.values())if(p.name().equals(rows[7]))named=p;
-                if(named!=null){
-                    int speed=Integer.parseInt(rows[6]);
+                // The two experimental v3 layouts used either a numeric target
+                // or a named active Project. Recover both, without wiping saves.
+                for(Project oldType:Project.values())if(oldType.name().equals(rows[7])){
                     if(!"true".equals(rows[9])&&!"false".equals(rows[9]))
-                        throw new IllegalArgumentException("Invalid old final-mission flag");
-                    int completed=Math.max(0,reached-1)+("true".equals(rows[9])?1:0);
-                    return normalized(Battle.Faction.valueOf(rows[1]),reached,
+                        throw new IllegalArgumentException("Malformed final-level flag");
+                    boolean finalClear=Boolean.parseBoolean(rows[9]);
+                    int legacyHigh=reached==500&&finalClear?500:Math.max(0,reached-1);
+                    return new State(Battle.Faction.valueOf(rows[1]),reached,
                             Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,
-                            completed,speed,named,Integer.parseInt(rows[8]));
+                            legacyHigh,Integer.parseInt(rows[6]),oldType,
+                            Integer.parseInt(rows[8]));
                 }
-                int target=Integer.parseInt(rows[7]);
-                int progress=Integer.parseInt(rows[8]),speed=Integer.parseInt(rows[9]);
+                int target=Integer.parseInt(rows[7]),progress=Integer.parseInt(rows[8]),
+                        speed=Integer.parseInt(rows[9]);
                 if(target!=0&&target!=licensed+1)
-                    throw new IllegalArgumentException("Unexpected prior research target");
-                return normalized(Battle.Faction.valueOf(rows[1]),reached,
-                        Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,high,
-                        speed,target==0?Project.NONE:Project.LICENSE,progress);
-            }
-            return new State(Battle.Faction.valueOf(rows[1]),reached,
+                    throw new IllegalArgumentException("Unrecognized prior research target");
+                // Earlier speed research shortened time left; translate its elapsed
+                // work without losing an earned partial research mission.
+                int carried=target==0?0:Math.min(
+                        LevelEconomy.researchMissionCost(target)-1,progress+speed);
+                return new State(Battle.Faction.valueOf(rows[1]),reached,
                         Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,high,
                         speed,target==0?Project.NONE:Project.LICENSE,carried);
             }
