@@ -321,7 +321,7 @@ public final class Shipyard {
                  .install(slotOf(hull,Mount.DEFENSE,0),"BASE-"+id+"-SHD")
                  .install(slotOf(hull,Mount.HABITAT,0),"BASE-"+id+"-CRW")
                  .install(slotOf(hull,Mount.HABITAT,1),"BASE-"+id+"-LFS");
-        return ship;
+        return ShipLineages.prototype(ship);
     }
     private static int slotOf(Hull hull,Mount mount,int nth) {
         for(Slot slot:hull.slots)if(slot.mount==mount&&nth--==0)return slot.index;
