@@ -89,7 +89,10 @@ public final class ShipStandingOrdersTest {
                 "Ship count reduction erased a commissioned hull doctrine");
         check(!deployment.withShips(-2,LevelEconomy.level(1)).standings().containsKey(1),
                 "Doctrine for a removed hull remained active");
-        var restored=deployment.withStandingProfiles(decoded.policies());
+        var restored=deployment.withStandingProfiles(
+                decoded.policies().entrySet().stream().collect(
+                        java.util.stream.Collectors.toMap(e->Math.toIntExact(e.getKey()),
+                                java.util.Map.Entry::getValue)));
         check(restored.standings().size()==3,
                 "Saved doctrines were not limited to commissioned ship slots");
 
