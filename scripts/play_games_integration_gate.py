@@ -30,6 +30,9 @@ def main():
     check("playImplementation 'com.google.android.gms:play-services-games-v2:22.1.0'" in gradle,
           "PGS-SDK-001", "Play Games v2 SDK must be Play-variant only",
           "Add playImplementation for the verified Play Games v2 SDK to the Play build type.")
+    check("resValues true" in gradle or "resValues = true" in gradle,
+          "PGS-RES-009", "AGP 9 Play Games project resource generation is enabled",
+          "Set android.buildFeatures.resValues=true for this Android app, then rebuild and verify the merged Play manifest resource.")
     check(source.is_file() and all(token in source.read_text() for token in
           ["PlayGamesSdk.initialize", "isAuthenticated()", "getCurrentPlayer()"]),
           "PGS-AUTH-002", "Play-only automatic platform authentication is implemented",
