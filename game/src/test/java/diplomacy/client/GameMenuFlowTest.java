@@ -46,6 +46,10 @@ public final class GameMenuFlowTest {
                     "Fleet service/purchase/name control missing "+i);
         check(GameMenuPanel.dockAction(1000,546-9*46,0,4)==13,
                 "Service All must be a usable button, not only a price label");
+        check(GameMenuPanel.dockAction(1110,546-8*46,0,4)==14,
+                "Manual renaming must have a separate native text-input action");
+        check(GameMenuPanel.dockAction(1024,546-8*46,0,4)==-1,
+                "Split rename controls must not have overlapping hit zones");
         check(GameMenuPanel.dockAction(1000,96,0,4)==-1,
                 "Service All tap must not overlap the campaign navigation");
         check(GameMenuPanel.dockAction(400,500,0,0)==-1,
