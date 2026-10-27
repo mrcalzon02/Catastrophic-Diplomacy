@@ -203,6 +203,7 @@ public final class HullLayouts {
             case BATTLECRUISER -> 1.03;
             case CARRIER -> 1.17;
             case DREADNOUGHT -> 1.14;
+            default -> throw new IllegalArgumentException("Unknown width category");
         };
         double length = switch(hull.spriteHull()) {
             case INTERCEPTOR -> 0.77;
@@ -216,6 +217,7 @@ public final class HullLayouts {
             case BATTLECRUISER -> 1.16;
             case CARRIER -> 0.97;
             case DREADNOUGHT -> 1.15;
+            default -> throw new IllegalArgumentException("Unknown length category");
         };
         List<Point> vertices=new ArrayList<>();
         for(int[] xy:shape)vertices.add(new Point((int)Math.round(xy[0]*width),
