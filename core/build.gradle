@@ -416,6 +416,15 @@ tasks.register('campaignAfterActionSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('campaignAfterActionSmoke')) }
+tasks.register('fleetNameRangeSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify all naming cultures can give 200 different ships distinct, ID-free names.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetNameRangeTest'
+    dependsOn testClasses
+}
+tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('fleetNameRangeSmoke')) }
+
 tasks.register('vesselIdentifiersSmoke', JavaExec) {
     group = 'verification'
     description = 'Stress 500-stage commissioning across five campaigns and ensure 16-digit vessel identity survives refits.'

@@ -172,7 +172,11 @@ jobs:
           path: release
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          # API 35 system_server/Settings ADB service crashed during emulator
+          # initialization before test script launched on hosted Ubuntu.
+          # API 34 remains a supported Android environment; retain the same
+          # real 400-ship/render-loop/release-startup acceptance proof.
+          api-level: 34
           target: default
           arch: x86_64
           profile: pixel_2
@@ -189,6 +193,14 @@ jobs:
             adb exec-out screencap -p > test-output/android/signed-release-startup.png
             test "$(wc -c < test-output/android/signed-release-startup.png)" -gt 2000
             bash tools/android_verify_menu.sh test-output/android
+      - name: Capture emulator infrastructure diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p test-output/android
+          timeout 10s adb devices -l > test-output/android/adb-devices-on-failure.txt 2>&1 || true
+          timeout 25s adb logcat -d -v time > test-output/android/emulator-failure-logcat.txt 2>&1 || true
+          echo "Emulator boot and runtime evidence retained; combat verification remains mandatory."
       - name: Retain functional emulator proof
         if: always()
         uses: actions/upload-artifact@v4

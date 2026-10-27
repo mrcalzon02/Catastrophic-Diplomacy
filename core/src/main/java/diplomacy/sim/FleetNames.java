@@ -275,6 +275,42 @@ public final class FleetNames {
             String candidate=name+" "+epithet;
             if(candidate.length()<=70)name=candidate;
         }
+        // Shipboard cultures commissioned hundreds of hulls; every ordinary
+        // tradition requires more than its original 8 x 8 noun pairs.
+        if(style.ordinal()>=5&&style.ordinal()<GRIMDARK_ORDINAL&&
+                style!=Style.SYNTHETIC&&style!=Style.DESIGNATION&&variant>=2){
+            String qualifier=switch(style){
+                case IMPERIAL,REPUBLIC,CEREMONIAL,MONASTIC -> "of "+choose((int)((scrambled>>>23)&15),
+                        "The Crown","The Republic","Ascension","Gloria","The Dawn",
+                        "Meridian","The Ninth Star","Providence","Aurea","The Charter",
+                        "First Light","The Council","The Old Fleet","The Covenant",
+                        "The Sovereignty","Valiance");
+                case FRONTIER,SCIENTIFIC,EXPLORER -> "from "+choose((int)((scrambled>>>23)&15),
+                        "Horizon Point","Kepler Reach","Deep Field","Far Meridian",
+                        "The Outer Survey","Lagrange Nine","Nova Research",
+                        "The Last Outpost","The Rim","Ceres Survey","Orion Station",
+                        "Aster Belt","The Dark Matter Lab","Long Passage",
+                        "The North Array","Beacon Seven");
+                case PRIVATEER,MERCHANT,NOMADIC -> "of "+choose((int)((scrambled>>>23)&15),
+                        "High Fortune","Dust Bay","Last Port","The Old Route",
+                        "The Free Isles","Far Harbor","The Merchant Road",
+                        "Bluewater","The Lost Exchange","Copper Cove","Windward",
+                        "The Golden Route","Deepwater","The Caravan","The Border",
+                        "The Long Haul");
+                case ORGANIC -> choose((int)((scrambled>>>23)&15),
+                        "Nuur","Khe'va","Thyrr","Zhal","Or'un","Nesh",
+                        "Taal","Yzur","Vhel","Kor","Na'li","Eth","Vrash",
+                        "Uxel","Vorr","Shael");
+                case FOLKLORE,IRREVERENT -> choose((int)((scrambled>>>23)&15),
+                        "Again","Tomorrow","Forever","Never","By Moonlight",
+                        "At Dawn","On Purpose","For Once","At Last","Under Stars",
+                        "In Passing","As Promised","By Request","Almost",
+                        "Beyond Reason","In Secret");
+                default -> throw new IllegalStateException("Unhandled name culture");
+            };
+            String expanded=name+" "+qualifier;
+            if(expanded.length()<=70)name=expanded;
+        }
         return name;
     }
     /** Reroll just the display name on a deterministic salted stream. */
