@@ -69,7 +69,7 @@ public final class CampaignFleetTest {
         reject(()->original.rename(ship1,"Duplicate\nLabel"),"Control characters allowed in names");
         reject(()->original.rename(ship1,original.get(ship2).name().toLowerCase(java.util.Locale.ROOT)),
                 "Duplicate name accepted with different letter case");
-        check(original.rename(ship1,"  Captain's Promise  ").get(1).name().equals("Captain's Promise"),
+        check(original.rename(ship1,"  Captain's Promise  ").get(ship1).name().equals("Captain's Promise"),
                 "Manual rename was not normalized and persisted");
 
         var tested=original;
