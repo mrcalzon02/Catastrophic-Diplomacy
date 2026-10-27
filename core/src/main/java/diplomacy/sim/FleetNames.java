@@ -5,7 +5,8 @@ public final class FleetNames {
     private FleetNames(){}
     // Legacy entries retain their ordinals and deterministic output for old saves.
     public enum Style { NAVAL, MYTHIC, CELESTIAL, INDUSTRIAL, ALIEN,
-        IMPERIAL, FRONTIER, SCIENTIFIC, CEREMONIAL, ORGANIC, SYNTHETIC, DESIGNATION }
+        IMPERIAL, FRONTIER, SCIENTIFIC, CEREMONIAL, ORGANIC, SYNTHETIC, DESIGNATION,
+        REPUBLIC, PRIVATEER, MERCHANT, NOMADIC, MONASTIC, EXPLORER, FOLKLORE, IRREVERENT }
     private static final String[][] FIRST={
         {"Resolute","Indomitable","Courageous","Vanguard","Dauntless","Stalwart","Valiant","Guardian"},
         {"Aegis","Valhalla","Orion","Nemesis","Basilisk","Titan","Erebus","Helios"},
@@ -58,6 +59,30 @@ public final class FleetNames {
                     "RELAY","VECTOR","ARRAY","GATE","SHELL"},j)+"-"+index;
             case DESIGNATION -> "FG-"+String.format(java.util.Locale.ROOT,"%02d",i+10)
                     +"-"+String.format(java.util.Locale.ROOT,"%02d",j+1)+"-"+index;
+            case REPUBLIC -> "RNS "+pick(new String[]{"Liberty","Resolve","Unity","Accord",
+                    "Freehold","Courage","Assembly","Civic"},i)+" "+pick(new String[]{
+                    "Star","Horizon","Concord","Mercy","Guard","Beacon","Legacy","Dawn"},j)+" "+index;
+            case PRIVATEER -> pick(new String[]{"Lucky","Red","Wayward","Laughing",
+                    "Ragged","Black","Gentle","Last"},i)+" "+pick(new String[]{
+                    "Corsair","Kestrel","Wager","Cutlass","Revenge","Gambit","Comet","Rumrunner"},j)+" "+index;
+            case MERCHANT -> "MV "+pick(new String[]{"Fair","Open","Copper","Grand",
+                    "Fortune","Steady","Blue","Golden"},i)+" "+pick(new String[]{
+                    "Exchange","Ledger","Freighter","Dividend","Parcel","Harbor","Venture","Cargo"},j)+" "+index;
+            case NOMADIC -> pick(new String[]{"Dust","Long","Far","Wandering",
+                    "Moon","Storm","Quiet","Bright"},i)+"-"+pick(new String[]{
+                    "Walker","Runner","Pilgrim","Traveler","Herder","Seeker","Path","Keeper"},j)+" "+index;
+            case MONASTIC -> "Vessel of "+pick(new String[]{"Vigil","Silence","Grace","Solace",
+                    "Dawn","Witness","Mercy","Penance"},i)+" "+pick(new String[]{
+                    "Prime","Secundus","Tertius","Quartus","Quintus","Sextus","Septimus","Octavus"},j)+" "+index;
+            case EXPLORER -> "CSV "+pick(new String[]{"Uncharted","Farpoint","Drifting","Blue",
+                    "Second","Endless","Bold","Quiet"},i)+" "+pick(new String[]{
+                    "Horizon","Compass","Latitude","Discovery","Passage","Beacon","Survey","Crossing"},j)+" "+index;
+            case FOLKLORE -> pick(new String[]{"Old","Silver","Dancing","Wild",
+                    "Morning","Midnight","Laughing","Winter"},i)+" "+pick(new String[]{
+                    "Fox","Hare","Stag","Serpent","Raven","Wolf","Witch","Lion"},j)+" "+index;
+            case IRREVERENT -> pick(new String[]{"Mostly","Probably","Definitely","Strictly",
+                    "Unreasonably","Questionably","Nominally","Temporarily"},i)+" "+pick(new String[]{
+                    "Harmless","Insured","Operational","Innocent","Stealthy","Repaired","Neutral","Official"},j)+" "+index;
             default -> throw new IllegalArgumentException("Unrecognized naming philosophy");
         };
     }

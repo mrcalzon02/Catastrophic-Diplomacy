@@ -63,9 +63,15 @@ public final class CampaignFleet {
         public Vessel withStores(Stores value){return new Vessel(id,name,fitting,deployed,value);}
     }
     public record Roster(Battle.Faction faction,FleetNames.Style style,int nextId,
-                         List<Vessel> ships) {
+                         List<Vessel> ships,long namingSeed,CrewChatter.Tone radioTone) {
+        /** Historical API and imported saves retain their former naming. */
+        public Roster(Battle.Faction faction,FleetNames.Style style,int nextId,
+                      List<Vessel> ships){
+            this(faction,style,nextId,ships,faction==null?0:faction.ordinal(),
+                    CrewChatter.Tone.MIXED);
+        }
         public Roster {
-            if(faction==null||style==null||nextId<1||ships==null||ships.size()>200)
+            if(faction==null||style==null||radioTone==null||nextId<1||ships==null||ships.size()>200)
                 throw new IllegalArgumentException("Invalid fleet roster");
             ships=List.copyOf(ships);
             HashSet<Integer> ids=new HashSet<>();
@@ -126,10 +132,15 @@ public final class CampaignFleet {
                 throw new IllegalArgumentException("Mission fleet cap reached");
             List<Vessel> result=new ArrayList<>();
             for(Vessel v:ships)result.add(v.id()==id?v.active(selected):v);
-            return new Roster(faction,style,nextId,result);
+            return new Roster(faction,style,nextId,result,namingSeed,radioTone);
         }
         public Roster changeStyle(FleetNames.Style desired){
-            return new Roster(faction,desired,nextId,ships);
+            if(desired==null)throw new IllegalArgumentException("Name style required");
+            return new Roster(faction,desired,nextId,ships,namingSeed,radioTone);
+        }
+        public Roster changeRadioTone(CrewChatter.Tone desired){
+            if(desired==null)throw new IllegalArgumentException("Radio tone required");
+            return new Roster(faction,style,nextId,ships,namingSeed,desired);
         }
         public Roster rename(int id,String name){
             get(id); // A stale dock selection must never report a successful rename.
@@ -142,7 +153,7 @@ public final class CampaignFleet {
                     throw new IllegalArgumentException("Another commissioned ship already uses that name");
             List<Vessel> result=new ArrayList<>();
             for(Vessel v:ships)result.add(v.id()==id?v.withName(unique):v);
-            return new Roster(faction,style,nextId,result);
+            return new Roster(faction,style,nextId,result,namingSeed,radioTone);
         }
         public Roster purchase(Shipyard.Design design,TechnologyCatalog technology) {
             if(ships.size()>=200||design==null||design.faction!=faction)
@@ -154,9 +165,9 @@ public final class CampaignFleet {
             newShip.kineticAmmo=0;newShip.missileAmmo=0;newShip.torpedoAmmo=0;
             newShip.fighterReserve=0;newShip.droneReserve=0;newShip.repairDroneReserve=0;
             ArrayList<Vessel> result=new ArrayList<>(ships);
-            result.add(new Vessel(nextId,FleetNames.generate(style,design.faction.ordinal(),nextId),
+            result.add(new Vessel(nextId,FleetNames.generate(style,namingSeed,nextId),
                     design,false,Stores.capture(newShip)));
-            return new Roster(faction,style,nextId+1,result);
+            return new Roster(faction,style,nextId+1,result,namingSeed,radioTone);
         }
         public Roster afterBattle(Battle battle,List<Integer> deployedIds){
             if(battle==null||deployedIds==null||active().size()!=deployedIds.size())
@@ -194,7 +205,7 @@ public final class CampaignFleet {
                 }
             }
             result.sort(java.util.Comparator.comparingInt(Vessel::id));
-            return new Roster(faction,style,nextId,result);
+            return new Roster(faction,style,nextId,result,namingSeed,radioTone);
         }
         public Roster service(int id,Service category,TechnologyCatalog technology) {
             Vessel v=get(id);
@@ -286,12 +297,19 @@ public final class CampaignFleet {
     }
     public static Roster start(Battle.Faction faction,Shipyard.Design starter,
                                TechnologyCatalog technology){
+        return start(faction,starter,technology,faction==null?0:faction.ordinal());
+    }
+    /** A truly new campaign chooses this seed once, then persists it in the
+     * owned roster. Deterministic fixtures continue using the legacy overload. */
+    public static Roster start(Battle.Faction faction,Shipyard.Design starter,
+                               TechnologyCatalog technology,long namingSeed){
         if(faction==null||starter==null||starter.faction!=faction)
             throw new IllegalArgumentException("Starter faction mismatch");
         ArrayList<Vessel> vessels=new ArrayList<>();
         for(int i=1;i<=4;i++)
             vessels.add(new Vessel(i,FleetNames.generate(FleetNames.Style.NAVAL,
-                    faction.ordinal(),i),starter,true,Stores.capture(fresh(starter,technology))));
-        return new Roster(faction,FleetNames.Style.NAVAL,5,vessels);
+                    namingSeed,i),starter,true,Stores.capture(fresh(starter,technology))));
+        return new Roster(faction,FleetNames.Style.NAVAL,5,vessels,namingSeed,
+                CrewChatter.Tone.MIXED);
     }
 }
