@@ -3,133 +3,107 @@ package diplomacy.sim;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.CRC32;
 
-/** Headless campaign research and replay contract for desktop and Android. */
+/** Every research completion has a nonnegative mission cost, including instant zero. */
 public final class CampaignResearchTest {
-    private static void require(boolean yes,String explanation){
-        if(!yes)throw new AssertionError(explanation);
+    private static void check(boolean pass,String why){if(!pass)throw new AssertionError(why);}
+    private static void reject(Runnable task,String why){
+        try{task.run();}catch(IllegalArgumentException expected){return;}
+        throw new AssertionError(why);
     }
-    private static void rejects(Runnable action,String detail){
-        try{action.run();}catch(IllegalArgumentException expected){return;}
-        throw new AssertionError(detail);
+    private static CampaignProgress.State funded(int frontier,int rank,int speed,long credits){
+        return new CampaignProgress.State(Battle.Faction.TERRAN,Math.min(500,frontier+1),
+                credits,frontier,rank,frontier,speed,CampaignProgress.Project.NONE,0);
     }
-    private static String legacy(String magic,int level,long credits,int victories,int rank) {
-        String s=magic+"\nTERRAN\n"+level+"\n"+credits+"\n"+victories+"\n";
-        if(!magic.equals("CD-CAMPAIGN-1"))s+=rank+"\n";
-        return seal(s);
+    private static String seal(String magic,String data){
+        String body=magic+"\n"+data;
+        CRC32 crc=new CRC32();crc.update(body.getBytes(StandardCharsets.UTF_8));
+        return body+Long.toHexString(crc.getValue())+"\n";
     }
-    private static String seal(String body){
-        CRC32 check=new CRC32();
-        check.update(body.getBytes(StandardCharsets.UTF_8));
-        return body+Long.toHexString(check.getValue())+"\n";
-    }
-    public static void main(String[] ignored){
-        var start=CampaignProgress.start(Battle.Faction.TERRAN);
-        require(!start.completedMission(1)&&start.nextResearchMissions()==1,
-                "Mission one and earliest technology must be new and 1 unit");
-        rejects(start::purchaseNextResearch,"No credits means no research");
-        var funded=new CampaignProgress.State(Battle.Faction.TERRAN,1,25000,0,0);
-        var queued=funded.purchaseNextResearch();
-        require(queued.credits()==0&&queued.researchRank()==0
-                        &&queued.activeProject()==CampaignProgress.Project.LICENSE
-                        &&queued.currentProjectMissions()==1,
-                "Technology costs real credits and requires a completed mission");
-        rejects(queued::purchaseNextResearch,"Two active projects are illegal");
-        rejects(()->queued.complete(2,4,4),"Locked mission cannot earn research time");
-        rejects(()->queued.complete(1,4,0),"Defeat cannot earn research time");
-        long raw1=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,4,true);
-        var won=queued.complete(1,4,4);
-        require(won.researchRank()==1&&won.activeProject()==CampaignProgress.Project.NONE
-                        &&won.completedMission(1)&&won.credits()==raw1,
-                "First clear pays full and finishes early 1-mission research");
-        var replay=won.complete(1,4,4);
-        require(replay.credits()-won.credits()==raw1/4&&replay.unlocked()==won.unlocked()
-                        &&replay.researchRank()==1,"Repeat must pay only one quarter");
-        var tier2=new CampaignProgress.State(Battle.Faction.TERRAN,2,100000,1,1)
-                .purchaseNextResearch();
-        require(tier2.currentProjectMissions()==2,"Second technology research must take two units");
-        var partial=tier2.complete(1,4,4);
-        require(partial.projectProgress()==1&&partial.researchRank()==1
-                        &&partial.missionsUntilResearchComplete()==1,
-                "Replay must advance exactly one unfinished research unit");
-        require(CampaignProgress.decode(CampaignProgress.encode(partial)).equals(partial),
-                "Active research and progress not persisted");
-        var complete=partial.complete(2,4,4);
-        require(complete.researchRank()==2&&complete.activeProject()==CampaignProgress.Project.NONE,
-                "Rank two only unlocks on the second successful mission");
-        require(complete.credits()-partial.credits()==
-                LevelEconomy.victoryCredits(LevelEconomy.level(2),4,4,true),
-                "New mission after a replay must still pay full amount");
-
-        int firstGate=LevelEconomy.researchSpeedMilestone(1);
-        var blocked=new CampaignProgress.State(Battle.Faction.TERRAN,firstGate,1000000,4,1);
-        rejects(()->blocked.beginResearch(CampaignProgress.Project.ACCELERATOR),
-                "Cannot skip campaign milestone to unlock lab accelerator");
-        var eligible=new CampaignProgress.State(Battle.Faction.TERRAN,firstGate+1,
-                1000000,5,1);
-        var lab=eligible.beginResearch(CampaignProgress.Project.ACCELERATOR);
-        require(lab.speedUpgrades()==0&&lab.projectProgress()==0
-                        &&lab.credits()==1000000-LevelEconomy.researchSpeedCost(1)
-                        &&lab.nextAccelerationMissions()==2,
-                "Lab upgrade must have a real expensive purchase and completion time");
-        lab=lab.complete(1,4,4);
-        require(lab.speedUpgrades()==0&&lab.projectProgress()==1,
-                "Paying for a lab speed upgrade must not immediately grant it");
-        lab=lab.complete(1,4,4);
-        require(lab.speedUpgrades()==1&&lab.researchPerVictory()==2,
-                "Second victory completes first research speed increase");
-
-        int fourthGate=LevelEconomy.researchSpeedMilestone(4);
-        var late=new CampaignProgress.State(Battle.Faction.TERRAN,fourthGate+1,
-                100000000L,500,5,fourthGate,3,CampaignProgress.Project.NONE,0);
-        var fourth=late.purchaseResearchSpeed();
-        require(fourth.currentProjectMissions()==5&&fourth.researchPerVictory()==4
-                        &&fourth.missionsUntilResearchComplete()==2,
-                "Fourth lab needs five work units with a four-work rate");
-        var fourthPartial=fourth.complete(1,4,4);
-        require(fourthPartial.projectProgress()==4&&fourthPartial.speedUpgrades()==3,
-                "Fourth lab should not be active before its completion");
-        var faster=fourthPartial.complete(1,4,4);
-        require(faster.speedUpgrades()==4&&faster.researchPerVictory()==5,
-                "Fourth lab completion raises the research rate to five");
-        rejects(faster::purchaseResearchSpeed,"The research tree permits at most four accelerators");
-        var apex=new CampaignProgress.State(Battle.Faction.TERRAN,fourthGate+1,
-                100000000L,500,5,fourthGate,4,CampaignProgress.Project.NONE,0)
-                .purchaseNextResearch();
-        require(apex.currentProjectMissions()==5&&apex.missionsUntilResearchComplete()==1,
-                "Late technology should require five base units but one accelerated victory");
-        require(apex.complete(1,4,4).researchRank()==6,
-                "Maximum acceleration cannot unlock without a successful mission");
-
-        var last=new CampaignProgress.State(Battle.Faction.TERRAN,500,10000L,499,
-                6,499,0,CampaignProgress.Project.NONE,0);
-        require(!last.completedMission(500),"Mission 500 first clear must be tracked separately");
-        long raw500=LevelEconomy.victoryCredits(LevelEconomy.level(500),4,4,true);
-        var cleared=last.complete(500,4,4);
-        require(cleared.highestCompleted()==500&&cleared.credits()-last.credits()==raw500,
-                "First mission 500 victory must pay full reward");
-        var repeated=cleared.complete(500,4,4);
-        require(repeated.credits()-cleared.credits()==raw500/4,
-                "The final campaign mission repeat must pay one quarter");
-        require(CampaignProgress.decode(CampaignProgress.encode(repeated)).equals(repeated),
-                "High-water clear ledger did not persist");
-
-        var v1=CampaignProgress.decode(legacy("CD-CAMPAIGN-1",4,75000,3,0));
-        var v2=CampaignProgress.decode(legacy("CD-CAMPAIGN-2",4,80000,3,2));
-        require(v1.highestCompleted()==3&&v1.researchRank()==0&&v1.credits()==75000,
-                "v1 progress and credits must migrate intact");
-        require(v2.highestCompleted()==3&&v2.researchRank()==2&&v2.credits()==80000,
-                "v2 already purchased licenses must migrate intact");
-        String old3=seal("CD-CAMPAIGN-3\nTERRAN\n4\n90000\n3\n1\n3\n2\n1\n0\n");
-        var v3=CampaignProgress.decode(old3);
-        require(v3.researchRank()==1&&v3.researchTarget()==2&&v3.projectProgress()==1,
-                "Prior mission-timed v3 research must migrate intact");
-        String namedV3=seal("CD-CAMPAIGN-3\nTERRAN\n500\n500000\n500\n2\n1\nLICENSE\n1\ntrue\n");
-        var named=CampaignProgress.decode(namedV3);
-        require(named.highestCompleted()==500&&named.researchRank()==2
-                        &&named.activeProject()==CampaignProgress.Project.LICENSE,
-                "Named legacy v3 project should preserve progress without free completion");
-        rejects(()->CampaignProgress.decode(CampaignProgress.encode(faster)
-                .replace("ACCELERATOR","LICENSE")),"Checksum must reject forged technology");
-        System.out.println("PASS: quarter replays, 1-5 research, 4 milestone labs, last level, v1-v4 save migration");
+    public static void main(String[] args){
+        reject(CampaignProgress.start(Battle.Faction.TERRAN)::purchaseNextResearch,
+                "Starting technology must be purchased");
+        var first=funded(0,0,0,50000).purchaseNextResearch();
+        check(first.activeProject()==CampaignProgress.Project.LICENSE
+                &&first.missionsUntilResearchComplete()==1,"First technology needs one mission");
+        reject(()->first.beginResearch(CampaignProgress.Project.ACCELERATOR),
+                "No simultaneous projects");
+        var winner=first.complete(1,20,20);
+        check(winner.researchRank()==1&&winner.activeProject()==CampaignProgress.Project.NONE,
+                "One successful mission did not complete early research");
+        var second=winner.purchaseNextResearch();
+        check(second.missionsUntilResearchComplete()==2,"Second technology should take two missions");
+        var one=second.complete(1,20,20);
+        long full=LevelEconomy.victoryCredits(LevelEconomy.level(1),20,20,true);
+        check(one.credits()-second.credits()==full/4,
+                "Repeated mission must pay exactly one quarter");
+        check(one.projectProgress()==1&&one.missionsUntilResearchComplete()==1,
+                "Replay must advance research by one mission tick only");
+        var two=one.complete(1,20,20);
+        check(two.researchRank()==2,"Second research project failed after two wins");
+        var fifth=funded(399,4,0,80000000).purchaseNextResearch();
+        check(fifth.missionsUntilResearchComplete()==5,"Late projects must need five missions");
+        for(int i=0;i<4;i++)fifth=fifth.complete(1,20,20);
+        check(fifth.researchRank()==4&&fifth.projectProgress()==4,
+                "Five-turn project prematurely completed");
+        fifth=fifth.complete(1,20,20);
+        check(fifth.researchRank()==5,"Five-turn project did not complete");
+        reject(()->funded(24,0,0,90000000).purchaseResearchSpeed(),
+                "Lab milestone 25 bypassed");
+        reject(()->funded(25,0,0,0).purchaseResearchSpeed(),
+                "Accelerators cannot be free");
+        var fleet=funded(400,0,0,90000000);
+        for(int tier=1;tier<=4;tier++){
+            long balance=fleet.credits();
+            var queued=fleet.purchaseResearchSpeed();
+            check(queued.credits()==balance-LevelEconomy.researchSpeedCost(tier),
+                    "Lab "+tier+" failed to debit credits");
+            check(queued.missionsUntilResearchComplete()>=0,
+                    "A laboratory has negative work duration");
+            while(queued.activeProject()!=CampaignProgress.Project.NONE)
+                queued=queued.complete(1,20,20);
+            fleet=queued;
+            check(fleet.speedUpgrades()==tier,"Research accelerator not earned");
+        }
+        check(fleet.researchPerVictory()==1,
+                "A completed mission must always provide one research tick");
+        var instant=fleet.purchaseNextResearch();
+        check(instant.researchRank()==1&&instant.activeProject()==CampaignProgress.Project.NONE,
+                "Low-level research at max acceleration must complete instantly");
+        check(instant.nextResearchMissions()>=0&&instant.missionsUntilResearchComplete()==0,
+                "Zero-duration research became negative");
+        final var maxedFleet=fleet;
+        reject(maxedFleet::purchaseResearchSpeed,"No fifth accelerator");
+        check(CampaignProgress.decode(CampaignProgress.encode(first)).equals(first),
+                "Active project failed to survive checksum save");
+        check(CampaignProgress.decode(CampaignProgress.encode(maxedFleet)).equals(maxedFleet),
+                "Speed upgrade purchase not saved");
+        reject(()->new CampaignProgress.State(Battle.Faction.TERRAN,1,0,0,
+                0,0,0,CampaignProgress.Project.LICENSE,-1),
+                "Negative stored research progress accepted");
+        var v1=CampaignProgress.decode(seal("CD-CAMPAIGN-1",
+                "TERRAN\n2\n75000\n1\n"));
+        check(v1.credits()==75000&&v1.isReplay(1),"Legacy first-clear lost");
+        var v2=CampaignProgress.decode(seal("CD-CAMPAIGN-2",
+                "TERRAN\n3\n100000\n2\n2\n"));
+        check(v2.researchRank()==2&&v2.isReplay(2),"Prior technology license lost");
+        var namedV3=CampaignProgress.decode(seal("CD-CAMPAIGN-3",
+                "TERRAN\n500\n500000\n500\n2\n1\nLICENSE\n1\ntrue\n"));
+        check(namedV3.highestCompleted()==500&&namedV3.researchRank()==2
+                &&namedV3.activeProject()==CampaignProgress.Project.LICENSE,
+                "Named v3 project lost or wrongly autocompleted");
+        var numericV3=CampaignProgress.decode(seal("CD-CAMPAIGN-3",
+                "TERRAN\n401\n500000\n400\n0\n400\n1\n0\n4\n"));
+        check(numericV3.researchRank()==1&&!numericV3.researchActive(),
+                "Zero-duration numeric v3 research was not restored");
+        var almost=funded(499,0,0,0);
+        var finalWin=almost.complete(500,20,20);
+        long first500=LevelEconomy.victoryCredits(LevelEconomy.level(500),20,20,true);
+        check(finalWin.highestCompleted()==500&&finalWin.credits()==first500,
+                "Campaign stage 500 first clear payout wrong");
+        check(finalWin.complete(500,20,20).credits()-finalWin.credits()==first500/4,
+                "Final stage replay paid full reward twice");
+        reject(()->CampaignProgress.decode(CampaignProgress.encode(first).replace("TERRAN","DRAXIAN")),
+                "Corrupted research save checksum accepted");
+        System.out.println("PASS research: instant/nonnegative floor, timed paid licenses/labs, four accelerators, quarter replays, v1-v4 saves");
     }
 }
