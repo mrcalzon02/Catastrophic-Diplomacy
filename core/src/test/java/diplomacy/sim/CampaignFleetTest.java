@@ -32,10 +32,10 @@ public final class CampaignFleetTest {
         check(reserve.active().size()==3&&reserve.reserves().size()==1,
                 "Moving vessel to reserve lost ownership or failed to update active group");
         check(original.active().size()==4,"Immutable original roster was changed");
-        reserve=reserve.setActive(2,true,20);
+        reserve=reserve.setActive(ship2,true,20);
         check(reserve.active().size()==4&&reserve.reserves().isEmpty(),
                 "Reserve vessel was repurchased or failed to return to active duty");
-        reject(()->original.setActive(999,true,20),"Nonexistent ship activated");
+        reject(()->original.setActive(999L,true,20),"Nonexistent ship activated");
         reject(()->original.setActive(ship1,true,0),"Invalid deployment limit accepted");
 
         for(FleetNames.Style style:FleetNames.Style.values()){
@@ -46,7 +46,7 @@ public final class CampaignFleetTest {
                     "Neighboring commissioned ships received same call sign");
         }
         var styled=original.changeStyle(FleetNames.Style.CELESTIAL)
-                .rename(1,FleetNames.generate(FleetNames.Style.CELESTIAL,73,21));
+                .rename(ship1,FleetNames.generate(FleetNames.Style.CELESTIAL,73,21));
         check(styled.get(ship1).name().equals(FleetNames.generate(FleetNames.Style.CELESTIAL,73,21)),
                 "Selected vessel name was not retained");
 
@@ -110,9 +110,9 @@ public final class CampaignFleetTest {
         CampaignProgress.State remaining=wallet;
         reject(()->remaining.spend(200001),"Insufficient credits silently accepted");
         var restored=returned.service(ship1,CampaignFleet.Service.REPAIR,tech)
-                .service(1,CampaignFleet.Service.CREW,tech)
-                .service(1,CampaignFleet.Service.AMMUNITION,tech)
-                .service(1,CampaignFleet.Service.FUEL,tech);
+                .service(ship1,CampaignFleet.Service.CREW,tech)
+                .service(ship1,CampaignFleet.Service.AMMUNITION,tech)
+                .service(ship1,CampaignFleet.Service.FUEL,tech);
         for(CampaignFleet.Service type:new CampaignFleet.Service[]{
                 CampaignFleet.Service.REPAIR,CampaignFleet.Service.CREW,
                 CampaignFleet.Service.AMMUNITION,CampaignFleet.Service.FUEL})
@@ -184,7 +184,7 @@ public final class CampaignFleetTest {
         check(fullyServiced.namingSeed()==namedSeed&&
                         fullyServiced.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Service All discarded saved radio tone or naming seed");
-        var reserveCycle=commissioned.setActive(ship1,false,20).setActive(1,true,20);
+        var reserveCycle=commissioned.setActive(ship1,false,20).setActive(ship1,true,20);
         check(reserveCycle.namingSeed()==namedSeed&&
                         reserveCycle.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Reserve/deployment changed saved crew communication preferences");
@@ -206,7 +206,7 @@ public final class CampaignFleetTest {
                 "Naming seed and communication voice were not preserved on reload");
         check(FleetNames.Style.values().length>=20,
                 "Ship naming themes were not expanded");
-        var copy=decoded.setActive(3,true,20);
+        var copy=decoded.setActive(ship3,true,20);
         var listed=copy.active();
         check(listed.stream().anyMatch(v->v.id()==ship3),
                 "Escaped preserved hull could not be recommissioned");
