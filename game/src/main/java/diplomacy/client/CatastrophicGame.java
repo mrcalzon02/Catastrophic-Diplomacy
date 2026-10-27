@@ -551,8 +551,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void newCampaign(){
         CampaignProgress.State proposed=CampaignProgress.start(pendingFaction);
+        // A new campaign receives its own name seed; existing campaigns keep
+        // their original seed in the atomic roster save.
+        long namingSeed=java.util.concurrent.ThreadLocalRandom.current().nextLong();
         CampaignFleet.Roster vessels=CampaignFleet.start(pendingFaction,
-                Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology);
+                Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology,namingSeed);
         if(!commitCampaign(proposed,vessels))return;
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
         saveCampaignBlueprint(campaignDesign);
@@ -716,6 +719,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 14 -> dockManualRename();
             case 15 -> openCampaignShipyard();
             case 16 -> openResearch();
+            case 17 -> {
+                var tones=CrewChatter.Tone.values();
+                int current=campaignFleet.radioTone().ordinal();
+                if(!commitCampaign(campaign,campaignFleet.changeRadioTone(
+                        tones[(current+1)%tones.length])))return;
+                dockNotice="Fleet communications set to "+campaignFleet.radioTone()+
+                        ". Applies to the next engagement.";
+            }
             case 11 -> {
                 var styles=FleetNames.Style.values();
                 if(!commitCampaign(campaign,campaignFleet.changeStyle(
@@ -727,7 +738,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     int id=dockShipId();
                     if(!commitCampaign(campaign,campaignFleet.rename(id,
                             FleetNames.generate(campaignFleet.style(),
-                                    campaign.faction().ordinal(),id))))return;
+                                    campaignFleet.namingSeed(),id))))return;
                     dockNotice="Renamed ship #"+id+" to "+campaignFleet.get(id).name();
                 }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
             }
@@ -1483,6 +1494,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
         for(int side=0;side<2;side++)battle.setTeamOrders(side,fleetOrders[side]);
+        if(!verifyDemo&&playedCampaign&&campaignFleet!=null)
+            battle.setTeamRadioTone(0,campaignFleet.radioTone());
         // Team policies are defaults; individual captain doctrines take precedence.
         // Apply after team orders so a restart cannot silently erase per-ship intent.
         if(!verifyDemo&&(playedCampaign||(preparedSkirmish&&!scenario.demonstration)))
