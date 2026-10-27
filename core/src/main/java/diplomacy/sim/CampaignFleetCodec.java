@@ -11,7 +11,8 @@ import java.util.List;
 
 /** Explicitly versioned, tamper-detecting campaign-owned vessel registry. */
 public final class CampaignFleetCodec {
-    private static final String MAGIC="CD-ROSTER-1";
+    private static final String MAGIC="CD-ROSTER-2";
+    private static final String LEGACY="CD-ROSTER-1";
     private CampaignFleetCodec(){}
     private static String pack(String s){
         return Base64.getUrlEncoder().withoutPadding()
@@ -43,6 +44,7 @@ public final class CampaignFleetCodec {
                     .append(pack(Shipyard.encode(v.fitting()))).append(',')
                     .append(stores.hull()).append(',')
                     .append(pack(stores.integrity())).append(',')
+                    .append(pack(stores.machinery())).append(',')
                     .append(stores.crew()).append(',')
                     .append(stores.kinetic()).append(',')
                     .append(stores.missiles()).append(',')
@@ -58,7 +60,8 @@ public final class CampaignFleetCodec {
         if(payload==null||payload.length()>3_000_000||tech==null)
             throw new IllegalArgumentException("Invalid roster file");
         String[] rows=payload.split("\n",-1);
-        if(rows.length<4||rows.length>204||!MAGIC.equals(rows[0])
+        if(rows.length<4||rows.length>204||
+                (!MAGIC.equals(rows[0])&&!LEGACY.equals(rows[0]))
                 ||!rows[rows.length-1].isEmpty())
             throw new IllegalArgumentException("Unknown roster encoding");
         StringBuilder body=new StringBuilder();
@@ -75,7 +78,9 @@ public final class CampaignFleetCodec {
             List<CampaignFleet.Vessel> vessels=new ArrayList<>();
             for(int i=2;i<rows.length-2;i++){
                 String[] parts=rows[i].split(",",-1);
-                if(parts.length!=14)throw new IllegalArgumentException("Invalid ship inventory");
+                int offset=MAGIC.equals(rows[0])?1:0;
+                if(parts.length!=14+offset)
+                    throw new IllegalArgumentException("Invalid ship inventory");
                 int id=Integer.parseInt(parts[0]);
                 boolean deployed=switch(parts[1]){
                     case "0" -> false;case "1" -> true;
@@ -84,10 +89,11 @@ public final class CampaignFleetCodec {
                 Shipyard.Design design=Shipyard.decode(unpack(parts[3]),tech);
                 CampaignFleet.Stores stores=new CampaignFleet.Stores(
                         Double.parseDouble(parts[4]),unpack(parts[5]),
-                        Double.parseDouble(parts[6]),Integer.parseInt(parts[7]),
-                        Integer.parseInt(parts[8]),Integer.parseInt(parts[9]),
-                        Integer.parseInt(parts[10]),Integer.parseInt(parts[11]),
-                        Integer.parseInt(parts[12]),Double.parseDouble(parts[13]));
+                        offset==0?ShipSubsystems.full():unpack(parts[6]),
+                        Double.parseDouble(parts[6+offset]),Integer.parseInt(parts[7+offset]),
+                        Integer.parseInt(parts[8+offset]),Integer.parseInt(parts[9+offset]),
+                        Integer.parseInt(parts[10+offset]),Integer.parseInt(parts[11+offset]),
+                        Integer.parseInt(parts[12+offset]),Double.parseDouble(parts[13+offset]));
                 stores.apply(CampaignFleet.fresh(design,tech));
                 vessels.add(new CampaignFleet.Vessel(id,unpack(parts[2]),design,deployed,stores));
             }
