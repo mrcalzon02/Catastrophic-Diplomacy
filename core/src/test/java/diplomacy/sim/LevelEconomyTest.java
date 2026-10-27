@@ -19,6 +19,13 @@ public final class LevelEconomyTest {
         check(LevelEconomy.victoryCredits(first,10,10,false)==0,"defeat cannot farm credits");
         check(LevelEconomy.victoryCredits(first,16,16,true)==14000,"full reward on replay");
         for(int stage=1;stage<=6;stage++)
+            check(LevelEconomy.researchMissionCost(stage)==Math.min(5,stage),
+                    "Research mission durations must range from one to five");
+        for(int level=1;level<=4;level++){
+            check(LevelEconomy.researchSpeedCost(level)>0,"Research acceleration cannot be free");
+            check(LevelEconomy.researchSpeedMilestone(level)>0,"Accelerator must have milestone");
+        }
+        for(int stage=1;stage<=6;stage++)
             check(LevelEconomy.draftResearchCost(stage)>0,"research pricing stage "+stage);
         boolean rejected=false;
         try{LevelEconomy.victoryCredits(first,21,20,true);}

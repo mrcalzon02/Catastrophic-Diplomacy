@@ -29,6 +29,16 @@ public final class GameFlowTest {
         verify(won.available(2)&&won.credits()>0&&won.victories()==1,"Progress rewards");
         verify(won.equals(CampaignProgress.decode(CampaignProgress.encode(won))),"Won save round-trip");
         verify(won.complete(1,4,3).credits()>won.credits(),"Replay credits");
+        long previousFull=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,3,true);
+        verify(won.complete(1,4,3).credits()-won.credits()==previousFull/4,
+                "Previously completed campaign levels must pay precisely one-quarter");
+        var top=new CampaignProgress.State(Battle.Faction.TERRAN,500,0,499,0,499,0,0,0);
+        var topWin=top.complete(500,20,20);
+        verify(topWin.highestCompleted()==500&&topWin.credits()>0,
+                "Final campaign stage should award its first-clear reward only once");
+        verify(topWin.complete(500,20,20).credits()-topWin.credits()==topWin.credits()/4,
+                "Stage 500 replay must not pay first-clear credits a second time");
+
         boolean rejected=false;
         try{CampaignProgress.decode(CampaignProgress.encode(won).replace("TERRAN","DRAXIAN"));}
         catch(IllegalArgumentException valid){rejected=true;}

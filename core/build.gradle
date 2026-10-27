@@ -318,6 +318,15 @@ tasks.register('gameFlowSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
+tasks.register('campaignResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove mission-timed research, instant zero-floor, quarter replay rewards and four paid milestones.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignResearchTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignResearchSmoke')) }
+
 
 tasks.register('campaignDeploymentSmoke', JavaExec) {
     group = 'verification'

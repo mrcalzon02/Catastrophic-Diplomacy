@@ -44,6 +44,30 @@ public final class LevelEconomy {
         if(level==null)throw new IllegalArgumentException("Level required");
         return victoryCredits(level.baseCredits(),level.maximumFleet(),deployed,survivors,completed);
     }
+    /** Mission turns required for each of the six research generations (1..5). */
+    public static int researchMissionCost(int rank){
+        if(rank<1||rank>6)throw new IllegalArgumentException("Research rank must be 1..6");
+        return Math.min(5,rank);
+    }
+    /** Four optional, expensive acceleration upgrades with completed-stage prerequisites. */
+    public static int researchSpeedMilestone(int level){
+        return switch(level){
+            case 1 -> 25;
+            case 2 -> 100;
+            case 3 -> 225;
+            case 4 -> 400;
+            default -> throw new IllegalArgumentException("Research accelerator must be 1..4");
+        };
+    }
+    public static long researchSpeedCost(int level){
+        return switch(level){
+            case 1 -> 80000L;
+            case 2 -> 500000L;
+            case 3 -> 2800000L;
+            case 4 -> 12000000L;
+            default -> throw new IllegalArgumentException("Research accelerator must be 1..4");
+        };
+    }
     /** Fixed six-stage research ladder pending technology catalogue purchase binding. */
     public static long draftResearchCost(int stage) {
         return switch(stage) {
