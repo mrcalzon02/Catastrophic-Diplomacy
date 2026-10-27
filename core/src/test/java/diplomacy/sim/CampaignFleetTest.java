@@ -187,15 +187,15 @@ public final class CampaignFleetTest {
                 "Fleet codec discarded naming and radio preferences after service");
         // Build a genuine v2 artifact, including its ORIGINAL checksum, rather
         // than treating a no-op string replacement as migration verification.
-        String[] v3Rows=encoded.split("\\n",-1);
+        String[] v3Rows=encoded.split("\n",-1);
         String[] v3Header=v3Rows[1].split(",",-1);
-        StringBuilder oldBody=new StringBuilder("CD-ROSTER-2\\n")
+        StringBuilder oldBody=new StringBuilder("CD-ROSTER-2\n")
                 .append(String.join(",",v3Header[0],v3Header[1],v3Header[2]))
-                .append('\\n');
-        for(int n=2;n<v3Rows.length-2;n++)oldBody.append(v3Rows[n]).append('\\n');
+                .append('\n');
+        for(int n=2;n<v3Rows.length-2;n++)oldBody.append(v3Rows[n]).append('\n');
         byte[] oldHash=java.security.MessageDigest.getInstance("SHA-256").digest(
                 oldBody.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        String originalV2=oldBody+java.util.HexFormat.of().formatHex(oldHash)+"\\n";
+        String originalV2=oldBody+java.util.HexFormat.of().formatHex(oldHash)+"\n";
         var migrated=CampaignFleetCodec.decode(originalV2,tech);
         check(migrated.namingSeed()==faction.ordinal()&&
                 migrated.radioTone()==CrewChatter.Tone.MIXED&&
