@@ -45,6 +45,35 @@ public final class CampaignFleetTest {
             check(!first.equals(FleetNames.generate(style,73,6)),
                     "Neighboring commissioned ships received same call sign");
         }
+        var rerolled=original.changeStyle(FleetNames.Style.ABSURDIST).generateName(ship1);
+        check(!rerolled.get(ship1).name().equals(original.get(ship1).name())&&
+                rerolled.get(ship1).id()==ship1&&
+                rerolled.get(ship2).name().equals(original.get(ship2).name(),
+                "Generating a different name changed identity or other vessels");
+        var rerolledAgain=rerolled.generateName(ship1);
+        check(!rerolledAgain.get(ship1).name().equals(rerolled.get(ship1).name()),
+                "Generate name action did not produce another distinctive name");
+        for(var style:FleetNames.Style.values())
+            for(int serial=1;serial<=80;serial++){
+                String name=FleetNames.generate(style,73L,serial);
+                check(!name.isBlank()&&name.length()<=70,
+                        "Invalid generated name in naming tradition "+style+": "+name);
+            }
+        for(var style:new FleetNames.Style[]{FleetNames.Style.GRIMDARK,
+                FleetNames.Style.NEOCLASSICAL,FleetNames.Style.ABSURDIST}){
+            var options=new java.util.HashSet<String>();
+            for(int serial=1;serial<=1000;serial++)
+                options.add(FleetNames.generate(style,73L,serial));
+            check(options.size()>=400,
+                    "Naming tradition lacks substantive variety: "+style+" "+options.size());
+        }
+        for(var style:new FleetNames.Style[]{FleetNames.Style.NAVAL,
+                FleetNames.Style.GRIMDARK,FleetNames.Style.NEOCLASSICAL,
+                FleetNames.Style.ABSURDIST}){
+            String name=FleetNames.generate(style,73,5);
+            check(!name.matches(".*\\\\s\\\\d{3}$"),
+                    "Cultural name leaked its commissioning serial: "+style);
+        }
         var styled=original.changeStyle(FleetNames.Style.CELESTIAL)
                 .rename(ship1,FleetNames.generate(FleetNames.Style.CELESTIAL,73,21));
         check(styled.get(ship1).name().equals(FleetNames.generate(FleetNames.Style.CELESTIAL,73,21)),
@@ -159,8 +188,9 @@ public final class CampaignFleetTest {
         var reservedName=original.rename(ship1,nextName);
         var acquired=reservedName.purchase(baseline,tech);
         check(!acquired.get(ship1).name().equalsIgnoreCase(acquired.get(ship5).name())&&
-                acquired.get(ship5).name().startsWith(nextName),
-                "Commissioning duplicated a manually reserved future ship name");
+                !acquired.get(ship5).name().isBlank()&&
+                acquired.get(ship5).id()==ship5,
+                "Commissioning duplicated an owned display name or changed the hull ID");
 
         String encoded=CampaignFleetCodec.encode(replacement);
         var decoded=CampaignFleetCodec.decode(encoded,tech);
