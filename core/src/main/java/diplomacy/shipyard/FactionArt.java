@@ -35,7 +35,7 @@ public final class FactionArt {
     public static boolean supports(Battle.Faction faction){return ALIENS.containsKey(faction);}
     public static String hullFile(Shipyard.Hull hull) {
         if(hull==null)throw new IllegalArgumentException("Hull required");
-        return switch(hull){
+        return switch(hull.spriteHull()){
             case INTERCEPTOR -> "interceptor";
             case CORVETTE -> "corvette";
             case MISSILE_CORVETTE -> "missile_corvette";
