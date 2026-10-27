@@ -67,7 +67,10 @@ public final class ShipLineages {
             case CORVETTE_LOGISTICS,FRIGATE_ESCORT,LIGHT_CRUISER_LOGISTICS,
                     HEAVY_CRUISER_LOGISTICS,CARRIER_LOGISTICS -> Role.LOGISTICS_JUGGERNAUT;
         };
-        return new Lineage(generation,artwork,ethos,role);
+        // Carrier/dreadnought share the tenth curated alien sheet's single
+        // ART SIZE category even where Terran art uses separate detailed PNGs.
+        return new Lineage(generation,artwork==Shipyard.Hull.DREADNOUGHT?
+                Shipyard.Hull.CARRIER:artwork,ethos,role);
     }
     /**
      * Build a role-specific FACTORY prototype using installed machinery.
@@ -123,6 +126,10 @@ public final class ShipLineages {
             case LOGISTICS_JUGGERNAUT -> {
                 fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
                 fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                // Shield transfer and repair power demand an actual second
+                // reactor plus radiator rather than a magic role multiplier.
+                fitting=set(fitting,Shipyard.Mount.SYSTEM,3,id+"REA");
+                fitting=set(fitting,Shipyard.Mount.SYSTEM,4,id+"RAD");
                 fitting=set(fitting,Shipyard.Mount.SUPPORT,0,id+"REP");
             }
         }
