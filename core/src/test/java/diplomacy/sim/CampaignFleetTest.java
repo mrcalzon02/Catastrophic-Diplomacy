@@ -90,6 +90,27 @@ public final class CampaignFleetTest {
         check(restored.get(3).stores().equals(returned.get(3).stores()),
                 "Servicing one ship regenerated a different reserve vessel");
 
+        // A complete dock job is quoted from the physical stores and charged
+        // once, not five independent purchases or a free automatic reset.
+        long allQuote=returned.costAll(1,tech);
+        long individualSum=0;
+        for(CampaignFleet.Service type:CampaignFleet.Service.values())
+            individualSum=Math.addExact(individualSum,returned.cost(1,type,tech));
+        check(allQuote==individualSum&&allQuote>0,
+                "Service All price differs from the sum of real shortages");
+        check(returned.costAll(3,tech)==0,
+                "An undamaged reserve is incorrectly quoted for service");
+        var onlyOne=returned.serviceAll(1,tech);
+        check(onlyOne.costAll(1,tech)==0,"Service All left charges or shortages");
+        check(onlyOne.get(3).stores().equals(returned.get(3).stores()),
+                "Service All secretly replenished a different ship");
+        CampaignProgress.State funded=new CampaignProgress.State(faction,1,allQuote,0);
+        check(funded.spend(allQuote).credits()==0,
+                "Exactly funded Service All must spend the complete quote");
+        CampaignProgress.State underfunded=new CampaignProgress.State(faction,1,allQuote-1,0);
+        reject(()->underfunded.spend(allQuote),
+                "Service All must never be partially applied when credits are insufficient");
+
         long purchasePrice=CampaignFleet.purchaseCost(baseline);
         check(purchasePrice>10000,"Ship replacements are implausibly cheap");
         var replacement=returned.purchase(baseline,tech);
