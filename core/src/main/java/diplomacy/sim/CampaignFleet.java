@@ -232,7 +232,7 @@ public final class CampaignFleet {
             }
             ArrayList<Vessel> updated=new ArrayList<>(ships);
             updated.replaceAll(item->item.id()==id?item.withStores(Stores.capture(fitted)):item);
-            return new Roster(faction,style,nextId,updated);
+            return new Roster(faction,style,nextId,updated,namingSeed,radioTone);
         }
         /** Quote the complete dock job before debiting credits. All five services
          * are calculated from this vessel's actual fitted capacity and stores. */
