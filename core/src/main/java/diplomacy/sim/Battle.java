@@ -127,6 +127,9 @@ public final class Battle {
         public void setLaunchMode(DamageType family,OrdnanceDoctrine.Mode mode){
             OrdnanceDoctrine.forWeapon(family,mode);launchModes.put(family,mode);
         }
+        /** Permanent sixteen-digit campaign identity; zero for uncommissioned
+         * skirmish ships. Tactical combat target IDs remain short-lived ints. */
+        public long commissionedId;
         public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
         /** Committed withdrawal remains active after field repairs; escaped hulls
