@@ -130,7 +130,7 @@ final class GameMenuPanel {
               boolean preparingCampaign,int standingPage,boolean selectingGroup,
               Set<Integer> doctrineGroup,boolean awaitingWaypoint,String editNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
-              boolean won,long reward,int surviving,int deployed){
+              boolean won,long reward,int surviving,int deployed,int escaped,int destroyed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,W,H,BG);
         // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
@@ -370,9 +370,13 @@ final class GameMenuPanel {
             }
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");
-                label(batch,font,won?"MISSION ACCOMPLISHED":"FLEET DEFEATED",416,464,won?Color.GREEN:Color.SCARLET);
-                label(batch,font,"SURVIVING SHIPS: "+surviving+" / "+deployed,416,412,Color.WHITE);
-                label(batch,font,"CREDITS AWARDED: "+reward,416,359,Color.GOLD);
+                label(batch,font,won?"MISSION ACCOMPLISHED":
+                        escaped>0&&surviving==0?"FLEET WITHDREW":"FLEET DEFEATED",
+                        416,494,won?Color.GREEN:Color.SCARLET);
+                label(batch,font,"ACTIVE SURVIVORS: "+surviving+" / "+deployed,416,444,Color.WHITE);
+                label(batch,font,"ESCAPED SHIPS: "+escaped+" (NO VICTORY CREDIT)",416,408,Color.CYAN);
+                label(batch,font,"DESTROYED HULLS: "+destroyed,416,372,Color.WHITE);
+                label(batch,font,"CREDITS AWARDED: "+reward,416,326,Color.GOLD);
                 label(batch,font,"RETRY",423,157,Color.WHITE);
                 label(batch,font,"RETURN TO "+(progress!=null?"CAMPAIGN":"SKIRMISH"),699,157,Color.WHITE);
             }

@@ -129,3 +129,31 @@ cosmetic screenshot gates.
 Not yet implemented: reusable named multi-group profiles, drag-box selection,
 manual squadron commander assignment, per-hardpoint targeting or completed
 withdrawal/escape accounting.
+
+## Physical withdrawal and escape resolution (2026-10-26)
+
+An explicit individual captain's hull or shield retreat minimum now triggers a
+**committed withdrawal**. Shield recharge or field repairs cannot cancel it,
+and previously queued movement orders cannot override it. The vessel travels
+under its real engine-condition, crew readiness and captain-set speed limit to
+its own friendly rear border (player-side x=0, opponent-side x=1280).
+It remains targetable and vulnerable while moving, can use defensive point
+defense or repair drones, but does not fire offensive batteries or release
+new offensive fighter/drone sorties. Existing guided salvo queues are stopped.
+
+After **physically crossing the border**, the hull is recorded as escaped, with
+its intact hull and tick of escape retained in the battle's vessel registry.
+Escaped ships are not active combatants, cannot be attacked, and are **not**
+counted as campaign survivors. A player who withdraws the last active vessel
+concedes the current mission; a partially withdrawn victorious fleet earns
+credits for the ships still present after the final enemy wave. The result
+screen distinguishes active survivors, escaped and destroyed hulls.
+
+Functional gate: `:core:battleRetreatSmoke` verifies real navigation through
+both opposing rear borders, irreversible low-hull/low-shield withdrawal,
+Last Stand, preexisting movement order priority, wave resolution, and
+reward exclusion. No screenshot/cosmetic release gates are introduced.
+
+Still to develop: post-mission repairs, preserved per-vessel campaign roster,
+salvage/insurance, additional combat doctrine conditions and enemy retreat
+rout AI. Escape alone does not imply a repaired ship in the next scenario.

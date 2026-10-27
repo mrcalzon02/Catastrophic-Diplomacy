@@ -65,7 +65,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private CampaignProgress.State campaign;
     private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
-    private int deployedAtLaunch,survivorsAtEnd;
+    private int deployedAtLaunch,survivorsAtEnd,escapedAtEnd,destroyedAtEnd;
     private CampaignEncounter campaignEncounter;
     private CampaignDeployment.Loadout deployment=CampaignDeployment.defaultFor(LevelEconomy.level(1));
     private int selectedDeploymentShip;
@@ -665,6 +665,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void finishEngagement(){
         lastWon=battle.alive(0)>0&&battle.alive(1)==0;
         survivorsAtEnd=battle.alive(0);
+        escapedAtEnd=battle.escaped(0);
+        destroyedAtEnd=battle.destroyed(0);
         lastReward=0;
         if(playedCampaign&&lastWon){
             long before=campaign.credits();
@@ -1101,7 +1103,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     preparingCampaign,standingPage,selectingDoctrineGroup,doctrineGroup,
                     waitingForWaypoint,deploymentNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
-                    survivorsAtEnd,deployedAtLaunch);
+                    survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
@@ -1316,6 +1318,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
+                + "   ESCAPED " + battle.escaped(0) + " / " + battle.escaped(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
                 + "   PD " + (battle.missileIntercepts+battle.ballisticIntercepts)
                 + "   CRAFT " + battle.crafts().size()
