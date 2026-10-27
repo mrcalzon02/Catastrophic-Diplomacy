@@ -42,7 +42,25 @@ public final class CampaignAfterActionTest {
                 first.hullPercent()==50,"Stable ship identity/hull integrity changed");
         check(first.crewLost()==3&&first.missileSpent()==7&&first.fuelSpent()==24,
                 "Battle expenses and personnel losses were not measured");
+        // Regression: an uncommissioned tactical hull (ID 0) or a swapped
+        // commissioned ID must never inherit another ship's losses or stores.
+        long firstId=ids.get(0);
+        battle.ships().get(0).commissionedId=0;
+        reject(()->CampaignAfterAction.capture(original,ids,battle),
+                "Uncommissioned hull was attributed to a campaign captain");
+        reject(()->original.afterBattle(battle,ids),
+                "Uncommissioned hull was accepted for permanent fleet recovery");
+        battle.ships().get(0).commissionedId=ids.get(1);
+        reject(()->CampaignAfterAction.capture(original,ids,battle),
+                "Swapped 16-digit hull ID was accepted by after-action reporting");
+        reject(()->original.afterBattle(battle,ids),
+                "Swapped 16-digit hull ID was accepted by fleet recovery");
+        battle.ships().get(0).commissionedId=firstId;
         var recovered=original.afterBattle(battle,ids);
+        check(recovered.get(firstId).id()==firstId&&
+                recovered.get(ids.get(2)).id()==ids.get(2)&&
+                Long.toString(recovered.get(firstId).id()).length()==16,
+                "Campaign recovery changed or truncated a surviving ship ID");
         check(recovered.ships().size()==3&&report.entries().get(1).outcome()==
                 CampaignAfterAction.Outcome.DESTROYED,
                 "Destroyed commissioned vessel disappeared from casualty ledger");
