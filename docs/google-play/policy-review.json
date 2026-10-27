@@ -1,0 +1,405 @@
+{
+  "package": "games.catastrophicdiplomacy",
+  "policy_center": "https://play.google/developer-content-policy/",
+  "reference_effective_date": "2026-09-30",
+  "privacy_policy_url": "",
+  "data_safety_evidence": "",
+  "content_rating_evidence": "",
+  "target_audience_evidence": "",
+  "store_listing_evidence": "",
+  "sdk_inventory_evidence": "",
+  "policies": [
+    {
+      "name": "Child Endangerment",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Inappropriate Content",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Age-Restricted Content and Functionality",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Financial Services",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Real-Money Gambling Games and Contests",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Illegal Activities",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "User Generated Content",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Health Content and Services",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Blockchain-based Content",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "AI-Generated Content",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Impersonation",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Intellectual Property",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "User Data",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Permissions",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Device and Network Abuse",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Deceptive Behavior",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Misrepresentation",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Target API Level",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "SDK Requirements",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Payments",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Subscriptions",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Ads",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Families Self-Certified Ads SDK Program",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "App Promotion",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Metadata",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "User Ratings Reviews and Installs",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Content Ratings",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "News and Magazines",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Spam",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Functionality Content and User Experience",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Malware",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Mobile Unwanted Software",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Ad Fraud",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Unauthorized Use or Imitation of System Functionality",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Social Engineering",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Hostile Downloaders",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Families",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Families Self-Certified Ads SDK Policy",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Android Auto/Automotive",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Android Emoji Policy",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Android Instant Apps",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Android TV",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Android XR",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Wear OS",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Policy Coverage",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Enforcement Process",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Managing Policy Violations and Appeals",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Play Console Requirements",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Privacy Policy",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Data Safety",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Store Listing",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "App Access and Tester Instructions",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Target Audience",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "IARC Content Rating",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "SDK and Data Inventory",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    },
+    {
+      "name": "Billing and In-App Purchases",
+      "status": "pending",
+      "reviewer": "",
+      "reviewed_on": "",
+      "evidence": ""
+    }
+  ]
+}
