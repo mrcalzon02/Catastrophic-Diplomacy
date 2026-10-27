@@ -129,7 +129,7 @@ public final class Battle {
         /** Committed withdrawal remains active after field repairs; escaped hulls
          * remain in the battle registry but cannot fight or be targeted. */
         public boolean withdrawing, escaped;
-        public int withdrawalTick=-1, escapeTick=-1;
+        public long withdrawalTick=-1, escapeTick=-1;
         public int commanderSkill;
         Ship(int identifier, int side, Faction group, String callSign) {
             id = identifier; team = side; faction = group; name = callSign;
