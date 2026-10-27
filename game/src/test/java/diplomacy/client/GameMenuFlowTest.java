@@ -41,9 +41,13 @@ public final class GameMenuFlowTest {
         for(int i=0;i<4;i++)
             check(GameMenuPanel.dockAction(300,545-i*43,0,4)==100+i,
                     "Owned vessel has no selectable roster row "+i);
-        for(int i=0;i<9;i++)
-            check(GameMenuPanel.dockAction(1000,547-i*55,0,4)==4+i,
+        for(int i=0;i<10;i++)
+            check(GameMenuPanel.dockAction(1000,546-i*46,0,4)==4+i,
                     "Fleet service/purchase/name control missing "+i);
+        check(GameMenuPanel.dockAction(1000,546-9*46,0,4)==13,
+                "Service All must be a usable button, not only a price label");
+        check(GameMenuPanel.dockAction(1000,96,0,4)==-1,
+                "Service All tap must not overlap the campaign navigation");
         check(GameMenuPanel.dockAction(400,500,0,0)==-1,
                 "Empty roster offers a selectable phantom ship");
         check(GameMenuPanel.Screen.valueOf("DEPLOYMENT")!=null,
