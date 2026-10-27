@@ -213,7 +213,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.RESEARCH){
-                        if(key==Input.Keys.ENTER)purchaseResearch();
+                        if(key==Input.Keys.ENTER)startResearch(CampaignProgress.Project.LICENSE);
+                        if(key==Input.Keys.A)startResearch(CampaignProgress.Project.ACCELERATOR);
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -566,18 +567,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(campaign==null)return;
         researchReturn=screen==GameMenuPanel.Screen.DOCK?
                 GameMenuPanel.Screen.DOCK:GameMenuPanel.Screen.CAMPAIGN;
-        researchNotice="Next rank costs "+campaign.nextResearchCost()+" credits.";
+        researchNotice=campaign.activeProject()==CampaignProgress.Project.NONE?
+                "Select a technology license or a milestone-locked laboratory upgrade.":
+                "Research advances only after a SUCCESSFUL full campaign mission.";
         screen=GameMenuPanel.Screen.RESEARCH;
     }
-    private void purchaseResearch(){
+    private void startResearch(CampaignProgress.Project project){
         if(campaign==null)return;
         try{
-            long quote=campaign.nextResearchCost();
-            campaign=campaign.purchaseNextResearch();
+            long quote=project==CampaignProgress.Project.LICENSE?
+                    campaign.nextResearchCost():campaign.nextAccelerationCost();
+            campaign=campaign.beginResearch(project);
             saveCampaign();
-            researchNotice="Purchased research rank "+campaign.researchRank()+
-                    " for "+quote+" credits. All old hulls remain unchanged.";
-            Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_RESEARCH rank="+campaign.researchRank());
+            researchNotice=project+" queued for "+quote+" credits. Complete "+
+                    campaign.missionsUntilResearchComplete()+" successful mission(s).";
+            Gdx.app.log("CD-GAME-FLOW","RESEARCH_STARTED "+project+" cost="+quote+
+                    " work="+campaign.currentProjectMissions());
         }catch(IllegalArgumentException denied){researchNotice=denied.getMessage();}
     }
     private void openDock(){
@@ -921,9 +926,24 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(playedCampaign&&lastWon){
             long before=campaign.credits();
+            CampaignProgress.Project previous=campaign.activeProject();
+            int previousRank=campaign.researchRank(),previousSpeed=campaign.speedUpgrades();
+            boolean replay=campaign.isReplay(activeMission);
             campaign=campaign.complete(activeMission,deployedAtLaunch,survivorsAtEnd);
             lastReward=campaign.credits()-before;
             saveCampaign();
+            if(campaign.researchRank()>previousRank)
+                dockNotice="RESEARCH COMPLETE: technology license rank "+campaign.researchRank()+
+                        " acquired after mission "+activeMission+".";
+            else if(campaign.speedUpgrades()>previousSpeed)
+                dockNotice="LAB UPGRADE COMPLETE: research now gains "+
+                        campaign.researchPerVictory()+" work per victorious mission.";
+            else if(previous!=CampaignProgress.Project.NONE)
+                dockNotice="Research progress: "+campaign.projectProgress()+" / "+
+                        campaign.currentProjectMissions()+" work after mission "+activeMission+".";
+            Gdx.app.log("CD-GAME-FLOW","MISSION_REWARD level="+activeMission+
+                    " replay="+replay+" credits="+lastReward+" research="+
+                    campaign.activeProject()+" progress="+campaign.projectProgress());
         }
         running=false;screen=GameMenuPanel.Screen.RESULTS;Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
     }
@@ -996,7 +1016,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.RESEARCH){
             if(GameMenuPanel.hit(x,y,35,35,250,54)){screen=researchReturn;return;}
-            if(GameMenuPanel.hit(x,y,906,35,330,54)){purchaseResearch();return;}
+            if(GameMenuPanel.hit(x,y,906,35,330,54)){
+                startResearch(CampaignProgress.Project.LICENSE);return;
+            }
+            if(GameMenuPanel.hit(x,y,592,35,294,54)){
+                startResearch(CampaignProgress.Project.ACCELERATOR);return;
+            }
             return;
         }
         if(screen==GameMenuPanel.Screen.DOCK){
