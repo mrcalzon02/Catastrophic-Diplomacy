@@ -4,6 +4,8 @@ import json, os, re, sys
 from pathlib import Path
 
 HELP = [
+(r"dependency baseline|direct Maven coordinates drift|approved dependency|license record", "Approved dependency baseline", "Update the exact-version dependency inventory and required license records to match the justified code fix; do not disable the existing dependency checker."),
+(r"curl:|Failed to connect|connection timed out|Network is unreachable|download failed", "Third-party source bootstrap", "Retry the pinned fetch safely, verify SHA-256 and source commit, and preserve original pinning; do not fall back to unverified sources."),
 (r"Missing class|R8|Could not resolve|Execution failed for task",
  "Dependency/build failure", "Inspect Gradle releaseRuntimeClasspath and the named task; provide the real missing dependency or repair failing source, then rebuild. Never suppress missing classes."),
 (r"ELF|16 KB|zip align|zip alignment",
@@ -42,16 +44,16 @@ def main():
     folder = Path(os.getenv("RUNNER_TEMP", "/tmp")) / "play-ci"
     folder.mkdir(parents=True, exist_ok=True)
     states = {name: os.getenv("PLAY_" + name.upper() + "_OUTCOME", "missing")
-              for name in ("source", "build", "artifact", "review")}
+              for name in ("source", "sdk", "bootstrap", "build", "artifact", "review")}
     findings = []
     for phase, state in states.items():
         f = folder / (phase + ".log")
         lines = f.read_text(errors="replace").splitlines() if f.exists() else []
         messages = [re.sub(r"\x1b\[[0-9;]*m", "", line)[6:]
                     for line in lines if line.startswith("FAIL: ")]
-        if phase == "build" and state == "failure":
+        if phase in ("build", "bootstrap", "sdk") and state == "failure":
             messages += [line.strip()[-500:] for line in lines
-                         if "Missing class" in line or "Execution failed for task" in line or "BUILD FAILED" in line]
+                         if "Missing class" in line or "Execution failed for task" in line or "BUILD FAILED" in line or "baseline FAILED" in line or "direct Maven coordinates drift" in line or "curl:" in line or "Error:" in line]
         if state == "failure" and not messages:
             messages = ["Failed phase has no recognized assertion; inspect " + phase + ".log"]
         for message in dict.fromkeys(messages):
@@ -59,7 +61,8 @@ def main():
             findings.append({"phase": phase, "reason": message,
                              "category": topic, "solution": action,
                              "policy_url": "https://play.google/developer-content-policy/"})
-    blocked = any(v != "success" for v in states.values())
+    is_reverie = json.loads((Path(__file__).resolve().parents[1] / "docs/google-play/build-contract.json").read_text())["package"] == "io.github.mrcalzon02.reverievr"
+    blocked = any(v != "success" and not (name == "bootstrap" and v == "skipped" and not is_reverie) for name, v in states.items())
     report = {"schema": 1, "revision": os.getenv("GITHUB_SHA"), "outcomes": states,
               "release_eligible": not blocked, "findings": findings,
               "note": "CI tests cannot certify Play approval or replace human review."}
