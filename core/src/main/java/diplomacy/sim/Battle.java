@@ -711,6 +711,24 @@ public final class Battle {
         }
         BattleOrders.Orders orders=actor.orders;
         Ship choice=null;double best=Double.POSITIVE_INFINITY;
+        // Gather protected assets once per acting ship, never for each hostile
+        // candidate: 200v200 targeting must not grow into a quadratic ally scan.
+        java.util.ArrayList<Integer> guardedIds=new java.util.ArrayList<>(5);
+        java.util.ArrayList<Integer> attackerIds=new java.util.ArrayList<>(5);
+        if(actor.standingOrders!=null){
+            for(int id:actor.defendedShipIds){
+                Ship asset=findShip(id);
+                if(asset!=null&&asset.alive()){
+                    guardedIds.add(asset.id);
+                    if(asset.lastAttackerId!=0)attackerIds.add(asset.lastAttackerId);
+                }
+            }
+            Ship escort=findShip(actor.escortShipId);
+            if(escort!=null&&escort.alive()){
+                guardedIds.add(escort.id);
+                if(escort.lastAttackerId!=0)attackerIds.add(escort.lastAttackerId);
+            }
+        }
         // Zero priority disables a class rather than silently turning it into
         // another target. PD continues according to its independent selector.
         for(Ship candidate:ships)if(candidate.team!=actor.team&&candidate.alive()){
@@ -721,18 +739,9 @@ public final class Battle {
             double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
-            if(actor.standingOrders!=null){
-                for(int protectedId:actor.defendedShipIds){
-                    Ship asset=findShip(protectedId);
-                    if(asset==null||!asset.alive())continue;
-                    if(candidate.id==asset.lastAttackerId||candidate.lastTargetId==asset.id)
-                        assessed-=260;
-                }
-                Ship escort=findShip(actor.escortShipId);
-                if(escort!=null&&escort.alive()&&
-                        (candidate.id==escort.lastAttackerId||candidate.lastTargetId==escort.id))
-                    assessed-=240;
-            }
+            if(actor.standingOrders!=null &&
+                    (attackerIds.contains(candidate.id)||guardedIds.contains(candidate.lastTargetId)))
+                assessed-=260;
             switch(orders.targeting()){
                 case NEAREST -> { }
                 case VULTURE -> assessed-=(1-Math.max(0,candidate.hull/candidate.maxHull))*160;
