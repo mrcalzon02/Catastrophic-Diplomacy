@@ -77,11 +77,14 @@ public final class CampaignFleet {
                 throw new IllegalArgumentException("Invalid fleet roster");
             ships=List.copyOf(ships);
             HashSet<Long> ids=new HashSet<>();
+            HashSet<String> names=new HashSet<>();
             for(Vessel v:ships)
                 if(v==null||VesselIdentifiers.serial(v.id())>=nextSerial||
                         v.id()!=VesselIdentifiers.commissioned(namingSeed,
                                 VesselIdentifiers.serial(v.id()))||
-                        !ids.add(v.id())||v.fitting().faction!=faction)
+                        !ids.add(v.id())||
+                        !names.add(v.name().toLowerCase(java.util.Locale.ROOT))||
+                        v.fitting().faction!=faction)
                     throw new IllegalArgumentException("Duplicate or misplaced fleet hull");
         }
         public List<Vessel> active(){
@@ -168,6 +171,14 @@ public final class CampaignFleet {
             for(Vessel v:ships)result.add(v.id()==id?v.withName(unique):v);
             return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
         }
+        /** Regenerate a distinctive name without altering the sixteen-digit ID. */
+        public Roster generateName(long id){
+            Vessel selected=get(id);
+            long rerollSeed=namingSeed^((long)selected.name().hashCode()*0xd1b54a32d192ed03L);
+            String generated=FleetNames.unique(style,rerollSeed,
+                    VesselIdentifiers.serial(id),ships.stream().map(Vessel::name).toList());
+            return rename(id,generated);
+        }
         public Roster purchase(Shipyard.Design design,TechnologyCatalog technology) {
             if(ships.size()>=200||nextSerial>VesselIdentifiers.MAX_SERIAL||design==null||design.faction!=faction)
                 throw new IllegalArgumentException("Fleet full or wrong faction");
@@ -178,23 +189,8 @@ public final class CampaignFleet {
             newShip.kineticAmmo=0;newShip.missileAmmo=0;newShip.torpedoAmmo=0;
             newShip.fighterReserve=0;newShip.droneReserve=0;newShip.repairDroneReserve=0;
             ArrayList<Vessel> result=new ArrayList<>(ships);
-            // A captain may have manually reserved the upcoming generated
-            // name. New acquisitions must still receive a distinct callsign.
-            String baseName=FleetNames.generate(style,namingSeed,nextSerial);
-            String uniqueName=baseName;
-            int suffix=2;
-            while(true){
-                boolean collision=false;
-                for(Vessel owned:ships)
-                    if(owned.name().equalsIgnoreCase(uniqueName)){
-                        collision=true;
-                        break;
-                    }
-                if(!collision)break;
-                if(suffix>ships.size()+2)
-                    throw new IllegalArgumentException("No unique ship name available");
-                uniqueName=baseName+" #"+suffix++;
-            }
+            String uniqueName=FleetNames.unique(style,namingSeed,nextSerial,
+                    ships.stream().map(Vessel::name).toList());
             result.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,nextSerial),uniqueName,
                     design,false,Stores.capture(newShip)));
             return new Roster(faction,style,nextSerial+1,result,namingSeed,radioTone);
@@ -343,7 +339,8 @@ public final class CampaignFleet {
         ArrayList<Vessel> vessels=new ArrayList<>();
         for(int i=1;i<=4;i++)
             vessels.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,i),
-                    FleetNames.generate(FleetNames.Style.NAVAL,namingSeed,i),
+                    FleetNames.unique(FleetNames.Style.NAVAL,namingSeed,i,
+                            vessels.stream().map(Vessel::name).toList()),
                     starter,true,Stores.capture(fresh(starter,technology))));
         return new Roster(faction,FleetNames.Style.NAVAL,5,vessels,namingSeed,
                 CrewChatter.Tone.MIXED);
