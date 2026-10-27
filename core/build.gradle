@@ -44,6 +44,14 @@ tasks.register('shipLineagesSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('shipyardSmoke') { finalizedBy(tasks.named('shipLineagesSmoke')) }
+tasks.register('campaignResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Paid mission-time research, quarter-credit replays, 4 lab upgrades and old save migration.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignResearchTest'
+    dependsOn testClasses
+}
+tasks.named('shipLineagesSmoke') { finalizedBy(tasks.named('campaignResearchSmoke')) }
 
 
 // Portable fleet encoding and pointer gestures shared by the desktop/Android client.

@@ -28,10 +28,15 @@ public final class AlienFactionArtTest {
                 String path=FactionArt.runtimePath(faction,hull);
                 check(path!=null && path.startsWith("ships/factions/"+art.id()+"/"),
                         "Missing distinct art family for "+faction+"/"+hull);
-                if(hull!=Shipyard.Hull.DREADNOUGHT){
-                    check(paths.add(path),"Sprite identity accidentally shared across classes");
+                if(hull.spriteHull()==hull&&hull!=Shipyard.Hull.DREADNOUGHT){
+                    check(paths.add(path),"Original art categories must retain unique PNG references");
                     images++;
-                }else check(path.endsWith("/carrier.png"),"Ten approved hulls; dreadnought fallback must be explicit");
+                }else {
+                    check(path.equals(FactionArt.runtimePath(faction,hull.spriteHull())),
+                            "Variant must reuse the approved source-category sprite");
+                }
+                if(hull==Shipyard.Hull.DREADNOUGHT)
+                    check(path.endsWith("/carrier.png"),"Capital fallback path changed");
                 check(!HullLayouts.outline(faction,hull).isEmpty(),
                         "New faction lacks procedural fallback silhouette");
                 Shipyard.Design basic=Shipyard.starter(faction,hull);
@@ -46,6 +51,6 @@ public final class AlienFactionArtTest {
             check(test.ships().size()==4,"Distinct race must work in live combat");
         }
         check(images==50&&paths.size()==50,"Require exact 50 original non-placeholder sprites");
-        System.out.println("PASS alien factions: 5 distinct playable races, 50 unique sprite mappings, 11-hull fallback and fleet save compatibility");
+        System.out.println("PASS alien factions: 5 playable races, 50 original PNG mappings and shared new chassis artwork");
     }
 }

@@ -17,7 +17,8 @@ public final class LevelEconomyTest {
         check(LevelEconomy.victoryCredits(first,1,1,true)==29000,"one-ship win 2.9x");
         check(LevelEconomy.victoryCredits(first,1,0,true)==0,"lost one ship means no survivors");
         check(LevelEconomy.victoryCredits(first,10,10,false)==0,"defeat cannot farm credits");
-        check(LevelEconomy.victoryCredits(first,16,16,true)==14000,"full reward on replay");
+        check(LevelEconomy.victoryCredits(first,16,16,true)==14000,
+                "Raw first-clear formula is unchanged; replay reduction is applied by CampaignProgress");
         for(int stage=1;stage<=6;stage++)
             check(LevelEconomy.researchMissionCost(stage)==Math.min(5,stage),
                     "Research mission durations must range from one to five");

@@ -28,7 +28,9 @@ public final class GameFlowTest {
         var won=start.complete(1,4,4);
         verify(won.available(2)&&won.credits()>0&&won.victories()==1,"Progress rewards");
         verify(won.equals(CampaignProgress.decode(CampaignProgress.encode(won))),"Won save round-trip");
-        verify(won.complete(1,4,3).credits()>won.credits(),"Replay credits");
+        long rawReplay=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,3,true);
+        verify(won.complete(1,4,3).credits()-won.credits()==rawReplay/4,
+                "Replay of completed mission must pay floor(full reward / 4)");
         long previousFull=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,3,true);
         verify(won.complete(1,4,3).credits()-won.credits()==previousFull/4,
                 "Previously completed campaign levels must pay precisely one-quarter");
