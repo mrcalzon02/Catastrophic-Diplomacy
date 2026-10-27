@@ -22,7 +22,7 @@ public final class CampaignProgress {
             case ACCELERATOR -> speed>=4?0:ACCELERATOR_WORK[speed+1];
         };
         // At most four accelerators can shorten research to ONE required victory.
-        return base==0?0:Math.max(1,base-speed);
+        return Math.max(0,base-speed);
     }
     /** A previous save can contain a project which now qualifies for immediate
      * completion after the duration-floor policy. Apply the paid entitlement once. */
