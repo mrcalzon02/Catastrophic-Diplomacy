@@ -103,6 +103,9 @@ public final class ShipLineages {
             case REPAIR_TENDER -> {
                 fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
                 fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                // Dedicated rear-line tenders use shield-generator displacement
+                // and power for repair bays. Their screen is their protection.
+                fitting=set(fitting,Shipyard.Mount.DEFENSE,0,null);
                 fitting=set(fitting,Shipyard.Mount.SUPPORT,0,id+"REP");
             }
             case APEX_VANGUARD -> {
@@ -112,6 +115,9 @@ public final class ShipLineages {
             case COMMAND_HUB -> {
                 fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
                 fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                // Sensors, jamming and targeting take precedence over the
+                // personal shield mount, preserving real weight/power limits.
+                fitting=set(fitting,Shipyard.Mount.DEFENSE,0,null);
                 fitting=set(fitting,Shipyard.Mount.SYSTEM,3,id+"ECM");
             }
             case LOGISTICS_JUGGERNAUT -> {
