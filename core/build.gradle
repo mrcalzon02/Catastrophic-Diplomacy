@@ -408,3 +408,12 @@ tasks.register('campaignFleetSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('battleRetreatSmoke') { finalizedBy(tasks.named('campaignFleetSmoke')) }
+tasks.register('campaignAfterActionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify individual commissioned ship losses, recovery, inventory and report pagination.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignAfterActionTest'
+    dependsOn testClasses
+}
+tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('campaignAfterActionSmoke')) }
+

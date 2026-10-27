@@ -1,0 +1,61 @@
+package diplomacy.sim;
+
+import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.TechnologyCatalog;
+import java.util.ArrayList;
+import java.util.List;
+
+public final class CampaignAfterActionTest {
+    private static void check(boolean valid,String reason){if(!valid)throw new AssertionError(reason);}
+    private static void reject(Runnable work,String reason){
+        try{work.run();}catch(IllegalArgumentException expected){return;}
+        throw new AssertionError(reason);
+    }
+    public static void main(String[] args)throws Exception{
+        var tech=TechnologyCatalog.loadDefault();
+        var original=CampaignFleet.start(Battle.Faction.TERRAN,
+                Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE),tech);
+        var ids=original.active().stream().map(CampaignFleet.Vessel::id).toList();
+        Battle battle=new Battle(1977);
+        for(var v:original.active())battle.spawnWing(0,v.fitting(),tech,1,310,335);
+        for(int i=0;i<ids.size();i++)
+            original.active().get(i).stores().apply(battle.ships().get(i));
+        var v=battle.ships().get(0);
+        v.hull=v.maxHull*0.5;
+        v.crewCount=Math.max(0,v.crewCount-3);
+        v.missileAmmo=Math.max(0,v.missileAmmo-7);
+        v.fuel=Math.max(0,v.fuel-24);
+        battle.ships().get(1).hull=0;
+        battle.ships().get(2).escaped=true;
+        battle.ships().get(3).withdrawing=true;
+        var report=CampaignAfterAction.capture(original,ids,battle);
+        check(report.entries().size()==4 &&
+                report.count(CampaignAfterAction.Outcome.SURVIVED)==1 &&
+                report.count(CampaignAfterAction.Outcome.DESTROYED)==1 &&
+                report.count(CampaignAfterAction.Outcome.ESCAPED)==1 &&
+                report.count(CampaignAfterAction.Outcome.WITHDRAWING)==1,
+                "Commissioned vessel loss outcomes are incorrect");
+        var first=report.entries().get(0);
+        check(first.id()==1&&first.name().equals(original.get(1).name())&&
+                first.hullPercent()==50,"Stable ship identity/hull integrity changed");
+        check(first.crewLost()==3&&first.missileSpent()==7&&first.fuelSpent()==24,
+                "Battle expenses and personnel losses were not measured");
+        var recovered=original.afterBattle(battle,ids);
+        check(recovered.ships().size()==3&&report.entries().get(1).outcome()==
+                CampaignAfterAction.Outcome.DESTROYED,
+                "Destroyed commissioned vessel disappeared from casualty ledger");
+        check(recovered.get(3).name().equals(report.entries().get(2).name()),
+                "Escaped named vessel did not match persisted reserve identity");
+        var many=new ArrayList<CampaignAfterAction.Entry>();
+        for(int i=0;i<13;i++)many.add(new CampaignAfterAction.Entry(i+1,
+                "Ship "+(i+1),Shipyard.Hull.CORVETTE,
+                CampaignAfterAction.Outcome.SURVIVED,100,0,0,0,0,0));
+        var pages=new CampaignAfterAction.Report(many);
+        check(pages.pages(5)==3&&pages.page(2,5).size()==3,
+                "Large sortie report pagination skipped vessels");
+        reject(()->pages.page(3,5),"Off-page selection accepted");
+        reject(()->CampaignAfterAction.capture(original,List.of(1),battle),
+                "Mismatched sortie IDs fabricated casualties");
+        System.out.println("PASS named after-action ledger: casualty ships, returned hulls, stores, 13-ship pagination");
+    }
+}
