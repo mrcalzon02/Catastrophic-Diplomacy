@@ -31,11 +31,8 @@ public final class GameFlowTest {
         long rawReplay=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,3,true);
         verify(won.complete(1,4,3).credits()-won.credits()==rawReplay/4,
                 "Replay of completed mission must pay floor(full reward / 4)");
-        long previousFull=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,3,true);
-        verify(won.complete(1,4,3).credits()-won.credits()==previousFull/4,
-                "Previously completed campaign levels must pay precisely one-quarter");
         var top=new CampaignProgress.State(Battle.Faction.TERRAN,500,0,499,
-                0,0,CampaignProgress.Project.NONE,0,false);
+                0,499,0,CampaignProgress.Project.NONE,0);
         var topWin=top.complete(500,20,20);
         verify(topWin.highestCompleted()==500&&topWin.credits()>0,
                 "Final campaign stage should award its first-clear reward only once");
