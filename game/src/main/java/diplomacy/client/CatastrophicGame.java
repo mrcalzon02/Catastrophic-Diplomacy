@@ -19,6 +19,9 @@ import diplomacy.sim.BattleView;
 import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
+import diplomacy.sim.CampaignFleet;
+import diplomacy.sim.CampaignFleetCodec;
+import diplomacy.sim.FleetNames;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.ShipCommandQueue;
 import diplomacy.sim.ShipStandingOrders;
@@ -63,6 +66,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private CampaignProgress.State campaign;
+    private CampaignFleet.Roster campaignFleet;
+    private final java.util.List<Integer> campaignSortie=new java.util.ArrayList<>();
+    private int dockPage,dockSelected;
+    private String dockNotice="Select ships for active duty or reserve and service them individually.";
+    private static final String ROSTER_FILE="campaign/fleet-roster-v1.dat";
     private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
     private int deployedAtLaunch,survivorsAtEnd,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd;
@@ -158,6 +166,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         restoreFleets();
         restoreOrderPresets();
         restoreCampaign();
+        restoreCampaignFleet();
         shipyard = new ShipyardPanel(technology,(team,design)->{
             if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
             saveFleets();
@@ -497,6 +506,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void newCampaign(){
         campaign=CampaignProgress.start(pendingFaction);
+        campaignFleet=CampaignFleet.start(pendingFaction,
+                Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology);
+        saveCampaignFleet();
         saveCampaign();
         campaignPage=0;selectedMission=1;
         screen=GameMenuPanel.Screen.CAMPAIGN;
@@ -795,6 +807,55 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,351,122,254,58)){
                 if(playedCampaign)launchCampaignMission();else launchSkirmish();
             }else if(GameMenuPanel.hit(x,y,673,122,254,58))leaveResults();
+        }
+    }
+    private void restoreCampaignFleet(){
+        if(campaign==null)return;
+        FileHandle primary=Gdx.files.local(ROSTER_FILE);
+        FileHandle backup=Gdx.files.local(ROSTER_FILE+".bak");
+        for(FileHandle file:new FileHandle[]{primary,backup}){
+            if(!file.exists())continue;
+            try{
+                var roster=CampaignFleetCodec.decode(file.readString("UTF-8"),technology);
+                if(roster.faction()!=campaign.faction())
+                    throw new IllegalArgumentException("Roster belongs to another faction");
+                campaignFleet=roster;
+                return;
+            }catch(RuntimeException invalid){
+                Gdx.app.error("CAMPAIGN","Invalid fleet roster: "+file.path(),invalid);
+            }
+        }
+        // Only legacy campaigns with NO roster get an initial fleet. A
+        // corrupted roster must never turn into free replacement hulls.
+        if(!primary.exists()&&!backup.exists()){
+            campaignFleet=CampaignFleet.start(campaign.faction(),
+                    Shipyard.starter(campaign.faction(),Shipyard.Hull.CORVETTE),technology);
+            saveCampaignFleet();
+        }else{
+            campaignFleet=null;
+            dockNotice="Fleet registry and backup invalid. Recover the saved roster; no free ships issued.";
+        }
+    }
+    private void saveCampaignFleet(){
+        if(campaignFleet==null)return;
+        try{
+            FileHandle primary=Gdx.files.local(ROSTER_FILE);
+            FileHandle backup=Gdx.files.local(ROSTER_FILE+".bak");
+            FileHandle temporary=Gdx.files.local(ROSTER_FILE+".tmp");
+            temporary.writeString(CampaignFleetCodec.encode(campaignFleet),false,"UTF-8");
+            CampaignFleetCodec.decode(temporary.readString("UTF-8"),technology);
+            if(primary.exists()){
+                try{
+                    CampaignFleetCodec.decode(primary.readString("UTF-8"),technology);
+                    primary.copyTo(backup);
+                }catch(RuntimeException corrupt){
+                    Gdx.app.log("CAMPAIGN","Retaining last valid fleet backup");
+                }
+            }
+            temporary.moveTo(primary);
+        }catch(RuntimeException failed){
+            Gdx.app.error("CAMPAIGN","Unable to save commissioned fleet",failed);
+            dockNotice="Fleet save failed; check local app storage.";
         }
     }
     private void restoreCampaign(){
