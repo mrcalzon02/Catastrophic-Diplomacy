@@ -165,7 +165,24 @@ public final class CampaignFleet {
             newShip.kineticAmmo=0;newShip.missileAmmo=0;newShip.torpedoAmmo=0;
             newShip.fighterReserve=0;newShip.droneReserve=0;newShip.repairDroneReserve=0;
             ArrayList<Vessel> result=new ArrayList<>(ships);
-            result.add(new Vessel(nextId,FleetNames.generate(style,namingSeed,nextId),
+            // A captain may have manually reserved the upcoming generated
+            // name. New acquisitions must still receive a distinct callsign.
+            String baseName=FleetNames.generate(style,namingSeed,nextId);
+            String uniqueName=baseName;
+            int suffix=2;
+            while(true){
+                boolean collision=false;
+                for(Vessel owned:ships)
+                    if(owned.name().equalsIgnoreCase(uniqueName)){
+                        collision=true;
+                        break;
+                    }
+                if(!collision)break;
+                if(suffix>ships.size()+2)
+                    throw new IllegalArgumentException("No unique ship name available");
+                uniqueName=baseName+" #"+suffix++;
+            }
+            result.add(new Vessel(nextId,uniqueName,
                     design,false,Stores.capture(newShip)));
             return new Roster(faction,style,nextId+1,result,namingSeed,radioTone);
         }

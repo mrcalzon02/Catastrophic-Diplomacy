@@ -139,6 +139,14 @@ public final class CampaignFleetTest {
         check(replacement.cost(latest.id(),CampaignFleet.Service.CREW,tech)>0,
                 "Recruitment is mysteriously free after buying a hull");
 
+        var nextName=FleetNames.generate(FleetNames.Style.NAVAL,
+                original.namingSeed(),5);
+        var reservedName=original.rename(1,nextName);
+        var acquired=reservedName.purchase(baseline,tech);
+        check(!acquired.get(1).name().equalsIgnoreCase(acquired.get(5).name())&&
+                acquired.get(5).name().startsWith(nextName),
+                "Commissioning duplicated a manually reserved future ship name");
+
         String encoded=CampaignFleetCodec.encode(replacement);
         var decoded=CampaignFleetCodec.decode(encoded,tech);
         check(CampaignFleetCodec.encode(decoded).equals(encoded),
@@ -177,6 +185,26 @@ public final class CampaignFleetTest {
         check(returnedNames.namingSeed()==namedSeed&&
                         returnedNames.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Fleet codec discarded naming and radio preferences after service");
+        // Build a genuine v2 artifact, including its ORIGINAL checksum, rather
+        // than treating a no-op string replacement as migration verification.
+        String[] v3Rows=encoded.split("\\n",-1);
+        String[] v3Header=v3Rows[1].split(",",-1);
+        StringBuilder oldBody=new StringBuilder("CD-ROSTER-2\\n")
+                .append(String.join(",",v3Header[0],v3Header[1],v3Header[2]))
+                .append('\\n');
+        for(int n=2;n<v3Rows.length-2;n++)oldBody.append(v3Rows[n]).append('\\n');
+        byte[] oldHash=java.security.MessageDigest.getInstance("SHA-256").digest(
+                oldBody.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String originalV2=oldBody+java.util.HexFormat.of().formatHex(oldHash)+"\\n";
+        var migrated=CampaignFleetCodec.decode(originalV2,tech);
+        check(migrated.namingSeed()==faction.ordinal()&&
+                migrated.radioTone()==CrewChatter.Tone.MIXED&&
+                migrated.ships().size()==replacement.ships().size()&&
+                migrated.get(1).name().equals(replacement.get(1).name()),
+                "Authentic v2 roster migration lost old ship names or changed default radio");
+        reject(()->CampaignFleetCodec.decode(originalV2.replace("CD-ROSTER-2",
+                "CD-ROSTER-1"),tech),"Corrupted v2 version marker bypassed checksum");
+
         var styledRadio=replacement.changeRadioTone(CrewChatter.Tone.LIGHTHEARTED);
         var persistedRadio=CampaignFleetCodec.decode(CampaignFleetCodec.encode(styledRadio),tech);
         check(persistedRadio.radioTone()==CrewChatter.Tone.LIGHTHEARTED
