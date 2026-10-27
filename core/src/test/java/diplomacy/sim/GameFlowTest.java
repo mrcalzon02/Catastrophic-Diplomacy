@@ -39,6 +39,14 @@ public final class GameFlowTest {
             for(int n=0;n<page.size();n++)
                 verify(page.get(n).level()==index*10+n+1,"Wrong stage for map node");
         }
+        for(int mission=1;mission<=500;mission++){
+            var story=CampaignNarrative.forLevel(mission);
+            verify(story.chapter()==LevelEconomy.level(mission).sector(),
+                    "Narrative chapter does not match real star-map sector: "+mission);
+            verify(!story.title().isBlank()&&!story.intelligence().isBlank()
+                            &&!story.beat().isBlank(),
+                    "Missing campaign briefing for stage "+mission);
+        }
         // Campaign does not silently award success after the first wave.
         // Reinforcements enter the SAME battle, preserving hull damage and spent ammunition.
         Shipyard.Design player=ScenarioCatalog.defaultDesign(
