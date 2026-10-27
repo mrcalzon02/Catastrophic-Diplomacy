@@ -416,6 +416,15 @@ tasks.register('campaignAfterActionSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('campaignAfterActionSmoke')) }
+tasks.register('vesselIdentifiersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Stress 500-stage commissioning across five campaigns and ensure 16-digit vessel identity survives refits.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.VesselIdentifiersTest'
+    dependsOn testClasses
+}
+tasks.named('campaignAfterActionSmoke') { finalizedBy(tasks.named('vesselIdentifiersSmoke')) }
+
 tasks.register('campaignLedgerSmoke', JavaExec) {
     group = 'verification'
     description = 'Check atomic campaign wallet+fleet authority, full-snapshot rollback, corruption and double-spend rejection.'
