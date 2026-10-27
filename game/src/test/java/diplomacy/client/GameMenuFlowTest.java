@@ -2,6 +2,7 @@ package diplomacy.client;
 
 import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
+import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.ScenarioCatalog;
 
 /** Functional hit-target routing for the desktop/Android front-end (no graphics required). */
