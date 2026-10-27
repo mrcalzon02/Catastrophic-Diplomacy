@@ -53,6 +53,8 @@ public final class CampaignAfterAction {
             if(prior.id()!=deployedIds.get(i))
                 throw new IllegalArgumentException("Commissioned ship identity mismatch");
             Battle.Ship now=participants.get(i);
+            if(now.commissionedId!=0&&now.commissionedId!=prior.id())
+                throw new IllegalArgumentException("After-action identity mismatch");
             Outcome outcome=now.hull<=0?Outcome.DESTROYED:now.escaped?Outcome.ESCAPED:
                     now.withdrawing?Outcome.WITHDRAWING:Outcome.SURVIVED;
             var before=prior.stores();
