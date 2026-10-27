@@ -668,6 +668,7 @@ public final class Battle {
                     s.withdrawing=true;
                     s.withdrawalTick=tick;
                     log(s.name+" withdrawing from battle");
+                    radio(s,CrewChatter.Event.RETREAT);
                 }
                 steerRetreat(s);
                 if(s.alive())launchAuxiliary(s,null);
@@ -677,8 +678,15 @@ public final class Battle {
             boolean navigated=executeShipCommands(s,target);
             if (target != null) {
                 if(!navigated)steer(s, target);
-                if(s.standingOrders==null||!s.standingOrders.mustWithdraw(s))
+                if(s.standingOrders==null||!s.standingOrders.mustWithdraw(s)){
+                    int before=visualEvents.size();
                     fire(s, target);
+                    if(visualEvents.size()>before){
+                        boolean guard=s.defendedShipIds.contains(target.lastTargetId)||
+                                target.id==s.lastAttackerId;
+                        radio(s,guard?CrewChatter.Event.COVER:CrewChatter.Event.ATTACK);
+                    }
+                }
             } else if(!navigated) {
                 if (weather.preset().enabled()) {
                     // Low sensor visibility must not cause a permanent standstill.
@@ -942,6 +950,7 @@ public final class Battle {
             ship.escapeTick=tick;
             ship.vx=0;ship.vy=0;
             log(ship.name+" escaped combat; hull "+Math.round(ship.hull));
+            radio(ship,CrewChatter.Event.ESCAPE);
         }
     }
     private void steerToward(Ship ship,double x,double y){
@@ -1253,6 +1262,7 @@ public final class Battle {
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
                     ship.x,ship.y,fighterTarget.x,fighterTarget.y);
             ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
+            radio(ship,CrewChatter.Event.LAUNCH);
             ship.power-=7;ship.heat+=3;
         }
         if(!withdrawing&&ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000){
@@ -1329,6 +1339,8 @@ public final class Battle {
         if(profile.ammunition()>0)craft.ammunition--;
         craft.reload=profile.cooldown();
         craft.shotsFired++;
+        if(craft.shotsFired==1&&carrier!=null)
+            radioFighter(carrier,CrewChatter.Event.FIGHTER_ATTACK);
         if(profile.weapon()==FighterModel.Weapon.CANNON){
             double heading=StrictMath.atan2(ty-craft.y,tx-craft.x);
             if(random.nextDouble()>accuracy)heading+=(shot%2==0?0.32:-0.32);
@@ -1824,6 +1836,7 @@ public final class Battle {
             damage -= fieldAbsorb;
         }
         defender.hull -= damage;
+        radio(defender,CrewChatter.Event.DAMAGE);
         if(defender.fittedCrewSystems){
             // Penetrating hits may kill personnel or disrupt occupied decks.
             // No random free crew is conjured when shields subsequently recharge.
@@ -1860,6 +1873,19 @@ public final class Battle {
             if (attacker != null) attacker.kills++;
             log(defender.name + " shattered at T+" + tick / 30 + "s");
         }
+    }
+    private void radio(Battle.Ship source,CrewChatter.Event event){
+        if(source==null||tick-source.lastChatterTick<90||
+                source.hull<=0)return;
+        source.lastChatterTick=tick;
+        log("RADIO "+source.name+": "+CrewChatter.line(CrewChatter.scale(source.hullClass),
+                event,tick,source.id));
+    }
+    private void radioFighter(Battle.Ship carrier,CrewChatter.Event event){
+        if(tick-carrier.lastChatterTick<90)return;
+        carrier.lastChatterTick=tick;
+        log("RADIO "+carrier.name+" / Flight: "+CrewChatter.line(
+                CrewChatter.Scale.FIGHTER,event,tick,carrier.id));
     }
     private void log(String message) { events.add(message); if (events.size() > 90) events.remove(0); }
 
