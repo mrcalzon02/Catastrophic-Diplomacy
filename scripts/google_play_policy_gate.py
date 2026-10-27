@@ -134,8 +134,14 @@ def review():
     check(ledger.get("policy_center") == "https://play.google/developer-content-policy/",
           "Official policy-center source recorded")
     entries = ledger.get("policies", [])
-    check(len(entries) >= 56 and len({x.get("name") for x in entries}) == len(entries),
-          "Complete distinct policy coverage")
+    expected_file = ROOT / "docs/google-play/required-policy-categories.json"
+    expected = json.loads(expected_file.read_text())["categories"]
+    actual = [entry.get("name") for entry in entries]
+    missing = sorted(set(expected) - set(actual))
+    duplicates = sorted({name for name in actual if actual.count(name) > 1})
+    check(not missing and not duplicates and len(expected) >= 56,
+          "Complete policy inventory (missing=" + str(missing) +
+          ", duplicated=" + str(duplicates) + ")")
     for e in entries:
         ok = e.get("status") in ("compliant", "not-applicable")
         ok = ok and len(str(e.get("evidence", "")).strip()) >= 15
