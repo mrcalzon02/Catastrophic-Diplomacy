@@ -29,9 +29,9 @@ public final class HullLayouts {
         for (Shipyard.Slot slot : hull.slots) counts[slot.mount().ordinal()]++;
         int[] seen = new int[counts.length];
         List<Shipyard.Slot> answer = new ArrayList<>();
-        int size = hull == Shipyard.Hull.INTERCEPTOR ? -7
-                : hull == Shipyard.Hull.CORVETTE || hull == Shipyard.Hull.MISSILE_CORVETTE ? -4
-                : hull == Shipyard.Hull.FRIGATE ? -2 : 0;
+        int size = hull.spriteHull() == Shipyard.Hull.INTERCEPTOR ? -7
+                : hull.spriteHull() == Shipyard.Hull.CORVETTE || hull.spriteHull() == Shipyard.Hull.MISSILE_CORVETTE ? -4
+                : hull.spriteHull() == Shipyard.Hull.FRIGATE ? -2 : 0;
         for (Shipyard.Slot slot : hull.slots) {
             int kind=slot.mount().ordinal(), n=seen[kind]++, total=counts[kind];
             int x,y;
@@ -191,7 +191,7 @@ public final class HullLayouts {
             case MANDRALLY, AUREATE_SYNOD -> new int[][]{{0,78},{28,49},{42,14},{64,-10},{48,-44},
                     {23,-35},{13,-65},{-13,-65},{-23,-35},{-48,-44},{-64,-10},{-42,14},{-28,49}};
         };
-        double width = switch(hull) {
+        double width = switch(hull.spriteHull()) {
             case INTERCEPTOR -> 0.68;
             case CORVETTE -> 0.79;
             case MISSILE_CORVETTE -> 0.91;
@@ -204,7 +204,7 @@ public final class HullLayouts {
             case CARRIER -> 1.17;
             case DREADNOUGHT -> 1.14;
         };
-        double length = switch(hull) {
+        double length = switch(hull.spriteHull()) {
             case INTERCEPTOR -> 0.77;
             case CORVETTE -> 0.86;
             case MISSILE_CORVETTE -> 0.94;
