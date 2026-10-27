@@ -13,6 +13,10 @@ public final class CampaignProgress {
                     ||credits<0||victories<0)throw new IllegalArgumentException("Invalid campaign state");
         }
         public boolean available(int level){return level>=1&&level<=unlocked;}
+        public State spend(long cost){
+            if(cost<0||cost>credits)throw new IllegalArgumentException("Insufficient campaign credits");
+            return new State(faction,unlocked,credits-cost,victories);
+        }
         public State complete(int level,int deployed,int survivors){
             if(!available(level))throw new IllegalArgumentException("Mission is locked");
             if(survivors<1)throw new IllegalArgumentException("No victory without surviving ships");
