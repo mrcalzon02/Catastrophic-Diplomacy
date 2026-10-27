@@ -205,7 +205,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }
                     if(screen==GameMenuPanel.Screen.RESULTS){
                         if(key==Input.Keys.R){
-                            if(playedCampaign)launchCampaignMission();else launchSkirmish();
+                            if(playedCampaign)openDock();else launchSkirmish();
                         }else if(key==Input.Keys.ENTER)leaveResults();
                         return true;
                     }
@@ -262,9 +262,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                     (key==Input.Keys.A?-1:1),deployment.ships());
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
                             int delta=key==Input.Keys.LEFT?-1:1;
-                            if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
-                                deployment=deployment.withShips(delta,
-                                        preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
+                            if(preparingCampaign)openDock();
+                            else if(scenario==ScenarioCatalog.Preset.CUSTOM)
+                                deployment=deployment.withShips(delta,200)
                                         .withStandingProfiles(savedStanding);
                             selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                             doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
@@ -629,9 +629,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
         shipyard.sync(0,leftDesign);
         preparingCampaign=true;
-        deployment=CampaignDeployment.defaultFor(stage);
+        if(campaignFleet==null||campaignFleet.active().isEmpty()||
+                campaignFleet.active().size()>stage.maximumFleet()){
+            dockNotice="Select 1–"+stage.maximumFleet()+" owned vessels for active deployment.";
+            openDock();return;
+        }
+        deployment=new CampaignDeployment.Loadout(campaignFleet.active().size(),
+                CampaignDeployment.Formation.LINE);
         loadStandingOrders(left);
-        deployment=deployment.withStandingProfiles(savedStanding);
+        deployment=deployment.withStandingProfiles(campaignFleet.forDeployment(savedStanding));
         selectedStandingSetting=0;
         selectedDeploymentShip=0;
         clearDoctrineGroup();
@@ -717,7 +723,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         try{
             deployment=FleetDoctrineGroups.apply(deployment,selectedDeploymentShip,doctrineGroup);
-            for(int slot:doctrineGroup)savedStanding.put(slot,deployment.standingFor(slot));
+            for(int slot:doctrineGroup){
+                int key=preparingCampaign&&campaignFleet!=null?
+                        campaignFleet.active().get(slot).id()-1:slot;
+                var policy=deployment.standingFor(slot);
+                savedStanding.put(key,preparingCampaign&&campaignFleet!=null?
+                        campaignFleet.toPersistent(slot,policy):policy);
+            }
             saveStandingOrders();
             deploymentNotice="Applied captain #"+(selectedDeploymentShip+1)+" doctrine to "+
                     doctrineGroup.size()+" ships; independent targets retained.";
@@ -743,7 +755,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 selectedDeploymentShip,deployment.ships());
         if(revised.equals(current))return;
         deployment=deployment.withStanding(selectedDeploymentShip,revised);
-        savedStanding.put(selectedDeploymentShip,revised);
+        int key=preparingCampaign&&campaignFleet!=null?
+                campaignFleet.active().get(selectedDeploymentShip).id()-1:selectedDeploymentShip;
+        savedStanding.put(key,preparingCampaign&&campaignFleet!=null?
+                campaignFleet.toPersistent(selectedDeploymentShip,revised):revised);
         saveStandingOrders();
         deploymentNotice="Standing doctrine saved for ship #"+(selectedDeploymentShip+1);
         Gdx.app.log("CD-GAME-FLOW","STANDING ship="+(selectedDeploymentShip+1)+
@@ -759,8 +774,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 " command="+command.type());
     }
     private void launchCampaignMission(){
-        if(campaign==null||!campaign.available(activeMission))return;
-        if(screen!=GameMenuPanel.Screen.DEPLOYMENT&&screen!=GameMenuPanel.Screen.RESULTS)return;
+        if(campaign==null||!campaign.available(activeMission)||campaignFleet==null)return;
+        if(screen!=GameMenuPanel.Screen.DEPLOYMENT)return;
+        if(campaignFleet.active().size()!=deployment.ships()){
+            dockNotice="Active roster changed. Prepare the fleet again.";
+            openDock();return;
+        }
         LevelEconomy.Level stage=LevelEconomy.level(activeMission);
         var node=CampaignMap.page(CampaignMap.pageOf(activeMission)).get((activeMission-1)%10);
         left=campaign.faction();right=node.opponent();
@@ -770,6 +789,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 Shipyard.Hull.CORVETTE:stage.index()<75?Shipyard.Hull.FRIGATE:Shipyard.Hull.CRUISER);
         shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         deployedAtLaunch=deployment.ships();
+        campaignSortie.clear();
+        for(var vessel:campaignFleet.active())campaignSortie.add(vessel.id());
         battlefieldLevel=activeMission;
         playedCampaign=true;screen=GameMenuPanel.Screen.BATTLE;
         reset();
@@ -791,7 +812,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         running=false;screen=GameMenuPanel.Screen.RESULTS;Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
     }
     private void leaveResults(){
-        if(playedCampaign){campaignPage=CampaignMap.pageOf(selectedMission);screen=GameMenuPanel.Screen.CAMPAIGN;}
+        if(playedCampaign){
+            campaignPage=CampaignMap.pageOf(selectedMission);
+            openDock();
+        }
         else screen=GameMenuPanel.Screen.SKIRMISH;
     }
     private void tapFrontEnd(float x,float y){
@@ -844,26 +868,31 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,35,35,165,50)){screen=GameMenuPanel.Screen.HOME;return;}
             if(GameMenuPanel.hit(x,y,214,35,136,50)){campaignPage=Math.max(0,campaignPage-1);selectedMission=campaignPage*10+1;return;}
             if(GameMenuPanel.hit(x,y,366,35,136,50)){campaignPage=Math.min(CampaignMap.PAGE_COUNT-1,campaignPage+1);selectedMission=campaignPage*10+1;return;}
-            if(GameMenuPanel.hit(x,y,964,35,278,50)){openDeployment();return;}
+            if(GameMenuPanel.hit(x,y,964,35,278,50)){openDock();return;}
             int mission=GameMenuPanel.mapHit(x,y,campaignPage);
             if(mission>=1)selectedMission=mission;
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.DOCK){
+            dockInput(GameMenuPanel.dockAction(x,y,dockPage,
+                    campaignFleet==null?0:campaignFleet.ships().size()));
             return;
         }
         if(screen==GameMenuPanel.Screen.DEPLOYMENT){
             switch(GameMenuPanel.deploymentAction(x,y)){
                 case 0 -> screen=preparingCampaign?GameMenuPanel.Screen.CAMPAIGN:GameMenuPanel.Screen.SKIRMISH;
                 case 1 -> {
-                    if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
-                        deployment=deployment.withShips(-1,
-                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
+                    if(preparingCampaign){openDock();return;}
+                    if(scenario==ScenarioCatalog.Preset.CUSTOM)
+                        deployment=deployment.withShips(-1,200)
                                 .withStandingProfiles(savedStanding);
                     selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                     doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                 }
                 case 2 -> {
-                    if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
-                        deployment=deployment.withShips(1,
-                                preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
+                    if(preparingCampaign){openDock();return;}
+                    if(scenario==ScenarioCatalog.Preset.CUSTOM)
+                        deployment=deployment.withShips(1,200)
                                 .withStandingProfiles(savedStanding);
                 }
                 case 3 -> deployment=deployment.withFormation(-1);
