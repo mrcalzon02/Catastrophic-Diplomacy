@@ -70,7 +70,15 @@ public final class SquadronOperationsTest {
                         decoded.squadronOf(first)==1&&decoded.squadronOf(second)==1&&
                         decoded.profile(2).naming()==FleetNames.Style.NEOCLASSICAL,
                 "Atomic roster serialization lost group culture, members or radio voice");
-        reject(()->CampaignFleetCodec.decode(encoded.replace(",GRIMDARK:",",SATIRICAL:"),tech),
+        // Squadron headers are Base64-encoded. Tamper with the actual encoded
+        // profile bytes, not a plaintext substring that does not exist.
+        String profileBytes=encoded.split("\\n",-1)[1].split(",",-1)[5];
+        check(!profileBytes.isEmpty(),"Encoded squadron profiles were not serialized");
+        String damagedProfile=profileBytes.substring(0,profileBytes.length()-1)+
+                (profileBytes.endsWith("A")?"B":"A");
+        String tampered=encoded.replace(profileBytes,damagedProfile);
+        check(!tampered.equals(encoded),"Squadron tampering fixture did not modify the save");
+        reject(()->CampaignFleetCodec.decode(tampered,tech),
                 "Mutating an encoded squadron should invalidate the checksum");
         reject(()->groups.assignSquadron(12345L,1),
                 "Unknown tactical ID allowed as commissioned squadron member");
