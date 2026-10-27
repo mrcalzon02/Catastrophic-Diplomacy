@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Test-only runs may supersede stale builds; this does not affect release signing.
+concurrency:
+  group: play-policy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   google-play-gate:
     runs-on: ubuntu-latest
