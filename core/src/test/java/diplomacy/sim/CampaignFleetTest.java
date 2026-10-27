@@ -143,8 +143,17 @@ public final class CampaignFleetTest {
         var decoded=CampaignFleetCodec.decode(encoded,tech);
         check(CampaignFleetCodec.encode(decoded).equals(encoded),
                 "Full owned fleet checksum save round-trip lost inventory");
-        reject(()->CampaignFleetCodec.decode(encoded.replace("CD-ROSTER-2","CD-ROSTER-1"),tech),
-                "Tampered campaign ship registry was accepted");
+        reject(()->CampaignFleetCodec.decode(encoded.replace("CD-ROSTER-3","CD-ROSTER-2"),tech),
+                "Version downgrade or checksum tampering was accepted");
+        reject(()->CampaignFleetCodec.decode(encoded.replace("TERRAN","DRAXIAN"),tech),
+                "Tampering with fleet faction was accepted");
+        var styledRadio=replacement.changeRadioTone(CrewChatter.Tone.LIGHTHEARTED);
+        var persistedRadio=CampaignFleetCodec.decode(CampaignFleetCodec.encode(styledRadio),tech);
+        check(persistedRadio.radioTone()==CrewChatter.Tone.LIGHTHEARTED
+                        &&persistedRadio.namingSeed()==styledRadio.namingSeed(),
+                "Naming seed and communication voice were not preserved on reload");
+        check(FleetNames.Style.values().length>=20,
+                "Ship naming themes were not expanded");
         var copy=decoded.setActive(3,true,20);
         var listed=copy.active();
         check(listed.stream().anyMatch(v->v.id()==3),
@@ -165,6 +174,11 @@ public final class CampaignFleetTest {
         check(!CrewChatter.line(CrewChatter.Scale.FIGHTER,CrewChatter.Event.DAMAGE,3,1)
                         .toLowerCase().contains("bulkheads"),
                 "Battleship bridge chatter incorrectly sent from fighter cockpit");
+        for(var tone:CrewChatter.Tone.values())
+            for(var scale:CrewChatter.Scale.values())
+                for(var event:CrewChatter.Event.values())
+                    check(!CrewChatter.line(scale,event,55,4,tone).isBlank(),
+                            "Missing radio phrase: "+tone+"/"+scale+"/"+event);
         System.out.println("PASS persistent campaign fleet: active/reserve, safe retreat, destroyed replacement, "+
                 "paid hull/crew/fuel/ammo/Service All, multiple name cultures and manual names, fighter/capital chatter");
     }
