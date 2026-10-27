@@ -115,8 +115,8 @@ final class GameMenuPanel {
         for(int i=0;i<9;i++)
             if(hit(x,y,45,521-i*43,746,38)&&page*9+i<ownedCount)
                 return 100+page*9+i;
-        for(int i=0;i<9;i++)
-            if(hit(x,y,840,525-i*55,374,47))return 4+i;
+        for(int i=0;i<10;i++)
+            if(hit(x,y,840,525-i*46,374,42))return 4+i;
         return -1;
     }
     static int mapHit(float x,float y,int page){
@@ -216,7 +216,7 @@ final class GameMenuPanel {
                         if(index>=ownedFleet.ships().size())break;
                         button(shapes,45,521-i*43,746,38,index==dockSelected);
                     }
-                for(int i=0;i<9;i++)button(shapes,840,525-i*55,374,47,false);
+                for(int i=0;i<10;i++)button(shapes,840,525-i*46,374,42,false);
             }
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
@@ -356,13 +356,14 @@ final class GameMenuPanel {
                     String[] names={"TOGGLE ACTIVE / RESERVE","REPAIR HULL / ARMOR / SHIELDS",
                             "RESTOCK CREW","RESTOCK AMMUNITION","REFILL FUEL",
                             "REPLACE FIGHTERS / DRONES","BUY NEW FITTED HULL",
-                            "CHANGE NAME STYLE","GENERATE SHIP NAME"};
+                            "CHANGE NAME STYLE","GENERATE SHIP NAME","SERVICE ALL"};
                     for(int i=0;i<names.length;i++){
                         String cost=i>=1&&i<=5&&dockCosts!=null?
                                 "  "+dockCosts[i-1]+" cr":
-                                i==6?"  "+purchaseCost+" cr":"";
-                        label(batch,font,names[i]+cost,847,553-i*55,
-                                i==6?Color.GOLD:Color.WHITE);
+                                i==6?"  "+purchaseCost+" cr":
+                                i==9&&dockCosts!=null?"  "+java.util.Arrays.stream(dockCosts).sum()+" cr":"";
+                        label(batch,font,names[i]+cost,847,553-i*46,
+                                (i==6||i==9)?Color.GOLD:Color.WHITE);
                     }
                 }
                 label(batch,font,"BACK TO STAR MAP",54,67,Color.WHITE);
