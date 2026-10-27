@@ -231,6 +231,56 @@ public final class DirectionalDefense {
         t.structure-=tileLoss;
         return new Impact(facing,t.column,t.row,shieldUsed,armorUsed,structural,tileLoss);
     }
+    /**
+     * Exact per-facing shields and occupied tile armor/structure persist between
+     * campaign sorties. This is never a cosmetic approximation of hit regions.
+     */
+    public String saveIntegrity(){
+        java.nio.ByteBuffer b=java.nio.ByteBuffer.allocate(4*8+GRID*GRID*2*8)
+                .order(java.nio.ByteOrder.BIG_ENDIAN);
+        for(Zone zone:zones)b.putDouble(zone.shield);
+        for(Tile[] row:tiles)for(Tile tile:row){
+            b.putDouble(tile.armor);b.putDouble(tile.structure);
+        }
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(b.array());
+    }
+    public void restoreIntegrity(String packed){
+        if(packed==null)throw new IllegalArgumentException("Integrity snapshot missing");
+        final byte[] data;
+        try{data=java.util.Base64.getUrlDecoder().decode(packed);}
+        catch(IllegalArgumentException malformed){throw new IllegalArgumentException("Invalid integrity encoding",malformed);}
+        if(data.length!=4*8+GRID*GRID*2*8)
+            throw new IllegalArgumentException("Incorrect integrity image length");
+        java.nio.ByteBuffer b=java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.BIG_ENDIAN);
+        double[] shieldValues=new double[4],armorValues=new double[GRID*GRID],structureValues=new double[GRID*GRID];
+        for(int i=0;i<4;i++){
+            shieldValues[i]=b.getDouble();
+            bounded(shieldValues[i],zones[i].maxShield);
+        }
+        int n=0;
+        for(Tile[] row:tiles)for(Tile tile:row){
+            armorValues[n]=b.getDouble();structureValues[n]=b.getDouble();
+            bounded(armorValues[n],tile.maxArmor);bounded(structureValues[n],tile.maxStructure);
+            n++;
+        }
+        for(int i=0;i<4;i++)zones[i].shield=shieldValues[i];
+        n=0;
+        for(Tile[] row:tiles)for(Tile tile:row){
+            tile.armor=armorValues[n];tile.structure=structureValues[n];n++;
+        }
+    }
+    private static void bounded(double value,double capacity){
+        if(!Double.isFinite(value)||value<0||value>capacity+1e-6)
+            throw new IllegalArgumentException("Invalid stored defense integrity");
+    }
+    /** Paid dock service, not automatic between campaign sorties. */
+    public void overhaul(){
+        for(Zone zone:zones){zone.shield=zone.maxShield;zone.delayRemaining=0;}
+        for(Tile[] row:tiles)for(Tile tile:row){
+            tile.armor=tile.maxArmor;tile.structure=tile.maxStructure;
+        }
+    }
+
     /** Include every affected tile and facing in deterministic replay fingerprints. */
     public long fingerprint() {
         long hash=0xcbf29ce484222325L;
