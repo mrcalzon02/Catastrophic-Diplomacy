@@ -67,12 +67,13 @@ public final class CampaignResearchTest {
         check(fleet.researchPerVictory()==1,
                 "A completed mission must always provide one research tick");
         var acceleratedLicense=fleet.purchaseNextResearch();
-        check(acceleratedLicense.researchRank()==1&&
-                        acceleratedLicense.activeProject()==CampaignProgress.Project.NONE,
-                "At zero duration, paid research must unlock immediately");
-        check(acceleratedLicense.nextResearchMissions()>=0&&
-                        acceleratedLicense.missionsUntilResearchComplete()==0,
-                "Research may be instant, but its duration can never be negative");
+        check(acceleratedLicense.researchRank()==0&&
+                        acceleratedLicense.activeProject()==CampaignProgress.Project.LICENSE,
+                "Even at maximum acceleration a newly paid technology must require victory");
+        check(acceleratedLicense.missionsUntilResearchComplete()==1,
+                "Four speed upgrades should reduce research to one mission, not zero");
+        check(acceleratedLicense.complete(1,20,20).researchRank()==1,
+                "Winning the required research mission must unlock the technology");
         final var maxedFleet=fleet;
         reject(maxedFleet::purchaseResearchSpeed,"No fifth accelerator");
         check(CampaignProgress.decode(CampaignProgress.encode(first)).equals(first),

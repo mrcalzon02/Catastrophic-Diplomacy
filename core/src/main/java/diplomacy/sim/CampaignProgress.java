@@ -21,8 +21,8 @@ public final class CampaignProgress {
             case LICENSE -> rank>=6?0:LevelEconomy.researchMissionCost(rank+1);
             case ACCELERATOR -> speed>=4?0:ACCELERATOR_WORK[speed+1];
         };
-        // Four accelerators may reduce a paid project's duration to zero, never below zero.
-        return Math.max(0,base-speed);
+        // At most four accelerators can shorten research to ONE required victory.
+        return base==0?0:Math.max(1,base-speed);
     }
     /** A previous save can contain a project which now qualifies for immediate
      * completion after the duration-floor policy. Apply the paid entitlement once. */
@@ -121,7 +121,7 @@ public final class CampaignProgress {
                         completed(nextAccelerationMilestone())&&credits>=nextAccelerationCost();
             };
         }
-        /** Pay up front. If adjusted duration is zero, research unlocks instantly. */
+        /** Pay upfront; even maximally accelerated research needs a victorious mission. */
         public State beginResearch(Project desired){
             if(desired==null||desired==Project.NONE)
                 throw new IllegalArgumentException("Select a research project");
@@ -224,6 +224,12 @@ public final class CampaignProgress {
                         speed=Integer.parseInt(rows[9]);
                 if(target!=0&&target!=licensed+1)
                     throw new IllegalArgumentException("Unrecognized prior research target");
+                // This experimental v3 format could already have awarded a
+                // zero-duration paid license. Keep that earned entitlement.
+                if(target>0&&LevelEconomy.researchMissionCost(target)<=speed)
+                    return new State(Battle.Faction.valueOf(rows[1]),reached,
+                            Long.parseLong(rows[3]),Integer.parseInt(rows[4]),
+                            licensed+1,high,speed,Project.NONE,0);
                 // Historic numeric v3 could grant an INSTANT paid unlock when
                 // speed exceeded duration. Honor that ALREADY-earned entitlement
                 // without allowing any new zero-turn research under v4.

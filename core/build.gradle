@@ -328,6 +328,13 @@ tasks.register('gameFlowSmoke', JavaExec) {
 tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
 // campaignResearchSmoke is registered once in the shipyard smoke chain above.
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignResearchSmoke')) }
+tasks.register('researchVictoryFloorSmoke', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ResearchVictoryFloorTest'
+    dependsOn testClasses
+}
+tasks.named('campaignResearchSmoke') { finalizedBy(tasks.named('researchVictoryFloorSmoke')) }
 
 
 tasks.register('campaignDeploymentSmoke', JavaExec) {
