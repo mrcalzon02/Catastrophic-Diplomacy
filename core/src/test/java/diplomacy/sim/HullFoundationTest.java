@@ -31,7 +31,7 @@ public final class HullFoundationTest {
                         &&intrinsic.power()>0&&intrinsic.sensorRange()>0
                         &&intrinsic.radarCrossSection()>0,"Physical hull has real intrinsic stats");
                 check(intrinsic.slots()==hull.slots.size(),"Class slot capacity is physical");
-                check(intrinsic.fighterBay()==(hull==Shipyard.Hull.CARRIER?2:0),
+                check(intrinsic.fighterBay()==(hull.spriteHull()==Shipyard.Hull.CARRIER?2:0),
                         "Only special carrier classes have a native fighter bay");
                 check(intrinsic.shields()==0 || intrinsic.shieldRecharge()>0,
                         "Intrinsic shields have an intrinsic refresh rate");
@@ -75,7 +75,8 @@ public final class HullFoundationTest {
                 check(technology.get(id)!=null,"Full six-level chain "+id);
             }
         }
-        check(hulls==121,"All 11 playable civilizations have all 11 hull classes");
+        check(hulls==Battle.Faction.values().length*Shipyard.Hull.values().length,
+                "Not every civilization received the complete expanded physical chassis roster");
         // Same race / same blueprint / both sides -> identical physical machinery;
         // the player may fit everything the enemy fleet can legally equip.
         var design=Shipyard.starter(Battle.Faction.VAERITH_PRISM,Shipyard.Hull.CRUISER);
@@ -84,6 +85,6 @@ public final class HullFoundationTest {
         check(one.maxHull==other.maxHull&&one.maxShields==other.maxShields
                         &&one.laserDamage==other.laserDamage&&one.sensorRange==other.sensorRange,
                 "No private enemy-only guns or stat overrides");
-        System.out.println("PASS physical hull baseline: 121 hulls, 11 native module rosters, 5808 tech upgrades, unarmed fits, symmetric combat");
+        System.out.println("PASS physical hull baseline: "+hulls+" chassis/faction combinations, 11 native module rosters, 5808 tech upgrades, unarmed fits, symmetric combat");
     }
 }
