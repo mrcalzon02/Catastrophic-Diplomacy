@@ -176,16 +176,17 @@ public final class CampaignFleetTest {
         var commissioned=CampaignFleet.start(faction,baseline,tech,namedSeed)
                 .changeRadioTone(CrewChatter.Tone.LIGHTHEARTED)
                 .changeStyle(FleetNames.Style.IRREVERENT);
-        var serviced=commissioned.service(ship1,CampaignFleet.Service.FUEL,tech);
+        long namedShip=commissioned.ships().get(0).id();
+        var serviced=commissioned.service(namedShip,CampaignFleet.Service.FUEL,tech);
         check(serviced.namingSeed()==namedSeed&&
                         serviced.radioTone()==CrewChatter.Tone.LIGHTHEARTED&&
                         serviced.style()==FleetNames.Style.IRREVERENT,
                 "Servicing a ship must not reset the fleet's radio or naming settings");
-        var fullyServiced=commissioned.serviceAll(ship1,tech);
+        var fullyServiced=commissioned.serviceAll(namedShip,tech);
         check(fullyServiced.namingSeed()==namedSeed&&
                         fullyServiced.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Service All discarded saved radio tone or naming seed");
-        var reserveCycle=commissioned.setActive(ship1,false,20).setActive(ship1,true,20);
+        var reserveCycle=commissioned.setActive(namedShip,false,20).setActive(ship1,true,20);
         check(reserveCycle.namingSeed()==namedSeed&&
                         reserveCycle.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Reserve/deployment changed saved crew communication preferences");
