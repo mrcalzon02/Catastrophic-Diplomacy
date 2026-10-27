@@ -347,6 +347,10 @@ public final class Battle {
     private final BattleOrders.Orders[] teamOrders={
             BattleOrders.DEFAULT,BattleOrders.DEFAULT
     };
+    /** Cosmetic radio preference. Does not influence simulation RNG or tactics. */
+    private final CrewChatter.Tone[] teamRadioTones={
+            CrewChatter.Tone.MIXED,CrewChatter.Tone.MIXED
+    };
     private final long seed;
     public long tick;
     public int hitCount, missileIntercepts, ballisticIntercepts, destructions, environmentalHits;
@@ -392,6 +396,25 @@ public final class Battle {
     public BattleOrders.Orders teamOrders(int team) {
         if(team<0||team>1)throw new IllegalArgumentException("Invalid team");
         return teamOrders[team];
+    }
+    public CrewChatter.Tone teamRadioTone(int team){
+        if(team<0||team>1)throw new IllegalArgumentException("Invalid radio team");
+        return teamRadioTones[team];
+    }
+    public void setTeamRadioTone(int team,CrewChatter.Tone tone){
+        if(team<0||team>1||tone==null)
+            throw new IllegalArgumentException("Invalid fleet communications tone");
+        teamRadioTones[team]=tone;
+    }
+    /** Side-effect-free formatter shared by real battle radio and acceptance
+     * checks. Fighter voices stay fighter-sized even when launched by capitals. */
+    String radioMessage(Ship source,CrewChatter.Event event,boolean fighter){
+        if(source==null||event==null)
+            throw new IllegalArgumentException("Radio message requires a ship and situation");
+        CrewChatter.Scale scale=fighter?CrewChatter.Scale.FIGHTER:
+                CrewChatter.scale(source.hullClass);
+        return "RADIO "+source.name+(fighter?" / Flight":"")+": "+
+                CrewChatter.line(scale,event,tick,source.id,teamRadioTone(source.team));
     }
     /**
      * Team-wide edits update existing combatants and future fleet deployments.
@@ -1879,14 +1902,12 @@ public final class Battle {
         if(source==null||tick-source.lastChatterTick<90||
                 source.hull<=0)return;
         source.lastChatterTick=tick;
-        log("RADIO "+source.name+": "+CrewChatter.line(CrewChatter.scale(source.hullClass),
-                event,tick,source.id));
+        log(radioMessage(source,event,false));
     }
     private void radioFighter(Battle.Ship carrier,CrewChatter.Event event){
         if(tick-carrier.lastChatterTick<90)return;
         carrier.lastChatterTick=tick;
-        log("RADIO "+carrier.name+" / Flight: "+CrewChatter.line(
-                CrewChatter.Scale.FIGHTER,event,tick,carrier.id));
+        log(radioMessage(carrier,event,true));
     }
     private void log(String message) { events.add(message); if (events.size() > 90) events.remove(0); }
 
