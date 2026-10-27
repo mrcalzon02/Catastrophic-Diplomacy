@@ -26,6 +26,6 @@ public final class FleetNames {
         scrambled^=scrambled>>>31;
         int i=(int)Math.floorMod(scrambled,8),j=(int)Math.floorMod(scrambled>>>8,8);
         String call=FIRST[style.ordinal()][i]+" "+LAST[style.ordinal()][j];
-        return style==Style.ALIEN?call:"CDS "+call;
+        return (style==Style.ALIEN?call:"CDS "+call)+" "+String.format(java.util.Locale.ROOT,"%03d",serial);
     }
 }

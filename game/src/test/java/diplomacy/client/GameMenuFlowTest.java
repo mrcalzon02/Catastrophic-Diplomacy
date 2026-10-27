@@ -32,6 +32,20 @@ public final class GameMenuFlowTest {
         }
         check(GameMenuPanel.factionHit(1250,650)==null,"Invalid faction hit region");
 
+        check(GameMenuPanel.Screen.valueOf("DOCK")!=null,
+                "Separate campaign active/reserve dock is missing");
+        check(GameMenuPanel.dockAction(88,60,0,4)==0,"Cannot exit owned fleet dock");
+        check(GameMenuPanel.dockAction(1060,60,0,4)==1,"Cannot deploy owned active fleet");
+        check(GameMenuPanel.dockAction(587,585,0,4)==2,"Previous roster page is inert");
+        check(GameMenuPanel.dockAction(683,585,0,4)==3,"Next roster page is inert");
+        for(int i=0;i<4;i++)
+            check(GameMenuPanel.dockAction(300,545-i*43,0,4)==100+i,
+                    "Owned vessel has no selectable roster row "+i);
+        for(int i=0;i<9;i++)
+            check(GameMenuPanel.dockAction(1000,547-i*55,0,4)==4+i,
+                    "Fleet service/purchase/name control missing "+i);
+        check(GameMenuPanel.dockAction(400,500,0,0)==-1,
+                "Empty roster offers a selectable phantom ship");
         check(GameMenuPanel.Screen.valueOf("DEPLOYMENT")!=null,
                 "Pre-battle deployment screen missing");
         float[][] deploymentTargets={
