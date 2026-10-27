@@ -212,6 +212,9 @@ public final class CampaignFleet {
             ArrayList<Vessel> result=new ArrayList<>(ships);
             for(int i=0;i<participants.size();i++){
                 Battle.Ship s=participants.get(i);
+                if(s.commissionedId!=0&&s.commissionedId!=deployedIds.get(i))
+                    throw new IllegalArgumentException(
+                            "Combat participant is not the commissioned hull");
                 Vessel prior=get(deployedIds.get(i));
                 result.remove(prior);
                 if(s.hull>0){
