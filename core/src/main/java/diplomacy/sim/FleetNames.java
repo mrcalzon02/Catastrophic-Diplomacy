@@ -6,7 +6,10 @@ public final class FleetNames {
     // Legacy entries retain their ordinals and deterministic output for old saves.
     public enum Style { NAVAL, MYTHIC, CELESTIAL, INDUSTRIAL, ALIEN,
         IMPERIAL, FRONTIER, SCIENTIFIC, CEREMONIAL, ORGANIC, SYNTHETIC, DESIGNATION,
-        REPUBLIC, PRIVATEER, MERCHANT, NOMADIC, MONASTIC, EXPLORER, FOLKLORE, IRREVERENT }
+        REPUBLIC, PRIVATEER, MERCHANT, NOMADIC, MONASTIC, EXPLORER, FOLKLORE, IRREVERENT,
+        GRIMDARK, NEOCLASSICAL, ABSURDIST, GOTHIC, BAROQUE, UTOPIAN, DYSTOPIAN,
+        CYBERPUNK, ANCIENT_EMPIRE, ARCHAEOLOGICAL, RETRO_SCI_FI, CORPORATE,
+        FOLK_HEROIC, PHILOSOPHICAL, ROMANTIC, OCCULT, SATIRICAL, LOST_COLONY }
     private static final String[][] FIRST={
         {"Resolute","Indomitable","Courageous","Vanguard","Dauntless","Stalwart","Valiant","Guardian"},
         {"Aegis","Valhalla","Orion","Nemesis","Basilisk","Titan","Erebus","Helios"},
@@ -28,7 +31,12 @@ public final class FleetNames {
         scrambled^=scrambled>>>27;scrambled*=0x94d049bb133111ebL;
         scrambled^=scrambled>>>31;
         int i=(int)Math.floorMod(scrambled,8),j=(int)Math.floorMod(scrambled>>>8,8);
+        // The commission counter selects naming vocabulary; it is NOT part
+        // of the permanent 16-digit identity and need not appear in the name.
         String index=String.format(java.util.Locale.ROOT,"%03d",serial);
+        int a=(int)Math.floorMod(scrambled>>>17,16);
+        int b=(int)Math.floorMod(scrambled>>>35,16);
+        int variant=(int)Math.floorMod(scrambled>>>49,4);
         if(style.ordinal()<FIRST.length){
             // Preserve previously commissioned legacy names exactly.
             String call=FIRST[style.ordinal()][i]+" "+LAST[style.ordinal()][j];
@@ -83,8 +91,130 @@ public final class FleetNames {
             case IRREVERENT -> pick(new String[]{"Mostly","Probably","Definitely","Strictly",
                     "Unreasonably","Questionably","Nominally","Temporarily"},i)+" "+pick(new String[]{
                     "Harmless","Insured","Operational","Innocent","Stealthy","Repaired","Neutral","Official"},j)+" "+index;
+            case GRIMDARK -> "The "+choose(a,
+                    "Gallows","Bleeding","Ashen","Penitent","Forsaken","Blackened",
+                    "Ironbound","Funereal","Mourning","Excommunicated","Wretched",
+                    "Hollow","Martyr's","Blighted","Final","Unforgiven")+" "+
+                    choose(b,"Reliquary","Tribunal","Sepulcher","Penance","Cathedral",
+                    "Malediction","Oblivion","Dirge","Inquisition","Tomb","Sentence",
+                    "Covenant","Absolution","Requiem","Epitaph","Vigil");
+            case NEOCLASSICAL -> choose(a,"Aurelia","Concordia","Pallas","Minerva",
+                    "Cassiopeia","Alexandria","Persephone","Ariadne","Thalia","Orpheus",
+                    "Praetoria","Calliope","Ionia","Antigone","Elysia","Octavia")
+                    +" "+choose(b,"Triumphans","Invicta","Caelestis","Magna",
+                    "Eterna","Aeterna","Nobilis","Serena","Imperatrix","Pacifica",
+                    "Virtus","Aurora","Lucentia","Maxima","Fidelis","Victoria");
+            case ABSURDIST -> choose(a,"A Minor","An Unscheduled","The Suspicious",
+                    "My Other","A Perfectly Ordinary","Three","The Unlicensed",
+                    "Mostly","An Unexpected","The Entirely","A Very Large",
+                    "The Last","A Questionable","Nobody's","The Bureaucratic",
+                    "An Extremely Polite")+" "+
+                    choose(b,"Incident","Teapot","Apology","Regret","Committee",
+                    "Sandwich","Argument","Turnip","Insurance Claim","Goose",
+                    "Pothole","Misunderstanding","Desk","Tax Return","Problem","Circus");
+            case GOTHIC -> choose(a,"Midnight","Velvet","Crimson","Black",
+                    "Shrouded","Weeping","Nocturnal","Raven","Sable","Moonlit",
+                    "Pale","Thorned","Hallowed","Obsidian","Silent","Ebon")+" "+
+                    choose(b,"Abbey","Bell","Veil","Rose","Chapel","Lament",
+                    "Revenant","Crypt","Spire","Choir","Grave","Coronet",
+                    "Wraith","Mausoleum","Nocturne","Vesper");
+            case BAROQUE -> choose(a,"Golden","Celestial","Magnificent","Grand",
+                    "Imperial","Sovereign","Jubilant","Radiant","Illustrious",
+                    "Opulent","Glorious","Royal","Pearlescent","Gilded","Splendid",
+                    "Exalted")+" "+choose(b,"Procession","Oratorio","Palace",
+                    "Fanfare","Symphony","Miracle","Crescendo","Triumph","Basilica",
+                    "Archangel","Cavalcade","Ceremony","Revelation","Pavilion",
+                    "Monument","Overture");
+            case UTOPIAN -> choose(a,"Common","Shared","Open","Bright","Gentle",
+                    "Kindred","Renewed","Harmonious","Free","Future","Equal",
+                    "Patient","Hopeful","Peaceful","Living","United")+" "+
+                    choose(b,"Garden","Horizon","Harbor","Tomorrow","Promise",
+                    "Exchange","Accord","Dawn","Commons","Assembly","Light",
+                    "Sanctuary","Vision","Concord","Home","Bridge");
+            case DYSTOPIAN -> choose(a,"Mandatory","Compliance","Civic","Authorized",
+                    "Standard","Quota","Emergency","State","Restricted","Official",
+                    "Collective","Temporary","Corrective","Departmental","Silent",
+                    "Executive")+" "+choose(b,"Harmony","Observer","Efficiency",
+                    "Allocation","Consent","Directive","Enforcement","Audit",
+                    "Ration","Ordinance","Monitor","Procedure","Mandate","Quota",
+                    "Reassignment","Registry");
+            case CYBERPUNK -> choose(a,"Neon","Ghost","Chrome","Broken","Wired",
+                    "Encrypted","Blacksite","Zero-Day","Circuit","Synth",
+                    "Data","Glass","Void","Quantum","Backdoor","Static")+" "+
+                    choose(b,"Runner","Firewall","Jackal","Relay","Pulse",
+                    "Cascade","Memory","Wraith","Payload","Protocol","Cipher",
+                    "Vault","Interface","Shard","Daemon","Overclock");
+            case ANCIENT_EMPIRE -> choose(a,"Throne of","Scepter of","Heir to",
+                    "Pillar of","Bastion of","Tribute to","Imperium of",
+                    "Legacy of","Crown of","Sanctum of","Seal of","Witness to",
+                    "Harrowing of","Remnant of","Aegis of","Temple of")+" "+
+                    choose(b,"Aram","Nine Kings","Orichal","The First Sun",
+                    "Kadesh","Asterion","Tiamat","Twelve Cities","Nimrud",
+                    "Seven Gates","Nara","Stone","The Old Law","Ur","The Dawn",
+                    "Forgotten Gods");
+            case ARCHAEOLOGICAL -> "RV "+choose(a,"Palimpsest","Tell","Stratum",
+                    "Lithic","Midden","Relic","Survey","Anastylosis","Axiom",
+                    "Artifact","Codex","Tablet","Digsite","Ruin","Provenance",
+                    "Antiquity")+" "+choose(b,"Alpha","Beta","Delta","Prime",
+                    "Gamma","North","Outer","Inner","VII","IX","Sigma",
+                    "One","Two","Last","Deep","East");
+            case RETRO_SCI_FI -> choose(a,"Atomic","Space Age","Rocket","Cosmic",
+                    "Galactic","Radiant","Astro","Planetary","Supersonic",
+                    "Turbo","Solar","Meteor","Star","Hyper","Moon","Pulsar")+" "+
+                    choose(b,"Patrol","Ranger","Queen","Cadet","Voyager","Pioneer",
+                    "Express","Defender","Skipper","Beacon","Cruiser",
+                    "Rocket","Saucer","Sentinel","Explorer","Adventurer");
+            case CORPORATE -> choose(a,"Synergy","Quarterly","Shareholder",
+                    "Fiscal","Leveraged","Premium","Enterprise","Brand",
+                    "Acquisition","Executive","Market","Strategic",
+                    "Return-on","Capital","Efficient","Best-Practice")+" "+
+                    choose(b,"Alignment","Outlook","Dividend","Merger","Margin",
+                    "Portfolio","Expansion","Revenue","Compliance","Growth",
+                    "Solution","Asset","Equity","Forecast","Optimization","Value");
+            case FOLK_HEROIC -> choose(a,"Bold","Old","Storm","Bright","Long",
+                    "Golden","Wild","Red","Swift","Fair","True","Young",
+                    "Wandering","Oak","High","Winter")+" "+
+                    choose(b,"Stag","Lion","Knight","Lantern","Sparrow","Heron",
+                    "Shield","Oak","Wanderer","Bridge","Song","Fiddle",
+                    "Wolf","Bell","Sword","Fox");
+            case PHILOSOPHICAL -> choose(a,"The Problem of","The Nature of",
+                    "On the Question of","Principle of","The Burden of",
+                    "Meditations on","An Argument for","Against","The Paradox of",
+                    "Measure of","The Limit of","A Theory of","The Meaning of",
+                    "The Absence of","The Weight of","A Case for")+" "+
+                    choose(b,"Being","Virtue","Change","Nothingness","Time",
+                    "Reason","Freedom","Certainty","Consciousness","Justice",
+                    "Order","Motion","Doubt","Memory","Existence","Light");
+            case ROMANTIC -> choose(a,"Beloved","Morning","Last","Distant",
+                    "Eternal","Soft","Wild","Hidden","Silver","Blue",
+                    "Tender","Golden","Autumn","First","Lost","Summer")+" "+
+                    choose(b,"Reunion","Promise","Letter","Sonnet","Embrace",
+                    "Kiss","Ballad","Memory","Devotion","Dance","Bouquet",
+                    "Lullaby","Dream","Lament","Farewell","Hope");
+            case OCCULT -> choose(a,"Thirteenth","Nameless","Veiled","Eldritch",
+                    "Forbidden","Abyssal","Pale","Hollow","Sealed","Cursed",
+                    "Unseen","Starless","Ancient","Cryptic","Hidden","Dark")+" "+
+                    choose(b,"Oracle","Threshold","Pentacle","Talisman",
+                    "Apostle","Grimoire","Chalice","Rite","Conjunction",
+                    "Conclave","Witness","Offering","Watcher","Sign",
+                    "Labyrinth","Coven");
+            case SATIRICAL -> choose(a,"With All Due","Subject to","As Per",
+                    "Absolutely No","Officially","We Regret the",
+                    "Terms and","Reasonably","Allegedly","Pending",
+                    "Unanimous","Limited","Perpetual","Statutory","Substantial",
+                    "Provisional")+" "+choose(b,"Respect","Approval","Procedure",
+                    "Fault","Refund","Conditions","Assurance","Liability",
+                    "Meeting","Notice","Quorum","Exception","Disclaimer",
+                    "Review","Inquiry","Authority");
+            case LOST_COLONY -> choose(a,"Last","Forgotten","Second","Distant",
+                    "Broken","Old","New","Silent","Homeward","Buried",
+                    "Far","Lonely","Return","Remnant","Unclaimed","Settler's")+" "+
+                    choose(b,"Hearth","Homestead","Beacon","Orchard","Signal",
+                    "Lullaby","Pilgrim","Lantern","Crossing","Wellspring",
+                    "Sunrise","Outpost","Valley","Promise","Legacy","Harvest");
             default -> throw new IllegalArgumentException("Unrecognized naming philosophy");
         };
     }
     private static String pick(String[] options,int index){return options[index];}
+    private static String choose(int slot,String... options){return options[slot];}
 }
