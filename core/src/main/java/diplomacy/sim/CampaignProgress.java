@@ -21,8 +21,8 @@ public final class CampaignProgress {
             case LICENSE -> rank>=6?0:LevelEconomy.researchMissionCost(rank+1);
             case ACCELERATOR -> speed>=4?0:ACCELERATOR_WORK[speed+1];
         };
-        // Four accelerators may shorten a project to ONE victory, never zero.
-        return base==0?0:Math.max(1,base-speed);
+        // Four accelerators may reduce a paid project's duration to zero, never below zero.
+        return Math.max(0,base-speed);
     }
     /** A previous save can contain a project which now qualifies for immediate
      * completion after the duration-floor policy. Apply the paid entitlement once. */
@@ -121,7 +121,7 @@ public final class CampaignProgress {
                         completed(nextAccelerationMilestone())&&credits>=nextAccelerationCost();
             };
         }
-        /** Pay up front. Even maximum lab acceleration requires a victory. */
+        /** Pay up front. If adjusted duration is zero, research unlocks instantly. */
         public State beginResearch(Project desired){
             if(desired==null||desired==Project.NONE)
                 throw new IllegalArgumentException("Select a research project");

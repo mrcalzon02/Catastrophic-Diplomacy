@@ -3,7 +3,7 @@ package diplomacy.sim;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.CRC32;
 
-/** Every newly purchased project requires at least one successful mission. */
+/** Research durations are bounded below by zero; immediate unlocks are valid. */
 public final class CampaignResearchTest {
     private static void check(boolean pass,String why){if(!pass)throw new AssertionError(why);}
     private static void reject(Runnable task,String why){
@@ -67,15 +67,12 @@ public final class CampaignResearchTest {
         check(fleet.researchPerVictory()==1,
                 "A completed mission must always provide one research tick");
         var acceleratedLicense=fleet.purchaseNextResearch();
-        check(acceleratedLicense.researchRank()==0&&
-                        acceleratedLicense.activeProject()==CampaignProgress.Project.LICENSE,
-                "Even maximum acceleration cannot grant an unearned technology instantly");
-        check(acceleratedLicense.nextResearchMissions()==1&&
-                        acceleratedLicense.missionsUntilResearchComplete()==1,
-                "Maximum acceleration must retain at least one mission of research");
-        var finishedLicense=acceleratedLicense.complete(1,20,20);
-        check(finishedLicense.researchRank()==1&&!finishedLicense.researchActive(),
-                "One successful mission should finish the fully accelerated project");
+        check(acceleratedLicense.researchRank()==1&&
+                        acceleratedLicense.activeProject()==CampaignProgress.Project.NONE,
+                "At zero duration, paid research must unlock immediately");
+        check(acceleratedLicense.nextResearchMissions()>=0&&
+                        acceleratedLicense.missionsUntilResearchComplete()==0,
+                "Research may be instant, but its duration can never be negative");
         final var maxedFleet=fleet;
         reject(maxedFleet::purchaseResearchSpeed,"No fifth accelerator");
         check(CampaignProgress.decode(CampaignProgress.encode(first)).equals(first),
@@ -109,6 +106,6 @@ public final class CampaignResearchTest {
                 "Final stage replay paid full reward twice");
         reject(()->CampaignProgress.decode(CampaignProgress.encode(first).replace("TERRAN","DRAXIAN")),
                 "Corrupted research save checksum accepted");
-        System.out.println("PASS research: one-mission minimum, paid licenses/labs, four accelerators, quarter replays, v1-v4 saves");
+        System.out.println("PASS research: instant zero-floor, paid licenses/labs, four accelerators, quarter replays, v1-v4 saves");
     }
 }
