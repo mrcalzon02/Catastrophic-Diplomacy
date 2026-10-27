@@ -97,6 +97,23 @@ def artifact():
     check(not bad, "Restricted permissions absent: " + str(bad))
     unexpected = sorted(found - set(CONFIG["allowed_permissions"]))
     check(not unexpected, "No undeclared merged permissions: " + str(unexpected))
+    zipalign = str(sdk / "zipalign")
+    check(subprocess.run([zipalign, "-c", "-P", "16", "-v", "4", str(apk)],
+                         capture_output=True, text=True).returncode == 0,
+          "APK ZIP alignment is 16 KB compatible")
+    with zipfile.ZipFile(apk) as archive:
+        native = [name for name in archive.namelist()
+                  if re.fullmatch(r"lib/[^/]+/[^/]+[.]so", name)]
+        import tempfile
+        for name in native:
+            with tempfile.NamedTemporaryFile(suffix=".so") as tmp:
+                tmp.write(archive.read(name))
+                tmp.flush()
+                elf = cmd("readelf", "-l", "-W", tmp.name)
+                offsets = [int(line.split()[-1], 0) for line in elf.splitlines()
+                           if line.lstrip().startswith("LOAD ")]
+                check(bool(offsets) and min(offsets) >= 16384,
+                      "Native 16 KB ELF PT_LOAD alignment: " + name)
     sig = cmd(signer, "verify", "--verbose", "--print-certs", str(apk))
     check("Signer #1 certificate SHA-256 digest:" in sig, "APK cryptographic signature verifies")
     analyzer = shutil.which("apkanalyzer")
