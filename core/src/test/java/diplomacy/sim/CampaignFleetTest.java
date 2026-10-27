@@ -147,6 +147,36 @@ public final class CampaignFleetTest {
                 "Version downgrade or checksum tampering was accepted");
         reject(()->CampaignFleetCodec.decode(encoded.replace("TERRAN","DRAXIAN"),tech),
                 "Tampering with fleet faction was accepted");
+        // Production bug regression: the old service() implementation rebuilt
+        // the roster with a legacy constructor, losing seed and radio settings.
+        long namedSeed=0x7fecb1493d2510L;
+        var commissioned=CampaignFleet.start(faction,baseline,tech,namedSeed)
+                .changeRadioTone(CrewChatter.Tone.LIGHTHEARTED)
+                .changeStyle(FleetNames.Style.IRREVERENT);
+        var serviced=commissioned.service(1,CampaignFleet.Service.FUEL,tech);
+        check(serviced.namingSeed()==namedSeed&&
+                        serviced.radioTone()==CrewChatter.Tone.LIGHTHEARTED&&
+                        serviced.style()==FleetNames.Style.IRREVERENT,
+                "Servicing a ship must not reset the fleet's radio or naming settings");
+        var fullyServiced=commissioned.serviceAll(1,tech);
+        check(fullyServiced.namingSeed()==namedSeed&&
+                        fullyServiced.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
+                "Service All discarded saved radio tone or naming seed");
+        var reserveCycle=commissioned.setActive(1,false,20).setActive(1,true,20);
+        check(reserveCycle.namingSeed()==namedSeed&&
+                        reserveCycle.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
+                "Reserve/deployment changed saved crew communication preferences");
+        var purchased=commissioned.purchase(baseline,tech);
+        check(purchased.get(5).name().equals(FleetNames.generate(
+                        FleetNames.Style.IRREVERENT,namedSeed,5))&&
+                        purchased.namingSeed()==namedSeed&&
+                        purchased.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
+                "Newly commissioned hull was not named with the saved campaign seed");
+        var returnedNames=CampaignFleetCodec.decode(
+                CampaignFleetCodec.encode(fullyServiced),tech);
+        check(returnedNames.namingSeed()==namedSeed&&
+                        returnedNames.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
+                "Fleet codec discarded naming and radio preferences after service");
         var styledRadio=replacement.changeRadioTone(CrewChatter.Tone.LIGHTHEARTED);
         var persistedRadio=CampaignFleetCodec.decode(CampaignFleetCodec.encode(styledRadio),tech);
         check(persistedRadio.radioTone()==CrewChatter.Tone.LIGHTHEARTED
@@ -174,6 +204,21 @@ public final class CampaignFleetTest {
         check(!CrewChatter.line(CrewChatter.Scale.FIGHTER,CrewChatter.Event.DAMAGE,3,1)
                         .toLowerCase().contains("bulkheads"),
                 "Battleship bridge chatter incorrectly sent from fighter cockpit");
+        Battle radioProof=Battle.duel(44991,1,baseline,baseline,tech);
+        var source=radioProof.ships().get(0);
+        radioProof.setTeamRadioTone(0,CrewChatter.Tone.PROFESSIONAL);
+        String professional=radioProof.radioMessage(source,CrewChatter.Event.DAMAGE,false);
+        radioProof.setTeamRadioTone(0,CrewChatter.Tone.LIGHTHEARTED);
+        String playful=radioProof.radioMessage(source,CrewChatter.Event.DAMAGE,false);
+        check(!professional.equals(playful),
+                "Battle radio ignores the player's selected communication voice");
+        check(radioProof.radioMessage(source,CrewChatter.Event.DAMAGE,true)
+                        .contains(" / Flight: "),
+                "Fighter communications used ship-bridge identification");
+        reject(()->radioProof.setTeamRadioTone(-1,CrewChatter.Tone.MIXED),
+                "Invalid radio side accepted");
+        reject(()->radioProof.setTeamRadioTone(0,null),
+                "Null radio voice accepted");
         for(var tone:CrewChatter.Tone.values())
             for(var scale:CrewChatter.Scale.values())
                 for(var event:CrewChatter.Event.values())
