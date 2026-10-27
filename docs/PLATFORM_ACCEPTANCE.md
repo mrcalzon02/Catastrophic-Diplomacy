@@ -22,3 +22,13 @@ Physical component/compartment damage, carrier recovery/refuel logistics, missil
 ## Mandatory mobile APK release compliance (P0, not yet certified)
 
 Every Android APK acceptance cycle MUST review all 38 controls in [the canonical release checklist](APK_RELEASE_COMPLIANCE_GATE.md), including current Play distribution rules, platform-specific target API, user-data flow, signer continuity and updater/download restrictions. Run `python3 tools/verify_apk_release_gate.py --checklist-only` during source preflight and then `python3 tools/verify_apk_release_gate.py --evidence <record.json> --apk <signed.apk>` for an actual candidate. An evidence record does not replace device upgrade tests, `apksigner` verification or Play Console approval. Keep GitHub/sideload development on `main`; the dormant `google-play` branch has a fail-closed complete functional-test release command. The current Android targetSdk 35 must be evaluated against today's Play upload requirement before any Play submission, and a distinct Play upload-signing plan remains outstanding. No private signing work is authorized by this checklist.
+
+## 2026-10-21 massed-combat acceptance delta
+
+Core campaign covers all steps 1v1..200v200, 864 six-family weapons/6-faction/4-hull
+pairings (860 accepted by engineering), all engine and weapon technology tracks,
+10 replay scales, and twice-repeated 480-tick 200v200 combined arms. Separate
+Java2D raster and projection tests validate 400 headless hull polygons and dynamic
+camera bounds. **These checks do not close desktop graphics, GL3 instancing,
+Android physical-device, signed-release or real frame-rate acceptance gates.**
+See `docs/MASS_BATTLE_ACCEPTANCE.md`.

@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 
 /** Verifiable, data-driven upgrade catalogue. Strict input parser, no external dependencies. */
@@ -20,7 +21,8 @@ public final class TechnologyCatalog {
     public static final String COMPONENTS_RESOURCE = "/technology/components-v0.1.csv";
     private static final int COLS = 20;
     private static final Set<String> TRACKS = Set.of("OUTPUT", "EFFICIENCY", "RESILIENCE", "SPECIALIST");
-    private static final Set<String> FACTIONS = Set.of("TER", "DRA", "CAR", "ZIP", "UZI", "MAN");
+    private static final Set<String> FACTIONS = Set.of(
+            "TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB");
 
     public static final class Upgrade {
         public final String id, faction, subsystem, track, name, prerequisite, tradeoff;
@@ -59,7 +61,7 @@ public final class TechnologyCatalog {
             mass = positive(row.get(6)); power = positive(row.get(7));
             heat = positive(row.get(8)); integrity = positive(row.get(9));
             industryCost = integer(row.get(10), "component cost"); effect = positive(row.get(11));
-            if (!FACTIONS.contains(faction) || !Set.of("weapons", "defense", "systems", "support").contains(category)
+            if (!FACTIONS.contains(faction) || !Set.of("weapons", "defense", "systems", "support", "habitat").contains(category)
                     || !id.equals("BASE-" + faction + "-" + subsystem) || name.isBlank()
                     || industryCost <= 0) throw new IllegalArgumentException("Invalid base component: " + id);
         }
@@ -84,13 +86,21 @@ public final class TechnologyCatalog {
         try (InputStream upgrades = TechnologyCatalog.class.getResourceAsStream(UPGRADES_RESOURCE);
              InputStream components = TechnologyCatalog.class.getResourceAsStream(COMPONENTS_RESOURCE)) {
             if (upgrades == null || components == null) throw new IOException("Bundled technology resources missing");
-            return load(upgrades, components);
+            return load(upgrades,components,true);
         }
     }
     public static TechnologyCatalog load(InputStream upgradeStream, InputStream componentStream) throws IOException {
+        return load(upgradeStream,componentStream,false);
+    }
+    private static TechnologyCatalog load(InputStream upgradeStream,InputStream componentStream,
+                                          boolean includeNewCivilizations)throws IOException {
         if (upgradeStream == null || componentStream == null) throw new IllegalArgumentException("Both inputs required");
         List<List<String>> bases = readCsv(componentStream, 13);
         List<List<String>> rows = readCsv(upgradeStream, COLS);
+        if(includeNewCivilizations){
+            expandNativeFactions(bases,rows);
+            addHabitatFamilies(bases,rows);
+        }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
                 || !rows.get(0).get(6).equals("Prerequisite ID") || !rows.get(0).get(19).equals("Tradeoff"))
@@ -119,6 +129,129 @@ public final class TechnologyCatalog {
                 throw new IllegalArgumentException("Missing prerequisite for " + u.id);
         }
         return new TechnologyCatalog(upgrades, baseMap);
+    }
+
+    /**
+     * Five additional civilizations have their OWN BASE/TECH identities,
+     * costs, prerequisite chains and incremental specialist branches.
+     * The original six CSV rosters stay untouched for save compatibility.
+     * Derived families start from a known engineering philosophy, then gain
+     * distinct native material, energy and targeting trade-offs.
+     */
+    private record NativeFamily(String inherited,String id,String name,
+                                double mass,double power,double heat,
+                                double integrity,double output,double aim) {}
+    private static final NativeFamily[] NEW_FAMILIES={
+        new NativeFamily("DRA","VAE","Vaerith",1.07,1.09,1.05,1.13,1.06,1.01),
+        new NativeFamily("UZI","ZEL","Zelthar",0.97,1.04,0.95,0.92,1.02,1.11),
+        new NativeFamily("MAN","AUR","Aureate",1.06,0.95,0.91,1.11,0.98,1.05),
+        new NativeFamily("CAR","NYX","Nyx",0.98,1.05,1.02,1.14,1.04,0.97),
+        new NativeFamily("ZIP","UMB","Umbra",1.12,1.03,1.07,1.17,1.03,0.94)
+    };
+    private static String ratio(double original,double multiplier){
+        return String.format(Locale.ROOT,"%.6f",original*multiplier);
+    }
+    private static String foreign(String id,String from,String to){
+        return id.replace("BASE-"+from+"-","BASE-"+to+"-")
+                 .replace("TECH-"+from+"-","TECH-"+to+"-");
+    }
+    private static void expandNativeFactions(List<List<String>> bases,List<List<String>> upgrades){
+        List<List<String>> parentBases=List.copyOf(bases);
+        List<List<String>> parentUpgrades=List.copyOf(upgrades);
+        for(NativeFamily f:NEW_FAMILIES){
+            for(int i=1;i<parentBases.size();i++){
+                List<String> original=parentBases.get(i);
+                if(!f.inherited.equals(original.get(1)))continue;
+                List<String> row=new ArrayList<>(original);
+                row.set(0,foreign(row.get(0),f.inherited,f.id));
+                row.set(1,f.id);
+                row.set(3,f.name+" "+row.get(3));
+                row.set(5,f.name+" native engineering lineage; not cross-faction equipment");
+                row.set(6,ratio(Double.parseDouble(row.get(6)),f.mass));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),f.power));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),f.heat));
+                row.set(9,ratio(Double.parseDouble(row.get(9)),f.integrity));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),f.output));
+                bases.add(row);
+            }
+            for(int i=1;i<parentUpgrades.size();i++){
+                List<String> original=parentUpgrades.get(i);
+                if(!f.inherited.equals(original.get(1)))continue;
+                List<String> row=new ArrayList<>(original);
+                row.set(0,foreign(row.get(0),f.inherited,f.id));
+                row.set(1,f.id);
+                row.set(5,f.name+" "+row.get(5));
+                row.set(6,foreign(row.get(6),f.inherited,f.id));
+                // Alter the per-stage modifiers only modestly: preserve tradeoffs,
+                // but ensure different civilizations aren't identical aliases.
+                row.set(12,ratio(Double.parseDouble(row.get(12)),
+                        1+(f.output-1)*0.22));
+                row.set(13,ratio(Double.parseDouble(row.get(13)),
+                        1+(f.aim-1)*0.18));
+                row.set(14,ratio(Double.parseDouble(row.get(14)),
+                        1+(f.integrity-1)*0.12));
+                row.set(19,f.name+" branch: "+row.get(19));
+                upgrades.add(row);
+            }
+        }
+    }
+
+    /**
+     * Dedicated habitat modules are not native crew capacity. The two new
+     * append-only HABITAT sockets require actual installed accommodation AND
+     * life support, with independent per-module research for all 11 races.
+     * Older six-race CSV files remain stable for blueprint compatibility.
+     */
+    private static void addHabitatFamilies(List<List<String>> bases,List<List<String>> upgrades){
+        String[][] families={
+            {"TER","Terran"},{"DRA","Draxian"},{"CAR","Carnelian"},
+            {"ZIP","Zippledrow"},{"UZI","Uzipt"},{"MAN","Mandrally"},
+            {"VAE","Vaerith"},{"ZEL","Zelthar"},{"AUR","Aureate"},
+            {"NYX","Nyx"},{"UMB","Umbra"}
+        };
+        String[][] modules={
+            {"CRW","Crew Accommodation","1.20","0.80","0.32","17.5","2.05"},
+            {"LFS","Life Support","1.15","0.90","0.38","16.0","2.12"}
+        };
+        String[] paths={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
+        String[] grades={"Primitive","Refined","Advanced","Masterwork","Exotic","Transcendent"};
+        for(String[] family:families)for(String[] module:modules){
+            String id=family[0],subsystem=module[0];
+            String baseId="BASE-"+id+"-"+subsystem;
+            double nativeVariation=1.0+((id.charAt(0)+id.charAt(1))%7-3)*0.008;
+            String output=ratio(Double.parseDouble(module[6]),nativeVariation);
+            bases.add(List.of(baseId,id,subsystem,family[1]+" "+module[1],
+                    "habitat","Manned fleet operations require explicit accommodation and oxygen support",
+                    module[2],module[3],module[4],module[5],"120",output,
+                    "Provides no weapon or crew unless physically mounted"));
+            for(String branch:paths)for(int rank=1;rank<=6;rank++){
+                String level=String.format(Locale.ROOT,"%02d",rank);
+                String techId="TECH-"+id+"-"+subsystem+"-"+branch+"-"+level;
+                String parent=rank==1?baseId:"TECH-"+id+"-"+subsystem+"-"+branch+"-"+
+                        String.format(Locale.ROOT,"%02d",rank-1);
+                double outputBoost=switch(branch){
+                    case "OUTPUT" -> 1+0.045*rank;
+                    case "EFFICIENCY" -> 1;
+                    case "RESILIENCE" -> 1+0.012*rank;
+                    default -> 1+0.025*rank;
+                };
+                double mass=switch(branch){
+                    case "EFFICIENCY" -> 1-0.020*rank;
+                    case "RESILIENCE" -> 1+0.025*rank;
+                    default -> 1+0.008*rank;
+                };
+                double power=branch.equals("EFFICIENCY")?1-0.035*rank:1+0.014*rank;
+                double integrity=branch.equals("RESILIENCE")?1+0.045*rank:1;
+                upgrades.add(List.of(techId,id,subsystem,branch,level,
+                        family[1]+" "+module[1]+" — "+branch+" "+grades[rank-1],
+                        parent,Integer.toString(115*rank*rank),
+                        Integer.toString(100*rank),ratio(mass,1),ratio(power,1),
+                        ratio(branch.equals("EFFICIENCY")?1-0.026*rank:1+0.012*rank,1),
+                        ratio(outputBoost,1),"1.0",ratio(integrity,1),
+                        "1.0","1.0","1.0",ratio(1+0.016*rank,1),
+                        branch+" improves a physical habitat module with costs and tradeoffs"));
+            }
+        }
     }
 
     private static int integer(String text, String field) {

@@ -7,65 +7,99 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.Battle;
 
-/** OpenGL3 version of Malefic Veil's mesh-once / instance-attributes architecture.
- * One hull mesh is uploaded once, then per-faction transform arrays draw whole squadrons.
- * Zero dependency on Beckenburg/Malefic resources. Falls back in CatastrophicGame.
- */
+/** GPU-instanced native faction/class silhouettes. Sprite-equipped ships are excluded. */
 public final class InstancedShipRenderer implements AutoCloseable {
-    private final Mesh hull;
+    private final Mesh[][] hulls =
+            new Mesh[Battle.Faction.values().length][Shipyard.Hull.values().length];
     private final ShaderProgram shader;
-    private final float[] positions = new float[4096 * 4];
-    public int drawCalls, instances;
+    private final float[] positions=new float[4096*4];
+    public int drawCalls,instances;
 
     public InstancedShipRenderer() {
-        if (Gdx.gl30 == null) throw new IllegalStateException("OpenGL ES 3 / GL 3 unavailable");
-        boolean mobile = Gdx.app.getType() == com.badlogic.gdx.Application.ApplicationType.Android;
-        String vertex = mobile
+        if(Gdx.gl30==null)throw new IllegalStateException("OpenGL ES 3 / GL 3 unavailable");
+        boolean mobile=Gdx.app.getType()==com.badlogic.gdx.Application.ApplicationType.Android;
+        String vertex=mobile
                 ? "#version 300 es\nprecision mediump float;\nin vec3 a_position;\nin vec4 a_instance;\nuniform mat4 u_proj;\nvoid main(){ vec2 p=vec2(a_position.x*a_instance.z-a_position.y*a_instance.w, a_position.x*a_instance.w+a_position.y*a_instance.z)+a_instance.xy; gl_Position=u_proj*vec4(p,0.0,1.0); }"
                 : "#version 150\nin vec3 a_position;\nin vec4 a_instance;\nuniform mat4 u_proj;\nvoid main(){ vec2 p=vec2(a_position.x*a_instance.z-a_position.y*a_instance.w, a_position.x*a_instance.w+a_position.y*a_instance.z)+a_instance.xy; gl_Position=u_proj*vec4(p,0.0,1.0); }";
-        String fragment = mobile
+        String fragment=mobile
                 ? "#version 300 es\nprecision mediump float;\nuniform vec4 u_color;\nout vec4 fragColor;\nvoid main(){ fragColor=u_color; }"
                 : "#version 150\nuniform vec4 u_color;\nout vec4 fragColor;\nvoid main(){ fragColor=u_color; }";
-        shader = new ShaderProgram(vertex, fragment);
-        if (!shader.isCompiled()) { String failure = shader.getLog(); shader.dispose(); throw new IllegalStateException(failure); }
-        hull = new Mesh(Mesh.VertexDataType.VertexBufferObjectWithVAO, true, 9, 0, VertexAttribute.Position());
-        // Independently authored 2D top-down arrow hull with two stabilizers.
-        hull.setVertices(new float[]{
-                13,0,0, -8,6,0, -4,0,0,
-                13,0,0, -4,0,0, -8,-6,0,
-                -4,0,0, -8,6,0, -8,-6,0
-        });
-        hull.enableInstancedRendering(false, 4096,
-                new VertexAttribute(VertexAttributes.Usage.Generic, 4, "a_instance"));
-    }
-
-    public void render(Battle battle, OrthographicCamera camera) {
-        drawCalls = 0; instances = 0;
-        shader.bind();
-        shader.setUniformMatrix("u_proj", camera.combined);
-        for (Battle.Faction faction : Battle.Faction.values()) {
-            for (int team = 0; team < 2; team++) {
-                int n = 0;
-                for (Battle.Ship ship : battle.ships()) {
-                    if (!ship.alive() || ship.faction != faction || ship.team != team) continue;
-                    if (n >= 4096) { // Explicit limit, renderer falls back rather than dropping ships.
-                        throw new IllegalStateException("Instance batch exceeded 4096 ships");
+        shader=new ShaderProgram(vertex,fragment);
+        if(!shader.isCompiled()) {
+            String why=shader.getLog();shader.dispose();throw new IllegalStateException(why);
+        }
+        try {
+            for(Battle.Faction faction:Battle.Faction.values())
+                for(Shipyard.Hull type:Shipyard.Hull.values()) {
+                    if(type.spriteHull()!=type){
+                        Mesh shared=hulls[faction.ordinal()][type.spriteHull().ordinal()];
+                        if(shared==null)throw new IllegalStateException("Missing base art mesh for "+type);
+                        hulls[faction.ordinal()][type.ordinal()]=shared;
+                        continue;
                     }
-                    int offset = n++ * 4;
-                    positions[offset] = (float) ship.x; positions[offset + 1] = (float) ship.y;
-                    positions[offset + 2] = (float) Math.cos(ship.facing);
-                    positions[offset + 3] = (float) Math.sin(ship.facing);
+                    float[] pairs=HullSilhouette.of(faction,type);
+                    float[] vertices=new float[pairs.length/2*3];
+                    for(int i=0;i<pairs.length/2;i++) {
+                        vertices[i*3]=pairs[i*2];
+                        vertices[i*3+1]=pairs[i*2+1];
+                        vertices[i*3+2]=0;
+                    }
+                    Mesh mesh=new Mesh(Mesh.VertexDataType.VertexBufferObjectWithVAO,
+                            true,vertices.length/3,0,VertexAttribute.Position());
+                    mesh.setVertices(vertices);
+                    hulls[faction.ordinal()][type.ordinal()]=mesh;
+                    mesh.enableInstancedRendering(false,4096,
+                            new VertexAttribute(VertexAttributes.Usage.Generic,4,"a_instance"));
                 }
-                if (n == 0) continue;
-                hull.setInstanceData(positions, 0, n * 4);
-                shader.setUniformf("u_color", faction.r, faction.g, faction.b, 1f);
-                hull.render(shader, GL20.GL_TRIANGLES);
-                drawCalls++; instances += n;
-            }
+        }catch(RuntimeException broken) {
+            close();
+            throw broken;
         }
     }
 
-    @Override public void close() { hull.dispose(); shader.dispose(); }
+    public void render(Battle battle,OrthographicCamera camera) {
+        render(battle,camera,ship -> false);
+    }
+    /** Avoid duplicate geometry under an actual, successfully loaded sprite. */
+    public void render(Battle battle,OrthographicCamera camera,
+                       java.util.function.Predicate<Battle.Ship> hasArt) {
+        drawCalls=0;instances=0;
+        shader.bind();
+        shader.setUniformMatrix("u_proj",camera.combined);
+        for(Battle.Faction faction:Battle.Faction.values())
+            for(Shipyard.Hull hull:Shipyard.Hull.values()) {
+                int n=0;
+                for(Battle.Ship ship:battle.ships()) {
+                    Shipyard.Hull type=ship.hullClass==null?Shipyard.Hull.CORVETTE:ship.hullClass;
+                    if(!ship.alive()||ship.faction!=faction||type!=hull||hasArt.test(ship))continue;
+                    if(n>=4096)throw new IllegalStateException("Hull instance batch exceeded 4096");
+                    int offset=n++*4;
+                    positions[offset]=(float)ship.x;
+                    positions[offset+1]=(float)ship.y;
+                    float scale=(float)ship.visualScale();
+                    // Native shipyard outlines point +Y; combat heading zero points +X.
+                    positions[offset+2]=(float)Math.sin(ship.facing)*scale;
+                    positions[offset+3]=(float)-Math.cos(ship.facing)*scale;
+                }
+                if(n==0)continue;
+                Mesh mesh=hulls[faction.ordinal()][hull.ordinal()];
+                mesh.setInstanceData(positions,0,n*4);
+                shader.setUniformf("u_color",faction.r*hull.tintRed(),
+                        faction.g*hull.tintGreen(),faction.b*hull.tintBlue(),1f);
+                mesh.render(shader,GL20.GL_TRIANGLES);
+                drawCalls++;instances+=n;
+            }
+    }
+
+    @Override public void close() {
+        // Chassis variants deliberately alias base-category meshes.
+        java.util.Set<Mesh> unique=java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Mesh,Boolean>());
+        for(Mesh[] row:hulls)for(Mesh mesh:row)
+            if(mesh!=null&&unique.add(mesh))mesh.dispose();
+        shader.dispose();
+    }
 }

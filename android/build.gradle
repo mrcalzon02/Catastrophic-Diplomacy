@@ -24,8 +24,6 @@ if (!(playGamesProjectId ==~ /[0-9]{1,24}/)) {
 }
 
 android {
-    // AGP 9 defaults resValues to false. Play Games APP_ID needs generated string resources.
-    buildFeatures { resValues = true }
     namespace 'games.catastrophicdiplomacy.android'
     compileSdk 36
     buildFeatures { resValues true }
@@ -33,8 +31,8 @@ android {
         applicationId 'games.catastrophicdiplomacy'
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 5
+        versionName '0.1.4-rc.1'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -73,7 +71,7 @@ android {
             matchingFallbacks = ['release']
         }
     }
-    sourceSets { main { assets.srcDirs = ['../assets'] } }
+    sourceSets { main { assets.srcDirs = ['../assets', rootProject.layout.buildDirectory.dir('generated/cd-ui').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-music').get().asFile] } }
     packaging { resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] } }
 }
 
@@ -91,6 +89,19 @@ tasks.register('copyAndroidNatives') {
     }
 }
 tasks.configureEach { task ->
+    // Both packaging and release lint inspect these generated asset directories.
+    // Gradle 8+ requires the producer tasks to be explicit dependencies, not
+    // just incidental side effects of Android's mergeAssets task ordering.
+    if ((task.name.startsWith('merge') && task.name.endsWith('Assets')) ||
+            (task.name.startsWith('generate') && task.name.endsWith('LintVitalReportModel')) ||
+            task.name.startsWith('lintVital')) {
+        task.dependsOn rootProject.tasks.named('prepareUiAssets')
+        task.dependsOn rootProject.tasks.named('prepareMusicAssets')
+    }
+    if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
+        task.dependsOn rootProject.tasks.named('verifyBattlefieldResources')
+        task.dependsOn rootProject.tasks.named('verifyBattleAudioResources')
+    }
     if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
         task.dependsOn(tasks.named('copyAndroidNatives'))
     }
@@ -99,6 +110,7 @@ tasks.configureEach { task ->
 dependencies {
     playImplementation 'com.google.android.gms:play-services-games-v2:22.1.0'
     implementation project(':game')
+    implementation 'androidx.core:core:1.15.0'
     implementation 'com.badlogicgames.gdx:gdx-backend-android:1.14.2'
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-armeabi-v7a'
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-arm64-v8a'

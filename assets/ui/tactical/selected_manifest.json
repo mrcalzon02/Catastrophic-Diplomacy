@@ -1,0 +1,318 @@
+{
+  "schema": "catastrophic-diplomacy-selected-ui-v5",
+  "approved_only": true,
+  "assets": {
+    "restart": {
+      "source": "approved/systems/navigation/navigation_03.png",
+      "sha256": "603d7d7c40e56e09441f9e8afb0b26a78d4ad7eb5d5e11b047da34304c272132",
+      "destination": "assets/ui/tactical/selected/restart.png",
+      "sheet": "systems",
+      "box": [
+        146,
+        174,
+        204,
+        240
+      ],
+      "pixel_sha256": "f62b0b636ee8e704028b953b03f9240b5ccf5f4dbe450369b247e2fa057a0130"
+    },
+    "speed": {
+      "source": "approved/systems/boosters/boosters_04.png",
+      "sha256": "607bbe17b8c2c54c96a7b86fb7183c93c463c22d9fca7db395f4a4bd76041c0e",
+      "destination": "assets/ui/tactical/selected/speed.png",
+      "sheet": "systems",
+      "box": [
+        208,
+        434,
+        266,
+        502
+      ],
+      "pixel_sha256": "eff3433bda7e8cca4eb8dd0d26ef267aed326b821bd99faf617802e056920b5d"
+    },
+    "squadron": {
+      "source": "approved/systems/ship_fleet/ship_fleet_02.png",
+      "sha256": "ce1f24a3959bce903c6fef48dc3a3a1825ccd4742c3ce789d5b3f96ea0588d8e",
+      "destination": "assets/ui/tactical/selected/squadron.png",
+      "sheet": "systems",
+      "box": [
+        84,
+        562,
+        146,
+        628
+      ],
+      "pixel_sha256": "578f8624d898bffb3c4415564475ad6a8a98b83b0bdfedb99e86e36c5bb92676"
+    },
+    "shipyard_ship": {
+      "source": "approved/systems/ship_fleet/ship_fleet_01.png",
+      "sha256": "edcb8bf98ca60f930bd88f30d707a0c543251891845940c744232e264c985955",
+      "destination": "assets/ui/tactical/selected/shipyard_ship.png",
+      "sheet": "systems",
+      "box": [
+        16,
+        562,
+        78,
+        628
+      ],
+      "pixel_sha256": "e5c646ad20364b7bb324bb837da921d1ae9821302a24f6d879c28d8200948c00"
+    },
+    "complete": {
+      "source": "approved/systems/misc/misc_07.png",
+      "sha256": "089c5e630261879e7bf8195aa0db8cfee4880c01dd6c02d041938dee81af703a",
+      "destination": "assets/ui/tactical/selected/complete.png",
+      "sheet": "systems",
+      "box": [
+        1412,
+        693,
+        1464,
+        759
+      ],
+      "pixel_sha256": "e2c375fc33e20648a0f88142019550a6facbdbc50052f8c46411ac3d2ea7d9d7"
+    },
+    "information": {
+      "source": "approved/systems/misc/misc_05.png",
+      "sha256": "e4cdca95b47d2493fdfe40b8d227d86e6b50b55161744d2827689824b932180f",
+      "destination": "assets/ui/tactical/selected/information.png",
+      "sheet": "systems",
+      "box": [
+        1300,
+        693,
+        1350,
+        759
+      ],
+      "pixel_sha256": "9d4e30fb469941bb18fa3232ed62c9fdc606f705943222f5b4146a57dcdd9da7"
+    },
+    "close": {
+      "source": "approved/systems/misc/misc_08.png",
+      "sha256": "846d3c6c50004f72390f62073359f126f02e172999803e3aba052ee27ddc02fa",
+      "destination": "assets/ui/tactical/selected/close.png",
+      "sheet": "systems",
+      "box": [
+        1470,
+        693,
+        1522,
+        759
+      ],
+      "pixel_sha256": "d23f5231ecd400ea0f1fae05c0e97462b9eb3be11f5e9e07bfe1720a5d26b0dc"
+    },
+    "back": {
+      "source": "approved/systems/navigation/navigation_01.png",
+      "sha256": "0acee90c1d01800b0bf6ed4600104ac2ef8c306e471ec41fee2e4c822e3a7c23",
+      "destination": "assets/ui/tactical/selected/back.png",
+      "sheet": "systems",
+      "box": [
+        17,
+        174,
+        75,
+        240
+      ],
+      "pixel_sha256": "ce9de7fd4b7cd7202be9a6dd6fbf7806cce8ecbc0646048b49e023ba257e286d"
+    },
+    "next": {
+      "source": "approved/systems/navigation/navigation_02.png",
+      "sha256": "731bf299a8dd04bfc0b656d9ed762694505475a74a7fbac82fe2ddde08656104",
+      "destination": "assets/ui/tactical/selected/next.png",
+      "sheet": "systems",
+      "box": [
+        81,
+        174,
+        139,
+        240
+      ],
+      "pixel_sha256": "fdc7632cd3333b81e425deed5d630420b1c34b21b0f4aa3034c6001fef09aebe"
+    },
+    "target": {
+      "source": "approved/systems/combat_status/combat_status_01.png",
+      "sha256": "51632e0b1edfcde232f83d58aaf463043128b4fa32d26fb68c9e37bca595588c",
+      "destination": "assets/ui/tactical/selected/target.png",
+      "sheet": "systems",
+      "box": [
+        641,
+        434,
+        703,
+        502
+      ],
+      "pixel_sha256": "6cf0288bc0d9af1d34826cb7b98b696ab5b2ddd58b0e43bf3cab9167c9527f98"
+    },
+    "shield": {
+      "source": "approved/systems/combat_status/combat_status_04.png",
+      "sha256": "d868d5a7fb8f9ea9051b969dce3878aed3ad96bea7245ae1e7239ce48ae918af",
+      "destination": "assets/ui/tactical/selected/shield.png",
+      "sheet": "systems",
+      "box": [
+        846,
+        434,
+        908,
+        502
+      ],
+      "pixel_sha256": "8c1d104ffd7d7220b775b041050fa996737e0eefa3b59ebd1f26bba7821f75d1"
+    },
+    "repair": {
+      "source": "approved/systems/combat_status/combat_status_06.png",
+      "sha256": "99bcb6a1f38b2d02c9df8ad23080e9c646ea8047680c4cf697443e5c08b32243",
+      "destination": "assets/ui/tactical/selected/repair.png",
+      "sheet": "systems",
+      "box": [
+        988,
+        434,
+        1058,
+        502
+      ],
+      "pixel_sha256": "b2ef2a0efd18565a2a7bdc46429bb6e05c0cb92fd7e70ffca5faaf62e2034da6"
+    },
+    "energy": {
+      "source": "approved/systems/combat_status/combat_status_07.png",
+      "sha256": "8c9cb19c5d72361fe7d2f7ba9507abb1e7b1e626bbb250d11a16fe3a45bcfaf8",
+      "destination": "assets/ui/tactical/selected/energy.png",
+      "sheet": "systems",
+      "box": [
+        1068,
+        434,
+        1140,
+        502
+      ],
+      "pixel_sha256": "afad721646ccf5063e3d04fb9f383cd56263b5bc2ba0c48222a29012654cf4a2"
+    },
+    "fleet": {
+      "source": "approved/combat/ship_systems/ship_systems_02.png",
+      "sha256": "33a11cda2abf6c75ec12f580684840cc8a0d5b6c88c03f02b192438ba5ba7654",
+      "destination": "assets/ui/tactical/selected/fleet.png",
+      "sheet": "combat",
+      "box": [
+        106,
+        464,
+        196,
+        535
+      ],
+      "pixel_sha256": "878396aff0716ccc8971c67b1e3819ef9b7765c7d5c5e05b68d67cd7ab9d4877"
+    },
+    "weapons": {
+      "source": "approved/combat/ship_systems/ship_systems_03.png",
+      "sha256": "aa0bf048c99aa1ca2bf161ef88784a3b25fd7c445d1259632a545ec3313a2006",
+      "destination": "assets/ui/tactical/selected/weapons.png",
+      "sheet": "combat",
+      "box": [
+        202,
+        464,
+        290,
+        535
+      ],
+      "pixel_sha256": "b98e9e486805c3970c46bc890ee30b2220b77c111d56032930db0ebbba509aa1"
+    },
+    "armor": {
+      "source": "approved/combat/ship_systems/ship_systems_05.png",
+      "sha256": "6cb9c1801c1f454dbab9b2945b6cd8d1668ec85b63dce6329990dd48df3f794b",
+      "destination": "assets/ui/tactical/selected/armor.png",
+      "sheet": "combat",
+      "box": [
+        392,
+        464,
+        480,
+        535
+      ],
+      "pixel_sha256": "dd9f2623acf69c4890f80a514b57787c0ac1c2ebca787663c0cc87a3b88a5ff1"
+    },
+    "engine": {
+      "source": "approved/combat/ship_systems/ship_systems_06.png",
+      "sha256": "ecfd85c093b52291e29181784868e8d784d8b10ee0b49faccd8ed9eeded7ddf9",
+      "destination": "assets/ui/tactical/selected/engine.png",
+      "sheet": "combat",
+      "box": [
+        486,
+        464,
+        576,
+        535
+      ],
+      "pixel_sha256": "6282d3d06298d66adedf1dc24c3e066f40914d701603da4dcd6bd8c05a8f77e6"
+    },
+    "drone": {
+      "source": "approved/combat/ship_systems/ship_systems_07.png",
+      "sha256": "10db045fe63bb4da18550e2f601a5ce6e4aa52aeef4ea6e59efc7be4404810a8",
+      "destination": "assets/ui/tactical/selected/drone.png",
+      "sheet": "combat",
+      "box": [
+        582,
+        464,
+        670,
+        535
+      ],
+      "pixel_sha256": "a4f109bcafbd7cc5c78e0a55d3a152d3ca13db644112e67a27f9686751985f33"
+    },
+    "turret": {
+      "source": "approved/combat/ship_systems/ship_systems_08.png",
+      "sha256": "f2b611149a5b78752793e9cb8495c225ab36836b5b2b002938b13a048315e73d",
+      "destination": "assets/ui/tactical/selected/turret.png",
+      "sheet": "combat",
+      "box": [
+        676,
+        464,
+        766,
+        535
+      ],
+      "pixel_sha256": "a870d9ce905efdd6518a668c125f429abe9cdfd820f86526f53f26d3963bb5e5"
+    },
+    "missile": {
+      "source": "approved/combat/ship_systems/ship_systems_09.png",
+      "sha256": "2400e1e05fae7359148dead49bffb466a0ad2a0300e3696634ea6101f9900709",
+      "destination": "assets/ui/tactical/selected/missile.png",
+      "sheet": "combat",
+      "box": [
+        772,
+        464,
+        860,
+        535
+      ],
+      "pixel_sha256": "b8f5d5a7a99d824b9db6bda2a256fd193cfb64a5056a6fd652beac8512f71b3f"
+    },
+    "laser": {
+      "source": "approved/combat/ship_systems/ship_systems_10.png",
+      "sha256": "0b59a801e70f90724ab0e18ca5d314630eefc398d4de99f830544d104aee7d24",
+      "destination": "assets/ui/tactical/selected/laser.png",
+      "sheet": "combat",
+      "box": [
+        866,
+        464,
+        956,
+        535
+      ],
+      "pixel_sha256": "eb3181eb1c7dc695b68f9db4a6f121037fef0816d6eaf2cf4d3a8154640e870d"
+    },
+    "emp": {
+      "source": "approved/combat/ship_systems/ship_systems_11.png",
+      "sha256": "3770e11ccb0bc586660ae24bd9a17b6377c14d38820da07e68ff4524904d3357",
+      "destination": "assets/ui/tactical/selected/emp.png",
+      "sheet": "combat",
+      "box": [
+        962,
+        464,
+        1050,
+        535
+      ],
+      "pixel_sha256": "fa64d306a20176e5165b80d39540cc45d1ba469f5c1605fb2e5f5397f40df7a0"
+    },
+    "stealth": {
+      "source": "approved/combat/ship_systems/ship_systems_15.png",
+      "sha256": "021208217ed91af89301b2770b7e5e1bb47c0100624099b0d71efb374108502b",
+      "destination": "assets/ui/tactical/selected/stealth.png",
+      "sheet": "combat",
+      "box": [
+        1342,
+        464,
+        1430,
+        535
+      ],
+      "pixel_sha256": "a66ae33c6a63e326f82a6dc1034cfa98394090878c2a78d3c2dad31e737a1da5"
+    },
+    "detect": {
+      "source": "approved/combat/ship_systems/ship_systems_16.png",
+      "sha256": "42c04668a82ce8cef3e1e906a2bcd449acd11d0c0ec97ec70891b3b65e0a04bd",
+      "destination": "assets/ui/tactical/selected/detect.png",
+      "sheet": "combat",
+      "box": [
+        1436,
+        464,
+        1525,
+        535
+      ],
+      "pixel_sha256": "7659b7122fa864cee4953c13a12cf98fbbcf132c9a445e65d571d9ed70b165c9"
+    }
+  }
+}

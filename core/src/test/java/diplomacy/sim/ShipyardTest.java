@@ -29,8 +29,14 @@ public final class ShipyardTest {
                 require(report.valid(),faction+" "+hull+": "+report.explanation());
                 require(report.mass()>0&&report.generation()>=report.demand(),"real closed power budget");
                 require(report.generatedHeat()<=report.cooling(),"thermodynamic closed budget");
-                require(Shipyard.fit(ship,catalog).laserDamage()>0,"starter lasers must work");
-                require(Shipyard.fit(ship,catalog).missileDamage()>0,"starter missiles must work");
+                // The original eleven generic starter blueprints are backward compatible.
+                // Specialized new chassis deliberately REPLACE these weapon families.
+                if(hull.ordinal()<11){
+                    require(Shipyard.fit(ship,catalog).laserDamage()>0,
+                            "Legacy starter laser lost during new-variant expansion");
+                    require(Shipyard.fit(ship,catalog).missileDamage()>0,
+                            "Legacy starter missile lost during new-variant expansion");
+                }
                 require(Shipyard.decode(Shipyard.encode(ship),catalog).faction==ship.faction,"round trip");
                 checked++;
             }

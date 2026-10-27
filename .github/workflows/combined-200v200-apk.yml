@@ -1,0 +1,106 @@
+name: Integrated 200v200 module and Android debug proving ground
+on:
+  push:
+    branches: ['integration/**']
+  pull_request:
+    paths: ['core/**', 'game/**', 'desktop/**', 'android/**', 'tools/**', '.github/workflows/combined-200v200-apk.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: cd-integrated-200v200-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mechanics:
+    name: All weapon/research/support and 200v200 mechanical assertions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Validate APK updater release manifest generation
+        run: python3 tools/test_prepare_android_update_manifest.py
+      - name: Run full independent module and 400-vessel deterministic proving suites
+        run: |
+          gradle --no-daemon --stacktrace \
+            :core:smoke :core:demoWeaponSmoke :core:massBattleCampaign \
+            :core:fighterCraftSmoke :core:projectileModuleSmoke \
+            :core:moduleResearchSmoke :core:supportSystemsSmoke \
+            :core:battleOrdersSmoke :core:updaterPolicySmoke :game:classes :desktop:classes
+  debug-apk:
+    name: Build installable debug APK even when mechanics fail
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install matching Android platform
+        run: |
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Build test-only Android package
+        run: gradle --no-daemon --stacktrace :android:assembleDebug
+      - name: Require nonempty APK and record hash
+        run: |
+          test -s android/build/outputs/apk/debug/android-debug.apk
+          sha256sum android/build/outputs/apk/debug/android-debug.apk | tee android-debug.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cd-integrated-debug-apk-${{ github.sha }}
+          path: |
+            android/build/outputs/apk/debug/android-debug.apk
+            android-debug.sha256
+          if-no-files-found: error
+          retention-days: 14
+  emulator:
+    name: Android framebuffer, live combat telemetry and module verification
+    needs: debug-apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cd-integrated-debug-apk-${{ github.sha }}
+          path: test-output/download
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
+          script: bash tools/android_verify_demo.sh test-output/download/android/build/outputs/apk/debug/android-debug.apk test-output/android
+      - name: Preserve images, telemetry and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-integrated-200v200-device-evidence
+          path: test-output/android/
+          if-no-files-found: warn
+          retention-days: 14
