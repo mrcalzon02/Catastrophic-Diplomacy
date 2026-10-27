@@ -17,6 +17,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+      - name: Verify Play branch contains authoritative main
+        id: mainline
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/play-ci"
+          python3 scripts/google_play_main_parity.py 2>&1 | tee "$RUNNER_TEMP/play-ci/mainline.log"
       - name: Source and manifest policy tests
         id: source
         continue-on-error: true
@@ -106,6 +115,7 @@ jobs:
       - name: Summarize failure reasons and gate the release
         if: always()
         env:
+          PLAY_MAINLINE_OUTCOME: ${{ steps.mainline.outcome }}
           PLAY_SOURCE_OUTCOME: ${{ steps.source.outcome }}
           PLAY_SDK_OUTCOME: ${{ steps.sdk.outcome }}
           PLAY_BOOTSTRAP_OUTCOME: ${{ steps.bootstrap.outcome }}
