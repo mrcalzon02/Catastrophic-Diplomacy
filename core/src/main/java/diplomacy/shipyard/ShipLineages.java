@@ -95,6 +95,9 @@ public final class ShipLineages {
             case ELECTRONIC_CONTROLLER -> {
                 fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
                 fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                // Compact ECM pods sacrifice shield generators to pay for their
+                // very expensive jamming plant rather than acquiring free power.
+                fitting=set(fitting,Shipyard.Mount.DEFENSE,0,null);
                 fitting=set(fitting,Shipyard.Mount.SYSTEM,3,id+"ECM");
             }
             case REPAIR_TENDER -> {
