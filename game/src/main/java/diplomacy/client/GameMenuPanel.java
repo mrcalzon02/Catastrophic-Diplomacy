@@ -13,6 +13,8 @@ import diplomacy.sim.ShipStandingOrders;
 import java.util.Set;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
+import diplomacy.sim.CampaignNarrative;
+import diplomacy.shipyard.ShipLineages;
 import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
@@ -515,6 +517,12 @@ final class GameMenuPanel {
         label(batch,font,progress.available(selected)?"AVAILABLE":"LOCKED",946,343,
               progress.available(selected)?Color.GREEN:Color.SCARLET);
         label(batch,font,"FACTION: "+progress.faction().name(),946,296,Color.WHITE);
+        var briefing=CampaignNarrative.forLevel(selected);
+        label(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title(),946,262,Color.CYAN);
+        label(batch,font,briefing.intelligence(),946,231,MUTED);
+        label(batch,font,briefing.beat(),946,202,Color.WHITE);
+        label(batch,font,"HULL SIZES: 1-"+ShipLineages.maximumCampaignGeneration(progress.unlocked()),
+                946,167,Color.GOLD);
         label(batch,font,"BACK",62,67,Color.WHITE);
         label(batch,font,"PREV",248,67,Color.WHITE);
         label(batch,font,"NEXT",402,67,Color.WHITE);
