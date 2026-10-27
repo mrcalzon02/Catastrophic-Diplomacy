@@ -71,7 +71,7 @@ chassis. Several legacy stock prototypes are generic, not role-pure.
 - **Campaign dock:** buy a fitted hull, pay for its machinery, then independently
   pay for crew, ammunition, fuel and craft. Old owned hulls stay in active or
   available reserve. Campaign credits and research license rank persist together
-  in `CD-CAMPAIGN-2`; `CD-CAMPAIGN-1` saves migrate with rank zero and unchanged
+  in `CD-CAMPAIGN-4`; `CD-CAMPAIGN-1/2/3` saves migrate with credits and already earned
   credits.
 - **QoL:** main Shipyard, campaign Shipyard/Research, dock Shipyard/Research,
   direct ten-category touch/keyboard navigation, variant scrolling within a

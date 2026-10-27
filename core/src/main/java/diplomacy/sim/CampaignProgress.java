@@ -21,7 +21,8 @@ public final class CampaignProgress {
             case LICENSE -> rank>=6?0:LevelEconomy.researchMissionCost(rank+1);
             case ACCELERATOR -> speed>=4?0:ACCELERATOR_WORK[speed+1];
         };
-        return Math.max(0,base-speed);
+        // Four accelerators may shorten a project to ONE victory, never zero.
+        return base==0?0:Math.max(1,base-speed);
     }
     /** A previous save can contain a project which now qualifies for immediate
      * completion after the duration-floor policy. Apply the paid entitlement once. */
@@ -120,7 +121,7 @@ public final class CampaignProgress {
                         completed(nextAccelerationMilestone())&&credits>=nextAccelerationCost();
             };
         }
-        /** Pay up front; projects with zero required missions finish instantly. */
+        /** Pay up front. Even maximum lab acceleration requires a victory. */
         public State beginResearch(Project desired){
             if(desired==null||desired==Project.NONE)
                 throw new IllegalArgumentException("Select a research project");
@@ -223,7 +224,13 @@ public final class CampaignProgress {
                         speed=Integer.parseInt(rows[9]);
                 if(target!=0&&target!=licensed+1)
                     throw new IllegalArgumentException("Unrecognized prior research target");
-                // Numeric v3 stored actual completed mission ticks, not bonus ticks.
+                // Historic numeric v3 could grant an INSTANT paid unlock when
+                // speed exceeded duration. Honor that ALREADY-earned entitlement
+                // without allowing any new zero-turn research under v4.
+                if(target>0&&LevelEconomy.researchMissionCost(target)<=speed)
+                    return new State(Battle.Faction.valueOf(rows[1]),reached,
+                            Long.parseLong(rows[3]),Integer.parseInt(rows[4]),
+                            licensed+1,high,speed,Project.NONE,0);
                 return restored(Battle.Faction.valueOf(rows[1]),reached,
                         Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,high,
                         speed,target==0?Project.NONE:Project.LICENSE,progress);
