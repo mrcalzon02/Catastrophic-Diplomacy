@@ -216,6 +216,7 @@ final class GameMenuPanel {
             case RESEARCH -> {
                 rectangle(shapes,110,174,1050,444,PANEL);
                 button(shapes,35,35,250,54,false);
+                button(shapes,592,35,294,54,false);
                 button(shapes,906,35,330,54,true);
             }
             case DOCK -> {
@@ -357,24 +358,44 @@ final class GameMenuPanel {
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
             case RESEARCH -> {
                 title(batch,font,"RESEARCH AND ENGINEERING",
-                        "PAID FACTION LICENSES APPLY TO CAMPAIGN FITTINGS; SKIRMISH IS UNRESTRICTED");
-                label(batch,font,"FACTION: "+progress.faction().displayName,151,559,Color.CYAN);
-                label(batch,font,"CURRENT TECHNOLOGY RANK: "+progress.researchRank()+" / 6",
-                        151,510,Color.GOLD);
-                label(batch,font,"ADVANCED MODULES REQUIRE PURCHASED RESEARCH RANKS",
-                        151,457,Color.WHITE);
-                label(batch,font,"HARDWARE MK II-IV AND SPECIALIZED FIGHTERS REQUIRE LICENSES",
-                        151,410,MUTED);
-                label(batch,font,"GENERATION ACCESS IS GAINED THROUGH CAMPAIGN MISSIONS",
-                        151,368,MUTED);
-                label(batch,font,"CURRENT CREDITS: "+progress.credits(),151,305,Color.WHITE);
-                label(batch,font,progress.researchRank()==6?"ALL RESEARCH RANKS PURCHASED":
-                                "NEXT RANK COST: "+progress.nextResearchCost()+" CREDITS",
-                        151,248,Color.GOLD);
-                label(batch,font,dockNotice,151,194,Color.CYAN);
+                        "LAB WORK IS MEASURED IN SUCCESSFUL MISSIONS, NOT WALL-CLOCK TIME");
+                label(batch,font,"FACTION: "+progress.faction().displayName,151,585,Color.CYAN);
+                label(batch,font,"AVAILABLE CREDITS: "+progress.credits(),151,551,Color.GOLD);
+                label(batch,font,"TECHNOLOGY LICENSE "+progress.researchRank()+"/6  |  LAB UPGRADES "+
+                        progress.speedUpgrades()+"/4",151,516,Color.WHITE);
+                label(batch,font,"EACH VICTORY ADVANCES RESEARCH BY "+
+                        progress.researchPerVictory()+" WORK UNIT(S)",151,479,MUTED);
+                if(progress.activeProject()!=CampaignProgress.Project.NONE){
+                    label(batch,font,"ACTIVE: "+progress.activeProject()+
+                            "  |  "+progress.projectProgress()+" / "+
+                            progress.currentProjectMissions()+" RESEARCH WORK",
+                            151,432,Color.CYAN);
+                    label(batch,font,"SUCCESSFUL MISSIONS REMAINING: "+
+                            progress.missionsUntilResearchComplete(),151,399,Color.WHITE);
+                }else{
+                    label(batch,font,"NO ACTIVE RESEARCH - SELECT A PROJECT BELOW",
+                            151,432,Color.CYAN);
+                    label(batch,font,"ONLY ONE PROJECT MAY BE RESEARCHED AT ONCE",
+                            151,399,MUTED);
+                }
+                label(batch,font,progress.researchRank()==6?"TECHNOLOGY: ALL SIX LICENSES COMPLETE":
+                        "NEXT LICENSE: "+progress.nextResearchCost()+" CREDITS  /  "+
+                                progress.nextResearchMissions()+" WORK",
+                        151,348,Color.WHITE);
+                label(batch,font,progress.speedUpgrades()==4?"LAB ACCELERATION: MAXIMUM LEVEL":
+                        "NEXT LAB UPGRADE: "+progress.nextAccelerationCost()+" CREDITS  /  "+
+                                progress.nextAccelerationMissions()+" WORK",
+                        151,313,Color.WHITE);
+                label(batch,font,progress.speedUpgrades()==4?"ALL FOUR LAB UPGRADES INSTALLED":
+                        "LAB REQUIRES FIRST CLEAR OF MISSION "+
+                                progress.nextAccelerationMilestone(),
+                        151,276,Color.GOLD);
+                label(batch,font,"NEW MISSIONS PAY FULL; CLEARED MISSIONS PAY 25%",
+                        151,235,MUTED);
+                label(batch,font,dockNotice,151,197,Color.CYAN);
                 label(batch,font,"BACK TO CAMPAIGN",69,67,Color.WHITE);
-                label(batch,font,progress.researchRank()==6?"RESEARCH COMPLETE":"PURCHASE NEXT RANK",
-                        923,67,Color.WHITE);
+                label(batch,font,"START LAB UPGRADE",604,67,Color.WHITE);
+                label(batch,font,"START NEXT LICENSE",922,67,Color.WHITE);
             }
             case DOCK -> {
                 title(batch,font,"CAMPAIGN FLEET DOCK",
@@ -516,7 +537,10 @@ final class GameMenuPanel {
         label(batch,font,"WAVES PLANNED: "+level.waves(),946,398,MUTED);
         label(batch,font,progress.available(selected)?"AVAILABLE":"LOCKED",946,343,
               progress.available(selected)?Color.GREEN:Color.SCARLET);
-        label(batch,font,"FACTION: "+progress.faction().name(),946,296,Color.WHITE);
+        label(batch,font,progress.isReplay(selected)?
+                "CLEARED: 25% REPLAY CREDITS":"FIRST CLEAR: FULL CREDITS",
+                946,312,progress.isReplay(selected)?MUTED:Color.GOLD);
+        label(batch,font,"FACTION: "+progress.faction().name(),946,285,Color.WHITE);
         var briefing=CampaignNarrative.forLevel(selected);
         label(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title(),946,262,Color.CYAN);
         label(batch,font,briefing.intelligence(),946,231,MUTED);
