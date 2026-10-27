@@ -68,6 +68,15 @@ public final class CampaignFleet {
     }
     /** Squadron 0 inherits the fleet-wide culture and radio voice.
      * Squadrons 1..7 may override those defaults independently. */
+    /** Service deficits are calculated against the vessel's actual fitted
+     * maximums. Energy-only ships do not get spurious ammunition warnings. */
+    public record Readiness(Vessel vessel,List<Service> deficits){
+        public Readiness {
+            if(vessel==null||deficits==null||deficits.isEmpty())
+                throw new IllegalArgumentException("Readiness requires a damaged or depleted vessel");
+            deficits=List.copyOf(deficits);
+        }
+    }
     public record SquadronProfile(FleetNames.Style naming,CrewChatter.Tone radio){
         public SquadronProfile {
             if(naming==null||radio==null)
@@ -354,6 +363,22 @@ public final class CampaignFleet {
             ArrayList<Vessel> updated=new ArrayList<>(ships);
             updated.replaceAll(item->item.id()==id?item.withStores(Stores.capture(fitted)):item);
             return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone,squadronAssignments,squadronProfiles);
+        }
+        /** Report only paid deficits applicable to a vessel's fitted equipment. */
+        public List<Service> requiredServices(long id,TechnologyCatalog technology){
+            ArrayList<Service> needed=new ArrayList<>();
+            for(Service service:Service.values())
+                if(cost(id,service,technology)>0)needed.add(service);
+            return List.copyOf(needed);
+        }
+        /** An advisory, not a blocking gate: captains may risk damaged ships. */
+        public List<Readiness> activeServiceWarnings(TechnologyCatalog technology){
+            ArrayList<Readiness> warnings=new ArrayList<>();
+            for(Vessel vessel:active()){
+                List<Service> deficits=requiredServices(vessel.id(),technology);
+                if(!deficits.isEmpty())warnings.add(new Readiness(vessel,deficits));
+            }
+            return List.copyOf(warnings);
         }
         /** Quote the complete dock job before debiting credits. All five services
          * are calculated from this vessel's actual fitted capacity and stores. */

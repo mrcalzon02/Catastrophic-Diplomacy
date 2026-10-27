@@ -917,7 +917,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
         clearDoctrineGroup();
         placementDragPointer=-1;
         waitingForWaypoint=false;
-        deploymentNotice="Drag ships inside the deployment zone. No overlaps allowed.";
+        var warnings=campaignFleet.activeServiceWarnings(technology);
+        if(warnings.isEmpty()){
+            deploymentNotice="All active ships fully serviced. Drag ships to position.";
+        }else{
+            var first=warnings.get(0);
+            deploymentNotice="SERVICE WARNING "+warnings.size()+"/"+campaignFleet.active().size()+
+                    ": #"+first.vessel().id()+" needs "+first.deficits();
+            Gdx.app.log("CD-GAME-FLOW","READINESS_WARNINGS active="+
+                    warnings.size()+" first="+first.vessel().id()+" deficits="+first.deficits());
+        }
         screen=GameMenuPanel.Screen.DEPLOYMENT;
         Gdx.app.log("CD-GAME-FLOW","DEPLOYMENT "+activeMission);
     }
@@ -1693,9 +1702,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     deployment,leftDesign.hull.name(),selectedDeploymentShip,
                     preparingCampaign,standingPage,selectingDoctrineGroup,doctrineGroup,
                     waitingForWaypoint,deploymentNotice,
-                    campaignFleet,dockPage,dockSelected,dockPrices(),
-                    CampaignFleet.purchaseCost(campaignDesign==null?leftDesign:campaignDesign,
-                            technology),screen==GameMenuPanel.Screen.RESEARCH?researchNotice:dockNotice,
+                    campaignFleet,dockPage,dockSelected,
+                    screen==GameMenuPanel.Screen.DOCK?dockPrices():null,
+                    screen==GameMenuPanel.Screen.DOCK?
+                            CampaignFleet.purchaseCost(campaignDesign==null?leftDesign:campaignDesign,
+                                    technology):0L,
+                    screen==GameMenuPanel.Screen.RESEARCH?researchNotice:dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,

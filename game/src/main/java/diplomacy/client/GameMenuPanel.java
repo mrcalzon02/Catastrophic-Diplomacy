@@ -502,6 +502,15 @@ final class GameMenuPanel {
                                 53,547-i*43,index==dockSelected?Color.GOLD:
                                         ship.deployed()?Color.GREEN:Color.WHITE);
                         label(batch,font,"ID "+ship.id(),59,530-i*43,MUTED);
+                        if(index==dockSelected&&dockCosts!=null){
+                            java.util.StringJoiner deficits=new java.util.StringJoiner("/");
+                            var services=CampaignFleet.Service.values();
+                            for(int service=0;service<services.length;service++)
+                                if(dockCosts[service]>0)deficits.add(services[service].name());
+                            boolean ready=deficits.length()==0;
+                            label(batch,font,ready?"FULLY SERVICED":"NEEDS "+deficits,
+                                    263,530-i*43,ready?Color.GREEN:Color.GOLD);
+                        }
                     }
                     String[] names={"TOGGLE ACTIVE / RESERVE","REPAIR HULL / ARMOR / SHIELDS",
                             "RESTOCK CREW","RESTOCK AMMUNITION","REFILL FUEL",

@@ -133,6 +133,17 @@ public final class CampaignFleetTest {
         long fuel=returned.cost(ship1,CampaignFleet.Service.FUEL,tech);
         check(repair>0&&crew>0&&ammo>0&&fuel>0,
                 "Damaged ships have no actual servicing charges");
+        var pending=returned.requiredServices(ship1,tech);
+        check(pending.containsAll(java.util.List.of(CampaignFleet.Service.REPAIR,
+                        CampaignFleet.Service.CREW,CampaignFleet.Service.AMMUNITION,
+                        CampaignFleet.Service.FUEL))&&
+                        returned.activeServiceWarnings(tech).stream().anyMatch(
+                                warning->warning.vessel().id()==ship1&&
+                                        warning.deficits().containsAll(pending)),
+                "Readiness warnings failed to identify combat depletion of an active hull");
+        check(returned.activeServiceWarnings(tech).stream().noneMatch(
+                        warning->warning.vessel().id()==ship3),
+                "An escaped reserve vessel was incorrectly treated as deployed");
         CampaignProgress.State wallet=new CampaignProgress.State(faction,1,200000,0);
         wallet=wallet.spend(repair).spend(crew).spend(ammo).spend(fuel);
         long spent=repair+crew+ammo+fuel;
@@ -147,6 +158,8 @@ public final class CampaignFleetTest {
                 CampaignFleet.Service.REPAIR,CampaignFleet.Service.CREW,
                 CampaignFleet.Service.AMMUNITION,CampaignFleet.Service.FUEL})
             check(restored.cost(ship1,type,tech)==0,"Paid dock service did not restore physical supplies");
+        check(restored.requiredServices(ship1,tech).isEmpty(),
+                "Fully paid servicing did not clear a ship's readiness warnings");
         check(restored.get(ship3).stores().equals(returned.get(ship3).stores()),
                 "Servicing one ship regenerated a different reserve vessel");
 
@@ -182,6 +195,11 @@ public final class CampaignFleetTest {
                 "Purchased bare hull received uncharged crew, fuel or ordnance");
         check(replacement.cost(latest.id(),CampaignFleet.Service.CREW,tech)>0,
                 "Recruitment is mysteriously free after buying a hull");
+        check(replacement.requiredServices(latest.id(),tech).containsAll(
+                        java.util.List.of(CampaignFleet.Service.CREW,CampaignFleet.Service.FUEL))&&
+                        replacement.activeServiceWarnings(tech).stream().noneMatch(
+                                warning->warning.vessel().id()==latest.id()),
+                "Unfueled and uncrewed new reserve hull should warn without inflating active count");
 
         var nextName=FleetNames.generate(FleetNames.Style.NAVAL,
                 original.namingSeed(),5);
