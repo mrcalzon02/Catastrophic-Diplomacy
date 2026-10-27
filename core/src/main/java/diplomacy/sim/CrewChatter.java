@@ -16,7 +16,7 @@ public final class CrewChatter {
     public enum ShipyardProxy { FIGHTER, ESCORT, CAPITAL }
     public static Scale scale(diplomacy.shipyard.Shipyard.Hull hull){
         if(hull==null)return Scale.ESCORT;
-        return switch(hull){
+        return switch(hull.spriteHull()){
             case INTERCEPTOR,CORVETTE,MISSILE_CORVETTE,FRIGATE,DESTROYER -> Scale.ESCORT;
             default -> Scale.CAPITAL;
         };
