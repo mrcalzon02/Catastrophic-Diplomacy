@@ -106,7 +106,7 @@ public final class CampaignFleetTest {
         var decoded=CampaignFleetCodec.decode(encoded,tech);
         check(CampaignFleetCodec.encode(decoded).equals(encoded),
                 "Full owned fleet checksum save round-trip lost inventory");
-        reject(()->CampaignFleetCodec.decode(encoded.replace("CD-ROSTER-1","CD-ROSTER-2"),tech),
+        reject(()->CampaignFleetCodec.decode(encoded.replace("CD-ROSTER-2","CD-ROSTER-1"),tech),
                 "Tampered campaign ship registry was accepted");
         var copy=decoded.setActive(3,true,20);
         var listed=copy.active();
