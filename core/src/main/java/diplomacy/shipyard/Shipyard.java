@@ -36,12 +36,63 @@ public final class Shipyard {
         LIGHT_CRUISER(345, 550, 640, 0.68, 6, 5, 3, 2),
         HEAVY_CRUISER(445, 730, 870, 0.56, 7, 6, 4, 3),
         BATTLECRUISER(555, 890, 1170, 0.52, 8, 8, 4, 3),
-        CARRIER(670, 1120, 1320, 0.44, 9, 4, 6, 8);
+        CARRIER(670, 1120, 1320, 0.44, 9, 4, 6, 8),
+        // Distinct commissioned chassis sharing already approved sprite categories.
+        // Append only: legacy hull ordinals, saved designs and fleet IDs remain stable.
+        CORVETTE_SCOUT(125, 190, 132, 1.18, 4, 2, 1, 0),
+        CORVETTE_GUNSHIP(175, 270, 218, 0.82, 4, 4, 2, 0),
+        FRIGATE_RAIDER(175, 300, 285, 0.98, 4, 3, 2, 1),
+        FRIGATE_MISSILE(215, 345, 320, 0.73, 4, 5, 2, 1),
+        FRIGATE_ESCORT(230, 355, 375, 0.72, 5, 3, 4, 2),
+        CRUISER_RAIDER(370, 590, 615, 0.77, 6, 5, 3, 2),
+        CRUISER_SUPPORT(410, 690, 785, 0.57, 7, 3, 5, 5),
+        DREADNOUGHT_SIEGE(700, 1150, 1710, 0.37, 10, 10, 6, 4);
 
         /** Preserve legacy enum ordinals and blueprint names; give designers size-sorted navigation. */
         public static Hull[] shipyardOrder() {
-            return new Hull[]{INTERCEPTOR,CORVETTE,MISSILE_CORVETTE,FRIGATE,DESTROYER,
-                    LIGHT_CRUISER,CRUISER,HEAVY_CRUISER,BATTLECRUISER,CARRIER,DREADNOUGHT};
+            return new Hull[]{INTERCEPTOR,CORVETTE,CORVETTE_SCOUT,CORVETTE_GUNSHIP,
+                    MISSILE_CORVETTE,FRIGATE,FRIGATE_RAIDER,FRIGATE_MISSILE,FRIGATE_ESCORT,
+                    DESTROYER,LIGHT_CRUISER,CRUISER,CRUISER_RAIDER,CRUISER_SUPPORT,
+                    HEAVY_CRUISER,BATTLECRUISER,CARRIER,DREADNOUGHT,DREADNOUGHT_SIEGE};
+        }
+        /** Art category is independent of combat chassis; no copied or invented sprites. */
+        public Hull spriteHull() {
+            return switch(this) {
+                case CORVETTE_SCOUT, CORVETTE_GUNSHIP -> CORVETTE;
+                case FRIGATE_RAIDER, FRIGATE_MISSILE, FRIGATE_ESCORT -> FRIGATE;
+                case CRUISER_RAIDER, CRUISER_SUPPORT -> CRUISER;
+                case DREADNOUGHT_SIEGE -> DREADNOUGHT;
+                default -> this;
+            };
+        }
+        public double spriteScale() {
+            return switch(this) {
+                case CORVETTE_SCOUT, FRIGATE_RAIDER, CRUISER_RAIDER -> 0.91;
+                case CORVETTE_GUNSHIP, FRIGATE_ESCORT, CRUISER_SUPPORT -> 1.08;
+                case FRIGATE_MISSILE -> 1.03;
+                case DREADNOUGHT_SIEGE -> 1.12;
+                default -> 1;
+            };
+        }
+        /** Subtle per-class livery shading; faction's original sprite remains intact. */
+        public float tintRed() {
+            return switch(this) {
+                case CORVETTE_SCOUT, FRIGATE_RAIDER, CRUISER_RAIDER -> 0.83f;
+                case FRIGATE_MISSILE, DREADNOUGHT_SIEGE -> 1.00f;
+                default -> 0.96f;
+            };
+        }
+        public float tintGreen() {
+            return switch(this) {
+                case CORVETTE_GUNSHIP, FRIGATE_MISSILE, DREADNOUGHT_SIEGE -> 0.85f;
+                default -> 1f;
+            };
+        }
+        public float tintBlue() {
+            return switch(this) {
+                case FRIGATE_ESCORT, CRUISER_SUPPORT -> 0.83f;
+                default -> 1f;
+            };
         }
         public final double massCapacity, volumeCapacity, baseHull, mobility;
         public final List<Slot> slots;
