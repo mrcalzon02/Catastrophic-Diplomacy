@@ -1,0 +1,395 @@
+{
+  "schema": "cd.weapon-firing-range.v1",
+  "purpose": "Deterministic fixed-platform visual acceptance; not evidence of captured video or device testing",
+  "configuration": {
+    "world": {
+      "width": 1280,
+      "height": 720,
+      "camera": "fixed_top_down",
+      "launcherX": 165,
+      "laneY": [
+        530,
+        360,
+        190
+      ],
+      "targetOrientation": "toward_launcher",
+      "targetMode": "indestructible_diagnostic_plate"
+    },
+    "simulation": {
+      "tickRateHz": 30,
+      "seed": 2479,
+      "disableHullTranslation": true,
+      "disableAutonomousSteering": true,
+      "disableTargetDestruction": true
+    },
+    "capture": {
+      "width": 1920,
+      "height": 1080,
+      "fps": 60,
+      "codec": "h264",
+      "container": "mp4",
+      "pixelFormat": "yuv420p",
+      "frameSource": "offscreen_render_not_os_screen_recording",
+      "frameStep": "deterministic_30hz_sim_with_60hz_render",
+      "captureRawFrames": true,
+      "expectedFramesPer24Seconds": 1440
+    },
+    "timing": {
+      "preRollSeconds": 2,
+      "singleFirePerLaneSeconds": 2,
+      "simultaneousSeconds": 5,
+      "staggeredSeconds": 6,
+      "cleanupSeconds": 5,
+      "sequenceForThreeWeaponsSeconds": 24,
+      "additionalTailRule": "Keep recording until last live missile/drone/impact/decay completes, capped at 30s; failure if still alive after cap"
+    },
+    "review": {
+      "requireEveryWeaponVisible": true,
+      "requireFullCycleSlowInspection": true,
+      "requireCleanImpactAndCleanup": true,
+      "forbidPhysicalEmitterInEffectAtlas": true,
+      "requireExplicitReviewerPass": true,
+      "allowBatchToAdvanceWithRecordedFailures": true
+    }
+  },
+  "batches": [
+    {
+      "id": "FR-01",
+      "name": "Pulse Beam Basics",
+      "priority": 1,
+      "goal": "Distinguish startup, trajectory, impact and disappearance; same underlying production renderer",
+      "lanes": [
+        {
+          "source": "BASE-TER-LAS",
+          "label": "Laser",
+          "distance": 350,
+          "effect": "beam_blue"
+        },
+        {
+          "source": "BASE-TER-KIN",
+          "label": "Kinetic battery",
+          "distance": 310,
+          "effect": "beam_gold"
+        },
+        {
+          "source": "BASE-TER-PAR",
+          "label": "Particle lance",
+          "distance": 420,
+          "effect": "beam_violet"
+        }
+      ],
+      "acceptanceFocus": [
+        "beam frame progression",
+        "shot-specific origin",
+        "no beam lingering after cleanup",
+        "no emitter graphic in sprite"
+      ]
+    },
+    {
+      "id": "FR-02",
+      "name": "High Energy Beams",
+      "priority": 2,
+      "goal": "Plasma close-range cadence and contrasting beam intensity",
+      "lanes": [
+        {
+          "source": "BASE-TER-PLA",
+          "label": "Plasma projector",
+          "distance": 190,
+          "effect": "beam_green"
+        },
+        {
+          "source": "BASE-TER-LAS",
+          "label": "Laser emitter",
+          "distance": 340,
+          "effect": "beam_blue"
+        },
+        {
+          "source": "BASE-TER-PAR",
+          "label": "Particle lance",
+          "distance": 430,
+          "effect": "beam_violet"
+        }
+      ],
+      "acceptanceFocus": [
+        "plasma never tested outside its 245-unit firing gate",
+        "flare and pulse read independently",
+        "no false continuous-fire claim from 0.13s projectile beams"
+      ]
+    },
+    {
+      "id": "FR-03",
+      "name": "Projectile Ordnance",
+      "priority": 3,
+      "goal": "Slow projectiles separated from hitscan and given flight-to-impact capture time",
+      "lanes": [
+        {
+          "source": "BASE-TER-MSL",
+          "label": "Missile rack",
+          "distance": 480,
+          "effect": "missile_tbd"
+        },
+        {
+          "source": "BASE-TER-TOR",
+          "label": "Torpedo tube",
+          "distance": 660,
+          "effect": "torpedo_tbd"
+        },
+        {
+          "source": "BASE-TER-KIN",
+          "label": "Kinetic battery reference",
+          "distance": 330,
+          "effect": "beam_gold"
+        }
+      ],
+      "acceptanceFocus": [
+        "distinct launch/motor/trail/arrival/explosion phases",
+        "guidance and orientation",
+        "no fused launcher/emitter art",
+        "kinetic is deliberately the timing comparison"
+      ],
+      "knownBlockers": [
+        "Missile and torpedo runtime are currently circles; source projectile sprites not yet curated"
+      ]
+    },
+    {
+      "id": "FR-04",
+      "name": "Defensive Batteries",
+      "priority": 4,
+      "goal": "Inject incoming enemy ordnance, stationary defense mounts acquire/intercept",
+      "laneTargetMode": "incoming_missile_stream",
+      "lanes": [
+        {
+          "source": "BASE-TER-PD",
+          "label": "Point defense",
+          "distance": 120,
+          "effect": "pd_tbd"
+        },
+        {
+          "source": "BASE-TER-FLK",
+          "label": "Flak",
+          "distance": 145,
+          "effect": "flak_tbd"
+        },
+        {
+          "source": "BASE-TER-DRN",
+          "label": "Defense drone controller",
+          "distance": 170,
+          "effect": "drone_tbd"
+        }
+      ],
+      "acceptanceFocus": [
+        "multiple tracked targets",
+        "intercept flash at interception point",
+        "flak burst volume readable",
+        "drone departure, attack and cleanup"
+      ],
+      "knownBlockers": [
+        "Firing range must create deterministic incoming ordnance and curate PD/flak/drone visual effects"
+      ]
+    },
+    {
+      "id": "FR-05",
+      "name": "Carried Craft And Launchers",
+      "priority": 5,
+      "goal": "Carrier auxiliary effects and missile salvo separated in three lanes",
+      "lanes": [
+        {
+          "source": "BASE-TER-FTR",
+          "label": "Fighter hangar",
+          "distance": 500,
+          "effect": "fighter_tbd"
+        },
+        {
+          "source": "BASE-TER-DRN",
+          "label": "Drone controller",
+          "distance": 430,
+          "effect": "drone_tbd"
+        },
+        {
+          "source": "BASE-TER-MSL",
+          "label": "Missile rack",
+          "distance": 460,
+          "effect": "missile_tbd"
+        }
+      ],
+      "acceptanceFocus": [
+        "deploy from correct socket",
+        "craft flight and return/despawn",
+        "repeatable launch spacing",
+        "no sprites attached to ammunition"
+      ]
+    },
+    {
+      "id": "FR-06",
+      "name": "Faction Firing Language",
+      "priority": 6,
+      "goal": "Three factions firing same class of laser in identical lanes for cross-faction visual comparison",
+      "lanes": [
+        {
+          "source": "BASE-TER-LAS",
+          "label": "Terran laser",
+          "distance": 360,
+          "effect": "faction_terran"
+        },
+        {
+          "source": "BASE-DRA-LAS",
+          "label": "Draxian laser",
+          "distance": 360,
+          "effect": "faction_draxian"
+        },
+        {
+          "source": "BASE-CAR-LAS",
+          "label": "Carnelian laser",
+          "distance": 360,
+          "effect": "faction_carnelian"
+        }
+      ],
+      "acceptanceFocus": [
+        "clear cultural silhouette without attached emitters",
+        "correct faction asset provenance",
+        "colors not determined solely by left/right team"
+      ],
+      "knownBlockers": [
+        "Current laser beam palette varies by team, not civilization"
+      ]
+    },
+    {
+      "id": "FR-07",
+      "name": "Faction Firing Language II",
+      "priority": 7,
+      "goal": "Remaining three factions using the same laser comparison",
+      "lanes": [
+        {
+          "source": "BASE-ZIP-LAS",
+          "label": "Zippledrow laser",
+          "distance": 360,
+          "effect": "faction_zippledrow"
+        },
+        {
+          "source": "BASE-UZI-LAS",
+          "label": "Uzipt laser",
+          "distance": 360,
+          "effect": "faction_uzipt"
+        },
+        {
+          "source": "BASE-MAN-LAS",
+          "label": "Mandrally laser",
+          "distance": 360,
+          "effect": "faction_mandrally"
+        }
+      ],
+      "acceptanceFocus": [
+        "no tint-only false equivalence",
+        "consistent payload/impact scale",
+        "faction-authored effects are approved before substitution"
+      ],
+      "knownBlockers": [
+        "No six-faction approved individual effect sets exist yet"
+      ]
+    },
+    {
+      "id": "FR-08",
+      "name": "Continuous Beam Frame Study",
+      "priority": 8,
+      "goal": "Review full seven-frame cycles independently of four-tick combat beams",
+      "playbackMode": "visual_asset_inspection_only",
+      "lanes": [
+        {
+          "source": "effects/beams/blue_01..07.png",
+          "label": "Blue cycle",
+          "distance": 380,
+          "effect": "blue"
+        },
+        {
+          "source": "effects/beams/green_01..07.png",
+          "label": "Green cycle",
+          "distance": 380,
+          "effect": "green"
+        },
+        {
+          "source": "effects/beams/violet_01..07.png",
+          "label": "Violet cycle",
+          "distance": 380,
+          "effect": "violet"
+        }
+      ],
+      "acceptanceFocus": [
+        "all seven frames individually visible",
+        "no blank/misordered cycles",
+        "alpha and glow continuity",
+        "does not falsely approve production firing cadence"
+      ],
+      "knownBlockers": [
+        "Curated beam PNG binaries still need import to GitHub and release assets"
+      ]
+    },
+    {
+      "id": "FR-09",
+      "name": "Remaining Continuous Colors",
+      "priority": 9,
+      "goal": "Complete all five curated palette families",
+      "playbackMode": "visual_asset_inspection_only",
+      "lanes": [
+        {
+          "source": "effects/beams/red_01..07.png",
+          "label": "Red cycle",
+          "distance": 380,
+          "effect": "red"
+        },
+        {
+          "source": "effects/beams/gold_01..07.png",
+          "label": "Gold cycle",
+          "distance": 380,
+          "effect": "gold"
+        }
+      ],
+      "acceptanceFocus": [
+        "full seven frames",
+        "clean end frames",
+        "no built-in barrel/weapon housing"
+      ]
+    }
+  ],
+  "captureEvidence": {
+    "basePath": "qa-output/firing-range/{commit}/{batch}/",
+    "files": [
+      "capture.mp4",
+      "events.jsonl",
+      "frames/",
+      "contact_sheet.png",
+      "review.json"
+    ],
+    "eventFields": [
+      "simulation_tick",
+      "capture_frame",
+      "lane",
+      "module_id",
+      "phase",
+      "event_type",
+      "source_xy",
+      "target_xy",
+      "asset_id",
+      "fallback_used"
+    ],
+    "reviewFields": [
+      "batch_id",
+      "git_sha",
+      "source_art_manifest_sha256",
+      "fps",
+      "resolution",
+      "actual_frames",
+      "reviewer",
+      "per_lane_status",
+      "issues",
+      "reviewed_utc"
+    ],
+    "states": [
+      "BLOCKED_MISSING_ASSET",
+      "READY",
+      "RECORDED",
+      "VISUAL_REVIEW_REQUIRED",
+      "PASS",
+      "FAIL"
+    ]
+  }
+}

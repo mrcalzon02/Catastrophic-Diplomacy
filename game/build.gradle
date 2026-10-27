@@ -5,3 +5,35 @@ dependencies {
     api project(':core')
     api 'com.badlogicgames.gdx:gdx:1.14.2'
 }
+
+tasks.register('geometrySmoke', JavaExec) {
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.HullSilhouetteTest'
+}
+
+
+// Headless verification of deterministic event-to-sound routing on the shared client.
+tasks.register('audioSmoke', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatAudioCueTest'
+}
+
+tasks.register('spatialAudioSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless zoom/distance spatial-audio and deterministic WAV synthesis checks.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.SpatialAudioTest'
+}
+tasks.named('audioSmoke') { finalizedBy(tasks.named('spatialAudioSmoke')) }
+
+tasks.register('menuFlowSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify playable main-menu, skirmish, campaign faction and star-map touch routing.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.GameMenuFlowTest'
+}

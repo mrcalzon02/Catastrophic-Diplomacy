@@ -28,6 +28,41 @@ tasks.register('shipyardSmoke', JavaExec) {
 }
 tasks.named('technologySmoke') { finalizedBy(tasks.named('shipyardSmoke')) }
 
+tasks.register('hullLayoutsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'All 11 hull classes x six factions: hardpoint positions, selection and legacy blueprint schema.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullLayoutsTest'
+    dependsOn testClasses
+}
+tasks.named('shipyardSmoke') { finalizedBy(tasks.named('hullLayoutsSmoke')) }
+tasks.register('shipLineagesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check all 10 alternating hull generations, physical prototypes, 11 factions, and licensed campaign research.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipLineagesTest'
+    dependsOn testClasses
+}
+tasks.named('shipyardSmoke') { finalizedBy(tasks.named('shipLineagesSmoke')) }
+tasks.register('campaignBlueprintSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify purchased campaign blueprints are checksum-safe, faction bound and compatible with replay-safe ship ownership.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignBlueprintTest'
+    dependsOn testClasses
+}
+tasks.named('shipLineagesSmoke') { finalizedBy(tasks.named('campaignBlueprintSmoke')) }
+
+tasks.register('campaignResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Paid mission-time research, quarter-credit replays, 4 lab upgrades and old save migration.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignResearchTest'
+    dependsOn testClasses
+}
+tasks.named('shipLineagesSmoke') { finalizedBy(tasks.named('campaignResearchSmoke')) }
+
+
 // Portable fleet encoding and pointer gestures shared by the desktop/Android client.
 tasks.register('platformSmoke', JavaExec) {
     group = 'verification'
@@ -45,6 +80,54 @@ tasks.register('combatMachinerySmoke', JavaExec) {
 }
 tasks.named('platformSmoke') { finalizedBy(tasks.named('combatMachinerySmoke')) }
 
+tasks.register('weaponFxSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless checks for independent firing/payload/impact stages and deterministic projectile outcomes.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WeaponFxPipelineTest'
+    dependsOn testClasses
+}
+tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('weaponFxSmoke')) }
+
+tasks.register('battleOrdersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify four PD modes, independent anti-ordnance/craft gating, class priorities and replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleOrdersTest'
+    dependsOn testClasses
+}
+tasks.named('weaponFxSmoke') { finalizedBy(tasks.named('battleOrdersSmoke')) }
+
+tasks.register('projectileModuleSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify fitted projectile speed/health/cross-section/signature and sensor-aware PD against live ordnance.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ProjectileModuleTest'
+    dependsOn testClasses
+}
+tasks.named('battleOrdersSmoke') { finalizedBy(tasks.named('projectileModuleSmoke')) }
+
+tasks.register('moduleResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Enforce one exclusive tech path per module and independent cross-module six-stage research.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ModuleResearchExclusivityTest'
+    dependsOn testClasses
+}
+tasks.named('projectileModuleSmoke') { finalizedBy(tasks.named('moduleResearchSmoke')) }
+
+tasks.register('supportSystemsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove six-level exclusive module tuning, self repair, ranged hull/shield beams and finite service drones.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SupportSystemsTest'
+    dependsOn testClasses
+}
+tasks.named('moduleResearchSmoke') { finalizedBy(tasks.named('supportSystemsSmoke')) }
+
+
+
+
 tasks.register('fleetScaleSmoke', JavaExec) {
     group = 'verification'
     classpath = sourceSets.test.runtimeClasspath
@@ -52,3 +135,321 @@ tasks.register('fleetScaleSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fleetScaleSmoke')) }
+
+// Explicit heavy campaign: not automatically chained to routine smoke tests.
+// No device/GPU coverage is implied by JavaExec success.
+tasks.register('massBattleSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Cross all scales 1v1 to 200v200; weapon/engine tech and 400-ship combined arms replays.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.MassBattleCampaignTest'
+    dependsOn testClasses
+}
+tasks.register('battleViewSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate live vessel positions under the HUD in 1v1..200v200 and moving battles.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleViewTest'
+    dependsOn testClasses
+}
+tasks.register('battleRasterSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Rasterize all 400 hulls with Java2D to verify observable ship polygons; NOT GPU acceptance.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleGeometryRasterTest'
+    dependsOn testClasses
+}
+tasks.register('massBattleCampaign') {
+    group = 'verification'
+    description = 'Run all exhaustive fleet, framing and headless raster acceptance suites.'
+    dependsOn(tasks.named('massBattleSmoke'),tasks.named('battleViewSmoke'),tasks.named('battleRasterSmoke'))
+}
+
+tasks.register('directionalDefenseSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test directional shields, tile armor, structure exposure and typed damage.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.DirectionalDefenseTest'
+    dependsOn testClasses
+}
+// Preserve the existing routine smoke chain and include directional defenses.
+tasks.named('fleetScaleSmoke') { finalizedBy(tasks.named('directionalDefenseSmoke')) }
+
+tasks.register('levelEconomySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Proof of deterministic 500-stage specifications and exact credit payouts.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelEconomyTest'
+    dependsOn testClasses
+}
+tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('levelEconomySmoke')) }
+
+tasks.register('skySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Reproduce all 500 seeded starfields without a graphics context.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelSkyTest'
+    dependsOn testClasses
+}
+tasks.register('spaceWeatherSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate deterministic asteroid, flare, radiation, ion and neutron weather.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SpaceWeatherTest'
+    dependsOn testClasses
+}
+tasks.register('battleWeatherSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify environmental impacts on real battle shields, aim and systems.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleWeatherTest'
+    dependsOn testClasses
+}
+tasks.register('levelEnvironmentSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Assert consistent level-to-background-to-weather mapping at 1..500.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LevelEnvironmentTest'
+    dependsOn testClasses
+}
+tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('skySmoke')) }
+tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
+tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
+tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
+
+/** Armed aircraft profiles and each live nested weapon family, device-free. */
+tasks.register('fighterCraftSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Six independent craft classes, real nested ordnance, sensors, damage and replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterCraftTest'
+}
+tasks.named('combatMachinerySmoke') { finalizedBy(tasks.named('fighterCraftSmoke')) }
+tasks.named('massBattleCampaign') { dependsOn tasks.named('fighterCraftSmoke') }
+
+tasks.register('alienFactionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate all five new independent alien races, 50 hull sprite paths, saved fleets and live combat.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AlienFactionArtTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('alienFactionSmoke') }
+
+tasks.register('hullFoundationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Require 11 physical hull baselines, 11 native technologies, unarmed support hulls and player/AI equipment parity.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullFoundationTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('hullFoundationSmoke') }
+
+tasks.register('moduleVersionsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove 4400 alternative manufactured module models with per-socket revisions and lossless CD-SHIP-1/2 save compatibility.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ModuleVersionsTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('moduleVersionsSmoke') }
+
+tasks.register('crewAccommodationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove explicit crew quarters and life-support modules for all 121 faction hulls, with legacy blueprint migration.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CrewAccommodationTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('crewAccommodationSmoke') }
+
+tasks.register('weaponBehaviorSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Certify all authoritative main battery firing gates, PD modes, fighter weapons, ordnance physics and FX type consistency.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WeaponBehaviorTableTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('weaponBehaviorSmoke') }
+
+tasks.register('ordnanceDoctrineSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove physical 7-mode guided missiles and torpedoes, decoys, cold ignition, ammunition and seeded replay.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceDoctrineTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnanceDoctrineSmoke') }
+
+
+tasks.register('ammunitionTypesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test five real ballistic ammunition types and six missile warheads, physics, AP, splash, EMP and deterministic replay.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionTableTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionTypesSmoke') }
+
+tasks.register('ammunitionResearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Gate physical ammunition by each installed module research path/rank across all factions and real salvo loading.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionResearchTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionResearchSmoke') }
+
+tasks.register('ammunitionSelectionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify actual selected loadout, anti-forgery, CD-SHIP-3 saved ammo and live AI/player use.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.AmmunitionSelectionTest'
+}
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ammunitionSelectionSmoke') }
+
+tasks.register('demoWeaponSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test exact Android 200v200 combined six-weapon fitted fixture and deterministic replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.DemonstrationBattleTest'
+    dependsOn testClasses
+}
+
+tasks.register('updaterPolicySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate stable, prerelease and test-channel version, signature-origin and integrity policy.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.update.UpdatePolicyTest'
+    dependsOn testClasses
+}
+tasks.named('levelEconomySmoke') { finalizedBy(tasks.named('updaterPolicySmoke')) }
+
+tasks.register('gameFlowSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check playable skirmish fixtures, campaign map nodes, save recovery and rewards.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.GameFlowTest'
+    dependsOn testClasses
+}
+tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
+// campaignResearchSmoke is registered once in the shipyard smoke chain above.
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignResearchSmoke')) }
+tasks.register('researchVictoryFloorSmoke', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ResearchVictoryFloorTest'
+    dependsOn testClasses
+}
+tasks.named('campaignResearchSmoke') { finalizedBy(tasks.named('researchVictoryFloorSmoke')) }
+
+
+tasks.register('campaignDeploymentSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Exercise selectable prebattle formation coordinates and fleet-size limits in live combat.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignDeploymentTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignDeploymentSmoke')) }
+
+tasks.register('shipPlacementOrdersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify 200-ship collision-free free deployment and arbitrarily long per-ship combat order queues.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipPlacementOrdersTest'
+    dependsOn testClasses
+}
+tasks.named('campaignDeploymentSmoke') { finalizedBy(tasks.named('shipPlacementOrdersSmoke')) }
+
+tasks.register('shipStandingOrdersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify persistent independent captain doctrines, withdrawal, 200-hull checksum saves and live combat.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipStandingOrdersTest'
+    dependsOn testClasses
+}
+tasks.named('shipPlacementOrdersSmoke') { finalizedBy(tasks.named('shipStandingOrdersSmoke')) }
+
+tasks.register('shipTacticalDirectivesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check independent protect/escort, speed and point defense tactics on real commissioned combat ships.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipTacticalDirectivesTest'
+    dependsOn testClasses
+}
+tasks.named('shipStandingOrdersSmoke') { finalizedBy(tasks.named('shipTacticalDirectivesSmoke')) }
+
+tasks.register('fleetDoctrineGroupSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify 200-ship group doctrinal assignment, independent escort/defend links and saved combat application.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetDoctrineGroupsTest'
+    dependsOn testClasses
+}
+tasks.named('shipTacticalDirectivesSmoke') { finalizedBy(tasks.named('fleetDoctrineGroupSmoke')) }
+
+tasks.register('battleRetreatSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify physical withdrawal and escape, real casualty/reward accounting, and campaign waves.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleRetreatTest'
+    dependsOn testClasses
+}
+tasks.named('fleetDoctrineGroupSmoke') { finalizedBy(tasks.named('battleRetreatSmoke')) }
+
+tasks.register('campaignFleetSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify owned active/reserve rosters, paid resource repair, crew, fuel, ordnance, ship purchase and radio.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignFleetTest'
+    dependsOn testClasses
+}
+tasks.named('battleRetreatSmoke') { finalizedBy(tasks.named('campaignFleetSmoke')) }
+tasks.register('campaignAfterActionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify individual commissioned ship losses, recovery, inventory and report pagination.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignAfterActionTest'
+    dependsOn testClasses
+}
+tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('campaignAfterActionSmoke')) }
+tasks.register('fleetNameRangeSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify all naming cultures can give 200 different ships distinct, ID-free names.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetNameRangeTest'
+    dependsOn testClasses
+}
+tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('fleetNameRangeSmoke')) }
+
+tasks.register('vesselIdentifiersSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Stress 500-stage commissioning across five campaigns and ensure 16-digit vessel identity survives refits.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.VesselIdentifiersTest'
+    dependsOn testClasses
+}
+tasks.named('campaignAfterActionSmoke') { finalizedBy(tasks.named('vesselIdentifiersSmoke')) }
+
+tasks.register('campaignLedgerSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check atomic campaign wallet+fleet authority, full-snapshot rollback, corruption and double-spend rejection.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignLedgerTest'
+    dependsOn testClasses
+}
+tasks.named('campaignAfterActionSmoke') { finalizedBy(tasks.named('campaignLedgerSmoke')) }
+tasks.register('squadronOperationsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate permanent commissioned squadrons, distinct naming cultures and live radio voices.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SquadronOperationsTest'
+    dependsOn testClasses
+}
+tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('squadronOperationsSmoke')) }
+
+
+
