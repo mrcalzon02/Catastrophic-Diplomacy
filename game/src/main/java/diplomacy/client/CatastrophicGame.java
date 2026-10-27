@@ -803,6 +803,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
         escapedAtEnd=battle.escaped(0);
         destroyedAtEnd=battle.destroyed(0);
         lastReward=0;
+        if(playedCampaign&&campaignFleet!=null){
+            try{
+                campaignFleet=campaignFleet.afterBattle(battle,campaignSortie);
+                saveCampaignFleet();
+                Gdx.app.log("CD-GAME-FLOW","ROSTER_RECOVERY owned="+campaignFleet.ships().size()+
+                        " active="+campaignFleet.active().size()+
+                        " reserve="+campaignFleet.reserves().size());
+            }catch(RuntimeException failed){
+                Gdx.app.error("CAMPAIGN","Cannot preserve returned ships",failed);
+            }
+        }
         if(playedCampaign&&lastWon){
             long before=campaign.credits();
             campaign=campaign.complete(activeMission,deployedAtLaunch,survivorsAtEnd);
@@ -1246,7 +1257,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verifyDemo)battle=DemonstrationBattle.create(technology);
         else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign) {
             campaignEncounter=CampaignEncounter.start(activeMission,deployment,
-                    leftDesign,rightDesign,technology);
+                    campaignFleet.active().stream().map(CampaignFleet.Vessel::fitting).toList(),
+                    rightDesign,technology);
             battle=campaignEncounter.battle();
         }
         else if(screen==GameMenuPanel.Screen.BATTLE) {
@@ -1260,6 +1272,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Apply after team orders so a restart cannot silently erase per-ship intent.
         if(!verifyDemo&&(playedCampaign||(preparedSkirmish&&!scenario.demonstration)))
             deployment.apply(battle);
+        if(!verifyDemo&&playedCampaign&&campaignFleet!=null){
+            int slot=0;
+            for(Battle.Ship ship:battle.ships())if(ship.team==0){
+                CampaignFleet.Vessel owned=campaignFleet.active().get(slot++);
+                owned.stores().apply(ship);
+                ship.name=owned.name();
+            }
+        }
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
         // The same validated stage index drives both GPU background and simulation.
         if (starfield != null) starfield.useLevel(environment.level());
@@ -1294,6 +1314,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     deployment,leftDesign.hull.name(),selectedDeploymentShip,
                     preparingCampaign,standingPage,selectingDoctrineGroup,doctrineGroup,
                     waitingForWaypoint,deploymentNotice,
+                    campaignFleet,dockPage,dockSelected,dockPrices(),
+                    CampaignFleet.purchaseCost(leftDesign),dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd);
             return;
@@ -1507,6 +1529,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
             font.draw(batch,"<",945,638);
             font.draw(batch,"LEVEL " + battlefieldLevel + "/500",998,638);
             font.draw(batch,">",1235,638);
+        }
+        font.setColor(Color.LIGHT_GRAY);
+        int traffic=0;
+        var transmissions=battle.events();
+        for(int i=transmissions.size()-1;i>=0&&traffic<3;i--){
+            String message=transmissions.get(i);
+            if(!message.startsWith("RADIO "))continue;
+            font.setColor(Color.CYAN);
+            font.draw(batch,message,22,208-traffic*24);
+            traffic++;
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
