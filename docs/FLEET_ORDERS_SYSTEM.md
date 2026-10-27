@@ -100,3 +100,32 @@ Per-ship directives now include engine speed limiting (25-100% of fitted drive),
 The orders editor has two compact pages: combat policies and support/relationships. Long-range intercept is limited by real point-defense module detection and reach. *Screen* launches fighter sorties for nearby threats and *Protect* for ships actually threatening designated friendlies; craft still use their own fitted weapon and sensor profiles. The individual policies are distinct from the older optional waypoint program.
 
 This does not yet model weapon-by-weapon PD fire control, squadron wing redistribution among multiple carriers, or completed retreat/escape accounting. Do not claim full GSB order parity.
+\n## Fleet-group standing doctrine assignment (2026-10-26)
+
+A marked subset of any campaign or skirmish fleet can inherit one captain's
+**simultaneously active** aggression, caution, hull/shield retreat thresholds,
+movement/targeting behavior, class priorities and ranges, point-defense modes,
+speed limit and fighter mission. In the standing-orders editor, choose a source
+captain (gold marker), press **MARK SHIPS** and tap other ship markers (green).
+**ALL** selects the remaining commissioned fleet; **APPLY** updates every marked
+ship in one atomic operation; **CLEAR** cancels the selection. Keyboard commands:
+G mark mode, H select all, Enter apply, Delete clear, A/D previous/next captain.
+
+Crucial reference protection: group application **retains each recipient's own
+four defended-friendly slots and escort leader** rather than copying the source
+captain's references, which can otherwise create unintended self-escort or
+circular escort relationships. The source captain's doctrine is unchanged.
+Placements and optional movement queues are also untouched. All affected
+standing policies save once through the existing checksummed per-faction
+CD-STANDING-2 profile file and are applied to actual simulated ship IDs at
+the next mission's combat launch. Invalid/empty/off-fleet selections are rejected.
+
+Functional verification: `:core:fleetDoctrineGroupSmoke` tests groups through
+200 ships, independent protect/escort relationships, source isolation, rejected
+invalid groups, save/reload and actual battle assignment; `:game:menuFlowSmoke`
+checks the four operational group controls. These tests are functional, not
+cosmetic screenshot gates.
+
+Not yet implemented: reusable named multi-group profiles, drag-box selection,
+manual squadron commander assignment, per-hardpoint targeting or completed
+withdrawal/escape accounting.

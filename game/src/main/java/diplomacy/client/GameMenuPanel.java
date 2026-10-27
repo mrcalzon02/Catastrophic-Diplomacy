@@ -9,6 +9,7 @@ import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.ShipStandingOrders;
+import java.util.Set;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import java.util.List;
@@ -96,6 +97,14 @@ final class GameMenuPanel {
         if(hit(x,y,900,32,300,55))return 30;
         return -1;
     }
+    /** Four real controls on the order editor's left fleet pane. */
+    static int groupAction(float x,float y){
+        if(hit(x,y,52,560,132,40))return 0; // select members
+        if(hit(x,y,192,560,105,40))return 1; // all except source
+        if(hit(x,y,305,560,132,40))return 2; // apply captain
+        if(hit(x,y,445,560,147,40))return 3; // clear selection
+        return -1;
+    }
     static int mapHit(float x,float y,int page){
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             if(Math.hypot(x-node.x(),y-node.y())<=26)return node.level();
@@ -118,7 +127,8 @@ final class GameMenuPanel {
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
               CampaignDeployment.Loadout deployment,String friendlyHull,int selectedShip,
-              boolean preparingCampaign,int standingPage,boolean awaitingWaypoint,String editNotice,
+              boolean preparingCampaign,int standingPage,boolean selectingGroup,
+              Set<Integer> doctrineGroup,boolean awaitingWaypoint,String editNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -214,10 +224,15 @@ final class GameMenuPanel {
                         ordersUiX(CampaignDeployment.MAX_X)-ordersUiX(CampaignDeployment.MIN_X),2);
                 for(int i=0;i<deployment.ships();i++){
                     var position=deployment.at(i);
-                    shapes.setColor(i==selectedShip?Color.GOLD:Color.CYAN);
+                    shapes.setColor(i==selectedShip?Color.GOLD:
+                            doctrineGroup.contains(i)?Color.GREEN:Color.CYAN);
                     shapes.circle(ordersUiX(position.x()),ordersUiY(position.y()),
                             i==selectedShip?9:deployment.ships()>80?3:5,12);
                 }
+                button(shapes,52,560,132,40,selectingGroup);
+                button(shapes,192,560,105,40,false);
+                button(shapes,305,560,132,40,!doctrineGroup.isEmpty());
+                button(shapes,445,560,147,40,false);
                 button(shapes,650,561,110,40,false);
                 button(shapes,1108,561,112,40,false);
                 button(shapes,785,561,296,40,true);
@@ -336,10 +351,14 @@ final class GameMenuPanel {
                     label(batch,font,"< "+ShipStandingOrders.SETTINGS[i],661,y,MUTED);
                     label(batch,font,policy.display(i)+" >",1006,y,Color.WHITE);
                 }
+                label(batch,font,"MARK SHIPS",58,586,Color.WHITE);
+                label(batch,font,"ALL",212,586,Color.WHITE);
+                label(batch,font,"APPLY",326,586,Color.WHITE);
+                label(batch,font,"CLEAR",468,586,Color.WHITE);
+                label(batch,font,"GROUP: "+doctrineGroup.size()+" SELECTED"+(selectingGroup?" - TAP SHIPS TO MARK":""),49,620,Color.GREEN);
                 label(batch,font,"BACK TO DEPLOYMENT",927,68,Color.WHITE);
-                label(batch,font,"SELECT SHIP ON MAP; TAP LEFT/RIGHT SIDE TO CHANGE VALUE",48,114,MUTED);
+                label(batch,font,"G: MARK   H: ALL   ENTER: APPLY   DEL: CLEAR",48,114,MUTED);
                 label(batch,font,editNotice,48,86,Color.GOLD);
-                label(batch,font,"STANDING DOCTRINE ACTIVE THROUGHOUT BATTLE",48,592,Color.CYAN);
             }
             case OPTIONS -> {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");

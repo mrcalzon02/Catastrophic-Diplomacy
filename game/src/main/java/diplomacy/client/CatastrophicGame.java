@@ -22,6 +22,7 @@ import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.ShipCommandQueue;
 import diplomacy.sim.ShipStandingOrders;
+import diplomacy.sim.FleetDoctrineGroups;
 import diplomacy.sim.ShipStandingOrdersCodec;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,6 +72,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int placementDragPointer=-1;
     private boolean waitingForWaypoint;
     private int selectedStandingSetting,standingPage;
+    private boolean selectingDoctrineGroup;
+    private final java.util.Set<Integer> doctrineGroup=new java.util.HashSet<>();
     private final Map<Integer,ShipStandingOrders> savedStanding=new HashMap<>();
     private Battle.Faction savedStandingFaction;
     private boolean preparingCampaign=true,preparedSkirmish;
@@ -222,9 +225,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         }
                     }
                     if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
+                        if(key==Input.Keys.G)toggleDoctrineMarking();
+                        if(key==Input.Keys.H)selectAllDoctrineShips();
+                        if(key==Input.Keys.ENTER)applyGroupDoctrine();
+                        if(key==Input.Keys.DEL)clearDoctrineGroup();
                         if(key==Input.Keys.A||key==Input.Keys.D)
-                            selectedDeploymentShip=Math.floorMod(selectedDeploymentShip+
-                                    (key==Input.Keys.A?-1:1),deployment.ships());
+                            selectDoctrineCaptain(Math.floorMod(selectedDeploymentShip+
+                                    (key==Input.Keys.A?-1:1),deployment.ships()));
                         if(key==Input.Keys.TAB||key==Input.Keys.PAGE_UP||
                                 key==Input.Keys.PAGE_DOWN)standingPage=1-standingPage;
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
@@ -251,6 +258,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                         preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
                                         .withStandingProfiles(savedStanding);
                             selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
+                    doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
+                            doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                         }
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             deployment=deployment.withFormation(key==Input.Keys.UP?-1:1);
@@ -321,8 +330,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }
                     if(screen==GameMenuPanel.Screen.SHIP_ORDERS &&
                             world.x>=39&&world.x<630&&world.y>=135&&world.y<=607){
+                        int action=GameMenuPanel.groupAction(world.x,world.y);
+                        if(action>=0){
+                            processDoctrineGroupAction(action);
+                            return true;
+                        }
                         int hit=GameMenuPanel.shipHit(world.x,world.y,deployment,true);
-                        if(hit>=0)selectedDeploymentShip=hit;
+                        if(hit>=0){
+                            if(selectingDoctrineGroup){
+                                if(hit==selectedDeploymentShip)
+                                    deploymentNotice="Source captain cannot be their own group recipient.";
+                                else if(!doctrineGroup.add(hit))doctrineGroup.remove(hit);
+                            }else selectDoctrineCaptain(hit);
+                        }
                         return true;
                     }
                     tapFrontEnd(world.x,world.y);
@@ -455,6 +475,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         deployment=deployment.withStandingProfiles(savedStanding);
         selectedStandingSetting=0;
         selectedDeploymentShip=0;
+        clearDoctrineGroup();
+        clearDoctrineGroup();
         placementDragPointer=-1;
         waitingForWaypoint=false;
         deploymentNotice="Drag your fleet within the zone. Each hull has its own ordered commands.";
@@ -551,6 +573,56 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }catch(RuntimeException e){
             Gdx.app.error("STANDING","Unable to save individual ship doctrines",e);
             deploymentNotice="Cannot save standing orders; check application storage";
+        }
+    }
+    private void clearDoctrineGroup(){
+        doctrineGroup.clear();
+        selectingDoctrineGroup=false;
+    }
+    private void selectDoctrineCaptain(int slot){
+        if(slot<0||slot>=deployment.ships())throw new IllegalArgumentException("Unknown captain");
+        selectedDeploymentShip=slot;
+        doctrineGroup.remove(slot);
+    }
+    private void toggleDoctrineMarking(){
+        selectingDoctrineGroup=!selectingDoctrineGroup;
+        deploymentNotice=selectingDoctrineGroup?
+                "Tap ship markers to select group members. Gold ship is the doctrine source.":
+                "Group selection paused. Use APPLY to copy the captain's doctrine.";
+    }
+    private void selectAllDoctrineShips(){
+        doctrineGroup.clear();
+        for(int i=0;i<deployment.ships();i++)
+            if(i!=selectedDeploymentShip)doctrineGroup.add(i);
+        selectingDoctrineGroup=false;
+        deploymentNotice="Selected "+doctrineGroup.size()+" fleet ships for group doctrine.";
+    }
+    private void applyGroupDoctrine(){
+        doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
+        if(doctrineGroup.isEmpty()){
+            deploymentNotice="Select one or more other ships first.";
+            return;
+        }
+        try{
+            deployment=FleetDoctrineGroups.apply(deployment,selectedDeploymentShip,doctrineGroup);
+            for(int slot:doctrineGroup)savedStanding.put(slot,deployment.standingFor(slot));
+            saveStandingOrders();
+            deploymentNotice="Applied captain #"+(selectedDeploymentShip+1)+" doctrine to "+
+                    doctrineGroup.size()+" ships; independent targets retained.";
+            Gdx.app.log("CD-GAME-FLOW","GROUP_DOCTRINE source="+(selectedDeploymentShip+1)+
+                    " recipients="+doctrineGroup.size());
+            clearDoctrineGroup();
+        }catch(IllegalArgumentException conflict){
+            deploymentNotice="Group doctrine rejected: "+conflict.getMessage();
+        }
+    }
+    private void processDoctrineGroupAction(int action){
+        switch(action){
+            case 0 -> toggleDoctrineMarking();
+            case 1 -> selectAllDoctrineShips();
+            case 2 -> applyGroupDoctrine();
+            case 3 -> clearDoctrineGroup();
+            default -> throw new IllegalArgumentException("Unknown group control");
         }
     }
     private void adjustStandingOrders(int setting,int direction){
@@ -696,8 +768,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
             int action=GameMenuPanel.ordersAction(x,y,standingPage);
-            if(action==0)selectedDeploymentShip=Math.floorMod(selectedDeploymentShip-1,deployment.ships());
-            else if(action==1)selectedDeploymentShip=(selectedDeploymentShip+1)%deployment.ships();
+            if(action==0)selectDoctrineCaptain(Math.floorMod(selectedDeploymentShip-1,deployment.ships()));
+            else if(action==1)selectDoctrineCaptain((selectedDeploymentShip+1)%deployment.ships());
             else if(action>=2&&action<2+ShipStandingOrders.SETTINGS.length){
                 selectedStandingSetting=action-2;
                 adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
@@ -1026,7 +1098,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,
                     screen==GameMenuPanel.Screen.DEPLOYMENT?activeMission:selectedMission,
                     deployment,leftDesign.hull.name(),selectedDeploymentShip,
-                    preparingCampaign,standingPage,waitingForWaypoint,deploymentNotice,
+                    preparingCampaign,standingPage,selectingDoctrineGroup,doctrineGroup,
+                    waitingForWaypoint,deploymentNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;

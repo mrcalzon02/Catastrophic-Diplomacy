@@ -74,6 +74,14 @@ public final class GameMenuFlowTest {
                 "Original doctrine page no longer handles persistent caution");
         check(GameMenuPanel.ordersAction(385,376)==-1,
                 "Map selection must not alter a doctrine setting");
+        float[][] groupButtons={{110,580},{240,580},{370,580},{515,580}};
+        for(int i=0;i<groupButtons.length;i++)
+            check(GameMenuPanel.groupAction(groupButtons[i][0],groupButtons[i][1])==i,
+                    "Fleet group action has no real touch surface "+i);
+        check(GameMenuPanel.groupAction(385,375)==-1,
+                "Ship selection surface should not activate a group command");
+        check(GameMenuPanel.groupAction(700,580)==-1,
+                "Captain navigation overlaps group controls");
         var formation=new diplomacy.sim.CampaignDeployment.Loadout(8,
                 diplomacy.sim.CampaignDeployment.Formation.LINE);
         for(int i=0;i<formation.ships();i++){

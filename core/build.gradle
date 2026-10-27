@@ -345,3 +345,12 @@ tasks.register('shipTacticalDirectivesSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('shipStandingOrdersSmoke') { finalizedBy(tasks.named('shipTacticalDirectivesSmoke')) }
+
+tasks.register('fleetDoctrineGroupSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify 200-ship group doctrinal assignment, independent escort/defend links and saved combat application.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetDoctrineGroupsTest'
+    dependsOn testClasses
+}
+tasks.named('shipTacticalDirectivesSmoke') { finalizedBy(tasks.named('fleetDoctrineGroupSmoke')) }
