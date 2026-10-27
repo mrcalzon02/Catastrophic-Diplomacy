@@ -16,6 +16,13 @@ def playKeyPass = (project.findProperty('playUploadKeyPassword') ?: '').toString
 def havePlaySigning = playStore && playStorePass && playKeyPass &&
         playAlias == 'catastrophicdiplomacy-play-upload-v1' && file(playStore).isFile()
 
+// A Play build can compile in CI with ID=0, but production eligibility
+// is blocked until the actual Play Console Games services project ID is set.
+def playGamesProjectId = (project.findProperty('playGamesProjectId') ?: '0').toString()
+if (!(playGamesProjectId ==~ /[0-9]{1,24}/)) {
+    throw new GradleException('Invalid playGamesProjectId: use the decimal Games services project ID shown in Play Console')
+}
+
 android {
     namespace 'games.catastrophicdiplomacy.android'
     compileSdk 36
@@ -56,6 +63,7 @@ android {
             if (signingAvailable) signingConfig signingConfigs.release
         }
         play {
+            resValue 'string', 'game_services_project_id', playGamesProjectId
             initWith release
             signingConfig = null
             if (havePlaySigning) signingConfig signingConfigs.playUpload
@@ -86,6 +94,7 @@ tasks.configureEach { task ->
 }
 
 dependencies {
+    playImplementation 'com.google.android.gms:play-services-games-v2:22.1.0'
     implementation project(':game')
     implementation 'com.badlogicgames.gdx:gdx-backend-android:1.14.2'
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-armeabi-v7a'
