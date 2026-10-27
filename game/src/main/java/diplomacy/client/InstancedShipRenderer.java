@@ -34,6 +34,12 @@ public final class InstancedShipRenderer implements AutoCloseable {
         try {
             for(Battle.Faction faction:Battle.Faction.values())
                 for(Shipyard.Hull type:Shipyard.Hull.values()) {
+                    if(type.spriteHull()!=type){
+                        Mesh shared=hulls[faction.ordinal()][type.spriteHull().ordinal()];
+                        if(shared==null)throw new IllegalStateException("Missing base art mesh for "+type);
+                        hulls[faction.ordinal()][type.ordinal()]=shared;
+                        continue;
+                    }
                     float[] pairs=HullSilhouette.of(faction,type);
                     float[] vertices=new float[pairs.length/2*3];
                     for(int i=0;i<pairs.length/2;i++) {
@@ -89,7 +95,11 @@ public final class InstancedShipRenderer implements AutoCloseable {
     }
 
     @Override public void close() {
-        for(Mesh[] row:hulls)for(Mesh mesh:row)if(mesh!=null)mesh.dispose();
+        // Chassis variants deliberately alias base-category meshes.
+        java.util.Set<Mesh> unique=java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<Mesh,Boolean>());
+        for(Mesh[] row:hulls)for(Mesh mesh:row)
+            if(mesh!=null&&unique.add(mesh))mesh.dispose();
         shader.dispose();
     }
 }
