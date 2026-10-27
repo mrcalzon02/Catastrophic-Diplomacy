@@ -130,6 +130,8 @@ public final class Battle {
         /** Permanent sixteen-digit campaign identity; zero for uncommissioned
          * skirmish ships. Tactical combat target IDs remain short-lived ints. */
         public long commissionedId;
+        /** Optional commissioned-squadron radio voice; skirmish inherits fleet. */
+        public CrewChatter.Tone squadronRadio;
         public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
         /** Committed withdrawal remains active after field repairs; escaped hulls
@@ -417,7 +419,8 @@ public final class Battle {
         CrewChatter.Scale scale=fighter?CrewChatter.Scale.FIGHTER:
                 CrewChatter.scale(source.hullClass);
         return "RADIO "+source.name+(fighter?" / Flight":"")+": "+
-                CrewChatter.line(scale,event,tick,source.id,teamRadioTone(source.team));
+                CrewChatter.line(scale,event,tick,source.id,
+                        source.squadronRadio==null?teamRadioTone(source.team):source.squadronRadio);
     }
     /**
      * Team-wide edits update existing combatants and future fleet deployments.

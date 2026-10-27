@@ -11,7 +11,8 @@ import java.util.List;
 
 /** Explicitly versioned, tamper-detecting campaign-owned vessel registry. */
 public final class CampaignFleetCodec {
-    private static final String MAGIC="CD-ROSTER-3";
+    private static final String MAGIC="CD-ROSTER-4";
+    private static final String V3="CD-ROSTER-3";
     private static final String PREVIOUS="CD-ROSTER-2";
     private static final String LEGACY="CD-ROSTER-1";
     private CampaignFleetCodec(){}
@@ -21,6 +22,27 @@ public final class CampaignFleetCodec {
     }
     private static String unpack(String s){
         return new String(Base64.getUrlDecoder().decode(s),StandardCharsets.UTF_8);
+    }
+    private static String encodeProfiles(java.util.Map<Integer,CampaignFleet.SquadronProfile> profiles){
+        StringBuilder result=new StringBuilder();
+        profiles.entrySet().stream().sorted(java.util.Map.Entry.comparingByKey()).forEach(e->
+                result.append(e.getKey()).append(':').append(e.getValue().naming())
+                        .append(':').append(e.getValue().radio()).append(';'));
+        return result.toString();
+    }
+    private static java.util.Map<Integer,CampaignFleet.SquadronProfile> decodeProfiles(String payload){
+        java.util.HashMap<Integer,CampaignFleet.SquadronProfile> profiles=new java.util.HashMap<>();
+        if(payload.isEmpty())return profiles;
+        for(String row:payload.split(";",-1)){
+            if(row.isEmpty())continue;
+            String[] cells=row.split(":",-1);
+            if(cells.length!=3)throw new IllegalArgumentException("Malformed squadron profile");
+            int squadron=Integer.parseInt(cells[0]);
+            if(profiles.putIfAbsent(squadron,new CampaignFleet.SquadronProfile(
+                    FleetNames.Style.valueOf(cells[1]),CrewChatter.Tone.valueOf(cells[2])))!=null)
+                throw new IllegalArgumentException("Repeated squadron profile");
+        }
+        return profiles;
     }
     private static String checksum(String text){
         try{
@@ -38,7 +60,8 @@ public final class CampaignFleetCodec {
         StringBuilder s=new StringBuilder(MAGIC).append('\n').append(roster.faction())
                 .append(',').append(roster.style()).append(',')
                 .append(roster.nextSerial()).append(',').append(roster.namingSeed()).append(',')
-                .append(roster.radioTone()).append('\n');
+                .append(roster.radioTone()).append(',')
+                .append(pack(encodeProfiles(roster.squadronProfiles()))).append('\n');
         for(var v:roster.ships()){
             var stores=v.stores();
             s.append(v.id()).append(',').append(v.deployed()?1:0).append(',')
@@ -54,7 +77,8 @@ public final class CampaignFleetCodec {
                     .append(stores.fighters()).append(',')
                     .append(stores.drones()).append(',')
                     .append(stores.repairDrones()).append(',')
-                    .append(stores.fuel()).append('\n');
+                    .append(stores.fuel()).append(',')
+                    .append(roster.squadronOf(v.id())).append('\n');
         }
         return s.toString()+checksum(s.toString())+"\n";
     }
@@ -63,7 +87,7 @@ public final class CampaignFleetCodec {
             throw new IllegalArgumentException("Invalid roster file");
         String[] rows=payload.split("\n",-1);
         if(rows.length<4||rows.length>204||
-                (!MAGIC.equals(rows[0])&&!PREVIOUS.equals(rows[0])&&!LEGACY.equals(rows[0]))
+                (!MAGIC.equals(rows[0])&&!V3.equals(rows[0])&&!PREVIOUS.equals(rows[0])&&!LEGACY.equals(rows[0]))
                 ||!rows[rows.length-1].isEmpty())
             throw new IllegalArgumentException("Unknown roster encoding");
         StringBuilder body=new StringBuilder();
@@ -73,8 +97,9 @@ public final class CampaignFleetCodec {
             throw new IllegalArgumentException("Fleet roster checksum mismatch");
         try{
             String[] header=rows[1].split(",",-1);
-            boolean v3=MAGIC.equals(rows[0]);
-            if(header.length!=(v3?5:3))
+            boolean v4=MAGIC.equals(rows[0]);
+            boolean v3=v4||V3.equals(rows[0]);
+            if(header.length!=(v4?6:v3?5:3))
                 throw new IllegalArgumentException("Invalid roster header");
             Battle.Faction faction=Battle.Faction.valueOf(header[0]);
             FleetNames.Style style=FleetNames.Style.valueOf(header[1]);
@@ -82,11 +107,13 @@ public final class CampaignFleetCodec {
             long namingSeed=v3?Long.parseLong(header[3]):faction.ordinal();
             CrewChatter.Tone tone=v3?CrewChatter.Tone.valueOf(header[4]):
                     CrewChatter.Tone.MIXED;
+            var profiles=v4?decodeProfiles(unpack(header[5])):java.util.Map.<Integer,CampaignFleet.SquadronProfile>of();
+            var assignments=new java.util.HashMap<Long,Integer>();
             List<CampaignFleet.Vessel> vessels=new ArrayList<>();
             for(int i=2;i<rows.length-2;i++){
                 String[] parts=rows[i].split(",",-1);
                 int offset=LEGACY.equals(rows[0])?0:1;
-                if(parts.length!=14+offset)
+                if(parts.length!=14+offset+(v4?1:0))
                     throw new IllegalArgumentException("Invalid ship inventory");
                 long id=Long.parseLong(parts[0]);
                 boolean deployed=switch(parts[1]){
@@ -103,8 +130,14 @@ public final class CampaignFleetCodec {
                         Integer.parseInt(parts[12+offset]),Double.parseDouble(parts[13+offset]));
                 stores.apply(CampaignFleet.fresh(design,tech));
                 vessels.add(new CampaignFleet.Vessel(id,unpack(parts[2]),design,deployed,stores));
+                if(v4){
+                    int group=Integer.parseInt(parts[14+offset]);
+                    if(group!=0&&assignments.putIfAbsent(id,group)!=null)
+                        throw new IllegalArgumentException("Duplicate assigned squadron hull");
+                }
             }
-            return new CampaignFleet.Roster(faction,style,next,vessels,namingSeed,tone);
+            return new CampaignFleet.Roster(faction,style,next,vessels,namingSeed,tone,
+                    assignments,profiles);
         }catch(RuntimeException invalid){
             throw new IllegalArgumentException("Invalid or incompatible campaign vessel registry",invalid);
         }

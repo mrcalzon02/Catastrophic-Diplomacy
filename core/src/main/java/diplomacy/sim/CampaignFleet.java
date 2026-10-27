@@ -5,6 +5,9 @@ import diplomacy.tech.TechnologyCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
 
 /**
  * Campaign-owned ships: active sortie group and reserve are independent,
@@ -63,8 +66,23 @@ public final class CampaignFleet {
         public Vessel withName(String value){return new Vessel(id,value,fitting,deployed,stores);}
         public Vessel withStores(Stores value){return new Vessel(id,name,fitting,deployed,value);}
     }
+    /** Squadron 0 inherits the fleet-wide culture and radio voice.
+     * Squadrons 1..7 may override those defaults independently. */
+    public record SquadronProfile(FleetNames.Style naming,CrewChatter.Tone radio){
+        public SquadronProfile {
+            if(naming==null||radio==null)
+                throw new IllegalArgumentException("Squadron needs name and voice");
+        }
+    }
+    public static final int SQUADRON_COUNT=8;
     public record Roster(Battle.Faction faction,FleetNames.Style style,int nextSerial,
-                         List<Vessel> ships,long namingSeed,CrewChatter.Tone radioTone) {
+                         List<Vessel> ships,long namingSeed,CrewChatter.Tone radioTone,
+                         Map<Long,Integer> squadronAssignments,
+                         Map<Integer,SquadronProfile> squadronProfiles) {
+        public Roster(Battle.Faction faction,FleetNames.Style style,int nextSerial,
+                      List<Vessel> ships,long namingSeed,CrewChatter.Tone radioTone){
+            this(faction,style,nextSerial,ships,namingSeed,radioTone,Map.of(),Map.of());
+        }
         /** Historical API and imported saves retain their former naming. */
         public Roster(Battle.Faction faction,FleetNames.Style style,int nextSerial,
                       List<Vessel> ships){
@@ -73,7 +91,8 @@ public final class CampaignFleet {
         }
         public Roster {
             if(faction==null||style==null||radioTone==null||nextSerial<1||
-                    nextSerial>VesselIdentifiers.MAX_SERIAL+1||ships==null||ships.size()>200)
+                    nextSerial>VesselIdentifiers.MAX_SERIAL+1||ships==null||ships.size()>200||
+                    squadronAssignments==null||squadronProfiles==null)
                 throw new IllegalArgumentException("Invalid fleet roster");
             ships=List.copyOf(ships);
             HashSet<Long> ids=new HashSet<>();
@@ -86,6 +105,52 @@ public final class CampaignFleet {
                         !names.add(v.name().toLowerCase(java.util.Locale.ROOT))||
                         v.fitting().faction!=faction)
                     throw new IllegalArgumentException("Duplicate or misplaced fleet hull");
+            for(var entry:squadronAssignments.entrySet())
+                if(entry.getKey()==null||!ids.contains(entry.getKey())||
+                        entry.getValue()==null||entry.getValue()<1||
+                        entry.getValue()>=SQUADRON_COUNT)
+                    throw new IllegalArgumentException("Squadron references nonexistent owned ship");
+            for(var entry:squadronProfiles.entrySet())
+                if(entry.getKey()==null||entry.getKey()<1||
+                        entry.getKey()>=SQUADRON_COUNT||entry.getValue()==null)
+                    throw new IllegalArgumentException("Invalid squadron profile");
+            squadronAssignments=Map.copyOf(squadronAssignments);
+            squadronProfiles=Map.copyOf(squadronProfiles);
+        }
+        public int squadronOf(long id){
+            get(id);
+            return squadronAssignments.getOrDefault(id,0);
+        }
+        public SquadronProfile profile(int group){
+            if(group<0||group>=SQUADRON_COUNT)
+                throw new IllegalArgumentException("Invalid squadron number");
+            return group==0?new SquadronProfile(style,radioTone):
+                    squadronProfiles.getOrDefault(group,new SquadronProfile(style,radioTone));
+        }
+        public FleetNames.Style namingFor(long shipId){return profile(squadronOf(shipId)).naming();}
+        public CrewChatter.Tone radioFor(long shipId){return profile(squadronOf(shipId)).radio();}
+        public Roster assignSquadron(long shipId,int group){
+            get(shipId);
+            if(group<0||group>=SQUADRON_COUNT)
+                throw new IllegalArgumentException("Invalid squadron group");
+            Map<Long,Integer> updated=new HashMap<>(squadronAssignments);
+            if(group==0)updated.remove(shipId);else updated.put(shipId,group);
+            return new Roster(faction,style,nextSerial,ships,namingSeed,radioTone,
+                    updated,squadronProfiles);
+        }
+        public Roster setSquadronProfile(int group,FleetNames.Style culture,
+                                         CrewChatter.Tone voice){
+            if(group<=0||group>=SQUADRON_COUNT)
+                throw new IllegalArgumentException("Only squads 1..7 have overrides");
+            var profile=new SquadronProfile(culture,voice);
+            Map<Integer,SquadronProfile> updated=new HashMap<>(squadronProfiles);
+            updated.put(group,profile);
+            return new Roster(faction,style,nextSerial,ships,namingSeed,radioTone,
+                    squadronAssignments,updated);
+        }
+        public List<Vessel> squadronShips(int group){
+            profile(group);
+            return ships.stream().filter(s->squadronOf(s.id())==group).toList();
         }
         public List<Vessel> active(){
             return ships.stream().filter(Vessel::deployed).toList();
@@ -148,15 +213,15 @@ public final class CampaignFleet {
                 throw new IllegalArgumentException("Mission fleet cap reached");
             List<Vessel> result=new ArrayList<>();
             for(Vessel v:ships)result.add(v.id()==id?v.active(selected):v);
-            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone,squadronAssignments,squadronProfiles);
         }
         public Roster changeStyle(FleetNames.Style desired){
             if(desired==null)throw new IllegalArgumentException("Name style required");
-            return new Roster(faction,desired,nextSerial,ships,namingSeed,radioTone);
+            return new Roster(faction,desired,nextSerial,ships,namingSeed,radioTone,squadronAssignments,squadronProfiles);
         }
         public Roster changeRadioTone(CrewChatter.Tone desired){
             if(desired==null)throw new IllegalArgumentException("Radio tone required");
-            return new Roster(faction,style,nextSerial,ships,namingSeed,desired);
+            return new Roster(faction,style,nextSerial,ships,namingSeed,desired,squadronAssignments,squadronProfiles);
         }
         public Roster rename(long id,String name){
             get(id); // A stale dock selection must never report a successful rename.
@@ -169,13 +234,13 @@ public final class CampaignFleet {
                     throw new IllegalArgumentException("Another commissioned ship already uses that name");
             List<Vessel> result=new ArrayList<>();
             for(Vessel v:ships)result.add(v.id()==id?v.withName(unique):v);
-            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone,squadronAssignments,squadronProfiles);
         }
         /** Regenerate a distinctive name without altering the sixteen-digit ID. */
         public Roster generateName(long id){
             Vessel selected=get(id);
             long rerollSeed=namingSeed^((long)selected.name().hashCode()*0xd1b54a32d192ed03L);
-            String generated=FleetNames.unique(style,rerollSeed,
+            String generated=FleetNames.unique(namingFor(id),rerollSeed,
                     VesselIdentifiers.serial(id),ships.stream().map(Vessel::name).toList());
             return rename(id,generated);
         }
@@ -193,7 +258,7 @@ public final class CampaignFleet {
                     ships.stream().map(Vessel::name).toList());
             result.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,nextSerial),uniqueName,
                     design,false,Stores.capture(newShip)));
-            return new Roster(faction,style,nextSerial+1,result,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial+1,result,namingSeed,radioTone,squadronAssignments,squadronProfiles);
         }
         public Roster afterBattle(Battle battle,List<Long> deployedIds){
             if(battle==null||deployedIds==null||active().size()!=deployedIds.size())
@@ -236,7 +301,11 @@ public final class CampaignFleet {
                 }
             }
             result.sort(java.util.Comparator.comparingLong(Vessel::id));
-            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
+            Set<Long> surviving=result.stream().map(Vessel::id).collect(java.util.stream.Collectors.toSet());
+            Map<Long,Integer> clean=new HashMap<>(squadronAssignments);
+            clean.keySet().retainAll(surviving);
+            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone,
+                    clean,squadronProfiles);
         }
         public Roster service(long id,Service category,TechnologyCatalog technology) {
             Vessel v=get(id);
@@ -263,7 +332,7 @@ public final class CampaignFleet {
             }
             ArrayList<Vessel> updated=new ArrayList<>(ships);
             updated.replaceAll(item->item.id()==id?item.withStores(Stores.capture(fitted)):item);
-            return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone,squadronAssignments,squadronProfiles);
         }
         /** Quote the complete dock job before debiting credits. All five services
          * are calculated from this vessel's actual fitted capacity and stores. */

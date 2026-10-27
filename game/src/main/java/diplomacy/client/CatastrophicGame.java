@@ -1567,6 +1567,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 owned.stores().apply(ship);
                 ship.name=owned.name();
                 ship.commissionedId=owned.id();
+                ship.squadronRadio=campaignFleet.radioFor(owned.id());
             }
         }
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
