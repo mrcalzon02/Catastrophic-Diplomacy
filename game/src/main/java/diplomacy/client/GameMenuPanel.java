@@ -124,6 +124,9 @@ final class GameMenuPanel {
             if(i==8){
                 if(hit(x,y,840,525-i*46,180,42))return 12; // generated rename
                 if(hit(x,y,1028,525-i*46,186,42))return 14; // manual rename
+            }else if(i==7){
+                if(hit(x,y,840,525-i*46,180,42))return 11; // name theme
+                if(hit(x,y,1028,525-i*46,186,42))return 17; // radio voice
             }else if(hit(x,y,840,525-i*46,374,42))return 4+i;
         }
         return -1;
@@ -242,7 +245,7 @@ final class GameMenuPanel {
                         button(shapes,45,521-i*43,746,38,index==dockSelected);
                     }
                 for(int i=0;i<10;i++){
-                    if(i==8){
+                    if(i==7||i==8){
                         button(shapes,840,525-i*46,180,42,false);
                         button(shapes,1028,525-i*46,186,42,false);
                     }else button(shapes,840,525-i*46,374,42,false);
@@ -418,7 +421,8 @@ final class GameMenuPanel {
                     label(batch,font,"<",573,592,Color.WHITE);
                     label(batch,font,">",670,592,Color.WHITE);
                     label(batch,font,"CREDITS: "+progress.credits(),842,609,Color.GOLD);
-                    label(batch,font,"NAME STYLE: "+ownedFleet.style(),842,581,MUTED);
+                    label(batch,font,"NAME STYLE: "+ownedFleet.style()+
+                            "  |  RADIO: "+ownedFleet.radioTone(),842,581,MUTED);
                     for(int i=0;i<9;i++){
                         int index=dockPage*9+i;
                         if(index>=ownedFleet.ships().size())break;
@@ -440,6 +444,9 @@ final class GameMenuPanel {
                         if(i==8){
                             label(batch,font,"GENERATE NAME",847,553-i*46,Color.WHITE);
                             label(batch,font,"MANUAL RENAME",1036,553-i*46,Color.WHITE);
+                        }else if(i==7){
+                            label(batch,font,"NAME THEME",847,553-i*46,Color.WHITE);
+                            label(batch,font,"RADIO VOICE",1036,553-i*46,Color.WHITE);
                         }else label(batch,font,names[i]+cost,847,553-i*46,
                                 (i==6||i==9)?Color.GOLD:Color.WHITE);
                     }
