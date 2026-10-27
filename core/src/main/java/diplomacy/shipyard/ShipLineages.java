@@ -69,6 +69,64 @@ public final class ShipLineages {
         };
         return new Lineage(generation,artwork,ethos,role);
     }
+    /**
+     * Build a role-specific FACTORY prototype using installed machinery.
+     * Legacy originals are unchanged for save compatibility. These are not
+     * implicit buffs: weapons/support must occupy real physical hardpoints.
+     * Players may refit any module subject to capacity and research checks.
+     */
+    public static Shipyard.Design prototype(Shipyard.Design standard){
+        if(standard==null)throw new IllegalArgumentException("Missing base fitting");
+        // The original eleven chassis are the unchanged save/replay baseline.
+        if(standard.hull.ordinal()<11)return standard;
+        String id="BASE-"+Shipyard.factionId(standard.faction)+"-";
+        Role role=of(standard.hull).role();
+        Shipyard.Design fitting=standard;
+        switch(role){
+            case FLAK_SCREEN -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,id+"PD");
+                fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+            }
+            case TORPEDO_STRIKER -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,id+"TOR");
+                fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                fitting=set(fitting,Shipyard.Mount.DEFENSE,0,null);
+            }
+            case ELECTRONIC_CONTROLLER -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
+                fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                fitting=set(fitting,Shipyard.Mount.SYSTEM,3,id+"ECM");
+            }
+            case REPAIR_TENDER -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
+                fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                fitting=set(fitting,Shipyard.Mount.SUPPORT,0,id+"REP");
+            }
+            case APEX_VANGUARD -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,id+"KIN");
+                // The ship retains a secondary missile battery and shield core.
+            }
+            case COMMAND_HUB -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
+                fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                fitting=set(fitting,Shipyard.Mount.SYSTEM,3,id+"ECM");
+            }
+            case LOGISTICS_JUGGERNAUT -> {
+                fitting=set(fitting,Shipyard.Mount.WEAPON,0,null);
+                fitting=set(fitting,Shipyard.Mount.WEAPON,1,null);
+                fitting=set(fitting,Shipyard.Mount.SUPPORT,0,id+"REP");
+            }
+        }
+        return fitting;
+    }
+    private static Shipyard.Design set(Shipyard.Design fitting,Shipyard.Mount kind,
+                                       int index,String component){
+        int n=0;
+        for(Shipyard.Slot slot:fitting.hull.slots)if(slot.mount()==kind){
+            if(n++==index)return fitting.install(slot.index(),component);
+        }
+        return fitting; // Some early hulls lack optional support/auxiliary sockets.
+    }
     public static List<Shipyard.Hull> generation(int number){
         if(number<1||number>10)throw new IllegalArgumentException("Generation must be 1..10");
         List<Shipyard.Hull> result=new ArrayList<>();
