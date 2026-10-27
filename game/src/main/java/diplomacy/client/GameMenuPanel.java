@@ -166,6 +166,8 @@ final class GameMenuPanel {
         if(current>0&&hit(x,y,700,368,505,51))return 2;
         if(current>0&&hit(x,y,700,290,505,51))return 3;
         if(hit(x,y,700,212,505,51))return 4;
+        if(hit(x,y,700,124,243,50))return 5; // mobilize complete group
+        if(hit(x,y,962,124,243,50))return 6; // stand down complete group
         return -1;
     }
     static int afterActionAction(float x,float y){
@@ -302,6 +304,8 @@ final class GameMenuPanel {
                     button(shapes,700,290,505,51,false);
                 }
                 button(shapes,700,212,505,51,false);
+                button(shapes,700,124,243,50,false);
+                button(shapes,962,124,243,50,false);
             }
             case NAME_THEMES -> {
                 rectangle(shapes,34,103,1212,510,PANEL);
@@ -539,7 +543,9 @@ final class GameMenuPanel {
                         var profile=ownedFleet.profile(group);
                         String title=group==0?"0  FLEET STANDARD":group+"  SQUADRON";
                         label(batch,font,title+"  |  "+
-                                ownedFleet.squadronShips(group).size()+" HULLS",
+                                ownedFleet.squadronShips(group).size()+" HULLS / "+
+                                ownedFleet.squadronShips(group).stream().filter(
+                                        CampaignFleet.Vessel::deployed).count()+" ACTIVE",
                                 63,554-group*55,
                                 group==selectedSquadron?Color.GOLD:Color.WHITE);
                         label(batch,font,shortLabel(profile.naming().name()+" / "+
@@ -560,8 +566,11 @@ final class GameMenuPanel {
                         label(batch,font,"CYCLE GROUP RADIO VOICE",718,321,Color.WHITE);
                     }else label(batch,font,"Group 0 uses the fleet defaults",718,381,MUTED);
                     label(batch,font,"GENERATE NAME IN ASSIGNED GROUP",718,243,Color.WHITE);
-                    label(batch,font,"Assignments persist through repairs and reserve",
-                            694,169,MUTED);
+                    label(batch,font,"Squadron mobilization obeys the mission fleet cap",
+                            700,194,MUTED);
+                    label(batch,font,"ACTIVATE GROUP",715,154,Color.WHITE);
+                    label(batch,font,"RESERVE GROUP",978,154,Color.WHITE);
+                    label(batch,font,shortLabel(dockNotice,57),700,103,Color.CYAN);
                 }
                 label(batch,font,"BACK TO DOCK",63,69,Color.WHITE);
             }

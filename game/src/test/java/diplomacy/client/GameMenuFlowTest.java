@@ -56,6 +56,13 @@ public final class GameMenuFlowTest {
                 "Squadron voice control inert");
         check(GameMenuPanel.squadronAction(800,239,3)==4,
                 "Squadron naming action inert");
+        check(GameMenuPanel.squadronAction(820,148,3)==5,
+                "Activate squadron touch control missing");
+        check(GameMenuPanel.squadronAction(1080,148,3)==6,
+                "Reserve squadron touch control missing");
+        check(GameMenuPanel.squadronAction(950,148,3)==-1&&
+                GameMenuPanel.squadronAction(820,195,3)==-1,
+                "Squadron mobilization buttons overlap or spill into inactive space");
         check(GameMenuPanel.squadronAction(800,395,0)==-1&&
                 GameMenuPanel.squadronAction(800,315,0)==-1,
                 "Inherited fleet defaults must not expose editable overrides");

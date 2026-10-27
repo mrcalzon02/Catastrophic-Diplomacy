@@ -41,6 +41,30 @@ public final class SquadronOperationsTest {
                 "Squadron naming or voice overrides leaked into other groups");
         check(groups.squadronShips(1).size()==2&&groups.squadronShips(2).size()==1,
                 "Squadron selection used tactical slot instead of ship ID");
+
+        // Squadron deployment is atomic: cap rejection cannot strand part
+        // of a commissioned group in ACTIVE while the remainder stays home.
+        var stoodDown=groups.setSquadronActive(1,false,20);
+        check(!stoodDown.get(first).deployed()&&!stoodDown.get(second).deployed()&&
+                        stoodDown.get(third).deployed()&&stoodDown.get(fourth).deployed(),
+                "Standing down a squadron altered another active group");
+        reject(()->stoodDown.setSquadronActive(1,true,3),
+                "Squadron activated partially across the mission fleet cap");
+        check(!stoodDown.get(first).deployed()&&!stoodDown.get(second).deployed(),
+                "Failed squadron activation mutated original fleet");
+        var remobilized=stoodDown.setSquadronActive(1,true,4);
+        check(remobilized.active().size()==4&&remobilized.get(first).id()==first&&
+                        remobilized.get(second).id()==second,
+                "Squadron activation did not retain 16-digit hull identities");
+        var defaultReserve=remobilized.setSquadronActive(0,false,4);
+        check(!defaultReserve.get(fourth).deployed()&&
+                        defaultReserve.get(first).deployed()&&
+                        defaultReserve.get(third).deployed(),
+                "Group zero must stand down only inherited-group ships");
+        reject(()->groups.setSquadronActive(7,true,20),
+                "Empty squadron should not claim successful mobilization");
+        reject(()->groups.setSquadronActive(8,false,20),
+                "Invalid squadron group accepted for reserve movement");
         check(groups.get(first).id()==first,
                 "Assigning a squadron mutated permanent 16-digit vessel identity");
         String before=groups.get(first).name();

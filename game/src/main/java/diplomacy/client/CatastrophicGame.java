@@ -243,6 +243,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.N)editSquadron(2);
                         if(key==Input.Keys.V)editSquadron(3);
                         if(key==Input.Keys.R)editSquadron(4);
+                        if(key==Input.Keys.D)editSquadron(5);
+                        if(key==Input.Keys.B)editSquadron(6);
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.NAME_THEMES){
@@ -769,6 +771,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void openSquadrons(){
         if(campaignFleet==null||campaignFleet.ships().isEmpty())return;
         selectedSquadron=campaignFleet.squadronOf(dockShipId());
+        dockNotice="Select a squadron to assign, activate or reserve commissioned ships.";
         screen=GameMenuPanel.Screen.SQUADRONS;
     }
     private void editSquadron(int action){
@@ -800,6 +803,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(!commitCampaign(campaign,campaignFleet.generateName(shipId)))return;
                     dockNotice="Renamed "+campaignFleet.get(shipId).name()+
                             " using its assigned squadron culture.";
+                }
+                case 5,6 -> {
+                    boolean activate=action==5;
+                    int mission=selectedMission<=campaign.unlocked()?selectedMission:campaign.unlocked();
+                    int cap=LevelEconomy.level(mission).maximumFleet();
+                    var updated=campaignFleet.setSquadronActive(selectedSquadron,activate,cap);
+                    if(!commitCampaign(campaign,updated))return;
+                    dockNotice="Squadron "+selectedSquadron+(activate?" activated.":" moved to reserve.")+
+                            " Active: "+campaignFleet.active().size()+" / "+cap+" mission slots.";
+                    Gdx.app.log("CD-GAME-FLOW","SQUADRON_DEPLOY "+selectedSquadron+
+                            " active="+activate+" cap="+cap);
                 }
                 default -> {}
             }

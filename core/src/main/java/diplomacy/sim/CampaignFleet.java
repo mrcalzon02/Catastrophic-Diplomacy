@@ -215,6 +215,27 @@ public final class CampaignFleet {
             for(Vessel v:ships)result.add(v.id()==id?v.active(selected):v);
             return new Roster(faction,style,nextSerial,result,namingSeed,radioTone,squadronAssignments,squadronProfiles);
         }
+
+        /** Mobilize or stand down a commissioned squadron as one roster edit.
+         * The cap check precedes any change, so partially mobilized groups
+         * can never be persisted. */
+        public Roster setSquadronActive(int group,boolean selected,int cap){
+            profile(group);
+            if(cap<1||cap>200)throw new IllegalArgumentException("Invalid deployment cap");
+            List<Vessel> members=squadronShips(group);
+            if(members.isEmpty())throw new IllegalArgumentException("Squadron has no commissioned ships");
+            if(selected){
+                long additions=members.stream().filter(v->!v.deployed()).count();
+                if(active().size()+additions>cap)
+                    throw new IllegalArgumentException("Squadron exceeds mission fleet cap");
+            }
+            List<Vessel> updated=new ArrayList<>(ships.size());
+            for(Vessel vessel:ships)
+                updated.add(squadronAssignments.getOrDefault(vessel.id(),0)==group?
+                        vessel.active(selected):vessel);
+            return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone,
+                    squadronAssignments,squadronProfiles);
+        }
         public Roster changeStyle(FleetNames.Style desired){
             if(desired==null)throw new IllegalArgumentException("Name style required");
             return new Roster(faction,desired,nextSerial,ships,namingSeed,radioTone,squadronAssignments,squadronProfiles);
