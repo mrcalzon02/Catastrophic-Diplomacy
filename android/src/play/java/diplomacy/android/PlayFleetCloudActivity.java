@@ -23,6 +23,8 @@ import java.nio.file.StandardCopyOption;
  * overwrite of another device's fleet. Restore retains an on-device rollback.
  */
 public final class PlayFleetCloudActivity extends AndroidLauncher {
+    @Override protected boolean allowSideloadUpdater() { return false; }
+
     private static final String SLOT = "catastrophic-diplomacy-fleets-v1";
     private static final int LIMIT_BYTES = 65000;
     private Button cloudButton;
