@@ -548,6 +548,23 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE "+service+" ship="+id+" credits="+price);
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
     }
+    private void dockServiceAll(){
+        try{
+            int id=dockShipId();
+            long quote=campaignFleet.costAll(id,technology);
+            if(quote==0){
+                dockNotice="Ship #"+id+" requires no dock services.";
+                return;
+            }
+            // Both proposed values are computed before mutating either live state.
+            CampaignProgress.State debited=campaign.spend(quote);
+            CampaignFleet.Roster serviced=campaignFleet.serviceAll(id,technology);
+            campaignFleet=serviced;campaign=debited;
+            saveCampaignFleet();saveCampaign();
+            dockNotice="All services for ship #"+id+" charged "+quote+" credits.";
+            Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE_ALL ship="+id+" credits="+quote);
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
     private void dockPurchase(){
         try{
             long price=CampaignFleet.purchaseCost(leftDesign);
@@ -594,6 +611,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 8 -> dockService(CampaignFleet.Service.FUEL);
             case 9 -> dockService(CampaignFleet.Service.CRAFT);
             case 10 -> dockPurchase();
+            case 13 -> dockServiceAll();
             case 11 -> {
                 var styles=FleetNames.Style.values();
                 campaignFleet=campaignFleet.changeStyle(styles[(campaignFleet.style().ordinal()+1)%styles.length]);
