@@ -78,6 +78,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private String researchNotice="Research licenses are purchased with campaign credits.";
     private final java.util.List<Long> campaignSortie=new java.util.ArrayList<>();
     private int dockPage,dockSelected;
+    private int themePage;
+    private FleetNames.Style themeCandidate=FleetNames.Style.NAVAL;
     private String dockNotice="Select ships for active duty or reserve and service them individually.";
     private static final String CAMPAIGN_BLUEPRINT_FILE="campaign/purchase-blueprint-v1.dat";
     private static final String ROSTER_FILE="campaign/fleet-roster-v1.dat";
@@ -214,6 +216,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
                         else if(screen==GameMenuPanel.Screen.RESEARCH)screen=researchReturn;
+                        else if(screen==GameMenuPanel.Screen.NAME_THEMES)
+                            screen=GameMenuPanel.Screen.DOCK;
                         else if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
                             screen=GameMenuPanel.Screen.DEPLOYMENT;waitingForWaypoint=false;
                         }else if(screen==GameMenuPanel.Screen.DEPLOYMENT)
@@ -224,6 +228,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(screen==GameMenuPanel.Screen.HOME){
                         if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_6)
                             tapFrontEnd(610,512-(key-Input.Keys.NUM_1)*64);
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.NAME_THEMES){
+                        if(key==Input.Keys.ENTER)applyNameTheme();
+                        else if(key==Input.Keys.LEFT||key==Input.Keys.PAGE_UP)
+                            themePage=Math.max(0,themePage-1);
+                        else if(key==Input.Keys.RIGHT||key==Input.Keys.PAGE_DOWN)
+                            themePage=Math.min(GameMenuPanel.nameThemePages()-1,themePage+1);
+                        else if(key==Input.Keys.UP||key==Input.Keys.DOWN){
+                            int ordinal=Math.max(0,Math.min(FleetNames.Style.values().length-1,
+                                    themeCandidate.ordinal()+(key==Input.Keys.UP?-1:1)));
+                            themeCandidate=FleetNames.Style.values()[ordinal];
+                            themePage=ordinal/GameMenuPanel.NAME_THEME_PAGE_SIZE;
+                        }
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.RESEARCH){
@@ -708,6 +726,37 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-GAME-FLOW","ROSTER ship="+id+" "+(active?"ACTIVE":"RESERVE"));
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
     }
+    private void openNameThemes(){
+        if(campaignFleet==null)return;
+        themeCandidate=campaignFleet.style();
+        themePage=themeCandidate.ordinal()/GameMenuPanel.NAME_THEME_PAGE_SIZE;
+        screen=GameMenuPanel.Screen.NAME_THEMES;
+    }
+    private void applyNameTheme(){
+        if(campaignFleet==null){screen=GameMenuPanel.Screen.DOCK;return;}
+        if(themeCandidate!=campaignFleet.style()&&
+                !commitCampaign(campaign,campaignFleet.changeStyle(themeCandidate)))return;
+        dockNotice="Naming culture: "+campaignFleet.style()+
+                ". Existing ship names and sixteen-digit IDs remain unchanged.";
+        screen=GameMenuPanel.Screen.DOCK;
+    }
+    private void nameThemeInput(int action){
+        if(action>=100){
+            int index=action-100;
+            if(index<FleetNames.Style.values().length&&index>=0){
+                themeCandidate=FleetNames.Style.values()[index];
+                themePage=index/GameMenuPanel.NAME_THEME_PAGE_SIZE;
+            }
+            return;
+        }
+        switch(action){
+            case 0 -> screen=GameMenuPanel.Screen.DOCK;
+            case 1 -> themePage=Math.max(0,themePage-1);
+            case 2 -> themePage=Math.min(GameMenuPanel.nameThemePages()-1,themePage+1);
+            case 3 -> applyNameTheme();
+            default -> {}
+        }
+    }
     private void dockInput(int action){
         if(action>=100){
             dockSelected=action-100;
@@ -741,14 +790,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 dockNotice="Fleet communications set to "+campaignFleet.radioTone()+
                         ". Applies to the next engagement.";
             }
-            case 11 -> {
-                var styles=FleetNames.Style.values();
-                if(!commitCampaign(campaign,campaignFleet.changeStyle(
-                        styles[(campaignFleet.style().ordinal()+1)%styles.length])))return;
-                dockNotice="NAME THEME: "+campaignFleet.style()+" | Next example: "+
-                        FleetNames.generate(campaignFleet.style(),
-                                campaignFleet.namingSeed(),campaignFleet.nextSerial());
-            }
+            case 11 -> openNameThemes();
             case 12 -> {
                 try{
                     long id=dockShipId();
@@ -1062,6 +1104,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,592,35,294,54)){
                 startResearch(CampaignProgress.Project.ACCELERATOR);return;
             }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.NAME_THEMES){
+            nameThemeInput(GameMenuPanel.nameThemeAction(x,y,themePage));
             return;
         }
         if(screen==GameMenuPanel.Screen.DOCK){
@@ -1563,7 +1609,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
-                    afterActionPage);
+                    afterActionPage,themePage,themeCandidate);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());

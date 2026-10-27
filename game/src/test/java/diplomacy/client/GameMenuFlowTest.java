@@ -40,6 +40,31 @@ public final class GameMenuFlowTest {
                 "Campaign dock shipyard must have a real selectable control");
         check(GameMenuPanel.dockAction(620,60,0,4)==16,
                 "Purchased research must have an independently clickable ledger");
+        check(GameMenuPanel.Screen.valueOf("NAME_THEMES")!=null,
+                "Naming cultures must have their own native menu");
+        check(GameMenuPanel.nameThemePages()==3,"38 themes should occupy 3 pages");
+        for(int ordinal=0;ordinal<diplomacy.sim.FleetNames.Style.values().length;ordinal++){
+            int page=ordinal/GameMenuPanel.NAME_THEME_PAGE_SIZE;
+            int slot=ordinal%GameMenuPanel.NAME_THEME_PAGE_SIZE;
+            int col=slot/7,row=slot%7;
+            check(GameMenuPanel.nameThemeAction(75+col*604,540-row*55,page)==100+ordinal,
+                    "Naming culture "+ordinal+" is not selectable");
+            check(GameMenuPanel.nameThemeAt(page,slot)==
+                    diplomacy.sim.FleetNames.Style.values()[ordinal],
+                    "Naming page/ordinal mismatch");
+        }
+        check(GameMenuPanel.nameThemeAt(2,10)==null,
+                "Empty final-page cells should not render nonexistent styles");
+        check(GameMenuPanel.nameThemeAction(480,62,0)==2,"Next theme page inert");
+        check(GameMenuPanel.nameThemeAction(310,62,1)==1,"Previous theme page inert");
+        check(GameMenuPanel.nameThemeAction(480,62,2)==-1,
+                "Final theme page must not expose next");
+        check(GameMenuPanel.nameThemeAction(310,62,0)==-1,
+                "First theme page must not expose previous");
+        check(GameMenuPanel.nameThemeAction(1000,62,2)==3,"Apply theme inert");
+        check(GameMenuPanel.nameThemeAction(75,62,1)==0,"Cancel theme inert");
+        check(GameMenuPanel.nameThemeAction(900,300,2)==-1,
+                "Empty selector area should not accidentally select a theme");
         check(GameMenuPanel.Screen.valueOf("RESEARCH")!=null,
                 "Paid research view missing");
         check(GameMenuPanel.dockAction(587,585,0,4)==2,"Previous roster page is inert");

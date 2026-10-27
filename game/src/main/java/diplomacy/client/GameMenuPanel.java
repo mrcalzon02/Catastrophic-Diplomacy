@@ -10,6 +10,7 @@ import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.CampaignAfterAction;
+import diplomacy.sim.FleetNames;
 import diplomacy.sim.ShipStandingOrders;
 import java.util.Set;
 import diplomacy.sim.LevelEconomy;
@@ -20,7 +21,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -132,6 +133,29 @@ final class GameMenuPanel {
         return -1;
     }
     /** Disjoint paging controls on the large commissioned-vessel report. */
+    static final int NAME_THEME_PAGE_SIZE=14;
+    static int nameThemePages(){
+        return (FleetNames.Style.values().length+NAME_THEME_PAGE_SIZE-1)/NAME_THEME_PAGE_SIZE;
+    }
+    static FleetNames.Style nameThemeAt(int page,int slot){
+        int index=page*NAME_THEME_PAGE_SIZE+slot;
+        if(page<0||page>=nameThemePages()||slot<0||slot>=NAME_THEME_PAGE_SIZE||
+                index>=FleetNames.Style.values().length)return null;
+        return FleetNames.Style.values()[index];
+    }
+    /** 100+ordinal previews a style, zero cancels, three applies to the fleet. */
+    static int nameThemeAction(float x,float y,int page){
+        if(hit(x,y,35,35,196,55))return 0;
+        if(page>0&&hit(x,y,256,35,163,55))return 1;
+        if(page<nameThemePages()-1&&hit(x,y,440,35,163,55))return 2;
+        if(hit(x,y,945,35,290,55))return 3;
+        for(int col=0;col<2;col++)for(int row=0;row<7;row++){
+            FleetNames.Style style=nameThemeAt(page,col*7+row);
+            if(style!=null&&hit(x,y,52+col*604,515-row*55,565,47))
+                return 100+style.ordinal();
+        }
+        return -1;
+    }
     static int afterActionAction(float x,float y){
         if(hit(x,y,825,253,160,44))return -1;
         if(hit(x,y,1011,253,165,44))return 1;
@@ -165,7 +189,8 @@ final class GameMenuPanel {
               long purchaseCost,String dockNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
-              int withdrawing,CampaignAfterAction.Report report,int reportPage){
+              int withdrawing,CampaignAfterAction.Report report,int reportPage,
+               int themePage,FleetNames.Style themeCandidate){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,W,H,BG);
         // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
@@ -250,6 +275,20 @@ final class GameMenuPanel {
                         button(shapes,1028,525-i*46,186,42,false);
                     }else button(shapes,840,525-i*46,374,42,false);
                 }
+            }
+            case NAME_THEMES -> {
+                rectangle(shapes,34,103,1212,510,PANEL);
+                rectangle(shapes,45,108,1190,80,SELECT);
+                for(int col=0;col<2;col++)for(int row=0;row<7;row++){
+                    FleetNames.Style style=nameThemeAt(themePage,col*7+row);
+                    if(style!=null)
+                        button(shapes,52+col*604,515-row*55,565,47,
+                                style==themeCandidate);
+                }
+                button(shapes,35,35,196,55,false);
+                if(themePage>0)button(shapes,256,35,163,55,false);
+                if(themePage<nameThemePages()-1)button(shapes,440,35,163,55,false);
+                button(shapes,945,35,290,55,true);
             }
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
@@ -457,6 +496,36 @@ final class GameMenuPanel {
                 label(batch,font,"RESEARCH",570,67,Color.WHITE);
                 label(batch,font,"DEPLOY ACTIVE FLEET",1002,67,Color.WHITE);
                 label(batch,font,dockNotice,45,112,Color.CYAN);
+            }
+            case NAME_THEMES -> {
+                title(batch,font,"SHIP NAMING TRADITIONS",
+                        "SELECT A CULTURE, PREVIEW TWO SHIPS, THEN APPLY TO FUTURE NAMES");
+                label(batch,font,"PAGE "+(themePage+1)+" / "+nameThemePages()+
+                        "  |  "+FleetNames.Style.values().length+" AVAILABLE THEMES",
+                        52,586,Color.CYAN);
+                for(int col=0;col<2;col++)for(int row=0;row<7;row++){
+                    FleetNames.Style style=nameThemeAt(themePage,col*7+row);
+                    if(style==null)continue;
+                    String status=ownedFleet!=null&&style==ownedFleet.style()?"  [ACTIVE]":
+                            style==themeCandidate?"  [PREVIEW]":"";
+                    label(batch,font,style.name().replace('_',' ')+status,
+                            73+col*604,544-row*55,
+                            style==themeCandidate?Color.GOLD:Color.WHITE);
+                }
+                label(batch,font,"PREVIEW: "+themeCandidate.name().replace('_',' '),
+                        65,168,Color.GOLD);
+                if(ownedFleet!=null){
+                    label(batch,font,shortLabel(FleetNames.generate(themeCandidate,
+                            ownedFleet.namingSeed(),ownedFleet.nextSerial()),73),
+                            66,144,Color.WHITE);
+                    label(batch,font,shortLabel(FleetNames.generate(themeCandidate,
+                            ownedFleet.namingSeed(),ownedFleet.nextSerial()+1),73),
+                            66,119,MUTED);
+                }
+                label(batch,font,"CANCEL",73,69,Color.WHITE);
+                if(themePage>0)label(batch,font,"PREVIOUS",270,69,Color.WHITE);
+                if(themePage<nameThemePages()-1)label(batch,font,"NEXT PAGE",456,69,Color.WHITE);
+                label(batch,font,"APPLY THEME",990,69,Color.WHITE);
             }
             case DEPLOYMENT -> {
                 LevelEconomy.Level stage=preparingCampaign?LevelEconomy.level(selectedLevel):null;
