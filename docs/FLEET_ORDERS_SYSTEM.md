@@ -157,3 +157,11 @@ reward exclusion. No screenshot/cosmetic release gates are introduced.
 Still to develop: post-mission repairs, preserved per-vessel campaign roster,
 salvage/insurance, additional combat doctrine conditions and enemy retreat
 rout AI. Escape alone does not imply a repaired ship in the next scenario.
+
+An important mid-extraction resolution rule is enforced: ships **committed to
+withdrawal but not yet across the boundary** are counted in
+`Battle.withdrawing(side)`, not `Battle.engaged(side)`, and are excluded from
+victory survivor rewards even if the final hostile hull is destroyed before
+they reach safety. The results page explicitly labels all three ship states.
+A final committed withdrawal concedes the mission even if the enemy is
+destroyed at the same moment.

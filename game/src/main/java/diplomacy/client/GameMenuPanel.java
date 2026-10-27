@@ -130,7 +130,8 @@ final class GameMenuPanel {
               boolean preparingCampaign,int standingPage,boolean selectingGroup,
               Set<Integer> doctrineGroup,boolean awaitingWaypoint,String editNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
-              boolean won,long reward,int surviving,int deployed,int escaped,int destroyed){
+              boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
+              int withdrawing){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,W,H,BG);
         // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
@@ -371,12 +372,13 @@ final class GameMenuPanel {
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");
                 label(batch,font,won?"MISSION ACCOMPLISHED":
-                        escaped>0&&surviving==0?"FLEET WITHDREW":"FLEET DEFEATED",
+                        escaped+withdrawing>0&&surviving==0?"FLEET WITHDREW":"FLEET DEFEATED",
                         416,494,won?Color.GREEN:Color.SCARLET);
-                label(batch,font,"ACTIVE SURVIVORS: "+surviving+" / "+deployed,416,444,Color.WHITE);
-                label(batch,font,"ESCAPED SHIPS: "+escaped+" (NO VICTORY CREDIT)",416,408,Color.CYAN);
-                label(batch,font,"DESTROYED HULLS: "+destroyed,416,372,Color.WHITE);
-                label(batch,font,"CREDITS AWARDED: "+reward,416,326,Color.GOLD);
+                label(batch,font,"ACTIVE SURVIVORS: "+surviving+" / "+deployed,416,448,Color.WHITE);
+                label(batch,font,"WITHDRAWING: "+withdrawing+" (NOT SURVIVORS)",416,412,Color.CYAN);
+                label(batch,font,"ESCAPED SHIPS: "+escaped+" (NO VICTORY CREDIT)",416,380,Color.CYAN);
+                label(batch,font,"DESTROYED HULLS: "+destroyed,416,348,Color.WHITE);
+                label(batch,font,"CREDITS AWARDED: "+reward,416,312,Color.GOLD);
                 label(batch,font,"RETRY",423,157,Color.WHITE);
                 label(batch,font,"RETURN TO "+(progress!=null?"CAMPAIGN":"SKIRMISH"),699,157,Color.WHITE);
             }

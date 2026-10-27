@@ -65,7 +65,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private CampaignProgress.State campaign;
     private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
-    private int deployedAtLaunch,survivorsAtEnd,escapedAtEnd,destroyedAtEnd;
+    private int deployedAtLaunch,survivorsAtEnd,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd;
     private CampaignEncounter campaignEncounter;
     private CampaignDeployment.Loadout deployment=CampaignDeployment.defaultFor(LevelEconomy.level(1));
     private int selectedDeploymentShip;
@@ -663,8 +663,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_BATTLE "+activeMission+" "+deployment.ships()+" "+deployment.formation());
     }
     private void finishEngagement(){
-        lastWon=battle.alive(0)>0&&battle.alive(1)==0;
-        survivorsAtEnd=battle.alive(0);
+        lastWon=battle.engaged(0)>0&&battle.alive(1)==0;
+        survivorsAtEnd=battle.engaged(0);
+        withdrawingAtEnd=battle.withdrawing(0);
         escapedAtEnd=battle.escaped(0);
         destroyedAtEnd=battle.destroyed(0);
         lastReward=0;
@@ -1103,7 +1104,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     preparingCampaign,standingPage,selectingDoctrineGroup,doctrineGroup,
                     waitingForWaypoint,deploymentNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
-                    survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd);
+                    survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
@@ -1325,7 +1326,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 + "   " + renderer + "   " + saveState, 22, 38);
         if (battle.finished()) {
             font.setColor(Color.GOLD);
-            font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.alive(0) > 0 ? left.displayName : right.displayName)
+            font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.engaged(0) > 0 ? left.displayName : right.displayName)
                     + " HOLDS THE FIELD", 330, 617);
         }
         batch.end();

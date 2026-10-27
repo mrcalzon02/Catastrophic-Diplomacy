@@ -72,7 +72,9 @@ public final class CampaignEncounter {
      * The same Battle instance is retained across reinforcements; it is never reset.
      */
     public Advance advance(){
-        if(battle.alive(0)==0)return Advance.DEFEAT;
+        // Retreating captains have already surrendered field control, even
+        // if their engines have not carried them over the rear line yet.
+        if(battle.engaged(0)==0)return Advance.DEFEAT;
         if(battle.alive(1)>0)return Advance.ACTIVE;
         if(wave==level.waves())return Advance.VICTORY;
         wave++;

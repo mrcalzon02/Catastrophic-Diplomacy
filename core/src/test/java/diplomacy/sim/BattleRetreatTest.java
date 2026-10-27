@@ -45,7 +45,13 @@ public final class BattleRetreatTest {
         right.x=1238;right.y=320;
         rightBattle.setShipStandingOrders(right.id,
                 new ShipStandingOrders(BattleOrders.DEFAULT,50,50,70));
-        right.shields=right.maxShields*.5;
+        right.defense.disruptShields(right.maxShields*.7);
+        right.shields=right.defense.totalShields();
+        ok(right.shields<right.maxShields*.7,
+                "Directional shields were not actually drained for escape test");
+        rightBattle.step();
+        ok(right.withdrawing&&right.withdrawalTick==1,
+                "Actual shield-loss threshold did not initiate first-tick withdrawal");
         escapes(rightBattle,right,800);
         ok(rightBattle.escaped(1)==1&&rightBattle.destroyed(1)==0&&rightBattle.alive(0)==1,
                 "Right-side shield withdrawal failed");
@@ -71,7 +77,7 @@ public final class BattleRetreatTest {
         Battle.Ship casualty=combat.ships().get(0);
         casualty.hull=casualty.maxHull*.4;
         escapes(combat,casualty,800);
-        ok(combat.alive(0)==1&&combat.escaped(0)==1,
+        ok(combat.alive(0)==1&&combat.escaped(0)==1&&combat.engaged(0)==1,
                 "Escaped hull incorrectly remains in campaign survivors");
         for(int wave=1;wave<=encounter.waves();wave++){
             for(Battle.Ship hostile:combat.ships())if(hostile.team==1)hostile.hull=0;
@@ -84,6 +90,20 @@ public final class BattleRetreatTest {
                 <LevelEconomy.victoryCredits(LevelEconomy.level(1),2,2,true),
                 "Evacuated hull incorrectly received survivor credit");
 
+        // If the last active captain is only still INSIDE the field while
+        // retreating, a just-destroyed enemy is not a free mission victory.
+        CampaignEncounter unearned=CampaignEncounter.start(1,
+                new CampaignDeployment.Loadout(1,CampaignDeployment.Formation.LINE)
+                        .withPlacement(0,75,350).withStanding(0,hullPolicy(.85)),
+                ally,enemy,catalog);
+        Battle lastFight=unearned.battle();
+        lastFight.ships().get(0).hull=lastFight.ships().get(0).maxHull*.4;
+        lastFight.step();
+        ok(lastFight.alive(0)==1&&lastFight.engaged(0)==0&&lastFight.withdrawing(0)==1,
+                "Retreating ship falsely classified as field-holding");
+        for(Battle.Ship foe: lastFight.ships())if(foe.team==1)foe.hull=0;
+        ok(unearned.advance()==CampaignEncounter.Advance.DEFEAT,
+                "Committed but not-yet-escaped retreat wrongly earned victory");
         CampaignEncounter withdrawn=CampaignEncounter.start(1,
                 new CampaignDeployment.Loadout(1,CampaignDeployment.Formation.LINE)
                         .withStanding(0,hullPolicy(.85)),ally,enemy,catalog);

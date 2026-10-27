@@ -601,6 +601,20 @@ public final class Battle {
         return new double[]{x,y};
     }
     public int alive(int team) { int count = 0; for (Ship s : ships) if (s.team == team && s.alive()) count++; return count; }
+    /** Active captains still committed to holding the field. Withdrawing but
+     * not-yet-escaped hulls cannot receive survivor rewards. */
+    public int engaged(int team){
+        checkTeam(team);
+        int count=0;
+        for(Ship ship:ships)if(ship.team==team&&ship.alive()&&!ship.withdrawing)count++;
+        return count;
+    }
+    public int withdrawing(int team){
+        checkTeam(team);
+        int count=0;
+        for(Ship ship:ships)if(ship.team==team&&ship.alive()&&ship.withdrawing)count++;
+        return count;
+    }
     /** Successfully escaped, still-intact hulls; not active mission survivors. */
     public int escaped(int team) {
         checkTeam(team);
