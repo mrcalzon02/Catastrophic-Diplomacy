@@ -132,8 +132,16 @@ public final class CampaignFleet {
             return new Roster(faction,desired,nextId,ships);
         }
         public Roster rename(int id,String name){
+            get(id); // A stale dock selection must never report a successful rename.
+            if(name==null||name.trim().isEmpty()||name.trim().length()>70||
+                    name.codePoints().anyMatch(Character::isISOControl))
+                throw new IllegalArgumentException("Ship name must contain 1–70 printable characters");
+            String unique=name.trim();
+            for(Vessel v:ships)
+                if(v.id()!=id&&v.name().equalsIgnoreCase(unique))
+                    throw new IllegalArgumentException("Another commissioned ship already uses that name");
             List<Vessel> result=new ArrayList<>();
-            for(Vessel v:ships)result.add(v.id()==id?v.withName(name):v);
+            for(Vessel v:ships)result.add(v.id()==id?v.withName(unique):v);
             return new Roster(faction,style,nextId,result);
         }
         public Roster purchase(Shipyard.Design design,TechnologyCatalog technology) {
