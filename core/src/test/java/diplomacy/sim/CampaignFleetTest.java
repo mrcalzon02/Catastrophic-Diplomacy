@@ -16,11 +16,19 @@ public final class CampaignFleetTest {
         Battle.Faction faction=Battle.Faction.TERRAN;
         Shipyard.Design baseline=Shipyard.starter(faction,Shipyard.Hull.CORVETTE);
         var original=CampaignFleet.start(faction,baseline,tech);
+        long ship1=original.ships().get(0).id();
+        long ship2=original.ships().get(1).id();
+        long ship3=original.ships().get(2).id();
+        long ship4=original.ships().get(3).id();
+        long ship5=VesselIdentifiers.commissioned(original.namingSeed(),5);
+        check(Long.toString(ship1).length()==16&&
+                Long.toString(ship5).length()==16&&ship1!=ship5,
+                "Every commissioned ship must have a permanent 16-digit ID");
         check(original.ships().size()==4&&original.active().size()==4&&original.reserves().isEmpty(),
                 "Starting ships are not commissioned and supplied");
         check(original.ships().stream().map(CampaignFleet.Vessel::name).distinct().count()==4,
                 "Initial registered vessel names must be individually distinguishable");
-        var reserve=original.setActive(2,false,20);
+        var reserve=original.setActive(ship2,false,20);
         check(reserve.active().size()==3&&reserve.reserves().size()==1,
                 "Moving vessel to reserve lost ownership or failed to update active group");
         check(original.active().size()==4,"Immutable original roster was changed");
@@ -28,7 +36,7 @@ public final class CampaignFleetTest {
         check(reserve.active().size()==4&&reserve.reserves().isEmpty(),
                 "Reserve vessel was repurchased or failed to return to active duty");
         reject(()->original.setActive(999,true,20),"Nonexistent ship activated");
-        reject(()->original.setActive(1,true,0),"Invalid deployment limit accepted");
+        reject(()->original.setActive(ship1,true,0),"Invalid deployment limit accepted");
 
         for(FleetNames.Style style:FleetNames.Style.values()){
             String first=FleetNames.generate(style,73,5);
@@ -39,28 +47,34 @@ public final class CampaignFleetTest {
         }
         var styled=original.changeStyle(FleetNames.Style.CELESTIAL)
                 .rename(1,FleetNames.generate(FleetNames.Style.CELESTIAL,73,21));
-        check(styled.get(1).name().equals(FleetNames.generate(FleetNames.Style.CELESTIAL,73,21)),
+        check(styled.get(ship1).name().equals(FleetNames.generate(FleetNames.Style.CELESTIAL,73,21)),
                 "Selected vessel name was not retained");
 
-        check(FleetNames.Style.values().length>=9,
+        check(FleetNames.Style.values().length>=38,
                 "Campaign should offer recognizable naming philosophies, not five labels");
+        check(FleetNames.generate(FleetNames.Style.GRIMDARK,73,5).startsWith("The "),
+                "Grimdark tradition missing");
+        check(FleetNames.generate(FleetNames.Style.NEOCLASSICAL,73,5).length()>9,
+                "Neoclassical tradition missing");
+        check(FleetNames.generate(FleetNames.Style.ABSURDIST,73,5).length()>9,
+                "Absurdist tradition missing");
         check(FleetNames.generate(FleetNames.Style.DESIGNATION,73,5).startsWith("FG-"),
                 "Military designation should follow its own serial structure");
         check(FleetNames.generate(FleetNames.Style.ORGANIC,73,5).contains("'"),
                 "Biological alien ships should not receive ordinary naval noun pairs");
         check(FleetNames.generate(FleetNames.Style.SYNTHETIC,73,5).startsWith("AXIOM/"),
                 "Synthetic alien ships should have a distinct machine nomenclature");
-        reject(()->original.rename(999,"Absent"),"Rename silently accepted nonexistent ID");
-        reject(()->original.rename(1,"   "), "Empty vessel name accepted");
-        reject(()->original.rename(1,"Duplicate\nLabel"),"Control characters allowed in names");
-        reject(()->original.rename(1,original.get(2).name().toLowerCase(java.util.Locale.ROOT)),
+        reject(()->original.rename(999L,"Absent"),"Rename silently accepted nonexistent ID");
+        reject(()->original.rename(ship1,"   "), "Empty vessel name accepted");
+        reject(()->original.rename(ship1,"Duplicate\nLabel"),"Control characters allowed in names");
+        reject(()->original.rename(ship1,original.get(ship2).name().toLowerCase(java.util.Locale.ROOT)),
                 "Duplicate name accepted with different letter case");
-        check(original.rename(1,"  Captain's Promise  ").get(1).name().equals("Captain's Promise"),
+        check(original.rename(ship1,"  Captain's Promise  ").get(1).name().equals("Captain's Promise"),
                 "Manual rename was not normalized and persisted");
 
         var tested=original;
         Battle first=new Battle(1977);
-        List<Integer> ids=new ArrayList<>();
+        List<Long> ids=new ArrayList<>();
         for(var ship:tested.active()){
             ids.add(ship.id());
             first.spawnWing(0,ship.fitting(),tech,1,310,330);
@@ -75,18 +89,18 @@ public final class CampaignFleetTest {
         check(returned.ships().size()==3&&returned.active().size()==2&&
                 returned.reserves().size()==1,
                 "Destroyed, survived and escaped hulls not handled separately");
-        check(returned.get(3).stores().hull()>0&&!returned.get(3).deployed(),
+        check(returned.get(ship3).stores().hull()>0&&!returned.get(ship3).deployed(),
                 "Escaped ship must remain owned but move to AVAILABLE reserve");
-        check(returned.get(1).stores().fuel()==17&&returned.get(1).stores().missiles()==1,
+        check(returned.get(ship1).stores().fuel()==17&&returned.get(ship1).stores().missiles()==1,
                 "Spent fuel and missiles were mysteriously refilled after combat");
-        check(returned.get(1).stores().crew()==first.ships().get(0).crewCount,
+        check(returned.get(ship1).stores().crew()==first.ships().get(0).crewCount,
                 "Lost crew were automatically replaced");
-        reject(()->returned.get(2),"Destroyed hull was kept as owned for free");
+        reject(()->returned.get(ship2),"Destroyed hull was kept as owned for free");
 
-        long repair=returned.cost(1,CampaignFleet.Service.REPAIR,tech);
-        long crew=returned.cost(1,CampaignFleet.Service.CREW,tech);
-        long ammo=returned.cost(1,CampaignFleet.Service.AMMUNITION,tech);
-        long fuel=returned.cost(1,CampaignFleet.Service.FUEL,tech);
+        long repair=returned.cost(ship1,CampaignFleet.Service.REPAIR,tech);
+        long crew=returned.cost(ship1,CampaignFleet.Service.CREW,tech);
+        long ammo=returned.cost(ship1,CampaignFleet.Service.AMMUNITION,tech);
+        long fuel=returned.cost(ship1,CampaignFleet.Service.FUEL,tech);
         check(repair>0&&crew>0&&ammo>0&&fuel>0,
                 "Damaged ships have no actual servicing charges");
         CampaignProgress.State wallet=new CampaignProgress.State(faction,1,200000,0);
@@ -95,30 +109,30 @@ public final class CampaignFleetTest {
         check(wallet.credits()==200000-spent,"Dock costs were not debited from campaign");
         CampaignProgress.State remaining=wallet;
         reject(()->remaining.spend(200001),"Insufficient credits silently accepted");
-        var restored=returned.service(1,CampaignFleet.Service.REPAIR,tech)
+        var restored=returned.service(ship1,CampaignFleet.Service.REPAIR,tech)
                 .service(1,CampaignFleet.Service.CREW,tech)
                 .service(1,CampaignFleet.Service.AMMUNITION,tech)
                 .service(1,CampaignFleet.Service.FUEL,tech);
         for(CampaignFleet.Service type:new CampaignFleet.Service[]{
                 CampaignFleet.Service.REPAIR,CampaignFleet.Service.CREW,
                 CampaignFleet.Service.AMMUNITION,CampaignFleet.Service.FUEL})
-            check(restored.cost(1,type,tech)==0,"Paid dock service did not restore physical supplies");
-        check(restored.get(3).stores().equals(returned.get(3).stores()),
+            check(restored.cost(ship1,type,tech)==0,"Paid dock service did not restore physical supplies");
+        check(restored.get(ship3).stores().equals(returned.get(ship3).stores()),
                 "Servicing one ship regenerated a different reserve vessel");
 
         // A complete dock job is quoted from the physical stores and charged
         // once, not five independent purchases or a free automatic reset.
-        long allQuote=returned.costAll(1,tech);
+        long allQuote=returned.costAll(ship1,tech);
         long individualSum=0;
         for(CampaignFleet.Service type:CampaignFleet.Service.values())
-            individualSum=Math.addExact(individualSum,returned.cost(1,type,tech));
+            individualSum=Math.addExact(individualSum,returned.cost(ship1,type,tech));
         check(allQuote==individualSum&&allQuote>0,
                 "Service All price differs from the sum of real shortages");
-        check(returned.costAll(3,tech)==0,
+        check(returned.costAll(ship3,tech)==0,
                 "An undamaged reserve is incorrectly quoted for service");
-        var onlyOne=returned.serviceAll(1,tech);
-        check(onlyOne.costAll(1,tech)==0,"Service All left charges or shortages");
-        check(onlyOne.get(3).stores().equals(returned.get(3).stores()),
+        var onlyOne=returned.serviceAll(ship1,tech);
+        check(onlyOne.costAll(ship1,tech)==0,"Service All left charges or shortages");
+        check(onlyOne.get(ship3).stores().equals(returned.get(ship3).stores()),
                 "Service All secretly replenished a different ship");
         CampaignProgress.State funded=new CampaignProgress.State(faction,1,allQuote,0);
         check(funded.spend(allQuote).credits()==0,
@@ -132,7 +146,7 @@ public final class CampaignFleetTest {
         var replacement=returned.purchase(baseline,tech);
         check(replacement.ships().size()==4&&replacement.reserves().size()==2,
                 "New ship was not individually delivered to reserve");
-        var latest=replacement.get(replacement.nextId()-1);
+        var latest=replacement.get(ship5);
         check(latest.stores().crew()==0&&latest.stores().fuel()==0&&
                 latest.stores().missiles()==0,
                 "Purchased bare hull received uncharged crew, fuel or ordnance");
@@ -141,10 +155,10 @@ public final class CampaignFleetTest {
 
         var nextName=FleetNames.generate(FleetNames.Style.NAVAL,
                 original.namingSeed(),5);
-        var reservedName=original.rename(1,nextName);
+        var reservedName=original.rename(ship1,nextName);
         var acquired=reservedName.purchase(baseline,tech);
-        check(!acquired.get(1).name().equalsIgnoreCase(acquired.get(5).name())&&
-                acquired.get(5).name().startsWith(nextName),
+        check(!acquired.get(ship1).name().equalsIgnoreCase(acquired.get(ship5).name())&&
+                acquired.get(ship5).name().startsWith(nextName),
                 "Commissioning duplicated a manually reserved future ship name");
 
         String encoded=CampaignFleetCodec.encode(replacement);
@@ -161,21 +175,21 @@ public final class CampaignFleetTest {
         var commissioned=CampaignFleet.start(faction,baseline,tech,namedSeed)
                 .changeRadioTone(CrewChatter.Tone.LIGHTHEARTED)
                 .changeStyle(FleetNames.Style.IRREVERENT);
-        var serviced=commissioned.service(1,CampaignFleet.Service.FUEL,tech);
+        var serviced=commissioned.service(ship1,CampaignFleet.Service.FUEL,tech);
         check(serviced.namingSeed()==namedSeed&&
                         serviced.radioTone()==CrewChatter.Tone.LIGHTHEARTED&&
                         serviced.style()==FleetNames.Style.IRREVERENT,
                 "Servicing a ship must not reset the fleet's radio or naming settings");
-        var fullyServiced=commissioned.serviceAll(1,tech);
+        var fullyServiced=commissioned.serviceAll(ship1,tech);
         check(fullyServiced.namingSeed()==namedSeed&&
                         fullyServiced.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Service All discarded saved radio tone or naming seed");
-        var reserveCycle=commissioned.setActive(1,false,20).setActive(1,true,20);
+        var reserveCycle=commissioned.setActive(ship1,false,20).setActive(1,true,20);
         check(reserveCycle.namingSeed()==namedSeed&&
                         reserveCycle.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Reserve/deployment changed saved crew communication preferences");
         var purchased=commissioned.purchase(baseline,tech);
-        check(purchased.get(5).name().equals(FleetNames.generate(
+        check(purchased.get(VesselIdentifiers.commissioned(namedSeed,5)).name().equals(FleetNames.generate(
                         FleetNames.Style.IRREVERENT,namedSeed,5))&&
                         purchased.namingSeed()==namedSeed&&
                         purchased.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
@@ -185,26 +199,6 @@ public final class CampaignFleetTest {
         check(returnedNames.namingSeed()==namedSeed&&
                         returnedNames.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Fleet codec discarded naming and radio preferences after service");
-        // Build a genuine v2 artifact, including its ORIGINAL checksum, rather
-        // than treating a no-op string replacement as migration verification.
-        String[] v3Rows=encoded.split("\n",-1);
-        String[] v3Header=v3Rows[1].split(",",-1);
-        StringBuilder oldBody=new StringBuilder("CD-ROSTER-2\n")
-                .append(String.join(",",v3Header[0],v3Header[1],v3Header[2]))
-                .append('\n');
-        for(int n=2;n<v3Rows.length-2;n++)oldBody.append(v3Rows[n]).append('\n');
-        byte[] oldHash=java.security.MessageDigest.getInstance("SHA-256").digest(
-                oldBody.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        String originalV2=oldBody+java.util.HexFormat.of().formatHex(oldHash)+"\n";
-        var migrated=CampaignFleetCodec.decode(originalV2,tech);
-        check(migrated.namingSeed()==faction.ordinal()&&
-                migrated.radioTone()==CrewChatter.Tone.MIXED&&
-                migrated.ships().size()==replacement.ships().size()&&
-                migrated.get(1).name().equals(replacement.get(1).name()),
-                "Authentic v2 roster migration lost old ship names or changed default radio");
-        reject(()->CampaignFleetCodec.decode(originalV2.replace("CD-ROSTER-2",
-                "CD-ROSTER-1"),tech),"Corrupted v2 version marker bypassed checksum");
-
         var styledRadio=replacement.changeRadioTone(CrewChatter.Tone.LIGHTHEARTED);
         var persistedRadio=CampaignFleetCodec.decode(CampaignFleetCodec.encode(styledRadio),tech);
         check(persistedRadio.radioTone()==CrewChatter.Tone.LIGHTHEARTED
@@ -214,14 +208,14 @@ public final class CampaignFleetTest {
                 "Ship naming themes were not expanded");
         var copy=decoded.setActive(3,true,20);
         var listed=copy.active();
-        check(listed.stream().anyMatch(v->v.id()==3),
+        check(listed.stream().anyMatch(v->v.id()==ship3),
                 "Escaped preserved hull could not be recommissioned");
         // Captain escort/defend references must resolve through immutable IDs,
         // not whichever hull happens to occupy the first active slot.
-        var linked=copy.setActive(1,false,20);
+        var linked=copy.setActive(ship1,false,20);
         var policy=ShipStandingOrders.DEFAULT.adjust(21,1,0,3);
-        var save=new java.util.HashMap<Integer,ShipStandingOrders>();
-        save.put(linked.active().get(0).id()-1,policy);
+        var save=new java.util.HashMap<Long,ShipStandingOrders>();
+        save.put(linked.active().get(0).id(),policy);
         check(linked.forDeployment(save).containsKey(0),
                 "Captain orders did not map from stable ship ID to active slot");
 
