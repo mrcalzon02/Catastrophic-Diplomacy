@@ -48,7 +48,7 @@ public final class CampaignFleetTest {
         var rerolled=original.changeStyle(FleetNames.Style.ABSURDIST).generateName(ship1);
         check(!rerolled.get(ship1).name().equals(original.get(ship1).name())&&
                 rerolled.get(ship1).id()==ship1&&
-                rerolled.get(ship2).name().equals(original.get(ship2).name(),
+                rerolled.get(ship2).name().equals(original.get(ship2).name()),
                 "Generating a different name changed identity or other vessels");
         var rerolledAgain=rerolled.generateName(ship1);
         check(!rerolledAgain.get(ship1).name().equals(rerolled.get(ship1).name()),
