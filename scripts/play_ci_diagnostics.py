@@ -24,6 +24,10 @@ HELP = [
 (r"target_audience_evidence", "Target audience", "Declare correct target age groups and Families/advertising applicability in Play Console; document the submission."),
 (r"store_listing_evidence", "Store listing", "Verify images, screenshots, claims, copyright, title and gameplay against the submitted build; document Play Console listing."),
 (r"sdk_inventory_evidence", "SDK inventory", "Inventory bundled dependencies, SDK permissions, data transfers and licenses; document library versions and SDK policy findings."),
+(r"PGS-CONSOLE-005", "Google Play Games project identity", "Configure the real numeric Play Games Services project ID and linked OAuth clients in this game's Play Console entry; put the ID in PLAY_GAMES_PROJECT_ID repo variable, then test real sign-in."),
+(r"PGS-ACCOUNT-006", "Google in-game account identity", "Implement OpenID-based Sign in with Google with server-validated tokens, account linking and account switching; Play Games Player ID cannot own save progress."),
+(r"PGS-SAVE-007", "Actual cloud-save integration", "Wire the native or WebView save serializer to an authenticated cloud backend. Test restore, migration, divergent saves, backup and isolation."),
+(r"PGS-DEVICE-008", "Cross-device acceptance", "Run verified two-device/reinstall/offline conflict tests and preserve actual evidence; do not approve with untested labels."),
 (r"Reviewed policy: ", "Individual policy review", "Open the named policy in the official Google Play Developer Policy Center; record concrete compliance or an explained non-applicable decision with dated evidence and reviewer in docs/google-play/policy-review.json."),
 (r"Play APK|Play AAB|APK integrity|Bundle", "Play artifact", "Repair the actual assemblePlay/bundlePlay Gradle build. Inspect and rerun tests against both generated APK and AAB."),
 (r"signature|Signing", "Signing", "Repair the CI-only certificate validation; provision a separate permanent Play upload key for production, never the ephemeral CI key."),
@@ -45,7 +49,7 @@ def main():
     folder = Path(os.getenv("RUNNER_TEMP", "/tmp")) / "play-ci"
     folder.mkdir(parents=True, exist_ok=True)
     states = {name: os.getenv("PLAY_" + name.upper() + "_OUTCOME", "missing")
-              for name in ("mainline", "source", "sdk", "bootstrap", "build", "artifact", "review")}
+              for name in ("mainline", "source", "sdk", "bootstrap", "build", "artifact", "review", "integration")}
     findings = []
     for phase, state in states.items():
         f = folder / (phase + ".log")
