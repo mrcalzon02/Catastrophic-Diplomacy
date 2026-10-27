@@ -23,7 +23,7 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final Texture severeHull;
     private final Texture shieldHull;
     private static String spriteName(Shipyard.Hull hull) {
-        return switch(hull) {
+        return switch(hull.spriteHull()) {
             case INTERCEPTOR -> "interceptor";
             case CORVETTE -> "corvette";
             case MISSILE_CORVETTE -> "missile_corvette";
@@ -50,9 +50,13 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(file==null||!Gdx.files.internal(file).exists())continue;
                 // Carrier/dreadnought share one atlas ship until an eleventh
                 // capital image exists. Avoid loading duplicate GPU textures.
-                if(hull==Shipyard.Hull.DREADNOUGHT &&
+                if(hull.spriteHull()==Shipyard.Hull.DREADNOUGHT &&
                         fleet.containsKey(Shipyard.Hull.CARRIER)){
                     fleet.put(hull,fleet.get(Shipyard.Hull.CARRIER));
+                    continue;
+                }
+                if(fleet.containsKey(hull.spriteHull())){
+                    fleet.put(hull,fleet.get(hull.spriteHull()));
                     continue;
                 }
                 try{
@@ -140,7 +144,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(tile.occupied && tile.exposure()>0.001) {damaged=true;break;}
             }
             if(!damaged) {
-                batch.setColor(1,1,1,1);
+                batch.setColor(ship.hullClass.tintRed(),ship.hullClass.tintGreen(),
+                        ship.hullClass.tintBlue(),1);
                 drawWhole(batch,tex,ship,width,height,rotation);
                 drawShield(batch,ship,width,height,rotation);
                 continue;
@@ -163,7 +168,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float offY=height*(0.5f-(sy+ey)*0.5f/tex.getHeight());
                 float midX=(float)ship.x+offX*cos-offY*sin;
                 float midY=(float)ship.y+offX*sin+offY*cos;
-                batch.setColor(1,1,1,(float)(1-tile.exposure()));
+                batch.setColor(ship.hullClass.tintRed(),ship.hullClass.tintGreen(),
+                        ship.hullClass.tintBlue(),(float)(1-tile.exposure()));
                 batch.draw(tex,midX-tileW/2,midY-tileH/2,
                         tileW/2,tileH/2,tileW,tileH,1,1,rotation,
                         sx,sy,ex-sx,ey-sy,false,false);
