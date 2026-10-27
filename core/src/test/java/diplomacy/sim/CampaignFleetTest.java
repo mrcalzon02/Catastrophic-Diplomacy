@@ -186,7 +186,7 @@ public final class CampaignFleetTest {
         check(fullyServiced.namingSeed()==namedSeed&&
                         fullyServiced.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Service All discarded saved radio tone or naming seed");
-        var reserveCycle=commissioned.setActive(namedShip,false,20).setActive(ship1,true,20);
+        var reserveCycle=commissioned.setActive(namedShip,false,20).setActive(namedShip,true,20);
         check(reserveCycle.namingSeed()==namedSeed&&
                         reserveCycle.radioTone()==CrewChatter.Tone.LIGHTHEARTED,
                 "Reserve/deployment changed saved crew communication preferences");
