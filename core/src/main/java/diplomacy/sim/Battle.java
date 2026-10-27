@@ -156,7 +156,8 @@ public final class Battle {
         public double weatherX() { return x; }
         public double weatherY() { return y; }
         /** Visible top-down hull scale; larger fitted capital hulls read as larger ships. */
-        public double visualScale() { return Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0))); }
+        public double visualScale() { return Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0)))
+                * (hullClass==null?1:hullClass.spriteScale()); }
         public double combatReadiness() {
             return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition)
                     * crewReadiness();
