@@ -1,0 +1,73 @@
+name: Google Play policy and APK-AAB release eligibility
+on:
+  push:
+    branches: [google-play]
+  pull_request:
+    branches: [google-play]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  google-play-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Source and manifest policy tests
+        run: python3 scripts/google_play_policy_gate.py source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.6.1'
+      - name: Install Android SDK and native build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "$SDKMANAGER" ]]; then SDKMANAGER="$(command -v sdkmanager)"; fi
+          "$SDKMANAGER" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Create isolated, disposable test-only Play signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -storetype PKCS12 -keystore "$RUNNER_TEMP/play-ci.p12" \
+            -storepass 'ci-test-only-never-publish' -keypass 'ci-test-only-never-publish' \
+            -alias 'catastrophicdiplomacy-play-upload-v1' -dname 'CN=PLAY CI TEST ONLY,OU=NOT FOR DISTRIBUTION,O=Temporary' \
+            -keyalg RSA -keysize 3072 -validity 2 -noprompt
+          {
+            echo "ORG_GRADLE_PROJECT_playUploadKeystorePath=$RUNNER_TEMP/play-ci.p12"
+            echo "ORG_GRADLE_PROJECT_playUploadStorePassword=ci-test-only-never-publish"
+            echo "ORG_GRADLE_PROJECT_playUploadKeyAlias=catastrophicdiplomacy-play-upload-v1"
+            echo "ORG_GRADLE_PROJECT_playUploadKeyPassword=ci-test-only-never-publish"
+          } >> "$GITHUB_ENV"
+      - name: Prepare ReverieVR pinned third-party game sources
+        if: false
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Not applicable'
+      - name: Build Play variant installable APK and Play submission AAB
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :android:assemblePlay :android:bundlePlay
+      - name: Verify built Play APK and AAB contents, permissions and signature
+        run: python3 scripts/google_play_policy_gate.py artifact
+      - name: Upload isolated build artifacts for CI inspection, never for store upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: PLAY-CI-TEST-ONLY-NOT-FOR-STORE
+          path: |
+            android/build/outputs/apk/play/*.apk
+            android/build/outputs/bundle/play/*.aab
+          retention-days: 7
+          if-no-files-found: error
+      - name: Fail closed until policy and Console declaration evidence complete
+        run: python3 scripts/google_play_policy_gate.py review
