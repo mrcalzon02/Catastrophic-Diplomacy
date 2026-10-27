@@ -48,6 +48,17 @@ public final class CampaignDeployment {
                 if(entry.getKey()==null||entry.getKey()<0||entry.getKey()>=ships||entry.getValue()==null)
                     throw new IllegalArgumentException("Standing doctrine refers to absent ship");
             }
+            // All captain-to-captain escort links must be acyclic. A saved ship
+            // slot outside the current fleet is inactive until recommissioned.
+            for(int slot=0;slot<ships;slot++){
+                java.util.HashSet<Integer> visited=new java.util.HashSet<>();
+                int cursor=slot;
+                while(cursor>=0&&cursor<ships&&standings.containsKey(cursor)){
+                    if(!visited.add(cursor))
+                        throw new IllegalArgumentException("Cyclic escort chain");
+                    cursor=standings.get(cursor).directives().escortSlot();
+                }
+            }
             for(var entry:placements.entrySet()){
                 if(entry.getKey()==null||entry.getKey()<0||entry.getKey()>=ships)
                     throw new IllegalArgumentException("Placement refers to absent ship");

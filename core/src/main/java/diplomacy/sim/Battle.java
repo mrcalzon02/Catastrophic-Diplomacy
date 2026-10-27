@@ -694,7 +694,8 @@ public final class Battle {
     }
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
-        if(actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
+        if(actor.standingOrders==null&&
+                actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
             Ship choice = null;
             double best = Double.POSITIVE_INFINITY;
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
@@ -1486,7 +1487,7 @@ public final class Battle {
         return closing>0.1?distance/closing:1000+distance/speed;
     }
     /** Hardware detection range is never extended by tactical doctrine. */
-    private boolean coversThreat(Ship defender,int targetId){
+    boolean coversThreat(Ship defender,int targetId){
         if(defender.standingOrders==null)return true;
         switch(defender.standingOrders.directives().defenseScope()){
             case ALL_ALLIES -> {return true;}
@@ -1498,7 +1499,7 @@ public final class Battle {
         }
         return false;
     }
-    private double defensiveScore(Ship defender,double distance,double eta){
+    double defensiveScore(Ship defender,double distance,double eta){
         if(defender.standingOrders==null)return eta;
         return switch(defender.standingOrders.directives().interceptStrategy()){
             case EARLY_INTERCEPT -> -distance; // first detected, farthest within fitted PD range
@@ -1527,6 +1528,9 @@ public final class Battle {
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
                         m.x,m.y,m.vx,m.vy,m.spec.speed());
+                if(defender.standingOrders!=null&&eta>=1000 &&
+                        defender.standingOrders.directives().interceptStrategy()!=
+                                ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
                 double score=defensiveScore(defender,distance,eta);
                 if(score<quickest){
                     quickest=score;chosenMissile=m;chosenShell=null;
@@ -1541,6 +1545,9 @@ public final class Battle {
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
                         p.x,p.y,p.vx,p.vy,p.spec.speed());
+                if(defender.standingOrders!=null&&eta>=1000 &&
+                        defender.standingOrders.directives().interceptStrategy()!=
+                                ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
                 double score=defensiveScore(defender,distance,eta);
                 if(score<quickest){
                     quickest=score;chosenShell=p;chosenMissile=null;
