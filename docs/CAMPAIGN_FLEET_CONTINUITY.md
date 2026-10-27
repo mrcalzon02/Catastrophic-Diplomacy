@@ -89,3 +89,18 @@ Follow INTENT -> EXECUTE -> OBSERVE -> VERIFY -> CLAIM. Inspect `main` and actua
 GitHub Actions run statuses before describing a feature as verified. Keep existing
 Android/Fire OS/Windows/Linux distribution paths and retained signing identity.
 Do not bypass the emulator acceptance gate; correct the underlying failure.
+
+## Persisted campaign shipyard selection
+
+- Campaign shipyard APPLY writes only a purchase blueprint, not a modification
+  to an existing owned hull. The selected faction, sub-chassis and installed
+  modules survive an app restart in a SHA-256 checksum-protected versioned file
+  at `campaign/purchase-blueprint-v1.dat`, with a last-known-valid backup.
+- Loading rejects a blueprint from another faction or a hull/technology beyond
+  the current campaign's actual unlocks. A replacement campaign overwrites the
+  old blueprint with that campaign's legal starter blueprint.
+- This is deliberately not an atomic wallet/fleet transaction, nor a free refit.
+  The separate purchase transaction still charges for the hull and modules.
+- `CampaignBlueprintTest` exercises integrity, wrong-faction isolation,
+  chassis-variant preservation, paid rank gates and corruption handling through
+  `campaignBlueprintSmoke` in the normal core smoke chain.

@@ -39,7 +39,7 @@ import java.util.Set;
 import diplomacy.sim.SpaceWeather;
 import diplomacy.sim.LevelEnvironment;
 import diplomacy.shipyard.Shipyard;
-import diplomacy.shipyard.CampaignShipyardRules;
+import diplomacy.shipyard.CampaignBlueprintCodec;\nimport diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.IOException;
@@ -74,6 +74,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final java.util.List<Integer> campaignSortie=new java.util.ArrayList<>();
     private int dockPage,dockSelected;
     private String dockNotice="Select ships for active duty or reserve and service them individually.";
+    private static final String CAMPAIGN_BLUEPRINT_FILE="campaign/purchase-blueprint-v1.dat";
     private static final String ROSTER_FILE="campaign/fleet-roster-v1.dat";
     private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
@@ -171,14 +172,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         restoreOrderPresets();
         restoreCampaign();
         restoreCampaignFleet();
-        campaignDesign=Shipyard.starter(campaign==null?left:campaign.faction(),
-                Shipyard.Hull.CORVETTE);
+        campaignDesign=restoreCampaignBlueprint();
         shipyard = new ShipyardPanel(technology,(team,design)->{
             if(shipyard.usage()==ShipyardPanel.Usage.CAMPAIGN){
                 // Approval selects the fitting for a NEW paid dock purchase.
                 // It never overwrites or repairs a commissioned ship.
-                campaignDesign=design;
-                dockNotice="Blueprint approved: buy a fitted hull at the dock to commission it.";
+                if(saveCampaignBlueprint(design)){
+                    campaignDesign=design;
+                    dockNotice="Blueprint approved and saved: purchase its new hull at the dock.";
+                }
                 shipyard.sync(0,leftDesign); // skirmish blueprint stays independent
             }else{
                 if(team==0){leftDesign=design;left=design.faction;}
@@ -539,6 +541,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         campaignFleet=CampaignFleet.start(pendingFaction,
                 Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology);
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
+        saveCampaignBlueprint(campaignDesign);
         saveCampaignFleet();
         saveCampaign();
         campaignPage=0;selectedMission=1;
@@ -1090,6 +1093,59 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,351,122,254,58)){
                 if(playedCampaign)launchCampaignMission();else launchSkirmish();
             }else if(GameMenuPanel.hit(x,y,673,122,254,58))leaveResults();
+        }
+    }
+    /** The workshop's candidate blueprint is deliberately independent of
+     * every persistent ship in the active and reserve commissioned rosters. */
+    private Shipyard.Design restoreCampaignBlueprint(){
+        Shipyard.Design fallback=Shipyard.starter(campaign==null?left:campaign.faction(),
+                Shipyard.Hull.CORVETTE);
+        if(campaign==null)return fallback;
+        for(FileHandle file:new FileHandle[]{
+                Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE),
+                Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE+".bak")}){
+            if(!file.exists())continue;
+            try{
+                Shipyard.Design restored=CampaignBlueprintCodec.decode(
+                        file.readString("UTF-8"),technology,campaign.faction());
+                CampaignShipyardRules.requireAllowed(restored,campaign.faction(),
+                        campaign.researchRank(),campaign.unlocked());
+                Gdx.app.log("CD-SHIPYARD","Restored paid-purchase blueprint "+restored.hull);
+                return restored;
+            }catch(RuntimeException invalid){
+                Gdx.app.error("CD-SHIPYARD","Rejected incompatible purchase blueprint "+file.path(),
+                        invalid);
+            }
+        }
+        return fallback; // A blueprint is not a free ship or a free refit.
+    }
+    /** The cache file is checksum validated BEFORE it becomes the live blueprint;
+     * only a previously valid primary can displace the last good backup. */
+    private boolean saveCampaignBlueprint(Shipyard.Design proposed){
+        if(campaign==null||proposed==null)return false;
+        try{
+            CampaignShipyardRules.requireAllowed(proposed,campaign.faction(),
+                    campaign.researchRank(),campaign.unlocked());
+            FileHandle primary=Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE);
+            FileHandle backup=Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE+".bak");
+            FileHandle temp=Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE+".tmp");
+            temp.writeString(CampaignBlueprintCodec.encode(proposed,technology),false,"UTF-8");
+            CampaignBlueprintCodec.decode(temp.readString("UTF-8"),technology,campaign.faction());
+            if(primary.exists()){
+                try{
+                    CampaignBlueprintCodec.decode(primary.readString("UTF-8"),technology,
+                            campaign.faction());
+                    primary.copyTo(backup);
+                }catch(RuntimeException invalid){
+                    Gdx.app.log("CD-SHIPYARD","Retaining last good purchase blueprint backup");
+                }
+            }
+            temp.moveTo(primary);
+            return true;
+        }catch(RuntimeException failed){
+            dockNotice="Blueprint save failed; the previous purchase design is retained.";
+            Gdx.app.error("CD-SHIPYARD","Could not save campaign purchase blueprint",failed);
+            return false;
         }
     }
     private void restoreCampaignFleet(){

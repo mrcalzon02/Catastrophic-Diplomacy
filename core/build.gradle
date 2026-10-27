@@ -44,6 +44,15 @@ tasks.register('shipLineagesSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('shipyardSmoke') { finalizedBy(tasks.named('shipLineagesSmoke')) }
+tasks.register('campaignBlueprintSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify purchased campaign blueprints are checksum-safe, faction bound and compatible with replay-safe ship ownership.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignBlueprintTest'
+    dependsOn testClasses
+}
+tasks.named('shipLineagesSmoke') { finalizedBy(tasks.named('campaignBlueprintSmoke')) }
+
 tasks.register('campaignResearchSmoke', JavaExec) {
     group = 'verification'
     description = 'Paid mission-time research, quarter-credit replays, 4 lab upgrades and old save migration.'
