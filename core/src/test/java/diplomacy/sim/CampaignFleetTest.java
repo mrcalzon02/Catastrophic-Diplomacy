@@ -78,6 +78,7 @@ public final class CampaignFleetTest {
         for(var ship:tested.active()){
             ids.add(ship.id());
             first.spawnWing(0,ship.fitting(),tech,1,310,330);
+            first.ships().get(first.ships().size()-1).commissionedId=ship.id();
         }
         first.ships().get(0).hull=first.ships().get(0).maxHull*.45;
         first.ships().get(0).crewCount=Math.max(0,first.ships().get(0).crewCount-3);
