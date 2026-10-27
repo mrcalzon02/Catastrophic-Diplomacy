@@ -8,6 +8,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignDeployment;
+import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.ShipStandingOrders;
 import java.util.Set;
 import diplomacy.sim.LevelEconomy;
@@ -16,7 +17,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -105,6 +106,19 @@ final class GameMenuPanel {
         if(hit(x,y,445,560,147,40))return 3; // clear selection
         return -1;
     }
+    /** Fleet-dock functional hit map; rows use absolute indices in the owned roster. */
+    static int dockAction(float x,float y,int page,int ownedCount){
+        if(hit(x,y,35,35,165,50))return 0;
+        if(hit(x,y,980,35,260,50))return 1;
+        if(hit(x,y,548,566,86,43))return 2;
+        if(hit(x,y,642,566,86,43))return 3;
+        for(int i=0;i<9;i++)
+            if(hit(x,y,45,521-i*43,746,38)&&page*9+i<ownedCount)
+                return 100+page*9+i;
+        for(int i=0;i<9;i++)
+            if(hit(x,y,840,525-i*55,374,47))return 4+i;
+        return -1;
+    }
     static int mapHit(float x,float y,int page){
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             if(Math.hypot(x-node.x(),y-node.y())<=26)return node.level();
@@ -129,6 +143,8 @@ final class GameMenuPanel {
               CampaignDeployment.Loadout deployment,String friendlyHull,int selectedShip,
               boolean preparingCampaign,int standingPage,boolean selectingGroup,
               Set<Integer> doctrineGroup,boolean awaitingWaypoint,String editNotice,
+              CampaignFleet.Roster ownedFleet,int dockPage,int dockSelected,long[] dockCosts,
+              long purchaseCost,String dockNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
               int withdrawing){
@@ -186,6 +202,21 @@ final class GameMenuPanel {
                 button(shapes,214,35,136,50,false);
                 button(shapes,366,35,136,50,false);
                 button(shapes,964,35,278,50,true);
+            }
+            case DOCK -> {
+                rectangle(shapes,33,108,771,509,PANEL);
+                rectangle(shapes,818,108,427,509,PANEL);
+                button(shapes,35,35,165,50,false);
+                button(shapes,980,35,260,50,false);
+                button(shapes,548,566,86,43,false);
+                button(shapes,642,566,86,43,false);
+                if(ownedFleet!=null)
+                    for(int i=0;i<9;i++){
+                        int index=dockPage*9+i;
+                        if(index>=ownedFleet.ships().size())break;
+                        button(shapes,45,521-i*43,746,38,index==dockSelected);
+                    }
+                for(int i=0;i<9;i++)button(shapes,840,525-i*55,374,47,false);
             }
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
@@ -302,6 +333,42 @@ final class GameMenuPanel {
                 label(batch,font,preset.demonstration?"LAUNCH TEST":"DEPLOY FLEET",998,67,Color.WHITE);
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
+            case DOCK -> {
+                title(batch,font,"CAMPAIGN FLEET DOCK",
+                        "OWNED HULLS ARE PERSISTENT  |  SELECT ACTIVE SHIPS AND SERVICE RESERVES");
+                if(ownedFleet!=null){
+                    label(batch,font,"OWNED "+ownedFleet.ships().size()+
+                            "   ACTIVE "+ownedFleet.active().size()+
+                            "   RESERVE "+ownedFleet.reserves().size(),44,594,Color.CYAN);
+                    label(batch,font,"<",573,592,Color.WHITE);
+                    label(batch,font,">",670,592,Color.WHITE);
+                    label(batch,font,"CREDITS: "+progress.credits(),842,609,Color.GOLD);
+                    label(batch,font,"NAME STYLE: "+ownedFleet.style(),842,581,MUTED);
+                    for(int i=0;i<9;i++){
+                        int index=dockPage*9+i;
+                        if(index>=ownedFleet.ships().size())break;
+                        var ship=ownedFleet.ships().get(index);
+                        label(batch,font,(ship.deployed()?"ACTIVE":"RESERVE")+"  #"+ship.id()+
+                                "  "+ship.name()+"  ["+ship.fitting().hull+"]",
+                                53,547-i*43,index==dockSelected?Color.GOLD:
+                                        ship.deployed()?Color.GREEN:Color.WHITE);
+                    }
+                    String[] names={"TOGGLE ACTIVE / RESERVE","REPAIR HULL / ARMOR / SHIELDS",
+                            "RESTOCK CREW","RESTOCK AMMUNITION","REFILL FUEL",
+                            "REPLACE FIGHTERS / DRONES","BUY NEW FITTED HULL",
+                            "CHANGE NAME STYLE","GENERATE SHIP NAME"};
+                    for(int i=0;i<names.length;i++){
+                        String cost=i>=1&&i<=5&&dockCosts!=null?
+                                "  "+dockCosts[i-1]+" cr":
+                                i==6?"  "+purchaseCost+" cr":"";
+                        label(batch,font,names[i]+cost,847,553-i*55,
+                                i==6?Color.GOLD:Color.WHITE);
+                    }
+                }
+                label(batch,font,"BACK TO STAR MAP",54,67,Color.WHITE);
+                label(batch,font,"DEPLOY ACTIVE FLEET",1002,67,Color.WHITE);
+                label(batch,font,dockNotice,45,112,Color.CYAN);
+            }
             case DEPLOYMENT -> {
                 LevelEconomy.Level stage=preparingCampaign?LevelEconomy.level(selectedLevel):null;
                 Battle.Faction opponent=preparingCampaign?
