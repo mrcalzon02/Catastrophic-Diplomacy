@@ -10,11 +10,11 @@ import java.util.List;
 public final class CampaignAfterAction {
     private CampaignAfterAction(){}
     public enum Outcome { SURVIVED, WITHDRAWING, ESCAPED, DESTROYED }
-    public record Entry(int id,String name,Shipyard.Hull hull,Outcome outcome,
+    public record Entry(long id,String name,Shipyard.Hull hull,Outcome outcome,
                         int hullPercent,int crewLost,int kineticSpent,int missileSpent,
                         int torpedoSpent,int fuelSpent) {
         public Entry{
-            if(id<1||name==null||name.isBlank()||hull==null||outcome==null||
+            if(!VesselIdentifiers.valid(id)||name==null||name.isBlank()||hull==null||outcome==null||
                     hullPercent<0||hullPercent>100||crewLost<0||kineticSpent<0||
                     missileSpent<0||torpedoSpent<0||fuelSpent<0)
                 throw new IllegalArgumentException("Invalid postbattle ship entry");
@@ -39,7 +39,7 @@ public final class CampaignAfterAction {
             return entries.stream().filter(e->e.outcome()==type).count();
         }
     }
-    public static Report capture(CampaignFleet.Roster owned,List<Integer> deployedIds,Battle battle){
+    public static Report capture(CampaignFleet.Roster owned,List<Long> deployedIds,Battle battle){
         if(owned==null||deployedIds==null||battle==null)
             throw new IllegalArgumentException("Incomplete after-action sources");
         List<CampaignFleet.Vessel> active=owned.active();

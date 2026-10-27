@@ -37,7 +37,7 @@ public final class CampaignFleetCodec {
         if(roster==null)throw new IllegalArgumentException("Missing campaign fleet");
         StringBuilder s=new StringBuilder(MAGIC).append('\n').append(roster.faction())
                 .append(',').append(roster.style()).append(',')
-                .append(roster.nextId()).append(',').append(roster.namingSeed()).append(',')
+                .append(roster.nextSerial()).append(',').append(roster.namingSeed()).append(',')
                 .append(roster.radioTone()).append('\n');
         for(var v:roster.ships()){
             var stores=v.stores();
@@ -88,7 +88,7 @@ public final class CampaignFleetCodec {
                 int offset=LEGACY.equals(rows[0])?0:1;
                 if(parts.length!=14+offset)
                     throw new IllegalArgumentException("Invalid ship inventory");
-                int id=Integer.parseInt(parts[0]);
+                long id=Long.parseLong(parts[0]);
                 boolean deployed=switch(parts[1]){
                     case "0" -> false;case "1" -> true;
                     default -> throw new IllegalArgumentException("Invalid sortie selection");

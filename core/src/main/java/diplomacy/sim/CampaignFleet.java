@@ -53,30 +53,35 @@ public final class CampaignFleet {
             ship.repairDroneReserve=repairDrones;ship.fuel=fuel;
         }
     }
-    public record Vessel(int id,String name,Shipyard.Design fitting,boolean deployed,Stores stores) {
+    public record Vessel(long id,String name,Shipyard.Design fitting,boolean deployed,Stores stores) {
         public Vessel {
-            if(id<1||name==null||name.isBlank()||name.length()>70||fitting==null||stores==null)
+            if(!VesselIdentifiers.valid(id)||name==null||name.isBlank()||
+                    name.length()>70||fitting==null||stores==null)
                 throw new IllegalArgumentException("Invalid commissioned ship");
         }
         public Vessel active(boolean selected){return new Vessel(id,name,fitting,selected,stores);}
         public Vessel withName(String value){return new Vessel(id,value,fitting,deployed,stores);}
         public Vessel withStores(Stores value){return new Vessel(id,name,fitting,deployed,value);}
     }
-    public record Roster(Battle.Faction faction,FleetNames.Style style,int nextId,
+    public record Roster(Battle.Faction faction,FleetNames.Style style,int nextSerial,
                          List<Vessel> ships,long namingSeed,CrewChatter.Tone radioTone) {
         /** Historical API and imported saves retain their former naming. */
-        public Roster(Battle.Faction faction,FleetNames.Style style,int nextId,
+        public Roster(Battle.Faction faction,FleetNames.Style style,int nextSerial,
                       List<Vessel> ships){
-            this(faction,style,nextId,ships,faction==null?0:faction.ordinal(),
+            this(faction,style,nextSerial,ships,faction==null?0:faction.ordinal(),
                     CrewChatter.Tone.MIXED);
         }
         public Roster {
-            if(faction==null||style==null||radioTone==null||nextId<1||ships==null||ships.size()>200)
+            if(faction==null||style==null||radioTone==null||nextSerial<1||
+                    nextSerial>VesselIdentifiers.MAX_SERIAL+1||ships==null||ships.size()>200)
                 throw new IllegalArgumentException("Invalid fleet roster");
             ships=List.copyOf(ships);
-            HashSet<Integer> ids=new HashSet<>();
+            HashSet<Long> ids=new HashSet<>();
             for(Vessel v:ships)
-                if(v==null||v.id()>=nextId||!ids.add(v.id())||v.fitting().faction!=faction)
+                if(v==null||VesselIdentifiers.serial(v.id())>=nextSerial||
+                        v.id()!=VesselIdentifiers.commissioned(namingSeed,
+                                VesselIdentifiers.serial(v.id()))||
+                        !ids.add(v.id())||v.fitting().faction!=faction)
                     throw new IllegalArgumentException("Duplicate or misplaced fleet hull");
         }
         public List<Vessel> active(){
@@ -88,61 +93,69 @@ public final class CampaignFleet {
         /** Saved captain targets use immutable owned IDs; battle references
          * use ordinal slots in the currently selected active fleet. */
         public java.util.Map<Integer,ShipStandingOrders> forDeployment(
-                java.util.Map<Integer,ShipStandingOrders> saved){
+                java.util.Map<Long,ShipStandingOrders> saved){
             if(saved==null)throw new IllegalArgumentException("Missing captain doctrines");
             List<Vessel> selected=active();
             java.util.HashMap<Integer,ShipStandingOrders> result=new java.util.HashMap<>();
             for(int i=0;i<selected.size();i++){
-                ShipStandingOrders policy=saved.get(selected.get(i).id()-1);
+                ShipStandingOrders policy=saved.get(selected.get(i).id());
                 if(policy!=null)
-                    result.put(i,translate(policy,selected,false));
+                    result.put(i,translate(policy,selected,ships,false));
             }
             return result;
         }
         public ShipStandingOrders toPersistent(int deployedIndex,ShipStandingOrders policy){
             if(policy==null||deployedIndex<0||deployedIndex>=active().size())
                 throw new IllegalArgumentException("Unknown commissioned captain");
-            return translate(policy,active(),true);
+            return translate(policy,active(),ships,true);
         }
         private static ShipStandingOrders translate(ShipStandingOrders policy,
-                List<Vessel> ships,boolean toPersistent){
+                List<Vessel> deployed,List<Vessel> all,boolean toPersistent){
             var d=policy.directives();
             java.util.ArrayList<Integer> defended=new java.util.ArrayList<>();
             for(int id:d.defendSlots())
-                defended.add(reference(id,ships,toPersistent));
+                defended.add(reference(id,deployed,all,toPersistent));
             var moved=new ShipTacticalDirectives(d.speedPercent(),d.interceptStrategy(),
                     d.defenseScope(),d.fighterMission(),defended,
-                    reference(d.escortSlot(),ships,toPersistent),d.escortRange());
+                    reference(d.escortSlot(),deployed,all,toPersistent),d.escortRange());
             return new ShipStandingOrders(policy.tactics(),policy.aggression(),
                     policy.caution(),policy.shieldWithdrawPercent(),moved);
         }
-        private static int reference(int id,List<Vessel> ships,boolean toPersistent){
-            if(id<0)return -1;
-            if(toPersistent)return id>=ships.size()?-1:ships.get(id).id()-1;
-            for(int i=0;i<ships.size();i++)if(ships.get(i).id()-1==id)return i;
+        private static int reference(int slot,List<Vessel> deployed,List<Vessel> all,
+                                     boolean toPersistent){
+            if(slot<0)return -1;
+            if(toPersistent){
+                if(slot>=deployed.size())return -1;
+                long id=deployed.get(slot).id();
+                for(int i=0;i<all.size();i++)if(all.get(i).id()==id)return i;
+                return -1;
+            }
+            if(slot>=all.size())return -1;
+            long id=all.get(slot).id();
+            for(int i=0;i<deployed.size();i++)if(deployed.get(i).id()==id)return i;
             return -1;
         }
-        public Vessel get(int id){
+        public Vessel get(long id){
             return ships.stream().filter(s->s.id()==id).findFirst()
                     .orElseThrow(()->new IllegalArgumentException("Unknown ship ID"));
         }
-        public Roster setActive(int id,boolean selected,int cap){
+        public Roster setActive(long id,boolean selected,int cap){
             if(cap<1||cap>200)throw new IllegalArgumentException("Invalid deployment cap");
             if(selected&&!get(id).deployed()&&active().size()>=cap)
                 throw new IllegalArgumentException("Mission fleet cap reached");
             List<Vessel> result=new ArrayList<>();
             for(Vessel v:ships)result.add(v.id()==id?v.active(selected):v);
-            return new Roster(faction,style,nextId,result,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
         }
         public Roster changeStyle(FleetNames.Style desired){
             if(desired==null)throw new IllegalArgumentException("Name style required");
-            return new Roster(faction,desired,nextId,ships,namingSeed,radioTone);
+            return new Roster(faction,desired,nextSerial,ships,namingSeed,radioTone);
         }
         public Roster changeRadioTone(CrewChatter.Tone desired){
             if(desired==null)throw new IllegalArgumentException("Radio tone required");
-            return new Roster(faction,style,nextId,ships,namingSeed,desired);
+            return new Roster(faction,style,nextSerial,ships,namingSeed,desired);
         }
-        public Roster rename(int id,String name){
+        public Roster rename(long id,String name){
             get(id); // A stale dock selection must never report a successful rename.
             if(name==null||name.trim().isEmpty()||name.trim().length()>70||
                     name.codePoints().anyMatch(Character::isISOControl))
@@ -153,10 +166,10 @@ public final class CampaignFleet {
                     throw new IllegalArgumentException("Another commissioned ship already uses that name");
             List<Vessel> result=new ArrayList<>();
             for(Vessel v:ships)result.add(v.id()==id?v.withName(unique):v);
-            return new Roster(faction,style,nextId,result,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
         }
         public Roster purchase(Shipyard.Design design,TechnologyCatalog technology) {
-            if(ships.size()>=200||design==null||design.faction!=faction)
+            if(ships.size()>=200||nextSerial>VesselIdentifiers.MAX_SERIAL||design==null||design.faction!=faction)
                 throw new IllegalArgumentException("Fleet full or wrong faction");
             Battle.Ship newShip=fresh(design,technology);
             // A delivered hull has engines but needs paid personnel, fuel and
@@ -167,7 +180,7 @@ public final class CampaignFleet {
             ArrayList<Vessel> result=new ArrayList<>(ships);
             // A captain may have manually reserved the upcoming generated
             // name. New acquisitions must still receive a distinct callsign.
-            String baseName=FleetNames.generate(style,namingSeed,nextId);
+            String baseName=FleetNames.generate(style,namingSeed,nextSerial);
             String uniqueName=baseName;
             int suffix=2;
             while(true){
@@ -182,11 +195,11 @@ public final class CampaignFleet {
                     throw new IllegalArgumentException("No unique ship name available");
                 uniqueName=baseName+" #"+suffix++;
             }
-            result.add(new Vessel(nextId,uniqueName,
+            result.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,nextSerial),uniqueName,
                     design,false,Stores.capture(newShip)));
-            return new Roster(faction,style,nextId+1,result,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial+1,result,namingSeed,radioTone);
         }
-        public Roster afterBattle(Battle battle,List<Integer> deployedIds){
+        public Roster afterBattle(Battle battle,List<Long> deployedIds){
             if(battle==null||deployedIds==null||active().size()!=deployedIds.size())
                 throw new IllegalArgumentException("Incomplete campaign sortie");
             List<Battle.Ship> participants=battle.ships().stream()
@@ -221,10 +234,10 @@ public final class CampaignFleet {
                     result.add(new Vessel(prior.id(),prior.name(),prior.fitting(),active,supplies));
                 }
             }
-            result.sort(java.util.Comparator.comparingInt(Vessel::id));
-            return new Roster(faction,style,nextId,result,namingSeed,radioTone);
+            result.sort(java.util.Comparator.comparingLong(Vessel::id));
+            return new Roster(faction,style,nextSerial,result,namingSeed,radioTone);
         }
-        public Roster service(int id,Service category,TechnologyCatalog technology) {
+        public Roster service(long id,Service category,TechnologyCatalog technology) {
             Vessel v=get(id);
             Battle.Ship fitted=fresh(v.fitting(),technology);
             v.stores().apply(fitted);
@@ -249,11 +262,11 @@ public final class CampaignFleet {
             }
             ArrayList<Vessel> updated=new ArrayList<>(ships);
             updated.replaceAll(item->item.id()==id?item.withStores(Stores.capture(fitted)):item);
-            return new Roster(faction,style,nextId,updated,namingSeed,radioTone);
+            return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone);
         }
         /** Quote the complete dock job before debiting credits. All five services
          * are calculated from this vessel's actual fitted capacity and stores. */
-        public long costAll(int id,TechnologyCatalog technology){
+        public long costAll(long id,TechnologyCatalog technology){
             long total=0;
             for(Service type:Service.values())
                 total=Math.addExact(total,cost(id,type,technology));
@@ -261,13 +274,13 @@ public final class CampaignFleet {
         }
         /** Return one new immutable fleet only after every service succeeds.
          * The caller must debit the full quoted price exactly once. */
-        public Roster serviceAll(int id,TechnologyCatalog technology){
+        public Roster serviceAll(long id,TechnologyCatalog technology){
             Roster updated=this;
             for(Service type:Service.values())
                 updated=updated.service(id,type,technology);
             return updated;
         }
-        public long cost(int id,Service service,TechnologyCatalog technology){
+        public long cost(long id,Service service,TechnologyCatalog technology){
             Vessel vessel=get(id);
             Battle.Ship full=fresh(vessel.fitting(),technology);
             Stores current=vessel.stores();
@@ -324,8 +337,9 @@ public final class CampaignFleet {
             throw new IllegalArgumentException("Starter faction mismatch");
         ArrayList<Vessel> vessels=new ArrayList<>();
         for(int i=1;i<=4;i++)
-            vessels.add(new Vessel(i,FleetNames.generate(FleetNames.Style.NAVAL,
-                    namingSeed,i),starter,true,Stores.capture(fresh(starter,technology))));
+            vessels.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,i),
+                    FleetNames.generate(FleetNames.Style.NAVAL,namingSeed,i),
+                    starter,true,Stores.capture(fresh(starter,technology))));
         return new Roster(faction,FleetNames.Style.NAVAL,5,vessels,namingSeed,
                 CrewChatter.Tone.MIXED);
     }

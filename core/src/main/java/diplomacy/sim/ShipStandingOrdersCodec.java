@@ -11,19 +11,19 @@ public final class ShipStandingOrdersCodec {
     private static final String MAGIC="CD-STANDING-2";
     private static final String LEGACY="CD-STANDING-1";
     private ShipStandingOrdersCodec(){}
-    public record File(Battle.Faction faction,Map<Integer,ShipStandingOrders> policies) {
+    public record File(Battle.Faction faction,Map<Long,ShipStandingOrders> policies) {
         public File {
             if(faction==null||policies==null)throw new IllegalArgumentException("Missing standing orders");
             policies=Map.copyOf(policies);
         }
     }
-    public static String encode(Battle.Faction faction,Map<Integer,ShipStandingOrders> records){
+    public static String encode(Battle.Faction faction,Map<Long,ShipStandingOrders> records){
         if(faction==null||records==null)throw new IllegalArgumentException("Missing standing orders");
         StringBuilder content=new StringBuilder(MAGIC).append('\n').append(faction.name()).append('\n');
         for(var entry:new TreeMap<>(records).entrySet()){
-            int slot=entry.getKey();
+            long slot=entry.getKey();
             ShipStandingOrders policy=entry.getValue();
-            if(slot<0||slot>=200||policy==null)throw new IllegalArgumentException("Invalid hull slot");
+            if((slot<0||slot>=200)&&!VesselIdentifiers.valid(slot)||policy==null)throw new IllegalArgumentException("Invalid hull slot");
             var o=policy.tactics();
             content.append(slot).append(',').append(policy.aggression()).append(',')
                     .append(policy.caution()).append(',').append(policy.shieldWithdrawPercent()).append(',')
@@ -56,13 +56,13 @@ public final class ShipStandingOrdersCodec {
             throw new IllegalArgumentException("Standing orders checksum mismatch");
         try{
             Battle.Faction faction=Battle.Faction.valueOf(lines[1]);
-            Map<Integer,ShipStandingOrders> result=new TreeMap<>();
+            Map<Long,ShipStandingOrders> result=new TreeMap<>();
             for(int i=2;i<lines.length-2;i++){
                 String[] p=lines[i].split(",",-1);
                 if(p.length!=(MAGIC.equals(lines[0])?24:14))
                     throw new IllegalArgumentException("Invalid doctrine field count");
-                int slot=Integer.parseInt(p[0]);
-                if(slot<0||slot>=200||result.containsKey(slot))
+                long slot=Long.parseLong(p[0]);
+                if(((slot<0||slot>=200)&&!VesselIdentifiers.valid(slot))||result.containsKey(slot))
                     throw new IllegalArgumentException("Invalid or duplicate doctrine slot");
                 BattleOrders.Orders orders=new BattleOrders.Orders(
                         BattleOrders.PointDefense.valueOf(p[4]),
