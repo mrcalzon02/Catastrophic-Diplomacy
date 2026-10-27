@@ -39,7 +39,7 @@ public final class Battle {
     public static final class Ship implements SpaceWeather.Target {
         public final int id, team;
         public final Faction faction;
-        public final String name;
+        public String name;
         /** Per-hull doctrine. POINT DEFENSE is independent of main gun fire orders. */
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
         /** Optional individual standing policy, continuously enforced, not consumed. */
@@ -55,6 +55,9 @@ public final class Battle {
         public DirectionalDefense defense;
         public double x, y, vx, vy, facing;
         public double hull, maxHull, shields, maxShields, armor, maxArmor, sif, power, maxPower, heat, maxHeat;
+        /** Persistent capital-ship reaction mass; unlike transient fighter flight fuel. */
+        public double fuel=180,maxFuel=180;
+        public long lastChatterTick=-1000;
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
@@ -684,6 +687,7 @@ public final class Battle {
                             * s.crewReadiness() * 0.38 - s.vx) * 0.055;
                 }
                 s.x += s.vx * DT; s.y += s.vy * DT;
+        s.fuel=Math.max(0,s.fuel-StrictMath.hypot(s.vx,s.vy)*DT*.018);
             }
             launchAuxiliary(s,target);
         }
@@ -839,6 +843,7 @@ public final class Battle {
             case HOLD -> {
                 ship.vx*=0.82;ship.vy*=0.82;
                 ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+        ship.fuel=Math.max(0,ship.fuel-StrictMath.hypot(ship.vx,ship.vy)*DT*.018);
                 ship.commandQueue.tickTimed();
                 return true;
             }
@@ -862,7 +867,7 @@ public final class Battle {
         if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
-        double thrust = s.speed * s.engineCondition * s.crewReadiness();
+        double thrust = s.fuel>0?s.speed * s.engineCondition * s.crewReadiness():0;
         double desiredVx = StrictMath.cos(s.facing) * thrust, desiredVy = StrictMath.sin(s.facing) * thrust;
         double smoothing = Math.min(1, 1.6 * DT);
         s.vx += (desiredVx - s.vx) * smoothing;
@@ -945,7 +950,7 @@ public final class Battle {
         ship.facing=wrap(ship.facing+change);
         double speedCap=ship.standingOrders==null?1:
                 ship.standingOrders.directives().speedPercent()/100.0;
-        double velocity=ship.speed*speedCap*ship.engineCondition*ship.crewReadiness();
+        double velocity=ship.fuel>0?ship.speed*speedCap*ship.engineCondition*ship.crewReadiness():0;
         double smooth=Math.min(1,1.6*DT);
         ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
         ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
@@ -1877,6 +1882,7 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.y));
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
+            hash = mix(hash, Double.doubleToLongBits(s.fuel));
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));
             hash = mix(hash,s.defense.fingerprint());
