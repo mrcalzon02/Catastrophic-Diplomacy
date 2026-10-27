@@ -36,6 +36,15 @@ tasks.register('hullLayoutsSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('shipyardSmoke') { finalizedBy(tasks.named('hullLayoutsSmoke')) }
+tasks.register('shipLineagesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check all 10 alternating hull generations, physical prototypes, 11 factions, and licensed campaign research.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipLineagesTest'
+    dependsOn testClasses
+}
+tasks.named('shipyardSmoke') { finalizedBy(tasks.named('shipLineagesSmoke')) }
+
 
 // Portable fleet encoding and pointer gestures shared by the desktop/Android client.
 tasks.register('platformSmoke', JavaExec) {
