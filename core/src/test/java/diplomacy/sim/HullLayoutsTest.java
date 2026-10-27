@@ -17,7 +17,8 @@ public final class HullLayoutsTest {
     public static void main(String[] args) throws Exception {
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Shipyard.Hull[] display=Shipyard.Hull.shipyardOrder();
-        check(display.length==11,"shipyard must present eleven legacy/new hull classes");
+        check(display.length==Shipyard.Hull.values().length&&display.length>=40,
+                "All append-only new chassis and historical hulls must appear in selector");
         Set<Shipyard.Hull> distinct=Set.of(display);
         check(distinct.size()==display.length,"each class appears once in the selector");
         // Existing blueprint IDs and the initial four ordinals remain untouched.
@@ -29,7 +30,10 @@ public final class HullLayoutsTest {
         int count=0;
         for(int i=0;i<display.length;i++){
             Shipyard.Hull hull=display[i];
-            check(hull.slots.size()==expectedTotals[i],"wrong "+hull+" slot count");
+            if(hull.ordinal()<expectedTotals.length)
+                check(hull.slots.size()==expectedTotals[hull.ordinal()],
+                        "Legacy hardpoint count was changed: "+hull);
+            else check(hull.slots.size()>=9,"New physical chassis lacks vital hardpoints: "+hull);
             for(Battle.Faction faction:Battle.Faction.values()){
                 Shipyard.Design design=Shipyard.starter(faction,hull);
                 List<Shipyard.Slot> layout=design.placements();
