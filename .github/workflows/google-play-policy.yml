@@ -18,7 +18,14 @@ jobs:
         with:
           submodules: recursive
       - name: Source and manifest policy tests
-        run: python3 scripts/google_play_policy_gate.py source
+        id: source
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/play-ci"
+          python3 scripts/play_ci_diagnostics.py --self-test
+          python3 scripts/google_play_policy_gate.py source 2>&1 | tee "$RUNNER_TEMP/play-ci/source.log"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -54,13 +61,23 @@ jobs:
           set -euo pipefail
           echo 'Not applicable'
       - name: Build Play variant installable APK and Play submission AAB
+        id: build
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
-          gradle --no-daemon :android:assemblePlay :android:bundlePlay
+          mkdir -p "$RUNNER_TEMP/play-ci"
+                    gradle --no-daemon :android:assemblePlay :android:bundlePlay 2>&1 | tee "$RUNNER_TEMP/play-ci/build.log"
       - name: Verify built Play APK and AAB contents, permissions and signature
-        run: python3 scripts/google_play_policy_gate.py artifact
+        id: artifact
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/google_play_policy_gate.py artifact 2>&1 | tee "$RUNNER_TEMP/play-ci/artifact.log"
       - name: Upload isolated build artifacts for CI inspection, never for store upload
+        if: always() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: PLAY-CI-TEST-ONLY-NOT-FOR-STORE
@@ -69,5 +86,28 @@ jobs:
             android/build/outputs/bundle/play/*.aab
           retention-days: 7
           if-no-files-found: error
-      - name: Fail closed until policy and Console declaration evidence complete
-        run: python3 scripts/google_play_policy_gate.py review
+      - name: Evaluate policy and Play Console declarations
+        id: review
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/play-ci"
+          python3 scripts/google_play_policy_gate.py review 2>&1 | tee "$RUNNER_TEMP/play-ci/review.log"
+      - name: Summarize failure reasons and gate the release
+        if: always()
+        env:
+          PLAY_SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          PLAY_BUILD_OUTCOME: ${{ steps.build.outcome }}
+          PLAY_ARTIFACT_OUTCOME: ${{ steps.artifact.outcome }}
+          PLAY_REVIEW_OUTCOME: ${{ steps.review.outcome }}
+        run: python3 scripts/play_ci_diagnostics.py
+      - name: Preserve full release-gate diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: google-play-compliance-evidence
+          path: ${{ runner.temp }}/play-ci/
+          retention-days: 30
+          if-no-files-found: error
