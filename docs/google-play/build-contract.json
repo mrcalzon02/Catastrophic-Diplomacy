@@ -1,0 +1,9 @@
+{
+  "package": "games.catastrophicdiplomacy",
+  "module": "android",
+  "modules": [
+    "android"
+  ],
+  "allowed_permissions": [],
+  "remove_install_permission": false
+}
