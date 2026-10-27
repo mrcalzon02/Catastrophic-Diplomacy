@@ -22,7 +22,7 @@ public final class CampaignResearchTest {
     public static void main(String[] args){
         reject(CampaignProgress.start(Battle.Faction.TERRAN)::purchaseNextResearch,
                 "Starting technology must be purchased");
-        var first=funded(0,0,0,50000).purchaseNextResearch();
+        var first=funded(0,0,0,300000).purchaseNextResearch();
         check(first.activeProject()==CampaignProgress.Project.LICENSE
                 &&first.missionsUntilResearchComplete()==1,"First technology needs one mission");
         reject(()->first.beginResearch(CampaignProgress.Project.ACCELERATOR),
