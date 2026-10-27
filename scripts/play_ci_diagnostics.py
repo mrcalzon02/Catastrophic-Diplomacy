@@ -4,6 +4,7 @@ import json, os, re, sys
 from pathlib import Path
 
 HELP = [
+(r"GOOGLE_PLAY_MAIN_PARITY|mainline behind|google-play.*main|Play branch does not contain main", "Stale Play integration branch", "Merge current origin/main into google-play with conflict resolution. Preserve Play-specific SDK/signing/policy code; never reset or overwrite these changes."),
 (r"dependency baseline|direct Maven coordinates drift|approved dependency|license record", "Approved dependency baseline", "Update the exact-version dependency inventory and required license records to match the justified code fix; do not disable the existing dependency checker."),
 (r"curl:|Failed to connect|connection timed out|Network is unreachable|download failed", "Third-party source bootstrap", "Retry the pinned fetch safely, verify SHA-256 and source commit, and preserve original pinning; do not fall back to unverified sources."),
 (r"Missing class|R8|Could not resolve|Execution failed for task",
@@ -44,16 +45,16 @@ def main():
     folder = Path(os.getenv("RUNNER_TEMP", "/tmp")) / "play-ci"
     folder.mkdir(parents=True, exist_ok=True)
     states = {name: os.getenv("PLAY_" + name.upper() + "_OUTCOME", "missing")
-              for name in ("source", "sdk", "bootstrap", "build", "artifact", "review")}
+              for name in ("mainline", "source", "sdk", "bootstrap", "build", "artifact", "review")}
     findings = []
     for phase, state in states.items():
         f = folder / (phase + ".log")
         lines = f.read_text(errors="replace").splitlines() if f.exists() else []
         messages = [re.sub(r"\x1b\[[0-9;]*m", "", line)[6:]
                     for line in lines if line.startswith("FAIL: ")]
-        if phase in ("build", "bootstrap", "sdk") and state == "failure":
+        if phase in ("mainline", "build", "bootstrap", "sdk") and state == "failure":
             messages += [line.strip()[-500:] for line in lines
-                         if "Missing class" in line or "Execution failed for task" in line or "BUILD FAILED" in line or "baseline FAILED" in line or "direct Maven coordinates drift" in line or "curl:" in line or "Error:" in line]
+                         if "Missing class" in line or "Execution failed for task" in line or "BUILD FAILED" in line or "GOOGLE_PLAY_MAIN_PARITY" in line or "baseline FAILED" in line or "direct Maven coordinates drift" in line or "curl:" in line or "Error:" in line]
         if state == "failure" and not messages:
             messages = ["Failed phase has no recognized assertion; inspect " + phase + ".log"]
         for message in dict.fromkeys(messages):
