@@ -4,6 +4,8 @@
   "modules": [
     "android"
   ],
-  "allowed_permissions": [],
+  "allowed_permissions": [
+    "games.catastrophicdiplomacy.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+  ],
   "remove_install_permission": false
 }
