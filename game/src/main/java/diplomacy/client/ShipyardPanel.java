@@ -12,6 +12,8 @@ import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
 import diplomacy.shipyard.HullLayouts;
+import diplomacy.shipyard.ShipLineages;
+import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.sim.Battle;
 import diplomacy.shipyard.TouchGesture;
 import diplomacy.tech.TechnologyCatalog;
@@ -34,7 +36,11 @@ final class ShipyardPanel {
     private int team, selectedSlot, scroll;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
+    enum Usage { WORKSHOP, SKIRMISH, CAMPAIGN }
+    private Usage usage=Usage.WORKSHOP;
+    private int campaignRank=6,unlockedMission=1;
     private boolean playerOnly;
+    Usage usage(){return usage;}
     private boolean artPreview;
     private final TouchGesture gesture = new TouchGesture();
     private boolean scrollGesture;
@@ -46,13 +52,22 @@ final class ShipyardPanel {
     }
     void setIcons(TacticalUiIcons icons) { uiIcons = icons; }
     boolean open() { return open; }
-    void show() { open=true; playerOnly=false; draft=active[team]; selectedSlot=0; scroll=0; artPreview=false; }
-    /** Campaign equipment is edited for its commissioned fleet only. */
-    void showCampaignFleet() {
-        side(0);
-        show();
-        playerOnly=true;
-        notice="Campaign fleet only: edit, save or load your commissioned hull.";
+    void show() {
+        open=true;usage=Usage.WORKSHOP;playerOnly=false;
+        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;
+        notice="FREE DESIGN WORKSHOP: all factions and technology available.";
+    }
+    void showSkirmish(){
+        show();usage=Usage.SKIRMISH;
+        notice="SKIRMISH: all factions, hull generations and research permitted.";
+    }
+    /** Campaign engineering edits a purchase blueprint, NOT an owned ship for free. */
+    void showCampaignFleet(int researchRank,int mission){
+        if(researchRank<0||researchRank>6)
+            throw new IllegalArgumentException("Invalid campaign license");
+        show();side(0);usage=Usage.CAMPAIGN;playerOnly=true;
+        campaignRank=researchRank;unlockedMission=mission;
+        notice="CAMPAIGN BLUEPRINT: APPLY queues design for paid purchase at dock.";
     }
     void close() { open=false; playerOnly=false; gesture.cancel(); }
     void sync(int side,Shipyard.Design design) {
@@ -65,8 +80,17 @@ final class ShipyardPanel {
         int current=0;
         for(int i=0;i<options.length;i++)if(options[i]==draft.hull){current=i;break;}
         Shipyard.Hull next=options[Math.floorMod(current+step,options.length)];
+        if(usage==Usage.CAMPAIGN){
+            for(int n=0;n<options.length;n++){
+                if(ShipLineages.availableInCampaign(next,unlockedMission))break;
+                current=Math.floorMod(current+step,options.length);
+                next=options[Math.floorMod(current+step,options.length)];
+            }
+        }
         draft=Shipyard.starter(draft.faction,next);
-        selectedSlot=0;scroll=0;artPreview=false;notice="New "+next+" frame; stock equipment installed";
+        selectedSlot=0;scroll=0;artPreview=false;
+        var line=ShipLineages.of(next);
+        notice="GEN "+line.generation()+" "+line.ethos()+" / "+line.role().description;
     }
     private void faction(int step) {
         Battle.Faction[] options=Battle.Faction.values();
@@ -81,6 +105,7 @@ final class ShipyardPanel {
     private void save(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot save unserviceable ship: "+report.explanation();return;}
+        if(usage==Usage.CAMPAIGN&&!campaignPermitted())return;
         try{Gdx.files.local(fileName()).writeString(Shipyard.encode(draft),false,"UTF-8");notice="Blueprint saved locally: "+fileName();}
         catch(RuntimeException error){notice="Save failed: "+error.getMessage();}
     }
@@ -91,6 +116,9 @@ final class ShipyardPanel {
             Shipyard.Design loaded=Shipyard.decode(file.readString("UTF-8"),catalog);
             if(loaded.faction!=draft.faction||loaded.hull!=draft.hull)
                 throw new IllegalArgumentException("Blueprint must match selected faction AND hull class");
+            if(usage==Usage.CAMPAIGN)
+                CampaignShipyardRules.requireAllowed(loaded,active[0].faction,
+                        campaignRank,unlockedMission);
             draft=loaded;selectedSlot=0;scroll=0;artPreview=false;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
@@ -141,6 +169,9 @@ final class ShipyardPanel {
         if(p==null){notice="Install a module first";return;}
         ModuleVersions.Pattern[] versions=ModuleVersions.Pattern.values();
         ModuleVersions.Pattern next=versions[(p.pattern.ordinal()+1)%versions.length];
+        if(usage==Usage.CAMPAIGN&&next!=ModuleVersions.Pattern.STANDARD&&campaignRank<2){
+            notice="LOCKED: advanced patterns require research rank II";return;
+        }
         draft=draft.withModuleVersion(selectedSlot,next,p.mark);
         notice="Hardware: "+next.name().replace('_',' ')+" Mk "+p.mark+
                 " (research branch preserved)";
@@ -149,16 +180,30 @@ final class ShipyardPanel {
         Shipyard.Installed p=draft.at(selectedSlot);
         if(p==null){notice="Install a module first";return;}
         int next=p.mark%4+1;
+        if(usage==Usage.CAMPAIGN&&next>campaignRank+1){
+            notice="LOCKED: hardware Mk "+next+" exceeds campaign research";return;
+        }
         draft=draft.withModuleVersion(selectedSlot,p.pattern,next);
         notice="Hardware: "+p.pattern.name().replace('_',' ')+" Mk "+next+
                 " (separate from six-rank research)";
     }
+    private boolean campaignPermitted(){
+        try{
+            CampaignShipyardRules.requireAllowed(draft,active[0].faction,
+                    campaignRank,unlockedMission);
+            return true;
+        }catch(IllegalArgumentException denied){
+            notice="LOCKED: "+denied.getMessage();return false;
+        }
+    }
     private void apply(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
-        if(!report.valid()){notice="Cannot deploy: "+report.explanation();return;}
+        if(!report.valid()){notice="Cannot approve: "+report.explanation();return;}
+        if(usage==Usage.CAMPAIGN&&!campaignPermitted())return;
         active[team]=draft;
         deploy.accept(team,draft);
-        notice="Battle fleet now uses fitted "+draft.hull+"s";
+        notice=usage==Usage.CAMPAIGN?"Purchase blueprint ready; no owned ship refitted":
+                "Fitted "+draft.hull+" applied to skirmish roster";
         open=false;
     }
     boolean key(int code){
@@ -277,6 +322,9 @@ final class ShipyardPanel {
                                 +"Reduce "+chosen+" to stage 0 to respec before choosing "+track;
                     }else{
                         int level=Math.max(0,Math.min(6,installed.stage(track)+delta));
+                        if(usage==Usage.CAMPAIGN&&level>campaignRank){
+                            notice="LOCKED: purchase research rank "+level+" first";return true;
+                        }
                         try{
                             draft=draft.stage(selectedSlot,track,level);
                             notice=level==0
@@ -400,7 +448,9 @@ final class ShipyardPanel {
             uiIcons.draw(batch,mountIcon,1218,357,23);
             uiIcons.draw(batch, "energy", 1213,148,22);
         }
-        font.setColor(Color.WHITE);font.draw(batch,"SHIPYARD",22,702);
+        font.setColor(Color.WHITE);
+        font.draw(batch,usage==Usage.CAMPAIGN?"CAMPAIGN SHIPYARD":
+                usage==Usage.SKIRMISH?"SKIRMISH SHIPYARD":"DESIGN WORKSHOP",22,702);
         font.setColor(team==0?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"LEFT FLEET",35,660);
         if(!playerOnly){
             font.setColor(team==1?Color.CYAN:Color.LIGHT_GRAY);
@@ -409,6 +459,11 @@ final class ShipyardPanel {
         font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("back"))font.draw(batch,"<",345,660);
         font.draw(batch,draft.hull.name().replace('_',' '),392,660);
+        var lineage=ShipLineages.of(draft.hull);
+        font.setColor(Color.GOLD);
+        font.draw(batch,"GEN "+lineage.generation()+" / "+lineage.ethos()+
+                " / "+lineage.role().name(),343,619);
+        font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);
         font.draw(batch,"APPLY",745,660);font.draw(batch,"SAVE",833,660);
         font.draw(batch,"LOAD",940,660);
@@ -539,7 +594,8 @@ final class ShipyardPanel {
         font.draw(batch,"VOLUME "+units(report.volume())+" / "+units(draft.hull.volumeCapacity),813,185);
         font.draw(batch,"POWER "+units(report.demand())+" / "+units(report.generation())+" MW",813,161);
         font.draw(batch,"HEAT  "+units(report.generatedHeat())+" / "+units(report.cooling())+" MW",813,137);
-        font.draw(batch,"COST "+report.industry()+" | RESEARCH "+report.research(),813,112);
+        font.draw(batch,"COST "+report.industry()+" | RESEARCH "+report.research()+
+                (usage==Usage.CAMPAIGN?" | LICENSE "+campaignRank+"/6":""),813,112);
         if(installed!=null){
             font.setColor(Color.GOLD);
             font.draw(batch,"V: "+installed.pattern.name().replace('_',' '),813,84);
