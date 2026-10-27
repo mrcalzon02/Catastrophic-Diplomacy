@@ -24,13 +24,13 @@ public final class CampaignLedgerTest {
                     Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE),tech);
             var initial=new CampaignLedger.Snapshot(1,state,fleet);
             CampaignLedger.commit(path,initial,tech);
-            check(CampaignLedger.load(path,tech).orElseThrow().equals(initial),
+            check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),initial),
                     "First commissioned campaign did not persist");
             var blueprint=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE_SCOUT);
             long quote=CampaignFleet.purchaseCost(blueprint,tech);
             var bought=initial.next(state.spend(quote),fleet.purchase(blueprint,tech));
             CampaignLedger.commit(path,bought,tech);
-            check(CampaignLedger.load(path,tech).orElseThrow().equals(bought),
+            check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),bought),
                     "New vessel and debit did not persist as one transaction");
             check(bought.fleet().ships().size()==fleet.ships().size()+1 &&
                     bought.progress().credits()==state.credits()-quote,
@@ -41,16 +41,16 @@ public final class CampaignLedgerTest {
             },"Duplicate purchase transaction applied twice");
             // An interrupted temp write is explicitly uncommitted; previous snapshot wins.
             Files.writeString(path.resolveSibling("campaign.dat.tmp"),"partial transaction");
-            check(CampaignLedger.load(path,tech).orElseThrow().equals(bought),
+            check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),bought),
                     "Uncommitted temporary save was treated as accepted");
             var research=bought.next(bought.progress().purchaseNextResearch(),bought.fleet());
             CampaignLedger.commit(path,research,tech);
-            check(CampaignLedger.load(path,tech).orElseThrow().equals(research),
+            check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),research),
                     "Research debit and fleet state did not persist together");
             // A damaged current file falls back to the *entire* prior snapshot,
             // never a mismatched wallet/roster pair or free ship delivery.
             Files.writeString(path,"damaged primary save");
-            check(CampaignLedger.load(path,tech).orElseThrow().equals(bought),
+            check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),bought),
                     "Corrupt primary recovered credits from a different fleet generation");
             Files.writeString(path.resolveSibling("campaign.dat.bak"),"also damaged");
             reject(()->CampaignLedger.load(path,tech),

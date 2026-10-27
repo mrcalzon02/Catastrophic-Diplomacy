@@ -63,6 +63,11 @@ public final class CampaignLedger {
             throw new IllegalArgumentException("Campaign snapshot exceeds capacity");
         return payload;
     }
+    /** Shipyard.Design intentionally has identity equality. Compare the
+     * complete canonical serialized wallet and fitted ships instead. */
+    public static boolean equivalent(Snapshot left,Snapshot right){
+        return left!=null&&right!=null&&encode(left).equals(encode(right));
+    }
     public static Snapshot decode(String data,TechnologyCatalog catalog){
         if(data==null||catalog==null||data.length()>MAX_BYTES)
             throw new IllegalArgumentException("Missing or oversized campaign snapshot");
@@ -126,7 +131,7 @@ public final class CampaignLedger {
         if(proposed.generation()!=expected)
             throw new IllegalArgumentException("Stale or duplicate campaign transaction");
         String content=encode(proposed);
-        if(!decode(content,technology).equals(proposed))
+        if(!equivalent(decode(content,technology),proposed))
             throw new IllegalArgumentException("Wallet/fleet transaction failed validation");
         Path previous=backup(path);
         // Use the highest valid prior snapshot as the recovery copy.
@@ -136,7 +141,7 @@ public final class CampaignLedger {
         }
         atomicWrite(path,content);
         Snapshot actual=load(path,technology).orElseThrow();
-        if(!actual.equals(proposed))
+        if(!equivalent(actual,proposed))
             throw new IOException("Written campaign snapshot verification failed");
     }
     private static void atomicWrite(Path path,String content)throws IOException{
