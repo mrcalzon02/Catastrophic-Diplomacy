@@ -42,11 +42,15 @@ public final class HullBaseline {
         double sensors=520+90*hull.mobility;
         double signature=0.2+StrictMath.sqrt(hull.massCapacity/120.0);
         int builtInFighters=0;
-        switch(hull){
+        switch(hull.spriteHull()){
             case LIGHT_CRUISER,CRUISER,HEAVY_CRUISER -> {shields=8;recharge=0.22;}
             case BATTLECRUISER,DREADNOUGHT -> {shields=15;recharge=0.35;}
             case CARRIER -> {shields=12;recharge=0.30;builtInFighters=2;}
             default -> { }
+        }
+        // Dedicated torpedo raiders sacrifice even inherited capital-grade shields.
+        if(ShipLineages.of(hull).role()==ShipLineages.Role.TORPEDO_STRIKER){
+            shields=0;recharge=0;
         }
         double hullFactor=1,armorFactor=1,shieldFactor=1,speedFactor=1;
         double sensorFactor=1,signatureFactor=1;
