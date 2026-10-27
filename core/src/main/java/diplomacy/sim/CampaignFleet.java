@@ -14,19 +14,28 @@ import java.util.HashSet;
 public final class CampaignFleet {
     private CampaignFleet(){}
     public enum Service { REPAIR, CREW, AMMUNITION, FUEL, CRAFT }
-    public record Stores(double hull,String integrity,double crew,int kinetic,int missiles,
+    public record Stores(double hull,String integrity,String machinery,double crew,int kinetic,int missiles,
                          int torpedoes,int fighters,int drones,int repairDrones,double fuel) {
         public Stores {
             if(!Double.isFinite(hull)||hull<0||integrity==null||integrity.isEmpty()||
+                    machinery==null||machinery.isEmpty()||
                     !Double.isFinite(crew)||crew<0||kinetic<0||missiles<0||torpedoes<0||
                     fighters<0||drones<0||repairDrones<0||!Double.isFinite(fuel)||fuel<0)
                 throw new IllegalArgumentException("Invalid ship stores");
         }
         public static Stores capture(Battle.Ship ship){
             return new Stores(Math.max(0,ship.hull),ship.defense.saveIntegrity(),
-                    Math.max(0,ship.crewCount),ship.kineticAmmo,ship.missileAmmo,
+                    ShipSubsystems.capture(ship),Math.max(0,ship.crewCount),ship.kineticAmmo,ship.missileAmmo,
                     ship.torpedoAmmo,ship.fighterReserve,ship.droneReserve,
                     ship.repairDroneReserve,Math.max(0,ship.fuel));
+        }
+        public Stores recover(int additionalFighters,int additionalDrones,int additionalRepair){
+            if(additionalFighters<0||additionalDrones<0||additionalRepair<0)
+                throw new IllegalArgumentException("Invalid recovered spacecraft");
+            return new Stores(hull,integrity,machinery,crew,kinetic,missiles,torpedoes,
+                    Math.addExact(fighters,additionalFighters),
+                    Math.addExact(drones,additionalDrones),
+                    Math.addExact(repairDrones,additionalRepair),fuel);
         }
         public void apply(Battle.Ship ship){
             if(hull>ship.maxHull+1e-6||crew>Math.min(ship.crewBerths,ship.lifeSupport)+1e-6||
@@ -36,6 +45,7 @@ public final class CampaignFleet {
                     fuel>ship.maxFuel+1e-6)
                 throw new IllegalArgumentException("Saved inventory exceeds this ship's fitted capacity");
             ship.defense.restoreIntegrity(integrity);
+            ShipSubsystems.restore(ship,machinery);
             ship.hull=hull;ship.shields=ship.defense.totalShields();
             ship.armor=ship.defense.totalArmor();
             ship.crewCount=crew;ship.kineticAmmo=kinetic;ship.missileAmmo=missiles;
@@ -159,8 +169,20 @@ public final class CampaignFleet {
                     // Escaped or committed-to-escape hulls are preserved but
                     // placed in RESERVE, never silently reactivated/replaced.
                     boolean active=prior.deployed()&&!s.escaped&&!s.withdrawing;
-                    result.add(new Vessel(prior.id(),prior.name(),prior.fitting(),active,
-                            Stores.capture(s)));
+                    int fighters=0,drones=0,repairs=0;
+                    for(Battle.Craft craft:battle.crafts()){
+                        if(craft.sourceId!=s.id||craft.integrity<=0||craft.fuel<=0)continue;
+                        if(craft.fighter)fighters++;
+                        else if(craft.repair)repairs++;
+                        else drones++;
+                    }
+                    // Only craft that actually survive in the battle can be
+                    // recovered, and never more than this vessel launched.
+                    Stores supplies=Stores.capture(s).recover(
+                            Math.min(fighters,s.fightersLaunched),
+                            Math.min(drones,s.dronesLaunched),
+                            Math.min(repairs,s.repairDronesLaunched));
+                    result.add(new Vessel(prior.id(),prior.name(),prior.fitting(),active,supplies));
                 }
             }
             result.sort(java.util.Comparator.comparingInt(Vessel::id));
@@ -174,6 +196,7 @@ public final class CampaignFleet {
                 case REPAIR -> {
                     fitted.hull=fitted.maxHull;fitted.defense.overhaul();
                     fitted.shields=fitted.maxShields;fitted.armor=fitted.maxArmor;
+                    ShipSubsystems.restore(fitted,ShipSubsystems.full());
                 }
                 case CREW -> fitted.crewCount=Math.min(fitted.crewBerths,fitted.lifeSupport);
                 case AMMUNITION -> {
@@ -203,7 +226,8 @@ public final class CampaignFleet {
                     long armor=(long)Math.ceil(Math.max(0,full.maxArmor-full.defense.totalArmor())*6);
                     long shields=(long)Math.ceil(Math.max(0,full.maxShields-
                             full.defense.totalShields())*2);
-                    yield Math.addExact(Math.addExact(structure,armor),shields);
+                    yield Math.addExact(Math.addExact(Math.addExact(structure,armor),
+                            shields),ShipSubsystems.repairCost(current.machinery()));
                 }
                 case CREW -> (long)Math.ceil(Math.max(0,
                         Math.min(full.crewBerths,full.lifeSupport)-current.crew())*95);
