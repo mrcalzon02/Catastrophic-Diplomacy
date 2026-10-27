@@ -21,6 +21,7 @@ import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.CampaignAfterAction;
+import diplomacy.sim.CampaignLedger;
 import diplomacy.sim.CampaignFleetCodec;
 import diplomacy.sim.FleetNames;
 import diplomacy.sim.CampaignDeployment;
@@ -78,6 +79,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private String dockNotice="Select ships for active duty or reserve and service them individually.";
     private static final String CAMPAIGN_BLUEPRINT_FILE="campaign/purchase-blueprint-v1.dat";
     private static final String ROSTER_FILE="campaign/fleet-roster-v1.dat";
+    private static final String LEDGER_FILE="campaign/authoritative-ledger-v1.dat";
+    private long ledgerGeneration;
+    /** Once an authoritative wallet+fleet save exists, never reimport
+     * independently saved legacy files or issue replacement starter ships. */
+    private boolean ledgerAuthorityPresent;
     private Battle.Faction pendingFaction=Battle.Faction.TERRAN;
     private int campaignPage,selectedMission=1,activeMission;
     private int deployedAtLaunch,survivorsAtEnd,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd;
@@ -544,13 +550,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_FACTION_SETUP");
     }
     private void newCampaign(){
-        campaign=CampaignProgress.start(pendingFaction);
-        campaignFleet=CampaignFleet.start(pendingFaction,
+        CampaignProgress.State proposed=CampaignProgress.start(pendingFaction);
+        CampaignFleet.Roster vessels=CampaignFleet.start(pendingFaction,
                 Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology);
+        if(!commitCampaign(proposed,vessels))return;
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
         saveCampaignBlueprint(campaignDesign);
-        saveCampaignFleet();
-        saveCampaign();
         campaignPage=0;selectedMission=1;
         screen=GameMenuPanel.Screen.CAMPAIGN;
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_MAP 1");
@@ -587,8 +592,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         try{
             long quote=project==CampaignProgress.Project.LICENSE?
                     campaign.nextResearchCost():campaign.nextAccelerationCost();
-            campaign=campaign.beginResearch(project);
-            saveCampaign();
+            CampaignProgress.State started=campaign.beginResearch(project);
+            if(!commitCampaign(started,campaignFleet))return;
             researchNotice=campaign.activeProject()==CampaignProgress.Project.NONE?
                     project+" researched instantly for "+quote+" credits (0 missions).":
                     project+" queued for "+quote+" credits. Complete "+
@@ -619,8 +624,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(price==0){dockNotice=service+" already fully supplied on ship #"+id;return;}
             CampaignProgress.State debited=campaign.spend(price);
             CampaignFleet.Roster serviced=campaignFleet.service(id,service,technology);
-            campaignFleet=serviced;campaign=debited;
-            saveCampaignFleet();saveCampaign();
+            if(!commitCampaign(debited,serviced))return;
             dockNotice=service+" for ship #"+id+" charged "+price+" credits.";
             Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE "+service+" ship="+id+" credits="+price);
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
@@ -634,8 +638,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     Gdx.app.postRunnable(()->{
                         if(campaignFleet==null||screen!=GameMenuPanel.Screen.DOCK)return;
                         try{
-                            campaignFleet=campaignFleet.rename(shipId,proposed);
-                            saveCampaignFleet();
+                            if(!commitCampaign(campaign,campaignFleet.rename(shipId,proposed)))return;
                             dockNotice="Ship #"+shipId+" renamed to "+campaignFleet.get(shipId).name();
                         }catch(IllegalArgumentException denied){
                             dockNotice=denied.getMessage();
@@ -657,8 +660,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             // Both proposed values are computed before mutating either live state.
             CampaignProgress.State debited=campaign.spend(quote);
             CampaignFleet.Roster serviced=campaignFleet.serviceAll(id,technology);
-            campaignFleet=serviced;campaign=debited;
-            saveCampaignFleet();saveCampaign();
+            if(!commitCampaign(debited,serviced))return;
             dockNotice="All services for ship #"+id+" charged "+quote+" credits.";
             Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE_ALL ship="+id+" credits="+quote);
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
@@ -671,10 +673,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             long price=CampaignFleet.purchaseCost(design,technology);
             CampaignProgress.State debited=campaign.spend(price);
             CampaignFleet.Roster purchased=campaignFleet.purchase(design,technology);
-            campaignFleet=purchased;campaign=debited;
+            if(!commitCampaign(debited,purchased))return;
             dockSelected=campaignFleet.ships().size()-1;
             dockPage=dockSelected/9;
-            saveCampaignFleet();saveCampaign();
             dockNotice="New hull in AVAILABLE reserve; crew, ordnance and fuel are not free.";
             Gdx.app.log("CD-GAME-FLOW","PURCHASE_HULL id="+dockShipId()+" cost="+price);
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
@@ -684,9 +685,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             int id=dockShipId();
             boolean active=!campaignFleet.get(id).deployed();
             int mission=selectedMission<=campaign.unlocked()?selectedMission:campaign.unlocked();
-            campaignFleet=campaignFleet.setActive(id,active,
-                    LevelEconomy.level(mission).maximumFleet());
-            saveCampaignFleet();
+            if(!commitCampaign(campaign,campaignFleet.setActive(id,active,
+                    LevelEconomy.level(mission).maximumFleet())))return;
             dockNotice="Ship #"+id+(active?" moved to ACTIVE deployment.":" moved to AVAILABLE reserve.");
             Gdx.app.log("CD-GAME-FLOW","ROSTER ship="+id+" "+(active?"ACTIVE":"RESERVE"));
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
@@ -718,16 +718,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 16 -> openResearch();
             case 11 -> {
                 var styles=FleetNames.Style.values();
-                campaignFleet=campaignFleet.changeStyle(styles[(campaignFleet.style().ordinal()+1)%styles.length]);
-                saveCampaignFleet();
+                if(!commitCampaign(campaign,campaignFleet.changeStyle(
+                        styles[(campaignFleet.style().ordinal()+1)%styles.length])))return;
                 dockNotice="New generated names use "+campaignFleet.style()+" style.";
             }
             case 12 -> {
                 try{
                     int id=dockShipId();
-                    campaignFleet=campaignFleet.rename(id,FleetNames.generate(campaignFleet.style(),
-                            campaign.faction().ordinal(),id));
-                    saveCampaignFleet();
+                    if(!commitCampaign(campaign,campaignFleet.rename(id,
+                            FleetNames.generate(campaignFleet.style(),
+                                    campaign.faction().ordinal(),id))))return;
                     dockNotice="Renamed ship #"+id+" to "+campaignFleet.get(id).name();
                 }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
             }
@@ -926,39 +926,39 @@ public final class CatastrophicGame extends ApplicationAdapter {
         escapedAtEnd=battle.escaped(0);
         destroyedAtEnd=battle.destroyed(0);
         lastReward=0;
-        if(playedCampaign&&campaignFleet!=null){
+        if(playedCampaign&&campaignFleet!=null&&campaign!=null){
             try{
+                // The battle ends once. Its returned vessels, costs, mission
+                // rewards and research tick are one durable ledger generation.
                 campaignAfterAction=CampaignAfterAction.capture(campaignFleet,campaignSortie,battle);
                 afterActionPage=0;
-                campaignFleet=campaignFleet.afterBattle(battle,campaignSortie);
-                saveCampaignFleet();
-                Gdx.app.log("CD-GAME-FLOW","ROSTER_RECOVERY owned="+campaignFleet.ships().size()+
-                        " active="+campaignFleet.active().size()+
-                        " reserve="+campaignFleet.reserves().size());
+                CampaignFleet.Roster returned=campaignFleet.afterBattle(battle,campaignSortie);
+                CampaignProgress.State before=campaign;
+                CampaignProgress.State next=lastWon?
+                        before.complete(activeMission,deployedAtLaunch,survivorsAtEnd):before;
+                boolean replay=before.isReplay(activeMission);
+                if(commitCampaign(next,returned)){
+                    lastReward=next.credits()-before.credits();
+                    if(lastWon&&next.researchRank()>before.researchRank())
+                        dockNotice="RESEARCH COMPLETE: technology license rank "+
+                                next.researchRank()+" acquired.";
+                    else if(lastWon&&next.speedUpgrades()>before.speedUpgrades())
+                        dockNotice="LAB UPGRADE COMPLETE: research time reduced, minimum zero.";
+                    else if(lastWon&&before.activeProject()!=CampaignProgress.Project.NONE)
+                        dockNotice="Research progress "+next.projectProgress()+
+                                "/"+next.currentProjectMissions()+" mission ticks.";
+                    Gdx.app.log("CD-GAME-FLOW","MISSION_LEDGER_COMMITTED mission="+
+                            activeMission+" replay="+replay+" credits="+lastReward+
+                            " owned="+returned.ships().size());
+                }else{
+                    lastReward=0; // An unsaved victory is not a credited victory.
+                    Gdx.app.error("CAMPAIGN","Battle ended; combined fleet/reward ledger not committed");
+                }
             }catch(RuntimeException failed){
-                Gdx.app.error("CAMPAIGN","Cannot preserve returned ships",failed);
+                lastReward=0;
+                dockNotice="Campaign recovery failed; no rewards or ship losses were committed.";
+                Gdx.app.error("CAMPAIGN","Unable to commit battle settlement",failed);
             }
-        }
-        if(playedCampaign&&lastWon){
-            long before=campaign.credits();
-            CampaignProgress.Project previous=campaign.activeProject();
-            int previousRank=campaign.researchRank(),previousSpeed=campaign.speedUpgrades();
-            boolean replay=campaign.isReplay(activeMission);
-            campaign=campaign.complete(activeMission,deployedAtLaunch,survivorsAtEnd);
-            lastReward=campaign.credits()-before;
-            saveCampaign();
-            if(campaign.researchRank()>previousRank)
-                dockNotice="RESEARCH COMPLETE: technology license rank "+campaign.researchRank()+
-                        " acquired after mission "+activeMission+".";
-            else if(campaign.speedUpgrades()>previousSpeed)
-                dockNotice="LAB UPGRADE COMPLETE: research requirements reduced by "+
-                        campaign.speedUpgrades()+" mission(s), floored at zero.";
-            else if(previous!=CampaignProgress.Project.NONE)
-                dockNotice="Research progress: "+campaign.projectProgress()+" / "+
-                        campaign.currentProjectMissions()+" work after mission "+activeMission+".";
-            Gdx.app.log("CD-GAME-FLOW","MISSION_REWARD level="+activeMission+
-                    " replay="+replay+" credits="+lastReward+" research="+
-                    campaign.activeProject()+" progress="+campaign.projectProgress());
         }
         running=false;screen=GameMenuPanel.Screen.RESULTS;Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
     }
@@ -1164,85 +1164,83 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return false;
         }
     }
-    private void restoreCampaignFleet(){
-        if(campaign==null)return;
-        FileHandle primary=Gdx.files.local(ROSTER_FILE);
-        FileHandle backup=Gdx.files.local(ROSTER_FILE+".bak");
-        for(FileHandle file:new FileHandle[]{primary,backup}){
-            if(!file.exists())continue;
-            try{
-                var roster=CampaignFleetCodec.decode(file.readString("UTF-8"),technology);
-                if(roster.faction()!=campaign.faction())
-                    throw new IllegalArgumentException("Roster belongs to another faction");
-                campaignFleet=roster;
-                return;
-            }catch(RuntimeException invalid){
-                Gdx.app.error("CAMPAIGN","Invalid fleet roster: "+file.path(),invalid);
-            }
-        }
-        // Only legacy campaigns with NO roster get an initial fleet. A
-        // corrupted roster must never turn into free replacement hulls.
-        if(!primary.exists()&&!backup.exists()){
-            campaignFleet=CampaignFleet.start(campaign.faction(),
-                    Shipyard.starter(campaign.faction(),Shipyard.Hull.CORVETTE),technology);
-            saveCampaignFleet();
-        }else{
-            campaignFleet=null;
-            dockNotice="Fleet registry and backup invalid. Recover the saved roster; no free ships issued.";
-        }
-    }
-    private void saveCampaignFleet(){
-        if(campaignFleet==null)return;
-        try{
-            FileHandle primary=Gdx.files.local(ROSTER_FILE);
-            FileHandle backup=Gdx.files.local(ROSTER_FILE+".bak");
-            FileHandle temporary=Gdx.files.local(ROSTER_FILE+".tmp");
-            temporary.writeString(CampaignFleetCodec.encode(campaignFleet),false,"UTF-8");
-            CampaignFleetCodec.decode(temporary.readString("UTF-8"),technology);
-            if(primary.exists()){
-                try{
-                    CampaignFleetCodec.decode(primary.readString("UTF-8"),technology);
-                    primary.copyTo(backup);
-                }catch(RuntimeException corrupt){
-                    Gdx.app.log("CAMPAIGN","Retaining last valid fleet backup");
-                }
-            }
-            temporary.moveTo(primary);
-        }catch(RuntimeException failed){
-            Gdx.app.error("CAMPAIGN","Unable to save commissioned fleet",failed);
-            dockNotice="Fleet save failed; check local app storage.";
-        }
-    }
+    /** Both records are restored from a single validated authority.
+     * Only when NO ledger has ever been written can old split saves be imported. */
     private void restoreCampaign(){
-        for(FileHandle f:new FileHandle[]{Gdx.files.local(CAMPAIGN_FILE),Gdx.files.local(CAMPAIGN_FILE+".bak")}){
+        java.nio.file.Path file=Gdx.files.local(LEDGER_FILE).file().toPath();
+        ledgerAuthorityPresent=java.nio.file.Files.exists(file)||
+                java.nio.file.Files.exists(file.resolveSibling(file.getFileName()+".bak"));
+        if(ledgerAuthorityPresent){
+            try{
+                var stored=CampaignLedger.load(file,technology).orElseThrow();
+                campaign=stored.progress();campaignFleet=stored.fleet();
+                ledgerGeneration=stored.generation();
+                Gdx.app.log("CAMPAIGN","Loaded atomic campaign generation "+ledgerGeneration);
+            }catch(RuntimeException invalid){
+                campaign=null;campaignFleet=null;
+                dockNotice="Campaign ledger and backup invalid. No free ships or credits issued.";
+                Gdx.app.error("CAMPAIGN","Authoritative recovery failed",invalid);
+            }
+            return;
+        }
+        for(FileHandle f:new FileHandle[]{Gdx.files.local(CAMPAIGN_FILE),
+                Gdx.files.local(CAMPAIGN_FILE+".bak")}){
             if(!f.exists())continue;
             try{
                 campaign=CampaignProgress.decode(f.readString("UTF-8"));
                 return;
-            }catch(RuntimeException damaged){
-                Gdx.app.error("CAMPAIGN","Rejected invalid campaign progress: "+f.path(),damaged);
+            }catch(RuntimeException invalid){
+                Gdx.app.error("CAMPAIGN","Rejected old progress: "+f.path(),invalid);
             }
         }
     }
-    private void saveCampaign(){
-        if(campaign==null)return;
-        try{
-            FileHandle primary=Gdx.files.local(CAMPAIGN_FILE);
-            FileHandle backup=Gdx.files.local(CAMPAIGN_FILE+".bak");
-            FileHandle temp=Gdx.files.local(CAMPAIGN_FILE+".tmp");
-            temp.writeString(CampaignProgress.encode(campaign),false,"UTF-8");
-            CampaignProgress.decode(temp.readString("UTF-8"));
-            if(primary.exists()){
-                try{
-                    CampaignProgress.decode(primary.readString("UTF-8"));
-                    primary.copyTo(backup);
-                }catch(RuntimeException corrupted){
-                    Gdx.app.log("CAMPAIGN","Preserving last good backup instead of corrupt primary");
-                }
+    private void restoreCampaignFleet(){
+        if(ledgerAuthorityPresent||campaign==null)return;
+        FileHandle primary=Gdx.files.local(ROSTER_FILE);
+        FileHandle backup=Gdx.files.local(ROSTER_FILE+".bak");
+        CampaignFleet.Roster legacy=null;
+        for(FileHandle candidate:new FileHandle[]{primary,backup}){
+            if(!candidate.exists())continue;
+            try{
+                legacy=CampaignFleetCodec.decode(candidate.readString("UTF-8"),technology);
+                if(legacy.faction()!=campaign.faction())
+                    throw new IllegalArgumentException("Legacy faction mismatch");
+                break;
+            }catch(RuntimeException invalid){
+                Gdx.app.error("CAMPAIGN","Rejected old roster "+candidate.path(),invalid);
             }
-            temp.moveTo(primary);
-        }catch(RuntimeException error){
-            Gdx.app.error("CAMPAIGN","Unable to save campaign progress",error);
+        }
+        if(legacy==null){
+            if(primary.exists()||backup.exists()){
+                campaignFleet=null;
+                dockNotice="Legacy fleet corrupted; no replacement hulls issued.";
+                return;
+            }
+            legacy=CampaignFleet.start(campaign.faction(),
+                    Shipyard.starter(campaign.faction(),Shipyard.Hull.CORVETTE),technology);
+        }
+        // Legacy migration must be one committed snapshot. The originals are
+        // retained for manual recovery, but are never used after this succeeds.
+        commitCampaign(campaign,legacy);
+    }
+    /** No live wallet/fleet mutation until the complete next snapshot has
+     * atomically reached local storage and readback verified it. */
+    private boolean commitCampaign(CampaignProgress.State nextProgress,
+                                   CampaignFleet.Roster nextFleet){
+        if(nextProgress==null||nextFleet==null)return false;
+        try{
+            var pending=new CampaignLedger.Snapshot(
+                    Math.addExact(ledgerGeneration,1),nextProgress,nextFleet);
+            CampaignLedger.commit(Gdx.files.local(LEDGER_FILE).file().toPath(),
+                    pending,technology);
+            campaign=nextProgress;campaignFleet=nextFleet;
+            ledgerGeneration=pending.generation();
+            ledgerAuthorityPresent=true;
+            return true;
+        }catch(java.io.IOException|RuntimeException failed){
+            dockNotice="CAMPAIGN SAVE FAILED: credits and fleet unchanged; free space and retry.";
+            Gdx.app.error("CAMPAIGN","Failed atomic campaign transaction",failed);
+            return false;
         }
     }
 
