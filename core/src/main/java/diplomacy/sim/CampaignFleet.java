@@ -215,6 +215,22 @@ public final class CampaignFleet {
             updated.replaceAll(item->item.id()==id?item.withStores(Stores.capture(fitted)):item);
             return new Roster(faction,style,nextId,updated);
         }
+        /** Quote the complete dock job before debiting credits. All five services
+         * are calculated from this vessel's actual fitted capacity and stores. */
+        public long costAll(int id,TechnologyCatalog technology){
+            long total=0;
+            for(Service type:Service.values())
+                total=Math.addExact(total,cost(id,type,technology));
+            return total;
+        }
+        /** Return one new immutable fleet only after every service succeeds.
+         * The caller must debit the full quoted price exactly once. */
+        public Roster serviceAll(int id,TechnologyCatalog technology){
+            Roster updated=this;
+            for(Service type:Service.values())
+                updated=updated.service(id,type,technology);
+            return updated;
+        }
         public long cost(int id,Service service,TechnologyCatalog technology){
             Vessel vessel=get(id);
             Battle.Ship full=fresh(vessel.fitting(),technology);
