@@ -52,6 +52,12 @@ public final class GameMenuFlowTest {
                     "Fleet service/purchase/name control missing "+i);
         check(GameMenuPanel.dockAction(1000,546-9*46,0,4)==13,
                 "Service All must be a usable button, not only a price label");
+        check(GameMenuPanel.dockAction(1110,546-7*46,0,4)==17,
+                "Radio voice selection must respond to a real dock button");
+        check(GameMenuPanel.dockAction(1000,546-7*46,0,4)==11,
+                "Name-theme selection displaced by the new radio button");
+        check(GameMenuPanel.dockAction(1024,546-7*46,0,4)==-1,
+                "Name-theme and radio-voice buttons must not overlap");
         check(GameMenuPanel.dockAction(1110,546-8*46,0,4)==14,
                 "Manual renaming must have a separate native text-input action");
         check(GameMenuPanel.dockAction(1024,546-8*46,0,4)==-1,
