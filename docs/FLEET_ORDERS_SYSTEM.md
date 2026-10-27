@@ -81,7 +81,7 @@ The earlier sequential MOVE/HOLD/ENGAGE `ShipCommandQueue` machinery is separate
 It is no longer exposed as the primary standing-orders UI. It does not substitute
 for orders that should remain effective all battle long.
 
-**Functional acceptance:** `:core:shipStandingOrdersSmoke` tests all 13 fields,
+**Functional acceptance:** `:core:shipStandingOrdersSmoke` tests all 23 fields,
 checksum round trips of 200 independently indexed ship profiles, tamper rejection,
 actual commissioned ship doctrine, wave retention and precedence over fleet-wide orders.
 `:game:menuFlowSmoke` checks all standing editor hit targets; the signed Android
@@ -92,4 +92,11 @@ Still to build: group selection and apply-to-group controls, separate *physical 
 hardpoint* fire-control doctrines, direct escort-parent selection, full retreat/escape
 accounting, deeper behavior for aggression and caution beyond engagement separation,
 and device-verified tuning against the 200v200 battle.
-\n## Expanded independent orders (implementation slice)\n\nPer-ship directives now include engine speed limiting (25-100% of fitted drive), physical point-defense interception strategy (early / close-in / fastest impact), point-defense scope (self / selected protected targets / all allies), fighter sortie behavior (strike / screen / protect / reserve), four separate protected friendly targets, and one assigned escort target with adjustable distance. These are simultaneous orders that persist in a versioned **CD-STANDING-2** format. Legacy **CD-STANDING-1** files remain readable. References are zero-based commissioned fleet slots and resolve to real friendly ship IDs at deployment, not opaque saved runtime IDs.\n\nThe orders editor has two compact pages: combat policies and support/relationships. Long-range intercept is limited by real point-defense module detection and reach. *Screen* launches fighter sorties for nearby threats and *Protect* for ships actually threatening designated friendlies; craft still use their own fitted weapon and sensor profiles. The individual policies are distinct from the older optional waypoint program.\n\nThis does not yet model weapon-by-weapon PD fire control, squadron wing redistribution among multiple carriers, or completed retreat/escape accounting. Do not claim full GSB order parity.\n
+
+## Expanded independent orders (implementation slice)
+
+Per-ship directives now include engine speed limiting (25-100% of fitted drive), physical point-defense interception strategy (early / close-in / fastest impact), point-defense scope (self / selected protected targets / all allies), fighter sortie behavior (strike / screen / protect / reserve), four separate protected friendly targets, and one assigned escort target with adjustable distance. These are simultaneous orders that persist in a versioned **CD-STANDING-2** format. Legacy **CD-STANDING-1** files remain readable. References are zero-based commissioned fleet slots and resolve to real friendly ship IDs at deployment, not opaque saved runtime IDs.
+
+The orders editor has two compact pages: combat policies and support/relationships. Long-range intercept is limited by real point-defense module detection and reach. *Screen* launches fighter sorties for nearby threats and *Protect* for ships actually threatening designated friendlies; craft still use their own fitted weapon and sensor profiles. The individual policies are distinct from the older optional waypoint program.
+
+This does not yet model weapon-by-weapon PD fire control, squadron wing redistribution among multiple carriers, or completed retreat/escape accounting. Do not claim full GSB order parity.

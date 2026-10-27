@@ -336,7 +336,8 @@ tasks.register('shipStandingOrdersSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('shipPlacementOrdersSmoke') { finalizedBy(tasks.named('shipStandingOrdersSmoke')) }
-\ntasks.register('shipTacticalDirectivesSmoke', JavaExec) {
+
+tasks.register('shipTacticalDirectivesSmoke', JavaExec) {
     group = 'verification'
     description = 'Check independent protect/escort, speed and point defense tactics on real commissioned combat ships.'
     classpath = sourceSets.test.runtimeClasspath

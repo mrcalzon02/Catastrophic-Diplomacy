@@ -68,7 +68,7 @@ public final class ShipStandingOrdersTest {
                 "200-hull standing orders failed checksum round-trip");
         check(encoded.equals(ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved)),
                 "Nondeterministic doctrine save serialization");
-        check(encoded.startsWith("CD-STANDING-2\\n".replace("\\\\n","\\n")),
+        check(encoded.startsWith("CD-STANDING-2\\n"),
                 "New versioned policy format not written");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replace("TERRAN","DRAXIAN")),
                 "Tampered faction save accepted");
