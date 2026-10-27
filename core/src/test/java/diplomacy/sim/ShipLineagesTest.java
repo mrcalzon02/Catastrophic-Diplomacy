@@ -25,6 +25,7 @@ public final class ShipLineagesTest {
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         check(Shipyard.Hull.values().length>=40,"Expected expanded physical chassis roster");
         int checked=0;
+        var invalidFittings=new java.util.ArrayList<String>();
         for(int generation=1;generation<=10;generation++){
             var hulls=ShipLineages.generation(generation);
             var kinds=EnumSet.noneOf(ShipLineages.Role.class);
@@ -40,7 +41,10 @@ public final class ShipLineagesTest {
                 for(Battle.Faction faction:Battle.Faction.values()){
                     var fitting=Shipyard.starter(faction,h);
                     var quality=Shipyard.inspect(fitting,catalog);
-                    check(quality.valid(),"Unbuildable "+faction+" "+h+": "+quality.explanation());
+                    if(!quality.valid()){
+                        invalidFittings.add("Unbuildable "+faction+"/"+h+": "+quality.explanation());
+                        continue;
+                    }
                     var actual=Shipyard.fit(fitting,catalog);
                     check(actual.speed()>0&&actual.hull()>0&&actual.maxPower()>0,
                             "Empty combat parameters for "+faction+"/"+h);
@@ -74,6 +78,9 @@ public final class ShipLineagesTest {
                     ShipLineages.Role.LOGISTICS_JUGGERNAUT)),
                     "Incomplete compressed three-role flagship at generation "+generation);
         }
+        check(invalidFittings.isEmpty(),
+                "Invalid physical role prototypes ("+invalidFittings.size()+"): "+
+                        String.join("; ",invalidFittings.subList(0,Math.min(invalidFittings.size(),50))));
         check(ShipLineages.maximumCampaignGeneration(1)==2,"Starting corvette access missing");
         check(ShipLineages.maximumCampaignGeneration(500)==10,"Top-level fleet locked forever");
         var base=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
