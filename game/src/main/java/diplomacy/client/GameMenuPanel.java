@@ -9,6 +9,7 @@ import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.CampaignFleet;
+import diplomacy.sim.CampaignAfterAction;
 import diplomacy.sim.ShipStandingOrders;
 import java.util.Set;
 import diplomacy.sim.LevelEconomy;
@@ -127,6 +128,12 @@ final class GameMenuPanel {
         }
         return -1;
     }
+    /** Disjoint paging controls on the large commissioned-vessel report. */
+    static int afterActionAction(float x,float y){
+        if(hit(x,y,825,253,160,44))return -1;
+        if(hit(x,y,1011,253,165,44))return 1;
+        return 0;
+    }
     static int mapHit(float x,float y,int page){
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             if(Math.hypot(x-node.x(),y-node.y())<=26)return node.level();
@@ -155,7 +162,7 @@ final class GameMenuPanel {
               long purchaseCost,String dockNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
-              int withdrawing){
+              int withdrawing,CampaignAfterAction.Report report,int reportPage){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,W,H,BG);
         // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
@@ -302,7 +309,12 @@ final class GameMenuPanel {
                     if(i!=3||updaterAvailable)button(shapes,405,472-i*78,470,59,false);
             }
             case RESULTS -> {
-                rectangle(shapes,300,240,680,270,PANEL);
+                if(report!=null){
+                    rectangle(shapes,35,231,1210,379,PANEL);
+                    rectangle(shapes,490,244,743,352,SELECT);
+                    button(shapes,825,253,160,44,false);
+                    button(shapes,1011,253,165,44,false);
+                }else rectangle(shapes,300,240,680,270,PANEL);
                 button(shapes,351,122,254,58,false);
                 button(shapes,673,122,254,58,true);
             }
@@ -507,20 +519,56 @@ final class GameMenuPanel {
             }
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");
-                label(batch,font,won?"MISSION ACCOMPLISHED":
-                        escaped+withdrawing>0&&surviving==0?"FLEET WITHDREW":"FLEET DEFEATED",
-                        416,494,won?Color.GREEN:Color.SCARLET);
-                label(batch,font,"ACTIVE SURVIVORS: "+surviving+" / "+deployed,416,448,Color.WHITE);
-                label(batch,font,"WITHDRAWING: "+withdrawing+" (NOT SURVIVORS)",416,412,Color.CYAN);
-                label(batch,font,"ESCAPED SHIPS: "+escaped+" (NO VICTORY CREDIT)",416,380,Color.CYAN);
-                label(batch,font,"DESTROYED HULLS: "+destroyed,416,348,Color.WHITE);
-                label(batch,font,"CREDITS AWARDED: "+reward,416,312,Color.GOLD);
+                if(report!=null){
+                    label(batch,font,won?"MISSION ACCOMPLISHED":"BATTLE ENDED",
+                            56,565,won?Color.GREEN:Color.SCARLET);
+                    label(batch,font,"SURVIVED: "+
+                            report.count(CampaignAfterAction.Outcome.SURVIVED),56,516,Color.WHITE);
+                    label(batch,font,"WITHDRAWING: "+
+                            report.count(CampaignAfterAction.Outcome.WITHDRAWING),56,473,Color.CYAN);
+                    label(batch,font,"ESCAPED: "+
+                            report.count(CampaignAfterAction.Outcome.ESCAPED),56,430,Color.CYAN);
+                    label(batch,font,"DESTROYED: "+
+                            report.count(CampaignAfterAction.Outcome.DESTROYED),56,387,Color.SCARLET);
+                    label(batch,font,"CREDITS AWARDED: "+reward,56,344,Color.GOLD);
+                    int pages=report.pages(5);
+                    int safe=Math.max(0,Math.min(pages-1,reportPage));
+                    label(batch,font,"COMMISSIONED SHIPS  PAGE "+(safe+1)+"/"+pages,
+                            510,579,Color.WHITE);
+                    int row=0;
+                    for(var ship:report.page(safe,5)){
+                        int y=542-row*48;
+                        label(batch,font,"#"+ship.id()+" "+shortLabel(ship.name(),23)+
+                                " ["+ship.hull().name().replace('_',' ')+"] "+ship.outcome(),
+                                510,y,ship.outcome()==CampaignAfterAction.Outcome.DESTROYED?
+                                        Color.SCARLET:Color.WHITE);
+                        label(batch,font,"HULL "+ship.hullPercent()+"% | CREW LOST "+ship.crewLost()+
+                                " | AMMO K/M/T "+ship.kineticSpent()+"/"+
+                                ship.missileSpent()+"/"+ship.torpedoSpent()+
+                                " | FUEL "+ship.fuelSpent(),510,y-20,MUTED);
+                        row++;
+                    }
+                    label(batch,font,"< PREVIOUS",843,284,Color.WHITE);
+                    label(batch,font,"NEXT >",1034,284,Color.WHITE);
+                }else{
+                    label(batch,font,won?"MISSION ACCOMPLISHED":
+                            escaped+withdrawing>0&&surviving==0?"FLEET WITHDREW":"FLEET DEFEATED",
+                            416,494,won?Color.GREEN:Color.SCARLET);
+                    label(batch,font,"ACTIVE SURVIVORS: "+surviving+" / "+deployed,416,448,Color.WHITE);
+                    label(batch,font,"WITHDRAWING: "+withdrawing+" (NOT SURVIVORS)",416,412,Color.CYAN);
+                    label(batch,font,"ESCAPED SHIPS: "+escaped+" (NO VICTORY CREDIT)",416,380,Color.CYAN);
+                    label(batch,font,"DESTROYED HULLS: "+destroyed,416,348,Color.WHITE);
+                    label(batch,font,"CREDITS AWARDED: "+reward,416,312,Color.GOLD);
+                }
                 label(batch,font,"RETRY",423,157,Color.WHITE);
                 label(batch,font,"RETURN TO "+(progress!=null?"CAMPAIGN":"SKIRMISH"),699,157,Color.WHITE);
             }
             default -> {}
         }
         batch.end();
+    }
+    private static String shortLabel(String value,int max){
+        return value.length()<=max?value:value.substring(0,max-3)+"...";
     }
     private static void drawCampaign(SpriteBatch batch,BitmapFont font,
                                       CampaignProgress.State progress,int page,int selected){

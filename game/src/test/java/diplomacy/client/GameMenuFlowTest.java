@@ -130,6 +130,14 @@ public final class GameMenuFlowTest {
             for(var node:CampaignMap.page(page))
                 check(GameMenuPanel.mapHit(node.x(),node.y(),page)==node.level(),
                         "Map selection did not return the displayed mission: "+node.level());
+        check(GameMenuPanel.afterActionAction(860,274)==-1,
+                "Previous report page has no touch action");
+        check(GameMenuPanel.afterActionAction(1060,274)==1,
+                "Next report page has no touch action");
+        check(GameMenuPanel.afterActionAction(700,274)==0,
+                "Results report text accidentally activates navigation");
+        check(GameMenuPanel.afterActionAction(700,155)==0,
+                "After-action pages overlap retry/exit");
         System.out.println("PASS functional menu hit regions: six home actions, "+
                 presets.length+" skirmishes, "+factions.length+" factions, 500 map nodes");
     }

@@ -20,6 +20,7 @@ import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignFleet;
+import diplomacy.sim.CampaignAfterAction;
 import diplomacy.sim.CampaignFleetCodec;
 import diplomacy.sim.FleetNames;
 import diplomacy.sim.CampaignDeployment;
@@ -92,6 +93,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean preparingCampaign=true,preparedSkirmish;
     private String deploymentNotice="Tap a ship then drag it anywhere within the non-overlapping deployment zone.";
     private long lastReward;
+    private CampaignAfterAction.Report campaignAfterAction;
+    private int afterActionPage;
     private boolean playedCampaign,lastWon;
     private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
     private TechnologyCatalog technology;
@@ -227,6 +230,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.RESULTS){
+                        if(key==Input.Keys.LEFT)afterActionPage=Math.max(0,afterActionPage-1);
+                        else if(key==Input.Keys.RIGHT&&campaignAfterAction!=null)
+                            afterActionPage=Math.min(campaignAfterAction.pages(5)-1,afterActionPage+1);
                         if(key==Input.Keys.R){
                             if(playedCampaign)openDock();else launchSkirmish();
                         }else if(key==Input.Keys.ENTER)leaveResults();
@@ -903,6 +909,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         rightDesign=Shipyard.starter(right,stage.index()<15?
                 Shipyard.Hull.CORVETTE:stage.index()<75?Shipyard.Hull.FRIGATE:Shipyard.Hull.CRUISER);
         shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+        campaignAfterAction=null;afterActionPage=0;
         deployedAtLaunch=deployment.ships();
         campaignSortie.clear();
         for(var vessel:campaignFleet.active())campaignSortie.add(vessel.id());
@@ -920,6 +927,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         lastReward=0;
         if(playedCampaign&&campaignFleet!=null){
             try{
+                campaignAfterAction=CampaignAfterAction.capture(campaignFleet,campaignSortie,battle);
+                afterActionPage=0;
                 campaignFleet=campaignFleet.afterBattle(battle,campaignSortie);
                 saveCampaignFleet();
                 Gdx.app.log("CD-GAME-FLOW","ROSTER_RECOVERY owned="+campaignFleet.ships().size()+
@@ -1090,6 +1099,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.RESULTS){
+            int direction=GameMenuPanel.afterActionAction(x,y);
+            if(campaignAfterAction!=null&&direction!=0){
+                afterActionPage=Math.max(0,Math.min(campaignAfterAction.pages(5)-1,
+                        afterActionPage+direction));
+                return;
+            }
             if(GameMenuPanel.hit(x,y,351,122,254,58)){
                 if(playedCampaign)launchCampaignMission();else launchSkirmish();
             }else if(GameMenuPanel.hit(x,y,673,122,254,58))leaveResults();
@@ -1519,7 +1534,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     CampaignFleet.purchaseCost(campaignDesign==null?leftDesign:campaignDesign,
                             technology),screen==GameMenuPanel.Screen.RESEARCH?researchNotice:dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
-                    survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd);
+                    survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
+                    screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
+                    afterActionPage);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
