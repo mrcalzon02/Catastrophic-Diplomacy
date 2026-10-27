@@ -17,7 +17,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -110,6 +110,8 @@ final class GameMenuPanel {
     static int dockAction(float x,float y,int page,int ownedCount){
         if(hit(x,y,35,35,165,50))return 0;
         if(hit(x,y,980,35,260,50))return 1;
+        if(hit(x,y,310,35,200,50))return 15; // owned campaign shipyard
+        if(hit(x,y,530,35,210,50))return 16; // paid research ledger
         if(hit(x,y,548,566,86,43))return 2;
         if(hit(x,y,642,566,86,43))return 3;
         for(int i=0;i<9;i++)
@@ -205,13 +207,22 @@ final class GameMenuPanel {
                 button(shapes,35,35,165,50,false);
                 button(shapes,214,35,136,50,false);
                 button(shapes,366,35,136,50,false);
+                button(shapes,525,35,200,50,false);
+                button(shapes,741,35,190,50,false);
                 button(shapes,964,35,278,50,true);
+            }
+            case RESEARCH -> {
+                rectangle(shapes,110,174,1050,444,PANEL);
+                button(shapes,35,35,250,54,false);
+                button(shapes,906,35,330,54,true);
             }
             case DOCK -> {
                 rectangle(shapes,33,108,771,509,PANEL);
                 rectangle(shapes,818,108,427,509,PANEL);
                 button(shapes,35,35,165,50,false);
                 button(shapes,980,35,260,50,false);
+                button(shapes,310,35,200,50,false);
+                button(shapes,530,35,210,50,false);
                 button(shapes,548,566,86,43,false);
                 button(shapes,642,566,86,43,false);
                 if(ownedFleet!=null)
@@ -342,6 +353,26 @@ final class GameMenuPanel {
                 label(batch,font,preset.demonstration?"LAUNCH TEST":"DEPLOY FLEET",998,67,Color.WHITE);
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
+            case RESEARCH -> {
+                title(batch,font,"RESEARCH AND ENGINEERING",
+                        "PAID FACTION LICENSES APPLY TO CAMPAIGN FITTINGS; SKIRMISH IS UNRESTRICTED");
+                label(batch,font,"FACTION: "+progress.faction().displayName,151,559,Color.CYAN);
+                label(batch,font,"CURRENT TECHNOLOGY RANK: "+progress.researchRank()+" / 6",
+                        151,510,Color.GOLD);
+                label(batch,font,"ADVANCED MODULES REQUIRE PURCHASED RESEARCH RANKS",
+                        151,457,Color.WHITE);
+                label(batch,font,"HARDWARE MK II-IV AND SPECIALIZED FIGHTERS REQUIRE LICENSES",
+                        151,410,MUTED);
+                label(batch,font,"GENERATION ACCESS IS GAINED THROUGH CAMPAIGN MISSIONS",
+                        151,368,MUTED);
+                label(batch,font,"CURRENT CREDITS: "+progress.credits(),151,305,Color.WHITE);
+                label(batch,font,progress.researchRank()==6?"ALL RESEARCH RANKS PURCHASED":
+                                "NEXT RANK COST: "+progress.nextResearchCost()+" CREDITS",
+                        151,248,Color.GOLD);
+                label(batch,font,"BACK TO CAMPAIGN",69,67,Color.WHITE);
+                label(batch,font,progress.researchRank()==6?"RESEARCH COMPLETE":"PURCHASE NEXT RANK",
+                        923,67,Color.WHITE);
+            }
             case DOCK -> {
                 title(batch,font,"CAMPAIGN FLEET DOCK",
                         "OWNED HULLS ARE PERSISTENT  |  SELECT ACTIVE SHIPS AND SERVICE RESERVES");
@@ -379,6 +410,8 @@ final class GameMenuPanel {
                     }
                 }
                 label(batch,font,"BACK TO STAR MAP",54,67,Color.WHITE);
+                label(batch,font,"SHIPYARD",352,67,Color.WHITE);
+                label(batch,font,"RESEARCH",570,67,Color.WHITE);
                 label(batch,font,"DEPLOY ACTIVE FLEET",1002,67,Color.WHITE);
                 label(batch,font,dockNotice,45,112,Color.CYAN);
             }
@@ -484,6 +517,8 @@ final class GameMenuPanel {
         label(batch,font,"BACK",62,67,Color.WHITE);
         label(batch,font,"PREV",248,67,Color.WHITE);
         label(batch,font,"NEXT",402,67,Color.WHITE);
+        label(batch,font,"RESEARCH",560,67,Color.WHITE);
+        label(batch,font,"SHIPYARD",771,67,Color.WHITE);
         label(batch,font,"DEPLOY FLEET",989,67,Color.WHITE);
     }
 }
