@@ -26,7 +26,8 @@ public final class HullLayoutsTest {
         check(Shipyard.Hull.values()[1]==Shipyard.Hull.FRIGATE,"legacy frigate ID");
         check(Shipyard.Hull.values()[2]==Shipyard.Hull.CRUISER,"legacy cruiser ID");
         check(Shipyard.Hull.values()[3]==Shipyard.Hull.DREADNOUGHT,"legacy dreadnought ID");
-        int[] expectedTotals={9,8,12,12,16,18,18,22,25,29,29};
+        // Indexed by immutable legacy enum ordinal, not the size-sorted selector.
+        int[] expectedTotals={8,12,18,29,9,12,16,18,22,25,29};
         int count=0;
         for(int i=0;i<display.length;i++){
             Shipyard.Hull hull=display[i];
