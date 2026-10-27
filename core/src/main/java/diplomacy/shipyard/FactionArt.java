@@ -46,6 +46,7 @@ public final class FactionArt {
             case HEAVY_CRUISER -> "heavy_cruiser";
             case BATTLECRUISER -> "battlecruiser";
             case CARRIER, DREADNOUGHT -> "carrier"; // ten original silhouettes per sheet
+            default -> throw new IllegalArgumentException("Invalid sprite family");
         };
     }
     /** Prefix relative to the shared assets directory, not the source sheet. */
