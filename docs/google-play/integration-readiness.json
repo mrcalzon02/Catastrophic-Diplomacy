@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "app_id": "games.catastrophicdiplomacy",
+  "google_play_games_sdk": "22.1.0",
+  "platform_auth": {
+    "implementation": "android/src/play/java/",
+    "console_project_id": "pending",
+    "on_device_auth_test": "pending"
+  },
+  "in_game_identity": {
+    "provider": "Sign in with Google (OpenID) or owned backend",
+    "oauth_client_id": "pending",
+    "account_link_security_test": "pending"
+  },
+  "cloud_save": {
+    "local_authority": "libGDX application game-state/persistence; ships, campaign and progression",
+    "remote_backend": "pending",
+    "serializer_tests": "pending",
+    "restore_tests": "pending",
+    "conflict_resolution_tests": "pending",
+    "account_switch_isolation_tests": "pending"
+  },
+  "cross_device": {
+    "android_to_android": "pending",
+    "desktop_linked_identity": "pending",
+    "reinstall_restore": "pending",
+    "offline_reconciliation": "pending"
+  },
+  "note": "Google Play Games player ID is platform identity only; never treat it as primary game/save owner. No production identity or cloud-save claim until executable tests and Play Console credentials are verified."
+}
