@@ -745,14 +745,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 var styles=FleetNames.Style.values();
                 if(!commitCampaign(campaign,campaignFleet.changeStyle(
                         styles[(campaignFleet.style().ordinal()+1)%styles.length])))return;
-                dockNotice="New generated names use "+campaignFleet.style()+" style.";
+                dockNotice="NAME THEME: "+campaignFleet.style()+" | Next example: "+
+                        FleetNames.generate(campaignFleet.style(),
+                                campaignFleet.namingSeed(),campaignFleet.nextSerial());
             }
             case 12 -> {
                 try{
                     long id=dockShipId();
-                    if(!commitCampaign(campaign,campaignFleet.rename(id,
-                            FleetNames.generate(campaignFleet.style(),
-                                    campaignFleet.namingSeed(),VesselIdentifiers.serial(id)))))return;
+                    if(!commitCampaign(campaign,campaignFleet.generateName(id)))return;
                     dockNotice="Renamed ship #"+id+" to "+campaignFleet.get(id).name();
                 }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
             }
