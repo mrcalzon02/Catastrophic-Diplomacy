@@ -3,13 +3,14 @@ package diplomacy.sim;
 /** Deterministically varied names with selectable fleet traditions. */
 public final class FleetNames {
     private FleetNames(){}
-    // Legacy entries retain their ordinals and deterministic output for old saves.
+    // Names are cultural display labels, not permanent vessel identifiers.
     public enum Style { NAVAL, MYTHIC, CELESTIAL, INDUSTRIAL, ALIEN,
         IMPERIAL, FRONTIER, SCIENTIFIC, CEREMONIAL, ORGANIC, SYNTHETIC, DESIGNATION,
         REPUBLIC, PRIVATEER, MERCHANT, NOMADIC, MONASTIC, EXPLORER, FOLKLORE, IRREVERENT,
         GRIMDARK, NEOCLASSICAL, ABSURDIST, GOTHIC, BAROQUE, UTOPIAN, DYSTOPIAN,
         CYBERPUNK, ANCIENT_EMPIRE, ARCHAEOLOGICAL, RETRO_SCI_FI, CORPORATE,
         FOLK_HEROIC, PHILOSOPHICAL, ROMANTIC, OCCULT, SATIRICAL, LOST_COLONY }
+    private static final int GRIMDARK_ORDINAL=20;
     private static final String[][] FIRST={
         {"Resolute","Indomitable","Courageous","Vanguard","Dauntless","Stalwart","Valiant","Guardian"},
         {"Aegis","Valhalla","Orion","Nemesis","Basilisk","Titan","Erebus","Helios"},
@@ -40,28 +41,28 @@ public final class FleetNames {
         if(style.ordinal()<FIRST.length){
             // Preserve previously commissioned legacy names exactly.
             String call=FIRST[style.ordinal()][i]+" "+LAST[style.ordinal()][j];
-            return (style==Style.ALIEN?call:"CDS "+call)+" "+index;
+            return style==Style.ALIEN?call:"CDS "+call;
         }
-        return switch(style){
+        String name=switch(style){
             case IMPERIAL -> "HIMS "+pick(new String[]{"Duchess","Emperor","Regent",
                     "Baroness","Margrave","Sovereign","Archduke","Viceroy"},i)
                     +" of "+pick(new String[]{"Ash","Halcyon","Veyr","Crownfall",
-                    "Veridian","Istria","Nacre","Eldcrest"},j)+" "+index;
+                    "Veridian","Istria","Nacre","Eldcrest"},j);
             case FRONTIER -> "Survey "+pick(new String[]{"Perimeter","Dawntrail",
                     "Longreach","Waypoint","Hinterland","Outrider","Farwatch","Lastlight"},i)
                     +"-"+pick(new String[]{"01","02","03","04","05","06","07","08"},j)
-                    +" "+index;
+                    ;
             case SCIENTIFIC -> "RSV "+pick(new String[]{"Kepler","Herschel","Faraday",
                     "Curie","Sagan","Cassini","Hubble","Vera"},i)
                     +" "+pick(new String[]{"Array","Observatory","Surveyor","Laboratory",
-                    "Prospector","Spectrometer","Probe","Mapper"},j)+" "+index;
+                    "Prospector","Spectrometer","Probe","Mapper"},j);
             case CEREMONIAL -> "Sanctum of "+pick(new String[]{"First Light","The Vigil",
                     "Embers","Last Mercy","The Witness","Requiem","Dawn","Pilgrims"},i)
                     +" "+pick(new String[]{"I","II","III","IV","V","VI","VII","VIII"},j)
-                    +" "+index;
+                    ;
             case ORGANIC -> pick(new String[]{"Vha","Kth","Yrr","Oss","Luum","Thae",
                     "Zhur","Myr"},i)+"'"+pick(new String[]{"brood","spore","root",
-                    "mantle","carapace","tendril","husk","bloom"},j)+" "+index;
+                    "mantle","carapace","tendril","husk","bloom"},j);
             case SYNTHETIC -> "AXIOM/"+pick(new String[]{"VX","KH","QY","PT","OM",
                     "XR","CN","TZ"},i)+"-"+pick(new String[]{"CORE","NODE","SYNC",
                     "RELAY","VECTOR","ARRAY","GATE","SHELL"},j)+"-"+index;
@@ -69,28 +70,28 @@ public final class FleetNames {
                     +"-"+String.format(java.util.Locale.ROOT,"%02d",j+1)+"-"+index;
             case REPUBLIC -> "RNS "+pick(new String[]{"Liberty","Resolve","Unity","Accord",
                     "Freehold","Courage","Assembly","Civic"},i)+" "+pick(new String[]{
-                    "Star","Horizon","Concord","Mercy","Guard","Beacon","Legacy","Dawn"},j)+" "+index;
+                    "Star","Horizon","Concord","Mercy","Guard","Beacon","Legacy","Dawn"},j);
             case PRIVATEER -> pick(new String[]{"Lucky","Red","Wayward","Laughing",
                     "Ragged","Black","Gentle","Last"},i)+" "+pick(new String[]{
-                    "Corsair","Kestrel","Wager","Cutlass","Revenge","Gambit","Comet","Rumrunner"},j)+" "+index;
+                    "Corsair","Kestrel","Wager","Cutlass","Revenge","Gambit","Comet","Rumrunner"},j);
             case MERCHANT -> "MV "+pick(new String[]{"Fair","Open","Copper","Grand",
                     "Fortune","Steady","Blue","Golden"},i)+" "+pick(new String[]{
-                    "Exchange","Ledger","Freighter","Dividend","Parcel","Harbor","Venture","Cargo"},j)+" "+index;
+                    "Exchange","Ledger","Freighter","Dividend","Parcel","Harbor","Venture","Cargo"},j);
             case NOMADIC -> pick(new String[]{"Dust","Long","Far","Wandering",
                     "Moon","Storm","Quiet","Bright"},i)+"-"+pick(new String[]{
-                    "Walker","Runner","Pilgrim","Traveler","Herder","Seeker","Path","Keeper"},j)+" "+index;
+                    "Walker","Runner","Pilgrim","Traveler","Herder","Seeker","Path","Keeper"},j);
             case MONASTIC -> "Vessel of "+pick(new String[]{"Vigil","Silence","Grace","Solace",
                     "Dawn","Witness","Mercy","Penance"},i)+" "+pick(new String[]{
-                    "Prime","Secundus","Tertius","Quartus","Quintus","Sextus","Septimus","Octavus"},j)+" "+index;
+                    "Prime","Secundus","Tertius","Quartus","Quintus","Sextus","Septimus","Octavus"},j);
             case EXPLORER -> "CSV "+pick(new String[]{"Uncharted","Farpoint","Drifting","Blue",
                     "Second","Endless","Bold","Quiet"},i)+" "+pick(new String[]{
-                    "Horizon","Compass","Latitude","Discovery","Passage","Beacon","Survey","Crossing"},j)+" "+index;
+                    "Horizon","Compass","Latitude","Discovery","Passage","Beacon","Survey","Crossing"},j);
             case FOLKLORE -> pick(new String[]{"Old","Silver","Dancing","Wild",
                     "Morning","Midnight","Laughing","Winter"},i)+" "+pick(new String[]{
-                    "Fox","Hare","Stag","Serpent","Raven","Wolf","Witch","Lion"},j)+" "+index;
+                    "Fox","Hare","Stag","Serpent","Raven","Wolf","Witch","Lion"},j);
             case IRREVERENT -> pick(new String[]{"Mostly","Probably","Definitely","Strictly",
                     "Unreasonably","Questionably","Nominally","Temporarily"},i)+" "+pick(new String[]{
-                    "Harmless","Insured","Operational","Innocent","Stealthy","Repaired","Neutral","Official"},j)+" "+index;
+                    "Harmless","Insured","Operational","Innocent","Stealthy","Repaired","Neutral","Official"},j);
             case GRIMDARK -> "The "+choose(a,
                     "Gallows","Bleeding","Ashen","Penitent","Forsaken","Blackened",
                     "Ironbound","Funereal","Mourning","Excommunicated","Wretched",
@@ -214,6 +215,53 @@ public final class FleetNames {
                     "Sunrise","Outpost","Valley","Promise","Legacy","Harvest");
             default -> throw new IllegalArgumentException("Unrecognized naming philosophy");
         };
+        // A third cultural epithet yields far more combinations than the
+        // original two-word lists without copying the vessel's 16-digit ID.
+        if(style.ordinal()>=GRIMDARK_ORDINAL&&(variant==1||variant==3)){
+            String epithet=switch(style){
+                case GRIMDARK,GOTHIC,OCCULT -> "of "+choose((int)((scrambled>>>23)&15),
+                        "Dusk","The Last Bell","The Hollow Moon","Broken Saints",
+                        "Ash","The End","Silent Graves","Nightfall","The Void",
+                        "Forgotten Oaths","The Deep","The Damned","Black Stars",
+                        "The Sepulcher","The Choir","No Return");
+                case NEOCLASSICAL,BAROQUE,ANCIENT_EMPIRE -> "of "+choose((int)((scrambled>>>23)&15),
+                        "Aurea","Arcadia","Helicon","The Seven Isles","Asteria",
+                        "Illyria","Elysium","Marmora","Thessalia","Caspia",
+                        "The Golden Sea","Athenia","Cyrene","Tyria","Lycia","Corinth");
+                case ABSURDIST,IRREVERENT,SATIRICAL,CORPORATE -> choose((int)((scrambled>>>23)&15),
+                        "Pending Review","By Appointment","Under Protest","Without Warranty",
+                        "At Short Notice","In Theory","For Accounting","On Tuesday",
+                        "At Your Peril","Until Further Notice","Almost Certainly",
+                        "Terms Apply","No Returns","Due to Circumstances","As Discussed",
+                        "More or Less");
+                default -> "of "+choose((int)((scrambled>>>23)&15),
+                        "The Outer Reach","Lost Suns","The Far Shore","Tomorrow",
+                        "The First Dawn","The Ninth Sky","The Boundary",
+                        "New Horizons","Last Light","The Long Road","The Quiet",
+                        "The Deep Field","The Meridian","Far Places","The Passage",
+                        "The Open Sea");
+            };
+            String candidate=name+" "+epithet;
+            if(candidate.length()<=70)name=candidate;
+        }
+        return name;
+    }
+    /** Reroll just the display name on a deterministic salted stream. */
+    public static String unique(Style style,long seed,int serial,
+                                java.util.Collection<String> alreadyUsed){
+        if(alreadyUsed==null)throw new IllegalArgumentException("Missing reserved ship names");
+        java.util.HashSet<String> reserved=new java.util.HashSet<>();
+        for(String label:alreadyUsed){
+            if(label==null)throw new IllegalArgumentException("Invalid owned name");
+            reserved.add(label.toLowerCase(java.util.Locale.ROOT));
+        }
+        for(int attempt=0;attempt<2048;attempt++){
+            long salt=seed+0x9e3779b97f4a7c15L*attempt;
+            String candidate=generate(style,salt,serial);
+            if(!reserved.contains(candidate.toLowerCase(java.util.Locale.ROOT)))
+                return candidate;
+        }
+        throw new IllegalArgumentException("Name pool exhausted in selected tradition");
     }
     private static String pick(String[] options,int index){return options[index];}
     private static String choose(int slot,String... options){return options[slot];}
