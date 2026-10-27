@@ -261,7 +261,7 @@ final class GameMenuPanel {
                         node.level()==progress.unlocked()?Color.CYAN:MUTED;
                     shapes.setColor(node.level()==selectedLevel?Color.GOLD:c);
                     shapes.circle(node.x(),node.y(),node.level()==selectedLevel?19:13,18);
-                    shapes.setColor(BG);
+                    shapes.setColor(MilitaryUiTheme.BACKGROUND);
                     shapes.circle(node.x(),node.y(),6,12);
                 }
                 button(shapes,35,35,165,50,false);
