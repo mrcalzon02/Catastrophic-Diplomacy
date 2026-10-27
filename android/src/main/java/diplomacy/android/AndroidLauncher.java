@@ -5,7 +5,7 @@ import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import diplomacy.client.CatastrophicGame;
 
-public final class AndroidLauncher extends AndroidApplication {
+public class AndroidLauncher extends AndroidApplication {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         AndroidApplicationConfiguration config = new AndroidApplicationConfiguration();
