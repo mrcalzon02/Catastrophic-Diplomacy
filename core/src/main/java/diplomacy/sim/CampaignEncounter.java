@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
+import java.util.List;
 
 /**
  * A campaign mission is a sequence of hostile reinforcements in ONE battle.
@@ -19,20 +20,23 @@ public final class CampaignEncounter {
     private int wave = 1;
 
     private CampaignEncounter(LevelEconomy.Level level,CampaignDeployment.Loadout deployment,
-                              Shipyard.Design friendly,Shipyard.Design hostile,
+                              List<Shipyard.Design> friendlies,Shipyard.Design hostile,
                               TechnologyCatalog catalog) {
-        if(level==null||deployment==null||friendly==null||hostile==null||catalog==null)
+        if(level==null||deployment==null||friendlies==null||hostile==null||catalog==null)
             throw new IllegalArgumentException("Campaign requires a stage and fitted fleets");
         int deployed=deployment.ships();
-        if(deployed>level.maximumFleet())
-            throw new IllegalArgumentException("Deployment exceeds mission fleet capacity");
+        if(deployed>level.maximumFleet()||friendlies.size()!=deployed||
+                friendlies.stream().anyMatch(x->x==null))
+            throw new IllegalArgumentException("Deployment or commissioned fleet invalid");
         this.level=level;
         this.deployed=deployed;
         this.deployment=deployment;
         this.opponent=hostile;
         this.catalog=catalog;
         battle=new Battle(level.seed());
-        battle.spawnWing(0,friendly,catalog,deployed,310,335);
+        // Each owned ship has its own fitting; do not clone one generic design.
+        for(Shipyard.Design friendly:friendlies)
+            battle.spawnWing(0,friendly,catalog,1,310,335);
         deployment.apply(battle);
         deployHostiles();
     }
@@ -45,7 +49,13 @@ public final class CampaignEncounter {
     public static CampaignEncounter start(int level,CampaignDeployment.Loadout deployment,
                                           Shipyard.Design friendly,Shipyard.Design hostile,
                                           TechnologyCatalog catalog) {
-        return new CampaignEncounter(LevelEconomy.level(level),deployment,friendly,hostile,catalog);
+        return new CampaignEncounter(LevelEconomy.level(level),deployment,
+                java.util.Collections.nCopies(deployment.ships(),friendly),hostile,catalog);
+    }
+    public static CampaignEncounter start(int level,CampaignDeployment.Loadout deployment,
+                                          List<Shipyard.Design> friendlies,Shipyard.Design hostile,
+                                          TechnologyCatalog catalog){
+        return new CampaignEncounter(LevelEconomy.level(level),deployment,friendlies,hostile,catalog);
     }
 
     private void deployHostiles(){
