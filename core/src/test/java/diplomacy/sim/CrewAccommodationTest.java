@@ -71,7 +71,8 @@ public final class CrewAccommodationTest {
                 observed++;
             }
         }
-        check(observed==121,"11 factions x 11 hulls");
+        check(observed==Battle.Faction.values().length*Shipyard.Hull.values().length,
+                "Every new chassis must have independently installed crew and air");
         var staffed=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         Battle collapse=new Battle(5028);
         collapse.spawnWing(0,staffed,catalog,1,340,335);
@@ -86,6 +87,6 @@ public final class CrewAccommodationTest {
                 "Crewless ship must not fire guns or launch combat craft");
         check(empty.vx==0&&empty.vy==0,
                 "Crewless ship cannot maneuver under power");
-        System.out.println("PASS crew habitat: 121 staffed hulls, 22 new module families, 528 upgrade nodes, zero free berths, no unmanned gunfire and version-1 fleet migration");
+        System.out.println("PASS crew habitat: "+observed+" staffed faction/chassis combinations, 22 new module families, zero free berths, no unmanned gunfire and version-1 fleet migration");
     }
 }
