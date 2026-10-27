@@ -579,8 +579,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     campaign.nextResearchCost():campaign.nextAccelerationCost();
             campaign=campaign.beginResearch(project);
             saveCampaign();
-            researchNotice=project+" queued for "+quote+" credits. Complete "+
-                    campaign.missionsUntilResearchComplete()+" successful mission(s).";
+            researchNotice=campaign.activeProject()==CampaignProgress.Project.NONE?
+                    project+" researched instantly for "+quote+" credits (0 missions).":
+                    project+" queued for "+quote+" credits. Complete "+
+                            campaign.missionsUntilResearchComplete()+" successful mission(s).";
             Gdx.app.log("CD-GAME-FLOW","RESEARCH_STARTED "+project+" cost="+quote+
                     " work="+campaign.currentProjectMissions());
         }catch(IllegalArgumentException denied){researchNotice=denied.getMessage();}
@@ -936,8 +938,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 dockNotice="RESEARCH COMPLETE: technology license rank "+campaign.researchRank()+
                         " acquired after mission "+activeMission+".";
             else if(campaign.speedUpgrades()>previousSpeed)
-                dockNotice="LAB UPGRADE COMPLETE: research now gains "+
-                        campaign.researchPerVictory()+" work per victorious mission.";
+                dockNotice="LAB UPGRADE COMPLETE: research requirements reduced by "+
+                        campaign.speedUpgrades()+" mission(s), floored at zero.";
             else if(previous!=CampaignProgress.Project.NONE)
                 dockNotice="Research progress: "+campaign.projectProgress()+" / "+
                         campaign.currentProjectMissions()+" work after mission "+activeMission+".";

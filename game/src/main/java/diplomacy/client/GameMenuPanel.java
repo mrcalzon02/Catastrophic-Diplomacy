@@ -363,8 +363,7 @@ final class GameMenuPanel {
                 label(batch,font,"AVAILABLE CREDITS: "+progress.credits(),151,551,Color.GOLD);
                 label(batch,font,"TECHNOLOGY LICENSE "+progress.researchRank()+"/6  |  LAB UPGRADES "+
                         progress.speedUpgrades()+"/4",151,516,Color.WHITE);
-                label(batch,font,"EACH VICTORY ADVANCES RESEARCH BY "+
-                        progress.researchPerVictory()+" WORK UNIT(S)",151,479,MUTED);
+                label(batch,font,"ONE SUCCESSFUL MISSION = ONE RESEARCH TICK",151,479,MUTED);
                 if(progress.activeProject()!=CampaignProgress.Project.NONE){
                     label(batch,font,"ACTIVE: "+progress.activeProject()+
                             "  |  "+progress.projectProgress()+" / "+
@@ -390,7 +389,7 @@ final class GameMenuPanel {
                         "LAB REQUIRES FIRST CLEAR OF MISSION "+
                                 progress.nextAccelerationMilestone(),
                         151,276,Color.GOLD);
-                label(batch,font,"NEW MISSIONS PAY FULL; CLEARED MISSIONS PAY 25%",
+                label(batch,font,"SPEED UPGRADES REDUCE WORK TO ZERO, NEVER BELOW",
                         151,235,MUTED);
                 label(batch,font,dockNotice,151,197,Color.CYAN);
                 label(batch,font,"BACK TO CAMPAIGN",69,67,Color.WHITE);

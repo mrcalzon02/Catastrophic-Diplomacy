@@ -105,17 +105,19 @@ public final class ShipLineagesTest {
         rejects(progress::purchaseNextResearch,"Unaffordable research purchased");
         var funded=new CampaignProgress.State(Battle.Faction.TERRAN,1,25000,0,0);
         var licensed=funded.purchaseNextResearch();
-        check(licensed.researchRank()==0&&licensed.researchTarget()==1&&licensed.researchRemaining()==1
-                &&licensed.credits()==0,"Research must charge once and require one victory tick");
+        check(licensed.researchRank()==0&&licensed.activeProject()==CampaignProgress.Project.LICENSE
+                &&licensed.missionsUntilResearchComplete()==1&&licensed.credits()==0,
+                "Research must charge once and require one victory tick");
         var finished=licensed.complete(1,20,20);
-        check(finished.researchRank()==1&&!finished.researchActive(),
+        check(finished.researchRank()==1&&finished.activeProject()==CampaignProgress.Project.NONE,
                 "Paid early research did not unlock upon mission completion");
         check(CampaignProgress.decode(CampaignProgress.encode(licensed)).equals(licensed),
                 "Purchased research not persisted");
         String legacyBody="CD-CAMPAIGN-1\nTERRAN\n1\n75000\n0\n";
         CRC32 crc=new CRC32();crc.update(legacyBody.getBytes(StandardCharsets.UTF_8));
         var migrated=CampaignProgress.decode(legacyBody+Long.toHexString(crc.getValue())+"\n");
-        check(migrated.credits()==75000&&migrated.researchRank()==0&&!migrated.researchActive(),
+        check(migrated.credits()==75000&&migrated.researchRank()==0
+                &&migrated.activeProject()==CampaignProgress.Project.NONE,
                 "Legacy campaign bank/research migration lost original credits");
         long quote=CampaignFleet.purchaseCost(base,catalog);
         check(quote>CampaignFleet.purchaseCost(base),
