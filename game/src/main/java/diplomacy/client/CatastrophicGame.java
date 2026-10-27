@@ -303,7 +303,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             if(preparingCampaign)openDock();
                             else if(scenario==ScenarioCatalog.Preset.CUSTOM)
                                 deployment=deployment.withShips(delta,200)
-                                        .withStandingProfiles(savedStanding);
+                                        .withStandingProfiles(skirmishStandingProfiles());
                             selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                             doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                         }
@@ -515,6 +515,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         }
     }
+    /** Skirmish captain profiles use local tactical slots 0..199.
+     * Campaign captain profiles are keyed by permanent 16-digit vessel IDs.
+     * Never narrow a commissioned long ID into an int. */
+    private Map<Integer,ShipStandingOrders> skirmishStandingProfiles(){
+        Map<Integer,ShipStandingOrders> profiles=new HashMap<>();
+        for(var entry:savedStanding.entrySet()){
+            long slot=entry.getKey();
+            if(slot>=0&&slot<200)
+                profiles.put((int)slot,entry.getValue());
+        }
+        return profiles;
+    }
     private void openSkirmishDeployment(){
         if(scenario.demonstration){
             preparedSkirmish=false;
@@ -527,7 +539,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships,
                 CampaignDeployment.Formation.LINE);
         loadStandingOrders(left);
-        deployment=deployment.withStandingProfiles(savedStanding);
+        deployment=deployment.withStandingProfiles(skirmishStandingProfiles());
         selectedStandingSetting=0;
         selectedDeploymentShip=0;
         clearDoctrineGroup();
@@ -1064,7 +1076,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(preparingCampaign){openDock();return;}
                     if(scenario==ScenarioCatalog.Preset.CUSTOM)
                         deployment=deployment.withShips(-1,200)
-                                .withStandingProfiles(savedStanding);
+                                .withStandingProfiles(skirmishStandingProfiles());
                     selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
                     doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                 }
@@ -1072,7 +1084,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(preparingCampaign){openDock();return;}
                     if(scenario==ScenarioCatalog.Preset.CUSTOM)
                         deployment=deployment.withShips(1,200)
-                                .withStandingProfiles(savedStanding);
+                                .withStandingProfiles(skirmishStandingProfiles());
                 }
                 case 3 -> deployment=deployment.withFormation(-1);
                 case 4 -> deployment=deployment.withFormation(1);
