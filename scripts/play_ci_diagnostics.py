@@ -7,6 +7,7 @@ HELP = [
 (r"GOOGLE_PLAY_MAIN_PARITY|mainline behind|google-play.*main|Play branch does not contain main", "Stale Play integration branch", "Merge current origin/main into google-play with conflict resolution. Preserve Play-specific SDK/signing/policy code; never reset or overwrite these changes."),
 (r"dependency baseline|direct Maven coordinates drift|approved dependency|license record", "Approved dependency baseline", "Update the exact-version dependency inventory and required license records to match the justified code fix; do not disable the existing dependency checker."),
 (r"curl:|Failed to connect|connection timed out|Network is unreachable|download failed", "Third-party source bootstrap", "Retry the pinned fetch safely, verify SHA-256 and source commit, and preserve original pinning; do not fall back to unverified sources."),
+(r"game_services_project_id|AAPT: error: resource", "Play Games project-ID Android resource", "On AGP 9 set android.buildFeatures.resValues=true and define resValue string game_services_project_id for the Play build type. Set the real project ID through PLAY_GAMES_PROJECT_ID before submission; rebuild and inspect merged manifest."),
 (r"Missing class|R8|Could not resolve|Execution failed for task",
  "Dependency/build failure", "Inspect Gradle releaseRuntimeClasspath and the named task; provide the real missing dependency or repair failing source, then rebuild. Never suppress missing classes."),
 (r"ELF|16 KB|zip align|zip alignment",
@@ -58,7 +59,7 @@ def main():
                     for line in lines if line.startswith("FAIL: ")]
         if phase in ("mainline", "build", "bootstrap", "sdk") and state == "failure":
             messages += [line.strip()[-500:] for line in lines
-                         if "Missing class" in line or "Execution failed for task" in line or "BUILD FAILED" in line or "GOOGLE_PLAY_MAIN_PARITY" in line or "baseline FAILED" in line or "direct Maven coordinates drift" in line or "curl:" in line or "Error:" in line]
+                         if "Missing class" in line or "Execution failed for task" in line or "AAPT: error:" in line or "game_services_project_id" in line or "BUILD FAILED" in line or "GOOGLE_PLAY_MAIN_PARITY" in line or "baseline FAILED" in line or "direct Maven coordinates drift" in line or "curl:" in line or "Error:" in line]
         if state == "failure" and not messages:
             messages = ["Failed phase has no recognized assertion; inspect " + phase + ".log"]
         for message in dict.fromkeys(messages):
