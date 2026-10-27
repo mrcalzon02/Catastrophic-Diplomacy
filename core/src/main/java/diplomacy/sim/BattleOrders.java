@@ -88,10 +88,11 @@ public final class BattleOrders {
             new Engagement(100,210),0,180,0.25);
     public static Size size(Battle.Ship ship) {
         if(ship.hullClass==null)return Size.ESCORT;
-        return switch(ship.hullClass) {
+        return switch(ship.hullClass.spriteHull()) {
             case INTERCEPTOR -> Size.FIGHTER;
             case CORVETTE,MISSILE_CORVETTE,FRIGATE,DESTROYER -> Size.ESCORT;
             case LIGHT_CRUISER,CRUISER,HEAVY_CRUISER,BATTLECRUISER,CARRIER,DREADNOUGHT -> Size.CAPITAL;
+            default -> throw new IllegalStateException("Unmapped sprite-size category");
         };
     }
 }
