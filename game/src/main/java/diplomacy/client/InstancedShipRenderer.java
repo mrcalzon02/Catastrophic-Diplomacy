@@ -81,7 +81,8 @@ public final class InstancedShipRenderer implements AutoCloseable {
                 if(n==0)continue;
                 Mesh mesh=hulls[faction.ordinal()][hull.ordinal()];
                 mesh.setInstanceData(positions,0,n*4);
-                shader.setUniformf("u_color",faction.r,faction.g,faction.b,1f);
+                shader.setUniformf("u_color",faction.r*hull.tintRed(),
+                        faction.g*hull.tintGreen(),faction.b*hull.tintBlue(),1f);
                 mesh.render(shader,GL20.GL_TRIANGLES);
                 drawCalls++;instances+=n;
             }
