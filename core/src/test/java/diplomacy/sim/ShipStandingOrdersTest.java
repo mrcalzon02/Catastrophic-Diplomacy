@@ -14,7 +14,7 @@ public final class ShipStandingOrdersTest {
     }
     public static void main(String[] args)throws Exception {
         ShipStandingOrders policy=ShipStandingOrders.DEFAULT;
-        check(ShipStandingOrders.SETTINGS.length==13,"Missing standing combat policies");
+        check(ShipStandingOrders.SETTINGS.length==23,"Missing advanced independent combat policies");
         for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
             check(!policy.display(i).isBlank(),"Invisible standing policy row "+i);
         ShipStandingOrders attack=policy.adjust(0,4).adjust(1,-3);
@@ -41,15 +41,35 @@ public final class ShipStandingOrdersTest {
         for(int i=10;i<=12;i++)
             check(policy.adjust(i,4).display(i).endsWith("units"),
                     "Independent weapon engagement range cannot be tuned");
+        ShipStandingOrders advanced=policy.adjust(13,-4).adjust(14,1)
+                .adjust(15,-1).adjust(16,1)
+                .adjust(17,1,0,8).adjust(18,1,0,8).adjust(19,1,0,8)
+                .adjust(20,1,0,8).adjust(21,1,0,8).adjust(22,2);
+        check(advanced.directives().speedPercent()==80,
+                "Per-ship engine limit did not change");
+        check(advanced.directives().defendSlots().size()==4&&
+                advanced.directives().defendSlots().stream().distinct().count()==4,
+                "Four independent defend targets failed");
+        check(advanced.directives().escortSlot()==1,
+                "Escort leader incorrectly targets self or is not selectable");
+        check(advanced.directives().escortRange()==300,
+                "Escort max distance slider did not change");
+        check(advanced.directives().fighterMission()!=policy.directives().fighterMission(),
+                "Carrier fighter mission failed to change");
+        check(advanced.directives().defenseScope()!=policy.directives().defenseScope()&&
+                advanced.directives().interceptStrategy()!=policy.directives().interceptStrategy(),
+                "Point defense strategy and protection scope must be independent");
         Map<Integer,ShipStandingOrders> saved=new HashMap<>();
         for(int slot=0;slot<200;slot++)
-            saved.put(slot,slot%2==0?attack:retreat);
+            saved.put(slot,slot%3==0?advanced:slot%2==0?attack:retreat);
         String encoded=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
         ShipStandingOrdersCodec.File decoded=ShipStandingOrdersCodec.decode(encoded);
         check(decoded.faction()==Battle.Faction.TERRAN&&decoded.policies().equals(saved),
                 "200-hull standing orders failed checksum round-trip");
         check(encoded.equals(ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved)),
                 "Nondeterministic doctrine save serialization");
+        check(encoded.startsWith("CD-STANDING-2\\n".replace("\\\\n","\\n")),
+                "New versioned policy format not written");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replace("TERRAN","DRAXIAN")),
                 "Tampered faction save accepted");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replaceFirst("90,20","30,20")),
@@ -113,7 +133,20 @@ public final class ShipStandingOrdersTest {
                 "Reinforcements reset persistent ship doctrine");
         battle.step();
         check(battle.tick==1,"Standing doctrines prevented live combat tick");
-        System.out.println("PASS individual standing orders: 13 simultaneous doctrines, "+
+        var connected=new CampaignDeployment.Loadout(6,CampaignDeployment.Formation.LINE)
+                .withStanding(0,advanced);
+        CampaignEncounter linked=CampaignEncounter.start(1,connected,friendly,hostile,tech);
+        Battle.Ship captain=linked.battle().ships().get(0);
+        check(captain.escortShipId==linked.battle().ships().get(1).id,
+                "Escort deployment slot did not resolve to physical ship ID");
+        check(captain.defendedShipIds.size()==4,
+                "Four defense relationships did not reach live battle");
+        check(captain.standingOrders.directives().speedPercent()==80,
+                "Engine speed restriction was not wired into ship");
+        linked.battle().setTeamOrders(0,BattleOrders.DEFAULT);
+        check(captain.standingOrders.equals(advanced),
+                "Fleet order edits must not erase complex individual behavior stacks");
+        System.out.println("PASS individual standing orders: 23 simultaneous doctrines, "+
                 "200 saved hull policies, withdrawal behavior, real combat and wave retention");
     }
 }

@@ -82,13 +82,18 @@ final class GameMenuPanel {
         }
         return result;
     }
-    /** 0/1 switch ships; 2..14 edit one standing-policy field; 15 returns. */
-    static int ordersAction(float x,float y){
+    /** Real hit routing: 0/1 select hull, 2..24 tune independent policies,
+     * 30 returns, 31 toggles doctrine page. */
+    static int ordersAction(float x,float y){return ordersAction(x,y,0);}
+    static int ordersAction(float x,float y,int page){
         if(hit(x,y,650,561,110,40))return 0;
         if(hit(x,y,1108,561,112,40))return 1;
-        for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
-            if(hit(x,y,650,519-i*29,570,27))return 2+i;
-        if(hit(x,y,900,32,300,55))return 15;
+        if(hit(x,y,785,561,296,40))return 31;
+        int first=page==0?0:13;
+        int end=page==0?13:ShipStandingOrders.SETTINGS.length;
+        for(int i=first;i<end;i++)
+            if(hit(x,y,650,519-(i-first)*29,570,27))return 2+i;
+        if(hit(x,y,900,32,300,55))return 30;
         return -1;
     }
     static int mapHit(float x,float y,int page){
@@ -113,7 +118,7 @@ final class GameMenuPanel {
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
               CampaignDeployment.Loadout deployment,String friendlyHull,int selectedShip,
-              boolean preparingCampaign,boolean awaitingWaypoint,String editNotice,
+              boolean preparingCampaign,int standingPage,boolean awaitingWaypoint,String editNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -215,8 +220,11 @@ final class GameMenuPanel {
                 }
                 button(shapes,650,561,110,40,false);
                 button(shapes,1108,561,112,40,false);
-                for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
-                    button(shapes,650,519-i*29,570,27,false);
+                button(shapes,785,561,296,40,true);
+                int start=standingPage==0?0:13;
+                int end=standingPage==0?13:ShipStandingOrders.SETTINGS.length;
+                for(int i=start;i<end;i++)
+                    button(shapes,650,519-(i-start)*29,570,27,false);
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
@@ -319,8 +327,12 @@ final class GameMenuPanel {
                 label(batch,font,"SHIP "+(selectedShip+1)+" / "+deployment.ships(),822,585,Color.GOLD);
                 label(batch,font,"< PREVIOUS",656,584,Color.WHITE);
                 label(batch,font,"NEXT >",1122,584,Color.WHITE);
-                for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++){
-                    float y=538-i*29;
+                label(batch,font,standingPage==0?"PAGE 1: COMBAT / NEXT >":
+                        "< PAGE 2: SUPPORT / BACK",799,585,Color.GOLD);
+                int start=standingPage==0?0:13;
+                int end=standingPage==0?13:ShipStandingOrders.SETTINGS.length;
+                for(int i=start;i<end;i++){
+                    float y=538-(i-start)*29;
                     label(batch,font,"< "+ShipStandingOrders.SETTINGS[i],661,y,MUTED);
                     label(batch,font,policy.display(i)+" >",1006,y,Color.WHITE);
                 }

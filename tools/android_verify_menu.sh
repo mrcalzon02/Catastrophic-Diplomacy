@@ -86,7 +86,21 @@ assert_step 'STANDING ship=1 setting=CAUTION'
 assert_step 'STANDING ship=1 setting=RETREAT BELOW HULL'
 assert_step 'STANDING ship=1 setting=FALL BACK BELOW SHIELDS'
 assert_step 'STANDING ship=1 setting=POINT DEFENSE'
-touch_ui skirmish-orders-programmed 1050 60
+# The advanced-page controls operate independently on the same hull.
+touch_ui skirmish-orders-programmed 900 580
+sleep 1
+capture skirmish-support-orders
+touch_ui skirmish-support-orders 700 534
+touch_ui skirmish-support-orders 1120 505
+touch_ui skirmish-support-orders 700 476
+touch_ui skirmish-support-orders 1120 447
+sleep 1
+capture skirmish-support-set
+assert_step 'STANDING ship=1 setting=ENGINE SPEED LIMIT'
+assert_step 'STANDING ship=1 setting=PD INTERCEPTION PLAN'
+assert_step 'STANDING ship=1 setting=PD PROTECTION SCOPE'
+assert_step 'STANDING ship=1 setting=FIGHTER OPERATIONS'
+touch_ui skirmish-support-set 1050 60
 sleep 1
 capture skirmish-ready
 touch_ui skirmish-ready 1050 62

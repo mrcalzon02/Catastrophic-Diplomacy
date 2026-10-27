@@ -70,7 +70,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int selectedDeploymentShip;
     private int placementDragPointer=-1;
     private boolean waitingForWaypoint;
-    private int selectedStandingSetting;
+    private int selectedStandingSetting,standingPage;
     private final Map<Integer,ShipStandingOrders> savedStanding=new HashMap<>();
     private Battle.Faction savedStandingFaction;
     private boolean preparingCampaign=true,preparedSkirmish;
@@ -225,15 +225,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.A||key==Input.Keys.D)
                             selectedDeploymentShip=Math.floorMod(selectedDeploymentShip+
                                     (key==Input.Keys.A?-1:1),deployment.ships());
-                        if(key==Input.Keys.UP||key==Input.Keys.DOWN)
+                        if(key==Input.Keys.TAB||key==Input.Keys.PAGE_UP||
+                                key==Input.Keys.PAGE_DOWN)standingPage=1-standingPage;
+                        if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             selectedStandingSetting=Math.floorMod(selectedStandingSetting+
                                     (key==Input.Keys.UP?-1:1),ShipStandingOrders.SETTINGS.length);
+                            standingPage=selectedStandingSetting<13?0:1;
+                        }
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT)
                             adjustStandingOrders(selectedStandingSetting,key==Input.Keys.LEFT?-1:1);
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.DEPLOYMENT){
-                        if(key==Input.Keys.O)screen=GameMenuPanel.Screen.SHIP_ORDERS;
+                        if(key==Input.Keys.O){
+                            standingPage=0;
+                            screen=GameMenuPanel.Screen.SHIP_ORDERS;
+                        }
                         if(key==Input.Keys.A||key==Input.Keys.D)
                             selectedDeploymentShip=Math.floorMod(selectedDeploymentShip+
                                     (key==Input.Keys.A?-1:1),deployment.ships());
@@ -548,7 +555,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void adjustStandingOrders(int setting,int direction){
         ShipStandingOrders current=deployment.standingFor(selectedDeploymentShip);
-        ShipStandingOrders revised=current.adjust(setting,direction);
+        ShipStandingOrders revised=current.adjust(setting,direction,
+                selectedDeploymentShip,deployment.ships());
         if(revised.equals(current))return;
         deployment=deployment.withStanding(selectedDeploymentShip,revised);
         savedStanding.put(selectedDeploymentShip,revised);
@@ -678,6 +686,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 case 7 -> {
                     screen=GameMenuPanel.Screen.SHIP_ORDERS;
+                    standingPage=0;
                     waitingForWaypoint=false;
                     deploymentNotice="Select a vessel; all standing policies remain active throughout battle.";
                 }
@@ -686,13 +695,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
-            int action=GameMenuPanel.ordersAction(x,y);
+            int action=GameMenuPanel.ordersAction(x,y,standingPage);
             if(action==0)selectedDeploymentShip=Math.floorMod(selectedDeploymentShip-1,deployment.ships());
             else if(action==1)selectedDeploymentShip=(selectedDeploymentShip+1)%deployment.ships();
             else if(action>=2&&action<2+ShipStandingOrders.SETTINGS.length){
                 selectedStandingSetting=action-2;
                 adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
-            }else if(action==15)screen=GameMenuPanel.Screen.DEPLOYMENT;
+            }else if(action==30)screen=GameMenuPanel.Screen.DEPLOYMENT;
+            else if(action==31)standingPage=1-standingPage;
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -1016,7 +1026,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,
                     screen==GameMenuPanel.Screen.DEPLOYMENT?activeMission:selectedMission,
                     deployment,leftDesign.hull.name(),selectedDeploymentShip,
-                    preparingCampaign,waitingForWaypoint,deploymentNotice,
+                    preparingCampaign,standingPage,waitingForWaypoint,deploymentNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch);
             return;
