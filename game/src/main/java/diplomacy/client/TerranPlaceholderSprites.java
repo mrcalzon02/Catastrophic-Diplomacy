@@ -34,6 +34,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             case BATTLECRUISER -> "battlecruiser";
             case CARRIER -> "carrier";
             case DREADNOUGHT -> "dreadnought";
+            default -> throw new IllegalArgumentException("Invalid sprite family");
         };
     }
     public TerranPlaceholderSprites() {
