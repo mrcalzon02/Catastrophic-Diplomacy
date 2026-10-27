@@ -36,6 +36,12 @@ public final class GameMenuFlowTest {
                 "Separate campaign active/reserve dock is missing");
         check(GameMenuPanel.dockAction(88,60,0,4)==0,"Cannot exit owned fleet dock");
         check(GameMenuPanel.dockAction(1060,60,0,4)==1,"Cannot deploy owned active fleet");
+        check(GameMenuPanel.dockAction(400,60,0,4)==15,
+                "Campaign dock shipyard must have a real selectable control");
+        check(GameMenuPanel.dockAction(620,60,0,4)==16,
+                "Purchased research must have an independently clickable ledger");
+        check(GameMenuPanel.Screen.valueOf("RESEARCH")!=null,
+                "Paid research view missing");
         check(GameMenuPanel.dockAction(587,585,0,4)==2,"Previous roster page is inert");
         check(GameMenuPanel.dockAction(683,585,0,4)==3,"Next roster page is inert");
         for(int i=0;i<4;i++)
