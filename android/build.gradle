@@ -26,6 +26,7 @@ if (!(playGamesProjectId ==~ /[0-9]{1,24}/)) {
 android {
     namespace 'games.catastrophicdiplomacy.android'
     compileSdk 36
+    buildFeatures { resValues true }
     defaultConfig {
         applicationId 'games.catastrophicdiplomacy'
         minSdk 26
