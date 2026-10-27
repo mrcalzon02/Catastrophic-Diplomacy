@@ -52,7 +52,7 @@ public final class GameMenuFlowTest {
                 "Previous ship standing-orders control unavailable");
         check(GameMenuPanel.ordersAction(1160,580)==1,
                 "Next ship standing-orders control unavailable");
-        for(int i=0;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
+        for(int i=0;i<13;i++){
             float y=534-i*29;
             check(GameMenuPanel.ordersAction(700,y)==2+i,
                     "Cannot reduce standing doctrine row "+i);
