@@ -520,6 +520,107 @@ public final class CatastrophicGame extends ApplicationAdapter {
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
+    private void openDock(){
+        if(campaign==null)return;
+        dockSelected=campaignFleet==null?0:Math.max(0,
+                Math.min(dockSelected,campaignFleet.ships().size()-1));
+        dockPage=dockSelected/9;
+        screen=GameMenuPanel.Screen.DOCK;
+        if(campaignFleet!=null)
+            Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_DOCK owned="+campaignFleet.ships().size()+
+                    " active="+campaignFleet.active().size()+" reserve="+campaignFleet.reserves().size());
+    }
+    private int dockShipId(){
+        if(campaignFleet==null||campaignFleet.ships().isEmpty())
+            throw new IllegalArgumentException("No commissioned ships");
+        return campaignFleet.ships().get(dockSelected).id();
+    }
+    private void dockService(CampaignFleet.Service service){
+        try{
+            int id=dockShipId();
+            long price=campaignFleet.cost(id,service,technology);
+            if(price==0){dockNotice=service+" already fully supplied on ship #"+id;return;}
+            CampaignProgress.State debited=campaign.spend(price);
+            CampaignFleet.Roster serviced=campaignFleet.service(id,service,technology);
+            campaignFleet=serviced;campaign=debited;
+            saveCampaignFleet();saveCampaign();
+            dockNotice=service+" for ship #"+id+" charged "+price+" credits.";
+            Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE "+service+" ship="+id+" credits="+price);
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
+    private void dockPurchase(){
+        try{
+            long price=CampaignFleet.purchaseCost(leftDesign);
+            CampaignProgress.State debited=campaign.spend(price);
+            CampaignFleet.Roster purchased=campaignFleet.purchase(leftDesign,technology);
+            campaignFleet=purchased;campaign=debited;
+            dockSelected=campaignFleet.ships().size()-1;
+            dockPage=dockSelected/9;
+            saveCampaignFleet();saveCampaign();
+            dockNotice="New hull in AVAILABLE reserve; crew, ordnance and fuel are not free.";
+            Gdx.app.log("CD-GAME-FLOW","PURCHASE_HULL id="+dockShipId()+" cost="+price);
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
+    private void dockToggle(){
+        try{
+            int id=dockShipId();
+            boolean active=!campaignFleet.get(id).deployed();
+            int mission=selectedMission<=campaign.unlocked()?selectedMission:campaign.unlocked();
+            campaignFleet=campaignFleet.setActive(id,active,
+                    LevelEconomy.level(mission).maximumFleet());
+            saveCampaignFleet();
+            dockNotice="Ship #"+id+(active?" moved to ACTIVE deployment.":" moved to AVAILABLE reserve.");
+            Gdx.app.log("CD-GAME-FLOW","ROSTER ship="+id+" "+(active?"ACTIVE":"RESERVE"));
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
+    private void dockInput(int action){
+        if(action>=100){
+            dockSelected=action-100;
+            return;
+        }
+        if(campaignFleet==null){
+            if(action==0)screen=GameMenuPanel.Screen.CAMPAIGN;
+            return;
+        }
+        switch(action){
+            case 0 -> screen=GameMenuPanel.Screen.CAMPAIGN;
+            case 1 -> openDeployment();
+            case 2 -> dockPage=Math.max(0,dockPage-1);
+            case 3 -> dockPage=Math.min(Math.max(0,(campaignFleet.ships().size()-1)/9),dockPage+1);
+            case 4 -> dockToggle();
+            case 5 -> dockService(CampaignFleet.Service.REPAIR);
+            case 6 -> dockService(CampaignFleet.Service.CREW);
+            case 7 -> dockService(CampaignFleet.Service.AMMUNITION);
+            case 8 -> dockService(CampaignFleet.Service.FUEL);
+            case 9 -> dockService(CampaignFleet.Service.CRAFT);
+            case 10 -> dockPurchase();
+            case 11 -> {
+                var styles=FleetNames.Style.values();
+                campaignFleet=campaignFleet.changeStyle(styles[(campaignFleet.style().ordinal()+1)%styles.length]);
+                saveCampaignFleet();
+                dockNotice="New generated names use "+campaignFleet.style()+" style.";
+            }
+            case 12 -> {
+                try{
+                    int id=dockShipId();
+                    campaignFleet=campaignFleet.rename(id,FleetNames.generate(campaignFleet.style(),
+                            campaign.faction().ordinal(),id));
+                    saveCampaignFleet();
+                    dockNotice="Renamed ship #"+id+" to "+campaignFleet.get(id).name();
+                }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+            }
+            default -> { }
+        }
+    }
+    private long[] dockPrices(){
+        long[] costs=new long[5];
+        if(campaignFleet!=null&&!campaignFleet.ships().isEmpty()){
+            int id=dockShipId();int n=0;
+            for(var service:CampaignFleet.Service.values())
+                costs[n++]=campaignFleet.cost(id,service,technology);
+        }
+        return costs;
+    }
     private void openDeployment(){
         if(campaign==null||!campaign.available(selectedMission))return;
         activeMission=selectedMission;
