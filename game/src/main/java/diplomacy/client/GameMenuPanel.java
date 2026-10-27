@@ -21,7 +21,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, SQUADRONS, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color BG=new Color(.018f,.029f,.064f,1);
     private static final Color PANEL=new Color(.055f,.105f,.18f,1);
@@ -116,6 +116,7 @@ final class GameMenuPanel {
         if(hit(x,y,980,35,260,50))return 1;
         if(hit(x,y,310,35,200,50))return 15; // owned campaign shipyard
         if(hit(x,y,530,35,210,50))return 16; // paid research ledger
+        if(hit(x,y,751,35,201,50))return 18; // squadron operations
         if(hit(x,y,548,566,86,43))return 2;
         if(hit(x,y,642,566,86,43))return 3;
         for(int i=0;i<9;i++)
@@ -156,6 +157,17 @@ final class GameMenuPanel {
         }
         return -1;
     }
+    /** Eight persistent roster groups independent of temporary tactical slots. */
+    static int squadronAction(float x,float y,int current){
+        if(hit(x,y,35,35,210,54))return 0;
+        for(int group=0;group<CampaignFleet.SQUADRON_COUNT;group++)
+            if(hit(x,y,45,524-group*55,580,47))return 100+group;
+        if(hit(x,y,700,446,505,51))return 1;
+        if(current>0&&hit(x,y,700,368,505,51))return 2;
+        if(current>0&&hit(x,y,700,290,505,51))return 3;
+        if(hit(x,y,700,212,505,51))return 4;
+        return -1;
+    }
     static int afterActionAction(float x,float y){
         if(hit(x,y,825,253,160,44))return -1;
         if(hit(x,y,1011,253,165,44))return 1;
@@ -190,7 +202,8 @@ final class GameMenuPanel {
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
-               int themePage,FleetNames.Style themeCandidate){
+               int themePage,FleetNames.Style themeCandidate,
+               int selectedSquadron,Screen namingReturn){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,W,H,BG);
         // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
@@ -261,6 +274,7 @@ final class GameMenuPanel {
                 button(shapes,980,35,260,50,false);
                 button(shapes,310,35,200,50,false);
                 button(shapes,530,35,210,50,false);
+                button(shapes,751,35,201,50,false);
                 button(shapes,548,566,86,43,false);
                 button(shapes,642,566,86,43,false);
                 if(ownedFleet!=null)
@@ -275,6 +289,19 @@ final class GameMenuPanel {
                         button(shapes,1028,525-i*46,186,42,false);
                     }else button(shapes,840,525-i*46,374,42,false);
                 }
+            }
+            case SQUADRONS -> {
+                rectangle(shapes,33,107,606,508,PANEL);
+                rectangle(shapes,666,107,579,508,PANEL);
+                for(int group=0;group<CampaignFleet.SQUADRON_COUNT;group++)
+                    button(shapes,45,524-group*55,580,47,group==selectedSquadron);
+                button(shapes,35,35,210,54,false);
+                button(shapes,700,446,505,51,false);
+                if(selectedSquadron>0){
+                    button(shapes,700,368,505,51,false);
+                    button(shapes,700,290,505,51,false);
+                }
+                button(shapes,700,212,505,51,false);
             }
             case NAME_THEMES -> {
                 rectangle(shapes,34,103,1212,510,PANEL);
@@ -494,8 +521,49 @@ final class GameMenuPanel {
                 label(batch,font,"BACK TO STAR MAP",54,67,Color.WHITE);
                 label(batch,font,"SHIPYARD",352,67,Color.WHITE);
                 label(batch,font,"RESEARCH",570,67,Color.WHITE);
+                label(batch,font,"SQUADRONS",772,67,Color.WHITE);
                 label(batch,font,"DEPLOY ACTIVE FLEET",1002,67,Color.WHITE);
                 label(batch,font,dockNotice,45,112,Color.CYAN);
+            }
+            case SQUADRONS -> {
+                title(batch,font,"COMMISSIONED SQUADRONS",
+                        "ASSIGN OWNED SHIPS; NAME CULTURES AND RADIO VOICES BELONG TO GROUPS");
+                if(ownedFleet!=null&&!ownedFleet.ships().isEmpty()){
+                    var selected=ownedFleet.ships().get(Math.max(0,
+                            Math.min(dockSelected,ownedFleet.ships().size()-1)));
+                    label(batch,font,"SELECTED: "+shortLabel(selected.name(),42),
+                            45,593,Color.CYAN);
+                    label(batch,font,"ID "+selected.id()+"  |  CURRENT GROUP "+
+                            ownedFleet.squadronOf(selected.id()),45,568,MUTED);
+                    for(int group=0;group<CampaignFleet.SQUADRON_COUNT;group++){
+                        var profile=ownedFleet.profile(group);
+                        String title=group==0?"0  FLEET STANDARD":group+"  SQUADRON";
+                        label(batch,font,title+"  |  "+
+                                ownedFleet.squadronShips(group).size()+" HULLS",
+                                63,554-group*55,
+                                group==selectedSquadron?Color.GOLD:Color.WHITE);
+                        label(batch,font,shortLabel(profile.naming().name()+" / "+
+                                profile.radio().name(),45),
+                                73,534-group*55,MUTED);
+                    }
+                    var selectedProfile=ownedFleet.profile(selectedSquadron);
+                    label(batch,font,"GROUP "+selectedSquadron+
+                            (selectedSquadron==0?" (INHERITS FLEET)":""),
+                            688,576,Color.GOLD);
+                    label(batch,font,"NAME CULTURE: "+selectedProfile.naming(),
+                            688,547,Color.WHITE);
+                    label(batch,font,"RADIO VOICE: "+selectedProfile.radio(),
+                            688,523,Color.WHITE);
+                    label(batch,font,"ASSIGN SELECTED SHIP TO THIS GROUP",718,477,Color.WHITE);
+                    if(selectedSquadron>0){
+                        label(batch,font,"CHOOSE GROUP NAMING CULTURE",718,399,Color.WHITE);
+                        label(batch,font,"CYCLE GROUP RADIO VOICE",718,321,Color.WHITE);
+                    }else label(batch,font,"Group 0 uses the fleet defaults",718,381,MUTED);
+                    label(batch,font,"GENERATE NAME IN ASSIGNED GROUP",718,243,Color.WHITE);
+                    label(batch,font,"Assignments persist through repairs and reserve",
+                            694,169,MUTED);
+                }
+                label(batch,font,"BACK TO DOCK",63,69,Color.WHITE);
             }
             case NAME_THEMES -> {
                 title(batch,font,"SHIP NAMING TRADITIONS",
@@ -512,7 +580,9 @@ final class GameMenuPanel {
                             73+col*604,544-row*55,
                             style==themeCandidate?Color.GOLD:Color.WHITE);
                 }
-                label(batch,font,"PREVIEW: "+themeCandidate.name().replace('_',' '),
+                label(batch,font,"PREVIEW: "+themeCandidate.name().replace('_',' ')+
+                        (namingReturn==Screen.SQUADRONS?"  |  SQUADRON "+selectedSquadron:
+                                "  |  FLEET DEFAULT"),
                         65,168,Color.GOLD);
                 if(ownedFleet!=null){
                     label(batch,font,shortLabel(FleetNames.generate(themeCandidate,

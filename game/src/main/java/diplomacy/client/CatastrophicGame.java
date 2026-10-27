@@ -80,6 +80,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int dockPage,dockSelected;
     private int themePage;
     private FleetNames.Style themeCandidate=FleetNames.Style.NAVAL;
+    private int selectedSquadron;
+    private GameMenuPanel.Screen namingReturn=GameMenuPanel.Screen.DOCK;
     private String dockNotice="Select ships for active duty or reserve and service them individually.";
     private static final String CAMPAIGN_BLUEPRINT_FILE="campaign/purchase-blueprint-v1.dat";
     private static final String ROSTER_FILE="campaign/fleet-roster-v1.dat";
@@ -217,6 +219,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
                         else if(screen==GameMenuPanel.Screen.RESEARCH)screen=researchReturn;
                         else if(screen==GameMenuPanel.Screen.NAME_THEMES)
+                            screen=namingReturn;
+                        else if(screen==GameMenuPanel.Screen.SQUADRONS)
                             screen=GameMenuPanel.Screen.DOCK;
                         else if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
                             screen=GameMenuPanel.Screen.DEPLOYMENT;waitingForWaypoint=false;
@@ -228,6 +232,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(screen==GameMenuPanel.Screen.HOME){
                         if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_6)
                             tapFrontEnd(610,512-(key-Input.Keys.NUM_1)*64);
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.SQUADRONS){
+                        if(key==Input.Keys.UP||key==Input.Keys.DOWN)
+                            selectedSquadron=Math.max(0,Math.min(
+                                    CampaignFleet.SQUADRON_COUNT-1,
+                                    selectedSquadron+(key==Input.Keys.UP?-1:1)));
+                        if(key==Input.Keys.ENTER)editSquadron(1);
+                        if(key==Input.Keys.N)editSquadron(2);
+                        if(key==Input.Keys.V)editSquadron(3);
+                        if(key==Input.Keys.R)editSquadron(4);
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.NAME_THEMES){
@@ -728,17 +743,72 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void openNameThemes(){
         if(campaignFleet==null)return;
-        themeCandidate=campaignFleet.style();
+        namingReturn=screen;
+        themeCandidate=namingReturn==GameMenuPanel.Screen.SQUADRONS?
+                campaignFleet.profile(selectedSquadron).naming():campaignFleet.style();
         themePage=themeCandidate.ordinal()/GameMenuPanel.NAME_THEME_PAGE_SIZE;
         screen=GameMenuPanel.Screen.NAME_THEMES;
     }
     private void applyNameTheme(){
-        if(campaignFleet==null){screen=GameMenuPanel.Screen.DOCK;return;}
-        if(themeCandidate!=campaignFleet.style()&&
-                !commitCampaign(campaign,campaignFleet.changeStyle(themeCandidate)))return;
-        dockNotice="Naming culture: "+campaignFleet.style()+
-                ". Existing ship names and sixteen-digit IDs remain unchanged.";
-        screen=GameMenuPanel.Screen.DOCK;
+        if(campaignFleet==null){screen=namingReturn;return;}
+        if(namingReturn==GameMenuPanel.Screen.SQUADRONS){
+            var current=campaignFleet.profile(selectedSquadron);
+            if(current.naming()!=themeCandidate&&
+                    !commitCampaign(campaign,campaignFleet.setSquadronProfile(
+                            selectedSquadron,themeCandidate,current.radio())))return;
+            dockNotice="Squadron "+selectedSquadron+" uses "+themeCandidate+
+                    " names. IDs and previous ship names unchanged.";
+        }else{
+            if(themeCandidate!=campaignFleet.style()&&
+                    !commitCampaign(campaign,campaignFleet.changeStyle(themeCandidate)))return;
+            dockNotice="Naming culture: "+campaignFleet.style()+
+                    ". Existing ship names and sixteen-digit IDs remain unchanged.";
+        }
+        screen=namingReturn;
+    }
+    private void openSquadrons(){
+        if(campaignFleet==null||campaignFleet.ships().isEmpty())return;
+        selectedSquadron=campaignFleet.squadronOf(dockShipId());
+        screen=GameMenuPanel.Screen.SQUADRONS;
+    }
+    private void editSquadron(int action){
+        if(campaignFleet==null)return;
+        try{
+            long shipId=dockShipId();
+            switch(action){
+                case 0 -> screen=GameMenuPanel.Screen.DOCK;
+                case 1 -> {
+                    if(!commitCampaign(campaign,
+                            campaignFleet.assignSquadron(shipId,selectedSquadron)))return;
+                    dockNotice=campaignFleet.get(shipId).name()+" assigned to squadron "+
+                            selectedSquadron+".";
+                }
+                case 2 -> {
+                    if(selectedSquadron!=0)openNameThemes();
+                }
+                case 3 -> {
+                    if(selectedSquadron==0)return;
+                    var current=campaignFleet.profile(selectedSquadron);
+                    var voices=CrewChatter.Tone.values();
+                    var next=voices[(current.radio().ordinal()+1)%voices.length];
+                    if(!commitCampaign(campaign,campaignFleet.setSquadronProfile(
+                            selectedSquadron,current.naming(),next)))return;
+                    dockNotice="Squadron "+selectedSquadron+" radio now "+next+
+                            ". Fighter and capital chatter remain class-specific.";
+                }
+                case 4 -> {
+                    if(!commitCampaign(campaign,campaignFleet.generateName(shipId)))return;
+                    dockNotice="Renamed "+campaignFleet.get(shipId).name()+
+                            " using its assigned squadron culture.";
+                }
+                default -> {}
+            }
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
+    private void squadronInput(int action){
+        if(action>=100&&action<100+CampaignFleet.SQUADRON_COUNT)
+            selectedSquadron=action-100;
+        else editSquadron(action);
     }
     private void nameThemeInput(int action){
         if(action>=100){
@@ -750,7 +820,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         switch(action){
-            case 0 -> screen=GameMenuPanel.Screen.DOCK;
+            case 0 -> screen=namingReturn;
             case 1 -> themePage=Math.max(0,themePage-1);
             case 2 -> themePage=Math.min(GameMenuPanel.nameThemePages()-1,themePage+1);
             case 3 -> applyNameTheme();
@@ -782,6 +852,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 14 -> dockManualRename();
             case 15 -> openCampaignShipyard();
             case 16 -> openResearch();
+            case 18 -> openSquadrons();
             case 17 -> {
                 var tones=CrewChatter.Tone.values();
                 int current=campaignFleet.radioTone().ordinal();
@@ -1108,6 +1179,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.NAME_THEMES){
             nameThemeInput(GameMenuPanel.nameThemeAction(x,y,themePage));
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.SQUADRONS){
+            squadronInput(GameMenuPanel.squadronAction(x,y,selectedSquadron));
             return;
         }
         if(screen==GameMenuPanel.Screen.DOCK){
@@ -1610,7 +1685,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
-                    afterActionPage,themePage,themeCandidate);
+                    afterActionPage,themePage,themeCandidate,
+                    selectedSquadron,namingReturn);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());

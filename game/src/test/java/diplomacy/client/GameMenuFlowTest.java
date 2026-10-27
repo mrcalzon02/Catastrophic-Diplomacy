@@ -40,6 +40,26 @@ public final class GameMenuFlowTest {
                 "Campaign dock shipyard must have a real selectable control");
         check(GameMenuPanel.dockAction(620,60,0,4)==16,
                 "Purchased research must have an independently clickable ledger");
+        check(GameMenuPanel.Screen.valueOf("SQUADRONS")!=null,
+                "Squadron management requires a functional native view");
+        check(GameMenuPanel.dockAction(800,55,0,4)==18,
+                "Dock squadron button is inert");
+        for(int group=0;group<CampaignFleet.SQUADRON_COUNT;group++)
+            check(GameMenuPanel.squadronAction(90,546-group*55,0)==100+group,
+                    "Squadron row "+group+" is not selectable");
+        check(GameMenuPanel.squadronAction(800,475,3)==1,
+                "Assign selected ship control inert");
+        check(GameMenuPanel.squadronAction(800,395,3)==2,
+                "Name gallery from squadron control inert");
+        check(GameMenuPanel.squadronAction(800,315,3)==3,
+                "Squadron voice control inert");
+        check(GameMenuPanel.squadronAction(800,239,3)==4,
+                "Squadron naming action inert");
+        check(GameMenuPanel.squadronAction(800,395,0)==-1&&
+                GameMenuPanel.squadronAction(800,315,0)==-1,
+                "Inherited fleet defaults must not expose editable overrides");
+        check(GameMenuPanel.squadronAction(88,60,3)==0,
+                "Squadron editor exit inert");
         check(GameMenuPanel.Screen.valueOf("NAME_THEMES")!=null,
                 "Naming cultures must have their own native menu");
         check(GameMenuPanel.nameThemePages()==3,"38 themes should occupy 3 pages");
