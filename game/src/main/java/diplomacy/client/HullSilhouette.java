@@ -23,8 +23,13 @@ public final class HullSilhouette {
                 new EnumMap<>(Battle.Faction.class);
         for (Battle.Faction faction : Battle.Faction.values()) {
             EnumMap<Shipyard.Hull,float[]> shapes = new EnumMap<>(Shipyard.Hull.class);
-            for (Shipyard.Hull hull : Shipyard.Hull.values())
-                shapes.put(hull, triangulate(HullLayouts.outline(faction, hull)));
+            for (Shipyard.Hull hull : Shipyard.Hull.values()) {
+                Shipyard.Hull artwork=hull.spriteHull();
+                float[] existing=shapes.get(artwork);
+                if(existing==null)
+                    existing=triangulate(HullLayouts.outline(faction, artwork));
+                shapes.put(hull,existing);
+            }
             all.put(faction, shapes);
         }
         return all;
