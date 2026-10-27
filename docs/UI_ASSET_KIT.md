@@ -1,5 +1,8 @@
 # Tactical interface artwork — source-safe v5 implementation (2026-10-25)
 
+> **Current visual authority (2026-10-27):** [Gritty Military Fleet Command UI design language](AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) is the governing visual and controls standard. This older audit still governs what source sprites are actually safe to distribute; references are not a license to invent cropped asset binaries. The shared menu chrome has begun migrating to that language, while the remaining controls and platform icon exports are not yet approved.
+
+
 ## Actual state (do not confuse with an APK certification)
 
 - **24 visually intact original-source icons are now integrated into the build pipeline**, using `assets/ui/tactical/selected_manifest.json` and the existing `:prepareUiAssets` task in `build.gradle`.

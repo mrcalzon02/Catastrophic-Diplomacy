@@ -23,10 +23,9 @@ import java.util.List;
 final class GameMenuPanel {
     enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, SQUADRONS, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
-    private static final Color BG=new Color(.018f,.029f,.064f,1);
-    private static final Color PANEL=new Color(.055f,.105f,.18f,1);
-    private static final Color SELECT=new Color(.12f,.28f,.40f,1);
-    private static final Color MUTED=new Color(.57f,.67f,.79f,1);
+    private static final Color PANEL=MilitaryUiTheme.PANEL;
+    private static final Color SELECT=MilitaryUiTheme.SELECTION;
+    private static final Color MUTED=MilitaryUiTheme.MUTED_TEXT;
     private static final String[] HOME_ACTIONS={
         "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT"
     };
@@ -181,10 +180,18 @@ final class GameMenuPanel {
         return -1;
     }
     private static void rectangle(ShapeRenderer shapes,float x,float y,float w,float h,Color color){
-        shapes.setColor(color);shapes.rect(x,y,w,h);
+        if(color==PANEL&&w>=200&&h>=80)
+            MilitaryUiTheme.panel(shapes,x,y,w,h);
+        else{
+            shapes.setColor(color);shapes.rect(x,y,w,h);
+        }
     }
     private static void button(ShapeRenderer shapes,float x,float y,float w,float h,boolean selected){
-        rectangle(shapes,x,y,w,h,selected?SELECT:PANEL);
+        MilitaryUiTheme.button(shapes,x,y,w,h,selected,MilitaryUiTheme.Intent.NORMAL);
+    }
+    private static void actionButton(ShapeRenderer shapes,float x,float y,float w,float h,
+                                     MilitaryUiTheme.Intent intent){
+        MilitaryUiTheme.button(shapes,x,y,w,h,false,intent);
     }
     private static void label(SpriteBatch batch,BitmapFont font,String text,float x,float y,Color color){
         font.setColor(color);font.draw(batch,text,x,y);
@@ -207,9 +214,10 @@ final class GameMenuPanel {
                int themePage,FleetNames.Style themeCandidate,
                int selectedSquadron,Screen namingReturn){
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        rectangle(shapes,0,0,W,H,BG);
-        // Stable UI frame; all text is genuine BitmapFont, never an icon substitute.
-        rectangle(shapes,0,622,W,2,SELECT);
+        MilitaryUiTheme.canvas(shapes,W,H);
+        // Paint-only change: original hit regions and native text remain authoritative.
+        rectangle(shapes,0,622,W,2,MilitaryUiTheme.FRAME_BRIGHT);
+        rectangle(shapes,37,622,132,2,MilitaryUiTheme.AMBER);
         switch(screen){
             case HOME -> {
                 for(int i=0;i<HOME_ACTIONS.length;i++)button(shapes,438,487-i*64,404,50,false);
@@ -221,7 +229,7 @@ final class GameMenuPanel {
                     button(shapes,80+(i/rows)*570,502-(i%rows)*62,520,49,
                             factions[i]==selectedFaction);
                 button(shapes,80,35,230,54,false);
-                button(shapes,892,35,308,54,true);
+                actionButton(shapes,892,35,308,54,MilitaryUiTheme.Intent.PRIMARY);
             }
             case SKIRMISH -> {
                 rectangle(shapes,610,113,638,524,PANEL);
@@ -231,7 +239,7 @@ final class GameMenuPanel {
                 button(shapes,30,35,160,49,false);
                 if(preset!=ScenarioCatalog.Preset.PROVING_GROUND)
                     button(shapes,702,35,225,49,false);
-                button(shapes,969,35,277,49,true);
+                actionButton(shapes,969,35,277,49,MilitaryUiTheme.Intent.PRIMARY);
                 if(preset!=ScenarioCatalog.Preset.PROVING_GROUND){
                     button(shapes,661,332,545,42,false);
                     button(shapes,661,271,545,42,false);
@@ -273,7 +281,7 @@ final class GameMenuPanel {
                 rectangle(shapes,33,108,771,509,PANEL);
                 rectangle(shapes,818,108,427,509,PANEL);
                 button(shapes,35,35,165,50,false);
-                button(shapes,980,35,260,50,false);
+                actionButton(shapes,980,35,260,50,MilitaryUiTheme.Intent.PRIMARY);
                 button(shapes,310,35,200,50,false);
                 button(shapes,530,35,210,50,false);
                 button(shapes,751,35,201,50,false);
@@ -304,8 +312,8 @@ final class GameMenuPanel {
                     button(shapes,700,290,505,51,false);
                 }
                 button(shapes,700,212,505,51,false);
-                button(shapes,700,124,243,50,false);
-                button(shapes,962,124,243,50,false);
+                actionButton(shapes,700,124,243,50,MilitaryUiTheme.Intent.CONFIRM);
+                actionButton(shapes,962,124,243,50,MilitaryUiTheme.Intent.WARNING);
             }
             case NAME_THEMES -> {
                 rectangle(shapes,34,103,1212,510,PANEL);
@@ -319,7 +327,7 @@ final class GameMenuPanel {
                 button(shapes,35,35,196,55,false);
                 if(themePage>0)button(shapes,256,35,163,55,false);
                 if(themePage<nameThemePages()-1)button(shapes,440,35,163,55,false);
-                button(shapes,945,35,290,55,true);
+                actionButton(shapes,945,35,290,55,MilitaryUiTheme.Intent.PRIMARY);
             }
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
@@ -347,7 +355,7 @@ final class GameMenuPanel {
                 button(shapes,845,214,352,55,false);
                 button(shapes,845,143,352,55,false);
                 button(shapes,35,35,175,55,false);
-                button(shapes,913,35,302,55,true);
+                actionButton(shapes,913,35,302,55,MilitaryUiTheme.Intent.PRIMARY);
             }
             case SHIP_ORDERS -> {
                 rectangle(shapes,39,135,582,472,PANEL);
@@ -388,8 +396,8 @@ final class GameMenuPanel {
                     button(shapes,825,253,160,44,false);
                     button(shapes,1011,253,165,44,false);
                 }else rectangle(shapes,300,240,680,270,PANEL);
-                button(shapes,351,122,254,58,false);
-                button(shapes,673,122,254,58,true);
+                actionButton(shapes,351,122,254,58,MilitaryUiTheme.Intent.WARNING);
+                actionButton(shapes,673,122,254,58,MilitaryUiTheme.Intent.PRIMARY);
             }
             default -> {}
         }

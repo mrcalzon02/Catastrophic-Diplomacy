@@ -1,5 +1,8 @@
 # Catastrophic Diplomacy
 
+**Authoritative interface direction:** [Gritty Military / Industrial Fleet Command Console](docs/AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) (user-approved 2026-10-27). This standard governs menus, buttons, HUDs, squadron/dock controls and native desktop icons. Current code integrates initial procedural steel-and-instrument chrome without replacing audited assets; visual acceptance and complete icon exports remain pending.
+
+
 *An Unreasonable Space Warfare Simulator* — six rival civilizations, engineering-driven fleet combat and entirely unnecessary quantities of ordnance.
 
 
