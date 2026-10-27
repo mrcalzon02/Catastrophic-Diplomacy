@@ -156,6 +156,20 @@ public final class CampaignDeployment {
                 i++;
             }
             if(i!=ships)throw new IllegalArgumentException("Insufficient allied ships in battle");
+            java.util.ArrayList<Battle.Ship> allies=new java.util.ArrayList<>();
+            for(Battle.Ship ship:battle.ships())if(ship.team==0)allies.add(ship);
+            for(int slot=0;slot<allies.size();slot++){
+                ShipStandingOrders policy=standings.get(slot);
+                if(policy==null)continue;
+                var d=policy.directives();
+                int escort=d.escortSlot()>=0&&d.escortSlot()<allies.size()&&d.escortSlot()!=slot
+                        ?allies.get(d.escortSlot()).id:0;
+                java.util.ArrayList<Integer> defended=new java.util.ArrayList<>();
+                for(int other:d.defendSlots())
+                    if(other>=0&&other<allies.size()&&other!=slot)
+                        defended.add(allies.get(other).id);
+                battle.setShipProtection(allies.get(slot).id,escort,defended);
+            }
         }
     }
     private static void checkZone(Point p) {

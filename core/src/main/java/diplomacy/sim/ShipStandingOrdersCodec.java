@@ -8,7 +8,8 @@ import java.util.TreeMap;
 
 /** Versioned, checksummed per-faction standing orders; never rewrites fleet blueprints. */
 public final class ShipStandingOrdersCodec {
-    private static final String MAGIC="CD-STANDING-1";
+    private static final String MAGIC="CD-STANDING-2";
+    private static final String LEGACY="CD-STANDING-1";
     private ShipStandingOrdersCodec(){}
     public record File(Battle.Faction faction,Map<Integer,ShipStandingOrders> policies) {
         public File {
@@ -31,14 +32,22 @@ public final class ShipStandingOrdersCodec {
                     .append(o.fighters().priority()).append(',').append(o.fighters().range()).append(',')
                     .append(o.escorts().priority()).append(',').append(o.escorts().range()).append(',')
                     .append(o.capitals().priority()).append(',').append(o.capitals().range()).append(',')
-                    .append(o.retreatAtHullFraction()).append('\n');
+                    .append(o.retreatAtHullFraction());
+            var d=policy.directives();
+            content.append(',').append(d.speedPercent()).append(',')
+                    .append(d.interceptStrategy()).append(',').append(d.defenseScope())
+                    .append(',').append(d.fighterMission()).append(',').append(d.escortSlot())
+                    .append(',').append(d.escortRange());
+            for(int defended:d.defendSlots())content.append(',').append(defended);
+            content.append('\n');
         }
         return content.toString()+sha256(content.toString())+"\n";
     }
     public static File decode(String data){
         if(data==null||data.length()>60000)throw new IllegalArgumentException("Oversized standing orders file");
         String[] lines=data.split("\n",-1);
-        if(lines.length<4||!MAGIC.equals(lines[0])||!lines[lines.length-1].isEmpty())
+        if(lines.length<4||(!MAGIC.equals(lines[0])&&!LEGACY.equals(lines[0]))||
+                !lines[lines.length-1].isEmpty())
             throw new IllegalArgumentException("Unsupported standing orders format");
         StringBuilder content=new StringBuilder();
         for(int i=0;i<lines.length-2;i++)content.append(lines[i]).append('\n');
@@ -50,7 +59,8 @@ public final class ShipStandingOrdersCodec {
             Map<Integer,ShipStandingOrders> result=new TreeMap<>();
             for(int i=2;i<lines.length-2;i++){
                 String[] p=lines[i].split(",",-1);
-                if(p.length!=14)throw new IllegalArgumentException("Invalid doctrine field count");
+                if(p.length!=(MAGIC.equals(lines[0])?24:14))
+                    throw new IllegalArgumentException("Invalid doctrine field count");
                 int slot=Integer.parseInt(p[0]);
                 if(slot<0||slot>=200||result.containsKey(slot))
                     throw new IllegalArgumentException("Invalid or duplicate doctrine slot");
@@ -62,8 +72,17 @@ public final class ShipStandingOrdersCodec {
                         new BattleOrders.Engagement(Integer.parseInt(p[9]),Double.parseDouble(p[10])),
                         new BattleOrders.Engagement(Integer.parseInt(p[11]),Double.parseDouble(p[12])),
                         0,180,Double.parseDouble(p[13]));
+                ShipTacticalDirectives directives=ShipTacticalDirectives.DEFAULT;
+                if(p.length==24)
+                    directives=new ShipTacticalDirectives(Integer.parseInt(p[14]),
+                            ShipTacticalDirectives.InterceptStrategy.valueOf(p[15]),
+                            ShipTacticalDirectives.DefenseScope.valueOf(p[16]),
+                            ShipTacticalDirectives.FighterMission.valueOf(p[17]),
+                            java.util.List.of(Integer.parseInt(p[20]),Integer.parseInt(p[21]),
+                                    Integer.parseInt(p[22]),Integer.parseInt(p[23])),
+                            Integer.parseInt(p[18]),Integer.parseInt(p[19]));
                 result.put(slot,new ShipStandingOrders(orders,Integer.parseInt(p[1]),
-                        Integer.parseInt(p[2]),Integer.parseInt(p[3])));
+                        Integer.parseInt(p[2]),Integer.parseInt(p[3]),directives));
             }
             return new File(faction,result);
         }catch(RuntimeException malformed){

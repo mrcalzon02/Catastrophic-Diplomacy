@@ -44,6 +44,8 @@ public final class Battle {
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
         /** Optional individual standing policy, continuously enforced, not consumed. */
         public ShipStandingOrders standingOrders;
+        public int escortShipId;
+        public List<Integer> defendedShipIds=List.of();
         /** Per-hull sequential mission plan, independent of weapons and fleet doctrine. */
         public ShipCommandQueue commandQueue=new ShipCommandQueue(List.of());
         public int lastTargetId,lastAttackerId;
@@ -433,6 +435,34 @@ public final class Battle {
         ship.standingOrders=profile;
         setShipOrders(shipId,profile.tactics());
     }
+    /** Runtime bindings for up to four independent defend targets and one escort. */
+    public void setShipProtection(int shipId,int escortId,List<Integer> targets){
+        Ship ship=findShip(shipId);
+        if(ship==null||targets==null||targets.size()>4)
+            throw new IllegalArgumentException("Invalid ship defense assignment");
+        if(escortId!=0)requireFriendly(ship,escortId);
+        java.util.HashSet<Integer> unique=new java.util.HashSet<>();
+        for(Integer target:targets) {
+            if(target==null||!unique.add(target))
+                throw new IllegalArgumentException("Duplicate protected ship");
+            requireFriendly(ship,target);
+        }
+        // A captain cannot form an escort cycle; trace existing leaders first.
+        int parent=escortId;
+        for(int hops=0;parent!=0&&hops<=ships.size();hops++){
+            if(parent==shipId)throw new IllegalArgumentException("Cyclic escort relationship");
+            Ship leader=findShip(parent);
+            if(leader==null)break;
+            parent=leader.escortShipId;
+        }
+        ship.escortShipId=escortId;
+        ship.defendedShipIds=List.copyOf(targets);
+    }
+    private void requireFriendly(Ship self,int otherId){
+        Ship other=findShip(otherId);
+        if(other==null||other.team!=self.team||other.id==self.id)
+            throw new IllegalArgumentException("Order target must be a distinct friendly ship");
+    }
     public void setShipOrders(int shipId,BattleOrders.Orders value) {
         if(value==null)throw new IllegalArgumentException("Orders missing");
         Ship ship=findShip(shipId);
@@ -690,6 +720,18 @@ public final class Battle {
             double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
+            if(actor.standingOrders!=null){
+                for(int protectedId:actor.defendedShipIds){
+                    Ship asset=findShip(protectedId);
+                    if(asset==null||!asset.alive())continue;
+                    if(candidate.id==asset.lastAttackerId||candidate.lastTargetId==asset.id)
+                        assessed-=260;
+                }
+                Ship escort=findShip(actor.escortShipId);
+                if(escort!=null&&escort.alive()&&
+                        (candidate.id==escort.lastAttackerId||candidate.lastTargetId==escort.id))
+                    assessed-=240;
+            }
             switch(orders.targeting()){
                 case NEAREST -> { }
                 case VULTURE -> assessed-=(1-Math.max(0,candidate.hull/candidate.maxHull))*160;
@@ -792,6 +834,14 @@ public final class Battle {
             steerToward(ship,ship.x+dx/length*400,ship.y+dy/length*400);
             return;
         }
+        Ship dedicated=findShip(ship.escortShipId);
+        if(dedicated!=null&&dedicated.alive()&&dedicated.team==ship.team){
+            double radius=ship.standingOrders.directives().escortRange();
+            if(StrictMath.hypot(dedicated.x-ship.x,dedicated.y-ship.y)>radius){
+                steerToward(ship,dedicated.x,dedicated.y);
+                return;
+            }
+        }
         Ship parent=findShip(orders.anchorShipId());
         if(parent!=null&&parent.team==ship.team&&parent.alive()&&parent!=ship){
             if(orders.position()==BattleOrders.Position.FORMATION){
@@ -831,7 +881,9 @@ public final class Battle {
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
         double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
         ship.facing=wrap(ship.facing+change);
-        double velocity=ship.speed*ship.engineCondition*ship.crewReadiness();
+        double speedCap=ship.standingOrders==null?1:
+                ship.standingOrders.directives().speedPercent()/100.0;
+        double velocity=ship.speed*speedCap*ship.engineCondition*ship.crewReadiness();
         double smooth=Math.min(1,1.6*DT);
         ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
         ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
@@ -1089,17 +1141,49 @@ public final class Battle {
         }
     }
 
+    /** Screen nearby threats; protect responds to actual attack orders and last attackers. */
+    private Ship protectedThreat(Ship source,boolean screen){
+        Ship chosen=null;
+        double best=Double.POSITIVE_INFINITY;
+        java.util.ArrayList<Ship> assets=new java.util.ArrayList<>();
+        Ship escort=findShip(source.escortShipId);
+        if(escort!=null&&escort.alive())assets.add(escort);
+        for(int id:source.defendedShipIds){
+            Ship friend=findShip(id);
+            if(friend!=null&&friend.alive())assets.add(friend);
+        }
+        if(assets.isEmpty())assets.add(source);
+        for(Ship enemy:ships)if(enemy.team!=source.team&&enemy.alive()){
+            for(Ship asset:assets){
+                double distance=StrictMath.hypot(enemy.x-asset.x,enemy.y-asset.y);
+                boolean attacking=enemy.lastTargetId==asset.id||asset.lastAttackerId==enemy.id;
+                if(!attacking&&(!screen||distance>300))continue;
+                double score=distance-(attacking?320:0);
+                if(score<best){best=score;chosen=enemy;}
+            }
+        }
+        return chosen;
+    }
     private void launchAuxiliary(Ship ship, Ship enemy) {
         if(ship.crewReadiness()<0.05 || ship.hangarCondition<0.20
                 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
         boolean withdrawing=ship.standingOrders!=null&&ship.standingOrders.mustWithdraw(ship);
         // A withdrawing captain conserves fighter and attack-drone sorties.
         // Repair drones and actual point defense remain independently operational.
-        if(!withdrawing&&enemy!=null && ship.fighterReserve>0 &&
+        Ship fighterTarget=enemy;
+        var fighterPlan=ship.standingOrders==null?
+                ShipTacticalDirectives.FighterMission.STRIKE:
+                ship.standingOrders.directives().fighterMission();
+        if(fighterPlan==ShipTacticalDirectives.FighterMission.SCREEN||
+                fighterPlan==ShipTacticalDirectives.FighterMission.PROTECT)
+            fighterTarget=protectedThreat(ship,fighterPlan==
+                    ShipTacticalDirectives.FighterMission.SCREEN);
+        if(!withdrawing&&fighterPlan!=ShipTacticalDirectives.FighterMission.RESERVE&&
+                fighterTarget!=null&&ship.fighterReserve>0 &&
                 ship.fighterReload<=0 && crafts.size()<2000) {
-            crafts.add(new Craft(nextCraftId++,ship,true,enemy.id));
+            crafts.add(new Craft(nextCraftId++,ship,true,fighterTarget.id));
             visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
-                    ship.x,ship.y,enemy.x,enemy.y);
+                    ship.x,ship.y,fighterTarget.x,fighterTarget.y);
             ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
             ship.power-=7;ship.heat+=3;
         }
@@ -1401,6 +1485,27 @@ public final class Battle {
         double closing=(dx*velocityX+dy*velocityY)/distance/v*speed;
         return closing>0.1?distance/closing:1000+distance/speed;
     }
+    /** Hardware detection range is never extended by tactical doctrine. */
+    private boolean coversThreat(Ship defender,int targetId){
+        if(defender.standingOrders==null)return true;
+        switch(defender.standingOrders.directives().defenseScope()){
+            case ALL_ALLIES -> {return true;}
+            case SELF_ONLY -> {return targetId==defender.id;}
+            case PROTECTED_SHIPS -> {
+                return targetId==defender.id||targetId==defender.escortShipId||
+                        defender.defendedShipIds.contains(targetId);
+            }
+        }
+        return false;
+    }
+    private double defensiveScore(Ship defender,double distance,double eta){
+        if(defender.standingOrders==null)return eta;
+        return switch(defender.standingOrders.directives().interceptStrategy()){
+            case EARLY_INTERCEPT -> -distance; // first detected, farthest within fitted PD range
+            case CLOSE_IN -> distance;         // closest to firing hull
+            case FASTEST_IMPACT -> eta;        // earliest arriving threat
+        };
+    }
     private void updateMissiles() {
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
@@ -1414,7 +1519,7 @@ public final class Battle {
             Missile chosenMissile=null;Ballistic chosenShell=null;
             double quickest=Double.POSITIVE_INFINITY;
             for(Missile m:missiles){
-                if(m.team==defender.team)continue;
+                if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
@@ -1422,12 +1527,13 @@ public final class Battle {
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
                         m.x,m.y,m.vx,m.vy,m.spec.speed());
-                if(eta<quickest){
-                    quickest=eta;chosenMissile=m;chosenShell=null;
+                double score=defensiveScore(defender,distance,eta);
+                if(score<quickest){
+                    quickest=score;chosenMissile=m;chosenShell=null;
                 }
             }
             for(Ballistic p:ballistics){
-                if(p.team==defender.team)continue;
+                if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
                 double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
@@ -1435,8 +1541,9 @@ public final class Battle {
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
                         p.x,p.y,p.vx,p.vy,p.spec.speed());
-                if(eta<quickest){
-                    quickest=eta;chosenShell=p;chosenMissile=null;
+                double score=defensiveScore(defender,distance,eta);
+                if(score<quickest){
+                    quickest=score;chosenShell=p;chosenMissile=null;
                 }
             }
             if(chosenMissile==null && chosenShell==null)continue;
@@ -1486,7 +1593,7 @@ public final class Battle {
                 &&defender.power>pdLaw.minimumPower()){
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
-                if(craft.team==defender.team
+                if(craft.team==defender.team||!coversThreat(defender,craft.targetId)
                         || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>
                         ProjectileModel.acquisitionRange(defender.pdRange,
                                 defender.sensorsCondition,weather.sensorFactor(),
