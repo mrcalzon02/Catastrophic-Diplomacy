@@ -92,6 +92,22 @@ final class ShipyardPanel {
         var line=ShipLineages.of(next);
         notice="GEN "+line.generation()+" "+line.ethos()+" / "+line.role().description;
     }
+    /** Jump between ten asset-size generations rather than tapping past 46 chassis.
+     * Campaign skips not-yet-unlocked tiers but remains fully navigable. */
+    private void hullGroup(int change){
+        int now=ShipLineages.of(draft.hull).generation();
+        for(int n=1;n<=10;n++){
+            int target=Math.floorMod(now-1+n*change,10)+1;
+            if(usage==Usage.CAMPAIGN&&
+                    target>ShipLineages.maximumCampaignGeneration(unlockedMission))continue;
+            Shipyard.Hull next=ShipLineages.generation(target).get(0);
+            draft=Shipyard.starter(draft.faction,next);
+            selectedSlot=0;scroll=0;artPreview=false;
+            notice="SIZE "+target+"/10: "+ShipLineages.of(next).ethos()+
+                    " | choose specific chassis with hull arrows";
+            return;
+        }
+    }
     private void faction(int step) {
         Battle.Faction[] options=Battle.Faction.values();
         Battle.Faction next=options[Math.floorMod(draft.faction.ordinal()+step,options.length)];
@@ -214,6 +230,8 @@ final class ShipyardPanel {
         if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
         if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
         if(code==com.badlogic.gdx.Input.Keys.A){cycleAmmunition();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.PAGE_UP){hullGroup(-1);return true;}
+        if(code==com.badlogic.gdx.Input.Keys.PAGE_DOWN){hullGroup(1);return true;}
         if(code==com.badlogic.gdx.Input.Keys.UP){selectedSlot=Math.max(0,selectedSlot-1);scroll=Math.min(scroll,selectedSlot);return true;}
         if(code==com.badlogic.gdx.Input.Keys.DOWN){selectedSlot=Math.min(draft.slots()-1,selectedSlot+1);scroll=Math.max(scroll,selectedSlot-SLOT_ROWS+1);return true;}
         return true;
@@ -249,6 +267,10 @@ final class ShipyardPanel {
     }
     boolean tap(float x,float y){
         if(!open)return false;
+        if(y>=605&&y<=634){
+            if(x>=337&&x<=382){hullGroup(-1);return true;}
+            if(x>=646&&x<=691){hullGroup(1);return true;}
+        }
         if(y>638){
             if(x<160){side(0);return true;}
             if(x<310){if(!playerOnly)side(1);return true;}
@@ -461,8 +483,10 @@ final class ShipyardPanel {
         font.draw(batch,draft.hull.name().replace('_',' '),392,660);
         var lineage=ShipLineages.of(draft.hull);
         font.setColor(Color.GOLD);
+        font.draw(batch,"<",351,619);
         font.draw(batch,"GEN "+lineage.generation()+" / "+lineage.ethos()+
-                " / "+lineage.role().name(),343,619);
+                " / "+lineage.role().name(),386,619);
+        font.draw(batch,">",668,619);
         font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);
         font.draw(batch,"APPLY",745,660);font.draw(batch,"SAVE",833,660);
