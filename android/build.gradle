@@ -24,6 +24,8 @@ if (!(playGamesProjectId ==~ /[0-9]{1,24}/)) {
 }
 
 android {
+    // AGP 9 defaults resValues to false. Play Games APP_ID needs generated string resources.
+    buildFeatures { resValues = true }
     namespace 'games.catastrophicdiplomacy.android'
     compileSdk 36
     buildFeatures { resValues true }
