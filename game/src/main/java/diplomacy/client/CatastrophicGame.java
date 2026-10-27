@@ -39,6 +39,7 @@ import java.util.Set;
 import diplomacy.sim.SpaceWeather;
 import diplomacy.sim.LevelEnvironment;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.IOException;
@@ -67,6 +68,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private CampaignProgress.State campaign;
     private CampaignFleet.Roster campaignFleet;
+    private Shipyard.Design campaignDesign;
+    private GameMenuPanel.Screen researchReturn=GameMenuPanel.Screen.CAMPAIGN;
+    private String researchNotice="Research licenses are purchased with campaign credits.";
     private final java.util.List<Integer> campaignSortie=new java.util.ArrayList<>();
     private int dockPage,dockSelected;
     private String dockNotice="Select ships for active duty or reserve and service them individually.";
@@ -167,10 +171,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
         restoreOrderPresets();
         restoreCampaign();
         restoreCampaignFleet();
+        campaignDesign=Shipyard.starter(campaign==null?left:campaign.faction(),
+                Shipyard.Hull.CORVETTE);
         shipyard = new ShipyardPanel(technology,(team,design)->{
-            if(team==0){leftDesign=design;left=design.faction;} else {rightDesign=design;right=design.faction;}
-            saveFleets();
-            reset();
+            if(shipyard.usage()==ShipyardPanel.Usage.CAMPAIGN){
+                // Approval selects the fitting for a NEW paid dock purchase.
+                // It never overwrites or repairs a commissioned ship.
+                campaignDesign=design;
+                dockNotice="Blueprint approved: buy a fitted hull at the dock to commission it.";
+                shipyard.sync(0,leftDesign); // skirmish blueprint stays independent
+            }else{
+                if(team==0){leftDesign=design;left=design.faction;}
+                else {rightDesign=design;right=design.faction;}
+                saveFleets();
+                if(screen==GameMenuPanel.Screen.BATTLE&&!playedCampaign)reset();
+            }
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
@@ -184,6 +199,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
+                        else if(screen==GameMenuPanel.Screen.RESEARCH)screen=researchReturn;
                         else if(screen==GameMenuPanel.Screen.SHIP_ORDERS){
                             screen=GameMenuPanel.Screen.DEPLOYMENT;waitingForWaypoint=false;
                         }else if(screen==GameMenuPanel.Screen.DEPLOYMENT)
@@ -194,6 +210,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(screen==GameMenuPanel.Screen.HOME){
                         if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_6)
                             tapFrontEnd(610,512-(key-Input.Keys.NUM_1)*64);
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.RESEARCH){
+                        if(key==Input.Keys.ENTER)purchaseResearch();
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -224,7 +244,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.E&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(1);
                         if(key==Input.Keys.LEFT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(-1);
                         if(key==Input.Keys.RIGHT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(1);
-                        if((key==Input.Keys.S||key==Input.Keys.TAB)&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)shipyard.show();
+                        if((key==Input.Keys.S||key==Input.Keys.TAB)&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)openSkirmishShipyard();
                         if(key==Input.Keys.ENTER){openSkirmishDeployment();return true;}
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             int step=key==Input.Keys.UP?-1:1;
@@ -272,7 +292,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             deployment=deployment.withFormation(key==Input.Keys.UP?-1:1);
                         }
-                        if(key==Input.Keys.TAB||key==Input.Keys.S)shipyard.showCampaignFleet();
+                        if(key==Input.Keys.TAB||key==Input.Keys.S){
+                            if(preparingCampaign)openCampaignShipyard();
+                            else openSkirmishShipyard();
+                        }
                         if(key==Input.Keys.ENTER){
                             if(preparingCampaign)launchCampaignMission();else launchSkirmish();
                         }
@@ -303,7 +326,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 if (shipyard.open()) return shipyard.key(key);
                 if (key == Input.Keys.M || key == Input.Keys.ESCAPE || key == Input.Keys.BACK) { openTacticalMenu(); return true; }
-                if (key == Input.Keys.TAB || key == Input.Keys.Y) { shipyard.show(); return true; }
+                if (key == Input.Keys.TAB || key == Input.Keys.Y) {
+                    if(playedCampaign)openCampaignShipyard();else openSkirmishShipyard();
+                    return true;
+                }
                 if (key == Input.Keys.F) { openFleetOrders(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
@@ -386,7 +412,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if (world.x >= 1170) { changeBattlefieldLevel(1); return true; }
                 }
                 if (world.y > 650) {
-                    if (world.x > 1160) { shipyard.show(); return true; }
+                    if (world.x > 1160) {
+                        if(playedCampaign)openCampaignShipyard();else openSkirmishShipyard();
+                        return true;
+                    }
                     if (world.x >= 1080) changeFleetSize(1);
                     else if (world.x >= 990) changeFleetSize(-1);
                     else if (world.x < 125) running = !running;
@@ -508,6 +537,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         campaign=CampaignProgress.start(pendingFaction);
         campaignFleet=CampaignFleet.start(pendingFaction,
                 Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology);
+        campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
         saveCampaignFleet();
         saveCampaign();
         campaignPage=0;selectedMission=1;
@@ -519,6 +549,36 @@ public final class CatastrophicGame extends ApplicationAdapter {
         selectedMission=campaign.unlocked();
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
+    }
+    private void openSkirmishShipyard(){
+        if(scenario==ScenarioCatalog.Preset.PROVING_GROUND)return;
+        shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+        shipyard.showSkirmish();
+    }
+    private void openCampaignShipyard(){
+        if(campaign==null||campaignFleet==null)return;
+        if(campaignDesign==null||campaignDesign.faction!=campaign.faction())
+            campaignDesign=Shipyard.starter(campaign.faction(),Shipyard.Hull.CORVETTE);
+        shipyard.sync(0,campaignDesign);
+        shipyard.showCampaignFleet(campaign.researchRank(),campaign.unlocked());
+    }
+    private void openResearch(){
+        if(campaign==null)return;
+        researchReturn=screen==GameMenuPanel.Screen.DOCK?
+                GameMenuPanel.Screen.DOCK:GameMenuPanel.Screen.CAMPAIGN;
+        researchNotice="Next rank costs "+campaign.nextResearchCost()+" credits.";
+        screen=GameMenuPanel.Screen.RESEARCH;
+    }
+    private void purchaseResearch(){
+        if(campaign==null)return;
+        try{
+            long quote=campaign.nextResearchCost();
+            campaign=campaign.purchaseNextResearch();
+            saveCampaign();
+            researchNotice="Purchased research rank "+campaign.researchRank()+
+                    " for "+quote+" credits. All old hulls remain unchanged.";
+            Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_RESEARCH rank="+campaign.researchRank());
+        }catch(IllegalArgumentException denied){researchNotice=denied.getMessage();}
     }
     private void openDock(){
         if(campaign==null)return;
@@ -588,9 +648,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void dockPurchase(){
         try{
-            long price=CampaignFleet.purchaseCost(leftDesign);
+            Shipyard.Design design=campaignDesign;
+            CampaignShipyardRules.requireAllowed(design,campaign.faction(),
+                    campaign.researchRank(),campaign.unlocked());
+            long price=CampaignFleet.purchaseCost(design,technology);
             CampaignProgress.State debited=campaign.spend(price);
-            CampaignFleet.Roster purchased=campaignFleet.purchase(leftDesign,technology);
+            CampaignFleet.Roster purchased=campaignFleet.purchase(design,technology);
             campaignFleet=purchased;campaign=debited;
             dockSelected=campaignFleet.ships().size()-1;
             dockPage=dockSelected/9;
@@ -634,6 +697,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 10 -> dockPurchase();
             case 13 -> dockServiceAll();
             case 14 -> dockManualRename();
+            case 15 -> openCampaignShipyard();
+            case 16 -> openResearch();
             case 11 -> {
                 var styles=FleetNames.Style.values();
                 campaignFleet=campaignFleet.changeStyle(styles[(campaignFleet.style().ordinal()+1)%styles.length]);
@@ -875,7 +940,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 0 -> showCampaign();
                 case 1 -> openCampaignSetup();
                 case 2 -> {screen=GameMenuPanel.Screen.SKIRMISH;Gdx.app.log("CD-GAME-FLOW","SKIRMISH_SETUP");}
-                case 3 -> shipyard.show();
+                case 3 -> {
+                    shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+                    shipyard.show();
+                }
                 case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
                 case 5 -> Gdx.app.exit();
             }
@@ -895,7 +963,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(screen==GameMenuPanel.Screen.SKIRMISH){
             if(GameMenuPanel.hit(x,y,30,35,160,49)){screen=GameMenuPanel.Screen.HOME;return;}
             if(GameMenuPanel.hit(x,y,702,35,225,49)){
-                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)shipyard.show();
+                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)openSkirmishShipyard();
                 return;
             }
             if(GameMenuPanel.hit(x,y,969,35,277,49)){openSkirmishDeployment();return;}
@@ -920,8 +988,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,214,35,136,50)){campaignPage=Math.max(0,campaignPage-1);selectedMission=campaignPage*10+1;return;}
             if(GameMenuPanel.hit(x,y,366,35,136,50)){campaignPage=Math.min(CampaignMap.PAGE_COUNT-1,campaignPage+1);selectedMission=campaignPage*10+1;return;}
             if(GameMenuPanel.hit(x,y,964,35,278,50)){openDock();return;}
+            if(GameMenuPanel.hit(x,y,525,35,200,50)){openResearch();return;}
+            if(GameMenuPanel.hit(x,y,741,35,190,50)){openCampaignShipyard();return;}
             int mission=GameMenuPanel.mapHit(x,y,campaignPage);
             if(mission>=1)selectedMission=mission;
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.RESEARCH){
+            if(GameMenuPanel.hit(x,y,35,35,250,54)){screen=researchReturn;return;}
+            if(GameMenuPanel.hit(x,y,906,35,330,54)){purchaseResearch();return;}
             return;
         }
         if(screen==GameMenuPanel.Screen.DOCK){
@@ -948,7 +1023,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 case 3 -> deployment=deployment.withFormation(-1);
                 case 4 -> deployment=deployment.withFormation(1);
-                case 5 -> shipyard.showCampaignFleet();
+                case 5 -> {if(preparingCampaign)openCampaignShipyard();else openSkirmishShipyard();}
                 case 6 -> {
                     if(preparingCampaign)launchCampaignMission();else launchSkirmish();
                 }
@@ -1114,7 +1189,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             switch(n){
                 case 0 -> closeTacticalMenu();
                 case 1 -> {reset();closeTacticalMenu();}
-                case 2 -> {closeTacticalMenu();shipyard.show();}
+                case 2 -> {
+                    closeTacticalMenu();
+                    if(playedCampaign)openCampaignShipyard();else openSkirmishShipyard();
+                }
                 case 3 -> openFleetOrders();
                 case 4 -> changeFleetSize(-1);
                 case 5 -> changeFleetSize(1);
@@ -1355,7 +1433,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     preparingCampaign,standingPage,selectingDoctrineGroup,doctrineGroup,
                     waitingForWaypoint,deploymentNotice,
                     campaignFleet,dockPage,dockSelected,dockPrices(),
-                    CampaignFleet.purchaseCost(leftDesign),dockNotice,
+                    CampaignFleet.purchaseCost(campaignDesign==null?leftDesign:campaignDesign,
+                            technology),screen==GameMenuPanel.Screen.RESEARCH?researchNotice:dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd);
             return;
