@@ -269,6 +269,15 @@ public final class CampaignFleet {
         if(design==null)throw new IllegalArgumentException("Missing design");
         return 7000L+(long)Math.ceil(design.hull.baseHull*72)+design.hull.slots.size()*1300L;
     }
+    /** New hull procurement charges for installed real machinery in addition
+     * to the raw hull. Campaign research licenses are purchased separately. */
+    public static long purchaseCost(Shipyard.Design design,TechnologyCatalog tech){
+        if(tech==null)throw new IllegalArgumentException("Research catalog required");
+        Shipyard.Report report=Shipyard.inspect(design,tech);
+        if(!report.valid())
+            throw new IllegalArgumentException("Unbuildable fitted hull: "+report.explanation());
+        return Math.addExact(purchaseCost(design),Math.multiplyExact((long)report.industry(),2L));
+    }
     public static Battle.Ship fresh(Shipyard.Design fitted,TechnologyCatalog technology){
         if(fitted==null||technology==null)throw new IllegalArgumentException("Ship fitting required");
         Battle sandbox=new Battle(0);
