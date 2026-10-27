@@ -69,6 +69,43 @@ public final class CampaignFleet {
         public List<Vessel> reserves(){
             return ships.stream().filter(v->!v.deployed()).toList();
         }
+        /** Saved captain targets use immutable owned IDs; battle references
+         * use ordinal slots in the currently selected active fleet. */
+        public java.util.Map<Integer,ShipStandingOrders> forDeployment(
+                java.util.Map<Integer,ShipStandingOrders> saved){
+            if(saved==null)throw new IllegalArgumentException("Missing captain doctrines");
+            List<Vessel> selected=active();
+            java.util.HashMap<Integer,ShipStandingOrders> result=new java.util.HashMap<>();
+            for(int i=0;i<selected.size();i++){
+                ShipStandingOrders policy=saved.get(selected.get(i).id()-1);
+                if(policy!=null)
+                    result.put(i,translate(policy,selected,false));
+            }
+            return result;
+        }
+        public ShipStandingOrders toPersistent(int deployedIndex,ShipStandingOrders policy){
+            if(policy==null||deployedIndex<0||deployedIndex>=active().size())
+                throw new IllegalArgumentException("Unknown commissioned captain");
+            return translate(policy,active(),true);
+        }
+        private static ShipStandingOrders translate(ShipStandingOrders policy,
+                List<Vessel> ships,boolean toPersistent){
+            var d=policy.directives();
+            java.util.ArrayList<Integer> defended=new java.util.ArrayList<>();
+            for(int id:d.defendSlots())
+                defended.add(reference(id,ships,toPersistent));
+            var moved=new ShipTacticalDirectives(d.speedPercent(),d.interceptStrategy(),
+                    d.defenseScope(),d.fighterMission(),defended,
+                    reference(d.escortSlot(),ships,toPersistent),d.escortRange());
+            return new ShipStandingOrders(policy.tactics(),policy.aggression(),
+                    policy.caution(),policy.shieldWithdrawPercent(),moved);
+        }
+        private static int reference(int id,List<Vessel> ships,boolean toPersistent){
+            if(id<0)return -1;
+            if(toPersistent)return id>=ships.size()?-1:ships.get(id).id()-1;
+            for(int i=0;i<ships.size();i++)if(ships.get(i).id()-1==id)return i;
+            return -1;
+        }
         public Vessel get(int id){
             return ships.stream().filter(s->s.id()==id).findFirst()
                     .orElseThrow(()->new IllegalArgumentException("Unknown ship ID"));
@@ -164,7 +201,9 @@ public final class CampaignFleet {
                     full.defense.restoreIntegrity(current.integrity());
                     long structure=(long)Math.ceil(Math.max(0,full.maxHull-current.hull())*18);
                     long armor=(long)Math.ceil(Math.max(0,full.maxArmor-full.defense.totalArmor())*6);
-                    yield Math.addExact(structure,armor);
+                    long shields=(long)Math.ceil(Math.max(0,full.maxShields-
+                            full.defense.totalShields())*2);
+                    yield Math.addExact(Math.addExact(structure,armor),shields);
                 }
                 case CREW -> (long)Math.ceil(Math.max(0,
                         Math.min(full.crewBerths,full.lifeSupport)-current.crew())*95);
