@@ -39,8 +39,39 @@ public final class FleetNames {
         int b=(int)Math.floorMod(scrambled>>>35,16);
         int variant=(int)Math.floorMod(scrambled>>>49,4);
         if(style.ordinal()<FIRST.length){
-            // Preserve previously commissioned legacy names exactly.
             String call=FIRST[style.ordinal()][i]+" "+LAST[style.ordinal()][j];
+            // Three-part ceremonial, material and alien names: the original
+            // two-word bank alone contained only 64 possible labels.
+            if((variant&1)==0){
+                String suffix=switch(style){
+                    case NAVAL -> "of "+choose(a,
+                            "Sol","The Vanguard","The North","Meridian","Courage",
+                            "The Starward Line","Dawn","The Old Republic","Winter",
+                            "First Light","The Home Fleet","The Reach","Victory",
+                            "Perimeter Nine","The Long Watch","The Third Fleet");
+                    case MYTHIC -> "of "+choose(a,
+                            "The Titans","Olympus","The Fates","Ancient Kings",
+                            "The Nine Halls","The Oracle","The Forge","The Hunt",
+                            "The Three Moons","Myth","Fire","The Dawn",
+                            "The Tempest","The Labyrinth","The First Age","Starlight");
+                    case CELESTIAL -> "of "+choose(a,
+                            "Sirius","Andromeda","Cygnus","The Pleiades",
+                            "Orion","Altair","Deneb","Vega","The Milky Way",
+                            "The Red Giant","The Nebula","Polaris","Solstice",
+                            "Equinox","The Blue Sun","The Last Star");
+                    case INDUSTRIAL -> "works "+choose(a,
+                            "Alpha","Beta","Gamma","Delta","Omega","Forty",
+                            "Prime","North","East","Outer","Ninth","Zero",
+                            "Core","Deep","Red","Black");
+                    case ALIEN -> choose(a,
+                            "Zharr","Ul'ke","Qorath","Neth","Thyr","Varr",
+                            "Zyk","Ol'nu","Khath","Shae","Rix","Draal",
+                            "Xeth","Qa'lo","Myr","Vess");
+                    default -> throw new IllegalStateException("Unsupported foundational name style");
+                };
+                String enriched=call+" "+suffix;
+                if(enriched.length()<=70)call=enriched;
+            }
             return style==Style.ALIEN?call:"CDS "+call;
         }
         String name=switch(style){
