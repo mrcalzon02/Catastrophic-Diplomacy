@@ -24,6 +24,7 @@ import diplomacy.sim.CampaignAfterAction;
 import diplomacy.sim.CampaignLedger;
 import diplomacy.sim.CampaignFleetCodec;
 import diplomacy.sim.FleetNames;
+import diplomacy.sim.CrewChatter;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.ShipCommandQueue;
 import diplomacy.sim.ShipStandingOrders;
