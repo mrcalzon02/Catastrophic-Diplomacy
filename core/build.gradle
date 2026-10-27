@@ -416,4 +416,13 @@ tasks.register('campaignAfterActionSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('campaignAfterActionSmoke')) }
+tasks.register('campaignLedgerSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check atomic campaign wallet+fleet authority, full-snapshot rollback, corruption and double-spend rejection.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignLedgerTest'
+    dependsOn testClasses
+}
+tasks.named('campaignAfterActionSmoke') { finalizedBy(tasks.named('campaignLedgerSmoke')) }
+
 
