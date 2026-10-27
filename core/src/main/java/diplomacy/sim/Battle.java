@@ -126,6 +126,10 @@ public final class Battle {
         }
         public int fightersLaunched, dronesLaunched, launched, intercepted, kills;
         public boolean retired;
+        /** Committed withdrawal remains active after field repairs; escaped hulls
+         * remain in the battle registry but cannot fight or be targeted. */
+        public boolean withdrawing, escaped;
+        public int withdrawalTick=-1, escapeTick=-1;
         public int commanderSkill;
         Ship(int identifier, int side, Faction group, String callSign) {
             id = identifier; team = side; faction = group; name = callSign;
@@ -144,7 +148,7 @@ public final class Battle {
             hull = maxHull; shields = maxShields; armor = maxArmor; power = maxPower;
             defense=new DirectionalDefense(maxShields,maxArmor,maxHull);
         }
-        public boolean alive() { return hull > 0 && !retired; }
+        public boolean alive() { return hull > 0 && !retired && !escaped; }
         public int weatherId() { return id; }
         public double weatherX() { return x; }
         public double weatherY() { return y; }
@@ -597,6 +601,23 @@ public final class Battle {
         return new double[]{x,y};
     }
     public int alive(int team) { int count = 0; for (Ship s : ships) if (s.team == team && s.alive()) count++; return count; }
+    /** Successfully escaped, still-intact hulls; not active mission survivors. */
+    public int escaped(int team) {
+        checkTeam(team);
+        int count=0;
+        for(Ship ship:ships)if(ship.team==team&&ship.escaped)count++;
+        return count;
+    }
+    /** Hulls lost to actual destruction, excluding escaped vessels. */
+    public int destroyed(int team) {
+        checkTeam(team);
+        int count=0;
+        for(Ship ship:ships)if(ship.team==team&&ship.hull<=0)count++;
+        return count;
+    }
+    private static void checkTeam(int team) {
+        if(team!=0&&team!=1)throw new IllegalArgumentException("Invalid fleet side");
+    }
     public boolean finished() { return alive(0) == 0 || alive(1) == 0; }
 
     public void step() {
@@ -623,6 +644,18 @@ public final class Battle {
         }
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
+            // Retreat overrides waypoint queues and navigation doctrines.
+            // Recharge/repair cannot reverse a committed escape under fire.
+            if(s.withdrawing||(s.standingOrders!=null&&s.standingOrders.mustWithdraw(s))) {
+                if(!s.withdrawing) {
+                    s.withdrawing=true;
+                    s.withdrawalTick=tick;
+                    log(s.name+" withdrawing from battle");
+                }
+                steerRetreat(s);
+                if(s.alive())launchAuxiliary(s,null);
+                continue;
+            }
             Ship target = chooseTarget(s);
             boolean navigated=executeShipCommands(s,target);
             if (target != null) {
@@ -825,13 +858,6 @@ public final class Battle {
 
     private void orderedSteer(Ship ship,Ship target) {
         BattleOrders.Orders orders=ship.orders;
-        if(ship.standingOrders!=null&&ship.standingOrders.mustWithdraw(ship)){
-            // Disengage toward the appropriate friendly rear. Repair/shield
-            // recovery may permit re-engagement; PD remains independently active.
-            steerToward(ship,ship.team==0?75:1205,
-                    Math.max(100,Math.min(575,ship.y)));
-            return;
-        }
         if(orders.position()==BattleOrders.Position.HOLD){
             ship.vx*=0.82;ship.vy*=0.82;
             ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
@@ -886,6 +912,18 @@ public final class Battle {
             double dx=target.x-ship.x,dy=target.y-ship.y;
             steerToward(ship,ship.x-dy,ship.y+dx);
         }else steerToward(ship,target.x,target.y);
+    }
+    /** Real extraction requires physically crossing your team's own rear
+     * battlefield edge at actual engine speed; enemy weapons remain dangerous. */
+    private void steerRetreat(Ship ship) {
+        steerToward(ship,ship.team==0?-120:1400,
+                Math.max(90,Math.min(590,ship.y)));
+        if((ship.team==0&&ship.x<=0)||(ship.team==1&&ship.x>=1280)) {
+            ship.escaped=true;
+            ship.escapeTick=tick;
+            ship.vx=0;ship.vy=0;
+            log(ship.name+" escaped combat; hull "+Math.round(ship.hull));
+        }
     }
     private void steerToward(Ship ship,double x,double y){
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
@@ -1022,7 +1060,7 @@ public final class Battle {
             Ship target=findShip(order.targetId);
             var gun=WeaponBehaviorTable.gun(order.family);
             boolean heavy=order.family==DamageType.TORPEDO;
-            if(source==null||!source.alive()||source.crewReadiness()<0.05
+            if(source==null||!source.alive()||source.withdrawing||source.crewReadiness()<0.05
                     ||target==null||!target.alive()
                     ||source.weaponsCondition<=gun.requiredWeaponCondition()
                     ||source.magazineCondition<=gun.requiredMagazineCondition()
@@ -1177,7 +1215,8 @@ public final class Battle {
     private void launchAuxiliary(Ship ship, Ship enemy) {
         if(ship.crewReadiness()<0.05 || ship.hangarCondition<0.20
                 || ship.power<7 || ship.heat>ship.maxHeat*0.9)return;
-        boolean withdrawing=ship.standingOrders!=null&&ship.standingOrders.mustWithdraw(ship);
+        boolean withdrawing=ship.withdrawing||
+                (ship.standingOrders!=null&&ship.standingOrders.mustWithdraw(ship));
         // A withdrawing captain conserves fighter and attack-drone sorties.
         // Repair drones and actual point defense remain independently operational.
         Ship fighterTarget=enemy;
