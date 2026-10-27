@@ -42,6 +42,22 @@ public final class CampaignFleetTest {
         check(styled.get(1).name().equals(FleetNames.generate(FleetNames.Style.CELESTIAL,73,21)),
                 "Selected vessel name was not retained");
 
+        check(FleetNames.Style.values().length>=9,
+                "Campaign should offer recognizable naming philosophies, not five labels");
+        check(FleetNames.generate(FleetNames.Style.DESIGNATION,73,5).startsWith("FG-"),
+                "Military designation should follow its own serial structure");
+        check(FleetNames.generate(FleetNames.Style.ORGANIC,73,5).contains("'"),
+                "Biological alien ships should not receive ordinary naval noun pairs");
+        check(FleetNames.generate(FleetNames.Style.SYNTHETIC,73,5).startsWith("AXIOM/"),
+                "Synthetic alien ships should have a distinct machine nomenclature");
+        reject(()->original.rename(999,"Absent"),"Rename silently accepted nonexistent ID");
+        reject(()->original.rename(1,"   "), "Empty vessel name accepted");
+        reject(()->original.rename(1,"Duplicate\nLabel"),"Control characters allowed in names");
+        reject(()->original.rename(1,original.get(2).name().toLowerCase(java.util.Locale.ROOT)),
+                "Duplicate name accepted with different letter case");
+        check(original.rename(1,"  Captain's Promise  ").get(1).name().equals("Captain's Promise"),
+                "Manual rename was not normalized and persisted");
+
         var tested=original;
         Battle first=new Battle(1977);
         List<Integer> ids=new ArrayList<>();
@@ -150,6 +166,6 @@ public final class CampaignFleetTest {
                         .toLowerCase().contains("bulkheads"),
                 "Battleship bridge chatter incorrectly sent from fighter cockpit");
         System.out.println("PASS persistent campaign fleet: active/reserve, safe retreat, destroyed replacement, "+
-                "paid hull/crew/fuel/ammo service, five name styles, contextual fighter/capital chatter");
+                "paid hull/crew/fuel/ammo/Service All, multiple name cultures and manual names, fighter/capital chatter");
     }
 }
