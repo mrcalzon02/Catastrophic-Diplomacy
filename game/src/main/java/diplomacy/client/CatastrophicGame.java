@@ -548,6 +548,27 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE "+service+" ship="+id+" credits="+price);
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
     }
+    private void dockManualRename(){
+        try{
+            int shipId=dockShipId();
+            String original=campaignFleet.get(shipId).name();
+            Gdx.input.getTextInput(new Input.TextInputListener(){
+                @Override public void input(String proposed){
+                    Gdx.app.postRunnable(()->{
+                        if(campaignFleet==null||screen!=GameMenuPanel.Screen.DOCK)return;
+                        try{
+                            campaignFleet=campaignFleet.rename(shipId,proposed);
+                            saveCampaignFleet();
+                            dockNotice="Ship #"+shipId+" renamed to "+campaignFleet.get(shipId).name();
+                        }catch(IllegalArgumentException denied){
+                            dockNotice=denied.getMessage();
+                        }
+                    });
+                }
+                @Override public void canceled(){ }
+            },"Rename commissioned ship #"+shipId,original,"Vessel name");
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
     private void dockServiceAll(){
         try{
             int id=dockShipId();
@@ -612,6 +633,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 9 -> dockService(CampaignFleet.Service.CRAFT);
             case 10 -> dockPurchase();
             case 13 -> dockServiceAll();
+            case 14 -> dockManualRename();
             case 11 -> {
                 var styles=FleetNames.Style.values();
                 campaignFleet=campaignFleet.changeStyle(styles[(campaignFleet.style().ordinal()+1)%styles.length]);
