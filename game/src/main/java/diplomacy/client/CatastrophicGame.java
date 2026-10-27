@@ -258,7 +258,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                         preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
                                         .withStandingProfiles(savedStanding);
                             selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
-                    doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                             doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                         }
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
@@ -476,7 +475,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
         selectedStandingSetting=0;
         selectedDeploymentShip=0;
         clearDoctrineGroup();
-        clearDoctrineGroup();
         placementDragPointer=-1;
         waitingForWaypoint=false;
         deploymentNotice="Drag your fleet within the zone. Each hull has its own ordered commands.";
@@ -523,6 +521,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         deployment=deployment.withStandingProfiles(savedStanding);
         selectedStandingSetting=0;
         selectedDeploymentShip=0;
+        clearDoctrineGroup();
         placementDragPointer=-1;
         waitingForWaypoint=false;
         deploymentNotice="Drag ships inside the deployment zone. No overlaps allowed.";
@@ -743,6 +742,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                 preparingCampaign?LevelEconomy.level(activeMission).maximumFleet():200)
                                 .withStandingProfiles(savedStanding);
                     selectedDeploymentShip=Math.min(selectedDeploymentShip,deployment.ships()-1);
+                    doctrineGroup.removeIf(i->i>=deployment.ships()||i==selectedDeploymentShip);
                 }
                 case 2 -> {
                     if(preparingCampaign||scenario==ScenarioCatalog.Preset.CUSTOM)
