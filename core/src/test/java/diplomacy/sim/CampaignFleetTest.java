@@ -196,7 +196,7 @@ public final class CampaignFleetTest {
         var decoded=CampaignFleetCodec.decode(encoded,tech);
         check(CampaignFleetCodec.encode(decoded).equals(encoded),
                 "Full owned fleet checksum save round-trip lost inventory");
-        reject(()->CampaignFleetCodec.decode(encoded.replace("CD-ROSTER-3","CD-ROSTER-2"),tech),
+        reject(()->CampaignFleetCodec.decode(encoded.replace("CD-ROSTER-4","CD-ROSTER-3"),tech),
                 "Version downgrade or checksum tampering was accepted");
         reject(()->CampaignFleetCodec.decode(encoded.replace("TERRAN","DRAXIAN"),tech),
                 "Tampering with fleet faction was accepted");

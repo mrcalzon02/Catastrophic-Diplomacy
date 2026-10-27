@@ -442,5 +442,14 @@ tasks.register('campaignLedgerSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignAfterActionSmoke') { finalizedBy(tasks.named('campaignLedgerSmoke')) }
+tasks.register('squadronOperationsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate permanent commissioned squadrons, distinct naming cultures and live radio voices.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SquadronOperationsTest'
+    dependsOn testClasses
+}
+tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('squadronOperationsSmoke')) }
+
 
 
