@@ -20,6 +20,7 @@ import diplomacy.sim.DemonstrationBattle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignFleet;
+import diplomacy.sim.VesselIdentifiers;
 import diplomacy.sim.CampaignAfterAction;
 import diplomacy.sim.CampaignLedger;
 import diplomacy.sim.CampaignFleetCodec;
@@ -75,7 +76,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private Shipyard.Design campaignDesign;
     private GameMenuPanel.Screen researchReturn=GameMenuPanel.Screen.CAMPAIGN;
     private String researchNotice="Research licenses are purchased with campaign credits.";
-    private final java.util.List<Integer> campaignSortie=new java.util.ArrayList<>();
+    private final java.util.List<Long> campaignSortie=new java.util.ArrayList<>();
     private int dockPage,dockSelected;
     private String dockNotice="Select ships for active duty or reserve and service them individually.";
     private static final String CAMPAIGN_BLUEPRINT_FILE="campaign/purchase-blueprint-v1.dat";
@@ -96,7 +97,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int selectedStandingSetting,standingPage;
     private boolean selectingDoctrineGroup;
     private final java.util.Set<Integer> doctrineGroup=new java.util.HashSet<>();
-    private final Map<Integer,ShipStandingOrders> savedStanding=new HashMap<>();
+    private final Map<Long,ShipStandingOrders> savedStanding=new HashMap<>();
     private Battle.Faction savedStandingFaction;
     private boolean preparingCampaign=true,preparedSkirmish;
     private String deploymentNotice="Tap a ship then drag it anywhere within the non-overlapping deployment zone.";
@@ -616,14 +617,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_DOCK owned="+campaignFleet.ships().size()+
                     " active="+campaignFleet.active().size()+" reserve="+campaignFleet.reserves().size());
     }
-    private int dockShipId(){
+    private long dockShipId(){
         if(campaignFleet==null||campaignFleet.ships().isEmpty())
             throw new IllegalArgumentException("No commissioned ships");
         return campaignFleet.ships().get(dockSelected).id();
     }
     private void dockService(CampaignFleet.Service service){
         try{
-            int id=dockShipId();
+            long id=dockShipId();
             long price=campaignFleet.cost(id,service,technology);
             if(price==0){dockNotice=service+" already fully supplied on ship #"+id;return;}
             CampaignProgress.State debited=campaign.spend(price);
@@ -635,7 +636,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void dockManualRename(){
         try{
-            int shipId=dockShipId();
+            long shipId=dockShipId();
             String original=campaignFleet.get(shipId).name();
             Gdx.input.getTextInput(new Input.TextInputListener(){
                 @Override public void input(String proposed){
@@ -655,7 +656,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void dockServiceAll(){
         try{
-            int id=dockShipId();
+            long id=dockShipId();
             long quote=campaignFleet.costAll(id,technology);
             if(quote==0){
                 dockNotice="Ship #"+id+" requires no dock services.";
@@ -686,7 +687,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void dockToggle(){
         try{
-            int id=dockShipId();
+            long id=dockShipId();
             boolean active=!campaignFleet.get(id).deployed();
             int mission=selectedMission<=campaign.unlocked()?selectedMission:campaign.unlocked();
             if(!commitCampaign(campaign,campaignFleet.setActive(id,active,
@@ -736,10 +737,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             case 12 -> {
                 try{
-                    int id=dockShipId();
+                    long id=dockShipId();
                     if(!commitCampaign(campaign,campaignFleet.rename(id,
                             FleetNames.generate(campaignFleet.style(),
-                                    campaignFleet.namingSeed(),id))))return;
+                                    campaignFleet.namingSeed(),VesselIdentifiers.serial(id)))))return;
                     dockNotice="Renamed ship #"+id+" to "+campaignFleet.get(id).name();
                 }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
             }
@@ -749,7 +750,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private long[] dockPrices(){
         long[] costs=new long[5];
         if(campaignFleet!=null&&!campaignFleet.ships().isEmpty()){
-            int id=dockShipId();int n=0;
+            long id=dockShipId();int n=0;
             for(var service:CampaignFleet.Service.values())
                 costs[n++]=campaignFleet.cost(id,service,technology);
         }
@@ -858,8 +859,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         try{
             deployment=FleetDoctrineGroups.apply(deployment,selectedDeploymentShip,doctrineGroup);
             for(int slot:doctrineGroup){
-                int key=preparingCampaign&&campaignFleet!=null?
-                        campaignFleet.active().get(slot).id()-1:slot;
+                long key=preparingCampaign&&campaignFleet!=null?
+                        campaignFleet.active().get(slot).id():(long)slot;
                 var policy=deployment.standingFor(slot);
                 savedStanding.put(key,preparingCampaign&&campaignFleet!=null?
                         campaignFleet.toPersistent(slot,policy):policy);
@@ -889,8 +890,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 selectedDeploymentShip,deployment.ships());
         if(revised.equals(current))return;
         deployment=deployment.withStanding(selectedDeploymentShip,revised);
-        int key=preparingCampaign&&campaignFleet!=null?
-                campaignFleet.active().get(selectedDeploymentShip).id()-1:selectedDeploymentShip;
+        long key=preparingCampaign&&campaignFleet!=null?
+                campaignFleet.active().get(selectedDeploymentShip).id():(long)selectedDeploymentShip;
         savedStanding.put(key,preparingCampaign&&campaignFleet!=null?
                 campaignFleet.toPersistent(selectedDeploymentShip,revised):revised);
         saveStandingOrders();

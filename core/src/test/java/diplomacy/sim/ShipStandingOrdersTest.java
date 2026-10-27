@@ -59,9 +59,9 @@ public final class ShipStandingOrdersTest {
         check(advanced.directives().defenseScope()!=policy.directives().defenseScope()&&
                 advanced.directives().interceptStrategy()!=policy.directives().interceptStrategy(),
                 "Point defense strategy and protection scope must be independent");
-        Map<Integer,ShipStandingOrders> saved=new HashMap<>();
+        Map<Long,ShipStandingOrders> saved=new HashMap<>();
         for(int slot=0;slot<200;slot++)
-            saved.put(slot,slot%3==0?advanced:slot%2==0?attack:retreat);
+            saved.put((long)slot,slot%3==0?advanced:slot%2==0?attack:retreat);
         String encoded=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
         ShipStandingOrdersCodec.File decoded=ShipStandingOrdersCodec.decode(encoded);
         check(decoded.faction()==Battle.Faction.TERRAN&&decoded.policies().equals(saved),

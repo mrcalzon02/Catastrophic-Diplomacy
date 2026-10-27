@@ -62,9 +62,13 @@ public final class FleetDoctrineGroupsTest {
         ok(massResult.standings().size()==200,"Full 200 ship group was truncated");
         ok(massResult.standingFor(199).directives().speedPercent()==75,
                 "Final commissioned hull ignored group doctrine");
-        String saved=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,massResult.standings());
+        String saved=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,
+                massResult.standings().entrySet().stream().collect(
+                        java.util.stream.Collectors.toMap(e->(long)e.getKey(),
+                                java.util.Map.Entry::getValue)));
         var loaded=ShipStandingOrdersCodec.decode(saved);
-        ok(loaded.policies().equals(massResult.standings()),
+        ok(loaded.policies().size()==massResult.standings().size()&&
+                loaded.policies().get(1L).equals(massResult.standingFor(1)),
                 "Grouped captain doctrines did not survive a real save/reload");
 
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();

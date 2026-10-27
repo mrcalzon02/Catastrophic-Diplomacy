@@ -427,10 +427,11 @@ final class GameMenuPanel {
                         int index=dockPage*9+i;
                         if(index>=ownedFleet.ships().size())break;
                         var ship=ownedFleet.ships().get(index);
-                        label(batch,font,(ship.deployed()?"ACTIVE":"RESERVE")+"  #"+ship.id()+
-                                "  "+ship.name()+"  ["+ship.fitting().hull+"]",
+                        label(batch,font,(ship.deployed()?"ACTIVE":"RESERVE")+"  "+
+                                ship.name()+"  ["+ship.fitting().hull+"]",
                                 53,547-i*43,index==dockSelected?Color.GOLD:
                                         ship.deployed()?Color.GREEN:Color.WHITE);
+                        label(batch,font,"ID "+ship.id(),59,530-i*43,MUTED);
                     }
                     String[] names={"TOGGLE ACTIVE / RESERVE","REPAIR HULL / ARMOR / SHIELDS",
                             "RESTOCK CREW","RESTOCK AMMUNITION","REFILL FUEL",
@@ -545,10 +546,11 @@ final class GameMenuPanel {
                     int row=0;
                     for(var ship:report.page(safe,5)){
                         int y=542-row*48;
-                        label(batch,font,"#"+ship.id()+" "+shortLabel(ship.name(),23)+
+                        label(batch,font,shortLabel(ship.name(),23)+
                                 " ["+ship.hull().name().replace('_',' ')+"] "+ship.outcome(),
                                 510,y,ship.outcome()==CampaignAfterAction.Outcome.DESTROYED?
                                         Color.SCARLET:Color.WHITE);
+                        label(batch,font,"ID "+ship.id(),510,y-17,MUTED);
                         label(batch,font,"HULL "+ship.hullPercent()+"% | CREW LOST "+ship.crewLost()+
                                 " | AMMO K/M/T "+ship.kineticSpent()+"/"+
                                 ship.missileSpent()+"/"+ship.torpedoSpent()+
