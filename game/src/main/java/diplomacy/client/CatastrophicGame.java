@@ -1508,6 +1508,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 CampaignFleet.Vessel owned=campaignFleet.active().get(slot++);
                 owned.stores().apply(ship);
                 ship.name=owned.name();
+                ship.commissionedId=owned.id();
             }
         }
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
