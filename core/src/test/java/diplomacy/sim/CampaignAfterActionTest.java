@@ -18,8 +18,10 @@ public final class CampaignAfterActionTest {
         var ids=original.active().stream().map(CampaignFleet.Vessel::id).toList();
         Battle battle=new Battle(1977);
         for(var v:original.active())battle.spawnWing(0,v.fitting(),tech,1,310,335);
-        for(int i=0;i<ids.size();i++)
+        for(int i=0;i<ids.size();i++){
             original.active().get(i).stores().apply(battle.ships().get(i));
+            battle.ships().get(i).commissionedId=ids.get(i);
+        }
         var v=battle.ships().get(0);
         v.hull=v.maxHull*0.5;
         v.crewCount=Math.max(0,v.crewCount-3);
