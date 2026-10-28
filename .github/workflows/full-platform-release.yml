@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
-      GH_TOKEN: ${{ github.token }
-      GH_REPO: ${{ github.repository }
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,14 +37,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }" == "push" ]]; then
-            source="${{ github.event.before }"
-            changed="$(git diff --name-only "$source" "$GITHUB_SHA")"
-            test "$changed" = '.github/workflows/full-platform-release.yml' || {
-              echo 'BLOCKED: push contains application changes lacking this exact release proof'; exit 1;
-            }
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            # Workflow-only repair commits must not impersonate new game builds.
+            # Walk back through ONLY this workflow's revisions to the latest
+            # actual application commit and demand its exact Actions evidence.
+            source="$GITHUB_SHA"
+            while [[ "$(git diff-tree --no-commit-id --name-only -r "$source")" == '.github/workflows/full-platform-release.yml' ]]; do
+              source="$(git rev-parse "$source^")"
+            done
           else
-            source="${{ inputs.source_sha }"
+            source="${{ inputs.source_sha }}"
             if [[ -z "$source" ]]; then source="$GITHUB_SHA"; fi
           fi
           [[ "$source" =~ ^[a-f0-9]{40}$ ]] || { echo 'Invalid exact source SHA'; exit 1; }
