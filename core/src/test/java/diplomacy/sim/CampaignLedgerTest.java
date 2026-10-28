@@ -47,6 +47,11 @@ public final class CampaignLedgerTest {
             CampaignLedger.commit(path,research,tech);
             check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),research),
                     "Research debit and fleet state did not persist together");
+            // A too-large authority is rejected before reading it into memory;
+            // recovery still uses the entire previous valid generation.
+            Files.write(path,new byte[4_500_001]);
+            check(CampaignLedger.equivalent(CampaignLedger.load(path,tech).orElseThrow(),bought),
+                    "Oversized primary did not recover the valid backup generation");
             // A damaged current file falls back to the *entire* prior snapshot,
             // never a mismatched wallet/roster pair or free ship delivery.
             Files.writeString(path,"damaged primary save");

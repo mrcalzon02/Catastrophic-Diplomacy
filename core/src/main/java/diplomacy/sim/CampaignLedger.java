@@ -107,7 +107,12 @@ public final class CampaignLedger {
     private static Snapshot tryRead(Path path,TechnologyCatalog technology){
         if(!Files.exists(path))return null;
         try{
-            return decode(Files.readString(path,StandardCharsets.UTF_8),technology);
+            // Android API 26 provides readAllBytes, but Files.readString is API 33+.
+            // Reject oversized authorities before allocation; a valid backup can recover.
+            if(Files.size(path)>MAX_BYTES)return null;
+            byte[] data=Files.readAllBytes(path);
+            if(data.length>MAX_BYTES)return null;
+            return decode(new String(data,StandardCharsets.UTF_8),technology);
         }catch(IOException|RuntimeException broken){return null;}
     }
     private static Path backup(Path path){

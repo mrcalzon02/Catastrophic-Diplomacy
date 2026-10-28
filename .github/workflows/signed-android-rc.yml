@@ -37,6 +37,16 @@ jobs:
           gradle-version: '8.11.1'
       - name: Validate functional Android navigation scripts
         run: bash -n tools/android_verify_demo.sh tools/android_verify_menu.sh
+      - name: Guard Android API 26 campaign ledger file-reading compatibility
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("core/src/main/java/diplomacy/sim/CampaignLedger.java").read_text()
+          assert "Files.readString(" not in source, "Android API 26-32 lack Files.readString; use readAllBytes"
+          assert "Files.readAllBytes(" in source, "Campaign ledger needs Android API 26-compatible reading"
+          assert "Files.size(" in source, "Campaign ledger must bound file size before allocation"
+          print("PASS: campaign ledger uses Android API 26-compatible bounded file reading")
+          PY
       - name: Verify release gate checklist coverage
         run: python3 tools/verify_apk_release_gate.py --checklist-only
       - name: Run updater manifest unit tests
