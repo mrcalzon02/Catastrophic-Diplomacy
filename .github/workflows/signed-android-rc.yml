@@ -170,6 +170,24 @@ jobs:
         with:
           name: cd-signed-android-0.1.4-rc.1-${{ github.sha }}
           path: release
+      - name: Require hardware-accelerated Android emulator (KVM)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # GitHub-hosted Ubuntu exposes /dev/kvm to the kvm group, but the
+          # runner account is not always a member. Without access the emulator
+          # silently falls back to -accel off: the OS itself ANRs and the real
+          # 200v200 gameplay proof cannot advance. Never accept that as PASS.
+          test -c /dev/kvm || {
+            echo 'BLOCKED: runner has no /dev/kvm; live 200v200 verification requires acceleration'
+            exit 1
+          }
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm || {
+            echo 'BLOCKED: runner cannot access /dev/kvm; refusing unaccelerated emulator'
+            exit 1
+          }
+          echo 'PASS: KVM device is accessible; Android emulator must still pass full 200v200 proof'
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           # API 35 system_server/Settings ADB service crashed during emulator
