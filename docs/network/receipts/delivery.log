@@ -1,0 +1,136 @@
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\javac.exe', '--release', '17', '-encoding', 'UTF-8', '-d', 'build/classes', '@C:\\Users\\Admin\\Documents\\ChatGPT\\Phasmaphobia alike\\multiplayer\\Catastrophic-Diplomacy\\build\\network-checks\\sources.txt']
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\javac.exe', '--release', '17', '-encoding', 'UTF-8', '-cp', 'build/classes;core/src/main/resources;C:\\Users\\Admin\\.m2\\repository\\com\\badlogicgames\\gdx\\gdx\\1.14.2\\gdx-1.14.2.jar', '-d', 'build/game', '@C:\\Users\\Admin\\Documents\\ChatGPT\\Phasmaphobia alike\\multiplayer\\Catastrophic-Diplomacy\\build\\network-checks\\game-sources.txt']
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.AlienFactionArtTest']
+PASS alien factions: 5 playable races, 50 original PNG mappings and shared new chassis artwork
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.AmmunitionResearchTest']
+PASS research-locked ammo: 11 races, 3 launcher types, 4 exclusive trees x 6 ranks, per-bank intersection, live ballistic rounds and frozen salvo warheads
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.AmmunitionSelectionTest']
+PASS CD-SHIP-1/2/3 compatibility, player ammo fitting, 11 race save parity, anti-downgrade lockouts and live EMP launches
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.AmmunitionTableTest']
+PASS 5 ballistic ammunition and 6 missile payloads: physical rounds, AP penetration, explosions, EMP, shield attack and replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.BattleGeometryRasterTest']
+PASS rasterized 400/400 ship polygons inside 1280x720 battlefield | ship-color pixels=137767
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.BattleOrdersTest']
+PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.BattleRetreatTest']
+PASS withdrawal: physical left/right exits, hull/shield latch, last stand, waypoint precedence, wave resolution and credit exclusion
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.BattleSmokeTest']
+PASS deterministic battles | ticks=865 hits=374 intercepts=157 destroyed=21 fingerprint=ad97e3ca982c2345
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.BattleViewTest']
+PASS dynamic battle camera: every scale 1v1..200v200; 750 moving combat ticks; no living hull clipped under HUD
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.BattleWeatherTest']
+PASS environmental targeting, battle damage, thermal effects and replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CampaignAfterActionTest']
+PASS named after-action ledger: casualty ships, returned hulls, stores, 13-ship pagination
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CampaignBlueprintTest']
+PASS persistent campaign purchase blueprint: checksum, sub-chassis, faction, milestone, restart and corruption
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CampaignDeploymentTest']
+PASS campaign deployment: 4 stages, all formations, real coordinates, fleet caps, reward balance
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CampaignFleetTest']
+PASS persistent campaign fleet: active/reserve, safe retreat, destroyed replacement, paid hull/crew/fuel/ammo/Service All, multiple name cultures and manual names, fighter/capital chatter
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CampaignLedgerTest']
+PASS atomic campaign ledger: purchase/research consistency, recovery, stale writes and corruption protection
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CampaignResearchTest']
+PASS research: instant zero-floor, paid licenses/labs, four accelerators, quarter replays, v1-v4 saves
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CombatMachineryTest']
+PASS combat machinery: fighters, defense drones, magazines, ECM, four distinct weapon branches and deterministic replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.CrewAccommodationTest']
+PASS crew habitat: 506 staffed faction/chassis combinations, 22 new module families, zero free berths, no unmanned gunfire and version-1 fleet migration
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.DemonstrationBattleTest']
+PASS demo 200v200: six weapon families fired, impacts=5042 hits=4735 craft=275 ordnance=264 fingerprint=eab7e3793723ffbd
+PASS demo 200v200: six weapon families fired, impacts=5042 hits=4735 craft=275 ordnance=264 fingerprint=eab7e3793723ffbd
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.DirectionalDefenseTest']
+PASS directional shield/armor/structure: 4 facings, tiles, typed damage and determinism
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.FighterCraftTest']
+PASS fighter type INTERCEPTOR -> CANNON
+PASS fighter type ASSAULT_GUNSHIP -> CANNON
+PASS fighter type LASER_FIGHTER -> LASER
+PASS fighter type PARTICLE_FIGHTER -> PARTICLE
+PASS fighter type MISSILE_FIGHTER -> MISSILE
+PASS fighter type TORPEDO_BOMBER -> TORPEDO
+PASS six armed fighter loadouts, air-to-air targeting, PD signatures, ammo, saves and replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.FleetDoctrineGroupsTest']
+PASS group standing orders: 200 hulls, independent targets, deployment, save, live battle
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.FleetNameRangeTest']
+PASS cultural ship naming: 38 themes, 22800 distinct commissioned roster names, rerolls, lengths, identity separation and deterministic replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.FleetScaleTest']
+PASS 200-ship headless scale | 2 x 300 ticks | combined-ms=545.9 | fingerprint=5e16119177253b3d
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.GameFlowTest']
+PASS game flow: real skirmishes, sequential campaign waves, map, saves and rewards
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.HullFoundationTest']
+PASS physical hull baseline: 506 chassis/faction combinations, 11 native module rosters, 5808 tech upgrades, unarmed fits, symmetric combat
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.HullLayoutsTest']
+PASS hull layouts: 506 valid faction/class fittings, distinct placements and hit tests
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.LevelEconomyTest']
+PASS 500 level definitions and exact survivor/underdog credit economics
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.LevelEnvironmentTest']
+PASS all 500 level backgrounds linked to weather simulation
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.LevelSkyTest']
+PASS 500 reproducible and distinct sky recipes, sector palettes and limits
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.MassBattleCampaignTest']
+PASS weapon/thruster matrix: valid=16846 rejected=1370 upgraded-drives=12022 upgraded-weapons=66722 beams=[LASER, PLASMA, PARTICLE] kinetic=true missile=true torpedo=true
+STEP 1v1 ticks=270 hits=14 destroyed=0 runtime-ms=1.65
+STEP 10v10 ticks=90 hits=16 destroyed=3 runtime-ms=1.46
+STEP 25v25 ticks=90 hits=15 destroyed=3 runtime-ms=5.40
+STEP 50v50 ticks=90 hits=212 destroyed=6 runtime-ms=16.18
+STEP 100v100 ticks=45 hits=149 destroyed=0 runtime-ms=30.57
+STEP 150v150 ticks=45 hits=109 destroyed=4 runtime-ms=65.91
+STEP 200v200 ticks=35 hits=0 destroyed=0 runtime-ms=82.13
+PASS 200v200 combined arms: ticks=480 hits=4648 destroyed=111 peak-missiles=409 peak-craft=156 fighter-types=[INTERCEPTOR, ASSAULT_GUNSHIP, LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER] fighter-payloads=1273/33/35/25/17 visible-beam-types=[LASER, PLASMA, PARTICLE] tracked-kinetics=true fingerprint=c4f1e8125cf4ad3f
+PASS 200v200 combined arms: ticks=480 hits=4648 destroyed=111 peak-missiles=409 peak-craft=156 fighter-types=[INTERCEPTOR, ASSAULT_GUNSHIP, LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER] fighter-payloads=1273/33/35/25/17 visible-beam-types=[LASER, PLASMA, PARTICLE] tracked-kinetics=true fingerprint=c4f1e8125cf4ad3f
+PASS full battle campaign: all sizes 1v1..200v200 (200 rungs), 16846 valid weapon/ship arrangements, 10 replay scales, 1833660 ship-ticks, wall-ms=13177.6
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ModuleResearchExclusivityTest']
+PASS per-module exclusive research: 4 branches x 6 stages, independent sockets, switch lock, reset, physics, cumulative costs and legacy safety
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ModuleVersionsTest']
+PASS 4840 module manufacturing versions, exclusive six-rank research retention, fitted sidegrades and CD-SHIP-1/2 compatibility
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.OrdnanceDoctrineTest']
+PASS 14 physical missile/torpedo schematics, finite reload and ammo, decoys, cold ignition, PD and replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.PlatformPersistenceTest']
+PASS shared platform persistence: checksum, fittings, touch gesture/pointer safety
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ProjectileModuleTest']
+PASS projectile modules: fitted speed/health/RCS/signature, sensor range, tracking, launch properties and replay
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ResearchVictoryFloorTest']
+PASS 10 instant and 20 mission-timed technology combinations, plus 4 paid laboratory projects
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ShipLineagesTest']
+PASS 506 faction/chassis prototypes in 10 alternating fleet-size generations
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ShipPlacementOrdersTest']
+PASS placement and individual orders: full 200-ship zones, collision rejection, 250 commands, independent queues and live ordered navigation
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ShipStandingOrdersTest']
+PASS individual standing orders: 23 simultaneous doctrines, 200 saved hull policies, withdrawal behavior, real combat and wave retention
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ShipTacticalDirectivesTest']
+PASS rich tactical directives: slot binding, relation guards, fighter, PD and speed controls
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.ShipyardTest']
+PASS shipyard | 506 faction/hull starters + invalid fitting + upgrades + blueprint round-trip + deterministic battles
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.SpaceWeatherTest']
+PASS 500 weather presets, seeded hazards, asteroid hits/misses and radiation effects
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.SquadronOperationsTest']
+PASS commissioned squadrons: 8 persistent groups, mixed styles/voices, actual battle subtitle overrides, unique ID ownership, v4 checksum, paid service, reserve, casualties and 16-digit name independence
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.SupportSystemsTest']
+PASS six-rank module doctrine + self repair + allied repair beams + shield transfers + finite service drones
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.TechnologyCatalogTest']
+PASS technology catalog | components=242 upgrades=5808 verified branches=44
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.VesselIdentifiersTest']
+PASS 500 missions x 200 ships x 5 campaign namespaces = 500000 permanent unique 16-digit IDs, independent names and battle slots
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.WeaponBehaviorTableTest']
+PASS authoritative weapon behavior: 6 ship guns, 3 delivery modes, 4 PD toggles, 66 fighter loadouts, ammo/power/heat/range/reload/accuracy and live FIRE events
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.sim.WeaponFxPipelineTest']
+PASS modular VFX: per-shot origins, three separate clips, deterministic impacts and real moving ordnance
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'hbnet.HbnetTest', 'local']
+SKIP Swing controls: platform uses native game UI
+PASS local-only hbnet cases=38; TLS socket acceptance explicitly NOT RUN
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'hbnet.HbnetTest']
+SKIP Swing controls: platform uses native game UI
+Exception in thread "main" java.io.IOException: Connection unavailable (NET-04)
+	at hbnet.Hbnet.failure(Hbnet.java:27)
+	at hbnet.Hbnet$Client.connect(Hbnet.java:239)
+	at hbnet.HbnetTest.main(HbnetTest.java:50)
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.server.BattleServerTest']
+Exception in thread "main" java.io.IOException: Connection unavailable (NET-04)
+	at hbnet.Hbnet.failure(Hbnet.java:27)
+	at hbnet.Hbnet$Client.connect(Hbnet.java:239)
+	at diplomacy.net.BattleConnection.<init>(BattleConnection.java:23)
+	at diplomacy.server.BattleServerTest.main(BattleServerTest.java:19)
+COMMAND ['C:\\Program Files\\Java\\jdk-17\\bin\\java.exe', '-Djava.awt.headless=true', '-ea', '-cp', 'build/classes;core/src/main/resources', 'diplomacy.server.BattleLanTest']
+PASS OPEN_LAN ships=2 tick=21 max_tick_us=36320 queued_bytes=6342 (trusted loopback only; no TLS claim)
+PASS OPEN_LAN ships=32 tick=21 max_tick_us=1243 queued_bytes=93066 (trusted loopback only; no TLS claim)
+PASS OPEN_LAN ships=400 tick=22 max_tick_us=19796 queued_bytes=1139776 (trusted loopback only; no TLS claim)

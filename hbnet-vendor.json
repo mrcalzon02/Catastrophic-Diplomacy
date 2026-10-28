@@ -1,0 +1,14 @@
+{
+  "version": "hbnet-1.0",
+  "canonical": "mrcalzon02/The-Beckenburg-Project:src/main/java/hbnet",
+  "source_root": "core/src/main/java/hbnet",
+  "sha256": {
+    "BoundedEventQueue.java": "4b09afdfe100d4c583a51da0c377062609b19b8eff3a0b61d39cdb719baaadb5",
+    "Hbnet.java": "aab0ce2a6fb10d513a364948ecd72f9681a27a0d96f4a7e66c6d7ac6eb5df70b",
+    "Invitation.java": "2ff6215be4c9055e7f22d9b391acc21504bcaf669f4e6b5924ad38b0794ace71",
+    "Lines.java": "84dd792bc71f695ab8bb47d9fa19c74349e035601ee87dbbc97d14aba83690d3",
+    "LocalProfile.java": "72c2dab2f96cc194facba5979c5c446bd7c4e7d7ab7db51a2799d639f53ee2de",
+    "Privacy.java": "2bcceb212ae4eec71d3867b473e3dcb0bf3bfa49d80df5a831b90a5808475424",
+    "Setup.java": "26af0af247eb68cdb179cf40188263cb62e8cbac044ca4b77d8fba4e3d8d2772"
+  }
+}

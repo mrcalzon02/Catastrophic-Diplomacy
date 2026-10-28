@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = 'CatastrophicDiplomacy'
-include ':core', ':game', ':desktop', ':android'
+include ':core', ':game', ':desktop', ':android', ':server'

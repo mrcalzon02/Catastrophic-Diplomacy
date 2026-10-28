@@ -68,6 +68,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
     private Battle battle;
+    private MultiplayerPanel multiplayer;
+    private Battle remotePresentation;
     private GameMenuPanel menuPanel;
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
@@ -246,7 +248,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.HOME){
-                        if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_6)
+                        if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_7)
                             tapFrontEnd(610,512-(key-Input.Keys.NUM_1)*64);
                         return true;
                     }
@@ -1232,6 +1234,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
                 case 5 -> Gdx.app.exit();
+                case 6 -> {
+                    try{multiplayer=new MultiplayerPanel(font,()->{multiplayer=null;screen=GameMenuPanel.Screen.HOME;},this::drawRemoteBattle);}
+                    catch(Exception unavailable){Gdx.app.error("NETWORK","Local network profile unavailable (NET-20)");}
+                }
             }
             return;
         }
@@ -1772,6 +1778,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     @Override public void render() {
+        if(multiplayer!=null){multiplayer.draw();return;}
         if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished()) {
             if(playedCampaign && campaignEncounter!=null) {
                 CampaignEncounter.Advance advance=campaignEncounter.advance();
@@ -2173,6 +2180,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.end();
     }
 
+    /** Presentation mirror only: no local step(), commands, campaign settlement or second rules engine. */
+    private void drawRemoteBattle(diplomacy.net.BattleConnection.Snapshot snapshot){
+        java.util.List<String> rows=snapshot.entities().stream().filter(s->s.startsWith("SHIP|")).toList();
+        if(remotePresentation==null||remotePresentation.ships().size()!=rows.size()){
+            remotePresentation=new Battle(0);
+            for(String row:rows){String[] p=row.split("\\|");remotePresentation.addShip(Integer.parseInt(p[2]),Battle.Faction.valueOf(p[3]),0,0);}
+        }
+        for(int i=0;i<rows.size();i++){
+            String[] p=rows.get(i).split("\\|");Battle.Ship s=remotePresentation.ships().get(i);
+            s.x=Double.parseDouble(p[4]);s.y=Double.parseDouble(p[5]);s.facing=Double.parseDouble(p[6]);s.hull=Double.parseDouble(p[7]);s.shields=Double.parseDouble(p[8]);s.armor=Double.parseDouble(p[9]);s.power=Double.parseDouble(p[10]);s.fuel=Double.parseDouble(p[11]);
+            s.hullClass=diplomacy.shipyard.Shipyard.Hull.CORVETTE;
+        }
+        remotePresentation.tick=snapshot.tick();
+        Gdx.gl.glClearColor(.015f,.025f,.055f,1);Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);viewport.apply();battleCamera.update();
+        // Reuse existing hull geometry and approved sprite renderer for the authoritative poses.
+        Battle solo=battle;try{battle=remotePresentation;drawShipsFallback();}finally{battle=solo;}
+        batch.setProjectionMatrix(battleCamera.combined);if(terranSprites!=null&&terranSprites.loaded()>0)terranSprites.render(remotePresentation,batch);
+        batch.setProjectionMatrix(camera.combined);batch.begin();font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+" / TAB: CONNECTION AND FLEET ORDERS",24,696);batch.end();
+    }
     @Override public void resize(int width, int height) { viewport.update(width, height, true); }
     @Override public void pause() {
         if (audio != null) audio.pause();
@@ -2181,6 +2207,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (audio != null) audio.resume();
     }
     @Override public void dispose() {
+        if(multiplayer!=null)multiplayer.close();
         if (audio != null) audio.close();
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();

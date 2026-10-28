@@ -18,3 +18,12 @@ local.properties
 !example.env
 .DS_Store
 android/src/main/jniLibs/
+
+# Local-first multiplayer private runtime state
+/network-profile/
+/server-network/
+keystore.pass
+room.secret
+server.p12
+room.verifier*
+invitation.secret

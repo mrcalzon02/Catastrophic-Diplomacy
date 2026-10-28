@@ -1,0 +1,11 @@
+plugins { id 'application' }
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
+dependencies { implementation project(':core') }
+application { mainClass = 'diplomacy.server.BattleServer' }
+tasks.register('networkSmoke', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.server.BattleServerTest'
+}
+tasks.named('check') { dependsOn tasks.named('networkSmoke') }

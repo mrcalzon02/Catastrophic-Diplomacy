@@ -45,7 +45,7 @@ final class GameMenuPanel {
     void dispose(){grittyChrome.dispose();backgrounds.dispose();}
 
     private static final String[] HOME_ACTIONS={
-        "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT"
+        "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT","MULTIPLAYER"
     };
 
     static boolean hit(float x,float y,float bx,float by,float w,float h){
