@@ -12,6 +12,7 @@ import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.CampaignFleet;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.ShipLineages;
 import diplomacy.shipyard.CampaignShipyardRules;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 /** Compact, touch-and-mouse compatible single-screen ship fitting interface. */
@@ -35,6 +37,9 @@ final class ShipyardPanel {
     private TacticalUiIcons uiIcons;
     private Supplier<CampaignProgress.State> campaignWallet;
     private Function<Shipyard.Design,Boolean> campaignPurchase;
+    private Supplier<CampaignFleet.Roster> commissionedFleet;
+    private BiFunction<Long,Shipyard.Design,Boolean> campaignRefit;
+    private long refitShipId;
     private Shipyard.Design purchaseArmedDesign;
     private long purchaseArmedCredits=-1,purchaseArmedCost=-1;
     private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
@@ -44,7 +49,7 @@ final class ShipyardPanel {
     private int team, selectedSlot, scroll;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
-    enum Usage { WORKSHOP, SKIRMISH, CAMPAIGN }
+    enum Usage { WORKSHOP, SKIRMISH, CAMPAIGN, CAMPAIGN_REFIT }
     private Usage usage=Usage.WORKSHOP;
     private int campaignRank=6,unlockedMission=1;
     private boolean playerOnly;
@@ -63,37 +68,50 @@ final class ShipyardPanel {
                               Function<Shipyard.Design,Boolean> purchase){
         campaignWallet=wallet;campaignPurchase=purchase;
     }
+    void setCampaignRefitting(Supplier<CampaignFleet.Roster> roster,
+                             BiFunction<Long,Shipyard.Design,Boolean> refit){
+        commissionedFleet=roster;campaignRefit=refit;
+    }
     private CampaignBudgetQuotes.Quote campaignQuote(){
         if(campaignWallet==null||campaignWallet.get()==null)
             throw new IllegalStateException("No active campaign budget");
-        return CampaignBudgetQuotes.hull(campaignWallet.get(),draft,catalog);
+        return usage==Usage.CAMPAIGN_REFIT?
+                CampaignBudgetQuotes.refit(campaignWallet.get(),commissionedFleet.get(),
+                        refitShipId,draft,catalog):
+                CampaignBudgetQuotes.hull(campaignWallet.get(),draft,catalog);
     }
     /** Purchase an owned hull only after a second explicit authorization. */
     private void purchaseCampaignHull(){
-        if(usage!=Usage.CAMPAIGN||campaignPurchase==null)return;
+        if((usage!=Usage.CAMPAIGN&&usage!=Usage.CAMPAIGN_REFIT)||
+                (usage==Usage.CAMPAIGN&&campaignPurchase==null)||
+                (usage==Usage.CAMPAIGN_REFIT&&campaignRefit==null))return;
         CampaignBudgetQuotes.Quote quote=campaignQuote();
         if(!quote.allowed()){
             purchaseArmedDesign=null;
-            notice="PURCHASE BLOCKED: "+quote.reason();return;
+            notice=(usage==Usage.CAMPAIGN_REFIT?"REFIT":"PURCHASE")+
+                    " BLOCKED: "+quote.reason();return;
         }
         if(purchaseArmedDesign!=draft||purchaseArmedCredits!=quote.wallet()
                 ||purchaseArmedCost!=quote.cost()){
             purchaseArmedDesign=draft;
             purchaseArmedCredits=quote.wallet();
             purchaseArmedCost=quote.cost();
-            notice="CONFIRM PURCHASE: "+quote.cost()+" cr / REMAINING "+
-                    quote.remaining()+" cr. Press PURCHASE again.";
+            notice="CONFIRM "+(usage==Usage.CAMPAIGN_REFIT?"REFIT":"PURCHASE")+
+                    ": "+quote.cost()+" cr / REMAINING "+quote.remaining()+
+                    " cr. Press the same action again.";
             return;
         }
         purchaseArmedDesign=null;
-        if(campaignPurchase.apply(draft))close();
-        else notice="Purchase not committed. Review campaign dock budget.";
+        boolean committed=usage==Usage.CAMPAIGN_REFIT?
+                campaignRefit.apply(refitShipId,draft):campaignPurchase.apply(draft);
+        if(committed)close();
+        else notice="Campaign spending not committed. Review dock status.";
     }
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
         draft=active[team];selectedSlot=0;scroll=0;artPreview=false;
-        purchaseArmedDesign=null;
+        purchaseArmedDesign=null;refitShipId=0;
         notice="FREE DESIGN WORKSHOP: all factions and technology available.";
     }
     void showSkirmish(){
@@ -107,6 +125,13 @@ final class ShipyardPanel {
         show();side(0);usage=Usage.CAMPAIGN;playerOnly=true;
         campaignRank=researchRank;unlockedMission=mission;
         notice="BLUEPRINT saves without spending; PURCHASE charges for a new reserve hull.";
+    }
+    void showCampaignRefit(int researchRank,int mission,long vesselId){
+        if(vesselId<=0)throw new IllegalArgumentException("Commissioned ship required");
+        showCampaignFleet(researchRank,mission);
+        usage=Usage.CAMPAIGN_REFIT;
+        refitShipId=vesselId;
+        notice="REFIT EXISTING SHIP: reserves only; repairs are paid separately.";
     }
     void close() { open=false; playerOnly=false; purchaseArmedDesign=null; gesture.cancel(); }
     void dispose(){backgrounds.dispose();}
@@ -255,6 +280,12 @@ final class ShipyardPanel {
     private void apply(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot approve: "+report.explanation();return;}
+        if(usage==Usage.CAMPAIGN_REFIT){
+            var quote=campaignQuote();
+            notice="REFIT QUOTE: "+quote.cost()+" cr. "+quote.reason()+
+                    ". Select REFIT to authorize.";
+            return;
+        }
         if(usage==Usage.CAMPAIGN&&!campaignPermitted())return;
         active[team]=draft;
         deploy.accept(team,draft);
@@ -266,7 +297,7 @@ final class ShipyardPanel {
         if(!open)return false;
         if(code==com.badlogic.gdx.Input.Keys.ESCAPE||code==com.badlogic.gdx.Input.Keys.TAB){close();return true;}
         if(code==com.badlogic.gdx.Input.Keys.ENTER){apply();return true;}
-        if(code==com.badlogic.gdx.Input.Keys.P&&usage==Usage.CAMPAIGN){purchaseCampaignHull();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.P&&playerOnly){purchaseCampaignHull();return true;}
         if(code==com.badlogic.gdx.Input.Keys.K){cycleFighter();return true;}
         if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
         if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
@@ -514,7 +545,8 @@ final class ShipyardPanel {
             uiIcons.draw(batch, "energy", 1213,148,22);
         }
         font.setColor(Color.WHITE);
-        font.draw(batch,usage==Usage.CAMPAIGN?"CAMPAIGN SHIPYARD":
+        font.draw(batch,usage==Usage.CAMPAIGN_REFIT?"CAMPAIGN REFIT #"+refitShipId:
+                usage==Usage.CAMPAIGN?"CAMPAIGN SHIPYARD":
                 usage==Usage.SKIRMISH?"SKIRMISH SHIPYARD":"DESIGN WORKSHOP",22,702);
         font.setColor(team==0?Color.CYAN:Color.LIGHT_GRAY);font.draw(batch,"LEFT FLEET",35,660);
         if(!playerOnly){
@@ -532,16 +564,18 @@ final class ShipyardPanel {
         font.draw(batch,">",668,619);
         font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);
-        font.draw(batch,playerOnly?"BLUEPRINT":"APPLY",playerOnly?716:745,660);font.draw(batch,"SAVE",833,660);
+        font.draw(batch,playerOnly?(usage==Usage.CAMPAIGN_REFIT?"QUOTE":"BLUEPRINT"):"APPLY",
+                playerOnly?716:745,660);font.draw(batch,"SAVE",833,660);
         font.draw(batch,"LOAD",940,660);
         if(playerOnly){
             var quote=campaignQuote();
             font.setColor(quote.allowed()?Color.GREEN:Color.SCARLET);
             font.draw(batch,purchaseArmedDesign==draft&&
                     purchaseArmedCredits==quote.wallet()&&purchaseArmedCost==quote.cost()
-                    ?"CONFIRM":"PURCHASE",1022,660);
+                    ?"CONFIRM":usage==Usage.CAMPAIGN_REFIT?"REFIT":"PURCHASE",1022,660);
             font.setColor(Color.GOLD);
-            font.draw(batch,"WALLET "+quote.wallet()+" cr   NEW HULL "+
+            font.draw(batch,"WALLET "+quote.wallet()+" cr   "+
+                    (usage==Usage.CAMPAIGN_REFIT?"REFIT ":"NEW HULL ")+
                     quote.cost()+" cr   AFTER "+quote.remaining()+" cr",440,703);
             font.setColor(quote.allowed()?Color.GREEN:Color.GOLD);
             font.draw(batch,shortText(quote.reason(),58),815,612);

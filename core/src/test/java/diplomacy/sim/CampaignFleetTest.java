@@ -210,6 +210,62 @@ public final class CampaignFleetTest {
                 acquired.get(ship5).id()==ship5,
                 "Commissioning duplicated an owned display name or changed the hull ID");
 
+        // A commissioned hull may be refitted, but not repaired, supplied,
+        // renamed, or reassigned for free. IDs and squadron membership survive.
+        var refitBase=replacement.assignSquadron(latest.id(),2);
+        int systemSlot=baseline.placements().stream()
+                .filter(slot->slot.mount()==Shipyard.Mount.SYSTEM&&baseline.at(slot.index())!=null)
+                .findFirst().orElseThrow().index();
+        var refitDesign=baseline.withModuleVersion(systemSlot,
+                diplomacy.shipyard.ModuleVersions.Pattern.STANDARD,2);
+        long refitPrice=refitBase.refitCost(latest.id(),refitDesign,tech);
+        check(refitPrice>0,"A machinery refit must never be free");
+        var refitted=refitBase.refit(latest.id(),refitDesign,tech);
+        check(refitted.get(latest.id()).id()==latest.id()&&
+                        refitted.get(latest.id()).name().equals(latest.name())&&
+                        refitted.get(latest.id()).fitting()==refitDesign&&
+                        refitted.squadronOf(latest.id())==2&&
+                        !refitted.get(latest.id()).deployed()&&
+                        refitted.nextSerial()==refitBase.nextSerial(),
+                "Refit replaced permanent ownership, name, squadron, or serial");
+        check(refitted.get(latest.id()).stores().crew()==0&&
+                        refitted.get(latest.id()).stores().fuel()==0&&
+                        refitted.get(latest.id()).stores().missiles()==0,
+                "Refit conjured personnel, fuel, or ammunition");
+        check(new CampaignProgress.State(faction,1,refitPrice,0)
+                        .spend(refitPrice).credits()==0,
+                "Exactly funded refit must debit the real campaign wallet");
+        reject(()->new CampaignProgress.State(faction,1,refitPrice-1,0)
+                        .spend(refitPrice),"Underfunded refit accepted");
+        reject(()->refitBase.refitCost(latest.id(),baseline,tech),
+                "No-op refit accepted");
+        reject(()->refitBase.setActive(latest.id(),true,20)
+                        .refit(latest.id(),refitDesign,tech),
+                "An active combat vessel was refitted");
+        var damaged=returned.setActive(ship1,false,20);
+        reject(()->damaged.refit(ship1,refitDesign,tech),
+                "Refit bypassed actual damage and repair fees");
+        // Replacing an installed weapon bank must not transmute existing
+        // missiles into a new loadout or replenish expendables.
+        int weaponSlot=baseline.placements().stream()
+                .filter(slot->slot.mount()==Shipyard.Mount.WEAPON&&baseline.at(slot.index())!=null)
+                .findFirst().orElseThrow().index();
+        var weaponRefit=baseline.withModuleVersion(weaponSlot,
+                diplomacy.shipyard.ModuleVersions.Pattern.STANDARD,2);
+        var warehouse=original.setActive(ship1,false,20);
+        var installed=warehouse.refit(ship1,weaponRefit,tech);
+        check(installed.get(ship1).stores().kinetic()==0&&
+                        installed.get(ship1).stores().missiles()==0&&
+                        installed.get(ship1).stores().torpedoes()==0&&
+                        installed.get(ship1).stores().crew()<=warehouse.get(ship1).stores().crew()&&
+                        installed.get(ship1).stores().fuel()<=warehouse.get(ship1).stores().fuel(),
+                "Weapon upgrade converted old ammunition or generated supplies");
+        var afterRefitSave=CampaignFleetCodec.decode(
+                CampaignFleetCodec.encode(refitted),tech);
+        check(afterRefitSave.get(latest.id()).fitting().at(systemSlot).mark==2&&
+                        afterRefitSave.squadronOf(latest.id())==2,
+                "Refitted machinery or squadron did not survive ledger round trip");
+
         String encoded=CampaignFleetCodec.encode(replacement);
         var decoded=CampaignFleetCodec.decode(encoded,tech);
         check(CampaignFleetCodec.encode(decoded).equals(encoded),

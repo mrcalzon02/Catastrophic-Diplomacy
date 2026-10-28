@@ -217,6 +217,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             return purchased;
         });
+        shipyard.setCampaignRefitting(()->campaignFleet,(id,design)->{
+            boolean changed=refitCampaignHull(id,design);
+            if(changed)screen=GameMenuPanel.Screen.DOCK;
+            return changed;
+        });
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel();
@@ -645,6 +650,38 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shipyard.sync(0,campaignDesign);
         shipyard.showCampaignFleet(campaign.researchRank(),campaign.unlocked());
     }
+    private void openCampaignRefit(){
+        if(campaign==null||campaignFleet==null)return;
+        try{
+            long id=dockShipId();
+            CampaignFleet.Vessel selected=campaignFleet.get(id);
+            if(selected.deployed()){
+                dockNotice="Move "+selected.name()+" to RESERVE before refitting.";
+                return;
+            }
+            shipyard.sync(0,selected.fitting());
+            shipyard.showCampaignRefit(campaign.researchRank(),campaign.unlocked(),id);
+            Gdx.app.log("CD-GAME-FLOW","REFIT_EDITOR ship="+id);
+        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+    }
+    private boolean refitCampaignHull(long id,Shipyard.Design design){
+        if(campaign==null||campaignFleet==null)return false;
+        try{
+            var quote=CampaignBudgetQuotes.refit(campaign,campaignFleet,id,design,technology);
+            if(!quote.allowed())throw new IllegalArgumentException(quote.reason());
+            CampaignProgress.State debited=campaign.spend(quote.cost());
+            CampaignFleet.Roster refitted=campaignFleet.refit(id,design,technology);
+            if(!commitCampaign(debited,refitted))return false;
+            dockNotice="Refit ship #"+id+" for "+quote.cost()+
+                    " credits. Unmatched ordnance and fighter loads are unloaded.";
+            Gdx.app.log("CD-GAME-FLOW","REFIT_HULL id="+id+
+                    " cost="+quote.cost()+" remaining="+campaign.credits());
+            return true;
+        }catch(IllegalArgumentException denied){
+            dockNotice="REFIT DENIED: "+denied.getMessage();
+            return false;
+        }
+    }
     private void openResearch(){
         if(campaign==null)return;
         researchReturn=screen==GameMenuPanel.Screen.DOCK?
@@ -919,6 +956,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             case 15 -> openCampaignShipyard();
             case 16 -> openResearch();
             case 18 -> openSquadrons();
+            case 19 -> openCampaignRefit();
             case 17 -> {
                 var tones=CrewChatter.Tone.values();
                 int current=campaignFleet.radioTone().ordinal();

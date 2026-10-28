@@ -274,6 +274,85 @@ public final class CampaignFleet {
                     VesselIdentifiers.serial(id),ships.stream().map(Vessel::name).toList());
             return rename(id,generated);
         }
+
+        /** A real commissioned refit, not a purchase or a free repair.
+         * A docked ship must be paid back to structural readiness first.
+         * Compatible inventory is transferred but never increased. */
+        public Roster refit(long id,Shipyard.Design replacement,TechnologyCatalog technology){
+            long charge=refitCost(id,replacement,technology); // validates all conditions
+            if(charge<=0)throw new IllegalArgumentException("Unpriced refit");
+            Vessel previous=get(id);
+            Battle.Ship previousHull=fresh(previous.fitting(),technology);
+            previous.stores().apply(previousHull);
+            Battle.Ship fitted=fresh(replacement,technology);
+            boolean weaponChanged=false,hangarChanged=
+                    previous.fitting().fighterHull!=replacement.fighterHull;
+            for(int i=0;i<replacement.slots();i++){
+                Shipyard.Installed former=previous.fitting().at(i),next=replacement.at(i);
+                if(!sameModule(former,next)&&replacement.placements().get(i).mount()==Shipyard.Mount.WEAPON)
+                    weaponChanged=true;
+                if(!sameModule(former,next)&&
+                        ((former!=null&&former.component.endsWith("-FTR"))||
+                         (next!=null&&next.component.endsWith("-FTR"))))
+                    hangarChanged=true;
+            }
+            Stores stores=previous.stores();
+            fitted.hull=Math.min(stores.hull(),fitted.maxHull);
+            fitted.crewCount=Math.min(stores.crew(),Math.min(fitted.crewBerths,fitted.lifeSupport));
+            // A swapped weapon/ammunition family cannot convert old rounds into new rounds.
+            fitted.kineticAmmo=weaponChanged||
+                    previous.fitting().ammoSelection.kinetic()!=replacement.ammoSelection.kinetic()?
+                    0:Math.min(stores.kinetic(),fitted.kineticAmmo);
+            fitted.missileAmmo=weaponChanged||
+                    previous.fitting().ammoSelection.missile()!=replacement.ammoSelection.missile()?
+                    0:Math.min(stores.missiles(),fitted.missileAmmo);
+            fitted.torpedoAmmo=weaponChanged||
+                    previous.fitting().ammoSelection.torpedo()!=replacement.ammoSelection.torpedo()?
+                    0:Math.min(stores.torpedoes(),fitted.torpedoAmmo);
+            fitted.fighterReserve=hangarChanged?0:Math.min(stores.fighters(),fitted.fighterReserve);
+            fitted.droneReserve=Math.min(stores.drones(),fitted.droneReserve);
+            fitted.repairDroneReserve=Math.min(stores.repairDrones(),fitted.repairDroneReserve);
+            fitted.fuel=Math.min(stores.fuel(),fitted.maxFuel);
+            // Previous overhaul was required and paid before this installation.
+            // New armor/defensive modules are included in the installation charge.
+            ArrayList<Vessel> updated=new ArrayList<>(ships);
+            updated.replaceAll(ship->ship.id()==id?
+                    new Vessel(id,ship.name(),replacement,false,Stores.capture(fitted)):ship);
+            return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone,
+                    squadronAssignments,squadronProfiles);
+        }
+        private static boolean sameModule(Shipyard.Installed old,Shipyard.Installed next){
+            return old==next||(old!=null&&next!=null&&
+                    old.component.equals(next.component)&&old.stages().equals(next.stages())&&
+                    old.pattern==next.pattern&&old.mark==next.mark);
+        }
+        private static boolean sameEquipment(Shipyard.Design old,Shipyard.Design next){
+            if(old.hull!=next.hull||old.faction!=next.faction||
+                    old.fighterHull!=next.fighterHull||
+                    !old.ammoSelection.equals(next.ammoSelection))return false;
+            for(int i=0;i<old.slots();i++)if(!sameModule(old.at(i),next.at(i)))return false;
+            return true;
+        }
+        /** Installation quote is positive even on a side-grade, with no salvage
+         * credits and no charge for another hull's frame. */
+        public long refitCost(long id,Shipyard.Design replacement,TechnologyCatalog technology){
+            Vessel existing=get(id);
+            if(replacement==null||technology==null||replacement.faction!=faction||
+                    replacement.hull!=existing.fitting().hull)
+                throw new IllegalArgumentException("Refit must retain commissioned hull class and faction");
+            if(existing.deployed())throw new IllegalArgumentException("Move ship to reserve before refitting");
+            if(sameEquipment(existing.fitting(),replacement))
+                throw new IllegalArgumentException("No equipment changes to purchase");
+            if(cost(id,Service.REPAIR,technology)!=0)
+                throw new IllegalArgumentException("Pay for hull and machinery repairs before refitting");
+            long oldTotal=CampaignFleet.purchaseCost(existing.fitting(),technology);
+            long newTotal=CampaignFleet.purchaseCost(replacement,technology);
+            long hullBase=CampaignFleet.purchaseCost(replacement);
+            long newMachinery=newTotal-hullBase;
+            long oldMachinery=oldTotal-hullBase;
+            return Math.addExact(Math.max(2500L,newMachinery/6L),
+                    Math.max(0L,newMachinery-oldMachinery));
+        }
         public Roster purchase(Shipyard.Design design,TechnologyCatalog technology) {
             if(ships.size()>=200||nextSerial>VesselIdentifiers.MAX_SERIAL||design==null||design.faction!=faction)
                 throw new IllegalArgumentException("Fleet full or wrong faction");

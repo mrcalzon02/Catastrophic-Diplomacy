@@ -36,6 +36,18 @@ final class CampaignBudgetQuotes {
             blocker="COMPLETE MISSION "+campaign.nextAccelerationMilestone()+" FIRST";
         return quote(campaign.credits(),cost,blocker);
     }
+    static Quote refit(CampaignProgress.State campaign,CampaignFleet.Roster roster,
+                       long shipId,Shipyard.Design design,TechnologyCatalog technology){
+        if(campaign==null||roster==null||design==null||technology==null)
+            throw new IllegalArgumentException("Refit needs a campaign, roster and design");
+        try{
+            CampaignShipyardRules.requireAllowed(design,campaign.faction(),
+                    campaign.researchRank(),campaign.unlocked());
+            return quote(campaign.credits(),roster.refitCost(shipId,design,technology),null);
+        }catch(IllegalArgumentException blocked){
+            return quote(campaign.credits(),0,blocked.getMessage());
+        }
+    }
     static Quote hull(CampaignProgress.State campaign,Shipyard.Design design,
                       TechnologyCatalog technology){
         if(campaign==null||design==null||technology==null)

@@ -159,6 +159,12 @@ public final class GameMenuFlowTest {
                 "Manual renaming must have a separate native text-input action");
         check(GameMenuPanel.dockAction(1024,546-8*46,0,4)==-1,
                 "Split rename controls must not have overlapping hit zones");
+        check(GameMenuPanel.dockAction(900,135,0,4)==13,
+                "Paid service-all control moved or lost its touch action");
+        check(GameMenuPanel.dockAction(1100,135,0,4)==19,
+                "Refit selected ship button has no native touch route");
+        check(GameMenuPanel.dockAction(1024,135,0,4)==-1,
+                "Refit and service-all hitboxes overlap");
         check(GameMenuPanel.dockAction(1000,96,0,4)==-1,
                 "Service All tap must not overlap the campaign navigation");
         check(GameMenuPanel.dockAction(400,500,0,0)==-1,
