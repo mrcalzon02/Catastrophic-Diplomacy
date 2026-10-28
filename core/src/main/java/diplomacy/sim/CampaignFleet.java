@@ -285,31 +285,28 @@ public final class CampaignFleet {
             Battle.Ship previousHull=fresh(previous.fitting(),technology);
             previous.stores().apply(previousHull);
             Battle.Ship fitted=fresh(replacement,technology);
-            boolean weaponChanged=false,hangarChanged=
-                    previous.fitting().fighterHull!=replacement.fighterHull;
-            for(int i=0;i<replacement.slots();i++){
-                Shipyard.Installed former=previous.fitting().at(i),next=replacement.at(i);
-                if(!sameModule(former,next)&&replacement.placements().get(i).mount()==Shipyard.Mount.WEAPON)
-                    weaponChanged=true;
-                if(!sameModule(former,next)&&
-                        ((former!=null&&former.component.endsWith("-FTR"))||
-                         (next!=null&&next.component.endsWith("-FTR"))))
-                    hangarChanged=true;
-            }
             Stores stores=previous.stores();
             fitted.hull=Math.min(stores.hull(),fitted.maxHull);
             fitted.crewCount=Math.min(stores.crew(),Math.min(fitted.crewBerths,fitted.lifeSupport));
-            // A swapped weapon/ammunition family cannot convert old rounds into new rounds.
-            fitted.kineticAmmo=weaponChanged||
-                    previous.fitting().ammoSelection.kinetic()!=replacement.ammoSelection.kinetic()?
-                    0:Math.min(stores.kinetic(),fitted.kineticAmmo);
-            fitted.missileAmmo=weaponChanged||
-                    previous.fitting().ammoSelection.missile()!=replacement.ammoSelection.missile()?
-                    0:Math.min(stores.missiles(),fitted.missileAmmo);
-            fitted.torpedoAmmo=weaponChanged||
-                    previous.fitting().ammoSelection.torpedo()!=replacement.ammoSelection.torpedo()?
-                    0:Math.min(stores.torpedoes(),fitted.torpedoAmmo);
-            fitted.fighterReserve=hangarChanged?0:Math.min(stores.fighters(),fitted.fighterReserve);
+            // Ammunition is held in ship magazines, not bound to the serial number
+            // of an upgraded gun. Retain stock only if BOTH fittings support its
+            // weapon family and the actual ammunition type remains identical.
+            // This does not create ammo in a newly installed launcher.
+            Shipyard.Design former=previous.fitting();
+            fitted.kineticAmmo=compatibleMagazine(former,replacement,"KIN")&&
+                    former.ammoSelection.kinetic()==replacement.ammoSelection.kinetic()?
+                    Math.min(stores.kinetic(),fitted.kineticAmmo):0;
+            fitted.missileAmmo=compatibleMagazine(former,replacement,"MSL")&&
+                    former.ammoSelection.missile()==replacement.ammoSelection.missile()?
+                    Math.min(stores.missiles(),fitted.missileAmmo):0;
+            fitted.torpedoAmmo=compatibleMagazine(former,replacement,"TOR")&&
+                    former.ammoSelection.torpedo()==replacement.ammoSelection.torpedo()?
+                    Math.min(stores.torpedoes(),fitted.torpedoAmmo):0;
+            // Matching hangar and craft type can keep already-purchased fighters
+            // through upgrades; changing craft family cannot transmute aircraft.
+            fitted.fighterReserve=compatibleMagazine(former,replacement,"FTR")&&
+                    former.fighterHull==replacement.fighterHull?
+                    Math.min(stores.fighters(),fitted.fighterReserve):0;
             fitted.droneReserve=Math.min(stores.drones(),fitted.droneReserve);
             fitted.repairDroneReserve=Math.min(stores.repairDrones(),fitted.repairDroneReserve);
             fitted.fuel=Math.min(stores.fuel(),fitted.maxFuel);
@@ -320,6 +317,17 @@ public final class CampaignFleet {
                     new Vessel(id,ship.name(),replacement,false,Stores.capture(fitted)):ship);
             return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone,
                     squadronAssignments,squadronProfiles);
+        }
+        private static boolean compatibleMagazine(Shipyard.Design old,
+                                                  Shipyard.Design next,String family){
+            return hasInstalledFamily(old,family)&&hasInstalledFamily(next,family);
+        }
+        private static boolean hasInstalledFamily(Shipyard.Design design,String family){
+            for(int slot=0;slot<design.slots();slot++){
+                Shipyard.Installed installed=design.at(slot);
+                if(installed!=null&&installed.component.endsWith("-"+family))return true;
+            }
+            return false;
         }
         private static boolean sameModule(Shipyard.Installed old,Shipyard.Installed next){
             return old==next||(old!=null&&next!=null&&

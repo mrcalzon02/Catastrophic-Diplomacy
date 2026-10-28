@@ -245,21 +245,41 @@ public final class CampaignFleetTest {
         var damaged=returned.setActive(ship1,false,20);
         reject(()->damaged.refit(ship1,refitDesign,tech),
                 "Refit bypassed actual damage and repair fees");
-        // Replacing an installed weapon bank must not transmute existing
-        // missiles into a new loadout or replenish expendables.
+        // A laser hardware upgrade must NOT confiscate the stock of an
+        // unchanged missile launcher. This is not a free rearm: transfer is
+        // clamped to the new real magazine capacity and requires the same type.
         int weaponSlot=baseline.placements().stream()
-                .filter(slot->slot.mount()==Shipyard.Mount.WEAPON&&baseline.at(slot.index())!=null)
+                .filter(slot->slot.mount()==Shipyard.Mount.WEAPON&&
+                        baseline.at(slot.index())!=null&&
+                        baseline.at(slot.index()).component.endsWith("-LAS"))
+                .findFirst().orElseThrow().index();
+        int missileSlot=baseline.placements().stream()
+                .filter(slot->slot.mount()==Shipyard.Mount.WEAPON&&
+                        baseline.at(slot.index())!=null&&
+                        baseline.at(slot.index()).component.endsWith("-MSL"))
                 .findFirst().orElseThrow().index();
         var weaponRefit=baseline.withModuleVersion(weaponSlot,
                 diplomacy.shipyard.ModuleVersions.Pattern.STANDARD,2);
         var warehouse=original.setActive(ship1,false,20);
+        check(warehouse.get(ship1).stores().missiles()>0,
+                "Regression fixture must have purchased missile stock to preserve");
         var installed=warehouse.refit(ship1,weaponRefit,tech);
-        check(installed.get(ship1).stores().kinetic()==0&&
-                        installed.get(ship1).stores().missiles()==0&&
+        check(installed.get(ship1).stores().missiles()==
+                        Math.min(warehouse.get(ship1).stores().missiles(),
+                                CampaignFleet.fresh(weaponRefit,tech).missileAmmo)&&
+                        installed.get(ship1).stores().kinetic()==0&&
                         installed.get(ship1).stores().torpedoes()==0&&
                         installed.get(ship1).stores().crew()<=warehouse.get(ship1).stores().crew()&&
                         installed.get(ship1).stores().fuel()<=warehouse.get(ship1).stores().fuel(),
-                "Weapon upgrade converted old ammunition or generated supplies");
+                "Upgrading unrelated laser hardware destroyed missile stock or added supplies");
+        // Removing the only missile launcher must not convert its ammunition
+        // into a new laser magazine. There is no fleet depot implemented yet.
+        var withoutMissile=baseline.install(missileSlot,"BASE-TER-LAS");
+        check(Shipyard.inspect(withoutMissile,tech).valid(),
+                "Missile removal regression requires a buildable alternate fitting");
+        var converted=warehouse.refit(ship1,withoutMissile,tech);
+        check(converted.get(ship1).stores().missiles()==0,
+                "Removed missile launcher retained inaccessible combat ammunition");
         var afterRefitSave=CampaignFleetCodec.decode(
                 CampaignFleetCodec.encode(refitted),tech);
         check(afterRefitSave.get(latest.id()).fitting().at(systemSlot).mark==2&&

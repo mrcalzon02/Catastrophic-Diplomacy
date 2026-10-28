@@ -31,7 +31,7 @@ for attempt in $(seq 1 75); do
         completed=1
         break
     fi
-    if grep -q 'AndroidRuntime.*Process: games.catastrophicdiplomacy\\|Force finishing activity.*catastrophicdiplomacy' "$report/logcat.txt"; then
+    if grep -qE 'AndroidRuntime.*Process: games\.catastrophicdiplomacy|Force finishing activity.*catastrophicdiplomacy' "$report/logcat.txt"; then
         echo "FAIL: Catastrophic Diplomacy process crashed during demonstration" >&2
         exit 1
     fi
@@ -47,6 +47,14 @@ for attempt in $(seq 1 75); do
 done
 if (( !completed )); then
     echo "FAIL: 200v200 proof never completed within timeout" >&2
+    # Keep the real gameplay gate; add evidence that distinguishes app hangs,
+    # failed verification assertions and a very slow but advancing emulator.
+    echo "Most recent in-game verifier telemetry:" >&2
+    tail -n 15 "$report/demo-telemetry.txt" >&2 || true
+    timeout 10s adb shell pidof "$package" > "$report/process-at-timeout.txt" 2>&1 || true
+    timeout 15s adb shell dumpsys activity activities > "$report/activity-at-timeout.txt" 2>&1 || true
+    timeout 15s adb shell dumpsys gfxinfo "$package" > "$report/gfxinfo-at-timeout.txt" 2>&1 || true
+    timeout 15s adb exec-out screencap -p > "$report/timeout.png" 2>/dev/null || true
     exit 1
 fi
 adb exec-out screencap -p > "$report/late.png"

@@ -2059,6 +2059,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(event.phase()==Battle.VisualPhase.IMPACT&&verifiedShotIds.contains(event.shotId()))
                 verifiedImpacts++;
         }
+        // Emulator performance diagnostics do not replace or reduce any
+        // acceptance criteria. A heartbeat distinguishes slow simulation
+        // progress from an initialization hang or frozen GL render loop.
+        if(verifiedFrames==1||verifiedFrames%30==0)
+            Gdx.app.log("CD-DEMO-VERIFY","PROGRESS tick="+battle.tick+
+                    " frames="+verifiedFrames+" shots="+verifiedShots+
+                    " impacts="+verifiedImpacts+" hits="+battle.hitCount+
+                    " craft="+peakCraft+" ordnance="+peakOrdnance);
         if(battle.tick<480&&!battle.finished())return;
         double self=0,remote=0,shield=0;
         int serviceDrones=0;
