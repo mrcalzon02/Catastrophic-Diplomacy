@@ -1,5 +1,10 @@
 # Catastrophic Diplomacy
 
+### Gritty military UI — first production asset intake
+
+The native menu now renders eight textless, nine-patch gritty button skins, drawn underneath live labels. The complete 182 edge-filtered source candidates and nine background panels are stored in checksummed `asset_packs/gritty-ui/` archives, **not** injected into the runtime indiscriminately. The source sprites remain subject to visual approval; only the eight hand-selected controls are currently live. See [UI design authority](docs/AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) and `assets/ui/gritty/README.md`. Windows/Linux and Android/Fire OS use the same shared game resources. The Gradle `verifyGrittyUiAssets` task prevents altered images or lost source archives from shipping.
+
+
 **Authoritative interface direction:** [Gritty Military / Industrial Fleet Command Console](docs/AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) (user-approved 2026-10-27). This standard governs menus, buttons, HUDs, squadron/dock controls and native desktop icons. Current code integrates initial procedural steel-and-instrument chrome without replacing audited assets; visual acceptance and complete icon exports remain pending.
 
 

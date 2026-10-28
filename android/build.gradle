@@ -69,6 +69,7 @@ tasks.configureEach { task ->
     if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
         task.dependsOn rootProject.tasks.named('verifyBattlefieldResources')
         task.dependsOn rootProject.tasks.named('verifyBattleAudioResources')
+        task.dependsOn rootProject.tasks.named('verifyGrittyUiAssets')
     }
     if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
         task.dependsOn(tasks.named('copyAndroidNatives'))

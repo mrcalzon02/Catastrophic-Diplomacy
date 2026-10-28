@@ -198,3 +198,48 @@ tasks.register('verifyBattleAudioResources') {
         println('PASS: 10 combat/UI sound assets and two soundtrack recordings')
     }
 }
+
+
+/** Require exactly the vetted eight-control runtime atlas and the unbundled
+ * archive provenance. Held/cropped candidates are never staged as runtime UI.
+ */
+tasks.register('verifyGrittyUiAssets') {
+    group = 'verification'
+    description = 'Verify pinned textless native button atlas and archive integrity.'
+    def atlas = file('assets/ui/gritty/buttons_v1.png')
+    def packs = [
+        [file('asset_packs/gritty-ui/strict-01.zip'),
+          '9e7e1ef4a9b7c0190df2bcf31d3ebb20fdbacd637bba40aefb20b6a307543b61',91],
+        [file('asset_packs/gritty-ui/strict-02.zip'),
+          'e6ff1b83bc6ab64996940f67744e7a2667b5422c0b78ba08646795b06f80ef0b',91],
+        [file('asset_packs/gritty-ui/background-panels-v1.zip'),
+          '5d601a5400bf803db0a6b0d5afea49013d23819253148cd54c31517b83636a7a',9]
+    ]
+    inputs.file atlas
+    inputs.files packs.collect { it[0] }
+    doLast {
+        def digest = { file ->
+            java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(file.bytes).encodeHex().toString()
+        }
+        if (!atlas.isFile() ||
+                digest(atlas) != 'd17e36fc7cf6dd9cfb49ec6823b5b379e50f732de50b89af7117138ee852202c')
+            throw new GradleException('Missing/altered gritty button atlas')
+        def image = javax.imageio.ImageIO.read(atlas)
+        if (image == null || image.width != 448 || image.height != 288)
+            throw new GradleException('Unexpected gritty button atlas layout')
+        packs.each { item ->
+            def file = item[0]
+            if (!file.isFile() || digest(file) != item[1])
+                throw new GradleException('Missing/altered gritty source archive: ' + file.name)
+            new java.util.zip.ZipFile(file).withCloseable { zip ->
+                def names=zip.entries().toList().collect { it.name }
+                int pngs=names.count { it.endsWith('.png') }
+                if (pngs != item[2] || !names.contains(
+                    file.name.startsWith('background')?'manifest.json':'selected_manifest.json'))
+                    throw new GradleException('Unexpected gritty archive contents: '+file.name)
+            }
+        }
+        println('PASS: 8 textless runtime button states, 182 strict source candidates and 9 isolated panels verified.')
+    }
+}

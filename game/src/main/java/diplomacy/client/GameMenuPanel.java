@@ -26,6 +26,22 @@ final class GameMenuPanel {
     private static final Color PANEL=MilitaryUiTheme.PANEL;
     private static final Color SELECT=MilitaryUiTheme.SELECTION;
     private static final Color MUTED=MilitaryUiTheme.MUTED_TEXT;
+    // No per-frame object allocation; one compact draw queue serves every menu.
+    private final GrittyUiChrome grittyChrome=new GrittyUiChrome();
+    private final float[] chromeCommands=new float[512*5];
+    private int chromeCount;
+
+    private void enqueueChrome(float x,float y,float w,float h,int variant){
+        if(chromeCount*5>=chromeCommands.length)
+            throw new IllegalStateException("Native UI control queue overflow");
+        int at=chromeCount++*5;
+        chromeCommands[at]=x;chromeCommands[at+1]=y;
+        chromeCommands[at+2]=w;chromeCommands[at+3]=h;
+        chromeCommands[at+4]=variant;
+    }
+
+    void dispose(){grittyChrome.dispose();}
+
     private static final String[] HOME_ACTIONS={
         "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT"
     };
@@ -186,12 +202,21 @@ final class GameMenuPanel {
             shapes.setColor(color);shapes.rect(x,y,w,h);
         }
     }
-    private static void button(ShapeRenderer shapes,float x,float y,float w,float h,boolean selected){
+    private void button(ShapeRenderer shapes,float x,float y,float w,float h,boolean selected){
         MilitaryUiTheme.button(shapes,x,y,w,h,selected,MilitaryUiTheme.Intent.NORMAL);
+        enqueueChrome(x,y,w,h,selected?GrittyUiChrome.SELECTED:GrittyUiChrome.NORMAL);
     }
-    private static void actionButton(ShapeRenderer shapes,float x,float y,float w,float h,
-                                     MilitaryUiTheme.Intent intent){
+    private void actionButton(ShapeRenderer shapes,float x,float y,float w,float h,
+                              MilitaryUiTheme.Intent intent){
         MilitaryUiTheme.button(shapes,x,y,w,h,false,intent);
+        int type=switch(intent){
+            case PRIMARY -> GrittyUiChrome.PRIMARY;
+            case CONFIRM -> GrittyUiChrome.CONFIRM;
+            case WARNING -> GrittyUiChrome.WARNING;
+            case DANGER -> GrittyUiChrome.DANGER;
+            case NORMAL -> GrittyUiChrome.NORMAL;
+        };
+        enqueueChrome(x,y,w,h,type);
     }
     private static void label(SpriteBatch batch,BitmapFont font,String text,float x,float y,Color color){
         font.setColor(color);font.draw(batch,text,x,y);
@@ -213,6 +238,7 @@ final class GameMenuPanel {
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
                int themePage,FleetNames.Style themeCandidate,
                int selectedSquadron,Screen namingReturn){
+        chromeCount=0;
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         MilitaryUiTheme.canvas(shapes,W,H);
         // Paint-only change: original hit regions and native text remain authoritative.
@@ -403,6 +429,12 @@ final class GameMenuPanel {
         }
         shapes.end();
         batch.begin();
+        for(int i=0;i<chromeCount;i++){
+            int at=i*5;
+            grittyChrome.draw(batch,(int)chromeCommands[at+4],
+                    chromeCommands[at],chromeCommands[at+1],
+                    chromeCommands[at+2],chromeCommands[at+3]);
+        }
         switch(screen){
             case HOME -> {
                 title(batch,font,"CATASTROPHIC DIPLOMACY","TACTICAL FLEET COMMAND");
