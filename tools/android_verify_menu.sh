@@ -133,18 +133,25 @@ touch_ui campaign-faction 1050 60
 sleep 2
 capture campaign-map
 assert_step 'CAMPAIGN_MAP 1'
-# First campaign system is unlocked, and its bottom-right action opens deployment.
+# The campaign map opens the commissioned-fleet dock first. Do not skip
+# the actual persistent active/reserve roster screen to fabricate deployment.
 touch_ui campaign-map 1080 60
+sleep 2
+capture campaign-dock
+assert_step 'CAMPAIGN_DOCK owned=4 active=4 reserve=0'
+# A new campaign starts with four real owned, active corvettes and zero credits.
+# Enter deployment through the dock's real DEPLOY ACTIVE FLEET control.
+touch_ui campaign-dock 1100 60
 sleep 2
 capture campaign-deployment
 assert_step 'DEPLOYMENT 1'
-# Select five real ships and switch from battle line to attack wedge.
-touch_ui campaign-deployment 1145 452
+# Switch the genuine four-ship roster from battle line to attack wedge.
+# A fifth ship costs credits and cannot be silently spawned in a new campaign.
 touch_ui campaign-deployment 1145 345
 sleep 1
 capture campaign-deployment-configured
 touch_ui campaign-deployment-configured 1050 62
 sleep 5
 capture campaign-battle
-assert_step 'CAMPAIGN_BATTLE 1 5 WEDGE'
-echo "PASS: signed APK real skirmish hull drag + five persistent standing-order policies, and campaign five-ship wedge -> multiwave combat."
+assert_step 'CAMPAIGN_BATTLE 1 4 WEDGE'
+echo "PASS: signed APK real skirmish hull drag + five persistent standing-order policies, and campaign four-owned-ship wedge -> multiwave combat."
