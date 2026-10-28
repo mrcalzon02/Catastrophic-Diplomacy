@@ -40,6 +40,14 @@ final class ShipyardPanel {
     private Supplier<CampaignFleet.Roster> commissionedFleet;
     private BiFunction<Long,Shipyard.Design,Boolean> campaignRefit;
     private long refitShipId;
+    // Read-only cache: the draft, wallet and roster are immutable snapshots.
+    // Without this, refit quotes instantiate throwaway ships every UI frame.
+    private CampaignBudgetQuotes.Quote cachedQuote;
+    private Shipyard.Design cachedQuoteDraft;
+    private CampaignProgress.State cachedQuoteWallet;
+    private CampaignFleet.Roster cachedQuoteRoster;
+    private Usage cachedQuoteMode;
+    private long cachedQuoteShipId;
     private Shipyard.Design purchaseArmedDesign;
     private long purchaseArmedCredits=-1,purchaseArmedCost=-1;
     private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
@@ -73,12 +81,19 @@ final class ShipyardPanel {
         commissionedFleet=roster;campaignRefit=refit;
     }
     private CampaignBudgetQuotes.Quote campaignQuote(){
-        if(campaignWallet==null||campaignWallet.get()==null)
-            throw new IllegalStateException("No active campaign budget");
-        return usage==Usage.CAMPAIGN_REFIT?
-                CampaignBudgetQuotes.refit(campaignWallet.get(),commissionedFleet.get(),
-                        refitShipId,draft,catalog):
-                CampaignBudgetQuotes.hull(campaignWallet.get(),draft,catalog);
+        CampaignProgress.State wallet=campaignWallet==null?null:campaignWallet.get();
+        if(wallet==null)throw new IllegalStateException("No active campaign budget");
+        CampaignFleet.Roster roster=usage==Usage.CAMPAIGN_REFIT?
+                commissionedFleet.get():null;
+        if(cachedQuote!=null&&cachedQuoteDraft==draft&&cachedQuoteWallet==wallet&&
+                cachedQuoteRoster==roster&&cachedQuoteMode==usage&&
+                cachedQuoteShipId==refitShipId)return cachedQuote;
+        cachedQuote=usage==Usage.CAMPAIGN_REFIT?
+                CampaignBudgetQuotes.refit(wallet,roster,refitShipId,draft,catalog):
+                CampaignBudgetQuotes.hull(wallet,draft,catalog);
+        cachedQuoteDraft=draft;cachedQuoteWallet=wallet;
+        cachedQuoteRoster=roster;cachedQuoteMode=usage;cachedQuoteShipId=refitShipId;
+        return cachedQuote;
     }
     /** Purchase an owned hull only after a second explicit authorization. */
     private void purchaseCampaignHull(){
@@ -133,8 +148,12 @@ final class ShipyardPanel {
         refitShipId=vesselId;
         notice="REFIT EXISTING SHIP: reserves only; repairs are paid separately.";
     }
-    void close() { open=false; playerOnly=false; purchaseArmedDesign=null; gesture.cancel(); }
-    void dispose(){backgrounds.dispose();}
+    void close() {
+        open=false;playerOnly=false;purchaseArmedDesign=null;
+        cachedQuote=null;cachedQuoteDraft=null;cachedQuoteWallet=null;cachedQuoteRoster=null;
+        gesture.cancel();
+    }
+    void dispose(){close();backgrounds.dispose();}
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}

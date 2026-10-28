@@ -5,13 +5,16 @@ import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.ScenarioCatalog;
+import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.ModuleVersions;
+import diplomacy.tech.TechnologyCatalog;
 
 /** Functional hit-target routing for the desktop/Android front-end (no graphics required). */
 public final class GameMenuFlowTest {
     private static void check(boolean pass,String detail) {
         if(!pass)throw new AssertionError(detail);
     }
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         // Background selection must not replace simulation-owned battle or map content.
         check("blank_armor_bulkhead".equals(GrittyMenuBackgrounds.nameFor(
                         GameMenuPanel.Screen.HOME)),
@@ -165,6 +168,28 @@ public final class GameMenuFlowTest {
                 "Refit selected ship button has no native touch route");
         check(GameMenuPanel.dockAction(1024,135,0,4)==-1,
                 "Refit and service-all hitboxes overlap");
+        var workshop=TechnologyCatalog.loadDefault();
+        var sample=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
+        int systemSlot=sample.placements().stream().filter(slot->
+                        slot.mount()==Shipyard.Mount.SYSTEM&&sample.at(slot.index())!=null)
+                .findFirst().orElseThrow().index();
+        var improved=sample.withModuleVersion(systemSlot,ModuleVersions.Pattern.STANDARD,2);
+        var roster=CampaignFleet.start(Battle.Faction.TERRAN,sample,workshop);
+        long refitId=roster.ships().get(0).id();
+        var reserve=roster.setActive(refitId,false,20);
+        var licensed=new CampaignProgress.State(Battle.Faction.TERRAN,1,500000,0,2);
+        var quoted=CampaignBudgetQuotes.refit(licensed,reserve,refitId,improved,workshop);
+        check(quoted.allowed()&&quoted.cost()>0&&
+                        quoted.remaining()==licensed.credits()-quoted.cost(),
+                "Campaign refit budget misquoted commissioned reserve hull");
+        check(!CampaignBudgetQuotes.refit(licensed,roster,refitId,improved,workshop).allowed(),
+                "Campaign refit quote permitted active deployed hull");
+        var unlicensed=new CampaignProgress.State(Battle.Faction.TERRAN,1,500000,0,0);
+        check(!CampaignBudgetQuotes.refit(unlicensed,reserve,refitId,improved,workshop).allowed(),
+                "Campaign refit quote bypassed hardware license");
+        var poor=new CampaignProgress.State(Battle.Faction.TERRAN,1,0,0,2);
+        check(!CampaignBudgetQuotes.refit(poor,reserve,refitId,improved,workshop).allowed(),
+                "Campaign refit quote permitted a negative wallet");
         check(GameMenuPanel.dockAction(1000,96,0,4)==-1,
                 "Service All tap must not overlap the campaign navigation");
         check(GameMenuPanel.dockAction(400,500,0,0)==-1,
