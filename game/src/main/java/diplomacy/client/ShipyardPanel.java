@@ -11,6 +11,7 @@ import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
+import diplomacy.sim.CampaignProgress;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.ShipLineages;
 import diplomacy.shipyard.CampaignShipyardRules;
@@ -22,6 +23,8 @@ import diplomacy.tech.TechnologyCatalog.Component;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 /** Compact, touch-and-mouse compatible single-screen ship fitting interface. */
 final class ShipyardPanel {
@@ -30,6 +33,10 @@ final class ShipyardPanel {
     private final TechnologyCatalog catalog;
     private final TerranPlaceholderSprites fleetArt;
     private TacticalUiIcons uiIcons;
+    private Supplier<CampaignProgress.State> campaignWallet;
+    private Function<Shipyard.Design,Boolean> campaignPurchase;
+    private Shipyard.Design purchaseArmedDesign;
+    private long purchaseArmedCredits=-1,purchaseArmedCost=-1;
     private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
     private final BiConsumer<Integer,Shipyard.Design> deploy;
     private Shipyard.Design[] active = new Shipyard.Design[2];
@@ -52,10 +59,41 @@ final class ShipyardPanel {
         draft=first;
     }
     void setIcons(TacticalUiIcons icons) { uiIcons = icons; }
+    void setCampaignPurchasing(Supplier<CampaignProgress.State> wallet,
+                              Function<Shipyard.Design,Boolean> purchase){
+        campaignWallet=wallet;campaignPurchase=purchase;
+    }
+    private CampaignBudgetQuotes.Quote campaignQuote(){
+        if(campaignWallet==null||campaignWallet.get()==null)
+            throw new IllegalStateException("No active campaign budget");
+        return CampaignBudgetQuotes.hull(campaignWallet.get(),draft,catalog);
+    }
+    /** Purchase an owned hull only after a second explicit authorization. */
+    private void purchaseCampaignHull(){
+        if(usage!=Usage.CAMPAIGN||campaignPurchase==null)return;
+        CampaignBudgetQuotes.Quote quote=campaignQuote();
+        if(!quote.allowed()){
+            purchaseArmedDesign=null;
+            notice="PURCHASE BLOCKED: "+quote.reason();return;
+        }
+        if(purchaseArmedDesign!=draft||purchaseArmedCredits!=quote.wallet()
+                ||purchaseArmedCost!=quote.cost()){
+            purchaseArmedDesign=draft;
+            purchaseArmedCredits=quote.wallet();
+            purchaseArmedCost=quote.cost();
+            notice="CONFIRM PURCHASE: "+quote.cost()+" cr / REMAINING "+
+                    quote.remaining()+" cr. Press PURCHASE again.";
+            return;
+        }
+        purchaseArmedDesign=null;
+        if(campaignPurchase.apply(draft))close();
+        else notice="Purchase not committed. Review campaign dock budget.";
+    }
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
         draft=active[team];selectedSlot=0;scroll=0;artPreview=false;
+        purchaseArmedDesign=null;
         notice="FREE DESIGN WORKSHOP: all factions and technology available.";
     }
     void showSkirmish(){
@@ -68,9 +106,9 @@ final class ShipyardPanel {
             throw new IllegalArgumentException("Invalid campaign license");
         show();side(0);usage=Usage.CAMPAIGN;playerOnly=true;
         campaignRank=researchRank;unlockedMission=mission;
-        notice="CAMPAIGN BLUEPRINT: APPLY queues design for paid purchase at dock.";
+        notice="BLUEPRINT saves without spending; PURCHASE charges for a new reserve hull.";
     }
-    void close() { open=false; playerOnly=false; gesture.cancel(); }
+    void close() { open=false; playerOnly=false; purchaseArmedDesign=null; gesture.cancel(); }
     void dispose(){backgrounds.dispose();}
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
@@ -228,6 +266,7 @@ final class ShipyardPanel {
         if(!open)return false;
         if(code==com.badlogic.gdx.Input.Keys.ESCAPE||code==com.badlogic.gdx.Input.Keys.TAB){close();return true;}
         if(code==com.badlogic.gdx.Input.Keys.ENTER){apply();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.P&&usage==Usage.CAMPAIGN){purchaseCampaignHull();return true;}
         if(code==com.badlogic.gdx.Input.Keys.K){cycleFighter();return true;}
         if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
         if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
@@ -281,7 +320,7 @@ final class ShipyardPanel {
             if(x>=705&&x<810){apply();return true;}
             if(x>=819&&x<910){save();return true;}
             if(x>=923&&x<1017){load();return true;}
-            if(x>=1018&&x<=1120){if(!playerOnly)faction(1);return true;}
+            if(x>=1018&&x<=1120){if(playerOnly)purchaseCampaignHull();else faction(1);return true;}
             if(x>1120){close();return true;}
             return true;
         }
@@ -456,7 +495,7 @@ final class ShipyardPanel {
             uiIcons.drawButton(batch,"confirm",706,642,107,42);
             uiIcons.drawButton(batch,"secondary",819,642,96,42);
             uiIcons.drawButton(batch,"secondary",924,642,94,42);
-            if(!playerOnly)uiIcons.drawButton(batch,"special",1019,642,109,42);
+            uiIcons.drawButton(batch,playerOnly?"confirm":"special",1019,642,109,42);
             uiIcons.drawButton(batch,"cancel",1135,642,116,42);
             uiIcons.drawButton(batch,"info",697,579,102,41);
         }
@@ -493,9 +532,20 @@ final class ShipyardPanel {
         font.draw(batch,">",668,619);
         font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);
-        font.draw(batch,"APPLY",745,660);font.draw(batch,"SAVE",833,660);
+        font.draw(batch,playerOnly?"BLUEPRINT":"APPLY",playerOnly?716:745,660);font.draw(batch,"SAVE",833,660);
         font.draw(batch,"LOAD",940,660);
-        if(!playerOnly)font.draw(batch,"FACTION >",1023,660);
+        if(playerOnly){
+            var quote=campaignQuote();
+            font.setColor(quote.allowed()?Color.GREEN:Color.SCARLET);
+            font.draw(batch,purchaseArmedDesign==draft&&
+                    purchaseArmedCredits==quote.wallet()&&purchaseArmedCost==quote.cost()
+                    ?"CONFIRM":"PURCHASE",1022,660);
+            font.setColor(Color.GOLD);
+            font.draw(batch,"WALLET "+quote.wallet()+" cr   NEW HULL "+
+                    quote.cost()+" cr   AFTER "+quote.remaining()+" cr",440,703);
+            font.setColor(quote.allowed()?Color.GREEN:Color.GOLD);
+            font.draw(batch,shortText(quote.reason(),58),815,612);
+        }else font.draw(batch,"FACTION >",1023,660);
         font.draw(batch,"CLOSE",1174,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);

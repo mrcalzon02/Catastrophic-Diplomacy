@@ -3,6 +3,7 @@ package diplomacy.client;
 import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignFleet;
+import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.ScenarioCatalog;
 
 /** Functional hit-target routing for the desktop/Android front-end (no graphics required). */
@@ -45,6 +46,37 @@ public final class GameMenuFlowTest {
         }
         check(GameMenuPanel.factionHit(1250,650)==null,"Invalid faction hit region");
 
+        // Campaign tech-tree node selection is separated from payment.
+        check(GameMenuPanel.researchAction(100,489)==100,
+                "License I is not selectable on the technology tree");
+        check(GameMenuPanel.researchAction(595,397)==105,
+                "License VI is not selectable on the technology tree");
+        check(GameMenuPanel.researchAction(101,290)==200&&
+                GameMenuPanel.researchAction(635,290)==203,
+                "Laboratory branches are not selectable");
+        check(GameMenuPanel.researchAction(1050,60)==2&&
+                GameMenuPanel.researchAction(740,60)==1&&
+                GameMenuPanel.researchAction(125,60)==0,
+                "Campaign research authorization/return controls are unmapped");
+        check(GameMenuPanel.researchAction(790,490)==-1,
+                "Research editor hits outside actual buttons");
+        var budget=new CampaignProgress.State(Battle.Faction.values()[0],1,1000000,0);
+        var license=CampaignBudgetQuotes.research(budget,CampaignProgress.Project.LICENSE);
+        check(license.allowed()&&license.cost()==budget.nextResearchCost()&&
+                        license.remaining()==budget.credits()-license.cost(),
+                "License quote diverges from campaign ledger");
+        check(!CampaignBudgetQuotes.research(budget,
+                        CampaignProgress.Project.ACCELERATOR).allowed(),
+                "Laboratory bypassed its campaign milestone requirement");
+        var spent=budget.beginResearch(CampaignProgress.Project.LICENSE);
+        check(spent.credits()==license.remaining()&&
+                        !CampaignBudgetQuotes.research(spent,
+                                CampaignProgress.Project.LICENSE).allowed(),
+                "Research budget quote permits duplicate active projects");
+        var broke=new CampaignProgress.State(Battle.Faction.values()[0],1,0,0);
+        check(!CampaignBudgetQuotes.research(broke,
+                        CampaignProgress.Project.LICENSE).allowed(),
+                "Research quote did not reject insufficient funds");
         check(GameMenuPanel.Screen.valueOf("DOCK")!=null,
                 "Separate campaign active/reserve dock is missing");
         check(GameMenuPanel.dockAction(88,60,0,4)==0,"Cannot exit owned fleet dock");

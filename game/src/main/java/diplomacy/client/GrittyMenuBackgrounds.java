@@ -12,9 +12,9 @@ final class GrittyMenuBackgrounds {
 
     static String nameFor(GameMenuPanel.Screen screen){
         return switch(screen){
-            case HOME, CAMPAIGN_SETUP, DOCK, NAME_THEMES, RESEARCH, OPTIONS, RESULTS ->
+            case HOME, CAMPAIGN_SETUP, DOCK, NAME_THEMES, OPTIONS, RESULTS ->
                     "blank_armor_bulkhead";
-            case CAMPAIGN, SQUADRONS, DEPLOYMENT, SHIP_ORDERS -> "armored_interface";
+            case CAMPAIGN, SQUADRONS, RESEARCH, DEPLOYMENT, SHIP_ORDERS -> "armored_interface";
             case SKIRMISH -> "fleet_approach";
             case BATTLE -> null;
         };

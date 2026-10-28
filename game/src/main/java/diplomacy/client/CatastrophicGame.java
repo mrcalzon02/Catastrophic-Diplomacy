@@ -76,6 +76,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private Shipyard.Design campaignDesign;
     private GameMenuPanel.Screen researchReturn=GameMenuPanel.Screen.CAMPAIGN;
     private String researchNotice="Research licenses are purchased with campaign credits.";
+    private int selectedResearchNode;
+    private CampaignProgress.Project armedResearch=CampaignProgress.Project.NONE;
+    private long armedResearchCost=-1,armedResearchWallet=-1;
     private final java.util.List<Long> campaignSortie=new java.util.ArrayList<>();
     private int dockPage,dockSelected;
     private int themePage;
@@ -206,6 +209,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
+        shipyard.setCampaignPurchasing(()->campaign,design->{
+            boolean purchased=purchaseCampaignHull(design);
+            if(purchased){
+                campaignDesign=design;
+                screen=GameMenuPanel.Screen.DOCK;
+            }
+            return purchased;
+        });
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel();
@@ -262,8 +273,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.RESEARCH){
-                        if(key==Input.Keys.ENTER)startResearch(CampaignProgress.Project.LICENSE);
-                        if(key==Input.Keys.A)startResearch(CampaignProgress.Project.ACCELERATOR);
+                        if(key==Input.Keys.ENTER)requestResearch(CampaignProgress.Project.LICENSE);
+                        if(key==Input.Keys.A)requestResearch(CampaignProgress.Project.ACCELERATOR);
+                        if(key==Input.Keys.R){
+                            armedResearch=CampaignProgress.Project.NONE;
+                            researchNotice="Authorization cancelled; credits unchanged.";
+                        }
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -634,10 +649,42 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(campaign==null)return;
         researchReturn=screen==GameMenuPanel.Screen.DOCK?
                 GameMenuPanel.Screen.DOCK:GameMenuPanel.Screen.CAMPAIGN;
+        armedResearch=CampaignProgress.Project.NONE;
+        selectedResearchNode=Math.min(5,campaign.researchRank());
         researchNotice=campaign.activeProject()==CampaignProgress.Project.NONE?
-                "Select a technology license or a milestone-locked laboratory upgrade.":
+                "Select a license node or a milestone-locked laboratory upgrade.":
                 "Research advances only after a SUCCESSFUL full campaign mission.";
         screen=GameMenuPanel.Screen.RESEARCH;
+    }
+    private void requestResearch(CampaignProgress.Project project){
+        if(campaign==null)return;
+        var quote=CampaignBudgetQuotes.research(campaign,project);
+        selectedResearchNode=project==CampaignProgress.Project.LICENSE?
+                Math.min(5,campaign.researchRank()):
+                100+Math.min(3,campaign.speedUpgrades());
+        if(!quote.allowed()){
+            armedResearch=CampaignProgress.Project.NONE;
+            researchNotice="AUTHORIZATION DENIED: "+quote.reason();return;
+        }
+        if(armedResearch!=project||armedResearchCost!=quote.cost()
+                ||armedResearchWallet!=quote.wallet()){
+            armedResearch=project;
+            armedResearchCost=quote.cost();
+            armedResearchWallet=quote.wallet();
+            researchNotice="CONFIRM "+project+": debit "+quote.cost()+
+                    " credits, balance "+quote.remaining()+
+                    ". Press the same action again; R cancels.";
+            return;
+        }
+        armedResearch=CampaignProgress.Project.NONE;
+        startResearch(project);
+    }
+    private void inspectResearchNode(int action){
+        if(action>=100&&action<106)selectedResearchNode=action-100;
+        else if(action>=200&&action<204)selectedResearchNode=100+action-200;
+        else return;
+        armedResearch=CampaignProgress.Project.NONE;
+        researchNotice="Node selected. Review cost, prerequisites and project status.";
     }
     private void startResearch(CampaignProgress.Project project){
         if(campaign==null)return;
@@ -717,20 +764,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-GAME-FLOW","DOCK_SERVICE_ALL ship="+id+" credits="+quote);
         }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
     }
-    private void dockPurchase(){
+    private void dockPurchase(){purchaseCampaignHull(campaignDesign);}
+    private boolean purchaseCampaignHull(Shipyard.Design design){
+        if(campaign==null||campaignFleet==null||design==null)return false;
         try{
-            Shipyard.Design design=campaignDesign;
             CampaignShipyardRules.requireAllowed(design,campaign.faction(),
                     campaign.researchRank(),campaign.unlocked());
             long price=CampaignFleet.purchaseCost(design,technology);
             CampaignProgress.State debited=campaign.spend(price);
             CampaignFleet.Roster purchased=campaignFleet.purchase(design,technology);
-            if(!commitCampaign(debited,purchased))return;
+            if(!commitCampaign(debited,purchased))return false;
             dockSelected=campaignFleet.ships().size()-1;
             dockPage=dockSelected/9;
             dockNotice="New hull in AVAILABLE reserve; crew, ordnance and fuel are not free.";
             Gdx.app.log("CD-GAME-FLOW","PURCHASE_HULL id="+dockShipId()+" cost="+price);
-        }catch(IllegalArgumentException denied){dockNotice=denied.getMessage();}
+            return true;
+        }catch(IllegalArgumentException denied){
+            dockNotice=denied.getMessage();
+            return false;
+        }
     }
     private void dockToggle(){
         try{
@@ -1191,12 +1243,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.RESEARCH){
-            if(GameMenuPanel.hit(x,y,35,35,250,54)){screen=researchReturn;return;}
-            if(GameMenuPanel.hit(x,y,906,35,330,54)){
-                startResearch(CampaignProgress.Project.LICENSE);return;
-            }
-            if(GameMenuPanel.hit(x,y,592,35,294,54)){
-                startResearch(CampaignProgress.Project.ACCELERATOR);return;
+            int action=GameMenuPanel.researchAction(x,y);
+            switch(action){
+                case 0 -> {armedResearch=CampaignProgress.Project.NONE;screen=researchReturn;}
+                case 1 -> requestResearch(CampaignProgress.Project.ACCELERATOR);
+                case 2 -> requestResearch(CampaignProgress.Project.LICENSE);
+                default -> inspectResearchNode(action);
             }
             return;
         }
@@ -1712,7 +1764,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
                     afterActionPage,themePage,themeCandidate,
-                    selectedSquadron,namingReturn);
+                    selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());

@@ -17,6 +17,7 @@ import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import diplomacy.sim.CampaignNarrative;
 import diplomacy.shipyard.ShipLineages;
+import diplomacy.sim.LevelEconomy;
 import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
@@ -173,6 +174,17 @@ final class GameMenuPanel {
         }
         return -1;
     }
+    /** Inspect technology nodes, or authorize one of two real campaign projects. */
+    static int researchAction(float x,float y){
+        if(hit(x,y,35,35,250,54))return 0;
+        if(hit(x,y,592,35,294,54))return 1;
+        if(hit(x,y,906,35,330,54))return 2;
+        for(int i=0;i<6;i++)
+            if(hit(x,y,62+(i%3)*232,455-(i/3)*92,213,77))return 100+i;
+        for(int i=0;i<4;i++)
+            if(hit(x,y,62+i*176,250,160,70))return 200+i;
+        return -1;
+    }
     /** Eight persistent roster groups independent of temporary tactical slots. */
     static int squadronAction(float x,float y,int current){
         if(hit(x,y,35,35,210,54))return 0;
@@ -238,7 +250,8 @@ final class GameMenuPanel {
               boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
                int themePage,FleetNames.Style themeCandidate,
-               int selectedSquadron,Screen namingReturn){
+               int selectedSquadron,Screen namingReturn,
+               int selectedResearchNode,CampaignProgress.Project armedResearch,Screen researchReturn){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -305,10 +318,20 @@ final class GameMenuPanel {
                 button(shapes,964,35,278,50,true);
             }
             case RESEARCH -> {
-                rectangle(shapes,110,174,1050,444,PANEL);
+                rectangle(shapes,35,163,748,453,PANEL);
+                rectangle(shapes,797,163,447,453,PANEL);
+                for(int i=0;i<6;i++)
+                    button(shapes,62+(i%3)*232,455-(i/3)*92,213,77,
+                            selectedResearchNode==i);
+                for(int i=0;i<4;i++)
+                    button(shapes,62+i*176,250,160,70,selectedResearchNode==100+i);
                 button(shapes,35,35,250,54,false);
-                button(shapes,592,35,294,54,false);
-                button(shapes,906,35,330,54,true);
+                actionButton(shapes,592,35,294,54,
+                        armedResearch==CampaignProgress.Project.ACCELERATOR?
+                                MilitaryUiTheme.Intent.CONFIRM:MilitaryUiTheme.Intent.NORMAL);
+                actionButton(shapes,906,35,330,54,
+                        armedResearch==CampaignProgress.Project.LICENSE?
+                                MilitaryUiTheme.Intent.CONFIRM:MilitaryUiTheme.Intent.PRIMARY);
             }
             case DOCK -> {
                 rectangle(shapes,33,108,771,509,PANEL);
@@ -489,44 +512,69 @@ final class GameMenuPanel {
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
             case RESEARCH -> {
-                title(batch,font,"RESEARCH AND ENGINEERING",
-                        "LAB WORK IS MEASURED IN SUCCESSFUL MISSIONS, NOT WALL-CLOCK TIME");
-                label(batch,font,"FACTION: "+progress.faction().displayName,151,585,Color.CYAN);
-                label(batch,font,"AVAILABLE CREDITS: "+progress.credits(),151,551,Color.GOLD);
-                label(batch,font,"TECHNOLOGY LICENSE "+progress.researchRank()+"/6  |  LAB UPGRADES "+
-                        progress.speedUpgrades()+"/4",151,516,Color.WHITE);
-                label(batch,font,"ONE SUCCESSFUL MISSION = ONE RESEARCH TICK",151,479,MUTED);
-                if(progress.activeProject()!=CampaignProgress.Project.NONE){
-                    label(batch,font,"ACTIVE: "+progress.activeProject()+
-                            "  |  "+progress.projectProgress()+" / "+
-                            progress.currentProjectMissions()+" RESEARCH WORK",
-                            151,432,Color.CYAN);
-                    label(batch,font,"SUCCESSFUL MISSIONS REMAINING: "+
-                            progress.missionsUntilResearchComplete(),151,399,Color.WHITE);
-                }else{
-                    label(batch,font,"NO ACTIVE RESEARCH - SELECT A PROJECT BELOW",
-                            151,432,Color.CYAN);
-                    label(batch,font,"ONLY ONE PROJECT MAY BE RESEARCHED AT ONCE",
-                            151,399,MUTED);
+                title(batch,font,"CAMPAIGN TECHNOLOGY TREE",
+                        "SIX LICENSE TIERS / FOUR LABORATORY UPGRADES / PAID FROM CAMPAIGN CREDITS");
+                label(batch,font,"ENGINEERING LICENSES",62,587,Color.CYAN);
+                label(batch,font,"LABORATORY ACCELERATION",62,339,Color.CYAN);
+                for(int i=0;i<6;i++){
+                    int tier=i+1;
+                    float x=80+(i%3)*232,y=501-(i/3)*92;
+                    boolean done=tier<=progress.researchRank();
+                    boolean next=tier==progress.researchRank()+1;
+                    boolean running=next&&progress.activeProject()==CampaignProgress.Project.LICENSE;
+                    label(batch,font,"LICENSE "+tier,x,y,done?Color.GREEN:
+                            selectedResearchNode==i?Color.GOLD:Color.WHITE);
+                    label(batch,font,done?"COMPLETED":running?"RESEARCHING":
+                            next?"NEXT AVAILABLE":"PREREQUISITE LOCKED",
+                            x,y-27,done?Color.GREEN:next?Color.CYAN:MUTED);
                 }
-                label(batch,font,progress.researchRank()==6?"TECHNOLOGY: ALL SIX LICENSES COMPLETE":
-                        "NEXT LICENSE: "+progress.nextResearchCost()+" CREDITS  /  "+
-                                progress.nextResearchMissions()+" WORK",
-                        151,348,Color.WHITE);
-                label(batch,font,progress.speedUpgrades()==4?"LAB ACCELERATION: MAXIMUM LEVEL":
-                        "NEXT LAB UPGRADE: "+progress.nextAccelerationCost()+" CREDITS  /  "+
-                                progress.nextAccelerationMissions()+" WORK",
-                        151,313,Color.WHITE);
-                label(batch,font,progress.speedUpgrades()==4?"ALL FOUR LAB UPGRADES INSTALLED":
-                        "LAB REQUIRES FIRST CLEAR OF MISSION "+
-                                progress.nextAccelerationMilestone(),
-                        151,276,Color.GOLD);
-                label(batch,font,"SPEED UPGRADES REDUCE WORK TO ZERO, NEVER BELOW",
-                        151,235,MUTED);
-                label(batch,font,dockNotice,151,197,Color.CYAN);
-                label(batch,font,"BACK TO CAMPAIGN",69,67,Color.WHITE);
-                label(batch,font,"START LAB UPGRADE",604,67,Color.WHITE);
-                label(batch,font,"START NEXT LICENSE",922,67,Color.WHITE);
+                for(int i=0;i<4;i++){
+                    int tier=i+1;float x=75+i*176;
+                    boolean done=tier<=progress.speedUpgrades();
+                    boolean next=tier==progress.speedUpgrades()+1;
+                    boolean running=next&&progress.activeProject()==CampaignProgress.Project.ACCELERATOR;
+                    label(batch,font,"LAB "+tier,x,290,done?Color.GREEN:
+                            selectedResearchNode==100+i?Color.GOLD:Color.WHITE);
+                    label(batch,font,done?"INSTALLED":running?"RESEARCHING":
+                            next?"NEXT PROJECT":"LOCKED",x,268,done?Color.GREEN:next?Color.CYAN:MUTED);
+                }
+                boolean license=selectedResearchNode<100;
+                int tier=license?selectedResearchNode+1:selectedResearchNode-99;
+                boolean done=license?tier<=progress.researchRank():tier<=progress.speedUpgrades();
+                boolean next=license?tier==progress.researchRank()+1:
+                        tier==progress.speedUpgrades()+1;
+                long cost=license?LevelEconomy.draftResearchCost(tier):
+                        LevelEconomy.researchSpeedCost(tier);
+                var quote=CampaignBudgetQuotes.research(progress,license?
+                        CampaignProgress.Project.LICENSE:CampaignProgress.Project.ACCELERATOR);
+                label(batch,font,"CAMPAIGN RESEARCH BUDGET",819,585,Color.CYAN);
+                label(batch,font,"WALLET  "+progress.credits()+" CR",819,548,Color.GOLD);
+                label(batch,font,"SELECTED: "+(license?"LICENSE ":"LAB UPGRADE ")+tier,
+                        819,508,Color.WHITE);
+                label(batch,font,"PROJECT COST: "+cost+" CR",819,470,Color.WHITE);
+                label(batch,font,"BALANCE AFTER: "+(progress.credits()-cost)+" CR",
+                        819,436,progress.credits()>=cost?Color.GREEN:Color.SCARLET);
+                label(batch,font,"STATUS: "+(done?"ALREADY OWNED":next?
+                        quote.reason():"COMPLETE PREVIOUS TIER"),819,399,
+                        done?Color.GREEN:next&&quote.allowed()?Color.CYAN:Color.GOLD);
+                if(!license&&!done)
+                    label(batch,font,"REQUIRES MISSION "+
+                            LevelEconomy.researchSpeedMilestone(tier)+" CLEAR",
+                            819,367,MUTED);
+                label(batch,font,"ACTIVE: "+progress.activeProject()+
+                        "  WORK LEFT "+progress.missionsUntilResearchComplete(),
+                        819,332,Color.WHITE);
+                label(batch,font,"ONE SUCCESSFUL MISSION = ONE RESEARCH TICK",
+                        819,300,MUTED);
+                label(batch,font,shortLabel(dockNotice,63),819,228,Color.CYAN);
+                label(batch,font,"SELECT NODES TO INSPECT; BUTTONS AUTHORIZE NEXT TIER",
+                        56,183,MUTED);
+                label(batch,font,researchReturn==Screen.DOCK?"BACK TO DOCK":"BACK TO CAMPAIGN",
+                        66,68,Color.WHITE);
+                label(batch,font,armedResearch==CampaignProgress.Project.ACCELERATOR?
+                        "CONFIRM LAB SPEND":"AUTHORIZE NEXT LAB",605,67,Color.WHITE);
+                label(batch,font,armedResearch==CampaignProgress.Project.LICENSE?
+                        "CONFIRM LICENSE SPEND":"AUTHORIZE NEXT LICENSE",921,67,Color.WHITE);
             }
             case DOCK -> {
                 title(batch,font,"CAMPAIGN FLEET DOCK",
