@@ -30,6 +30,7 @@ final class ShipyardPanel {
     private final TechnologyCatalog catalog;
     private final TerranPlaceholderSprites fleetArt;
     private TacticalUiIcons uiIcons;
+    private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
     private final BiConsumer<Integer,Shipyard.Design> deploy;
     private Shipyard.Design[] active = new Shipyard.Design[2];
     private Shipyard.Design draft;
@@ -70,6 +71,7 @@ final class ShipyardPanel {
         notice="CAMPAIGN BLUEPRINT: APPLY queues design for paid purchase at dock.";
     }
     void close() { open=false; playerOnly=false; gesture.cancel(); }
+    void dispose(){backgrounds.dispose();}
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
@@ -407,8 +409,10 @@ final class ShipyardPanel {
         List<Shipyard.Slot> layout=draft.placements();
         Shipyard.Slot selected=layout.get(selectedSlot);
         Shipyard.Installed installed=draft.at(selectedSlot);
+        boolean textured=backgrounds.prepareNamed("shipyard_hangar");
+        if(textured){batch.begin();backgrounds.draw(batch);batch.end();}
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        rectangle(shapes,0,0,1280,720,new Color(0.018f,0.029f,0.05f,1));
+        if(!textured)rectangle(shapes,0,0,1280,720,new Color(0.018f,0.029f,0.05f,1));
         rectangle(shapes,0,635,1280,85,new Color(0.06f,0.09f,0.15f,1));
         rectangle(shapes,24,83,300,524,new Color(0.045f,0.075f,0.11f,1));
         rectangle(shapes,332,83,463,524,new Color(0.03f,0.052f,0.081f,1));

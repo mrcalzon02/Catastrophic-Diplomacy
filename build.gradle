@@ -12,11 +12,13 @@ allprojects {
 // Reconstruct only reviewed UI entries from their source pixel rectangles.
 def approvedUiParts = (0..<20).collect { file('asset_packs/ui-kit/part-' + String.format('%02d', it) + '.bin') }
 def approvedUiOutput = layout.buildDirectory.dir('generated/cd-ui')
+def curatedGrittyBackgrounds = file('asset_packs/gritty-ui/fullscreen-menu-backgrounds-v1.zip')
 
 tasks.register('prepareUiAssets') {
     inputs.files approvedUiParts
     inputs.file file('assets/ui/tactical/selected_manifest.json')
     inputs.files fileTree('assets/ui/tactical/selected')
+    inputs.file curatedGrittyBackgrounds
     outputs.dir approvedUiOutput
     doLast {
         approvedUiParts.each { if (!it.isFile()) throw new GradleException('Missing UI source part: ' + it.name) }
@@ -91,7 +93,33 @@ tasks.register('prepareUiAssets') {
             if (!javax.imageio.ImageIO.write(crop, 'png', png))
                 throw new GradleException('Cannot encode reviewed UI sprite: ' + id)
         }
-        println('PASS: 24 exact-source verified UI icons generated; rejected atlas excluded.')
+        if (!curatedGrittyBackgrounds.isFile() ||
+                digestBytes(curatedGrittyBackgrounds.bytes) !=
+                    'd44f38956bfb3e2ad35f4412902ee16027a90135760f80e67f80bd9f4ba4f1c4')
+            throw new GradleException('Gritty background archive missing or changed')
+        def backgrounds=[
+            blank_armor_bulkhead:'7e2f2ecc428ca686bc6b5ef0c6c3ad3fa6fd298b0a0f395bba8a40fc227098ac',
+            armored_interface:'0a4bb946c6d9908b68dd16a789f8ed4d029e8d6bbac519bd252817707f82ae50',
+            tactical_star_chart:'615e978ea2eae40ebb52588f376d409d2ba86b8d29772a6c89dfdd0b359c7b08',
+            fleet_approach:'b6057f3913863bfc1aaa82e68fd25f20c4ace052322f0603e09ca34ac25dad8d',
+            shipyard_hangar:'d61cd628bc41e0e302d116afe49084f0667f2ee63caf3bd9e8e6214d3cd284ec'
+        ]
+        new java.util.zip.ZipFile(curatedGrittyBackgrounds).withCloseable { zip ->
+            backgrounds.each { name, digest ->
+                def entry=zip.getEntry('ui/gritty/backgrounds/'+name+'.jpg')
+                if(entry==null)throw new GradleException('Missing curated background: '+name)
+                byte[] bytes=zip.getInputStream(entry).withCloseable { it.bytes }
+                if(digestBytes(bytes)!=digest)
+                    throw new GradleException('Altered gritty background: '+name)
+                def img=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes))
+                if(img==null||img.width!=1280||img.height!=720)
+                    throw new GradleException('Invalid full-screen background: '+name)
+                def dest=new File(target,'ui/gritty/backgrounds/'+name+'.jpg')
+                dest.parentFile.mkdirs()
+                dest.bytes=bytes
+            }
+        }
+        println('PASS: 24 vetted UI icons and 5 verified full-screen backgrounds generated.')
     }
 }
 

@@ -37,7 +37,10 @@ final class MilitaryUiTheme {
 
     /** The outer rail doesn't intrude into a screen's native content area. */
     static void canvas(ShapeRenderer shapes,float width,float height){
-        block(shapes,0,0,width,height,BACKGROUND);
+        canvas(shapes,width,height,false);
+    }
+    static void canvas(ShapeRenderer shapes,float width,float height,boolean textured){
+        if(!textured)block(shapes,0,0,width,height,BACKGROUND);
         block(shapes,0,height-8,width,8,FRAME_SHADOW);
         block(shapes,8,height-5,width-16,2,FRAME_BRIGHT);
         block(shapes,0,0,5,height,FRAME_SHADOW);

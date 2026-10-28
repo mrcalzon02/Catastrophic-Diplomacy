@@ -11,6 +11,18 @@ public final class GameMenuFlowTest {
         if(!pass)throw new AssertionError(detail);
     }
     public static void main(String[] args) {
+        // Background selection must not replace simulation-owned battle or map content.
+        check("blank_armor_bulkhead".equals(GrittyMenuBackgrounds.nameFor(
+                        GameMenuPanel.Screen.HOME)),
+                "Home must use a text-friendly industrial plate");
+        check("armored_interface".equals(GrittyMenuBackgrounds.nameFor(
+                        GameMenuPanel.Screen.SQUADRONS)),
+                "Squadron screens need low-detail industrial texture");
+        check("armored_interface".equals(GrittyMenuBackgrounds.nameFor(
+                        GameMenuPanel.Screen.CAMPAIGN)),
+                "Campaign map must not use a fake pre-painted star chart");
+        check(GrittyMenuBackgrounds.nameFor(GameMenuPanel.Screen.BATTLE)==null,
+                "Live combat must not be obscured by illustrative art");
         // The exact coordinates that users tap must resolve to the displayed action.
         for(int i=0;i<6;i++)
             check(GameMenuPanel.homeHit(600,512-i*64)==i,"Home action "+i);

@@ -2090,6 +2090,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(weaponFx!=null)weaponFx.dispose();
         if(uiIcons!=null)uiIcons.dispose();
         if(menuPanel!=null)menuPanel.dispose();
+        if(shipyard!=null)shipyard.dispose();
         if(starfield!=null)starfield.dispose();
         if(weatherVfx!=null)weatherVfx.dispose();
         shapes.dispose(); batch.dispose(); font.dispose();

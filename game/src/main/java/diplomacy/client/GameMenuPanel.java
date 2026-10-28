@@ -28,6 +28,7 @@ final class GameMenuPanel {
     private static final Color MUTED=MilitaryUiTheme.MUTED_TEXT;
     // No per-frame object allocation; one compact draw queue serves every menu.
     private final GrittyUiChrome grittyChrome=new GrittyUiChrome();
+    private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
     private final float[] chromeCommands=new float[512*5];
     private int chromeCount;
 
@@ -40,7 +41,7 @@ final class GameMenuPanel {
         chromeCommands[at+4]=variant;
     }
 
-    void dispose(){grittyChrome.dispose();}
+    void dispose(){grittyChrome.dispose();backgrounds.dispose();}
 
     private static final String[] HOME_ACTIONS={
         "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT"
@@ -239,8 +240,14 @@ final class GameMenuPanel {
                int themePage,FleetNames.Style themeCandidate,
                int selectedSquadron,Screen namingReturn){
         chromeCount=0;
+        boolean textured=backgrounds.prepare(screen);
+        if(textured){
+            batch.begin();
+            backgrounds.draw(batch);
+            batch.end();
+        }
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        MilitaryUiTheme.canvas(shapes,W,H);
+        MilitaryUiTheme.canvas(shapes,W,H,textured);
         // Paint-only change: original hit regions and native text remain authoritative.
         rectangle(shapes,0,622,W,2,MilitaryUiTheme.FRAME_BRIGHT);
         rectangle(shapes,37,622,132,2,MilitaryUiTheme.AMBER);
