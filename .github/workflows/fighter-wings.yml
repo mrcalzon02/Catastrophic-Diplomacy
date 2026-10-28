@@ -8,6 +8,12 @@ on:
       - 'android/**'
       - 'desktop/**'
       - 'tools/package_desktop.py'
+      - 'assets/ui/tactical/selected_manifest.json'
+      - 'asset_packs/ui-kit/**'
+      - 'build.gradle'
+      - 'tools/verify_tactical_ui.py'
+      - 'tools/verify_tactical_ui_packages.py'
+      - 'tools/test_verify_tactical_ui_packages.py'
       - '.github/workflows/fighter-wings.yml'
   pull_request:
     paths:
@@ -16,6 +22,12 @@ on:
       - 'android/**'
       - 'desktop/**'
       - 'tools/package_desktop.py'
+      - 'assets/ui/tactical/selected_manifest.json'
+      - 'asset_packs/ui-kit/**'
+      - 'build.gradle'
+      - 'tools/verify_tactical_ui.py'
+      - 'tools/verify_tactical_ui_packages.py'
+      - 'tools/test_verify_tactical_ui_packages.py'
       - '.github/workflows/fighter-wings.yml'
 concurrency:
   group: fighter-wings-${{ github.event.pull_request.number || github.ref }}
@@ -44,6 +56,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify exact 24 source-approved icons in built desktop JAR
+        run: |
+          python tools/verify_tactical_ui.py
+          python tools/test_verify_tactical_ui_packages.py
+          python tools/verify_tactical_ui_packages.py --desktop-dir desktop/build/libs
       - name: Package actual Windows/Linux executable and bundled Java 17 runtime
         run: python tools/package_desktop.py
       - name: Upload runnable desktop package and checksums
@@ -89,3 +106,5 @@ jobs:
         run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Build Android package from same core and game
         run: gradle :android:assembleDebug --no-daemon --stacktrace
+      - name: Verify exact 24 source-approved icons in built Android APK
+        run: python3 tools/verify_tactical_ui_packages.py --android-apk android/build/outputs/apk/debug/android-debug.apk
