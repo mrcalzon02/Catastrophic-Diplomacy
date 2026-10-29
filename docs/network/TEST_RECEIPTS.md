@@ -35,3 +35,18 @@ Physical Windows↔Windows/Linux Ethernet/Wi-Fi; NAT-forwarded separate-network 
 - `delivery.json` SHA-256 `e580ea9a217d1e79ed6845f6a6d674b06d7f26c3b891d578cd465888794c231f`
 - `delivery.log` SHA-256 `61f420c75364b5469d3a93d244bb6b98b1cb3dccd9d911bd8b0af6d2f72b6309`
 - `processes.json` SHA-256 `3576ae0dbab36837a6341ff2581bb8e54c77657f8f1c7b6784c7fc5517645da3`
+
+## Verification after concurrent-main reconciliation
+
+Base after preserving newer main: `ee683e93f368cb424d3d4e427b715cd14bf699ea`. Recompiled and reran the affected suites: **51 test invocations passed, 2 failed**, with unchanged strict certificate-pin failures. Exact commands/durations are in [reconciled.json](receipts/reconciled.json). No force push was used.
+
+
+## Exact-byte evidence check
+
+- `delivery.json` SHA-256 `e580ea9a217d1e79ed6845f6a6d674b06d7f26c3b891d578cd465888794c231f`
+- `delivery.log` SHA-256 `61f420c75364b5469d3a93d244bb6b98b1cb3dccd9d911bd8b0af6d2f72b6309`
+- `processes.json` SHA-256 `8c0355a3c6aeefd004f55d062394b4ccd515ad657b5c59c9a49711f24de63d03`
+- `reconciled.json` SHA-256 `0ca9fc80d14f91be611c6750f00a89aadfe0b176bd97ad3799bb8ad087df33f7`
+- `reconciled.log` SHA-256 `7d5f7b68d71b49f5bcaa878b0dd58dbec06639ceca855ddc442c51a15b41bb94`
+
+Source parity uses UTF-8/LF Git-blob canonicalization so Windows checkout line endings cannot create false source drift; all three copies were compared and the checksummed verifier passed.

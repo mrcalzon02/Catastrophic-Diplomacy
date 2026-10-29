@@ -1,0 +1,3 @@
+
+# Preserve exact multiplayer evidence bytes across operating systems.
+docs/network/receipts/* -text -whitespace

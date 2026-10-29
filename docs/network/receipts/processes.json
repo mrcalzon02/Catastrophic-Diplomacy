@@ -4,11 +4,11 @@
   "clients": [
     {
       "exit": 0,
-      "output": "PASS independent battle client team=1 tick=30 entities=64"
+      "output": "PASS independent battle client team=0 tick=30 entities=64"
     },
     {
       "exit": 0,
-      "output": "PASS independent battle client team=0 tick=30 entities=64"
+      "output": "PASS independent battle client team=1 tick=30 entities=64"
     }
   ],
   "server_exit": 0,

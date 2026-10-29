@@ -1,0 +1,674 @@
+{
+  "base": "ee683e93f368cb424d3d4e427b715cd14bf699ea",
+  "platform": "nt",
+  "results": [
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\javac.exe",
+        "--release",
+        "17",
+        "-encoding",
+        "UTF-8",
+        "-d",
+        "build/classes",
+        "@C:\\Users\\Admin\\Documents\\ChatGPT\\Phasmaphobia alike\\multiplayer\\Catastrophic-Diplomacy\\build\\network-checks\\sources.txt"
+      ],
+      "exit": 0,
+      "seconds": 2.813
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\javac.exe",
+        "--release",
+        "17",
+        "-encoding",
+        "UTF-8",
+        "-cp",
+        "build/classes;core/src/main/resources;C:\\Users\\Admin\\.m2\\repository\\com\\badlogicgames\\gdx\\gdx\\1.14.2\\gdx-1.14.2.jar",
+        "-d",
+        "build/game",
+        "@C:\\Users\\Admin\\Documents\\ChatGPT\\Phasmaphobia alike\\multiplayer\\Catastrophic-Diplomacy\\build\\network-checks\\game-sources.txt"
+      ],
+      "exit": 0,
+      "seconds": 1.687
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.AlienFactionArtTest"
+      ],
+      "exit": 0,
+      "seconds": 0.5
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.AmmunitionResearchTest"
+      ],
+      "exit": 0,
+      "seconds": 0.406
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.AmmunitionSelectionTest"
+      ],
+      "exit": 0,
+      "seconds": 0.454
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.AmmunitionTableTest"
+      ],
+      "exit": 0,
+      "seconds": 0.187
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.BattleGeometryRasterTest"
+      ],
+      "exit": 0,
+      "seconds": 0.625
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.BattleOrdersTest"
+      ],
+      "exit": 0,
+      "seconds": 0.141
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.BattleRetreatTest"
+      ],
+      "exit": 0,
+      "seconds": 0.375
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.BattleSmokeTest"
+      ],
+      "exit": 0,
+      "seconds": 0.265
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.BattleViewTest"
+      ],
+      "exit": 0,
+      "seconds": 2.641
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.BattleWeatherTest"
+      ],
+      "exit": 0,
+      "seconds": 0.156
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CampaignAfterActionTest"
+      ],
+      "exit": 0,
+      "seconds": 0.391
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CampaignBlueprintTest"
+      ],
+      "exit": 0,
+      "seconds": 0.344
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CampaignDeploymentTest"
+      ],
+      "exit": 0,
+      "seconds": 0.421
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CampaignFleetTest"
+      ],
+      "exit": 0,
+      "seconds": 0.547
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CampaignLedgerTest"
+      ],
+      "exit": 0,
+      "seconds": 0.719
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CampaignResearchTest"
+      ],
+      "exit": 0,
+      "seconds": 0.078
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CombatMachineryTest"
+      ],
+      "exit": 0,
+      "seconds": 0.406
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.CrewAccommodationTest"
+      ],
+      "exit": 0,
+      "seconds": 0.641
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.DemonstrationBattleTest"
+      ],
+      "exit": 0,
+      "seconds": 3.141
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.DirectionalDefenseTest"
+      ],
+      "exit": 0,
+      "seconds": 0.062
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.FighterCraftTest"
+      ],
+      "exit": 0,
+      "seconds": 0.469
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.FleetDoctrineGroupsTest"
+      ],
+      "exit": 0,
+      "seconds": 0.406
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.FleetNameRangeTest"
+      ],
+      "exit": 0,
+      "seconds": 0.594
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.FleetScaleTest"
+      ],
+      "exit": 0,
+      "seconds": 0.969
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.GameFlowTest"
+      ],
+      "exit": 0,
+      "seconds": 0.547
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.HullFoundationTest"
+      ],
+      "exit": 0,
+      "seconds": 0.5
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.HullLayoutsTest"
+      ],
+      "exit": 0,
+      "seconds": 0.718
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.LevelEconomyTest"
+      ],
+      "exit": 0,
+      "seconds": 0.063
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.LevelEnvironmentTest"
+      ],
+      "exit": 0,
+      "seconds": 0.109
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.LevelSkyTest"
+      ],
+      "exit": 0,
+      "seconds": 0.078
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.MassBattleCampaignTest"
+      ],
+      "exit": 0,
+      "seconds": 21.188
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ModuleResearchExclusivityTest"
+      ],
+      "exit": 0,
+      "seconds": 0.297
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ModuleVersionsTest"
+      ],
+      "exit": 0,
+      "seconds": 0.297
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.OrdnanceDoctrineTest"
+      ],
+      "exit": 0,
+      "seconds": 0.14
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.PlatformPersistenceTest"
+      ],
+      "exit": 0,
+      "seconds": 0.297
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ProjectileModuleTest"
+      ],
+      "exit": 0,
+      "seconds": 0.359
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ResearchVictoryFloorTest"
+      ],
+      "exit": 0,
+      "seconds": 0.063
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ShipLineagesTest"
+      ],
+      "exit": 0,
+      "seconds": 0.422
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ShipPlacementOrdersTest"
+      ],
+      "exit": 0,
+      "seconds": 0.375
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ShipStandingOrdersTest"
+      ],
+      "exit": 0,
+      "seconds": 0.344
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ShipTacticalDirectivesTest"
+      ],
+      "exit": 0,
+      "seconds": 0.359
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.ShipyardTest"
+      ],
+      "exit": 0,
+      "seconds": 0.516
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.SpaceWeatherTest"
+      ],
+      "exit": 0,
+      "seconds": 0.093
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.SquadronOperationsTest"
+      ],
+      "exit": 0,
+      "seconds": 0.407
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.SupportSystemsTest"
+      ],
+      "exit": 0,
+      "seconds": 0.359
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.TechnologyCatalogTest"
+      ],
+      "exit": 0,
+      "seconds": 0.219
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.VesselIdentifiersTest"
+      ],
+      "exit": 0,
+      "seconds": 0.453
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.WeaponBehaviorTableTest"
+      ],
+      "exit": 0,
+      "seconds": 0.109
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.sim.WeaponFxPipelineTest"
+      ],
+      "exit": 0,
+      "seconds": 0.141
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "hbnet.HbnetTest",
+        "local"
+      ],
+      "exit": 0,
+      "seconds": 1.344
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "hbnet.HbnetTest"
+      ],
+      "exit": 1,
+      "seconds": 1.531
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.server.BattleServerTest"
+      ],
+      "exit": 1,
+      "seconds": 1.359
+    },
+    {
+      "command": [
+        "C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+        "-Djava.awt.headless=true",
+        "-ea",
+        "-cp",
+        "build/classes;core/src/main/resources",
+        "diplomacy.server.BattleLanTest"
+      ],
+      "exit": 0,
+      "seconds": 2.594
+    }
+  ],
+  "log_sha256": "7d5f7b68d71b49f5bcaa878b0dd58dbec06639ceca855ddc442c51a15b41bb94"
+}
