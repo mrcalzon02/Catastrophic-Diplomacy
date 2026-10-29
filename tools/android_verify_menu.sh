@@ -5,6 +5,39 @@ set -euo pipefail
 report="${1:-test-output/android}"
 mkdir -p "$report"
 package=games.catastrophicdiplomacy
+python3 -m unittest discover -s tools -p "test_android_native_dialog.py" -q
+
+# The signed sideload updater may legitimately offer published GitHub APKs at
+# startup. Its native AlertDialog intercepts game taps; the 2026-10-29 failed
+# run retained identical before/after screenshots showing this exact overlay.
+# Use the Android accessibility hierarchy to dismiss ONLY its real Later
+# button, never a permission prompt, installer, or arbitrary coordinate.
+dismiss_optional_updater(){
+  local phase="$1" attempt point x y xml="$report/$1-hierarchy.xml"
+  for attempt in 1 2 3; do
+    if timeout 25s adb shell uiautomator dump /sdcard/cd-navigation.xml \
+         > "$report/$phase-uiautomator.log" 2>&1 &&
+       timeout 10s adb exec-out cat /sdcard/cd-navigation.xml > "$xml"; then
+      if ! point="$(python3 tools/android_native_dialog.py "$xml")"; then
+        echo "FAIL: updater dialog visible but safe Later target could not be identified" >&2
+        return 1
+      fi
+      if [[ -n "$point" ]]; then
+        read -r x y <<< "$point"
+        adb shell input tap "$x" "$y"
+        echo "Dismissed the signed app's optional updater dialog via its actual Later control."
+        sleep 1
+        return 0
+      fi
+    fi
+    sleep 1
+  done
+  if [[ ! -s "$xml" ]]; then
+    echo "FAIL: could not inspect native Android overlays before game navigation" >&2
+    return 1
+  fi
+}
+
 capture(){
   adb exec-out screencap -p > "$report/$1.png"
   test "$(wc -c < "$report/$1.png")" -gt 2000
@@ -53,6 +86,7 @@ adb logcat -c
 adb shell am force-stop "$package"
 adb shell am start -W -n "$package/diplomacy.android.AndroidLauncher"
 sleep 5
+dismiss_optional_updater first-launch
 capture main-menu
 assert_step MAIN_MENU
 touch_ui main-menu 640 384
@@ -121,6 +155,7 @@ adb shell am force-stop "$package"
 adb logcat -c
 adb shell am start -W -n "$package/diplomacy.android.AndroidLauncher"
 sleep 5
+dismiss_optional_updater campaign-relaunch
 capture campaign-main-menu
 assert_step MAIN_MENU
 # HOME's second item: NEW CAMPAIGN.
