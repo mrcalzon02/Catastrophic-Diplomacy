@@ -1,0 +1,57 @@
+{
+  "repository": "mrcalzon02/Catastrophic-Diplomacy",
+  "branch": "main",
+  "remote_head": "59c5598c3247751cae556c6f09e2f4ddc6734964",
+  "local_head": "59c5598c3247751cae556c6f09e2f4ddc6734964",
+  "fetched_head": "59c5598c3247751cae556c6f09e2f4ddc6734964",
+  "verified_by": [
+    "git fetch origin main",
+    "git ls-remote origin refs/heads/main",
+    "git show origin/main:path",
+    "compare exact Git-blob source bytes and evidence bytes"
+  ],
+  "files": [
+    {
+      "path": "core/src/main/java/hbnet/Hbnet.java",
+      "git_blob": "c478de7eedb108ff85622621b9dcd3fd0d3945a8",
+      "sha256": "d34f80abf7a22ede219d5bd652d731f5372a8e4f6f4ba8e68ef50ff98b2c9ca9",
+      "bytes": 22275,
+      "matches_local": true
+    },
+    {
+      "path": "core/src/main/java/diplomacy/net/BattleConnection.java",
+      "git_blob": "d061f6b6ad5b05c3a63b75d550240dbbf9704291",
+      "sha256": "0a0fba7974096830db6e5774ddd7e3e8d946417d5cf4632d7061510af0cf2e9f",
+      "bytes": 3852,
+      "matches_local": true
+    },
+    {
+      "path": "server/src/main/java/diplomacy/server/BattleServer.java",
+      "git_blob": "3987bfd497b6a7c258a75f73a3230b3243e48bf8",
+      "sha256": "15392e61ef2e5a3ab371918a7d5cef86f40655d9b4eb646846602b898490bd3d",
+      "bytes": 10845,
+      "matches_local": true
+    },
+    {
+      "path": "game/src/main/java/diplomacy/client/MultiplayerPanel.java",
+      "git_blob": "7cb88e92a11e19157b38c738ce77e07a32fb8fa3",
+      "sha256": "32dbd2541844a4b18140702ba2878cbc10a1bf3220e31eb0da22d0222c244a5d",
+      "bytes": 11106,
+      "matches_local": true
+    },
+    {
+      "path": "server/src/test/java/diplomacy/server/BattleServerTest.java",
+      "git_blob": "a5c516abf36eb04b9347950ca0e7b7d528d8a73a",
+      "sha256": "f0a3c0a10e92fc21b6a64bd8b679c31a3583d36e2186b7c231b8d10a9a0ce9d0",
+      "bytes": 3040,
+      "matches_local": true
+    },
+    {
+      "path": "docs/network/receipts/reconciled.json",
+      "git_blob": "8fb1fd3e02712c2a9c9b28726005497705bd249c",
+      "sha256": "0ca9fc80d14f91be611c6750f00a89aadfe0b176bd97ad3799bb8ad087df33f7",
+      "bytes": 17581,
+      "matches_local": true
+    }
+  ]
+}

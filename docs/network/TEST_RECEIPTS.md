@@ -50,3 +50,7 @@ Base after preserving newer main: `ee683e93f368cb424d3d4e427b715cd14bf699ea`. Re
 - `reconciled.log` SHA-256 `7d5f7b68d71b49f5bcaa878b0dd58dbec06639ceca855ddc442c51a15b41bb94`
 
 Source parity uses UTF-8/LF Git-blob canonicalization so Windows checkout line endings cannot create false source drift; all three copies were compared and the checksummed verifier passed.
+
+## Remote implementation read-back
+
+Verified remote `main` at `59c5598c3247751cae556c6f09e2f4ddc6734964` with independently read remote ref and fetched source/test/evidence blobs. [Exact blob IDs and SHA-256 read-back](receipts/remote-readback.json). This verifies delivery of the recorded implementation, not a passed TLS or Internet acceptance gate.
