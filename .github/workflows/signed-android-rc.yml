@@ -239,7 +239,11 @@ jobs:
           retention-days: 30
 
   publish-prerelease:
-    name: Publish verified signed Android prerelease
+    # This fixed 0.1.4-rc.1 tag is already published. Pushes still build and
+    # exercise the signed APK; publication requires an explicit dispatch and
+    # a vacant, version-bumped tag. Never overwrite a released APK.
+    name: Publish verified signed Android prerelease (manual only)
+    if: github.event_name == 'workflow_dispatch'
     needs: [qualification, signed-android, android-functional-emulator]
     runs-on: ubuntu-24.04
     steps:
