@@ -16,6 +16,7 @@ public final class ScenarioCatalog {
         CAPITALS("Capital Fleet Battle","Large hulls with extended weapon ranges.",64,86,6006L,Shipyard.Hull.BATTLECRUISER,Shipyard.Hull.DREADNOUGHT,false),
         STORM("Space Weather Battle","Environmental hazards affect the engagement.",64,117,6007L,Shipyard.Hull.FRIGATE,Shipyard.Hull.CRUISER,false),
         ARMADA("Armada Engagement","One hundred vessels on each side.",100,221,6008L,Shipyard.Hull.FRIGATE,Shipyard.Hull.DESTROYER,false),
+        HULL_COVERAGE("Hull Coverage 11v11","One ship of every size per side; module/armor inspection.",11,32,HullCoverageBattle.SEED,Shipyard.Hull.INTERCEPTOR,Shipyard.Hull.INTERCEPTOR,true),
         PROVING_GROUND("200v200 Proving Ground","Canonical six-weapon combined-arms test fixture.",200,301,DemonstrationBattle.SEED,Shipyard.Hull.CRUISER,Shipyard.Hull.CRUISER,true);
         public final String title,description;
         public final int ships,environmentLevel;
@@ -41,7 +42,7 @@ public final class ScenarioCatalog {
             case CARRIERS -> first?"LAS":"TOR";
             case CAPITALS -> first?"PAR":"TOR";
             case STORM -> first?"PAR":"PLA";
-            case ARMADA,PROVING_GROUND -> first?"KIN":"MSL";
+            case ARMADA,PROVING_GROUND,HULL_COVERAGE -> first?"KIN":"MSL";
         };
         for(Shipyard.Slot slot:hull.slots)if(slot.mount()==Shipyard.Mount.WEAPON){
             d=d.install(slot.index(),"BASE-"+Shipyard.factionId(faction)+"-"+weapon);
@@ -76,6 +77,7 @@ public final class ScenarioCatalog {
         if(preset==null||left==null||right==null||technology==null)
             throw new IllegalArgumentException("Scenario, designs and catalog required");
         if(customShips<1||customShips>200)throw new IllegalArgumentException("Fleet size out of range");
+        if(preset==Preset.HULL_COVERAGE)return HullCoverageBattle.mixed(technology);
         if(preset.demonstration)return DemonstrationBattle.create(technology);
         return Battle.duel(preset.seed,preset==Preset.CUSTOM?customShips:preset.ships,
                            left,right,technology);
