@@ -553,3 +553,11 @@ tasks.register('propulsionSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.OrdnancePropulsionTest'
 }
+
+tasks.register('laserFamiliesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify five actual module-selected laser families, damage events and beam origins.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.LaserFamiliesTest'
+}
