@@ -545,3 +545,11 @@ tasks.register('weaponMuzzleSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('projectileModuleSmoke') { finalizedBy(tasks.named('weaponMuzzleSmoke')) }
+
+tasks.register('propulsionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate cold launch, continuous burn, boost/coast/terminal and pulsed propulsion.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnancePropulsionTest'
+}
