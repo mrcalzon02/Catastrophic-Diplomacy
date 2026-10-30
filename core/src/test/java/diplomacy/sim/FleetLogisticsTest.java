@@ -50,7 +50,7 @@ public final class FleetLogisticsTest {
                 Shipyard.supportDoctrine(ordinary,tech).equals(SupportDoctrine.NONE),
                 "Starter shield is not a support projector");
 
-        String[] direct={"APR","PWR"};
+        String[] direct={"HPR","APR","PWR"};
         String[] drone={"DHL","DSH","DAR","DPW"};
         String[] aura={"AHL","ASH","AAR","APW"};
         for(String code:direct){
