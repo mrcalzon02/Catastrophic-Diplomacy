@@ -9,3 +9,12 @@ tasks.register('networkSmoke', JavaExec) {
     mainClass = 'diplomacy.server.BattleServerTest'
 }
 tasks.named('check') { dependsOn tasks.named('networkSmoke') }
+
+tasks.register('pvpFleetSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify authoritative trusted-LAN mixed-tier fleet and host tech-cap enforcement.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.server.PvpFleetTest'
+}
+tasks.named('networkSmoke') { finalizedBy(tasks.named('pvpFleetSmoke')) }
