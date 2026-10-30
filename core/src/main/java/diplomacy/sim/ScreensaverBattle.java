@@ -46,11 +46,83 @@ public final class ScreensaverBattle {
             ship.name=FleetNames.generate(team==0?firstStyle:secondStyle,
                     seed^(team*0x9e3779b97f4a7c15L),++serial[team]);
         }
+        assignCaptainOrders(random,battle);
         battle.setTeamRadioTone(0,CrewChatter.Tone.values()[
                 random.nextInt(CrewChatter.Tone.values().length)]);
         battle.setTeamRadioTone(1,CrewChatter.Tone.values()[
                 random.nextInt(CrewChatter.Tone.values().length)]);
         return new Round(seed,battle,left,right,tierA,tierB,environment,first,second);
+    }
+
+    /**
+     * An exhibition is not a replay of the player's saved fleet orders.
+     * Give every physical captain an independently seeded, simultaneous doctrine;
+     * the same round seed reproduces both fittings and orders.
+     */
+    private static void assignCaptainOrders(Random random,Battle battle){
+        BattleOrders.Position[] movement={
+                BattleOrders.Position.FREE,BattleOrders.Position.FREE,
+                BattleOrders.Position.HOLD,BattleOrders.Position.KEEP_MOVING,
+                BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.CAUTIOUS,
+                BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND
+        };
+        BattleOrders.PointDefense[] defenses={
+                BattleOrders.PointDefense.BALANCED,BattleOrders.PointDefense.BALANCED,
+                BattleOrders.PointDefense.INTERCEPT_ONLY,BattleOrders.PointDefense.ANTI_CRAFT,
+                BattleOrders.PointDefense.HOLD_FIRE
+        };
+        for(int team=0;team<2;team++){
+            List<Battle.Ship> allies=new ArrayList<>();
+            for(Battle.Ship ship:battle.ships())if(ship.team==team)allies.add(ship);
+            for(int slot=0;slot<allies.size();slot++){
+                Battle.Ship ship=allies.get(slot);
+                // Only an earlier friendly can lead this escort. No cycles,
+                // self-assignments or references to an opposing fleet.
+                int escort=slot>0&&random.nextInt(100)<25?random.nextInt(slot):-1;
+                List<Integer> defendSlots=new ArrayList<>(List.of(-1,-1,-1,-1));
+                List<Integer> defendedIds=new ArrayList<>();
+                if(allies.size()>1&&random.nextInt(100)<45){
+                    List<Integer> candidates=new ArrayList<>();
+                    for(int i=0;i<allies.size();i++)
+                        if(i!=slot)candidates.add(i);
+                    int count=1+random.nextInt(Math.min(4,candidates.size()));
+                    for(int i=0;i<count;i++){
+                        int choice=candidates.remove(random.nextInt(candidates.size()));
+                        defendSlots.set(i,choice);
+                        defendedIds.add(allies.get(choice).id);
+                    }
+                }
+                BattleOrders.Orders tactics=BattleOrders.DEFAULT
+                        .withPosition(movement[random.nextInt(movement.length)])
+                        .withTargeting(BattleOrders.Targeting.values()[
+                                random.nextInt(BattleOrders.Targeting.values().length)])
+                        .withPointDefense(defenses[random.nextInt(defenses.length)])
+                        .withRetreat(random.nextInt(5)==0?0:(5+random.nextInt(36))/100.0);
+                int enabled=0;
+                for(BattleOrders.Size size:BattleOrders.Size.values()){
+                    int priority=random.nextInt(7)==0?0:20+random.nextInt(81);
+                    tactics=tactics.withEngagement(size,priority,110+random.nextInt(791));
+                    enabled+=priority;
+                }
+                // A rare defense-focused vessel is fine, but never accidentally
+                // prohibit every offensive target category on an armed captain.
+                if(enabled==0)tactics=tactics.withEngagement(BattleOrders.Size.ESCORT,75,300);
+                ShipTacticalDirectives directives=new ShipTacticalDirectives(
+                        55+random.nextInt(46),
+                        ShipTacticalDirectives.InterceptStrategy.values()[
+                                random.nextInt(ShipTacticalDirectives.InterceptStrategy.values().length)],
+                        ShipTacticalDirectives.DefenseScope.values()[
+                                random.nextInt(ShipTacticalDirectives.DefenseScope.values().length)],
+                        ShipTacticalDirectives.FighterMission.values()[
+                                random.nextInt(ShipTacticalDirectives.FighterMission.values().length)],
+                        defendSlots,escort,100+random.nextInt(601));
+                ShipStandingOrders orders=new ShipStandingOrders(tactics,
+                        random.nextInt(101),random.nextInt(101),
+                        random.nextInt(5)==0?10+random.nextInt(41):0,directives);
+                battle.setShipStandingOrders(ship.id,orders);
+                battle.setShipProtection(ship.id,escort<0?0:allies.get(escort).id,defendedIds);
+            }
+        }
     }
 
     /** Small patrols are more frequent than massive engagements; 200/side is possible. */
