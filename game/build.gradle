@@ -117,3 +117,12 @@ tasks.register('combatShipStatusSmoke', JavaExec) {
     mainClass = 'diplomacy.client.CombatShipStatusTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatShipStatusSmoke') }
+
+tasks.register('shipDeathSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify jagged hull shatter, unique kills, smoke, 400-loss cap and reset.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipDeathTimelineTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipDeathSmoke') }
