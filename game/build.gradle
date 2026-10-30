@@ -92,6 +92,15 @@ tasks.register('screensaverCameraSmoke', JavaExec) {
 // regression there, rather than leaving a diagnostic-only test unexecuted.
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('screensaverCameraSmoke') }
 
+tasks.register('screensaverWakeSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Reject accidental wake from taps/drags/pinches and validate double-tap controls.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ScreensaverWakeGestureTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('screensaverWakeSmoke') }
+
 tasks.register('renderPosesSmoke', JavaExec) {
     group = 'verification'
     dependsOn tasks.named('testClasses')
