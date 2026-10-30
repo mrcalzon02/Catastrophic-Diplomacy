@@ -173,6 +173,10 @@ final class CombatLightingRenderer implements Disposable {
     }
     void renderGlow(Battle battle, SpriteBatch batch, OrthographicCamera camera,
                     BattleRenderPoses poses) {
+        renderGlow(battle,batch,camera,poses,null);
+    }
+    void renderGlow(Battle battle, SpriteBatch batch, OrthographicCamera camera,
+                    BattleRenderPoses poses, ShieldFxTimeline shields) {
         timeline.update(battle);
         lastGlowQuads = 0;
         batch.setProjectionMatrix(camera.combined);
@@ -291,6 +295,31 @@ final class CombatLightingRenderer implements Disposable {
                     tint,(intercepted?.44f:.76f)*intensity);
             spot(batch,camera,e.x(),e.y(),baseRadius*.37f,
                     Color.WHITE,(intercepted?.28f:.67f)*intensity*intensity);
+        }
+        // Tiny additive shield spill follows the same authoritative per-facing
+        // timeline as the art overlay. Capped, camera-culled and mobile-friendly.
+        if(shields!=null){
+            int shieldLights=0;
+            for(ShieldFxTimeline.Effect fx:shields.events()){
+                if(++shieldLights>96)break;
+                if(!fx.ship.alive()&&fx.kind!=ShieldFxTimeline.Kind.COLLAPSE)continue;
+                float life=1f-fx.progress();
+                if(life<=0)continue;
+                if(fx.kind==ShieldFxTimeline.Kind.RECHARGE && camera.zoom>1.8f)continue;
+                BattleRenderPoses.Pose pose=poses==null?
+                        new BattleRenderPoses.Pose((float)fx.ship.x,(float)fx.ship.y,(float)fx.ship.facing):
+                        poses.ship(fx.ship);
+                double facing=pose.angle()+StrictMath.toRadians(fx.localAngle);
+                float shell=(float)(16*fx.ship.visualScale());
+                float x=pose.x()+(float)StrictMath.cos(facing)*shell;
+                float y=pose.y()+(float)StrictMath.sin(facing)*shell;
+                Color tint=fx.weapon==Battle.DamageType.PLASMA?Color.PINK:
+                        fx.weapon==Battle.DamageType.PARTICLE?Color.VIOLET:
+                        fx.weapon==Battle.DamageType.KINETIC?Color.GOLD:Color.CYAN;
+                float small=CombatEffectScale.of(12f)*(float)fx.ship.visualScale();
+                spot(batch,camera,x,y,small*(1f+.22f*fx.progress()),tint,
+                        .28f*life*fx.intensity);
+            }
         }
         batch.setColor(Color.WHITE);
         batch.end();
