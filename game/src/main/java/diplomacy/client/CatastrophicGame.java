@@ -1994,7 +1994,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
         if(craftSprites!=null)craftSprites.render(battle,batch);
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams);
-        drawArmorDamage();
+        // Damage is rendered by the ship's irregular alpha peel mask.
+        // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
         // Query sprite availability before opening ShapeRenderer's GL batch.
         java.util.Set<Long> texturedMissiles=new java.util.HashSet<>();
@@ -2221,32 +2222,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         battleCamera.position.set((float)cx,(float)cy,0);
         battleCamera.update();
-    }
-
-    /**
-     * Temporary ship-local damage indicators until an exterior alpha mask and
-     * structural sublayer shader are introduced for the final sprite pipeline.
-     */
-    private void drawArmorDamage() {
-        shapes.setProjectionMatrix(battleCamera.combined);
-        shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for(Battle.Ship ship:battle.ships())if(ship.alive()) {
-            double length=23*ship.visualScale(), breadth=13*ship.visualScale();
-            double c=StrictMath.cos(ship.facing),s=StrictMath.sin(ship.facing);
-            for(int row=0;row<diplomacy.sim.DirectionalDefense.GRID;row++)
-                for(int col=0;col<diplomacy.sim.DirectionalDefense.GRID;col++) {
-                    var tile=ship.defense.tile(row,col);
-                    if(!tile.occupied || tile.exposure()<0.45)continue;
-                    double x=(1-(row+0.5)*2/diplomacy.sim.DirectionalDefense.GRID)*length;
-                    double y=(1-(col+0.5)*2/diplomacy.sim.DirectionalDefense.GRID)*breadth;
-                    float wx=(float)(ship.x+x*c-y*s),wy=(float)(ship.y+x*s+y*c);
-                    float radius=(float)(0.6+tile.exposure()*0.8);
-                    shapes.setColor(tile.internalDamage()>0.65?com.badlogic.gdx.graphics.Color.SCARLET:
-                            com.badlogic.gdx.graphics.Color.ORANGE);
-                    shapes.circle(wx,wy,radius,5);
-                }
-        }
-        shapes.end();
     }
 
     private void drawShipsFallback() {
