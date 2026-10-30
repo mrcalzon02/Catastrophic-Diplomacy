@@ -29,8 +29,9 @@ tasks.register('prepareStage1Art') {
         new java.util.zip.ZipFile(stage1Archive).withCloseable { archive ->
             def manifestEntry = archive.getEntry('runtime-art-manifest.json')
             if (manifestEntry == null) throw new GradleException('Missing original Stage 1 art manifest')
-            def manifest = new groovy.json.JsonSlurper().parse(
-                    archive.getInputStream(manifestEntry).withCloseable { it })
+            def manifest = archive.getInputStream(manifestEntry).withCloseable { stream ->
+                new groovy.json.JsonSlurper().parse(stream)
+            }
             if (manifest.schema != 'cd-runtime-art-stage1-v1' ||
                     manifest.counts.terran_hulls != 10 ||
                     manifest.counts.emitter_free_beam_frames != 35 ||
