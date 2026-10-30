@@ -128,6 +128,40 @@ public final class CampaignOpposition {
             String family=weapon(random,tier,operation);
             design=validOr(design,design.install(slot.index(),prefix+family),catalog);
         }
+        // Base templates mount only two guns, even on capital hulls with
+        // extensive spare batteries. Escalate through actual installed
+        // reactors/radiators and hardpoints as engineering improves.
+        if(tier>=2){
+            int plants=0,plantLimit=Math.min(6,(tier/3)*2);
+            for(Shipyard.Slot slot:design.hull.slots){
+                if(slot.mount()!=Shipyard.Mount.SYSTEM||design.at(slot.index())!=null
+                        ||plants>=plantLimit)continue;
+                String component=plants%2==0?"REA":"RAD";
+                Shipyard.Design candidate=design.install(slot.index(),prefix+component);
+                if(Shipyard.inspect(candidate,catalog).valid()){
+                    design=candidate;plants++;
+                }
+            }
+            int additionalBatteries=0,maximumAdditional=Math.min(4,tier/2);
+            for(Shipyard.Slot slot:design.hull.slots){
+                if(slot.mount()!=Shipyard.Mount.WEAPON||design.at(slot.index())!=null
+                        ||additionalBatteries>=maximumAdditional)continue;
+                Shipyard.Design candidate=design.install(slot.index(),
+                        prefix+weapon(random,tier,operation));
+                if(Shipyard.inspect(candidate,catalog).valid()){
+                    design=candidate;additionalBatteries++;
+                }
+            }
+            int additionalScreens=0,screenLimit=tier<3?0:1+(tier-3)/3;
+            for(Shipyard.Slot slot:design.hull.slots){
+                if(slot.mount()!=Shipyard.Mount.DEFENSE||design.at(slot.index())!=null
+                        ||additionalScreens>=screenLimit)continue;
+                Shipyard.Design candidate=design.install(slot.index(),prefix+"SHD");
+                if(Shipyard.inspect(candidate,catalog).valid()){
+                    design=candidate;additionalScreens++;
+                }
+            }
+        }
         if(tier>=3&&(operation==Operation.STRIKE_WING||operation==Operation.COMMAND)
                 &&design.hull.spriteHull()==Shipyard.Hull.CARRIER){
             for(Shipyard.Slot slot:design.hull.slots)if(slot.mount()==Shipyard.Mount.SUPPORT){
