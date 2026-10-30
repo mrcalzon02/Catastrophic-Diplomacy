@@ -6,15 +6,16 @@ import diplomacy.shipyard.Shipyard;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Headless test: three recorded banks, exact event/line mapping, no device. */
+/** Headless test: five recorded banks, exact event/line mapping, no device. */
 public final class FighterVoiceAudioTest {
     public static void main(String[] args) {
-        if (RecordedHullVoiceAudio.registeredCues() != 78)
-            throw new AssertionError("Expected 78 recorded hull voice cues");
+        if (RecordedHullVoiceAudio.registeredCues() != 130)
+            throw new AssertionError("Expected 130 recorded hull voice cues");
         Set<String> paths = new HashSet<>();
         int n = 0;
         for (Shipyard.Hull hull : new Shipyard.Hull[]{
-                Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER}) {
+                Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER,
+                Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT}) {
             for (CrewChatter.Event event : CrewChatter.Event.values()) {
                 for (CrewChatter.Tone tone : new CrewChatter.Tone[]{
                         CrewChatter.Tone.PROFESSIONAL, CrewChatter.Tone.VETERAN}) {
@@ -34,8 +35,8 @@ public final class FighterVoiceAudioTest {
         }
         if (RecordedHullVoiceAudio.assetPathForRadio("RADIO Cruiser: Open fire.") != null)
             throw new AssertionError("Unrecorded ship chatter must remain text only");
-        if(n != 78 || paths.size() != 78)
-            throw new AssertionError("Incomplete three-hull voice bank");
-        System.out.println("PASS: 78 unique original recorded lines assigned to 3 fixed hull voices");
+        if(n != 130 || paths.size() != 130)
+            throw new AssertionError("Incomplete five-hull voice bank");
+        System.out.println("PASS: 130 unique original recorded lines assigned to 5 fixed hull voices");
     }
 }

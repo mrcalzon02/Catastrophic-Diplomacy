@@ -640,12 +640,16 @@ def additionalHullVoicePacks = [
     [hull: 'CORVETTE', batch: '004', file: file('asset_packs/audio/corvette-voice-batch-004.zip'),
      checksum: '5f65fb476fe84d98d2f6d9746bc90e0553b089b4ba6803ec57c0408c20261346'],
     [hull: 'DESTROYER', batch: '005', file: file('asset_packs/audio/destroyer-voice-batch-005.zip'),
-     checksum: '1b1705174e305c8894d38750965e72b0961d7fb8242cf55fdb1cc3aa4d9431ec']
+     checksum: '1b1705174e305c8894d38750965e72b0961d7fb8242cf55fdb1cc3aa4d9431ec'],
+    [hull: 'CARRIER', batch: '006', file: file('asset_packs/audio/carrier-voice-batch-006.zip'),
+     checksum: '77e20b9e589459f77581b81d8071797f030346a5cb5256d9fb52506144e0ed39'],
+    [hull: 'DREADNOUGHT', batch: '007', file: file('asset_packs/audio/dreadnought-voice-batch-007.zip'),
+     checksum: '90c65e4af2d71f759be3762fa8d320a513d7d405a6327fac77cec5575da511b6'
 ]
 def additionalHullVoicesOutput = layout.buildDirectory.dir('generated/cd-hull-voices')
 tasks.register('prepareAdditionalHullVoiceAssets') {
     group = 'assets'
-    description = 'Verify both Drive-transferred hull voice archives and stage 52 original OGG clips.'
+    description = 'Verify four Drive-transferred hull voice archives and stage 104 original OGG clips.'
     inputs.files additionalHullVoicePacks.collect { it.file }
     outputs.dir additionalHullVoicesOutput
     doLast {
@@ -671,7 +675,7 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
                 def seen = [] as Set
                 manifest.clips.each { cue ->
                     String id = cue.id as String
-                    if (!(id ==~ /(?:CORVETTE|DESTROYER)_[A-Z_]+_0[12]/)
+                    if (!(id ==~ /(?:CORVETTE|DESTROYER|CARRIER|DREADNOUGHT)_[A-Z_]+_0[12]/)
                             || !id.startsWith(pack.hull+'_') || !seen.add(id))
                         throw new GradleException('Invalid/duplicate hull voice ID: '+id)
                     String filename = id.toLowerCase(java.util.Locale.ROOT)+'.ogg'
@@ -687,10 +691,20 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
                         throw new GradleException('Corrupt hull voice clip '+id)
                     new File(target,filename).bytes = bytes
                 }
+                // Reject incomplete or duplicated event banks even if the raw file count is 26.
+                def expected = [] as Set
+                ['ATTACK','DAMAGE','RETREAT','ESCAPE','COVER','LAUNCH','FIGHTER_ATTACK',
+                 'SHIELDS_DOWN','LOW_AMMO','LOW_FUEL','CASUALTIES','SUPPORT','VICTORY'].each { event ->
+                    (1..2).each { variant ->
+                        expected.add(pack.hull+'_'+event+'_0'+variant)
+                    }
+                }
+                if (seen != expected)
+                    throw new GradleException('Incorrect event coverage for '+pack.hull)
                 new File(target,pack.hull.toLowerCase(java.util.Locale.ROOT)+'-manifest.json').bytes = record
             }
         }
-        println('PASS: 52 user-recorded corvette/destroyer voice clips verified and staged')
+        println('PASS: 104 user-recorded corvette/destroyer/carrier/dreadnought voice clips verified and staged')
     }
 }
 tasks.named('verifyBattleAudioResources') {
