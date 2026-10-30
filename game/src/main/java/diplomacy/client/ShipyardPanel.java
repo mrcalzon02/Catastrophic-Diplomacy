@@ -377,6 +377,137 @@ final class ShipyardPanel {
         if(gesture.end(pointer,x,y)) return tap(x,y);
         return true;
     }
+    /** Stable, platform-independent touch targets for the engineering tree. */
+    static int technologyHit(float x,float y){
+        if(y>=578&&y<=607&&x>=807&&x<=1255)return x<998?0:1;
+        for(int row=0;row<4;row++){
+            float bottom=479-row*62;
+            if(y>=bottom&&y<=bottom+43){
+                if(x>=807&&x<937)return 30+row; // skirmish track gate
+                for(int stage=0;stage<6;stage++)
+                    if(x>=943+stage*49&&x<985+stage*49)return 100+row*6+stage;
+            }
+        }
+        if(y>=211&&y<=257){
+            if(x>=809&&x<945)return 2;
+            if(x>=949&&x<1092)return 3;
+            if(x>=1096&&x<=1255)return 4;
+        }
+        if(y>=159&&y<=202){
+            if(x>=809&&x<940)return 5;
+            if(x>=943&&x<1076)return 6;
+            if(x>=1080&&x<=1255)return 7;
+        }
+        if(y>=111&&y<=153){
+            if(x>=809&&x<1000)return 8;
+            if(x>=1003&&x<=1255)return 9;
+            if(x>=341&&x<563)return 10;
+            if(x>=568&&x<=792)return 11;
+        }
+        return -1;
+    }
+    private boolean campaignTechnology(){
+        return usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT;
+    }
+    private CampaignTechnology.State permittedResearch(){
+        return campaignTechnology()&&campaignDiscoveries!=null?campaignDiscoveries.get():null;
+    }
+    private SkirmishTechnologyRules challenge(){
+        return usage==Usage.SKIRMISH?skirmishRules.get():SkirmishTechnologyRules.unrestricted();
+    }
+    private String technologyId(){
+        Shipyard.Installed selected=draft.at(selectedSlot);
+        return selected==null?"NO INSTALLED MODULE":
+                ShipTechnologyFit.id(selected,technologyTrack,technologyStage);
+    }
+    private boolean technologyAvailable(int slot,Shipyard.Track track,int stage){
+        if(campaignTechnology())return ShipTechnologyFit.available(draft,catalog,
+                permittedResearch(),slot,track,stage);
+        return ShipTechnologyFit.available(draft,catalog,challenge(),slot,track,stage);
+    }
+    private void exportChallenge(){
+        if(usage!=Usage.SKIRMISH){
+            notice="Portable challenges are exported from the skirmish shipyard.";return;
+        }
+        try{
+            String encoded=SkirmishShipExchange.encode(draft,challenge(),catalog);
+            String path="shipyard/skirmish-"+(team==0?"left":"right")+".cdship";
+            Gdx.files.local(path).writeString(encoded,false,"UTF-8");
+            notice="EXPORTED "+path+" (copy file to another device to share)";
+        }catch(RuntimeException rejected){notice="EXPORT BLOCKED: "+rejected.getMessage();}
+    }
+    private void importChallenge(){
+        if(usage!=Usage.SKIRMISH){
+            notice="Import a skirmish challenge from the skirmish shipyard.";return;
+        }
+        try{
+            var file=Gdx.files.local("shipyard/import.cdship");
+            var imported=SkirmishShipExchange.decode(file.readString("UTF-8"),catalog);
+            updateSkirmishRules.accept(imported.rules());
+            draft=imported.design();selectedSlot=0;scroll=0;
+            notice="IMPORTED ship and challenge rules from shipyard/import.cdship; APPLY to roster.";
+        }catch(RuntimeException blocked){notice="IMPORT REJECTED: "+blocked.getMessage();}
+    }
+    private void technologyInput(int action){
+        if(action==0){technologyView=false;return;}
+        if(action==1){technologyView=true;return;}
+        if(action>=100&&action<124){
+            technologyTrack=Shipyard.Track.values()[(action-100)/6];
+            technologyStage=(action-100)%6+1;
+            notice=technologyId()+(technologyAvailable(selectedSlot,technologyTrack,technologyStage)
+                    ?" AVAILABLE TO FIT":" LOCKED BY CURRENT TECH RULES");
+            return;
+        }
+        if(action>=30&&action<34){
+            if(usage!=Usage.SKIRMISH){notice="Campaign research is owned in the laboratory.";return;}
+            Shipyard.Track branch=Shipyard.Track.values()[action-30];
+            updateSkirmishRules.accept(challenge().toggleTrack(branch));
+            notice="SKIRMISH "+branch+" branch permitted: "+challenge().allowedTracks().contains(branch);
+            return;
+        }
+        if(action==10){exportChallenge();return;}
+        if(action==11){importChallenge();return;}
+        if(action==5||action==6||action==7||action==8||action==9){
+            if(usage!=Usage.SKIRMISH){notice="Only skirmish challenges can change their tech gates.";return;}
+            var rules=challenge();
+            try{
+                if(action==5)rules=rules.withStage(Math.max(0,rules.maxStage()-1));
+                if(action==6)rules=rules.withStage(Math.min(6,rules.maxStage()+1));
+                if(action==7){
+                    if(draft.at(selectedSlot)==null){notice="Select a fitted module first";return;}
+                    rules=rules.toggleTechnology(technologyId());
+                }
+                if(action==8)rules=rules.withHullGeneration(Math.max(1,rules.maxHullGeneration()-1));
+                if(action==9)rules=rules.withHullGeneration(Math.min(10,rules.maxHullGeneration()+1));
+                updateSkirmishRules.accept(rules);
+                notice="CHALLENGE: TECH "+rules.maxStage()+"/6  HULL GEN <= "+rules.maxHullGeneration();
+            }catch(IllegalArgumentException refused){notice=refused.getMessage();}
+            return;
+        }
+        if(action!=2&&action!=3&&action!=4)return;
+        if(draft.at(selectedSlot)==null){notice="Install a component and select its technology";return;}
+        try{
+            Shipyard.Design next;
+            if(action==4){
+                if(campaignTechnology())
+                    next=ShipTechnologyFit.doctrine(draft,catalog,permittedResearch(),technologyTrack);
+                else next=ShipTechnologyFit.doctrine(draft,catalog,challenge(),technologyTrack);
+            }else{
+                var scope=action==2?ShipTechnologyFit.Scope.SOCKET:
+                        ShipTechnologyFit.Scope.MATCHING_COMPONENTS;
+                if(campaignTechnology())
+                    next=ShipTechnologyFit.fit(draft,catalog,permittedResearch(),selectedSlot,
+                            technologyTrack,technologyStage,scope);
+                else next=ShipTechnologyFit.fit(draft,catalog,challenge(),selectedSlot,
+                            technologyTrack,technologyStage,scope);
+            }
+            draft=next;purchaseArmedDesign=null;cachedQuote=null;
+            notice="FITTED "+technologyTrack+" / "+
+                    (action==4?"whole draft":action==3?"all matching modules":"selected socket")+
+                    " | changes apply only to this ship blueprint";
+        }catch(IllegalArgumentException blocked){notice="FITTING DENIED: "+blocked.getMessage();}
+    }
+
     /** Shared pointer/touch hit test is intentionally independent of the renderer. */
     private int hitHardpoint(float x,float y) {
         return HullLayouts.pick(draft.placements(),x,y,MAP_CX,MAP_CY,MAP_SCALE,14);
@@ -389,6 +520,16 @@ final class ShipyardPanel {
     }
     boolean tap(float x,float y){
         if(!open)return false;
+        if(y>=578&&y<=607&&x>=807&&x<=1255){
+            technologyInput(technologyHit(x,y));return true;
+        }
+        if(technologyView&&y<638){
+            if(x<320&&y>=105&&y<=590){
+                int index=scroll+(int)((590-y)/26);
+                if(index>=0&&index<draft.slots())select(index);
+            }else technologyInput(technologyHit(x,y));
+            return true;
+        }
         if(y>=605&&y<=634){
             if(x>=337&&x<=382){hullGroup(-1);return true;}
             if(x>=646&&x<=691){hullGroup(1);return true;}
@@ -537,6 +678,7 @@ final class ShipyardPanel {
         return result;
     }
     void draw(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font) {
+        if(technologyView){drawTechnology(shapes,batch,font);return;}
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         List<Shipyard.Slot> layout=draft.placements();
         Shipyard.Slot selected=layout.get(selectedSlot);
@@ -648,7 +790,9 @@ final class ShipyardPanel {
         font.draw(batch,artPreview?"HULL ART PREVIEW":"FACTION HULL SCHEMATIC",345,590);
         font.setColor(Color.GOLD);
         font.draw(batch,artPreview?"SHOW MAP":"SHOW ART",705,590);
-        font.draw(batch,"COMPATIBLE MODULES",813,590);
+        font.draw(batch,"MODULES",813,590);
+        font.setColor(Color.CYAN);
+        font.draw(batch,"TECH LOADOUT >",1004,590);
         for(int n=0;n<SLOT_ROWS;n++) {
             int index=scroll+n;
             if(index>=draft.slots())break;
