@@ -26,6 +26,8 @@ public final class OrdnancePropulsionTest {
                 OrdnancePropulsion.Phase.COAST,"booster expended, silent coasting");
         check(!OrdnancePropulsion.burning(OrdnancePropulsion.Phase.COAST),
                 "coast produces no smoke or light");
+        check(OrdnancePropulsion.guidanceMultiplier(OrdnancePropulsion.Phase.COAST)==0,
+                "unpowered coasting cannot turn its velocity vector");
         check(OrdnancePropulsion.phase(heavy,60,0,160,true)==
                 OrdnancePropulsion.Phase.TERMINAL,"terminal attack restarts engine");
         check(OrdnancePropulsion.speedMultiplier(OrdnancePropulsion.Phase.TERMINAL)>

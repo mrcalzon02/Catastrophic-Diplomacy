@@ -48,7 +48,7 @@ public final class OrdnancePropulsion {
         return switch(phase){
             case COLD_EJECT -> 0;
             case BOOST -> .78;
-            case COAST -> .34;
+            case COAST -> 0;
             case TERMINAL -> 1.35;
             case CRUISE -> 1;
         };
