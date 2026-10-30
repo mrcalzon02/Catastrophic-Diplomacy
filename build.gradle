@@ -835,3 +835,44 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
 tasks.named('verifyBattleAudioResources') {
     dependsOn tasks.named('prepareAdditionalHullVoiceAssets')
 }
+
+
+/**
+ * Authored source sprites remain untouched. Produce real tangent-space normal
+ * and masked emissive PNGs once per asset build; never per ship or frame.
+ * All four source trees feed the SAME output directory on desktop and Android.
+ */
+def shipSurfaceOutput = layout.buildDirectory.dir('generated/cd-ship-surfaces')
+tasks.register('prepareShipSurfaceMaps') {
+    group = 'assets'
+    description = 'Derive normal and emissive textures for every approved hull and fighter.'
+    dependsOn tasks.named('prepareStage1Art')
+    dependsOn tasks.named('prepareFighterArt')
+    dependsOn tasks.named('prepareLegacyFactionArt')
+    inputs.file file('tools/ShipSurfaceMapGenerator.java')
+    inputs.files fileTree('assets/ships') { include '**/*.png' }
+    outputs.dir shipSurfaceOutput
+    doLast {
+        def roots = [
+            file('assets/ships'),
+            layout.buildDirectory.dir('generated/cd-stage1/ships').get().asFile,
+            layout.buildDirectory.dir('generated/cd-fighters/ships').get().asFile,
+            layout.buildDirectory.dir('generated/cd-legacy-factions/ships').get().asFile
+        ]
+        def dest=shipSurfaceOutput.get().asFile
+        project.delete(dest)
+        dest.mkdirs()
+        def javaBin = new File(System.getProperty('java.home'),'bin/java').absolutePath
+        project.exec {
+            executable javaBin
+            args '-Djava.awt.headless=true','tools/ShipSurfaceMapGenerator.java',
+                    dest.absolutePath
+            args roots.collect { it.absolutePath }
+        }
+        def normal=fileTree(dest) { include 'ships/**/*_n.png' }.files
+        def emit=fileTree(dest) { include 'ships/**/*_e.png' }.files
+        if(normal.size()<60 || normal.size()!=emit.size())
+            throw new GradleException('Incomplete approved ship surface maps: '+
+                    normal.size()+' normal / '+emit.size()+' emissive')
+    }
+}
