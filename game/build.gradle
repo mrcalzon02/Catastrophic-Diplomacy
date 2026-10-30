@@ -37,3 +37,16 @@ tasks.register('menuFlowSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.GameMenuFlowTest'
 }
+
+// Tested without an OpenGL context: ignition-only exhaust, pause fidelity,
+// real event bursts and bounded smoke/light timelines.
+tasks.register('lightingSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify combat lighting simulation integration and smoke budgets.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatLightingModelTest'
+}
+// Existing release CI already executes menuFlowSmoke on desktop + Windows,
+// so this functional lighting test is not an orphan or a new workflow.
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('lightingSmoke') }
