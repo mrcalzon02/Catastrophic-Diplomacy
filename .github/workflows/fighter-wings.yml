@@ -54,7 +54,7 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Test fighter machinery, menu navigation and compile installed desktop application
-        run: gradle :core:fighterCraftSmoke :core:combatMachinerySmoke :core:gameFlowSmoke :game:menuFlowSmoke :game:classes :desktop:installDist --no-daemon --stacktrace
+        run: gradle :core:fighterCraftSmoke :core:alienFactionSmoke :core:combatMachinerySmoke :core:gameFlowSmoke :game:menuFlowSmoke :game:classes :desktop:installDist --no-daemon --stacktrace
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -63,6 +63,8 @@ jobs:
           python tools/verify_tactical_ui.py
           python tools/test_verify_tactical_ui_packages.py
           python tools/verify_tactical_ui_packages.py --desktop-dir desktop/build/libs
+          python tools/verify_faction_ship_assets.py
+          python tools/verify_runtime_ship_art.py --desktop-dir desktop/build/libs
       - name: Build real Windows MSI or Linux app with bundled Java 17 runtime
         run: python tools/package_desktop.py
       - name: Smoke-install and uninstall Windows MSI
@@ -114,4 +116,7 @@ jobs:
       - name: Build Android package from same core and game
         run: gradle :android:assembleDebug --no-daemon --stacktrace
       - name: Verify exact 24 source-approved icons in built Android APK
-        run: python3 tools/verify_tactical_ui_packages.py --android-apk android/build/outputs/apk/debug/android-debug.apk
+        run: |
+          python3 tools/verify_tactical_ui_packages.py --android-apk android/build/outputs/apk/debug/android-debug.apk
+          python3 tools/verify_faction_ship_assets.py
+          python3 tools/verify_runtime_ship_art.py --android-apk android/build/outputs/apk/debug/android-debug.apk
