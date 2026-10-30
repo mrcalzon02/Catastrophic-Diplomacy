@@ -17,6 +17,9 @@ import diplomacy.sim.CampaignFleet;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.ShipLineages;
 import diplomacy.shipyard.CampaignShipyardRules;
+import diplomacy.shipyard.ShipTechnologyFit;
+import diplomacy.shipyard.SkirmishTechnologyRules;
+import diplomacy.shipyard.SkirmishShipExchange;
 import diplomacy.sim.Battle;
 import diplomacy.shipyard.TouchGesture;
 import diplomacy.tech.TechnologyCatalog;
@@ -28,6 +31,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
+import java.util.function.Consumer;
 
 /** Compact, touch-and-mouse compatible single-screen ship fitting interface. */
 final class ShipyardPanel {
@@ -65,6 +69,11 @@ final class ShipyardPanel {
     private boolean playerOnly;
     Usage usage(){return usage;}
     private boolean artPreview;
+    private boolean technologyView;
+    private Shipyard.Track technologyTrack=Shipyard.Track.OUTPUT;
+    private int technologyStage=1;
+    private Supplier<SkirmishTechnologyRules> skirmishRules=SkirmishTechnologyRules::unrestricted;
+    private Consumer<SkirmishTechnologyRules> updateSkirmishRules=rules->{};
     private final TouchGesture gesture = new TouchGesture();
     private boolean scrollGesture;
 
@@ -74,6 +83,10 @@ final class ShipyardPanel {
         draft=first;
     }
     void setIcons(TacticalUiIcons icons) { uiIcons = icons; }
+    void setSkirmishRules(Supplier<SkirmishTechnologyRules> rules,
+                          Consumer<SkirmishTechnologyRules> update){
+        skirmishRules=rules;updateSkirmishRules=update;
+    }
     void setCampaignPurchasing(Supplier<CampaignProgress.State> wallet,
                               Function<Shipyard.Design,Boolean> purchase){
         campaignWallet=wallet;campaignPurchase=purchase;
@@ -132,13 +145,13 @@ final class ShipyardPanel {
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
-        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;
+        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;
         purchaseArmedDesign=null;refitShipId=0;
         notice="DESIGN SANDBOX: configure fitted modules; campaign technology is researched separately.";
     }
     void showSkirmish(){
         show();usage=Usage.SKIRMISH;
-        notice="SKIRMISH: all factions, hull generations and research permitted.";
+        notice="SKIRMISH: fitted technology is restricted by this challenge ruleset.";
     }
     /** Campaign engineering edits a purchase blueprint, NOT an owned ship for free. */
     void showCampaignFleet(int researchRank,int mission){
@@ -165,7 +178,7 @@ final class ShipyardPanel {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
     }
-    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=false;}
+    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;}
     private void hull(int step){
         Shipyard.Hull[] options=Shipyard.Hull.shipyardOrder();
         int current=0;
@@ -212,7 +225,11 @@ final class ShipyardPanel {
     private void save(){
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot save unserviceable ship: "+report.explanation();return;}
-        if(usage==Usage.CAMPAIGN&&!campaignPermitted())return;
+        if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&!campaignPermitted())return;
+        if(usage==Usage.SKIRMISH){
+            try{skirmishRules.get().requireAllowed(draft,catalog);}
+            catch(IllegalArgumentException blocked){notice=blocked.getMessage();return;}
+        }
         try{Gdx.files.local(fileName()).writeString(Shipyard.encode(draft),false,"UTF-8");notice="Blueprint saved locally: "+fileName();}
         catch(RuntimeException error){notice="Save failed: "+error.getMessage();}
     }
@@ -316,6 +333,10 @@ final class ShipyardPanel {
             return;
         }
         if(usage==Usage.CAMPAIGN&&!campaignPermitted())return;
+        if(usage==Usage.SKIRMISH){
+            try{skirmishRules.get().requireAllowed(draft,catalog);}
+            catch(IllegalArgumentException blocked){notice="CHALLENGE BLOCKED: "+blocked.getMessage();return;}
+        }
         active[team]=draft;
         deploy.accept(team,draft);
         notice=usage==Usage.CAMPAIGN?"Purchase blueprint ready; no owned ship refitted":
