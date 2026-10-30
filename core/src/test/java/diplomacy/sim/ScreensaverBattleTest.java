@@ -2,7 +2,9 @@ package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /** Diagnostic-only seed replay, real fitting, tier, and fleet-diversity coverage. */
@@ -29,6 +31,44 @@ public final class ScreensaverBattleTest {
             check(round.battle().alive(0)==round.leftFleet().size() &&
                     round.battle().alive(1)==round.rightFleet().size(),"Fleet count not deployed");
             check(round.battle().ships().size()<=400,"Exhibition exceeds 200 per side");
+            // Each ship receives an independent, valid, replayable tactical policy.
+            // Escort slots are earlier allies only: the generated graph cannot cycle.
+            check(round.battle().ships().size()==replay.battle().ships().size(),
+                    "Seed replay changed individual ship count");
+            for(int side=0;side<2;side++){
+                List<Battle.Ship> allies=new ArrayList<>();
+                for(Battle.Ship ship:round.battle().ships())
+                    if(ship.team==side)allies.add(ship);
+                Set<ShipStandingOrders> different=new HashSet<>();
+                for(int slot=0;slot<allies.size();slot++){
+                    Battle.Ship ship=allies.get(slot);
+                    check(ship.standingOrders!=null&&ship.orders.equals(ship.standingOrders.tactics()),
+                            "Exhibition captain has no active individual doctrine");
+                    different.add(ship.standingOrders);
+                    var d=ship.standingOrders.directives();
+                    int leader=d.escortSlot();
+                    check(leader<slot,"Generated escort relationship is cyclic or self-referential");
+                    check(ship.escortShipId==(leader<0?0:allies.get(leader).id),
+                            "Escort slot did not resolve to same-team physical ship");
+                    List<Integer> expected=new ArrayList<>();
+                    for(int targetSlot:d.defendSlots())if(targetSlot>=0){
+                        check(targetSlot<allies.size()&&targetSlot!=slot,
+                                "Captain protects an invalid or self ship");
+                        expected.add(allies.get(targetSlot).id);
+                    }
+                    check(expected.equals(ship.defendedShipIds),
+                            "Defended ship slots were not bound to battle IDs");
+                    check(new HashSet<>(expected).size()==expected.size(),
+                            "Captain received duplicate protected targets");
+                    int index=round.battle().ships().indexOf(ship);
+                    Battle.Ship again=replay.battle().ships().get(index);
+                    check(ship.standingOrders.equals(again.standingOrders)
+                                    &&ship.escortShipId==again.escortShipId
+                                    &&ship.defendedShipIds.equals(again.defendedShipIds),
+                            "Captains changed orders or protection relationships on replay");
+                }
+                check(different.size()>1,"All ships on a side share identical orders");
+            }
             seen.add(round.left());seen.add(round.right());
             environments.add(round.environmentLevel());
             tiers.add(round.leftTier());tiers.add(round.rightTier());
@@ -55,6 +95,6 @@ public final class ScreensaverBattleTest {
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
-        System.out.println("PASS screensaver seeded fitted battles with rare optional support");
+        System.out.println("PASS screensaver seeded fitted battles, distinct replayable captain orders and safe escorts");
     }
 }
