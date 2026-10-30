@@ -45,6 +45,21 @@ final class ShieldFxRenderer {
         shapes.end();
     }
     private static float radians(float degrees){return (float)StrictMath.toRadians(degrees);}
+    /** Perimeter-only arc: ShapeRenderer.arc adds center spokes in Line mode. */
+    static void arc(ShapeRenderer shapes,float x,float y,float radius,
+                    float start,float sweep,int segments){
+        if(radius<=0||sweep<=0||segments<1)return;
+        float step=sweep/segments;
+        float priorX=x+radius*(float)StrictMath.cos(radians(start));
+        float priorY=y+radius*(float)StrictMath.sin(radians(start));
+        for(int i=1;i<=segments;i++){
+            float a=start+step*i;
+            float nextX=x+radius*(float)StrictMath.cos(radians(a));
+            float nextY=y+radius*(float)StrictMath.sin(radians(a));
+            shapes.line(priorX,priorY,nextX,nextY);
+            priorX=nextX;priorY=nextY;
+        }
+    }
     private static void lineAt(ShapeRenderer shapes,float x,float y,float radius,
                                float a,float length){
         float c=(float)StrictMath.cos(radians(a)),s=(float)StrictMath.sin(radians(a));
@@ -64,9 +79,9 @@ final class ShieldFxRenderer {
             red=.67f;green=.88f;blue=1f;
         }
         shapes.setColor(red,green,blue,Math.min(1f,fade*(.60f+power*.35f)));
-        shapes.arc(x,y,r,angle-30f-t*6f,60f+12f*t,10);
+        arc(shapes,x,y,r,angle-30f-t*6f,60f+12f*t,10);
         shapes.setColor(.83f,.96f,1f,fade*.68f);
-        shapes.arc(x,y,r*.90f,angle-17f,34f,7);
+        arc(shapes,x,y,r*.90f,angle-17f,34f,7);
         if(weapon==Battle.DamageType.PARTICLE){
             shapes.setColor(.75f,.58f,1f,fade*.78f);
             // Two short deterministic electrical cracks across the contact.
@@ -78,10 +93,10 @@ final class ShieldFxRenderer {
                     2.7f*power*(1-t));
         }else if(weapon==Battle.DamageType.PLASMA){
             shapes.setColor(1f,.68f,.91f,fade*.73f);
-            shapes.arc(x,y,r*1.04f,angle-13f,26f,5);
+            arc(shapes,x,y,r*1.04f,angle-13f,26f,5);
         }else if(weapon==Battle.DamageType.MISSILE||weapon==Battle.DamageType.TORPEDO){
             shapes.setColor(.58f,.83f,1f,fade*.52f);
-            shapes.arc(x,y,r*(1f+.25f*t),angle-26f,52f,8);
+            arc(shapes,x,y,r*(1f+.25f*t),angle-26f,52f,8);
         }else if(weapon==Battle.DamageType.LASER){
             shapes.setColor(.8f,.98f,1f,fade*.7f);
             lineAt(shapes,x,y,r*.76f,angle,r*.17f);
@@ -95,7 +110,7 @@ final class ShieldFxRenderer {
         // circular force-field explosion.
         for(int i=0;i<5;i++){
             float a=angle-38+i*18f+(i%2==0?-1:1)*t*8f;
-            shapes.arc(x,y,r,a,10f-3f*t,3);
+            arc(shapes,x,y,r,a,10f-3f*t,3);
         }
         shapes.setColor(.85f,.97f,1f,.67f*fade);
         for(int i=-2;i<=2;i++)
@@ -106,16 +121,16 @@ final class ShieldFxRenderer {
                                  float angle,float t,float fade,float strength){
         float sweep=angle-36f+t*61f;
         shapes.setColor(.27f,.80f,1f,fade*.53f*strength);
-        shapes.arc(x,y,radius*.98f,sweep,24f,5);
+        arc(shapes,x,y,radius*.98f,sweep,24f,5);
         shapes.setColor(.78f,.97f,1f,fade*.30f*strength);
-        shapes.arc(x,y,radius*.90f,sweep+7f,10f,3);
+        arc(shapes,x,y,radius*.90f,sweep+7f,10f,3);
     }
     private static void restart(ShapeRenderer shapes,float x,float y,float radius,
                                 float angle,float t,float fade){
         // A small sweeping sector weld, not a globally flashed solid sphere.
         float sweep=Math.max(2f,78f*t);
         shapes.setColor(.46f,.91f,1f,.35f+.50f*fade);
-        shapes.arc(x,y,radius,angle-39f,sweep,12);
+        arc(shapes,x,y,radius,angle-39f,sweep,12);
         shapes.setColor(.88f,1f,1f,fade*.67f);
         lineAt(shapes,x,y,radius*.92f,angle-39f+sweep,radius*.08f);
     }
