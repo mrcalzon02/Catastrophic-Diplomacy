@@ -564,7 +564,8 @@ public final class Battle {
         ships.add(ship); return ship;
     }
     /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
-    private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery, double x, double y) {
+    private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery,
+                         SupportDoctrine doctrine,double x, double y) {
         if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
@@ -616,7 +617,7 @@ public final class Battle {
         s.setWarhead(DamageType.MISSILE,design.ammoSelection.missile());
         s.setWarhead(DamageType.TORPEDO,design.ammoSelection.torpedo());
         s.support=machinery.support();
-        s.logistics=Shipyard.supportDoctrine(design,catalog);
+        s.logistics=doctrine;
         for(SupportDoctrine.Channel channel:SupportDoctrine.Channel.values())
             s.serviceDroneReserve[channel.ordinal()]=s.logistics.droneCapacity(channel);
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
@@ -633,9 +634,10 @@ public final class Battle {
                           int count, double centerX, double centerY) {
         if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
         Shipyard.Fitted machinery = Shipyard.fit(design, catalog);
+        SupportDoctrine doctrine=Shipyard.supportDoctrine(design,catalog);
         for (int i=0;i<count;i++) {
             double[] point = formationPosition(i,count,centerX,centerY,random);
-            addShip(team,design,machinery,point[0],point[1]);
+            addShip(team,design,machinery,doctrine,point[0],point[1]);
         }
         log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
     }
@@ -647,10 +649,14 @@ public final class Battle {
                 designs.stream().anyMatch(d->d==null))
             throw new IllegalArgumentException("Invalid custom fleet");
         List<Shipyard.Fitted> fittings=new ArrayList<>(designs.size());
-        for(Shipyard.Design design:designs)fittings.add(Shipyard.fit(design,catalog));
+        List<SupportDoctrine> doctrines=new ArrayList<>(designs.size());
+        for(Shipyard.Design design:designs){
+            fittings.add(Shipyard.fit(design,catalog));
+            doctrines.add(Shipyard.supportDoctrine(design,catalog));
+        }
         for(int i=0;i<designs.size();i++){
             double[] point=formationPosition(i,designs.size(),centerX,centerY,random);
-            addShip(team,designs.get(i),fittings.get(i),point[0],point[1]);
+            addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),point[0],point[1]);
         }
         log("Team "+team+" deployed "+designs.size()+" individual engineering configurations");
     }
