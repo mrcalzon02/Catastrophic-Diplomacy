@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove all 98 original approved ship, beam and material PNGs are inside the actual desktop JAR / APK.
+"""Prove all 148 approved hull, fighter, beam and material PNGs are inside the actual desktop JAR / APK.
 
 This checks runtime deliverables rather than merely testing whether the PNGs
 exist in the source checkout. Desktop libGDX assets live at the JAR root;
@@ -44,6 +44,28 @@ def expected():
             result[short]=record["sha256"]
     if len(result)!=98:
         raise ValueError("Expected 50 alien hulls, 10 Terran hulls, 35 beams, 3 materials")
+    parts=[ROOT/"asset_packs/fighter-craft"/f"part-{i:02d}.bin" for i in range(13)]
+    original_fighters=b"".join(part.read_bytes() for part in parts)
+    if hashlib.sha256(original_fighters).hexdigest()!=(
+            "11d9bd179f7cdb891c0a8aafdb83eb16d635a9d012c2de8b3996125015bbf2eb"):
+        raise ValueError("Original 50-fighter archive checksum mismatch")
+    import io
+    with ZipFile(io.BytesIO(original_fighters)) as source:
+        manifest=json.loads(source.read("manifest.json"))
+        if manifest.get("format")!="cd-fighters-v1" or manifest.get("count")!=50 or len(manifest["ships"])!=50:
+            raise ValueError("Unexpected fighter sprite manifest")
+        for ship in manifest["ships"]:
+            role=ship["role"]
+            faction=ship["faction"]
+            name=f"{faction}/{role}.png"
+            if ship["file"]!=name:
+                raise ValueError("Unexpected original fighter path "+name)
+            short="ships/fighters/"+name
+            if short in result:
+                raise ValueError("Duplicate approved fighter path "+short)
+            result[short]=hashlib.sha256(source.read(name)).hexdigest()
+    if len(result)!=148:
+        raise ValueError("Expected 50 alien hulls, 10 Terran hulls, 35 beams, 3 materials, 50 fighters")
     return result
 
 def verify(path,kind,approved):
@@ -60,7 +82,7 @@ def verify(path,kind,approved):
                 raise ValueError("invalid packaged PNG "+archive_name)
             if hashlib.sha256(image).hexdigest()!=source_digest:
                 raise ValueError(f"{kind} package corrupted or replaced {archive_name}")
-    print(f"PASS {kind}: all 98 original approved sprite/material images embedded in {path}")
+    print(f"PASS {kind}: all 148 original approved hull/fighter/FX images embedded in {path}")
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
