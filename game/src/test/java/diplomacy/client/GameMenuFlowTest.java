@@ -82,6 +82,9 @@ public final class GameMenuFlowTest {
         check(ShipyardPanel.technologyHit(410,127)==10&&
                 ShipyardPanel.technologyHit(620,127)==11,
                 "Ship exchange controls are missing");
+        check(ShipyardPanel.technologyHit(430,178)==12&&
+                ShipyardPanel.technologyHit(650,178)==13,
+                "Exact hull-class whitelist editing controls are missing");
         check(ScenarioCatalog.challenge(ScenarioCatalog.Preset.DUEL).maxStage()==1&&
                 ScenarioCatalog.challenge(ScenarioCatalog.Preset.PATROL).maxStage()==2&&
                 ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM).maxStage()==6,
