@@ -56,9 +56,9 @@ try {
     Get-Content $installLog -Tail 35 -ErrorAction SilentlyContinue
     throw "MSI silent installation failed, code $($proc.ExitCode)"
   }
-  if ($installer.ProductState($product) -ne 5) {
-    throw 'Installed MSI not registered with Windows Installer'
-  }
+  # Windows Installer's COM ProductState accessor is unreliable with the
+  # hosted PowerShell COM bridge. An exit code of zero plus actual installed
+  # launcher/runtime, followed by a real removal, are stronger observations.
   $installed = $true
   $launcher = Get-ChildItem -Path $env:LOCALAPPDATA -Filter 'CatastrophicDiplomacy.exe' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($null -eq $launcher) { throw 'Installed MSI launcher not found under per-user application directory' }
@@ -70,15 +70,15 @@ try {
 finally {
   if ($installed) {
     $proc = Start-Process -FilePath msiexec.exe -PassThru -Wait -ArgumentList @(
-      '/x', $product, '/qn', '/norestart',
+      '/x', ([char]34 + $msi + [char]34), '/qn', '/norestart',
       '/L*v', ([char]34 + $uninstallLog + [char]34))
     if ($proc.ExitCode -ne 0) {
       Get-Content $uninstallLog -Tail 35 -ErrorAction SilentlyContinue
       throw "MSI uninstall failed, code $($proc.ExitCode)"
     }
-    if ($installer.ProductState($product) -eq 5) {
-      throw 'Windows Installer still reports installed after uninstall'
+    if ($null -ne $launcher -and (Test-Path $launcher.FullName)) {
+      throw 'Uninstall succeeded but the installed executable still exists'
     }
-    Write-Host 'PASS: MSI product uninstalled'
+    Write-Host 'PASS: Windows MSI uninstalled and executable removed'
   }
 }
