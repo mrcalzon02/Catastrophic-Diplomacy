@@ -118,7 +118,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
     private ShipyardPanel shipyard;
-    private Battle.Faction left = Battle.Faction.TERRAN, right = Battle.Faction.DRAXIAN;
+    // Start a fresh skirmish with two actually packaged sprite families.
+    // Terran remains selectable, but its promised ten PNGs have not been imported.
+    private Battle.Faction left = Battle.Faction.UZIPT, right = Battle.Faction.DRAXIAN;
     private long nextSeed = 2479;
     private final BattleOrders.Orders[] fleetOrders={
             BattleOrders.DEFAULT,BattleOrders.DEFAULT};
