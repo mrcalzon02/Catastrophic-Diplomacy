@@ -133,8 +133,13 @@ public final class FighterCraftSprites implements Disposable {
             float rotation=(float)StrictMath.toDegrees(bearing)-90f;
             if(view!=null&&!view.circle(position.x(),position.y(),
                     Math.max(width,height)*.72))continue;
-            if(picture==unassignedWireframe)surfaces.unlit(batch);
-            else surfaces.bind(batch,picture);
+            if(picture==unassignedWireframe){
+                surfaces.unlit(batch);
+                batch.setColor(1,1,1,1);
+            }else{
+                surfaces.bind(batch,picture);
+                ShipSurfaceLighting.heading(batch,rotation);
+            }
             batch.draw(picture,position.x()-width/2,position.y()-height/2,
                     width/2,height/2,width,height,1,1,rotation,
                     0,0,picture.getWidth(),picture.getHeight(),false,false);
