@@ -495,7 +495,7 @@ public final class Shipyard {
             };
             if(channel==null)continue;
             var tune=p.tuning();
-            if(id.equals("APR")||id.equals("PWR")){
+            if(id.equals("APR")||id.equals("PWR")||id.equals("HPR")){
                 direct.add(new SupportDoctrine.Emitter(channel,
                         Math.max(0.05,p.effect*0.030*tune.shieldTransfer()),
                         450*tune.reach(),3.3/tune.supportEfficiency(),0,0));
