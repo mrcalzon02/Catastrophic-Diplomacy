@@ -118,7 +118,18 @@ public final class GameMenuFlowTest {
         try{
             TechnologyCatalog engineering=TechnologyCatalog.loadDefault();
             var nativeParts=GameMenuPanel.technologySubsystems(engineering,Battle.Faction.TERRAN);
-            check(nativeParts.size()==22,"Technology browser must list all 22 native subsystem families");
+            long actual=engineering.baseComponents().values().stream()
+                    .filter(part->"TER".equals(part.faction)).count();
+            check(nativeParts.size()==actual,
+                    "Technology browser must expose all actual native subsystem families");
+            for(String required:new String[]{"XFR","HPR","APR","PWR",
+                    "DHL","DSH","DAR","DPW","AHL","ASH","AAR","APW"}){
+                check(nativeParts.stream().anyMatch(part->part.subsystem.equals(required)),
+                        "Technology browser hides purpose-fitted logistics research "+required);
+                check(engineering.get(GameMenuPanel.technologyId(Battle.Faction.TERRAN,
+                        required,3,6))!=null,
+                        "Final specialist research stage missing for "+required);
+            }
             check(engineering.get(GameMenuPanel.technologyId(Battle.Faction.TERRAN,
                     "LAS",0,1))!=null,"Selected faction technology ID does not exist");
         }catch(java.io.IOException missing){
