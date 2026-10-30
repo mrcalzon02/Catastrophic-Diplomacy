@@ -47,6 +47,8 @@ import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.CampaignBlueprintCodec;
 import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.SkirmishTechnologyRules;
+import diplomacy.shipyard.SkirmishFleet;
+import diplomacy.shipyard.SkirmishFleetCodec;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.IOException;
@@ -78,6 +80,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private SkirmishTechnologyRules skirmishRules=ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM);
     private String skirmishNotice="Use SHIPYARD > TECH LOADOUT to configure challenge rules.";
+    private SkirmishFleet skirmishLeftFleet,skirmishRightFleet;
     private CampaignProgress.State campaign;
     private CampaignTechnology.State discoveries;
     private CampaignFleet.Roster campaignFleet;
@@ -217,10 +220,23 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 shipyard.sync(0,leftDesign); // skirmish blueprint stays independent
             }else{
-                if(team==0){leftDesign=design;left=design.faction;}
-                else {rightDesign=design;right=design.faction;}
-                saveFleets();
-                if(screen==GameMenuPanel.Screen.BATTLE&&!playedCampaign)reset();
+                if(preparedSkirmish&&!preparingCampaign&&
+                        screen==GameMenuPanel.Screen.DEPLOYMENT&&
+                        skirmishLeftFleet!=null&&skirmishRightFleet!=null){
+                    try{
+                        if(team==0)skirmishLeftFleet=skirmishLeftFleet.with(selectedDeploymentShip,design);
+                        else skirmishRightFleet=skirmishRightFleet.with(selectedDeploymentShip,design);
+                        deploymentNotice="Ship #"+(selectedDeploymentShip+1)+
+                                " equipped independently for this skirmish.";
+                    }catch(IllegalArgumentException rejected){
+                        deploymentNotice="Fitting rejected: "+rejected.getMessage();
+                    }
+                }else{
+                    if(team==0){leftDesign=design;left=design.faction;}
+                    else {rightDesign=design;right=design.faction;}
+                    saveFleets();
+                    if(screen==GameMenuPanel.Screen.BATTLE&&!playedCampaign)reset();
+                }
             }
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
@@ -594,6 +610,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     private void selectScenario(ScenarioCatalog.Preset choice){
         preparedSkirmish=false;
+        skirmishLeftFleet=null;skirmishRightFleet=null;
         scenario=choice;
         skirmishRules=ScenarioCatalog.challenge(choice);
         skirmishNotice="PRESET TECH LIMIT "+skirmishRules.maxStage()+
@@ -619,8 +636,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void openSkirmishDeployment(){
         if(!scenario.demonstration){
             try{
-                skirmishRules.requireAllowed(leftDesign,technology);
-                skirmishRules.requireAllowed(rightDesign,technology);
+                int count=scenario==ScenarioCatalog.Preset.CUSTOM?
+                        FLEET_SIZES[fleetIndex]:scenario.ships;
+                skirmishLeftFleet=SkirmishFleet.repeat(leftDesign,count);
+                skirmishRightFleet=SkirmishFleet.repeat(rightDesign,count);
+                skirmishLeftFleet.requireAllowed(skirmishRules,technology);
+                skirmishRightFleet.requireAllowed(skirmishRules,technology);
             }catch(IllegalArgumentException blocked){
                 skirmishNotice="CHALLENGE VIOLATION: "+blocked.getMessage();
                 return;
@@ -650,8 +671,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void launchSkirmish(){
         if(!scenario.demonstration){
             try{
-                skirmishRules.requireAllowed(leftDesign,technology);
-                skirmishRules.requireAllowed(rightDesign,technology);
+                activeSkirmishFleet(0).requireAllowed(skirmishRules,technology);
+                activeSkirmishFleet(1).requireAllowed(skirmishRules,technology);
             }catch(IllegalArgumentException blocked){
                 skirmishNotice="BATTLE BLOCKED: "+blocked.getMessage();
                 screen=GameMenuPanel.Screen.SKIRMISH;return;
@@ -699,9 +720,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
+    private SkirmishFleet activeSkirmishFleet(int team){
+        int count=preparedSkirmish?deployment.ships():
+                scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships;
+        SkirmishFleet configured=team==0?skirmishLeftFleet:skirmishRightFleet;
+        return configured==null?SkirmishFleet.repeat(team==0?leftDesign:rightDesign,count):
+                configured.resize(count);
+    }
     private void openSkirmishShipyard(){
         if(scenario.demonstration)return;
-        shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+        if(preparedSkirmish&&!preparingCampaign&&
+                screen==GameMenuPanel.Screen.DEPLOYMENT){
+            shipyard.sync(0,activeSkirmishFleet(0).ship(selectedDeploymentShip));
+            shipyard.sync(1,activeSkirmishFleet(1).ship(selectedDeploymentShip));
+        }else{
+            shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
+        }
         shipyard.showSkirmish();
     }
     private void openCampaignShipyard(){
@@ -1875,8 +1909,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             battle=campaignEncounter.battle();
         }
         else if(screen==GameMenuPanel.Screen.BATTLE) {
-            battle=ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
-                    preparedSkirmish?deployment.ships():FLEET_SIZES[fleetIndex],skirmishRules);
+            battle=scenario.demonstration?
+                    ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
+                            preparedSkirmish?deployment.ships():FLEET_SIZES[fleetIndex],skirmishRules):
+                    ScenarioCatalog.create(scenario,activeSkirmishFleet(0),
+                            activeSkirmishFleet(1),technology,skirmishRules);
             if(preparedSkirmish && !scenario.demonstration)deployment.apply(battle);
         }
         else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
