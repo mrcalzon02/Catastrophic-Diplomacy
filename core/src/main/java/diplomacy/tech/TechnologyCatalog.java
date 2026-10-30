@@ -305,6 +305,7 @@ public final class TechnologyCatalog {
     private static void addSpecializedSupportFamilies(List<List<String>> bases,
                                                        List<List<String>> upgrades){
         String[][] types={
+            {"HPR","Long-Range Hull Restoration Projector","XFR"},
             {"APR","Armor Restoration Projector","XFR"},
             {"PWR","Power Transfer Projector","XFR"},
             {"DHL","Hull Service Drone Bay","DRN"},
