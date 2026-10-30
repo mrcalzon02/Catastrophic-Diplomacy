@@ -152,3 +152,12 @@ tasks.register('combatHitFeedbackSmoke', JavaExec) {
     mainClass = 'diplomacy.client.CombatHitFeedbackTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatHitFeedbackSmoke') }
+
+tasks.register('shipSurfaceSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless proof of real normal, emissive, alpha and rotation shader contracts.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipSurfaceShaderTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipSurfaceSmoke') }
