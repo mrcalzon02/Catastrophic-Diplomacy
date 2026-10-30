@@ -109,6 +109,15 @@ final class GameMenuPanel {
     static boolean hit(float x,float y,float bx,float by,float w,float h){
         return x>=bx&&x<=bx+w&&y>=by&&y<=by+h;
     }
+    /** Shared options hit contract, including a real disabled updater state. */
+    static int optionsAction(float x,float y,boolean updaterAvailable){
+        if(VoiceVolumeControl.hit(x,y))return 0;
+        for(int i=0;i<5;i++){
+            if(hit(x,y,405,472-i*78,470,59))
+                return i==3&&!updaterAvailable?-2:i+1;
+        }
+        return -1;
+    }
     static int homeHit(float x,float y){
         for(int i=0;i<HOME_ACTIONS.length;i++)
             if(hit(x,y,438,487-i*64,404,50))return i;
@@ -1005,7 +1014,6 @@ final class GameMenuPanel {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
                 label(batch,font,"VOICE VOLUME",427,598,Color.WHITE);
                 label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",817,598,Color.WHITE);
-                label(batch,font,"DRAG OR LEFT / RIGHT: 5% STEPS",427,540,MUTED);
                 label(batch,font,"MUSIC: "+(music?"ON":"OFF"),445,510,Color.WHITE);
                 label(batch,font,"SOUND EFFECTS: "+(effects?"ON":"OFF"),445,432,Color.WHITE);
                 label(batch,font,"SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),445,354,Color.WHITE);
