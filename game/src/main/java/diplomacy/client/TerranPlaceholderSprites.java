@@ -43,6 +43,10 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final java.util.Map<Texture,Pixmap> sourcePixels =
             new java.util.IdentityHashMap<>();
     private Battle activeBattle;
+    // One shader + cached textures for all faction/hull instances; no per-frame Pixmaps.
+    private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
+    public int litMaterialCount(){return surfaces.materialCount();}
+    public int materialTextureBindings(){return surfaces.textureBindings();}
     private static String spriteName(Shipyard.Hull hull) {
         return switch(hull.spriteHull()) {
             case INTERCEPTOR -> "interceptor";
@@ -336,13 +340,14 @@ public final class TerranPlaceholderSprites implements Disposable {
                     poses.ship(ship);
             if(view!=null&&!view.ship(position,ship.visualScale()))continue;
             Texture tex=texture(ship.faction,ship.hullClass);
+            surfaces.prepare(tex,originals.get(tex));
             if(ship.shields>0)prepareShields(tex);
             if(breached(ship)){
                 exposedInterior(tex,ship.hull<ship.maxHull*0.30);
                 erodedExterior(ship,tex);
             }
         }
-        batch.begin();
+        surfaces.begin(batch);
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship))continue;
             Texture tex=texture(ship.faction,ship.hullClass);
@@ -354,24 +359,34 @@ public final class TerranPlaceholderSprites implements Disposable {
                     poses.ship(ship);
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
             float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
-            boolean damaged=breached(ship);
-            if(!damaged) {
-                // Ship PNGs already contain the approved civilization palette.
-                // Multiply by white: class tint belongs to geometry fallback only.
-                batch.setColor(1,1,1,1);
-                drawWhole(batch,tex,pose,width,height,rotation);
-                drawShield(batch,ship,tex,pose,width,height,rotation);
-                continue;
-            }
+            surfaces.bind(batch,tex);
             batch.setColor(1,1,1,1);
-            // The understructure uses the ORIGINAL sprite's alpha/UV mask.
-            // Damaged hulls never become opaque gray ovals.
-            drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*0.30),
-                    pose,width,height,rotation);
-            // Progressive pixel-level peeling: irregular alpha reveals the
-            // original silhouette-masked damaged surface directly beneath.
-            drawWhole(batch,peeled.get(ship.id).overlay,pose,width,height,rotation);
-            drawShield(batch,ship,tex,pose,width,height,rotation);
+            if(!breached(ship)){
+                drawWhole(batch,tex,pose,width,height,rotation);
+            }else{
+                // Damage remains authored-UV registered: peel alpha stays under
+                // the surface shader; uncovered steel is a separate image layer.
+                drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*.30),
+                        pose,width,height,rotation);
+                drawWhole(batch,peeled.get(ship.id).overlay,pose,width,height,rotation);
+            }
+        }
+        batch.setColor(1,1,1,1);
+        surfaces.end(batch);
+        // Shields use original alpha-masked materials, not fabricated normal
+        // directions or emissive pixels. Separate translucent overlay pass.
+        batch.begin();
+        for(Battle.Ship ship:battle.ships()){
+            if(!hasSprite(ship)||ship.shields<=0)continue;
+            Texture tex=texture(ship.faction,ship.hullClass);
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
+                    poses.ship(ship);
+            if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
+            float height=(float)(34*ship.visualScale());
+            float width=height*tex.getWidth()/(float)tex.getHeight();
+            drawShield(batch,ship,tex,pose,width,height,
+                    (float)(StrictMath.toDegrees(pose.angle())-90));
         }
         batch.setColor(1,1,1,1);
         batch.end();
@@ -412,6 +427,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture image:damagedLayers.values())image.dispose();
         for(Texture image:severeLayers.values())image.dispose();
         damagedLayers.clear();severeLayers.clear();originals.clear();
+        surfaces.dispose();
         damagedMaterial.dispose();
         destroyedMaterial.dispose();
         shieldMaterial.dispose();
