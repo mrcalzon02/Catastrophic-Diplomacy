@@ -14,6 +14,9 @@ final class CombatHitRenderer {
         shapes.setProjectionMatrix(camera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for(CombatHitFeedback.Pulse hit:feedback.pulses()){
+            // The authoritative per-facing ShieldFxRenderer owns shield
+            // contacts. The legacy duplicate arc would overexpose every hit.
+            if(hit.layer==CombatHitFeedback.Layer.SHIELD)continue;
             float t=hit.age/CombatHitFeedback.LIFETIME;
             if(t>=1)continue;
             float radius=hit.layer==CombatHitFeedback.Layer.SHIELD?
