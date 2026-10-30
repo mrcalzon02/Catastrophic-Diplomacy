@@ -169,13 +169,21 @@ final class CombatLightingRenderer implements Disposable {
         int beams = 0;
         for (Battle.Beam beam : battle.beams()) {
             if (++beams > MAX_BEAM_LIGHTS) break;
-            Color tint = weaponColor(beam.type);
-            streak(batch, camera, beam.x1, beam.y1, beam.x2, beam.y2,
-                    CombatEffectScale.of(31), tint, .22f);
-            streak(batch, camera, beam.x1, beam.y1, beam.x2, beam.y2,
-                    CombatEffectScale.of(12), tint, .40f);
-            spot(batch, camera, beam.x1, beam.y1, CombatEffectScale.of(21), tint, .32f);
-            spot(batch, camera, beam.x2, beam.y2, CombatEffectScale.of(23), tint, .38f);
+            Color tint=beam.pointDefense?Color.GREEN:weaponColor(beam.type);
+            // Defensive beams are deliberately thinner and emit a restrained
+            // corona, so hundreds of interceptions don't conceal the fleet.
+            streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
+                    CombatEffectScale.of(beam.pointDefense?9:31),
+                    tint,beam.pointDefense?.11f:.22f);
+            streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
+                    CombatEffectScale.of(beam.pointDefense?4:12),
+                    tint,beam.pointDefense?.24f:.40f);
+            spot(batch,camera,beam.x1,beam.y1,
+                    CombatEffectScale.of(beam.pointDefense?7:21),
+                    tint,beam.pointDefense?.24f:.32f);
+            spot(batch,camera,beam.x2,beam.y2,
+                    CombatEffectScale.of(beam.pointDefense?8:23),
+                    tint,beam.pointDefense?.27f:.38f);
         }
 
         // Missile light is on ONLY after ignition. Smoke is sampled separately

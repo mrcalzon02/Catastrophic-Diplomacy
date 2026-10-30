@@ -2337,7 +2337,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (Battle.Beam beam : battle.beams()) {
             if(!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,7))continue;
             if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
-            shapes.setColor(switch(beam.type) {
+            shapes.setColor(beam.pointDefense?Color.GREEN:switch(beam.type) {
                 case KINETIC -> Color.GOLD;
                 case PLASMA -> Color.ORANGE;
                 case PARTICLE -> Color.VIOLET;

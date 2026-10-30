@@ -36,6 +36,7 @@ public final class WeaponBeamSprites implements Disposable {
     public int loaded(){return loaded;}
 
     private static int color(Battle.Beam beam){
+        if(beam.pointDefense)return 2; // shorter-lived green defensive optic
         return switch(beam.type){
             case KINETIC -> 4; // gold
             case PLASMA -> 1; // red, matching crimson plasma atlas
@@ -110,7 +111,8 @@ public final class WeaponBeamSprites implements Disposable {
             double dx=beam.x2-beam.x1,dy=beam.y2-beam.y1;
             float length=(float)StrictMath.hypot(dx,dy);
             if(length<0.01f)continue;
-            float thickness=CombatEffectScale.of(beam.type==Battle.DamageType.KINETIC?4.0f:6.3f);
+            float thickness=CombatEffectScale.of(beam.pointDefense?2.8f:
+                    beam.type==Battle.DamageType.KINETIC?4.0f:6.3f);
             float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
             batch.draw(image,(float)beam.x1,(float)beam.y1-thickness/2,
                     0,thickness/2,length,thickness,1,1,rotation,

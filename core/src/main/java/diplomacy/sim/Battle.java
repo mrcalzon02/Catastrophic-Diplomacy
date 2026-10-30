@@ -322,9 +322,14 @@ public final class Battle {
         public final double x1, y1, x2, y2;
         public final int team;
         public final DamageType type;
+        /** A distinct defensive emitter, not another full-sized main laser. */
+        public final boolean pointDefense;
         public double lifetime = 0.13;
         Beam(long visualId,long spawnTick, double startX, double startY, double endX, double endY, int side, DamageType weapon) {
-            this.visualId=visualId;this.spawnTick=spawnTick;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;
+            this(visualId,spawnTick,startX,startY,endX,endY,side,weapon,false);
+        }
+        Beam(long visualId,long spawnTick, double startX, double startY, double endX, double endY, int side, DamageType weapon, boolean pd) {
+            this.visualId=visualId;this.spawnTick=spawnTick;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;pointDefense=pd;
         }
     }
 
@@ -1976,7 +1981,7 @@ public final class Battle {
             visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                     defender.team,defender.id,hostileSource,pdMuzzle.x(),pdMuzzle.y(),tx,ty);
             beams.add(new Beam(defensiveShot,tick,pdMuzzle.x(),pdMuzzle.y(),
-                    tx,ty,defender.team,DamageType.LASER));
+                    tx,ty,defender.team,DamageType.LASER,true));
             // Fast shells are harder to track than guided ordnance, but genuinely
             // interceptable; visual glows alone cannot be shot down.
             ProjectileModel.Spec incoming=chosenMissile!=null?chosenMissile.spec:chosenShell.spec;
@@ -2027,7 +2032,7 @@ public final class Battle {
                         defender.team,defender.id,craft.sourceId,
                         pdMuzzle.x(),pdMuzzle.y(),craft.x,craft.y);
                 beams.add(new Beam(defensiveShot,tick,pdMuzzle.x(),pdMuzzle.y(),
-                        craft.x,craft.y,defender.team,DamageType.LASER));
+                        craft.x,craft.y,defender.team,DamageType.LASER,true));
                 ProjectileModel.Spec signature=craft.radarProfile();
                 if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
                         defender.pointDefenseProfile,defender.pointDefenseCondition,
