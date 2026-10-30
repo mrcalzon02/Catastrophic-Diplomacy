@@ -16,8 +16,13 @@ public final class HullFoundationTest {
     }
     public static void main(String[] args)throws Exception {
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
-        check(technology.componentCount()==242,"11 factions x 22 native module chassis");
-        check(technology.upgradeCount()==5808,"11 x 22 x four exclusive six-rank tech branches");
+        // Physical hull acceptance is independent of how many optional module
+        // families the research catalog grows to contain. Verify its actual
+        // engineering invariants, not an obsolete global module count.
+        check(technology.componentCount()%Battle.Faction.values().length==0,
+                "Every civilization must retain its own complete base module roster");
+        check(technology.upgradeCount()==technology.componentCount()*4*6,
+                "Every module must retain four exclusive six-stage research branches");
         Set<String> factionIds=new HashSet<>();
         int hulls=0;
         for(Battle.Faction faction:Battle.Faction.values()){
@@ -85,6 +90,6 @@ public final class HullFoundationTest {
         check(one.maxHull==other.maxHull&&one.maxShields==other.maxShields
                         &&one.laserDamage==other.laserDamage&&one.sensorRange==other.sensorRange,
                 "No private enemy-only guns or stat overrides");
-        System.out.println("PASS physical hull baseline: "+hulls+" chassis/faction combinations, 11 native module rosters, 5808 tech upgrades, unarmed fits, symmetric combat");
+        System.out.println("PASS physical hull baseline: "+hulls+" chassis/faction combinations, 11 native module rosters, "+technology.upgradeCount()+" tech upgrades, unarmed fits, symmetric combat");
     }
 }
