@@ -55,6 +55,8 @@ public final class Battle {
         public Shipyard.Hull hullClass;
         /** Installed and physically located shipyard modules available for hit targeting. */
         public List<Shipyard.Slot> impactHardpoints=List.of();
+        /** Installed weapon-family emitters in the original faction hull layout. */
+        public List<WeaponMuzzles.Emitter> weaponEmitters=List.of();
         public Map<Integer,Subsystem> installedSubsystems=Map.of();
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
@@ -583,6 +585,7 @@ public final class Battle {
             if(system!=null)located.put(slot.index(),system);
         }
         s.impactHardpoints=List.copyOf(installed);
+        s.weaponEmitters=WeaponMuzzles.equipped(design,HullLayouts.slots(design.faction,design.hull));
         s.installedSubsystems=Map.copyOf(located);
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.fittedCrewSystems=true;
@@ -1125,8 +1128,10 @@ public final class Battle {
                 endX+=StrictMath.cos(angle)*deviation;
                 endY+=StrictMath.sin(angle)*deviation;
             }
-            beams.add(new Beam(shotId,tick,s.x,s.y,endX,endY,s.team,DamageType.LASER));
-            visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,endX,endY);
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.LASER,shotId);
+            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.LASER));
+            visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,
+                    muzzle.x(),muzzle.y(),endX,endY);
             if(landed)hit(target,s.laserDamage,s,DamageType.LASER,shotId,aim.x(),aim.y());
         }
         if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
@@ -1156,15 +1161,16 @@ public final class Battle {
             s.heat+=kinetic.heatPerShot()*shell.heatCost();
             s.kineticAmmo--;
             long shotId=nextVisualShotId++;
-            double angle=StrictMath.atan2(target.y-s.y,target.x-s.x);
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.KINETIC,shotId);
+            double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x());
             boolean onTarget=random.nextDouble()<kinetic.aim(
                     s.accuracy,s.weapons.kineticTracking(),weatherAim,lock);
             if(!onTarget)angle+=(shotId%2==0?1:-1)*WeaponBehaviorTable.BALLISTIC_MISS_ANGLE_RADIANS;
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
-                    s.x,s.y,angle,s.kineticDamage*shell.damage(),
+                    muzzle.x(),muzzle.y(),angle,s.kineticDamage*shell.damage(),
                     shell.physical(s.kineticProjectile),s.kineticType));
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
-                    s.x,s.y,target.x,target.y);
+                    muzzle.x(),muzzle.y(),target.x,target.y);
         }
         if(plasma.available(s.plasmaDamage,0,distance,s.weapons.plasmaRange(),
                 s.plasmaReload,s.power,s.heat,s.maxHeat,
@@ -1184,8 +1190,10 @@ public final class Battle {
                 endX+=StrictMath.cos(angle)*deviation;
                 endY+=StrictMath.sin(angle)*deviation;
             }
-            beams.add(new Beam(shotId,tick,s.x,s.y,endX,endY,s.team,DamageType.PLASMA));
-            visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,endX,endY);
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.PLASMA,shotId);
+            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.PLASMA));
+            visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,
+                    muzzle.x(),muzzle.y(),endX,endY);
             if(landed)hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId,aim.x(),aim.y());
         }
         if(particle.available(s.particleDamage,0,distance,s.weapons.particleRange(),
@@ -1206,8 +1214,10 @@ public final class Battle {
                 endX+=StrictMath.cos(angle)*deviation;
                 endY+=StrictMath.sin(angle)*deviation;
             }
-            beams.add(new Beam(shotId,tick,s.x,s.y,endX,endY,s.team,DamageType.PARTICLE));
-            visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,endX,endY);
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.PARTICLE,shotId);
+            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.PARTICLE));
+            visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,
+                    muzzle.x(),muzzle.y(),endX,endY);
             if(landed)hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId,aim.x(),aim.y());
         }
         if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
@@ -1264,8 +1274,10 @@ public final class Battle {
             OrdnanceDoctrine.Payload subtype=decoy?OrdnanceDoctrine.Payload.DECOY
                     :order.pattern.payload();
             double spread=(index-(order.pattern.count()-1)*0.5)*0.045;
-            double angle=StrictMath.atan2(target.y-source.y,target.x-source.x)+spread;
-            double distance=StrictMath.hypot(target.y-source.y,target.x-source.x);
+            WeaponMuzzles.Family family=heavy?WeaponMuzzles.Family.TORPEDO:WeaponMuzzles.Family.MISSILE;
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(source,family,nextVisualShotId);
+            double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x())+spread;
+            double distance=StrictMath.hypot(target.y-muzzle.y(),target.x-muzzle.x());
             double velocityX=StrictMath.cos(angle)*Math.max(1,distance);
             double velocityY=StrictMath.sin(angle)*Math.max(1,distance);
             double baseDamage=heavy?source.torpedoDamage:source.missileDamage;
@@ -1281,12 +1293,12 @@ public final class Battle {
             if(decoy)decoysLaunched++;
             long shot=nextVisualShotId++;
             Missile body=new Missile(shot,tick,source.id,source.team,target.id,
-                    source.x,source.y,velocityX,velocityY,damage,heavy,actual,
+                    muzzle.x(),muzzle.y(),velocityX,velocityY,damage,heavy,actual,
                     heavy?source.weapons.torpedoTracking():source.weapons.missileTracking(),
                     subtype,order.pattern.ignitionDelayTicks(),warhead);
             missiles.add(body);
             visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
-                    source.team,source.id,target.id,source.x,source.y,target.x,target.y);
+                    source.team,source.id,target.id,muzzle.x(),muzzle.y(),target.x,target.y);
             if(++order.nextIndex>=order.pattern.count())launchQueue.remove(i);
             else order.nextTick=tick+order.pattern.intervalTicks();
         }
@@ -1959,9 +1971,11 @@ public final class Battle {
             double ty=chosenMissile!=null?chosenMissile.y:chosenShell.y;
             int hostileSource=chosenMissile!=null?chosenMissile.sourceId:chosenShell.sourceId;
             long defensiveShot=nextVisualShotId++;
+            WeaponMuzzles.Origin pdMuzzle=WeaponMuzzles.at(
+                    defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot);
             visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
-                    defender.team,defender.id,hostileSource,defender.x,defender.y,tx,ty);
-            beams.add(new Beam(defensiveShot,tick,defender.x,defender.y,
+                    defender.team,defender.id,hostileSource,pdMuzzle.x(),pdMuzzle.y(),tx,ty);
+            beams.add(new Beam(defensiveShot,tick,pdMuzzle.x(),pdMuzzle.y(),
                     tx,ty,defender.team,DamageType.LASER));
             // Fast shells are harder to track than guided ordnance, but genuinely
             // interceptable; visual glows alone cannot be shot down.
@@ -2007,10 +2021,12 @@ public final class Battle {
                 defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
                 defender.pdReload=pdLaw.reload(true,defender.pdCycle,defender.pointDefenseCondition);
                 long defensiveShot=nextVisualShotId++;
+                WeaponMuzzles.Origin pdMuzzle=WeaponMuzzles.at(
+                        defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot);
                 visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                         defender.team,defender.id,craft.sourceId,
-                        defender.x,defender.y,craft.x,craft.y);
-                beams.add(new Beam(defensiveShot,tick,defender.x,defender.y,
+                        pdMuzzle.x(),pdMuzzle.y(),craft.x,craft.y);
+                beams.add(new Beam(defensiveShot,tick,pdMuzzle.x(),pdMuzzle.y(),
                         craft.x,craft.y,defender.team,DamageType.LASER));
                 ProjectileModel.Spec signature=craft.radarProfile();
                 if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
