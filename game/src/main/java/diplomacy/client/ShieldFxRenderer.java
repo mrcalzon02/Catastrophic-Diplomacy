@@ -35,6 +35,7 @@ final class ShieldFxRenderer {
             float energy=fx.intensity;
             switch(fx.kind){
                 case IMPACT -> impact(shapes,x,y,radius,center,progress,decay,energy,fx.weapon);
+                case STRAIN -> strain(shapes,x,y,radius,center,progress,decay);
                 case COLLAPSE -> collapse(shapes,x,y,radius,center,progress,decay);
                 case RECHARGE -> recharge(shapes,x,y,radius,center,progress,decay,energy);
                 case RESTART -> restart(shapes,x,y,radius,center,progress,decay);
@@ -100,6 +101,21 @@ final class ShieldFxRenderer {
         }else if(weapon==Battle.DamageType.LASER){
             shapes.setColor(.8f,.98f,1f,fade*.7f);
             lineAt(shapes,x,y,r*.76f,angle,r*.17f);
+        }
+    }
+    /** Critical energy: restrained tangential discontinuities, not a collapse. */
+    private static void strain(ShapeRenderer shapes,float x,float y,float radius,
+                               float angle,float t,float fade){
+        float r=radius*(1f+.045f*t);
+        shapes.setColor(.72f,.88f,1f,.85f*fade);
+        for(int i=0;i<4;i++){
+            float phase=angle-36+i*21+(i%2==0?1:-1)*t*4f;
+            arc(shapes,x,y,r,phase,9f,3);
+        }
+        shapes.setColor(.35f,.66f,1f,.45f*fade);
+        for(int i=0;i<3;i++){
+            float shift=angle-22+i*22f;
+            lineAt(shapes,x,y,r*.97f,shift,(1-t)*radius*.065f);
         }
     }
     private static void collapse(ShapeRenderer shapes,float x,float y,float radius,
