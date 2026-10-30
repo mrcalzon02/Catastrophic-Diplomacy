@@ -61,13 +61,18 @@ public final class ModuleBranchEffects {
                     case SPECIALIST -> {reach+=0.063*rank;remote+=0.045*rank;}
                 }
             }
-            case "SHD" -> {
+            case "XFR" -> {
                 switch(branch){
                     case OUTPUT -> shield+=0.050*rank;
                     case EFFICIENCY -> efficiency+=0.047*rank;
                     case RESILIENCE -> shield+=0.035*rank;
                     case SPECIALIST -> {reach+=0.055*rank;shield+=0.042*rank;}
                 }
+            }
+            case "SHD" -> {
+                // Ordinary local shields: never grant cross-vessel capability.
+                // Their own shield capacity still follows catalog research.
+                if(branch==Shipyard.Track.EFFICIENCY)efficiency+=0.047*rank;
             }
             case "DRN" -> {
                 switch(branch){
