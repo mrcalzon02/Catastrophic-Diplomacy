@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Locale;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.CampaignTechnology;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import java.util.EnumSet;
@@ -74,6 +75,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private CampaignProgress.State campaign;
+    private CampaignTechnology.State discoveries;
     private CampaignFleet.Roster campaignFleet;
     private Shipyard.Design campaignDesign;
     private GameMenuPanel.Screen researchReturn=GameMenuPanel.Screen.CAMPAIGN;
@@ -213,6 +215,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
+        shipyard.setCampaignDiscovery(()->discoveries);
         shipyard.setCampaignPurchasing(()->campaign,design->{
             boolean purchased=purchaseCampaignHull(design);
             if(purchased){
@@ -629,7 +632,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         long namingSeed=java.util.concurrent.ThreadLocalRandom.current().nextLong();
         CampaignFleet.Roster vessels=CampaignFleet.start(pendingFaction,
                 Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology,namingSeed);
-        if(!commitCampaign(proposed,vessels))return;
+        if(!commitCampaign(proposed,vessels,new CampaignTechnology.State(pendingFaction)))return;
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
         saveCampaignBlueprint(campaignDesign);
         campaignPage=0;selectedMission=1;
@@ -671,7 +674,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean refitCampaignHull(long id,Shipyard.Design design){
         if(campaign==null||campaignFleet==null)return false;
         try{
-            var quote=CampaignBudgetQuotes.refit(campaign,campaignFleet,id,design,technology);
+            var quote=CampaignBudgetQuotes.refit(campaign,discoveries,campaignFleet,id,design,technology);
             if(!quote.allowed())throw new IllegalArgumentException(quote.reason());
             CampaignProgress.State debited=campaign.spend(quote.cost());
             CampaignFleet.Roster refitted=campaignFleet.refit(id,design,technology);
@@ -809,8 +812,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean purchaseCampaignHull(Shipyard.Design design){
         if(campaign==null||campaignFleet==null||design==null)return false;
         try{
-            CampaignShipyardRules.requireAllowed(design,campaign.faction(),
-                    campaign.researchRank(),campaign.unlocked());
+            CampaignShipyardRules.requireAllowed(design,campaign,discoveries,technology);
             long price=CampaignFleet.purchaseCost(design,technology);
             CampaignProgress.State debited=campaign.spend(price);
             CampaignFleet.Roster purchased=campaignFleet.purchase(design,technology);
@@ -1191,10 +1193,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 CampaignProgress.State before=campaign;
                 CampaignProgress.State next=lastWon?
                         before.complete(activeMission,deployedAtLaunch,survivorsAtEnd):before;
+                CampaignTechnology.State beforeTechnology=discoveries;
+                CampaignTechnology.State nextTechnology=lastWon?
+                        beforeTechnology.victory():beforeTechnology;
                 boolean replay=before.isReplay(activeMission);
-                if(commitCampaign(next,returned)){
+                if(commitCampaign(next,returned,nextTechnology)){
                     lastReward=next.credits()-before.credits();
-                    if(lastWon&&next.researchRank()>before.researchRank())
+                    if(lastWon&&nextTechnology.unlocked().size()>beforeTechnology.unlocked().size())
+                        dockNotice="TECHNOLOGY DISCOVERED: "+beforeTechnology.activeId();
+                    else if(lastWon&&next.researchRank()>before.researchRank())
                         dockNotice="RESEARCH COMPLETE: technology license rank "+
                                 next.researchRank()+" acquired.";
                     else if(lastWon&&next.speedUpgrades()>before.speedUpgrades())
@@ -1391,8 +1398,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             try{
                 Shipyard.Design restored=CampaignBlueprintCodec.decode(
                         file.readString("UTF-8"),technology,campaign.faction());
-                CampaignShipyardRules.requireAllowed(restored,campaign.faction(),
-                        campaign.researchRank(),campaign.unlocked());
+                CampaignShipyardRules.requireAllowed(restored,campaign,discoveries,technology);
                 Gdx.app.log("CD-SHIPYARD","Restored paid-purchase blueprint "+restored.hull);
                 return restored;
             }catch(RuntimeException invalid){
@@ -1407,8 +1413,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean saveCampaignBlueprint(Shipyard.Design proposed){
         if(campaign==null||proposed==null)return false;
         try{
-            CampaignShipyardRules.requireAllowed(proposed,campaign.faction(),
-                    campaign.researchRank(),campaign.unlocked());
+            CampaignShipyardRules.requireAllowed(proposed,campaign,discoveries,technology);
             FileHandle primary=Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE);
             FileHandle backup=Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE+".bak");
             FileHandle temp=Gdx.files.local(CAMPAIGN_BLUEPRINT_FILE+".tmp");
@@ -1441,10 +1446,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             try{
                 var stored=CampaignLedger.load(file,technology).orElseThrow();
                 campaign=stored.progress();campaignFleet=stored.fleet();
+                discoveries=stored.technology();
                 ledgerGeneration=stored.generation();
                 Gdx.app.log("CAMPAIGN","Loaded atomic campaign generation "+ledgerGeneration);
             }catch(RuntimeException invalid){
-                campaign=null;campaignFleet=null;
+                campaign=null;campaignFleet=null;discoveries=null;
                 dockNotice="Campaign ledger and backup invalid. No free ships or credits issued.";
                 Gdx.app.error("CAMPAIGN","Authoritative recovery failed",invalid);
             }
@@ -1455,6 +1461,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(!f.exists())continue;
             try{
                 campaign=CampaignProgress.decode(f.readString("UTF-8"));
+                discoveries=new CampaignTechnology.State(campaign.faction());
                 return;
             }catch(RuntimeException invalid){
                 Gdx.app.error("CAMPAIGN","Rejected old progress: "+f.path(),invalid);
@@ -1494,13 +1501,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
      * atomically reached local storage and readback verified it. */
     private boolean commitCampaign(CampaignProgress.State nextProgress,
                                    CampaignFleet.Roster nextFleet){
-        if(nextProgress==null||nextFleet==null)return false;
+        return commitCampaign(nextProgress,nextFleet,discoveries);
+    }
+    private boolean commitCampaign(CampaignProgress.State nextProgress,
+                                   CampaignFleet.Roster nextFleet,
+                                   CampaignTechnology.State nextTechnology){
+        if(nextProgress==null||nextFleet==null||nextTechnology==null)return false;
         try{
             var pending=new CampaignLedger.Snapshot(
-                    Math.addExact(ledgerGeneration,1),nextProgress,nextFleet);
+                    Math.addExact(ledgerGeneration,1),nextProgress,nextFleet,nextTechnology);
             CampaignLedger.commit(Gdx.files.local(LEDGER_FILE).file().toPath(),
                     pending,technology);
-            campaign=nextProgress;campaignFleet=nextFleet;
+            campaign=nextProgress;campaignFleet=nextFleet;discoveries=nextTechnology;
             ledgerGeneration=pending.generation();
             ledgerAuthorityPresent=true;
             return true;
