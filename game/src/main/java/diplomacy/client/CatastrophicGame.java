@@ -72,6 +72,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ProceduralStarfield starfield;
     private BattlefieldWeatherVfx weatherVfx;
     private CombatAudio audio;
+    private final RenderPerformanceCounters renderProfile=new RenderPerformanceCounters();
     private int voiceSliderPointer=-1, menuButtonPointer=-1;
     private int tacticalHovered=-1, tacticalPressed=-1;
     private long tacticalPressUntilNs;
@@ -2180,6 +2181,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verifyDemo){
             verifiedSequence=0;verifiedFrames=verifiedShots=verifiedImpacts=peakAnimations=peakCraft=peakOrdnance=peakSpriteShips=0;
             verificationReported=false;verifiedTypes.clear();verifiedShotIds.clear();
+            renderProfile.reset();
             Gdx.app.log("CD-DEMO-VERIFY","START 200v200 module/weapon/service suite seed="+DemonstrationBattle.SEED);
         }
     }
@@ -2239,6 +2241,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             return;
         }
+        // Includes actual simulation and all battle render passes, not menu time.
+        long renderStartNs=System.nanoTime();
+        int drawCallsBefore=batch.totalRenderCalls;
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
         if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
             accumulator += delta * speed;
@@ -2567,6 +2572,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         batch.end();
         if (tacticalMenuOpen) drawTacticalMenu();
+        renderProfile.sample(System.nanoTime()-renderStartNs,
+                Math.max(0,batch.totalRenderCalls-drawCallsBefore),
+                (terranSprites==null?0:terranSprites.materialTextureBindings())+
+                (craftSprites==null?0:craftSprites.materialTextureBindings()));
+        if(renderProfile.ready()){
+            var frame=renderProfile.report();
+            if(Gdx.app!=null)Gdx.app.log("CD-RENDER-PERF",
+                    "samples="+frame.samples()+" avgCpuMs="+frame.meanCpuMs()+
+                    " worstCpuMs="+frame.worstCpuMs()+
+                    " avgDraws="+frame.meanDrawCalls()+
+                    " maxDraws="+frame.maximumDrawCalls()+
+                    " avgMaterialBinds="+frame.meanMaterialBinds()+
+                    " maxMaterialBinds="+frame.maximumMaterialBinds()+
+                    " fps="+Gdx.graphics.getFramesPerSecond());
+            renderProfile.reset();
+        }
         if(verifyDemo)verifyRenderedDemoFrame();
     }
 
@@ -2652,7 +2673,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(craftSprites==null || craftSprites.litCraftMaterials()!=51)
             failure.append("fighter normal/emissive materials missing; ");
         verificationReported=true;
+        var perf=renderProfile.report();
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
+            " renderCpuAvgMs="+perf.meanCpuMs()+
+            " renderCpuWorstMs="+perf.worstCpuMs()+
+            " avgDraws="+perf.meanDrawCalls()+
+            " avgMatBinds="+perf.meanMaterialBinds()+
             " shots="+verifiedShots+" hits="+battle.hitCount+
             " impacts="+verifiedImpacts+" weapons="+verifiedTypes+
             " ordnance="+peakOrdnance+" craft="+peakCraft+

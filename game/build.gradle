@@ -188,3 +188,12 @@ tasks.register('shieldSurfaceSmoke', JavaExec) {
     mainClass = 'diplomacy.client.ShieldSurfaceModelTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('shieldSurfaceSmoke') }
+
+tasks.register('renderPerformanceSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check CPU frame, draw-call and material-bind telemetry accounting without FPS assertions.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.RenderPerformanceCountersTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('renderPerformanceSmoke') }

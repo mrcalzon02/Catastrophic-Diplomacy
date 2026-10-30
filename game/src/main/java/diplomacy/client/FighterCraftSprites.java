@@ -31,6 +31,7 @@ public final class FighterCraftSprites implements Disposable {
     private final Map<Integer,Battle.Ship> vesselById=new HashMap<>();
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
     public int litCraftMaterials(){return surfaces.materialCount();}
+    public int materialTextureBindings(){return surfaces.textureBindings();}
     private final Texture unassignedWireframe;
     private final EnumMap<Battle.Faction,Map<String,Texture>> palettes=
             new EnumMap<>(Battle.Faction.class);
