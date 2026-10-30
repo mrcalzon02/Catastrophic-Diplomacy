@@ -631,7 +631,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         scenario=choice;
         skirmishRules=ScenarioCatalog.challenge(choice);
         skirmishNotice="PRESET TECH LIMIT "+skirmishRules.maxStage()+
-                "/6 | HULL GEN <= "+skirmishRules.maxHullGeneration();
+                "/9 | HULL GEN <= "+skirmishRules.maxHullGeneration();
         if(choice!=ScenarioCatalog.Preset.CUSTOM&&!choice.demonstration){
             leftDesign=ScenarioCatalog.defaultDesign(choice,left,true,technology);
             rightDesign=ScenarioCatalog.defaultDesign(choice,right,false,technology);
@@ -849,7 +849,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         researchReturn=screen==GameMenuPanel.Screen.DOCK?
                 GameMenuPanel.Screen.DOCK:GameMenuPanel.Screen.CAMPAIGN;
         armedResearch=CampaignProgress.Project.NONE;
-        selectedResearchNode=Math.min(5,campaign.researchRank());
+        selectedResearchNode=Math.min(8,campaign.researchRank());
         researchNotice=campaign.activeProject()==CampaignProgress.Project.NONE?
                 "Select a license node or a milestone-locked laboratory upgrade.":
                 "Research advances only after a SUCCESSFUL full campaign mission.";
@@ -883,9 +883,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         else if(action>=100&&action<108){
             int target=technologyPage*8+action-100;
             if(target<count)technologyModule=target;
-        }else if(action>=200&&action<224){
-            technologyTrack=(action-200)/6;
-            technologyStage=(action-200)%6+1;
+        }else if(action>=200&&action<236){
+            technologyTrack=(action-200)/9;
+            technologyStage=(action-200)%9+1;
         }else return;
         armedTechnology=null;
         technologyNotice="Inspect the selected technology and confirm its research budget.";
@@ -939,7 +939,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         startResearch(project);
     }
     private void inspectResearchNode(int action){
-        if(action>=100&&action<106)selectedResearchNode=action-100;
+        if(action>=100&&action<109)selectedResearchNode=action-100;
         else if(action>=200&&action<204)selectedResearchNode=100+action-200;
         else return;
         armedResearch=CampaignProgress.Project.NONE;

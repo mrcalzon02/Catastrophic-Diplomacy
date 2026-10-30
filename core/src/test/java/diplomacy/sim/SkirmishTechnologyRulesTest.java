@@ -65,6 +65,21 @@ public final class SkirmishTechnologyRulesTest {
                 "Specialized siege variant bypassed Tech IV");
         open.withStage(4).requireAllowed(
                 Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT_SIEGE),catalog);
+        // Extended stages are real per-socket technologies, not a display cap.
+        var maximum=open.withStage(9);
+        var capital=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT);
+        var ninth=capital.stage(0,Shipyard.Track.OUTPUT,9);
+        check(ninth.at(0).stage(Shipyard.Track.OUTPUT)==9,
+                "Ninth-tier engineering was not installed");
+        maximum.requireAllowed(ninth,catalog);
+        reject(()->open.withStage(8).requireAllowed(ninth,catalog),
+                "Tech VIII incorrectly admitted Tech IX hardware");
+        String blueprint=Shipyard.encode(ninth);
+        check(Shipyard.encode(Shipyard.decode(blueprint,catalog)).equals(blueprint),
+                "Tech IX physical fitting lost its rank when exported");
+        check(SkirmishTechnologyRules.decode(
+                SkirmishTechnologyRules.encode(maximum)).maxStage()==9,
+                "Tech IX PvP challenge could not round-trip");
         var high=open.withStage(6);
         var independent=ShipTechnologyFit.fit(ship,catalog,high,laser,
                 Shipyard.Track.OUTPUT,4,ShipTechnologyFit.Scope.SOCKET);

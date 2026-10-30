@@ -41,7 +41,7 @@ public final class TechnologyCatalog {
             shield = positive(cells.get(15)); thrust = positive(cells.get(16));
             cooling = positive(cells.get(17)); maintenance = positive(cells.get(18));
             tradeoff = cells.get(19);
-            if (!FACTIONS.contains(faction) || !TRACKS.contains(track) || stage < 1 || stage > 6
+            if (!FACTIONS.contains(faction) || !TRACKS.contains(track) || stage < 1 || stage > 9
                     || subsystem.isBlank() || name.isBlank() || tradeoff.isBlank()
                     || researchCost <= 0 || industryCost <= 0)
                 throw new IllegalArgumentException("Invalid upgrade metadata: " + id);
@@ -102,6 +102,7 @@ public final class TechnologyCatalog {
             addHabitatFamilies(bases,rows);
             addShieldTransferProjectors(bases,rows);
             addSpecializedSupportFamilies(bases,rows);
+            extendToNineStages(rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
@@ -131,6 +132,46 @@ public final class TechnologyCatalog {
                 throw new IllegalArgumentException("Missing prerequisite for " + u.id);
         }
         return new TechnologyCatalog(upgrades, baseMap);
+    }
+
+    /**
+     * Extend each existing native branch with VII-IX without rewriting the
+     * six-stage CSV. Stage VI is retained exactly as released. Every higher
+     * stage requires its direct predecessor and extrapolates existing physical
+     * tradeoffs: no free weapons, slots or intrinsic hull bonuses.
+     */
+    private static void extendToNineStages(List<List<String>> rows) {
+        Map<String,List<String>> original=new LinkedHashMap<>();
+        for(int i=1;i<rows.size();i++)original.put(rows.get(i).get(0),rows.get(i));
+        for(List<String> stageSix:List.copyOf(original.values())) {
+            if(Integer.parseInt(stageSix.get(4))!=6)continue;
+            String stem=stageSix.get(0).substring(0,stageSix.get(0).length()-2);
+            List<String> stageFive=original.get(stem+"05");
+            if(stageFive==null)throw new IllegalArgumentException(
+                    "Missing fifth-stage source for "+stageSix.get(0));
+            for(int stage=7;stage<=9;stage++) {
+                List<String> entry=new ArrayList<>(stageSix);
+                entry.set(0,stem+String.format(Locale.ROOT,"%02d",stage));
+                entry.set(4,Integer.toString(stage));
+                entry.set(5,stageSix.get(5)+" / Stage "+stage);
+                entry.set(6,stem+String.format(Locale.ROOT,"%02d",stage-1));
+                for(int index=7;index<=8;index++) {
+                    long baseline=Long.parseLong(stageSix.get(index));
+                    long price=Math.round(baseline*StrictMath.pow(stage/6.0,2.0));
+                    if(price>Integer.MAX_VALUE)throw new IllegalArgumentException(
+                            "Technology cost overflows "+entry.get(0));
+                    entry.set(index,Long.toString(Math.max(1L,price)));
+                }
+                for(int index=9;index<=18;index++) {
+                    double fifth=Double.parseDouble(stageFive.get(index));
+                    double sixth=Double.parseDouble(stageSix.get(index));
+                    entry.set(index,ratio(Math.max(0.05,
+                            sixth+(sixth-fifth)*(stage-6)),1.0));
+                }
+                entry.set(19,stageSix.get(19)+"; higher-stage engineering and upkeep");
+                rows.add(entry);
+            }
+        }
     }
 
     /**

@@ -40,19 +40,19 @@ public final class CampaignTechnology {
                         String activeId,int progress,int duration) {
         public State(Battle.Faction faction){this(faction,Set.of(),null,0,0);}
         public State {
-            if(faction==null||unlocked==null||unlocked.size()>6000||
-                    progress<0||duration<0||duration>6)
+            if(faction==null||unlocked==null||unlocked.size()>14000||
+                    progress<0||duration<0||duration>9)
                 throw new IllegalArgumentException("Invalid technology inventory");
             unlocked=Set.copyOf(unlocked);
             String prefix="TECH-"+factionCode(faction)+"-";
             for(String id:unlocked)
-                if(id==null||!id.startsWith(prefix)||!id.matches("TECH-[A-Z]{3}-[A-Z]{2,4}-(OUTPUT|EFFICIENCY|RESILIENCE|SPECIALIST)-0[1-6]"))
+                if(id==null||!id.startsWith(prefix)||!id.matches("TECH-[A-Z]{3}-[A-Z]{2,4}-(OUTPUT|EFFICIENCY|RESILIENCE|SPECIALIST)-0[1-9]"))
                     throw new IllegalArgumentException("Foreign or malformed technology unlock "+id);
             if(activeId==null){
                 if(progress!=0||duration!=0)
                     throw new IllegalArgumentException("Idle technology has outstanding research work");
             }else if(!activeId.startsWith(prefix)||unlocked.contains(activeId)||
-                    !activeId.matches("TECH-[A-Z]{3}-[A-Z]{2,4}-(OUTPUT|EFFICIENCY|RESILIENCE|SPECIALIST)-0[1-6]")||
+                    !activeId.matches("TECH-[A-Z]{3}-[A-Z]{2,4}-(OUTPUT|EFFICIENCY|RESILIENCE|SPECIALIST)-0[1-9]")||
                     duration<1||progress>=duration)
                 throw new IllegalArgumentException("Invalid funded technology project");
         }

@@ -4,7 +4,7 @@ import java.util.Set;
 
 /**
  * Per-component behavioral deltas from a single exclusive technology branch.
- * Six ranks at incremental 2-6% steps, not four branches applied simultaneously.
+ * Nine ranks at incremental 2-6% steps, not four branches applied simultaneously.
  * Generic research economics/accuracy/integrity remain in TechnologyCatalog.
  */
 public final class ModuleBranchEffects {
@@ -24,7 +24,7 @@ public final class ModuleBranchEffects {
     public static final Tuning NEUTRAL=new Tuning(1,1,1,1,1,1,1,1,1);
     /** Branch and rank are the immutable current choice of THIS installed module. */
     public static Tuning tune(String subsystem,Shipyard.Track branch,int rank) {
-        if(subsystem==null||rank<0||rank>6||(branch==null&&rank!=0)
+        if(subsystem==null||rank<0||rank>9||(branch==null&&rank!=0)
                 ||(branch!=null&&rank==0))
             throw new IllegalArgumentException("Invalid specialized module");
         if(rank==0)return NEUTRAL;

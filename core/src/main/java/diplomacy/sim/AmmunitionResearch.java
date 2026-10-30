@@ -6,7 +6,7 @@ import java.util.Set;
 
 /**
  * Per-installed-weapon ammunition research law. Stock ammunition is free;
- * purpose-built rounds require this SAME socket's one committed 6-rank path.
+ * purpose-built rounds require this SAME socket's one committed 9-rank path.
  * All 11 civilizations share this unlock law and use their own research IDs.
  * Projectile effects/physics remain defined by AmmunitionTable.
  */
@@ -40,8 +40,8 @@ public final class AmmunitionResearch {
             Set.of(AmmunitionTable.Warhead.STANDARD));
 
     private static void valid(Shipyard.Track path,int rank){
-        if(rank<0||rank>6||(rank>0&&path==null))
-            throw new IllegalArgumentException("Ammunition research must use one branch at rank 0-6");
+        if(rank<0||rank>9||(rank>0&&path==null))
+            throw new IllegalArgumentException("Ammunition research must use one branch at rank 0-9");
     }
     /**
      * Rank breakpoints are deliberate: no instant full arsenal at rank 1.

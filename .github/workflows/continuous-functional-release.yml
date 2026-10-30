@@ -32,7 +32,8 @@ jobs:
           gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke \
             :core:massBattleSmoke :core:updaterPolicySmoke \
             :core:desktopUpdaterPolicySmoke :core:shipLineagesSmoke \
-            :core:skirmishTechSmoke :server:check \
+            :core:technologySmoke :core:campaignResearchSmoke \
+            :core:campaignTechnologySmoke :core:skirmishTechSmoke :server:check \
             :game:menuFlowSmoke :desktop:installDist
       - name: Create native Linux app image with bundled Java
         run: python3 tools/package_desktop.py

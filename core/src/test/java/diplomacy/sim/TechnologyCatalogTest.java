@@ -11,7 +11,7 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 8976, "full technology count");
+        require(c.upgradeCount() == 13464, "full technology count");
         require(c.componentCount() == 374, "all base components");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
@@ -20,7 +20,7 @@ public final class TechnologyCatalogTest {
                         && "support".equals(c.base("BASE-"+faction+"-"+role).category),
                         "Missing physical support module "+faction+"/"+role);
                 for(String branch:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
-                    for(int rank=1;rank<=6;rank++)
+                    for(int rank=1;rank<=9;rank++)
                         require(c.get("TECH-"+faction+"-"+role+"-"+branch+"-"+
                                 String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
                                 "Support evolution research missing "+faction+"/"+role);
@@ -32,7 +32,7 @@ public final class TechnologyCatalogTest {
                     "defense".equals(c.base("BASE-"+faction+"-SHD").category),
                     "Ordinary SHD generators retain their separate defensive mount");
             for (String track : Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST")) {
-                for (int stage = 1; stage <= 6; stage++) {
+                for (int stage = 1; stage <= 9; stage++) {
                     String id = "TECH-" + faction + "-KIN-" + track + "-" + String.format(java.util.Locale.ROOT, "%02d", stage);
                     require(c.get(id) != null, "missing branch entry " + id);
                     String relay="TECH-"+faction+"-XFR-"+track+"-"+

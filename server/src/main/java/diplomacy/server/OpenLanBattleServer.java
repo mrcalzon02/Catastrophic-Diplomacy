@@ -17,7 +17,7 @@ public final class OpenLanBattleServer {
     public static void main(String[] args)throws Exception{
         if(args.length>5||args.length==4)
             throw new IllegalArgumentException(
-                "Use [private-bind] [port] [fleet-size], or [private-bind] [port] [match-tech-0..6] [left.cdfleet] [right.cdfleet]");
+                "Use [private-bind] [port] [fleet-size], or [private-bind] [port] [match-tech-0..9] [left.cdfleet] [right.cdfleet]");
         String bind=args.length>0?args[0]:"127.0.0.1";
         int port=args.length>1?hbnet.Hbnet.port(args[1]):27817;
         BattleServer server;
@@ -31,7 +31,7 @@ public final class OpenLanBattleServer {
                     Files.readString(Path.of(args[4]),StandardCharsets.UTF_8),catalog);
             // Never adopt a technology cap supplied by either player's export.
             server=BattleServer.openLan(bind,port,2479L,left,right,match);
-            System.out.println("HOST TECH "+ceiling+"/6 (INCLUSIVE). Left "+
+            System.out.println("HOST TECH "+ceiling+"/9 (INCLUSIVE). Left "+
                     left.size()+" ships, right "+right.size()+" ships.");
         }else if(args.length==5){
             // Legacy single-design challenge exchange compatibility.

@@ -15,8 +15,8 @@ public final class ShipTechnologyFit {
     public enum Scope { SOCKET, MATCHING_COMPONENTS }
 
     public static String id(Shipyard.Installed part,Shipyard.Track track,int stage){
-        if(part==null||track==null||stage<1||stage>6)
-            throw new IllegalArgumentException("Select an installed component and technology stage I-VI");
+        if(part==null||track==null||stage<1||stage>9)
+            throw new IllegalArgumentException("Select an installed component and technology stage I-IX");
         return part.component.replaceFirst("^BASE-","TECH-")+"-"+track.name()+"-"+
                 String.format(Locale.ROOT,"%02d",stage);
     }
@@ -25,7 +25,7 @@ public final class ShipTechnologyFit {
                                     CampaignTechnology.State discoveries,
                                     int slot,Shipyard.Track track,int stage){
         if(design==null||catalog==null||track==null||slot<0||slot>=design.slots()||
-                stage<1||stage>6)return false;
+                stage<1||stage>9)return false;
         Shipyard.Installed part=design.at(slot);
         if(part==null||!catalog.hasBase(part.component))return false;
         String techId=id(part,track,stage);
@@ -37,7 +37,7 @@ public final class ShipTechnologyFit {
     public static int highestAvailable(Shipyard.Design design,TechnologyCatalog catalog,
                                        CampaignTechnology.State discoveries,
                                        int slot,Shipyard.Track track){
-        for(int stage=6;stage>=1;stage--)
+        for(int stage=9;stage>=1;stage--)
             if(available(design,catalog,discoveries,slot,track,stage))return stage;
         return 0;
     }
@@ -59,7 +59,7 @@ public final class ShipTechnologyFit {
                                      CampaignTechnology.State discoveries,int slot,
                                      Shipyard.Track track,int stage,Scope scope){
         if(original==null||catalog==null||scope==null||slot<0||slot>=original.slots()||
-                track==null||stage<1||stage>6||original.at(slot)==null)
+                track==null||stage<1||stage>9||original.at(slot)==null)
             throw new IllegalArgumentException("Choose a fitted technology target");
         if(!available(original,catalog,discoveries,slot,track,stage))
             throw new IllegalArgumentException("Technology not discovered: "+
@@ -103,7 +103,7 @@ public final class ShipTechnologyFit {
     public static int highestAvailable(Shipyard.Design design,TechnologyCatalog catalog,
                                        SkirmishTechnologyRules rules,
                                        int slot,Shipyard.Track track){
-        for(int stage=6;stage>=1;stage--)
+        for(int stage=9;stage>=1;stage--)
             if(available(design,catalog,rules,slot,track,stage))return stage;
         return 0;
     }

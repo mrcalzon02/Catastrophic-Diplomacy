@@ -174,7 +174,7 @@ public final class Shipyard {
             for(Map.Entry<Track,Integer> entry:upgrades.entrySet()) {
                 Track branch=entry.getKey();
                 Integer level=entry.getValue();
-                if(branch==null||level==null||level<1||level>6)
+                if(branch==null||level==null||level<1||level>9)
                     throw new IllegalArgumentException("Invalid module research stage");
                 if(chosen!=null && chosen!=branch)
                     throw new IllegalArgumentException(
@@ -279,7 +279,7 @@ public final class Shipyard {
             return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
         }
         public Design stage(int slot, Track track, int level) {
-            if(level<0||level>6||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..6");
+            if(level<0||level>9||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..9");
             Installed current=at(slot);
             if(current==null) throw new IllegalArgumentException("Empty slot has no technology");
             Track active=current.branch();
@@ -361,7 +361,7 @@ public final class Shipyard {
         int industry=base.industryCost,research=0;
         for(Map.Entry<Track,Integer> selected:installed.stages.entrySet()) {
             int level=selected.getValue();
-            if(level<1||level>6)throw new IllegalArgumentException("Bad upgrade stage");
+            if(level<1||level>9)throw new IllegalArgumentException("Bad upgrade stage");
             for(int stage=1;stage<=level;stage++) {
                 String techId="TECH-"+factionId(faction)+"-"+base.subsystem+"-"+selected.getKey()+"-"+String.format(Locale.ROOT,"%02d",stage);
                 Upgrade tech=catalog.get(techId);
@@ -454,7 +454,7 @@ public final class Shipyard {
                 throw new IllegalArgumentException("Invalid crew support");
         }
     }
-    /** Module-distinct six-rank offensive specialization; all ratios are bounded. */
+    /** Module-distinct nine-rank offensive specialization; all ratios are bounded. */
     public record Weapons(double laserRange,double kineticRange,double plasmaRange,
                           double particleRange,double missileRange,double torpedoRange,
                           double laserCycle,double kineticCycle,double plasmaCycle,
@@ -838,8 +838,8 @@ public final class Shipyard {
             for(int j=0;j<levels.length;j++){
                 try{levels[j]=Integer.parseInt(p[j+2]);}
                 catch(NumberFormatException bad){throw new IllegalArgumentException("Invalid technology rank",bad);}
-                if(levels[j]<0||levels[j]>6)
-                    throw new IllegalArgumentException("Upgrade stage must be 0..6 at slot "+index);
+                if(levels[j]<0||levels[j]>9)
+                    throw new IllegalArgumentException("Upgrade stage must be 0..9 at slot "+index);
                 if(levels[j]>0){
                     Track branch=Track.values()[j];
                     if(chosen!=null)

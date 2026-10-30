@@ -16,7 +16,7 @@ public final class CampaignShipyardRules {
     private CampaignShipyardRules() { }
     public static void requireAllowed(Shipyard.Design design,Battle.Faction faction,
                                        int researchRank,int unlockedMission){
-        if(design==null||faction==null||researchRank<0||researchRank>6||
+        if(design==null||faction==null||researchRank<0||researchRank>9||
                 unlockedMission<1||unlockedMission>500)
             throw new IllegalArgumentException("Invalid campaign research authorization");
         if(design.faction!=faction)

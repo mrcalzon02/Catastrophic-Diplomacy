@@ -21,7 +21,7 @@ public final class HullFoundationTest {
         // engineering invariants, not an obsolete global module count.
         check(technology.componentCount()%Battle.Faction.values().length==0,
                 "Every civilization must retain its own complete base module roster");
-        check(technology.upgradeCount()==technology.componentCount()*4*6,
+        check(technology.upgradeCount()==technology.componentCount()*4*9,
                 "Every module must retain four exclusive six-stage research branches");
         Set<String> factionIds=new HashSet<>();
         int hulls=0;
@@ -77,7 +77,7 @@ public final class HullFoundationTest {
             }
             for(Shipyard.Track track:Shipyard.Track.values()){
                 String id="TECH-"+code+"-LAS-"+track+"-06";
-                check(technology.get(id)!=null,"Full six-level chain "+id);
+                check(technology.get(id)!=null,"Full nine-level chain "+id);
             }
         }
         check(hulls==Battle.Faction.values().length*Shipyard.Hull.values().length,

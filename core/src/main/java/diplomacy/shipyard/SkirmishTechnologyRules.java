@@ -23,19 +23,19 @@ public record SkirmishTechnologyRules(
         Set<Shipyard.Hull> allowedHulls) {
     private static final String MAGIC="CD-SKIRMISH-RULES-1";
     public SkirmishTechnologyRules {
-        if(maxStage<0||maxStage>6||maxHullGeneration<1||maxHullGeneration>10||
+        if(maxStage<0||maxStage>9||maxHullGeneration<1||maxHullGeneration>10||
                 allowedTracks==null||bannedTechnologyIds==null||allowedHulls==null||
-                bannedTechnologyIds.size()>5808)
+                bannedTechnologyIds.size()>13464)
             throw new IllegalArgumentException("Invalid skirmish technology challenge");
         allowedTracks=Set.copyOf(allowedTracks);
         bannedTechnologyIds=Set.copyOf(bannedTechnologyIds);
         allowedHulls=Set.copyOf(allowedHulls);
         for(String id:bannedTechnologyIds)
-            if(id==null||!id.matches("TECH-[A-Z]{3}-[A-Z]{2,4}-(OUTPUT|EFFICIENCY|RESILIENCE|SPECIALIST)-0[1-6]"))
+            if(id==null||!id.matches("TECH-[A-Z]{3}-[A-Z]{2,4}-(OUTPUT|EFFICIENCY|RESILIENCE|SPECIALIST)-0[1-9]"))
                 throw new IllegalArgumentException("Invalid barred technology: "+id);
     }
     public static SkirmishTechnologyRules unrestricted(){
-        return new SkirmishTechnologyRules(6,10,EnumSet.allOf(Shipyard.Track.class),Set.of(),Set.of());
+        return new SkirmishTechnologyRules(9,10,EnumSet.allOf(Shipyard.Track.class),Set.of(),Set.of());
     }
     public SkirmishTechnologyRules withStage(int level){
         return new SkirmishTechnologyRules(level,maxHullGeneration,allowedTracks,bannedTechnologyIds,allowedHulls);

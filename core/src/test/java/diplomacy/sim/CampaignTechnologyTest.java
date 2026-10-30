@@ -66,6 +66,30 @@ public final class CampaignTechnologyTest {
         var loaded=CampaignLedger.decode(CampaignLedger.encode(saved),catalog);
         check(CampaignLedger.equivalent(saved,loaded)&&loaded.technology().equals(second),
                 "Atomic campaign ledger lost paid research or fleet");
+        // Tier IX must be paid, mission-earned and serialized as a real module
+        // upgrade. Neither the inclusive skirmish cap nor a save import grants it.
+        var mature=new CampaignProgress.State(Battle.Faction.TERRAN,426,
+                1_000_000_000L,425,9,425,0,CampaignProgress.Project.NONE,0);
+        java.util.Set<String> earlier=new java.util.HashSet<>();
+        for(int level=1;level<=8;level++)
+            earlier.add("TECH-TER-LAS-OUTPUT-"+String.format(java.util.Locale.ROOT,"%02d",level));
+        var matureDiscoveries=new CampaignTechnology.State(Battle.Faction.TERRAN,
+                earlier,null,0,0);
+        String apex="TECH-TER-LAS-OUTPUT-09";
+        check(matureDiscoveries.quote(apex,mature,catalog).allowed(),
+                "Legitimate Tier IX module unavailable after eight researched predecessors");
+        var apexProject=matureDiscoveries.begin(apex,mature,catalog);
+        check(apexProject.duration()==9&&apexProject.remaining()==9,
+                "Unaccelerated Tier IX research was not nine successful missions");
+        for(int n=0;n<9;n++)apexProject=apexProject.victory();
+        check(apexProject.has(apex),"Tier IX research completion did not unlock the module");
+        check(CampaignTechnology.decode(CampaignTechnology.encode(apexProject),catalog)
+                .equals(apexProject),"Tier IX unlock did not survive the technology codec");
+        final int apexSlot=laserSlot;
+        Shipyard.Design apexShip=ship.stage(apexSlot,Shipyard.Track.OUTPUT,9);
+        CampaignShipyardRules.requireAllowed(apexShip,mature,apexProject,catalog);
+        reject(()->CampaignShipyardRules.requireAllowed(apexShip,mature,
+                matureDiscoveries,catalog),"Unresearched Tier IX was installed in campaign");
         System.out.println("PASS campaign technology: faction ownership, prerequisites, debit, victories, authorization, atomic ledger");
     }
 }

@@ -18,7 +18,7 @@ public final class CampaignProgress {
     private static int requiredMissions(Project kind,int rank,int speed){
         int base=switch(kind){
             case NONE -> 0;
-            case LICENSE -> rank>=6?0:LevelEconomy.researchMissionCost(rank+1);
+            case LICENSE -> rank>=9?0:LevelEconomy.researchMissionCost(rank+1);
             case ACCELERATOR -> speed>=4?0:ACCELERATOR_WORK[speed+1];
         };
         // At most four accelerators can shorten research to ONE required victory.
@@ -50,7 +50,7 @@ public final class CampaignProgress {
         }
         public State {
             if(faction==null||unlocked<1||unlocked>LevelEconomy.LEVEL_COUNT
-                    ||credits<0||victories<0||researchRank<0||researchRank>6
+                    ||credits<0||victories<0||researchRank<0||researchRank>9
                     ||highestCompleted<0||highestCompleted>LevelEconomy.LEVEL_COUNT
                     ||unlocked!=Math.min(LevelEconomy.LEVEL_COUNT,highestCompleted+1)
                     ||speedUpgrades<0||speedUpgrades>4||activeProject==null||projectProgress<0)
@@ -74,7 +74,7 @@ public final class CampaignProgress {
                     highestCompleted,speedUpgrades,activeProject,projectProgress);
         }
         public long nextResearchCost(){
-            return researchRank==6?0:LevelEconomy.draftResearchCost(researchRank+1);
+            return researchRank==9?0:LevelEconomy.draftResearchCost(researchRank+1);
         }
         public int nextResearchMissions(){
             return requiredMissions(Project.LICENSE,researchRank,speedUpgrades);
@@ -116,7 +116,9 @@ public final class CampaignProgress {
             if(desired==null||desired==Project.NONE||activeProject!=Project.NONE)return false;
             return switch(desired){
                 case NONE -> false;
-                case LICENSE -> researchRank<6&&credits>=nextResearchCost();
+                case LICENSE -> researchRank<9&&
+                        highestCompleted>=LevelEconomy.researchLicenseMilestone(researchRank+1)&&
+                        credits>=nextResearchCost();
                 case ACCELERATOR -> speedUpgrades<4&&
                         completed(nextAccelerationMilestone())&&credits>=nextAccelerationCost();
             };
@@ -127,8 +129,13 @@ public final class CampaignProgress {
                 throw new IllegalArgumentException("Select a research project");
             if(activeProject!=Project.NONE)
                 throw new IllegalArgumentException("Finish current research before starting another");
-            if(desired==Project.LICENSE&&researchRank==6)
-                throw new IllegalArgumentException("All six technology licenses completed");
+            if(desired==Project.LICENSE&&researchRank==9)
+                throw new IllegalArgumentException("All nine technology licenses completed");
+            if(desired==Project.LICENSE&&
+                    highestCompleted<LevelEconomy.researchLicenseMilestone(researchRank+1))
+                throw new IllegalArgumentException("Complete campaign mission "+
+                        LevelEconomy.researchLicenseMilestone(researchRank+1)+
+                        " to research engineering license "+(researchRank+1));
             if(desired==Project.ACCELERATOR){
                 if(speedUpgrades==4)
                     throw new IllegalArgumentException("All four laboratory upgrades completed");

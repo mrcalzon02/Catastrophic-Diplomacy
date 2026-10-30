@@ -66,7 +66,7 @@ final class ShipyardPanel {
     private boolean open;
     enum Usage { WORKSHOP, SKIRMISH, CAMPAIGN, CAMPAIGN_REFIT }
     private Usage usage=Usage.WORKSHOP;
-    private int campaignRank=6,unlockedMission=1;
+    private int campaignRank=9,unlockedMission=1;
     private boolean playerOnly;
     Usage usage(){return usage;}
     private boolean artPreview;
@@ -156,7 +156,7 @@ final class ShipyardPanel {
     }
     /** Campaign engineering edits a purchase blueprint, NOT an owned ship for free. */
     void showCampaignFleet(int researchRank,int mission){
-        if(researchRank<0||researchRank>6)
+        if(researchRank<0||researchRank>9)
             throw new IllegalArgumentException("Invalid campaign license");
         show();side(0);usage=Usage.CAMPAIGN;playerOnly=true;
         campaignRank=researchRank;unlockedMission=mission;
@@ -386,8 +386,8 @@ final class ShipyardPanel {
             float bottom=479-row*62;
             if(y>=bottom&&y<=bottom+43){
                 if(x>=807&&x<937)return 30+row; // skirmish track gate
-                for(int stage=0;stage<6;stage++)
-                    if(x>=943+stage*49&&x<985+stage*49)return 100+row*6+stage;
+                for(int stage=0;stage<9;stage++)
+                    if(x>=943+stage*35&&x<974+stage*35)return 100+row*9+stage;
             }
         }
         if(y>=211&&y<=257){
@@ -455,9 +455,9 @@ final class ShipyardPanel {
     private void technologyInput(int action){
         if(action==0){technologyView=false;return;}
         if(action==1){technologyView=true;return;}
-        if(action>=100&&action<124){
-            technologyTrack=Shipyard.Track.values()[(action-100)/6];
-            technologyStage=(action-100)%6+1;
+        if(action>=100&&action<136){
+            technologyTrack=Shipyard.Track.values()[(action-100)/9];
+            technologyStage=(action-100)%9+1;
             notice=technologyId()+(technologyAvailable(selectedSlot,technologyTrack,technologyStage)
                     ?" AVAILABLE TO FIT":" LOCKED BY CURRENT TECH RULES");
             return;
@@ -488,7 +488,7 @@ final class ShipyardPanel {
             var rules=challenge();
             try{
                 if(action==5)rules=rules.withStage(Math.max(0,rules.maxStage()-1));
-                if(action==6)rules=rules.withStage(Math.min(6,rules.maxStage()+1));
+                if(action==6)rules=rules.withStage(Math.min(9,rules.maxStage()+1));
                 if(action==7){
                     if(draft.at(selectedSlot)==null){notice="Select a fitted module first";return;}
                     rules=rules.toggleTechnology(technologyId());
@@ -496,7 +496,7 @@ final class ShipyardPanel {
                 if(action==8)rules=rules.withHullGeneration(Math.max(1,rules.maxHullGeneration()-1));
                 if(action==9)rules=rules.withHullGeneration(Math.min(10,rules.maxHullGeneration()+1));
                 updateSkirmishRules.accept(rules);
-                notice="CHALLENGE: TECH "+rules.maxStage()+"/6  HULL GEN <= "+rules.maxHullGeneration();
+                notice="CHALLENGE: TECH "+rules.maxStage()+"/9  HULL GEN <= "+rules.maxHullGeneration();
             }catch(IllegalArgumentException refused){notice=refused.getMessage();}
             return;
         }
@@ -622,7 +622,7 @@ final class ShipyardPanel {
                         notice="LOCKED: "+chosen+" research selected on this module. "
                                 +"Reduce "+chosen+" to stage 0 to respec before choosing "+track;
                     }else{
-                        int level=Math.max(0,Math.min(6,installed.stage(track)+delta));
+                        int level=Math.max(0,Math.min(9,installed.stage(track)+delta));
                         if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&
                                 level>campaignRank){
                             notice="LOCKED: purchase research rank "+level+" first";return true;
@@ -642,7 +642,7 @@ final class ShipyardPanel {
                             draft=draft.stage(selectedSlot,track,level);
                             notice=level==0
                                     ?"Fitted specialization cleared; choose another available variant"
-                                    :track+" fitting stage "+level+" / 6 (other branches locked)";
+                                    :track+" fitting stage "+level+" / 9 (other branches locked)";
                         }catch(IllegalArgumentException rejected){
                             notice=rejected.getMessage();
                         }
@@ -718,11 +718,11 @@ final class ShipyardPanel {
             boolean branchEnabled=campaign||rules.allowedTracks().contains(track);
             rectangle(shapes,810,bottom,126,43,branchEnabled?
                     new Color(.10f,.20f,.27f,1):new Color(.25f,.08f,.12f,1));
-            for(int rank=1;rank<=6;rank++){
+            for(int rank=1;rank<=9;rank++){
                 boolean allowed=selected!=null&&technologyAvailable(selectedSlot,track,rank);
                 boolean active=selected!=null&&selected.stage(track)==rank;
                 boolean chosen=track==technologyTrack&&rank==technologyStage;
-                rectangle(shapes,943+(rank-1)*49,bottom,42,43,
+                rectangle(shapes,943+(rank-1)*35,bottom,31,43,
                         active?new Color(.24f,.44f,.23f,1):
                         chosen?new Color(.30f,.25f,.12f,1):
                         allowed?new Color(.10f,.27f,.24f,1):
@@ -801,7 +801,7 @@ final class ShipyardPanel {
         font.setColor(Color.WHITE);
         font.draw(batch,campaign?(permittedResearch()==null?"NO RESEARCH INVENTORY":
                 permittedResearch().unlocked().size()+" PERMANENT RESEARCH UNLOCKS"):
-                "TECH "+rules.maxStage()+"/6 / GEN "+rules.maxHullGeneration()+
+                "TECH "+rules.maxStage()+"/9 / GEN "+rules.maxHullGeneration()+
                 "/10 / HULLS "+(rules.allowedHulls().isEmpty()?"ALL":rules.allowedHulls().size()),345,212);
         font.draw(batch,"TOGGLE HULL CLASS",355,185);
         font.draw(batch,"ALLOW ALL HULLS",582,185);
@@ -812,11 +812,11 @@ final class ShipyardPanel {
             int bottom=479-branch*62;
             font.setColor(campaign||rules.allowedTracks().contains(track)?Color.CYAN:Color.SCARLET);
             font.draw(batch,shortText(track.name(),13),815,bottom+28);
-            for(int rank=1;rank<=6;rank++){
+            for(int rank=1;rank<=9;rank++){
                 boolean unlocked=selected!=null&&technologyAvailable(selectedSlot,track,rank);
                 font.setColor(selected!=null&&selected.stage(track)==rank?Color.GREEN:
                         unlocked?Color.WHITE:Color.GRAY);
-                font.draw(batch,rank+"",959+(rank-1)*49,bottom+28);
+                font.draw(batch,rank+"",952+(rank-1)*35,bottom+28);
             }
         }
         font.setColor(Color.WHITE);
@@ -1063,7 +1063,7 @@ final class ShipyardPanel {
             boolean locked=activeResearch!=null && activeResearch!=track;
             font.setColor(locked?Color.GRAY:activeResearch==track?Color.GOLD:Color.WHITE);
             font.draw(batch,track.name()+(locked?" [LOCKED]":activeResearch==track?" [ACTIVE]":""),813,341-n*30);
-            font.draw(batch,locked?"---":("-   "+level+" / 6   +"),1097,341-n*30);
+            font.draw(batch,locked?"---":("-   "+level+" / 9   +"),1097,341-n*30);
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"MASS  "+units(report.mass())+" / "+units(draft.hull.massCapacity)+" t",813,209);
@@ -1071,7 +1071,7 @@ final class ShipyardPanel {
         font.draw(batch,"POWER "+units(report.demand())+" / "+units(report.generation())+" MW",813,161);
         font.draw(batch,"HEAT  "+units(report.generatedHeat())+" / "+units(report.cooling())+" MW",813,137);
         font.draw(batch,"BUILD COST "+report.industry()+" | TECH VALUE "+report.research()+
-                (usage==Usage.CAMPAIGN?" | LICENSE "+campaignRank+"/6":""),813,112);
+                (usage==Usage.CAMPAIGN?" | LICENSE "+campaignRank+"/9":""),813,112);
         if(installed!=null){
             font.setColor(Color.GOLD);
             font.draw(batch,"V: "+installed.pattern.name().replace('_',' '),813,84);

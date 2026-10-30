@@ -29,8 +29,12 @@ final class CampaignBudgetQuotes {
         String blocker=null;
         if(campaign.activeProject()!=CampaignProgress.Project.NONE)
             blocker="COMPLETE EXISTING PROJECT FIRST";
-        else if(license&&campaign.researchRank()==6)
-            blocker="ALL SIX LICENSES COMPLETED";
+        else if(license&&campaign.researchRank()==9)
+            blocker="ALL NINE LICENSES COMPLETED";
+        else if(license&&campaign.highestCompleted()<
+                LevelEconomy.researchLicenseMilestone(campaign.researchRank()+1))
+            blocker="COMPLETE MISSION "+
+                    LevelEconomy.researchLicenseMilestone(campaign.researchRank()+1)+" FIRST";
         else if(!license&&campaign.speedUpgrades()==4)
             blocker="ALL FOUR LAB UPGRADES COMPLETED";
         else if(!license&&!campaign.completed(campaign.nextAccelerationMilestone()))

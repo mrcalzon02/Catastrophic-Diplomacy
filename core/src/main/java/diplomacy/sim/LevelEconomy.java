@@ -44,10 +44,20 @@ public final class LevelEconomy {
         if(level==null)throw new IllegalArgumentException("Level required");
         return victoryCredits(level.baseCredits(),level.maximumFleet(),deployed,survivors,completed);
     }
-    /** Mission turns required for each of the six research generations (1..5). */
+    /** Mission turns required for each of the nine research generations (1..5). */
     public static int researchMissionCost(int rank){
-        if(rank<1||rank>6)throw new IllegalArgumentException("Research rank must be 1..6");
+        if(rank<1||rank>9)throw new IllegalArgumentException("Research rank must be 1..9");
         return Math.min(5,rank);
+    }
+    /** Hold the three late-game engineering licenses for sectors 5, 7 and 9. */
+    public static int researchLicenseMilestone(int rank) {
+        if(rank<1||rank>9)throw new IllegalArgumentException("Technology tier must be 1..9");
+        return switch(rank) {
+            case 7 -> 250;
+            case 8 -> 350;
+            case 9 -> 425;
+            default -> 0; // Existing I-VI campaign authorization remains intact.
+        };
     }
     /** Four optional, expensive acceleration upgrades with completed-stage prerequisites. */
     public static int researchSpeedMilestone(int level){
@@ -68,7 +78,7 @@ public final class LevelEconomy {
             default -> throw new IllegalArgumentException("Research accelerator must be 1..4");
         };
     }
-    /** Fixed six-stage research ladder pending technology catalogue purchase binding. */
+    /** Nine-stage research ladder pending technology catalogue purchase binding. */
     public static long draftResearchCost(int stage) {
         return switch(stage) {
             case 1 -> 25000L;
@@ -77,7 +87,10 @@ public final class LevelEconomy {
             case 4 -> 900000L;
             case 5 -> 3500000L;
             case 6 -> 15000000L;
-            default -> throw new IllegalArgumentException("Research stage must be 1 through 6");
+            case 7 -> 28000000L;
+            case 8 -> 45000000L;
+            case 9 -> 70000000L;
+            default -> throw new IllegalArgumentException("Research stage must be 1 through 9");
         };
     }
 }

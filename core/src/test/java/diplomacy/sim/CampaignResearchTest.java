@@ -104,6 +104,26 @@ public final class CampaignResearchTest {
                 "Campaign stage 500 first clear payout wrong");
         check(finalWin.complete(500,20,20).credits()-finalWin.credits()==first500/4,
                 "Final stage replay paid full reward twice");
+        reject(()->funded(249,6,0,1000000000L).purchaseNextResearch(),
+                "Engineering VII was purchasable before mission 250");
+        var seventh=funded(250,6,0,1000000000L).purchaseNextResearch();
+        check(seventh.activeProject()==CampaignProgress.Project.LICENSE,
+                "Tech VII research was not scheduled");
+        while(seventh.activeProject()!=CampaignProgress.Project.NONE)
+            seventh=seventh.complete(250,20,20);
+        check(seventh.researchRank()==7,"Tech VII never completed");
+        reject(()->funded(349,7,0,1000000000L).purchaseNextResearch(),
+                "Tech VIII milestone was bypassed");
+        reject(()->funded(424,8,0,1000000000L).purchaseNextResearch(),
+                "Tech IX milestone was bypassed");
+        var ninth=funded(425,8,0,1000000000L).purchaseNextResearch();
+        while(ninth.activeProject()!=CampaignProgress.Project.NONE)
+            ninth=ninth.complete(425,20,20);
+        check(ninth.researchRank()==9,"Tech IX not earned by campaign research");
+        final var top=ninth;
+        reject(top::purchaseNextResearch,"Ten technology licenses were allowed");
+        check(CampaignProgress.decode(CampaignProgress.encode(top)).equals(top),
+                "Tech IX campaign research was not persisted");
         reject(()->CampaignProgress.decode(CampaignProgress.encode(first).replace("TERRAN","DRAXIAN")),
                 "Corrupted research save checksum accepted");
         System.out.println("PASS research: instant zero-floor, paid licenses/labs, four accelerators, quarter replays, v1-v4 saves");

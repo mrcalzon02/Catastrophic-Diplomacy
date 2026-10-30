@@ -23,7 +23,7 @@ public final class HullProgression {
         };
     }
     public static boolean available(Shipyard.Hull hull,int tier) {
-        if(tier<0||tier>6)throw new IllegalArgumentException("Invalid technology tier");
+        if(tier<0||tier>9)throw new IllegalArgumentException("Invalid technology tier");
         return hull!=null&&requiredTier(hull)<=tier;
     }
     public static int baseFamiliesAtTier(int tier) {
@@ -41,6 +41,9 @@ public final class HullProgression {
             case 4 -> "STRIKE VARIANTS";
             case 5 -> "COMMAND VARIANTS";
             case 6 -> "SUPPORT VARIANTS";
+            case 7 -> "ELITE SYSTEMS";
+            case 8 -> "EXPERIMENTAL SYSTEMS";
+            case 9 -> "APEX ENGINEERING";
             default -> throw new IllegalArgumentException("Invalid technology tier");
         };
     }

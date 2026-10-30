@@ -190,8 +190,8 @@ final class GameMenuPanel {
         if(hit(x,y,306,35,255,54))return 3;
         if(hit(x,y,592,35,294,54))return 1;
         if(hit(x,y,906,35,330,54))return 2;
-        for(int i=0;i<6;i++)
-            if(hit(x,y,62+(i%3)*232,455-(i/3)*92,213,77))return 100+i;
+        for(int i=0;i<9;i++)
+            if(hit(x,y,62+(i%3)*232,515-(i/3)*68,213,60))return 100+i;
         for(int i=0;i<4;i++)
             if(hit(x,y,62+i*176,250,160,70))return 200+i;
         return -1;
@@ -205,9 +205,9 @@ final class GameMenuPanel {
         if(hit(x,y,917,35,317,55))return 3;
         for(int row=0;row<8;row++)
             if(hit(x,y,48,551-row*51,270,44))return 100+row;
-        for(int track=0;track<4;track++)for(int stage=0;stage<6;stage++)
-            if(hit(x,y,374+stage*74,439-track*100,64,49))
-                return 200+track*6+stage;
+        for(int track=0;track<4;track++)for(int stage=0;stage<9;stage++)
+            if(hit(x,y,374+stage*49,439-track*100,42,49))
+                return 200+track*9+stage;
         return -1;
     }
     static List<Component> technologySubsystems(TechnologyCatalog catalog,Battle.Faction faction){
@@ -218,7 +218,7 @@ final class GameMenuPanel {
                         .thenComparing(c->c.name)).toList();
     }
     static String technologyId(Battle.Faction faction,String subsystem,int track,int stage){
-        if(track<0||track>=4||stage<1||stage>6)
+        if(track<0||track>=4||stage<1||stage>9)
             throw new IllegalArgumentException("Invalid technology branch selection");
         String[] branches={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
         return "TECH-"+CampaignTechnology.factionCode(faction)+"-"+subsystem+"-"+
@@ -363,8 +363,8 @@ final class GameMenuPanel {
             case RESEARCH -> {
                 rectangle(shapes,35,163,748,453,PANEL);
                 rectangle(shapes,797,163,447,453,PANEL);
-                for(int i=0;i<6;i++)
-                    button(shapes,62+(i%3)*232,455-(i/3)*92,213,77,
+                for(int i=0;i<9;i++)
+                    button(shapes,62+(i%3)*232,515-(i/3)*68,213,60,
                             selectedResearchNode==i);
                 for(int i=0;i<4;i++)
                     button(shapes,62+i*176,250,160,70,selectedResearchNode==100+i);
@@ -389,12 +389,12 @@ final class GameMenuPanel {
                 }
                 shapes.setColor(MilitaryUiTheme.FRAME_BRIGHT);
                 for(int track=0;track<4;track++)
-                    for(int link=0;link<5;link++)
-                        shapes.rectLine(438+link*74,463-track*100,
-                                448+link*74,463-track*100,2f);
+                    for(int link=0;link<8;link++)
+                        shapes.rectLine(416+link*49,463-track*100,
+                                423+link*49,463-track*100,2f);
                 for(int track=0;track<4;track++)
-                    for(int stage=0;stage<6;stage++)
-                        button(shapes,374+stage*74,439-track*100,64,49,
+                    for(int stage=0;stage<9;stage++)
+                        button(shapes,374+stage*49,439-track*100,42,49,
                                 track==technologyTrack&&stage+1==technologyStage);
                 button(shapes,48,144,112,45,false);
                 button(shapes,174,144,125,45,false);
@@ -599,9 +599,9 @@ final class GameMenuPanel {
                         "CURRENT RESEARCH PROJECTS / FUNDED WITH CAMPAIGN CREDITS");
                 label(batch,font,"ENGINEERING LICENSE TIERS",62,587,Color.CYAN);
                 label(batch,font,"LABORATORY ACCELERATION",62,339,Color.CYAN);
-                for(int i=0;i<6;i++){
+                for(int i=0;i<9;i++){
                     int tier=i+1;
-                    float x=80+(i%3)*232,y=501-(i/3)*92;
+                    float x=80+(i%3)*232,y=552-(i/3)*68;
                     boolean done=tier<=progress.researchRank();
                     boolean next=tier==progress.researchRank()+1;
                     boolean running=next&&progress.activeProject()==CampaignProgress.Project.LICENSE;
@@ -687,13 +687,13 @@ final class GameMenuPanel {
                 String[] tracks={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
                 for(int track=0;track<4;track++){
                     label(batch,font,tracks[track],369,530-track*100,Color.CYAN);
-                    for(int stage=1;stage<=6;stage++){
+                    for(int stage=1;stage<=9;stage++){
                         String id=technologyId(progress.faction(),selected.subsystem,track,stage);
                         boolean known=discoveries.has(id);
                         boolean current=id.equals(discoveries.activeId());
                         Color color=known?Color.GREEN:current?Color.CYAN:
                                 technologyTrack==track&&technologyStage==stage?Color.GOLD:Color.WHITE;
-                        label(batch,font,""+stage,391+(stage-1)*74,469-track*100,color);
+                        label(batch,font,""+stage,382+(stage-1)*49,469-track*100,color);
                     }
                 }
                 String id=technologyId(progress.faction(),selected.subsystem,

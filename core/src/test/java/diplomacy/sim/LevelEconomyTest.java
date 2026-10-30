@@ -19,15 +19,19 @@ public final class LevelEconomyTest {
         check(LevelEconomy.victoryCredits(first,10,10,false)==0,"defeat cannot farm credits");
         check(LevelEconomy.victoryCredits(first,16,16,true)==14000,
                 "Raw first-clear formula is unchanged; replay reduction is applied by CampaignProgress");
-        for(int stage=1;stage<=6;stage++)
+        for(int stage=1;stage<=9;stage++)
             check(LevelEconomy.researchMissionCost(stage)==Math.min(5,stage),
                     "Research mission durations must range from one to five");
         for(int level=1;level<=4;level++){
             check(LevelEconomy.researchSpeedCost(level)>0,"Research acceleration cannot be free");
             check(LevelEconomy.researchSpeedMilestone(level)>0,"Accelerator must have milestone");
         }
-        for(int stage=1;stage<=6;stage++)
+        for(int stage=1;stage<=9;stage++)
             check(LevelEconomy.draftResearchCost(stage)>0,"research pricing stage "+stage);
+        check(LevelEconomy.researchLicenseMilestone(6)==0,"Existing licenses unexpectedly milestone-gated");
+        check(LevelEconomy.researchLicenseMilestone(7)==250,"Tech VII should follow Level 250");
+        check(LevelEconomy.researchLicenseMilestone(8)==350,"Tech VIII should follow Level 350");
+        check(LevelEconomy.researchLicenseMilestone(9)==425,"Tech IX should follow Level 425");
         boolean rejected=false;
         try{LevelEconomy.victoryCredits(first,21,20,true);}
         catch(IllegalArgumentException e){rejected=true;}

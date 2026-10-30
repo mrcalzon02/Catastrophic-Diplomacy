@@ -68,7 +68,7 @@ public final class GameMenuFlowTest {
                 ShipyardPanel.technologyHit(850,588)==0,
                 "Shipyard tech-loadout and module tabs are unmapped");
         check(ShipyardPanel.technologyHit(956,490)==100&&
-                ShipyardPanel.technologyHit(1201,305)==123,
+                ShipyardPanel.technologyHit(1225,305)==135,
                 "Per-module technology tree ranks are not clickable");
         check(ShipyardPanel.technologyHit(840,230)==2&&
                 ShipyardPanel.technologyHit(1010,230)==3&&
@@ -88,13 +88,14 @@ public final class GameMenuFlowTest {
                 "Exact hull-class whitelist editing controls are missing");
         check(ScenarioCatalog.challenge(ScenarioCatalog.Preset.DUEL).maxStage()==1&&
                 ScenarioCatalog.challenge(ScenarioCatalog.Preset.PATROL).maxStage()==2&&
-                ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM).maxStage()==6,
+                ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM).maxStage()==9,
                 "Scenario-specific technology tiers were not loaded");
 
         // Campaign tech-tree node selection is separated from payment.
-        check(GameMenuPanel.researchAction(100,489)==100,
+        check(GameMenuPanel.researchAction(100,540)==100,
                 "License I is not selectable on the technology tree");
-        check(GameMenuPanel.researchAction(595,397)==105,
+        check(GameMenuPanel.researchAction(595,470)==105&&
+                GameMenuPanel.researchAction(595,405)==108,
                 "License VI is not selectable on the technology tree");
         check(GameMenuPanel.researchAction(101,290)==200&&
                 GameMenuPanel.researchAction(635,290)==203,
@@ -111,7 +112,7 @@ public final class GameMenuFlowTest {
                 "Faction technology browser screen not present");
         check(GameMenuPanel.technologyAction(110,575)==100&&
                 GameMenuPanel.technologyAction(390,458)==200&&
-                GameMenuPanel.technologyAction(760,160)==223,
+                GameMenuPanel.technologyAction(780,160)==235,
                 "Tech subsystem/branch/stage hit targets do not match displayed controls");
         check(GameMenuPanel.technologyAction(1050,59)==3&&
                 GameMenuPanel.technologyAction(108,60)==0,
@@ -128,8 +129,8 @@ public final class GameMenuFlowTest {
                 check(nativeParts.stream().anyMatch(part->part.subsystem.equals(required)),
                         "Technology browser hides purpose-fitted logistics research "+required);
                 check(engineering.get(GameMenuPanel.technologyId(Battle.Faction.TERRAN,
-                        required,3,6))!=null,
-                        "Final specialist research stage missing for "+required);
+                        required,3,9))!=null,
+                        "Ninth specialist research stage missing for "+required);
             }
             check(engineering.get(GameMenuPanel.technologyId(Battle.Faction.TERRAN,
                     "LAS",0,1))!=null,"Selected faction technology ID does not exist");
