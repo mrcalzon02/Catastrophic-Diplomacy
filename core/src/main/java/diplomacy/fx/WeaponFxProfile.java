@@ -77,11 +77,11 @@ public final class WeaponFxProfile {
                         seq("particle","impact",8,1,36,36),NONE));
         byType.put(Battle.DamageType.MISSILE,
                 new Profile("missile",Motion.GUIDED,seq("missile","firing",6,1,22,22),
-                        seq("missile","payload",8,2,24,14),seq("missile","impact",10,1,42,42),
+                        new Clip("effects/weapon_fx/missile/payload_%02d.png",1,1,true,36,18),seq("missile","impact",10,1,42,42),
                         seq("missile","intercept",8,1,25,25)));
         byType.put(Battle.DamageType.TORPEDO,
                 new Profile("torpedo",Motion.GUIDED,seq("torpedo","firing",8,1,28,28),
-                        seq("torpedo","payload",8,2,30,18),seq("torpedo","impact",12,1,58,58),
+                        new Clip("effects/weapon_fx/torpedo/payload_%02d.png",1,1,true,48,22),seq("torpedo","impact",12,1,58,58),
                         seq("torpedo","intercept",8,1,33,33)));
         byType.put(Battle.DamageType.FIGHTER,
                 new Profile("fighter",Motion.CRAFT,seq("fighter","firing",8,1,24,24),

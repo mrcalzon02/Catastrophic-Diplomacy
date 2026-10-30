@@ -106,3 +106,34 @@ fighter and drone launch art still need source review and correct individual
 runtime sprites. Do not repurpose a UI missile glyph or entire arsenal
 sheet as a missile. Debug geometry is retained ONLY when the corresponding
 real art is missing, while the lighting/exhaust pass remains active.
+
+
+## Source-cropped physical guided ordnance (second pass)
+
+The project Library's original `catastrophic_diplomacy_weapon_fx_source_2026-10-24.zip`
+contains the transparent 1254×1254 `03_ballistic_missile_arsenal.png`
+(source SHA-256
+`069edc48f9d04d1eb2f14c1b8eb7fbf2e729660d2464c11bb3b31d3391926264`).
+Two **individual complete projectiles** were inspected against transparent
+and checkerboard backgrounds and source-cropped without re-illustration:
+
+| Runtime file | Exact source rectangle, left/top/right/bottom | Curated PNG SHA-256 | Geometry |
+| --- | --- | --- | --- |
+| `effects/weapon_fx/missile/payload_01.png` | `117,24,224,108` | `a60e59ae9ef171cf1b37f816f975e25b72eddfd364544943601b09785179f4f2` | 107×84 |
+| `effects/weapon_fx/torpedo/payload_01.png` | `878,20,1032,110` | `08bece0712eaf2b91dbdb449d2b43f831f360aa8c656a4e994ec426d3c49777f` | 154×90 |
+
+Unlike an effect flash or HUD icon, these sprites represent the actual
+munition body. One immutable transparent texture is reused across all ticks
+of each projectile's life; `ModularWeaponFxRenderer` rotates and translates
+it using live `Battle.Missile` coordinates and current velocity, retains
+cold-launch body visibility, and leaves ignited thruster/long smoke rendering
+to `CombatLightingRenderer`. `WeaponFxPipelineTest` enforces the one-frame
+looping profile paths for both families. Missing binaries still fall back to
+explicit debug geometry, but normal packaged desktop and Android builds now
+contain both images directly under `assets/`.
+
+These two cutouts are a first implementation of *physical missile bodies*;
+not yet a per-ammunition-variant atlas, launcher socket, or hand-approved
+full-scale visual test. Their source sheet is retained in the project Library.
+Point defense, flak and dedicated missile impact animations remain subsequent
+asset-curation work.

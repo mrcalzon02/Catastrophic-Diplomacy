@@ -46,6 +46,16 @@ public final class WeaponFxPipelineTest {
         require(payload.looping() && payload.frame(8)==1,"payload animation loops independently");
         require(WeaponFxProfile.forType(Battle.DamageType.MISSILE).motion()
                 ==WeaponFxProfile.Motion.GUIDED,"missile payload follows physical ordnance");
+        Clip missileBody=WeaponFxProfile.forType(Battle.DamageType.MISSILE).payload();
+        Clip torpedoBody=WeaponFxProfile.forType(Battle.DamageType.TORPEDO).payload();
+        require(missileBody.looping() && missileBody.frames()==1
+                && missileBody.path(0).equals("effects/weapon_fx/missile/payload_01.png")
+                && missileBody.frame(9999)==0,
+                "the original guided missile body stays visible for its complete real flight");
+        require(torpedoBody.looping() && torpedoBody.frames()==1
+                && torpedoBody.path(0).equals("effects/weapon_fx/torpedo/payload_01.png")
+                && torpedoBody.frame(9999)==0,
+                "the original torpedo body stays visible for its complete real flight");
         require(WeaponFxProfile.forWeapon("DRONE").firing().present(),"drone launch uses firing slot");
         require(WeaponFxProfile.forWeapon("UNKNOWN")==null,"unknown weapons cannot fabricate assets");
 
