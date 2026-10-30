@@ -124,8 +124,22 @@ final class ModularWeaponFxRenderer implements Disposable {
             if(image==null)continue;
             float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
                     event.targetY()-event.y(),event.targetX()-event.x()));
+            diplomacy.sim.LaserFamilies.Type laser=
+                    diplomacy.sim.LaserFamilies.fromWeapon(event.weapon());
+            float size=laser==null?1f:switch(laser){
+                case PULSE -> 1f;
+                case RAPID -> .72f;
+                case LANCE -> 1.25f;
+                case OVERDRIVE -> 1.35f;
+                case NEEDLE -> .62f;
+            };
+            if(laser!=null){
+                var tint=CombatLightingRenderer.laserColor(laser);
+                batch.setColor(tint.r,tint.g,tint.b,1);
+            }
             drawCentered(batch,image,(float)event.x(),(float)event.y(),
-                    shot.clip().width(),shot.clip().height(),angle);
+                    shot.clip().width()*size,shot.clip().height()*size,angle);
+            if(laser!=null)batch.setColor(1,1,1,1);
         }
         // Guided PAYLOAD uses the projectile's *current* simulation position,
         // rotation and own spawn tick. A missile does not teleport to its target.
