@@ -9,6 +9,10 @@ import diplomacy.tech.TechnologyCatalog;
  */
 public final class DemonstrationBattle {
     private static final String[] WEAPONS = {"LAS","KIN","PLA","PAR","MSL","TOR"};
+    /** One visual civilization PER side; vary the weapons, never the race. */
+    public static final Battle.Faction[] SIDES = {
+            Battle.Faction.VAERITH_PRISM,Battle.Faction.AUREATE_SYNOD
+    };
     // Wing 0 carries fighters; groups 2 and 4 contain ONE purpose-fitted
     // service hull each, never 33 invisible fleet-wide support operators.
     private static final String[] SUPPORT = {"FTR","DRN","REP"};
@@ -26,7 +30,7 @@ public final class DemonstrationBattle {
         if(catalog==null)throw new IllegalArgumentException("Technology catalog missing");
         Battle battle=new Battle(SEED);
         for(int team=0;team<2;team++)for(int group=0;group<WEAPONS.length;group++) {
-            Battle.Faction faction=Battle.Faction.values()[(group+3*team)%6];
+            Battle.Faction faction=SIDES[team];
             Shipyard.Hull hull=(group==2||group==4)?Shipyard.Hull.DREADNOUGHT
                     :group%2==0?Shipyard.Hull.CRUISER:Shipyard.Hull.FRIGATE;
             String prefix="BASE-"+Shipyard.factionId(faction)+"-";
