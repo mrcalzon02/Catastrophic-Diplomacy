@@ -12,7 +12,7 @@ public final class TechnologyCatalogTest {
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
         require(c.upgradeCount() == 8976, "full technology count");
-        require(c.componentCount() == 363, "all base components");
+        require(c.componentCount() == 374, "all base components");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
