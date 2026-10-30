@@ -2314,10 +2314,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     " craft="+peakCraft+" ordnance="+peakOrdnance);
         if(battle.tick<480&&!battle.finished())return;
         double self=0,remote=0,shield=0;
-        int serviceDrones=0;
+        int serviceDrones=0,specialists=0;
         for(Battle.Ship ship:battle.ships()){
             self+=ship.hullRepaired;remote+=ship.remoteHullRepaired;
             shield+=ship.shieldsTransferred;serviceDrones+=ship.repairDronesLaunched;
+            if(ship.support.remoteRepairRate()>0||ship.support.shieldTransferRate()>0
+                    ||ship.support.repairDroneCapacity()>0)specialists++;
         }
         StringBuilder failure=new StringBuilder();
         if(battle.ships().size()!=400)failure.append("ship count; ");
@@ -2328,7 +2330,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verifiedFrames<6||verifiedShots==0||verifiedImpacts==0||battle.hitCount==0)
             failure.append("unverified rendered combat; ");
         if(peakOrdnance==0||peakCraft==0)failure.append("no ordnance/craft; ");
-        if(self<=0||remote<=0||shield<=0||serviceDrones==0)failure.append("inactive support; ");
+        // Self-repair is NOT standard on ships; deliberately rare purpose-built
+        // projectors are proven by their actual remote output and drone launches.
+        // Requiring self>0 would pressure test fleets to equip everybody with
+        // automatic self-repair again, violating specialist support doctrine.
+        if(remote<=0||shield<=0||serviceDrones==0)
+            failure.append("dedicated remote support inactive; ");
+        if(specialists!=4)failure.append("unexpected specialist count "+specialists+"; ");
         if(peakAnimations==0)failure.append("VFX compositor unused; ");
         // Exactly 400 fitted ships spawn; a single missing faction can hide
         // behind hundreds of successful draws unless the count is strict.
@@ -2341,7 +2349,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " shots="+verifiedShots+" hits="+battle.hitCount+
             " impacts="+verifiedImpacts+" weapons="+verifiedTypes+
             " ordnance="+peakOrdnance+" craft="+peakCraft+
-            " self="+self+" remote="+remote+" shield="+shield+
+            " self="+self+" specialists="+specialists+
+            " remote="+remote+" shield="+shield+
             " repairDrones="+serviceDrones+
             " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
             " VFX="+peakAnimations+" spriteShips="+peakSpriteShips+
