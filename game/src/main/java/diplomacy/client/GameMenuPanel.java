@@ -36,6 +36,11 @@ final class GameMenuPanel {
     private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
     private final float[] chromeCommands=new float[512*5];
     private int chromeCount;
+    private float pointerX=-100,pointerY=-100;
+    private boolean pointerActive,pointerDown;
+    private Screen lastPressScreen,hoverScreen;
+    private int recentPress=-1,lastHover=-1;
+    private long pressUntilNs;
 
     private void enqueueChrome(float x,float y,float w,float h,int variant){
         if(chromeCount*5>=chromeCommands.length)
@@ -47,6 +52,55 @@ final class GameMenuPanel {
     }
 
     void dispose(){grittyChrome.dispose();backgrounds.dispose();}
+    void pointer(float x,float y,boolean active,boolean held){
+        pointerX=x;pointerY=y;pointerActive=active;pointerDown=held;
+    }
+    /** -2 means a visible disabled button, -1 means no button at this point. */
+    int controlAt(float x,float y){
+        for(int i=chromeCount-1;i>=0;i--){
+            int k=i*5;
+            if(hit(x,y,chromeCommands[k],chromeCommands[k+1],
+                    chromeCommands[k+2],chromeCommands[k+3]))
+                return chromeCommands[k+4]<0?-2:i;
+        }
+        return -1;
+    }
+    void press(Screen screen,float x,float y){
+        recentPress=controlAt(x,y);
+        lastPressScreen=screen;
+        pressUntilNs=System.nanoTime()+160_000_000L;
+    }
+    boolean enteredNewButton(Screen screen){
+        int next=pointerActive&&!pointerDown?controlAt(pointerX,pointerY):-1;
+        boolean entered=next>=0&&(next!=lastHover||hoverScreen!=screen);
+        lastHover=next;hoverScreen=screen;
+        return entered;
+    }
+    private void feedback(ShapeRenderer shapes,Screen screen){
+        int hovering=pointerActive?controlAt(pointerX,pointerY):-1;
+        int pressed=lastPressScreen==screen&&System.nanoTime()<pressUntilNs?recentPress:-1;
+        for(int i=0;i<chromeCount;i++){
+            int k=i*5;
+            float x=chromeCommands[k],y=chromeCommands[k+1],
+                    w=chromeCommands[k+2],h=chromeCommands[k+3];
+            if(chromeCommands[k+4]<0){
+                shapes.setColor(.035f,.044f,.048f,1f);
+                shapes.rect(x+3,y+3,w-6,h-6);
+                shapes.setColor(.18f,.20f,.20f,1f);
+                shapes.rect(x+4,y+h-7,w-8,2);
+                continue;
+            }
+            boolean down=i==pressed||(pointerDown&&i==hovering);
+            if(i!=hovering&&!down)continue;
+            shapes.setColor(down?MilitaryUiTheme.AMBER:MilitaryUiTheme.TELEMETRY);
+            float thick=down?4:2;
+            shapes.rect(x+2,y+2,w-4,thick);
+            shapes.rect(x+2,y+h-2-thick,w-4,thick);
+            shapes.rect(x+2,y+2,thick,h-4);
+            shapes.rect(x+w-2-thick,y+2,thick,h-4);
+            if(down)shapes.rect(x+10,y+8,w-20,3);
+        }
+    }
 
     private static final String[] HOME_ACTIONS={
         "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT","MULTIPLAYER"
@@ -258,6 +312,10 @@ final class GameMenuPanel {
         MilitaryUiTheme.button(shapes,x,y,w,h,selected,MilitaryUiTheme.Intent.NORMAL);
         enqueueChrome(x,y,w,h,selected?GrittyUiChrome.SELECTED:GrittyUiChrome.NORMAL);
     }
+    private void disabledButton(ShapeRenderer shapes,float x,float y,float w,float h){
+        MilitaryUiTheme.button(shapes,x,y,w,h,false,MilitaryUiTheme.Intent.NORMAL);
+        enqueueChrome(x,y,w,h,-1);
+    }
     private void actionButton(ShapeRenderer shapes,float x,float y,float w,float h,
                               MilitaryUiTheme.Intent intent){
         MilitaryUiTheme.button(shapes,x,y,w,h,false,intent);
@@ -286,6 +344,7 @@ final class GameMenuPanel {
               CampaignFleet.Roster ownedFleet,int dockPage,int dockSelected,long[] dockCosts,
               long purchaseCost,String dockNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
+              float voiceVolume,
               boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
                int themePage,FleetNames.Style themeCandidate,
@@ -516,8 +575,18 @@ final class GameMenuPanel {
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
-                for(int i=0;i<5;i++)
-                    if(i!=3||updaterAvailable)button(shapes,405,472-i*78,470,59,false);
+                for(int i=0;i<5;i++){
+                    if(i==3&&!updaterAvailable)disabledButton(shapes,405,472-i*78,470,59);
+                    else button(shapes,405,472-i*78,470,59,false);
+                }
+                rectangle(shapes,405,544,470,72,MilitaryUiTheme.PANEL);
+                rectangle(shapes,VoiceVolumeControl.LEFT,560,VoiceVolumeControl.WIDTH,7,
+                        MilitaryUiTheme.FRAME);
+                rectangle(shapes,VoiceVolumeControl.LEFT,560,
+                        VoiceVolumeControl.WIDTH*VoiceVolumeControl.clamp(voiceVolume),7,
+                        MilitaryUiTheme.TELEMETRY);
+                rectangle(shapes,VoiceVolumeControl.thumbX(voiceVolume)-7,552,14,24,
+                        MilitaryUiTheme.AMBER);
             }
             case RESULTS -> {
                 if(report!=null){
@@ -539,6 +608,11 @@ final class GameMenuPanel {
                     chromeCommands[at],chromeCommands[at+1],
                     chromeCommands[at+2],chromeCommands[at+3]);
         }
+        batch.end();
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        feedback(shapes,screen);
+        shapes.end();
+        batch.begin();
         switch(screen){
             case HOME -> {
                 title(batch,font,"CATASTROPHIC DIPLOMACY","TACTICAL FLEET COMMAND");
@@ -929,10 +1003,14 @@ final class GameMenuPanel {
             }
             case OPTIONS -> {
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
+                label(batch,font,"VOICE VOLUME",427,598,Color.WHITE);
+                label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",817,598,Color.WHITE);
+                label(batch,font,"DRAG OR LEFT / RIGHT: 5% STEPS",427,540,MUTED);
                 label(batch,font,"MUSIC: "+(music?"ON":"OFF"),445,510,Color.WHITE);
                 label(batch,font,"SOUND EFFECTS: "+(effects?"ON":"OFF"),445,432,Color.WHITE);
                 label(batch,font,"SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),445,354,Color.WHITE);
-                label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES: NOT AVAILABLE ON DESKTOP",445,276,Color.WHITE);
+                label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",445,276,
+                        updaterAvailable?Color.WHITE:MUTED);
                 label(batch,font,"BACK",445,198,Color.WHITE);
             }
             case RESULTS -> {
