@@ -138,7 +138,13 @@ public final class ShipSurfaceMapGenerator {
                     });
             }
         }
-        if(sources.size()<60)throw new IllegalStateException("Expected full approved fleet + fighter art, found "+sources.size());
+        long terran=sources.keySet().stream().filter(p->p.startsWith("terran/")).count();
+        long modern=sources.keySet().stream().filter(p->p.startsWith("factions/")).count();
+        long fighters=sources.keySet().stream().filter(p->p.startsWith("fighters/")).count();
+        long legacy=sources.keySet().stream().filter(p->p.startsWith("legacy_factions/")).count();
+        if(terran<10||modern<50||fighters<50||legacy<50)
+            throw new IllegalStateException("Incomplete original art: terran="+terran+
+                    " approved factions="+modern+" fighters="+fighters+" legacy="+legacy);
         for(var item:sources.entrySet())generate(item.getValue(),output.resolve("ships").resolve(item.getKey()));
         System.out.println("PASS: derived "+sources.size()+" paired original-alpha normal/emissive maps");
     }
