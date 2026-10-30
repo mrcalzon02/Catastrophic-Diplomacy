@@ -72,6 +72,85 @@ tasks.register('prepareStage1Art') {
     }
 }
 
+
+/**
+ * The user's original five-faction, ten-roles-per-faction fighter art.
+ * Binary chunks reconstruct the original ZIP byte-for-byte. Do not substitute
+ * synthetic icons or arbitrary fleet-sheet crops for the approved craft.
+ */
+def originalFighterParts = (0..<13).collect {
+    file('asset_packs/fighter-craft/part-' + String.format('%02d', it) + '.bin')
+}
+def originalFighterOutput = layout.buildDirectory.dir('generated/cd-fighters')
+tasks.register('prepareFighterArt') {
+    group = 'assets'
+    description = 'Restore all 50 original fighter and drone ship sprites for combat.'
+    inputs.files originalFighterParts
+    outputs.dir originalFighterOutput
+    doLast {
+        originalFighterParts.each {
+            if (!it.isFile()) throw new GradleException('Missing original fighter sprite ZIP part: ' + it)
+        }
+        def original = layout.buildDirectory.file('tmp/approved-fighter-craft.zip').get().asFile
+        original.parentFile.mkdirs()
+        original.withOutputStream { target ->
+            originalFighterParts.each { part ->
+                part.withInputStream { source -> source.transferTo(target) }
+            }
+        }
+        def hash = { byte[] bytes ->
+            java.security.MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString()
+        }
+        if (hash(original.bytes) !=
+                '11d9bd179f7cdb891c0a8aafdb83eb16d635a9d012c2de8b3996125015bbf2eb')
+            throw new GradleException('Original 50-fighter sprite ZIP checksum mismatch')
+        def destRoot = originalFighterOutput.get().asFile
+        project.delete(destRoot)
+        destRoot.mkdirs()
+        def required = [
+            'interceptor','superiority_fighter','assault_gunship','missile_fighter',
+            'torpedo_bomber','recon_fighter','heavy_bomber','point_defense_fighter',
+            'electronic_warfare','support_drone'
+        ] as Set
+        def factions = [
+            'vaerith_prism','zelthar_luminari','nyx_biolith','umbra_foundry','aureate_synod'
+        ] as Set
+        new java.util.zip.ZipFile(original).withCloseable { archive ->
+            def manifestEntry = archive.getEntry('manifest.json')
+            if (manifestEntry == null) throw new GradleException('Fighter art manifest missing')
+            def manifest = archive.getInputStream(manifestEntry).withCloseable { stream ->
+                new groovy.json.JsonSlurper().parse(stream)
+            }
+            if (manifest.format != 'cd-fighters-v1' || manifest.count != 50 ||
+                    manifest.ships.size() != 50)
+                throw new GradleException('Unexpected original fighter asset count')
+            def seen = [] as Set
+            manifest.ships.each { ship ->
+                if (!(ship.faction in factions) || !(ship.role in required) ||
+                        ship.file != ship.faction + '/' + ship.role + '.png' ||
+                        !seen.add(ship.file))
+                    throw new GradleException('Invalid/duplicate fighter sprite: ' + ship.file)
+                def entry=archive.getEntry(ship.file)
+                if (entry == null) throw new GradleException('Original fighter sprite missing: ' + ship.file)
+                byte[] content=archive.getInputStream(entry).withCloseable { it.bytes }
+                if (content.length < 64 || !java.util.Arrays.equals(
+                        java.util.Arrays.copyOf(content,8),
+                        [137,80,78,71,13,10,26,10].collect { (byte)it } as byte[]))
+                    throw new GradleException('Fighter sprite is not PNG: ' + ship.file)
+                def image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(content))
+                if (image == null || image.width != ship.size[0] || image.height != ship.size[1])
+                    throw new GradleException('Original fighter sprite dimensions changed: ' + ship.file)
+                def target=new File(destRoot,'ships/fighters/'+ship.file)
+                target.parentFile.mkdirs()
+                target.bytes=content
+            }
+            if (seen.size()!=50 || seen.collect { it.split('/')[0] }.toSet()!=factions)
+                throw new GradleException('Fighter sprites are incomplete')
+        }
+        println('PASS: all 50 original fighter and drone sprites restored from Git.')
+    }
+}
+
 allprojects {
     group = 'games.catastrophicdiplomacy'
     version = '0.1.0-SNAPSHOT'
