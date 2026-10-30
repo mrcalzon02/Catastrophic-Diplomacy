@@ -108,6 +108,10 @@ final class ShieldFxTimeline {
     }
     private static Battle.DamageType weapon(Battle.VisualEvent event){
         if(event==null)return null;
+        // Pulse, rapid, lance, overdrive and needle laser variants all
+        // produce a real laser contact filament, not an unknown-type flash.
+        if(diplomacy.sim.LaserFamilies.fromWeapon(event.weapon())!=null)
+            return Battle.DamageType.LASER;
         try{return Battle.DamageType.valueOf(event.weapon());}
         catch(IllegalArgumentException|NullPointerException ignored){return null;}
     }
