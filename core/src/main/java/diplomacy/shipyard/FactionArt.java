@@ -50,23 +50,13 @@ public final class FactionArt {
         };
     }
     /**
-     * The five legacy non-Terran races are the mechanical ancestors of the new
-     * art civilizations. Share their already-approved sprite families at runtime
-     * rather than silently rendering a solid polygon for legacy faction choices.
-     * This changes only the visual lookup: identity, mechanics and saves stay put.
-     * Terran has no committed per-hull PNGs yet, so never impersonate another race.
+     * Identity is authoritative: an approved faction sprite belongs ONLY to its
+     * named civilization. Sharing a mechanics archetype is NEVER an art license.
+     * A null entry means this faction needs its own approved asset import;
+     * renderers must not display a different civilization's hull instead.
      */
     public static Entry visualArt(Battle.Faction faction){
-        if(faction==null)return null;
-        Battle.Faction source=switch(faction){
-            case DRAXIAN -> Battle.Faction.VAERITH_PRISM;
-            case UZIPT -> Battle.Faction.ZELTHAR_LUMINARI;
-            case MANDRALLY -> Battle.Faction.AUREATE_SYNOD;
-            case CARNELIAN -> Battle.Faction.NYX_BIOLITH;
-            case ZIPPLEDROW -> Battle.Faction.UMBRA_FOUNDRY;
-            default -> faction;
-        };
-        return ALIENS.get(source);
+        return faction==null?null:ALIENS.get(faction);
     }
     /** Prefix relative to the shared assets directory, not the source sheet. */
     public static String runtimePath(Battle.Faction faction,Shipyard.Hull hull){
