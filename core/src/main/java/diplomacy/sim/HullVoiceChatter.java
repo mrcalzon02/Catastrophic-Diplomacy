@@ -207,6 +207,11 @@ public final class HullVoiceChatter {
         // Register selects phrasing INSIDE the hull's fixed personality bank.
         if(tone==CrewChatter.Tone.PROFESSIONAL)return variants[0];
         if(tone==CrewChatter.Tone.VETERAN)return variants[1];
+        // The inherited LIGHTHEARTED setting must never silently collapse
+        // into the professional line. Retain actual playful, size-appropriate
+        // diction instead of randomly selecting a serious bridge report.
+        if(tone==CrewChatter.Tone.LIGHTHEARTED)
+            return CrewChatter.line(CrewChatter.scale(hull),event,tick,id,tone);
         long seed=tick^((long)id*0x9e3779b97f4a7c15L)
                 ^((long)event.ordinal()*0xd1b54a32d192ed03L);
         seed^=seed>>>30;seed*=0xbf58476d1ce4e5b9L;

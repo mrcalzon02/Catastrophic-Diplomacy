@@ -4,6 +4,7 @@ import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.CampaignTechnology;
 import diplomacy.tech.TechnologyCatalog;
 
