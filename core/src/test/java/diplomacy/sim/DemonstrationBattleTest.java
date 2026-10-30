@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import diplomacy.fx.WeaponFxProfile;
+import diplomacy.shipyard.FactionArt;
 import diplomacy.tech.TechnologyCatalog;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -17,6 +18,10 @@ public final class DemonstrationBattleTest {
         // a specialist DRN tender and an independent REP+XFR relay craft.
         int[] service={0,0},relays={0,0},repairs={0,0},repairDrones={0,0};
         for(Battle.Ship ship:battle.ships()){
+            check(ship.faction==DemonstrationBattle.SIDES[ship.team],
+                    "Canonical 200v200 fleet improperly mixes civilization sprites on one team");
+            check(FactionArt.runtimePath(ship.faction,ship.hullClass)!=null,
+                    "200v200 ship has no approved image belonging to its own civilization");
             if(ship.support.remoteRepairRate()>0)repairs[ship.team]++;
             if(ship.support.shieldTransferRate()>0)relays[ship.team]++;
             if(ship.support.repairDroneCapacity()>0)repairDrones[ship.team]++;
