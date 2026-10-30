@@ -1,0 +1,45 @@
+name: Hull coverage diagnostic - 11 duels and mixed 11v11
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hull-coverage-diagnostics.yml'
+      - 'core/src/main/java/diplomacy/sim/HullCoverageBattle.java'
+      - 'core/src/test/java/diplomacy/sim/HullCoverageBattleTest.java'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Intentionally isolated from frequently cancelled release builds.
+# This runs functional/visual diagnostics without publishing or blocking releases.
+jobs:
+  every-hull:
+    name: Validate real fitted 1v1 and 11v11 fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Exercise every hull size and shield-to-armor progression
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p test-output/hull-coverage
+          gradle --no-daemon :core:hullCoverageSmoke :core:shipSurfaceDamageSmoke :game:classes |
+            tee test-output/hull-coverage/functional-test.log
+      - name: Save independent diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-hull-coverage-${{ github.sha }}
+          path: test-output/hull-coverage/
+          if-no-files-found: warn
+          retention-days: 30
