@@ -89,7 +89,30 @@ public final class ShipSurfaceMapGenerator {
                 throw new IOException("PNG encoder unavailable "+target);
         }
     }
+    /** Structural pixel regression for transparent margins, painted lights and normals. */
+    static void selfTest(){
+        BufferedImage sample=new BufferedImage(7,7,BufferedImage.TYPE_INT_ARGB);
+        for(int y=1;y<6;y++)for(int x=1;x<6;x++)
+            sample.setRGB(x,y,0xff3b4652);
+        sample.setRGB(3,3,0xff25d6f8);
+        BufferedImage[] maps=derive(sample);
+        if(maps[0].getRGB(0,0)!=0||maps[1].getRGB(0,0)!=0)
+            throw new AssertionError("Transparent ship margins must remain transparent");
+        if((maps[0].getRGB(3,3)>>>24)!=255||
+                (maps[1].getRGB(3,3)>>>24)!=255)
+            throw new AssertionError("Source alpha lost in material maps");
+        if((maps[1].getRGB(3,3)&0x00ffffff)==0||
+                (maps[1].getRGB(1,1)&0x00ffffff)!=0)
+            throw new AssertionError("Source-driven emission misclassified");
+        if(((maps[0].getRGB(2,3)>>>16)&255)==128)
+            throw new AssertionError("Painted detail did not produce a surface normal");
+        BufferedImage oversized=new BufferedImage(640,320,BufferedImage.TYPE_INT_ARGB);
+        BufferedImage limited=bounded(oversized);
+        if(limited.getWidth()!=320||limited.getHeight()!=160)
+            throw new AssertionError("Material texture cap/aspect is invalid");
+    }
     public static void main(String[] args) throws Exception{
+        selfTest();
         if(args.length<2)throw new IllegalArgumentException("Output and >=1 ship source root required");
         Path output=Path.of(args[0]);
         Map<String,Path> sources=new TreeMap<>();
