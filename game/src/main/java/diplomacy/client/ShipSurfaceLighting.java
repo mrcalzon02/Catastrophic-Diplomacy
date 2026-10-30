@@ -31,10 +31,13 @@ final class ShipSurfaceLighting implements Disposable {
         "uniform sampler2D u_normal;\n"+
         "uniform sampler2D u_emission;\n"+
         "void main(){\n"+
-        " vec4 albedo=texture2D(u_texture,v_uv)*v_color;\n"+
+        " vec4 albedo=texture2D(u_texture,v_uv);\n"+
+        " albedo.a*=v_color.a;\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
         " vec3 n=normalize(texture2D(u_normal,v_uv).rgb*2.0-1.0);\n"+
-        " vec3 key=normalize(vec3(-0.52,0.45,0.75));\n"+
+        " vec2 axis=normalize(v_color.rg*2.0-1.0);\n"+
+        " vec3 key=normalize(vec3(-0.52*axis.x+0.45*axis.y,\n"+
+        "                          0.52*axis.y+0.45*axis.x,0.75));\n"+
         " float diffuse=max(dot(n,key),0.0);\n"+
         " float glint=pow(max(dot(reflect(-key,n),vec3(0.0,0.0,1.0)),0.0),24.0);\n"+
         " float rim=pow(clamp(1.0-n.z,0.0,1.0),2.0);\n"+
@@ -92,6 +95,16 @@ final class ShipSurfaceLighting implements Disposable {
             normal.dispose();if(emissive!=null)emissive.dispose();
             throw failure;
         }
+    }
+    /**
+     * Encode per-sprite rotation in the existing packed vertex color channels.
+     * The material shader decodes it as world-light direction, not a tint.
+     * No per-vessel uniform upload, shader rebind, or forced draw-call flush.
+     */
+    static void heading(SpriteBatch batch,float spriteRotationDegrees){
+        double theta=Math.toRadians(spriteRotationDegrees);
+        batch.setColor((float)(.5+.5*Math.cos(theta)),
+                       (float)(.5+.5*Math.sin(theta)),1f,1f);
     }
     void begin(SpriteBatch batch){
         active=null;binds=0;started=true;
