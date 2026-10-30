@@ -89,6 +89,7 @@ public final class Battle {
         public SupportDoctrine logistics=SupportDoctrine.NONE;
         public final int[] serviceDroneReserve=new int[SupportDoctrine.Channel.values().length];
         public double armorServiced,powerSupplied,auraService;
+        public int serviceDronesRearmed;
         public double hullRepaired,shieldRecharged,remoteHullRepaired,shieldsTransferred;
         public int repairDronesLaunched;
         /** Installed machinery determines operating headroom and thermal rejection. */
@@ -1679,6 +1680,7 @@ public final class Battle {
                             source.power-=cost;source.heat+=cost*0.17;
                             craft.repairReserve=craft.serviceMaxCharge;
                             craft.fuel=52;
+                            source.serviceDronesRearmed++;
                             if(craft.serviceRange>300)
                                 source.serviceDroneReserve[craft.serviceChannel.ordinal()]++;
                             else source.repairDroneReserve++;
