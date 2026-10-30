@@ -177,7 +177,7 @@ final class GameMenuPanel {
         }
         return -1;
     }
-    /** Inspect technology nodes, or authorize one of two real campaign projects. */
+    /** Inspect campaign licenses/laboratories, or authorize an actual paid project. */
     static int researchAction(float x,float y){
         if(hit(x,y,35,35,250,54))return 0;
         if(hit(x,y,592,35,294,54))return 1;
@@ -515,9 +515,9 @@ final class GameMenuPanel {
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
             case RESEARCH -> {
-                title(batch,font,"CAMPAIGN TECHNOLOGY TREE",
-                        "SIX LICENSE TIERS / FOUR LABORATORY UPGRADES / PAID FROM CAMPAIGN CREDITS");
-                label(batch,font,"ENGINEERING LICENSES",62,587,Color.CYAN);
+                title(batch,font,"CAMPAIGN RESEARCH - LICENSES & LABS",
+                        "CURRENT RESEARCH PROJECTS / FUNDED WITH CAMPAIGN CREDITS");
+                label(batch,font,"ENGINEERING LICENSE TIERS",62,587,Color.CYAN);
                 label(batch,font,"LABORATORY ACCELERATION",62,339,Color.CYAN);
                 for(int i=0;i<6;i++){
                     int tier=i+1;
@@ -570,7 +570,7 @@ final class GameMenuPanel {
                 label(batch,font,"ONE SUCCESSFUL MISSION = ONE RESEARCH TICK",
                         819,300,MUTED);
                 label(batch,font,shortLabel(dockNotice,63),819,228,Color.CYAN);
-                label(batch,font,"SELECT NODES TO INSPECT; BUTTONS AUTHORIZE NEXT TIER",
+                label(batch,font,"LICENSE TIERS ARE NOT MODULE-SPECIFIC TECHNOLOGY TREES",
                         56,183,MUTED);
                 label(batch,font,researchReturn==Screen.DOCK?"BACK TO DOCK":"BACK TO CAMPAIGN",
                         66,68,Color.WHITE);
