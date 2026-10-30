@@ -13,6 +13,21 @@ public final class DemonstrationBattleTest {
     }
     private static long exercise(TechnologyCatalog catalog) {
         Battle battle=DemonstrationBattle.create(catalog);
+        // There must be only two purpose-fitted support operators per side:
+        // a specialist DRN tender and an independent REP+XFR relay craft.
+        int[] service={0,0},relays={0,0},repairs={0,0},repairDrones={0,0};
+        for(Battle.Ship ship:battle.ships()){
+            if(ship.support.remoteRepairRate()>0)repairs[ship.team]++;
+            if(ship.support.shieldTransferRate()>0)relays[ship.team]++;
+            if(ship.support.repairDroneCapacity()>0)repairDrones[ship.team]++;
+            if(ship.support.remoteRepairRate()>0||ship.support.shieldTransferRate()>0
+                    ||ship.support.repairDroneCapacity()>0)service[ship.team]++;
+        }
+        for(int side=0;side<2;side++){
+            check(service[side]==2,"Only 2 dedicated support hulls per 200, team "+side);
+            check(relays[side]==1&&repairs[side]==1&&repairDrones[side]==1,
+                    "Specialist capabilities must not spread across ordinary ships");
+        }
         EnumSet<Battle.DamageType> fired=EnumSet.noneOf(Battle.DamageType.class);
         Set<Long> fireIds=new HashSet<>();
         long last=0;
