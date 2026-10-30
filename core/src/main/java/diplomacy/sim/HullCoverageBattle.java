@@ -19,6 +19,10 @@ public final class HullCoverageBattle {
             Shipyard.Hull.BATTLECRUISER,Shipyard.Hull.CARRIER,
             Shipyard.Hull.DREADNOUGHT);
     private static final String[] WEAPONS={"LAS","KIN","PLA","PAR","MSL","TOR"};
+    /** Each side represents ONE civilization across every hull size. */
+    public static final Battle.Faction[] SIDES={
+            Battle.Faction.VAERITH_PRISM,Battle.Faction.AUREATE_SYNOD
+    };
     private HullCoverageBattle(){}
 
     private static int slot(Shipyard.Hull hull,Shipyard.Mount mount,int n){
@@ -30,8 +34,7 @@ public final class HullCoverageBattle {
         if(size<0||size>=SIZES.size()||side<0||side>1)
             throw new IllegalArgumentException("Invalid hull coverage fixture");
         Shipyard.Hull hull=SIZES.get(size);
-        Battle.Faction[] races=Battle.Faction.values();
-        Battle.Faction faction=races[(size+side*5)%races.length];
+        Battle.Faction faction=SIDES[side];
         Shipyard.Design base=Shipyard.starter(faction,hull);
         if(!Shipyard.inspect(base,tech).valid())
             throw new IllegalStateException("Starter must be buildable: "+faction+" "+hull);
@@ -66,11 +69,11 @@ public final class HullCoverageBattle {
             throw new IllegalStateException("Hull test fitted invalid machinery");
         return preferred;
     }
-    /** Isolated same-size but different-faction 1v1; seed determines replay. */
+    /** Isolated same-size, two correctly and consistently identified factions. */
     public static Battle duel(TechnologyCatalog tech,int size){
         return Battle.duel(SEED+size,1,design(tech,size,0),design(tech,size,1),tech);
     }
-    /** Eleven vessels per faction, each a different canonical size/class. */
+    /** Eleven differently sized ships per faction, ONE coherent art family per side. */
     public static Battle mixed(TechnologyCatalog tech){
         Battle battle=new Battle(SEED);
         for(int side=0;side<2;side++)for(int i=0;i<SIZES.size();i++){
