@@ -389,6 +389,15 @@ tasks.register('skirmishTechSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('shipTechnologyFitSmoke') { finalizedBy(tasks.named('skirmishTechSmoke')) }
+tasks.register('mixedTierFleetSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test Tech VI inclusive I/III/VI heterogeneous fleets, import/export and real battle spawn.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SkirmishFleetTest'
+}
+tasks.named('skirmishTechSmoke') { finalizedBy(tasks.named('mixedTierFleetSmoke')) }
+
 
 
 
