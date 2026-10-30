@@ -14,7 +14,7 @@ import java.util.Map;
  */
 final class ShieldFxTimeline {
     static final int MAX_EVENTS=192;
-    enum Kind { IMPACT, COLLAPSE, RECHARGE, RESTART }
+    enum Kind { IMPACT, STRAIN, COLLAPSE, RECHARGE, RESTART }
     static final class Effect {
         final Battle.Ship ship;
         final DirectionalDefense.Facing facing;
@@ -31,6 +31,7 @@ final class ShieldFxTimeline {
         float duration(){
             return switch(kind){
                 case IMPACT -> .40f;
+                case STRAIN -> .70f;
                 case COLLAPSE -> .85f;
                 case RECHARGE -> .52f;
                 case RESTART -> .95f;
@@ -62,19 +63,30 @@ final class ShieldFxTimeline {
     /** Event injection permits headless verification without GL or video frames. */
     void afterStep(Battle battle,List<Battle.VisualEvent> visualEvents){
         sync(battle);
-        // Only inspect events from the current tick, not the 8192-entry history.
-        Map<Integer,Battle.VisualEvent> impacts=new HashMap<>();
+        // Multiple beams/warheads may strike different facings of the SAME ship
+        // in a single simulation tick. Resolve contact by the attacking ship's
+        // approach direction (the exact rule used by DirectionalDefense), not
+        // by whichever VisualEvent happened to be last for the whole target.
+        Map<Integer,Battle.Ship> byId=new HashMap<>();
+        for(Battle.Ship ship:battle.ships())byId.put(ship.id,ship);
+        Map<Integer,Battle.VisualEvent[]> contacts=new HashMap<>();
         for(int i=visualEvents.size()-1;i>=0;i--){
             Battle.VisualEvent e=visualEvents.get(i);
             if(e.tick()<battle.tick)break;
-            if(e.tick()==battle.tick&&e.phase()==Battle.VisualPhase.IMPACT)
-                impacts.putIfAbsent(e.targetId(),e);
+            if(e.tick()!=battle.tick||e.phase()!=Battle.VisualPhase.IMPACT)continue;
+            Battle.Ship target=byId.get(e.targetId());
+            if(target==null)continue;
+            DirectionalDefense.Facing face=contactFacing(target,e,byId.get(e.sourceId()));
+            if(face==null)continue;
+            Battle.VisualEvent[] faces=contacts.computeIfAbsent(e.targetId(),
+                    ignored->new Battle.VisualEvent[4]);
+            if(faces[face.ordinal()]==null)faces[face.ordinal()]=e;
         }
         for(Battle.Ship ship:battle.ships()){
             if(!ship.alive())continue;
             Facings state=states.get(ship.id);
             if(state==null)continue;
-            Battle.VisualEvent contact=impacts.get(ship.id);
+            Battle.VisualEvent[] contactsForShip=contacts.get(ship.id);
             for(DirectionalDefense.Facing facing:DirectionalDefense.Facing.values()){
                 int slot=facing.ordinal();
                 double before=state.previous[slot],now=ship.defense.shields(facing);
@@ -86,12 +98,20 @@ final class ShieldFxTimeline {
                     state.flash[slot]=Math.max(state.flash[slot],Math.min(1f,.38f+strength*.95f));
                     // An actual sector loss is authoritative even for area damage.
                     // The impact event, when available, colors it by weapon family.
+                    Battle.VisualEvent contact=contactsForShip==null?null:
+                            contactsForShip[slot];
                     Battle.DamageType weapon=weapon(contact);
-                    float angle=impactAngle(ship,facing,contact);
+                    Battle.Ship sourceShip=contact==null?null:byId.get(contact.sourceId());
+                    float angle=impactAngle(ship,facing,contact,sourceShip);
                     add(new Effect(ship,facing,Kind.IMPACT,weapon,angle,
                             Math.min(1f,.42f+strength),battle.tick));
-                    if(before>.015 && now<=.015)
+                    if(before>.015 && now<=.015){
                         add(new Effect(ship,facing,Kind.COLLAPSE,weapon,angle,1f,battle.tick));
+                    }else if(before/capacity>.26 && now/capacity<=.26 && now>.015){
+                        // A critically weakened sector begins to fragment,
+                        // distinct from an actually destroyed shield facing.
+                        add(new Effect(ship,facing,Kind.STRAIN,weapon,angle,.74f,battle.tick));
+                    }
                 }else if(gain>.015){
                     state.regen[slot]=Math.max(state.regen[slot],.50f);
                     if(before<=.015&&now>.015){
@@ -123,16 +143,46 @@ final class ShieldFxTimeline {
             case STARBOARD -> -90f;
         };
     }
+    /** Same incoming vector priority as the mechanical damage solver. */
+    static DirectionalDefense.Facing contactFacing(Battle.Ship ship,
+                          Battle.VisualEvent event,Battle.Ship attacker){
+        if(event==null)return null;
+        double dx=Double.NaN,dy=Double.NaN;
+        if(attacker!=null && attacker!=ship){
+            dx=attacker.x-ship.x;dy=attacker.y-ship.y;
+        }
+        if(!Double.isFinite(dx)||!Double.isFinite(dy)||dx*dx+dy*dy<1e-6){
+            dx=event.x()-ship.x;dy=event.y()-ship.y;
+        }
+        if(!Double.isFinite(dx)||!Double.isFinite(dy)||dx*dx+dy*dy<1e-6)
+            return null;
+        double cos=StrictMath.cos(ship.facing),sin=StrictMath.sin(ship.facing);
+        return DirectionalDefense.facingFor(dx*cos+dy*sin,-dx*sin+dy*cos);
+    }
     static float impactAngle(Battle.Ship ship,DirectionalDefense.Facing face,
                              Battle.VisualEvent event){
+        return impactAngle(ship,face,event,null);
+    }
+    static float impactAngle(Battle.Ship ship,DirectionalDefense.Facing face,
+                             Battle.VisualEvent event,Battle.Ship attacker){
         float center=centerAngle(face);
         if(event==null)return center;
-        double dx=event.x()-ship.x,dy=event.y()-ship.y;
-        if(!Double.isFinite(dx)||!Double.isFinite(dy)||dx*dx+dy*dy<.0001)return center;
-        double relative=StrictMath.toDegrees(StrictMath.atan2(dy,dx)-ship.facing);
-        double offset=((relative-center+540)%360)-180;
-        // A report in another sector must never draw a strike across this facing.
-        return Math.abs(offset)<=43 ? center+(float)offset : center;
+        // Precise impact point first; for center-positioned beams, use their
+        // authoritative shooter direction. Never flash an unrelated sector.
+        double[] directions={
+                event.x()-ship.x,event.y()-ship.y,
+                attacker==null?Double.NaN:attacker.x-ship.x,
+                attacker==null?Double.NaN:attacker.y-ship.y
+        };
+        for(int i=0;i<directions.length;i+=2){
+            double dx=directions[i],dy=directions[i+1];
+            if(!Double.isFinite(dx)||!Double.isFinite(dy)||dx*dx+dy*dy<1e-6)
+                continue;
+            double relative=StrictMath.toDegrees(StrictMath.atan2(dy,dx)-ship.facing);
+            double offset=((relative-center+540)%360)-180;
+            if(Math.abs(offset)<=43)return center+(float)offset;
+        }
+        return center;
     }
     private void add(Effect effect){
         if(events.size()==MAX_EVENTS)events.removeFirst();
