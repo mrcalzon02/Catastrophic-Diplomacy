@@ -223,9 +223,9 @@ final class ShipyardPanel {
             Shipyard.Design loaded=Shipyard.decode(file.readString("UTF-8"),catalog);
             if(loaded.faction!=draft.faction||loaded.hull!=draft.hull)
                 throw new IllegalArgumentException("Blueprint must match selected faction AND hull class");
-            if(usage==Usage.CAMPAIGN)
-                CampaignShipyardRules.requireAllowed(loaded,active[0].faction,
-                        campaignRank,unlockedMission);
+            if(usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)
+                CampaignShipyardRules.requireAllowed(loaded,campaignWallet.get(),
+                        campaignDiscoveries.get(),catalog);
             draft=loaded;selectedSlot=0;scroll=0;artPreview=false;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
