@@ -11,13 +11,22 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 5808, "full technology count");
-        require(c.componentCount() == 242, "all base components");
+        require(c.upgradeCount() == 6072, "full technology count");
+        require(c.componentCount() == 253, "all base components");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
+            require(c.base("BASE-"+faction+"-XFR")!=null &&
+                    "support".equals(c.base("BASE-"+faction+"-XFR").category),
+                    "Each civilization requires a dedicated shield-transfer support module");
+            require(c.base("BASE-"+faction+"-SHD")!=null &&
+                    "defense".equals(c.base("BASE-"+faction+"-SHD").category),
+                    "Ordinary SHD generators retain their separate defensive mount");
             for (String track : Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST")) {
                 for (int stage = 1; stage <= 6; stage++) {
                     String id = "TECH-" + faction + "-KIN-" + track + "-" + String.format(java.util.Locale.ROOT, "%02d", stage);
                     require(c.get(id) != null, "missing branch entry " + id);
+                    String relay="TECH-"+faction+"-XFR-"+track+"-"+
+                            String.format(java.util.Locale.ROOT,"%02d",stage);
+                    require(c.get(relay)!=null,"Missing native relay upgrade "+relay);
                 }
             }
         }
