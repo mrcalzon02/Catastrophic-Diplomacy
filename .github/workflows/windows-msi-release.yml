@@ -27,7 +27,7 @@ jobs:
       - name: Checkout the independently committed MSI packaging repair
         uses: actions/checkout@v4
         with:
-          ref: 7a92ef32ff362e7bc43f0ef234c4f0180b186016
+          ref: ${{ github.sha }}
           path: msi-tools
       - name: Install the MSI packager and verification script without modifying game source
         shell: pwsh
@@ -85,7 +85,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       GAME_SOURCE: 72afaa8fad431a9b37ac6fcc40d9ae2a7bd41b99
-      TOOL_COMMIT: 7a92ef32ff362e7bc43f0ef234c4f0180b186016
+      TOOL_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/download-artifact@v4
         with:

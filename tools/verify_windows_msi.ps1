@@ -24,6 +24,17 @@ function Get-MsiProperty([string]$name) {
 $product = Get-MsiProperty 'ProductCode'
 $version = Get-MsiProperty 'ProductVersion'
 $upgrade = Get-MsiProperty 'UpgradeCode'
+if ([string]::IsNullOrWhiteSpace($upgrade)) {
+  # WiX stores the upgrade family in MSI's Upgrade TABLE; it need not
+  # appear as a dynamic Property entry. Inspect the real Installer database.
+  $q = [char]96
+  $sql = ('SELECT '+$q+'UpgradeCode'+$q+' FROM '+$q+'Upgrade'+$q)
+  $view = $db.OpenView($sql)
+  $view.Execute()
+  $row = $view.Fetch()
+  if ($null -eq $row) { throw 'No upgrade identity in MSI Upgrade table' }
+  $upgrade = $row.StringData(1)
+}
 if ($version -ne '0.1.5') { throw "MSI version mismatch: $version" }
 if ($upgrade.Trim('{}').ToLowerInvariant() -ne 'cfc2e09f-fbaa-4b95-9f20-d59ac1148057') {
   throw "MSI upgrade identity mismatch: $upgrade"
