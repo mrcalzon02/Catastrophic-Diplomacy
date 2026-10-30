@@ -65,7 +65,7 @@ public final class CampaignLedgerTest {
                             Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE),tech)),
                     "Mixing campaigns across factions accepted");
             reject(()->CampaignLedger.decode(CampaignLedger.encode(initial)
-                            .replace("CD-CAMPAIGN-LEDGER-1","CD-CAMPAIGN-LEDGER-2"),tech),
+                            .replace("CD-CAMPAIGN-LEDGER-2","CD-CAMPAIGN-LEDGER-3"),tech),
                     "Unknown authority format accepted");
             check(Files.exists(directory.resolve("campaign.dat.bak")),
                     "Last-generation recovery record not retained");
