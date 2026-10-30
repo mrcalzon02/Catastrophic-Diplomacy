@@ -19,6 +19,22 @@ public final class CombatViewBoundsTest {
         ok(!close.circle(Double.NaN,0,10),"invalid coordinates rejected");
         ok(!close.segment(0,0,Double.POSITIVE_INFINITY,0,1),
                 "invalid beam rejected");
+        // Actual large battle: all 400 combatants remain authoritative, while
+        // a tight camera draws only nearby vessels rather than all 400 quads.
+        diplomacy.sim.Battle live=new diplomacy.sim.Battle(779L);
+        for(int i=0;i<200;i++){
+            live.addShip(0,diplomacy.sim.Battle.Faction.TERRAN,i*25,50);
+            live.addShip(1,diplomacy.sim.Battle.Faction.DRAXIAN,7000+i*25,50);
+        }
+        int visible=0;
+        var camera=new CombatViewBounds(100,50,600,400);
+        var poses=new BattleRenderPoses();
+        poses.fraction(live,1f);
+        for(var ship:live.ships())if(camera.ship(poses.ship(ship),ship.visualScale()))visible++;
+        ok(visible>0 && visible<60,"tight camera should not draw 400 distant hulls");
+        ok(live.ships().size()==400,"visual culling must not delete combat ships");
+        ok(new CombatViewBounds(7000,50,600,400).circle(7000,50,2),
+                "panned camera sees alternate fleet");
         System.out.println("PASS combat view bounds: edge-safe hulls, long beams, zoom and pan");
     }
 }

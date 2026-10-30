@@ -53,6 +53,21 @@ public final class ScreensaverCameraDirectorTest {
         require(teams.size()==2,"must show both fleets");
         require(camera.targetChanges()>=9,"camera must regularly change subjects");
         require(Math.abs(previous.centerX()-firstX)>10,"camera must move");
+        // The cinematic director must aim at the SAME interpolated hull pose
+        // that the sprite renderer sees, not its future physics-tick location.
+        Battle interpolated=fixture();
+        ScreensaverCameraDirector smooth=new ScreensaverCameraDirector();
+        ScreensaverCameraDirector raw=new ScreensaverCameraDirector();
+        smooth.reset(interpolated,773L);
+        raw.reset(interpolated,773L);
+        BattleRenderPoses poses=new BattleRenderPoses();
+        poses.beforeStep(interpolated);
+        for(Battle.Ship ship:interpolated.ships())ship.x+=1000;
+        poses.fraction(interpolated,0f);
+        var smoothFrame=smooth.update(interpolated,.05f,poses);
+        var rawFrame=raw.update(interpolated,.05f);
+        require(Math.abs(rawFrame.centerX()-smoothFrame.centerX())>40,
+                "cinematic shot must follow interpolated, not future tick, pose");
         int currently=previous.shipId();
         for(Battle.Ship s:battle.ships())if(s.id==currently)s.hull=0;
         var switched=camera.update(battle,.016f);
