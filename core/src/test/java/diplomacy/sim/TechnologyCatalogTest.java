@@ -11,9 +11,20 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 6072, "full technology count");
-        require(c.componentCount() == 253, "all base components");
+        require(c.upgradeCount() == 8712, "full technology count");
+        require(c.componentCount() == 363, "all base components");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
+            for(String role: new String[]{"APR","PWR","DHL","DSH","DAR","DPW",
+                    "AHL","ASH","AAR","APW"}){
+                require(c.base("BASE-"+faction+"-"+role)!=null
+                        && "support".equals(c.base("BASE-"+faction+"-"+role).category),
+                        "Missing physical support module "+faction+"/"+role);
+                for(String branch:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=6;rank++)
+                        require(c.get("TECH-"+faction+"-"+role+"-"+branch+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
+                                "Support evolution research missing "+faction+"/"+role);
+            }
             require(c.base("BASE-"+faction+"-XFR")!=null &&
                     "support".equals(c.base("BASE-"+faction+"-XFR").category),
                     "Each civilization requires a dedicated shield-transfer support module");
