@@ -150,13 +150,7 @@ public final class ShipLineages {
             if(of(hull).generation()==number)result.add(hull);
         return List.copyOf(result);
     }
-    /** Existing campaign starters at generation 2 remain legal at mission one. */
-    public static int maximumCampaignGeneration(int unlockedMission){
-        if(unlockedMission<1||unlockedMission>500)
-            throw new IllegalArgumentException("Invalid campaign milestone");
-        return Math.min(10,2+(unlockedMission-1)/50);
-    }
-    public static boolean availableInCampaign(Shipyard.Hull hull,int unlockedMission){
-        return of(hull).generation()<=maximumCampaignGeneration(unlockedMission);
-    }
+    // Ten visual generations label physical size, not technology access.
+    // HullProgression governs shared campaign and skirmish eligibility.
+
 }

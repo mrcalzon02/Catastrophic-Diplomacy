@@ -50,6 +50,21 @@ public final class SkirmishTechnologyRulesTest {
                 .requireAllowed(ship,catalog),"Challenge hull whitelist ignored");
         reject(()->tierOne.withHullGeneration(1).requireAllowed(ship,catalog),
                 "Ship generation cap ignored");
+        // Every original physical size is valid at Tech III regardless of
+        // its art-generation number. Specialized hulls remain IV-VI.
+        for(Shipyard.Hull h:Shipyard.Hull.values())
+            if(HullProgression.base(h)){
+                Shipyard.Design original=Shipyard.starter(Battle.Faction.TERRAN,h);
+                open.withStage(3).requireAllowed(original,catalog);
+                int need=HullProgression.requiredTier(h);
+                if(need>0)reject(()->open.withStage(need-1).requireAllowed(original,catalog),
+                        "Premature base hull admission: "+h);
+            }
+        reject(()->open.withStage(3).requireAllowed(
+                Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT_SIEGE),catalog),
+                "Specialized siege variant bypassed Tech IV");
+        open.withStage(4).requireAllowed(
+                Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT_SIEGE),catalog);
         var high=open.withStage(6);
         var independent=ShipTechnologyFit.fit(ship,catalog,high,laser,
                 Shipyard.Track.OUTPUT,4,ShipTechnologyFit.Scope.SOCKET);

@@ -9,20 +9,21 @@ import java.util.Locale;
 
 /**
  * Shared Android/desktop campaign shipyard authorization.
- * Sandbox/skirmish have no restrictions; campaign licenses and unlocked mission
- * tier are always checked before commissioning a new physical hull.
+ * Campaign licenses unlock all eleven base hull sizes by Tech III and specialist
+ * chassis in IV-VI. Mission progress no longer independently gates hull size.
  */
 public final class CampaignShipyardRules {
     private CampaignShipyardRules() { }
     public static void requireAllowed(Shipyard.Design design,Battle.Faction faction,
                                        int researchRank,int unlockedMission){
-        if(design==null||faction==null||researchRank<0||researchRank>6)
+        if(design==null||faction==null||researchRank<0||researchRank>6||
+                unlockedMission<1||unlockedMission>500)
             throw new IllegalArgumentException("Invalid campaign research authorization");
         if(design.faction!=faction)
             throw new IllegalArgumentException("Campaign shipyard cannot build another faction's vessel");
-        if(!ShipLineages.availableInCampaign(design.hull,unlockedMission))
-            throw new IllegalArgumentException("Hull generation "+ShipLineages.of(design.hull).generation()
-                    +" has not been unlocked by the campaign");
+        if(!HullProgression.available(design.hull,researchRank))
+            throw new IllegalArgumentException("Hull "+design.hull+
+                    " requires engineering license "+HullProgression.requiredTier(design.hull));
         for(int i=0;i<design.slots();i++){
             Shipyard.Installed installed=design.at(i);
             if(installed==null)continue;

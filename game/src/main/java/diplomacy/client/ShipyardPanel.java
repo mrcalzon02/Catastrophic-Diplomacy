@@ -16,6 +16,7 @@ import diplomacy.sim.CampaignTechnology;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.ShipLineages;
+import diplomacy.shipyard.HullProgression;
 import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.ShipTechnologyFit;
 import diplomacy.shipyard.SkirmishTechnologyRules;
@@ -183,32 +184,33 @@ final class ShipyardPanel {
         Shipyard.Hull[] options=Shipyard.Hull.shipyardOrder();
         int current=0;
         for(int i=0;i<options.length;i++)if(options[i]==draft.hull){current=i;break;}
-        Shipyard.Hull next=options[Math.floorMod(current+step,options.length)];
-        if(usage==Usage.CAMPAIGN){
-            for(int n=0;n<options.length;n++){
-                if(ShipLineages.availableInCampaign(next,unlockedMission))break;
-                current=Math.floorMod(current+step,options.length);
-                next=options[Math.floorMod(current+step,options.length)];
+        Shipyard.Hull next=null;
+        for(int n=1;n<=options.length;n++){
+            Shipyard.Hull candidate=options[Math.floorMod(current+n*step,options.length)];
+            if((usage!=Usage.CAMPAIGN&&usage!=Usage.CAMPAIGN_REFIT)||
+                    HullProgression.available(candidate,campaignRank)){
+                next=candidate;break;
             }
         }
+        if(next==null){notice="No hull licensed at Tech "+campaignRank;return;}
         draft=Shipyard.starter(draft.faction,next);
         selectedSlot=0;scroll=0;artPreview=false;
         var line=ShipLineages.of(next);
-        notice="GEN "+line.generation()+" "+line.ethos()+" / "+line.role().description;
+        notice="SIZE "+line.generation()+"/10 | TECH "+HullProgression.requiredTier(next)+
+                " | "+line.role().description;
     }
-    /** Jump between ten asset-size generations rather than tapping past 46 chassis.
-     * Campaign skips not-yet-unlocked tiers but remains fully navigable. */
+    /** Jump between visual size families, independent of engineering license tiers. */
     private void hullGroup(int change){
         int now=ShipLineages.of(draft.hull).generation();
         for(int n=1;n<=10;n++){
             int target=Math.floorMod(now-1+n*change,10)+1;
-            if(usage==Usage.CAMPAIGN&&
-                    target>ShipLineages.maximumCampaignGeneration(unlockedMission))continue;
             Shipyard.Hull next=ShipLineages.generation(target).get(0);
+            if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&
+                    !HullProgression.available(next,campaignRank))continue;
             draft=Shipyard.starter(draft.faction,next);
             selectedSlot=0;scroll=0;artPreview=false;
-            notice="SIZE "+target+"/10: "+ShipLineages.of(next).ethos()+
-                    " | choose specific chassis with hull arrows";
+            notice="SIZE "+target+"/10 | BASE TECH "+HullProgression.requiredTier(next)+
+                    " | choose chassis with hull arrows";
             return;
         }
     }
@@ -919,8 +921,8 @@ final class ShipyardPanel {
         var lineage=ShipLineages.of(draft.hull);
         font.setColor(Color.GOLD);
         font.draw(batch,"<",351,619);
-        font.draw(batch,"GEN "+lineage.generation()+" / "+lineage.ethos()+
-                " / "+lineage.role().name(),386,619);
+        font.draw(batch,"SIZE "+lineage.generation()+"/10 | TECH "+HullProgression.requiredTier(draft.hull)+
+                " | "+lineage.role().name(),386,619);
         font.draw(batch,">",668,619);
         font.setColor(Color.WHITE);
         if(uiIcons == null || !uiIcons.has("next"))font.draw(batch,">",657,660);

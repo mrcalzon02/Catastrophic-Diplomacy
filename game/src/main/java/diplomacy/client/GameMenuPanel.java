@@ -20,7 +20,7 @@ import java.util.Set;
 import diplomacy.sim.LevelEconomy;
 import diplomacy.sim.ScenarioCatalog;
 import diplomacy.sim.CampaignNarrative;
-import diplomacy.shipyard.ShipLineages;
+import diplomacy.shipyard.HullProgression;
 import diplomacy.sim.LevelEconomy;
 import java.util.List;
 
@@ -610,6 +610,8 @@ final class GameMenuPanel {
                     label(batch,font,done?"COMPLETED":running?"RESEARCHING":
                             next?"NEXT AVAILABLE":"PREREQUISITE LOCKED",
                             x,y-27,done?Color.GREEN:next?Color.CYAN:MUTED);
+                    label(batch,font,HullProgression.tierLabel(tier),
+                            x,y-47,tier<=3?Color.CYAN:MUTED);
                 }
                 for(int i=0;i<4;i++){
                     int tier=i+1;float x=75+i*176;
@@ -650,8 +652,10 @@ final class GameMenuPanel {
                 label(batch,font,"ONE SUCCESSFUL MISSION = ONE RESEARCH TICK",
                         819,300,MUTED);
                 label(batch,font,shortLabel(dockNotice,63),819,228,Color.CYAN);
-                label(batch,font,"LICENSE TIERS ARE NOT MODULE-SPECIFIC TECHNOLOGY TREES",
+                label(batch,font,"BASE HULL SIZES BY TECH III | SPECIALIZED CHASSIS IV-VI",
                         56,183,MUTED);
+                label(batch,font,"MODULE UPGRADES: RESEARCH EACH BRANCH SEPARATELY",
+                        56,158,MUTED);
                 label(batch,font,researchReturn==Screen.DOCK?"BACK TO DOCK":"BACK TO CAMPAIGN",
                         66,68,Color.WHITE);
                 label(batch,font,"TECHNOLOGY LAB",323,67,Color.CYAN);
@@ -1007,8 +1011,8 @@ final class GameMenuPanel {
         label(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title(),946,262,Color.CYAN);
         label(batch,font,briefing.intelligence(),946,231,MUTED);
         label(batch,font,briefing.beat(),946,202,Color.WHITE);
-        label(batch,font,"HULL SIZES: 1-"+ShipLineages.maximumCampaignGeneration(progress.unlocked()),
-                946,167,Color.GOLD);
+        label(batch,font,"BASE HULLS: "+HullProgression.baseFamiliesAtTier(progress.researchRank())+
+                "/11 | TECH "+progress.researchRank(),946,167,Color.GOLD);
         label(batch,font,"BACK",62,67,Color.WHITE);
         label(batch,font,"PREV",248,67,Color.WHITE);
         label(batch,font,"NEXT",402,67,Color.WHITE);

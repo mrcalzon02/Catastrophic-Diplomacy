@@ -3,6 +3,7 @@ package diplomacy.sim;
 import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.ModuleVersions;
 import diplomacy.shipyard.ShipLineages;
+import diplomacy.shipyard.HullProgression;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
 import java.nio.charset.StandardCharsets;
@@ -81,15 +82,28 @@ public final class ShipLineagesTest {
         check(invalidFittings.isEmpty(),
                 "Invalid physical role prototypes ("+invalidFittings.size()+"): "+
                         String.join("; ",invalidFittings.subList(0,Math.min(invalidFittings.size(),50))));
-        check(ShipLineages.maximumCampaignGeneration(1)==2,"Starting corvette access missing");
-        check(ShipLineages.maximumCampaignGeneration(500)==10,"Top-level fleet locked forever");
+        check(HullProgression.baseFamiliesAtTier(0)==2,"Two starter hull families required");
+        check(HullProgression.baseFamiliesAtTier(1)==5,"Escort batch requires five base sizes");
+        check(HullProgression.baseFamiliesAtTier(2)==9,"Cruiser batch requires nine base sizes");
+        check(HullProgression.baseFamiliesAtTier(3)==11,"Tech III requires every base size");
+        for(Shipyard.Hull h:Shipyard.Hull.values()){
+            int tier=HullProgression.requiredTier(h);
+            check(HullProgression.base(h)?tier<=3:tier>=4&&tier<=6,"Wrong hull unlock tier: "+h);
+            check(HullProgression.available(h,tier),"Hull unavailable at own tech tier: "+h);
+            if(tier>0)check(!HullProgression.available(h,tier-1),"Premature hull unlock: "+h);
+        }
         var base=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         CampaignShipyardRules.requireAllowed(base,Battle.Faction.TERRAN,0,1);
         rejects(()->CampaignShipyardRules.requireAllowed(base,Battle.Faction.DRAXIAN,0,1),
                 "Cross-faction campaign shipyard bypass");
-        rejects(()->CampaignShipyardRules.requireAllowed(Shipyard.starter(
-                        Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT),Battle.Faction.TERRAN,6,1),
-                "Future-generation ship commissioned in stage one");
+        var dread=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT);
+        rejects(()->CampaignShipyardRules.requireAllowed(dread,Battle.Faction.TERRAN,2,1),
+                "Tech II cannot commission a base dreadnought");
+        CampaignShipyardRules.requireAllowed(dread,Battle.Faction.TERRAN,3,1);
+        var siege=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT_SIEGE);
+        rejects(()->CampaignShipyardRules.requireAllowed(siege,Battle.Faction.TERRAN,3,500),
+                "Tech III cannot commission specialist siege hulls");
+        CampaignShipyardRules.requireAllowed(siege,Battle.Faction.TERRAN,4,1);
         var advanced=base.stage(3,Shipyard.Track.OUTPUT,3);
         rejects(()->CampaignShipyardRules.requireAllowed(advanced,Battle.Faction.TERRAN,2,1),
                 "Module level bypassed research rank");

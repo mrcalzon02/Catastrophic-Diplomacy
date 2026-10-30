@@ -59,7 +59,8 @@ public record SkirmishTechnologyRules(
         return new SkirmishTechnologyRules(maxStage,maxHullGeneration,allowedTracks,bannedTechnologyIds,hulls);
     }
     public boolean permitsHull(Shipyard.Hull hull){
-        return hull!=null&&ShipLineages.of(hull).generation()<=maxHullGeneration&&
+        return hull!=null&&HullProgression.available(hull,maxStage)&&
+                ShipLineages.of(hull).generation()<=maxHullGeneration&&
                 (allowedHulls.isEmpty()||allowedHulls.contains(hull));
     }
     public boolean permits(Shipyard.Design design,TechnologyCatalog catalog,int slot,
@@ -76,7 +77,8 @@ public record SkirmishTechnologyRules(
             throw new IllegalArgumentException("Challenge needs a ship and technology catalog");
         if(!permitsHull(design.hull))
             throw new IllegalArgumentException("Hull "+design.hull+
-                    " is outside the skirmish ship-class restrictions");
+                    " requires Tech "+HullProgression.requiredTier(design.hull)+
+                    " or exceeds optional hull restrictions");
         for(int i=0;i<design.slots();i++){
             Shipyard.Installed module=design.at(i);
             if(module==null)continue;
