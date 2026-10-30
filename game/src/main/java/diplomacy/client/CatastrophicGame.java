@@ -160,6 +160,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int focusedShipId = -1;
     private float battlePanX,battlePanY;
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
+    private final BattleRenderPoses renderPoses=new BattleRenderPoses();
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
@@ -2151,10 +2152,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             accumulator += delta * speed;
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
+                renderPoses.beforeStep(battle);
                 battle.step(); accumulator -= Battle.DT;
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
+        // Shared visual clock: current authoritative state minus one fixed-tick.
+        // Paused battles draw the exact state, not an old snapshot.
+        renderPoses.fraction(battle,!running || battle.finished()?1f:accumulator/Battle.DT);
         if(screensaverMode){
             ScreensaverCameraDirector.Shot cinematic=screensaverCamera.update(battle,delta);
             battleCamera.zoom=cinematic.zoom();
@@ -2248,7 +2253,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced == null) drawShipsFallback();
         else {
             try {
-                instanced.render(battle,battleCamera,ship -> terranSprites!=null && terranSprites.hasSprite(ship));
+                instanced.render(battle,battleCamera,
+                        ship -> terranSprites!=null && terranSprites.hasSprite(ship),renderPoses);
                 int expected=0;
                 for(Battle.Ship ship:battle.ships())
                     if(ship.alive() && (terranSprites==null || !terranSprites.hasSprite(ship)))expected++;
@@ -2263,10 +2269,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
-        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
-        if(craftSprites!=null)craftSprites.render(battle,batch);
+        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses);
+        if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses);
         if(lighting!=null)lighting.renderSmoke(battle,batch,battleCamera);
-        if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams);
+        if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
@@ -2287,17 +2293,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (Battle.Missile m : battle.missiles()) {
             if(texturedMissiles.contains(m.visualId))continue;
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
-            shapes.circle((float) m.x, (float) m.y, CombatEffectScale.of(m.torpedo?4.4f:2.8f), 7);
+            BattleRenderPoses.Pose pose=renderPoses.missile(m);
+            shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(m.torpedo?4.4f:2.8f),7);
         }
         for (Battle.Ballistic shell:battle.ballistics()) {
             if(texturedBallistics.contains(shell.visualId))continue;
             shapes.setColor(Color.GOLD);
-            shapes.circle((float)shell.x,(float)shell.y,CombatEffectScale.of(2.1f),6);
+            BattleRenderPoses.Pose pose=renderPoses.shell(shell);
+            shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(2.1f),6);
         }
         shapes.end();
         // Final additive world-space pass illuminates actual ship and projectile
         // pixels as well as space around real weapon and engine light sources.
-        if(lighting!=null)lighting.renderGlow(battle,batch,battleCamera);
+        if(lighting!=null)lighting.renderGlow(battle,batch,battleCamera,renderPoses);
         if(screensaverMode){
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
@@ -2537,7 +2545,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 followed=ship;break;
             }
             if(followed==null)focusedShipId=-1;
-            else {cx=followed.x;cy=followed.y;}
+            else {BattleRenderPoses.Pose pose=renderPoses.ship(followed);
+                cx=pose.x();cy=pose.y();}
         }
         battleCamera.position.set((float)cx+battlePanX,(float)cy+battlePanY,0);
         battleCamera.update();
@@ -2548,10 +2557,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (Battle.Ship s : battle.ships()) if (s.alive()
                 && (terranSprites==null||!terranSprites.hasSprite(s))) {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
-            float x = (float) s.x, y = (float) s.y;
+            BattleRenderPoses.Pose pose=renderPoses.ship(s);
+            float x=pose.x(),y=pose.y();
             float scale=(float)s.visualScale();
             // Keep Stage 2's distinct faction/class art in the GL2 fallback path.
-            float angle=(float)(s.facing-Math.PI/2);
+            float angle=(float)(pose.angle()-Math.PI/2);
             float c=(float)Math.cos(angle), d=(float)Math.sin(angle);
             float[] triangles=HullSilhouette.of(s.faction,s.hullClass);
             for(int i=0;i<triangles.length;i+=6) {
@@ -2582,7 +2592,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         remotePresentation.tick=snapshot.tick();
         Gdx.gl.glClearColor(.015f,.025f,.055f,1);Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);viewport.apply();battleCamera.update();
         // Reuse existing hull geometry and approved sprite renderer for the authoritative poses.
-        Battle solo=battle;try{battle=remotePresentation;drawShipsFallback();}finally{battle=solo;}
+        Battle solo=battle;try{
+            battle=remotePresentation;
+            // Snapshot presentations are complete authoritative frames; never
+            // borrow previous local simulation poses with recycled vessel IDs.
+            renderPoses.sync(remotePresentation);
+            drawShipsFallback();
+        }finally{battle=solo;}
         batch.setProjectionMatrix(battleCamera.combined);if(terranSprites!=null&&terranSprites.loaded()>0)terranSprites.render(remotePresentation,batch);
         batch.setProjectionMatrix(battleCamera.combined);if(craftSprites!=null)craftSprites.render(remotePresentation,batch);
         batch.setProjectionMatrix(camera.combined);batch.begin();font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+" / TAB: CONNECTION AND FLEET ORDERS",24,696);batch.end();
