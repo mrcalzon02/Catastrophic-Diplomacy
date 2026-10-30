@@ -1,0 +1,53 @@
+name: Qualify GitHub prerelease updater integration
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/updater-integration-qualification.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-updater-pinned-qualification
+  cancel-in-progress: false
+
+jobs:
+  updater:
+    name: Verify update selection and installed desktop assets (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c5663d71e821568bbfd6fcd105f283e2dcb1c9fd
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile updater and verify stable prerelease and draft policy
+        run: gradle :core:updaterPolicySmoke :core:desktopUpdaterPolicySmoke :desktop:jar --no-daemon --stacktrace
+      - name: Verify packaged updater and correct installed release tag
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib,zipfile
+          jars=list(pathlib.Path('desktop/build/libs').glob('desktop-*.jar'))
+          assert len(jars)==1,jars
+          with zipfile.ZipFile(jars[0]) as f:
+              names=set(f.namelist())
+              for path in ('diplomacy/desktop/DesktopReleaseUpdater.class',
+                           'diplomacy/desktop/DesktopLauncher.class',
+                           'cd-update-tag.txt'):
+                  assert path in names,path
+              tag=f.read('cd-update-tag.txt').decode().strip()
+              assert tag=='cd-v0.1.5-rc.1',('Unexpected installed release tag',tag)
+          print('PASS: updater class packaged in desktop JAR; release tag matches published RC')
+          PY
