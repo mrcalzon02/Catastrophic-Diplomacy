@@ -361,7 +361,8 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
             float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
             surfaces.bind(batch,tex);
-            ShipSurfaceLighting.heading(batch,rotation,(float)Math.max(0,\n                    Math.min(1,ship.hull/Math.max(1,ship.maxHull))));
+            ShipSurfaceLighting.heading(batch,rotation,(float)Math.max(0,
+                    Math.min(1,ship.hull/Math.max(1,ship.maxHull))));
             if(!breached(ship)){
                 drawWhole(batch,tex,pose,width,height,rotation);
             }else{
