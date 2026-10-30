@@ -13,8 +13,14 @@ public final class CrewAccommodationTest {
     }
     public static void main(String[] args)throws Exception {
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
-        check(catalog.componentCount()==242&&catalog.upgradeCount()==5808,
-                "Eleven native lineages now include accommodation AND life support");
+        // Crew tests must assert actual habitat capabilities, not an
+        // obsolete total component count that unrelated support modules change.
+        for(Battle.Faction race:Battle.Faction.values()){
+            String id=Shipyard.factionId(race);
+            check(catalog.hasBase("BASE-"+id+"-CRW")&&
+                    catalog.hasBase("BASE-"+id+"-LFS"),
+                    "Each faction must retain separate accommodation and life-support hardware");
+        }
         int observed=0;
         for(Battle.Faction faction:Battle.Faction.values()){
             String id=Shipyard.factionId(faction);
