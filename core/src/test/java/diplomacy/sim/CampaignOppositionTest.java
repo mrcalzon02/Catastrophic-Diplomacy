@@ -36,6 +36,14 @@ public final class CampaignOppositionTest {
         }
         check(operations.size()==CampaignOpposition.Operation.values().length,
                 "Mission categories never appear across the map");
+        check(CampaignOpposition.operation(1)==CampaignOpposition.Operation.PATROL,
+                "The first mission must introduce the campaign with a patrol");
+        for(int front=0;front<CampaignMap.PAGE_COUNT;front++){
+            Set<CampaignOpposition.Operation> distinct=new HashSet<>();
+            for(var node:CampaignMap.page(front))distinct.add(node.operation());
+            check(distinct.size()==CampaignMap.PAGE_SIZE,
+                    "Map front repeats a mission archetype instead of offering tactical variety");
+        }
         for(int sector=1;sector<=10;sector++){
             int first=(sector-1)*50+1;
             int last=sector*50;
