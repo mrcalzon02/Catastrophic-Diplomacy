@@ -93,6 +93,44 @@ public final class ShipTechnologyFit {
         return result;
     }
 
+
+    /** Explicit challenge-tier authorization; never reads campaign discoveries. */
+    public static boolean available(Shipyard.Design design,TechnologyCatalog catalog,
+                                    SkirmishTechnologyRules rules,
+                                    int slot,Shipyard.Track track,int stage){
+        return rules!=null&&rules.permits(design,catalog,slot,track,stage);
+    }
+    public static int highestAvailable(Shipyard.Design design,TechnologyCatalog catalog,
+                                       SkirmishTechnologyRules rules,
+                                       int slot,Shipyard.Track track){
+        for(int stage=6;stage>=1;stage--)
+            if(available(design,catalog,rules,slot,track,stage))return stage;
+        return 0;
+    }
+    public static Shipyard.Design fit(Shipyard.Design original,TechnologyCatalog catalog,
+                                     SkirmishTechnologyRules rules,int slot,
+                                     Shipyard.Track track,int stage,Scope scope){
+        if(rules==null||!rules.permits(original,catalog,slot,track,stage))
+            throw new IllegalArgumentException("Technology outside this skirmish challenge");
+        Shipyard.Design result=fit(original,catalog,
+                (CampaignTechnology.State)null,slot,track,stage,scope);
+        rules.requireAllowed(result,catalog);
+        return result;
+    }
+    public static Shipyard.Design doctrine(Shipyard.Design original,TechnologyCatalog catalog,
+                                          SkirmishTechnologyRules rules,Shipyard.Track track){
+        if(original==null||catalog==null||rules==null||track==null)
+            throw new IllegalArgumentException("Skirmish doctrine not available");
+        Shipyard.Design result=original;
+        for(int slot=0;slot<original.slots();slot++){
+            if(original.at(slot)==null)continue;
+            int stage=highestAvailable(original,catalog,rules,slot,track);
+            if(stage>0)result=replace(result,slot,track,stage);
+        }
+        rules.requireAllowed(result,catalog);
+        return result;
+    }
+
     public static Shipyard.Design clear(Shipyard.Design original,int slot){
         if(original==null||slot<0||slot>=original.slots()||original.at(slot)==null)
             throw new IllegalArgumentException("No installed technology on that socket");
