@@ -84,9 +84,11 @@ final class ShipSurfaceLighting implements Disposable {
         Texture emissive=null;
         try {
             emissive=new Texture(Gdx.files.internal(e));
-            if(original.getWidth()!=normal.getWidth()||original.getHeight()!=normal.getHeight()
-                    ||normal.getWidth()!=emissive.getWidth()
-                    ||normal.getHeight()!=emissive.getHeight())
+            if(normal.getWidth()!=emissive.getWidth()
+                    ||normal.getHeight()!=emissive.getHeight()
+                    ||normal.getWidth()>original.getWidth() || normal.getHeight()>original.getHeight()
+                    ||Math.abs(normal.getWidth()/(float)original.getWidth()
+                             -normal.getHeight()/(float)original.getHeight())>.015f)
                 throw new IllegalStateException("Ship normal/emissive UV dimensions differ: "+path);
             normal.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
             emissive.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
