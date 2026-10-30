@@ -664,6 +664,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships;
         reset();
         Gdx.app.log("CD-GAME-FLOW","BATTLE "+scenario.name());
+        if(scenario==ScenarioCatalog.Preset.HULL_COVERAGE){
+            java.util.EnumSet<Shipyard.Hull> first=java.util.EnumSet.noneOf(Shipyard.Hull.class);
+            java.util.EnumSet<Shipyard.Hull> second=java.util.EnumSet.noneOf(Shipyard.Hull.class);
+            for(Battle.Ship ship:battle.ships())
+                (ship.team==0?first:second).add(ship.hullClass);
+            if(battle.ships().size()!=22 || first.size()!=11 || second.size()!=11)
+                throw new IllegalStateException("Hull inspection battle did not deploy every distinct hull size");
+            Gdx.app.log("CD-HULL-COVERAGE","START 11v11 every size, 22 fitted ships, 11 distinct hulls per side");
+        }
     }
     private void openCampaignSetup(){
         pendingFaction=campaign==null?left:campaign.faction();
