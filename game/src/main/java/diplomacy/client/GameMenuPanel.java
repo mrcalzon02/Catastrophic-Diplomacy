@@ -78,6 +78,8 @@ final class GameMenuPanel {
     }
     /** The deployment input map is shared by UI, controller and functional tests. */
     static int deploymentAction(float x,float y) {
+        if(hit(x,y,847,570,165,37))return 8;
+        if(hit(x,y,1025,570,166,37))return 9;
         if(hit(x,y,35,35,175,55))return 0;
         if(hit(x,y,845,430,99,51))return 1;
         if(hit(x,y,1098,430,99,51))return 2;
@@ -454,6 +456,10 @@ final class GameMenuPanel {
             case DEPLOYMENT -> {
                 rectangle(shapes,39,135,760,472,PANEL);
                 rectangle(shapes,819,135,425,472,PANEL);
+                if(!preparingCampaign){
+                    button(shapes,847,570,165,37,false);
+                    button(shapes,1025,570,166,37,false);
+                }
                 // Boundary displayed is exactly the same box that placement rejects outside.
                 shapes.setColor(.18f,.42f,.51f,1);
                 shapes.rect(59,165,611,2);
@@ -860,7 +866,11 @@ final class GameMenuPanel {
                         "SKIRMISH  |  PLACE EACH VESSEL AND PROGRAM INDIVIDUAL ORDERS");
                 label(batch,font,"YOUR "+left.displayName+" BATTLE GROUP",58,580,Color.CYAN);
                 label(batch,font,"TACTICAL STARTING POSITIONS",58,161,MUTED);
-                label(batch,font,"ENEMY: "+opponent.displayName,846,563,Color.WHITE);
+                if(!preparingCampaign){
+                    label(batch,font,"EXPORT FLEETS",865,594,Color.CYAN);
+                    label(batch,font,"IMPORT FLEETS",1041,594,Color.CYAN);
+                }
+                label(batch,font,"ENEMY: "+opponent.displayName,846,551,Color.WHITE);
                 label(batch,font,"HULL: "+friendlyHull,846,532,MUTED);
                 label(batch,font,preparingCampaign?"WAVES: "+stage.waves():"SINGLE ENGAGEMENT",846,505,Color.WHITE);
                 label(batch,font,"DEPLOYED: "+deployment.ships()+
@@ -879,7 +889,8 @@ final class GameMenuPanel {
                 label(batch,font,"EDIT FITTED SHIP",896,249,Color.WHITE);
                 label(batch,font,"SHIP ORDERS",945,180,Color.WHITE);
                 label(batch,font,"SELECT AND DRAG A VESSEL TO REPOSITION",61,139,MUTED);
-                label(batch,font,"SELECTED VESSEL #"+(selectedShip+1),846,120,Color.GOLD);
+                label(batch,font,"SELECTED VESSEL #"+(selectedShip+1)+
+                        (preparingCampaign?"":" / INDIVIDUAL FITTING"),846,120,Color.GOLD);
                 label(batch,font,editNotice,61,115,MUTED);
                 label(batch,font,preparingCampaign?"BACK TO MAP":"BACK TO SKIRMISH",68,68,Color.WHITE);
                 label(batch,font,"BEGIN MISSION",978,68,Color.WHITE);
