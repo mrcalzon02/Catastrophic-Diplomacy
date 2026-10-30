@@ -417,7 +417,8 @@ final class GameMenuPanel {
                     Color c=node.level()<progress.unlocked()?Color.GREEN:
                         node.level()==progress.unlocked()?Color.CYAN:MUTED;
                     shapes.setColor(node.level()==selectedLevel?Color.GOLD:c);
-                    shapes.circle(node.x(),node.y(),node.level()==selectedLevel?19:13,18);
+                    shapes.circle(node.x(),node.y(),node.level()==selectedLevel?19:
+                            node.sectorFinale()?17:13,18);
                     shapes.setColor(MilitaryUiTheme.BACKGROUND);
                     shapes.circle(node.x(),node.y(),6,12);
                 }
@@ -1084,9 +1085,14 @@ final class GameMenuPanel {
             label(batch,font,""+node.level(),node.x()-12,node.y()+38,MUTED);
         label(batch,font,"MISSION "+selected,946,568,Color.WHITE);
         label(batch,font,"SECTOR "+level.sector(),946,524,MUTED);
-        label(batch,font,"ENEMY: "+CampaignMap.page(CampaignMap.pageOf(selected)).get((selected-1)%10).opponent().name(),946,482,MUTED);
-        label(batch,font,"FLEET CAP: "+level.maximumFleet(),946,440,Color.WHITE);
-        label(batch,font,"WAVES PLANNED: "+level.waves(),946,398,MUTED);
+        var node=CampaignMap.page(CampaignMap.pageOf(selected))
+                .get((selected-1)%CampaignMap.PAGE_SIZE);
+        label(batch,font,"ENEMY: "+node.opponent().name(),946,482,MUTED);
+        label(batch,font,"OPERATION: "+node.operation().title.toUpperCase(java.util.Locale.ROOT),
+                946,460,Color.CYAN);
+        label(batch,font,"ENEMY TECH: "+node.enemyTier()+" / IX",946,439,Color.GOLD);
+        label(batch,font,"FLEET CAP: "+level.maximumFleet(),946,414,Color.WHITE);
+        label(batch,font,"WAVES PLANNED: "+level.waves(),946,389,MUTED);
         label(batch,font,progress.available(selected)?"AVAILABLE":"LOCKED",946,343,
               progress.available(selected)?Color.GREEN:Color.SCARLET);
         label(batch,font,progress.isReplay(selected)?
