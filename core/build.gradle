@@ -172,6 +172,13 @@ tasks.register('directionalDefenseSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.DirectionalDefenseTest'
     dependsOn testClasses
 }
+tasks.register('hullCoverageSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Eleven isolated 1v1 hull duels and a mixed 11v11 with every size, fitted modules and shields.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullCoverageBattleTest'
+    dependsOn testClasses
+}
 tasks.register('shipSurfaceDamageSmoke', JavaExec) {
     group = 'verification'
     description = 'Check shield-first, fitted-module scatter, localized radial armor erosion and campaign persistence.'
