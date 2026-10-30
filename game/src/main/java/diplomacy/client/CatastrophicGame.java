@@ -72,6 +72,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private BattlefieldWeatherVfx weatherVfx;
     private CombatAudio audio;
     private int voiceSliderPointer=-1, menuButtonPointer=-1;
+    private int tacticalHovered=-1, tacticalPressed=-1;
+    private long tacticalPressUntilNs;
+    private final com.badlogic.gdx.math.Vector2 tacticalPointer=new com.badlogic.gdx.math.Vector2();
     private int battlefieldLevel = 1;
     private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
@@ -1871,14 +1874,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(!fleetOrdersPanel.open())return;
         fleetOrdersPanel.close();running=resumeAfterOrders;
     }
+    /** Shared tactical menu hit contract, identical for desktop and touch. */
+    static int tacticalAction(float x,float y){
+        if(x<420||x>860)return -1;
+        for(int n=0;n<12;n++){
+            float low=550-40*n;
+            if(y>=low&&y<low+36)return n;
+        }
+        return -1;
+    }
     private void tapTacticalMenu(float x, float y) {
-        if(x<420||x>860){closeTacticalMenu();return;}
-        final float top=550, step=40;
-        for(int n=0;n<12;n++) {
-            float y0=top-step*n;
-            if(y<y0||y>=y0+36)continue;
-            if (audio != null) audio.ui();
-            switch(n){
+        int n=tacticalAction(x,y);
+        if(n<0){closeTacticalMenu();if(audio!=null)audio.uiBack();return;}
+        tacticalPressed=n;
+        tacticalPressUntilNs=System.nanoTime()+160_000_000L;
+        if(audio!=null)audio.uiPress();
+        switch(n){
                 case 0 -> closeTacticalMenu();
                 case 1 -> {reset();closeTacticalMenu();}
                 case 2 -> {
@@ -1894,8 +1905,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 9 -> audio.toggleEffects();
                 case 10 -> audio.toggleTrack();
                 case 11 -> {tacticalMenuOpen=false;running=false;screen=GameMenuPanel.Screen.HOME;}
-            }
-            return;
         }
     }
     private void drawTacticalMenu() {
@@ -1935,6 +1944,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"P/O: point defense  |  F: fleet orders  |  U/I/J: audio",439,99);
         batch.end();
+        boolean mouse=Gdx.app.getType()!=com.badlogic.gdx.Application.ApplicationType.Android;
+        tacticalPointer.set(Gdx.input.getX(),Gdx.input.getY());
+        viewport.unproject(tacticalPointer);
+        int hovered=mouse?tacticalAction(tacticalPointer.x,tacticalPointer.y):-1;
+        if(hovered!=tacticalHovered){
+            if(hovered>=0&&audio!=null)audio.uiHover();
+            tacticalHovered=hovered;
+        }
+        int active=System.nanoTime()<tacticalPressUntilNs?tacticalPressed:-1;
+        if(active>=0||hovered>=0){
+            shapes.begin(ShapeRenderer.ShapeType.Filled);
+            for(int i=0;i<12;i++){
+                if(i!=hovered&&i!=active)continue;
+                boolean down=i==active;
+                float x=438,y=550-40*i,w=405,h=36,edge=down?4:2;
+                shapes.setColor(down?MilitaryUiTheme.AMBER:MilitaryUiTheme.TELEMETRY);
+                shapes.rect(x,y,w,edge);
+                shapes.rect(x,y+h-edge,w,edge);
+                shapes.rect(x,y,edge,h);
+                shapes.rect(x+w-edge,y,edge,h);
+            }
+            shapes.end();
+        }
     }
 
     /**
