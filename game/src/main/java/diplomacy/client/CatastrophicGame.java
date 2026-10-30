@@ -163,7 +163,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final boolean verifyDemo;
     private final Runnable updateCheck;
     private long verifiedSequence;
-    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips;
+    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads;
     private boolean verificationReported;
     private final EnumSet<Battle.DamageType> verifiedTypes=EnumSet.noneOf(Battle.DamageType.class);
     private final Set<Long> verifiedShotIds=new HashSet<>();
@@ -2372,6 +2372,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verificationReported)return;
         verifiedFrames++;
         if(weaponFx!=null)peakAnimations=Math.max(peakAnimations,weaponFx.activeAnimations());
+        if(lighting!=null){
+            peakLightQuads=Math.max(peakLightQuads,lighting.glowQuads());
+            peakSmokeQuads=Math.max(peakSmokeQuads,lighting.smokeQuads());
+        }
         peakCraft=Math.max(peakCraft,battle.crafts().size());
         peakOrdnance=Math.max(peakOrdnance,battle.missiles().size()+battle.ballistics().size());
         int texturedShips=0;
@@ -2423,6 +2427,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             failure.append("dedicated remote support inactive; ");
         if(specialists!=4)failure.append("unexpected specialist count "+specialists+"; ");
         if(peakAnimations==0)failure.append("VFX compositor unused; ");
+        if(peakLightQuads==0)failure.append("emissive combat lighting not rendered; ");
         // Exactly 400 fitted ships spawn; a single missing faction can hide
         // behind hundreds of successful draws unless the count is strict.
         if(peakSpriteShips!=400)failure.append("only ").append(peakSpriteShips)
@@ -2438,7 +2443,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " remote="+remote+" shield="+shield+
             " repairDrones="+serviceDrones+
             " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
-            " VFX="+peakAnimations+" spriteShips="+peakSpriteShips+
+            " VFX="+peakAnimations+" glowQuads="+peakLightQuads+
+            " smokeQuads="+peakSmokeQuads+" spriteShips="+peakSpriteShips+
             " fighterArtTextures="+(craftSprites==null?0:craftSprites.loaded())+
             " maskedDamageLayers="+(terranSprites==null?0:terranSprites.damageLayersBuilt())+
             " textureFrames="+
