@@ -2106,7 +2106,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
                 + "   PD " + (battle.missileIntercepts+battle.ballisticIntercepts)
                 + "   CRAFT " + battle.crafts().size()
-                + "   " + renderer + "   " + saveState, 22, 38);
+                + "   HULL ART " + visibleSpriteShips() + "/" +
+                  (battle.alive(0)+battle.alive(1)) +
+                  "   " + saveState, 22, 38);
         if (battle.finished()) {
             font.setColor(Color.GOLD);
             font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.engaged(0) > 0 ? left.displayName : right.displayName)
@@ -2115,6 +2117,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.end();
         if (tacticalMenuOpen) drawTacticalMenu();
         if(verifyDemo)verifyRenderedDemoFrame();
+    }
+
+    private int visibleSpriteShips(){
+        if(terranSprites==null || battle==null)return 0;
+        int sprites=0;
+        for(Battle.Ship ship:battle.ships())if(terranSprites.hasSprite(ship))sprites++;
+        return sprites;
     }
 
     private void verifyRenderedDemoFrame(){
@@ -2187,6 +2196,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             throw new IllegalStateException("CD 200v200 in-game validation failed: "+failure);
         }
         Gdx.app.log("CD-DEMO-VERIFY","PASS 200v200 mechanics+render-loop"+facts);
+        // Hold the proven last framebuffer for reproducible camera/zoom
+        // screenshots; never continue killing ships during ADB capture.
+        running=false;
         if(weaponFx==null||weaponFx.loadedTextures()==0||
                 weaponBeams==null||weaponBeams.loaded()==0)
             Gdx.app.log("CD-DEMO-VERIFY","ART_PENDING: real atlas PNGs not packaged; fallback is not quality approval");
