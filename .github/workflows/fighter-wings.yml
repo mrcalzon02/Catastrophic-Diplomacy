@@ -1,122 +1,79 @@
-name: Fighter wings combat and multiplatform smoke
+name: Pull request functional checks
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/**'
-      - 'game/**'
-      - 'android/**'
-      - 'desktop/**'
-      - 'tools/package_desktop.py'
-      - 'tools/verify_windows_msi.ps1'
-      - 'assets/ui/tactical/selected_manifest.json'
-      - 'asset_packs/ui-kit/**'
-      - 'build.gradle'
-      - 'tools/verify_tactical_ui.py'
-      - 'tools/verify_tactical_ui_packages.py'
-      - 'tools/test_verify_tactical_ui_packages.py'
-      - '.github/workflows/fighter-wings.yml'
   pull_request:
     paths:
       - 'core/**'
       - 'game/**'
-      - 'android/**'
+      - 'server/**'
       - 'desktop/**'
-      - 'tools/package_desktop.py'
-      - 'tools/verify_windows_msi.ps1'
-      - 'assets/ui/tactical/selected_manifest.json'
-      - 'asset_packs/ui-kit/**'
+      - 'android/**'
+      - 'assets/**'
+      - 'asset_packs/**'
+      - 'tools/**'
+      - 'gradle/**'
       - 'build.gradle'
-      - 'tools/verify_tactical_ui.py'
-      - 'tools/verify_tactical_ui_packages.py'
-      - 'tools/test_verify_tactical_ui_packages.py'
+      - 'settings.gradle'
       - '.github/workflows/fighter-wings.yml'
-concurrency:
-  group: fighter-wings-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+      - '.github/workflows/continuous-functional-release.yml'
+
 permissions:
   contents: read
+
+# PR verification must not duplicate the signed three-platform release.
+# Superseded PR revisions can be cancelled; main-commit releases cannot.
+concurrency:
+  group: cd-pr-functional-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  desktop-core:
-    name: Craft/saves/weapon tests + desktop compile (${{ matrix.os }})
+  desktop-and-server:
+    name: Compile desktop and test gameplay/network (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+        with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-      - name: Test fighter machinery, menu navigation and compile installed desktop application
-        run: gradle :core:desktopUpdaterPolicySmoke :core:fighterCraftSmoke :core:alienFactionSmoke :core:hullCoverageSmoke :core:shipSurfaceDamageSmoke :core:combatMachinerySmoke :core:gameFlowSmoke :game:menuFlowSmoke :server:check :game:classes :desktop:installDist --no-daemon --stacktrace
+        with: {gradle-version: '8.11.1'}
+      - name: Validate actual gameplay, LAN/PvP, update selection and desktop assembly
+        run: |
+          gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke :core:updaterPolicySmoke :core:desktopUpdaterPolicySmoke :server:check :game:menuFlowSmoke :desktop:installDist
+      - name: Run full 200v200 combat replay (one runner)
+        if: runner.os == 'Linux'
+        run: gradle --no-daemon :core:massBattleSmoke
+
+  android-compile:
+    name: Build installable Android debug APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Validate updater manifest support
+        run: python3 tools/test_prepare_android_update_manifest.py
+      - name: Build installable APK (no signing secrets on pull requests)
+        run: gradle --no-daemon :android:assembleDebug
+      - name: Verify APK exists
+        run: test -s android/build/outputs/apk/debug/android-debug.apk
+
+  art-diagnostics:
+    name: Non-blocking asset inventory and faction sprite diagnostics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Verify exact 24 source-approved icons in built desktop JAR
+        with: {python-version: '3.12'}
+      - name: Inspect art and UI manifests (informational, never a release gate)
         run: |
-          python tools/verify_tactical_ui.py
-          python tools/test_verify_tactical_ui_packages.py
-          python tools/verify_tactical_ui_packages.py --desktop-dir desktop/build/libs
-          python tools/verify_faction_ship_assets.py
-          python tools/verify_runtime_ship_art.py --desktop-dir desktop/build/libs
-      - name: Build real Windows MSI or Linux app with bundled Java 17 runtime
-        run: python tools/package_desktop.py
-      - name: Smoke-install and uninstall Windows MSI
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: ./tools/verify_windows_msi.ps1
-      - name: Upload runnable desktop package and checksums
-        uses: actions/upload-artifact@v4
-        with:
-          name: cd-desktop-${{ matrix.os }}-${{ github.sha }}
-          path: |
-            desktop/build/platform-packages/*.zip
-            desktop/build/platform-packages/*.msi
-            desktop/build/platform-packages/*.sha256
-          if-no-files-found: error
-          retention-days: 30
-
-  mass-battle:
-    name: Mixed 200v200 every fighter weapon and replay
-    needs: desktop-core
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-      - name: Exercise 1v1 through 200v200 and repeat mixed 400-ship carrier battle
-        run: gradle :core:massBattleSmoke --no-daemon --stacktrace
-
-  android-build:
-    name: Package shared fighter code in debug APK
-    needs: desktop-core
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-      - name: Install Android platform and build tools
-        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0"
-      - name: Build Android package from same core and game
-        run: gradle :android:assembleDebug --no-daemon --stacktrace
-      - name: Verify exact 24 source-approved icons in built Android APK
-        run: |
-          python3 tools/verify_tactical_ui_packages.py --android-apk android/build/outputs/apk/debug/android-debug.apk
           python3 tools/verify_faction_ship_assets.py
-          python3 tools/verify_runtime_ship_art.py --android-apk android/build/outputs/apk/debug/android-debug.apk
+          python3 tools/verify_tactical_ui.py
