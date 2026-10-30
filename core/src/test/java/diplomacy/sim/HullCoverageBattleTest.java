@@ -57,20 +57,33 @@ public final class HullCoverageBattleTest {
                         "Module aiming must select installed equipment");
                 // Controlled contact probes verify the same directional defense
                 // carried by these concrete fitted hulls in the real battle.
-                double before=ship.defense.totalArmor();
-                var shielded=ship.defense.impactSplash(1,0,aimed.x(),aimed.y(),
+                // Probe an independent shield/armor copy; do not modify the
+                // actual duel's opening state merely to perform an assertion.
+                DirectionalDefense surface=new DirectionalDefense(
+                        ship.maxShields,ship.maxArmor,ship.maxHull);
+                double before=surface.totalArmor();
+                var shielded=surface.impactSplash(1,0,aimed.x(),aimed.y(),
                         .01,Battle.DamageType.LASER,0,1.15);
                 check(shielded.armorConsumed()==0,
                         "Active shields must prevent armor peel on "+ship.hullClass);
-                check(ship.defense.totalArmor()==before,
+                check(surface.totalArmor()==before,
                         "No armored pixel should erode from fully absorbed beam");
+                surface.disruptShields(surface.totalShields());
+                var exposed=surface.impactSplash(1,0,aimed.x(),aimed.y(),
+                        3,Battle.DamageType.LASER,0,1.15);
+                check(exposed.armorConsumed()>0&&surface.totalArmor()<before,
+                        "After shield loss, real localized armor must erode");
+                String saved=surface.saveIntegrity();
+                DirectionalDefense restored=new DirectionalDefense(
+                        ship.maxShields,ship.maxArmor,ship.maxHull);
+                restored.restoreIntegrity(saved);
+                check(restored.fingerprint()==surface.fingerprint(),
+                        "Armor and shield exposure must survive save roundtrip");
             }
-            // Rebuild an identical seeded duel and assert simulation parity.
+            // Rebuild the exact same seed and compare complete real combat replay.
             long first=run(battle,100);
             long second=run(HullCoverageBattle.duel(tech,size),100);
-            // The deliberate shield probe modifies only this duel, so compare
-            // duplicate probes instead of comparing divergent initial states.
-            check(first!=0&&second!=0,"Duel did not advance");
+            check(first==second,"1v1 replay drifted for "+HullCoverageBattle.SIZES.get(size));
             duels++;
         }
         check(modulePatterns.size()>=11,"Hull classes need distinct module layouts");
