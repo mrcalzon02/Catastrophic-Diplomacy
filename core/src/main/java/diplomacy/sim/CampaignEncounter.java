@@ -18,6 +18,7 @@ public final class CampaignEncounter {
     private final Battle battle;
     private final CampaignDeployment.Loadout deployment;
     private int wave = 1;
+    private int hostileSerial;
 
     private CampaignEncounter(LevelEconomy.Level level,CampaignDeployment.Loadout deployment,
                               List<Shipyard.Design> friendlies,Shipyard.Design hostile,
@@ -59,15 +60,39 @@ public final class CampaignEncounter {
     }
 
     private void deployHostiles(){
-        battle.spawnWing(1,opponent,catalog,enemyCount(level,deployed,wave),970,335);
+        int first=battle.ships().size();
+        var fittings=CampaignOpposition.fleet(level.index(),wave,
+                enemyCount(level,deployed,wave),opponent.faction,catalog);
+        // Actual independent ship designs, not a wing of copies of one template.
+        battle.spawnFleet(1,fittings,catalog,970,335);
+        CampaignOpposition.assignOrders(battle,first,level.index(),wave);
+        FleetNames.Style[] styles=FleetNames.Style.values();
+        FleetNames.Style naming=styles[Math.floorMod(
+                level.sector()+opponent.faction.ordinal(),styles.length)];
+        for(int i=first;i<battle.ships().size();i++){
+            Battle.Ship hostile=battle.ships().get(i);
+            hostile.name=FleetNames.generate(naming,level.seed(),++hostileSerial);
+        }
     }
 
-    /** Deterministic wave sizes scale within each stage's physical fleet cap. */
+    /** Mission-role-dependent wave sizes within each stage's physical fleet cap. */
     public static int enemyCount(LevelEconomy.Level level,int deployed,int wave){
         if(level==null||deployed<1||deployed>level.maximumFleet()
                 ||wave<1||wave>level.waves())
             throw new IllegalArgumentException("Invalid wave specification");
-        return Math.max(1,Math.min(level.maximumFleet(),deployed+(wave-1)));
+        // A carrier/command/siege mission trades numbers for equipment,
+        // while a screen or sector-capital confrontation fields more hulls.
+        int percent=switch(CampaignOpposition.operation(level.index())){
+            case PATROL -> 100;
+            case INTERDICTION,TORPEDO_RAID,STRIKE_WING -> 85;
+            case SCREEN,BREAKTHROUGH -> 110;
+            case CONVOY,COMMAND -> 90;
+            case SIEGE -> 80;
+            case FLEET_BATTLE -> 115;
+            case SECTOR_CAPITAL -> 125;
+        };
+        int initial=Math.max(1,(deployed*percent+99)/100);
+        return Math.min(level.maximumFleet(),initial+wave-1);
     }
 
     public Battle battle(){return battle;}
