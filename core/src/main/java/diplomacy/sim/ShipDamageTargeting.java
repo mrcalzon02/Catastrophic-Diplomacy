@@ -63,6 +63,37 @@ public final class ShipDamageTargeting {
         double y=clip(-best.x()/66.0+(fraction(scatter+17)-0.5)*0.20,0.71);
         return new Point(x,y,best.index());
     }
+    /** The closest actual module to a physical hull collision, when nearby. */
+    public static int nearestModule(List<Shipyard.Slot> modules,Point impact){
+        if(modules==null||impact==null)return -1;
+        double nearest=0.32*0.32;
+        int chosen=-1;
+        for(Shipyard.Slot slot:modules){
+            double x=clip(slot.y()/72.0,0.85),y=clip(-slot.x()/66.0,0.68);
+            double dist=(impact.x()-x)*(impact.x()-x)+(impact.y()-y)*(impact.y()-y);
+            if(dist<nearest){nearest=dist;chosen=slot.index();}
+        }
+        return chosen;
+    }
+    /** Map real fitted module types onto their physical combat subsystems. */
+    public static Battle.Subsystem subsystem(String component){
+        if(component==null||component.length()<3)return null;
+        String kind=component.substring(component.lastIndexOf('-')+1);
+        return switch(kind){
+            case "REA","SIF","SHD" -> Battle.Subsystem.REACTOR;
+            case "ENG" -> Battle.Subsystem.ENGINES;
+            case "RAD" -> Battle.Subsystem.COOLING;
+            case "SEN" -> Battle.Subsystem.SENSORS;
+            case "LAS","KIN","MSL","TOR","PAR","PLA" -> Battle.Subsystem.WEAPONS;
+            case "PD","FLK" -> Battle.Subsystem.POINT_DEFENSE;
+            case "ECM" -> Battle.Subsystem.ELECTRONIC_WARFARE;
+            case "FTR","DRN","REP" -> Battle.Subsystem.HANGAR;
+            case "MAG" -> Battle.Subsystem.MAGAZINE;
+            case "CRW","LFS" -> Battle.Subsystem.COMMAND;
+            default -> null; // passive armor, or an unmapped custom device
+        };
+    }
+
     /** Impact footprint in armor-tile units. A torpedo peels a wider patch. */
     public static double radius(Battle.DamageType type){
         return switch(type){
