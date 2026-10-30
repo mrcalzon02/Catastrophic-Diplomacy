@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.HullLayouts;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Deterministic 30 Hz combat simulation. No graphics, files, time or Android APIs. */
@@ -51,6 +52,8 @@ public final class Battle {
         public int lastTargetId,lastAttackerId;
         public double anchorOffsetX,anchorOffsetY;
         public Shipyard.Hull hullClass;
+        /** Installed and physically located shipyard modules available for hit targeting. */
+        public List<Shipyard.Slot> impactHardpoints=List.of();
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
         public double x, y, vx, vy, facing;
@@ -540,6 +543,10 @@ public final class Battle {
         if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
+        List<Shipyard.Slot> installed=new ArrayList<>();
+        for(Shipyard.Slot slot:HullLayouts.slots(design.faction,design.hull))
+            if(design.at(slot.index())!=null)installed.add(slot);
+        s.impactHardpoints=List.copyOf(installed);
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.fittedCrewSystems=true;
         s.crewRequired=machinery.crew().minimum();
@@ -1804,7 +1811,7 @@ public final class Battle {
                 defender.x,defender.y);
         double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
-        hitAt(defender,raw,attacker,kind,dx,dy);
+        hitAt(defender,raw,attacker,kind,dx,dy,0,impactX,impactY);
     }
     /** Physical warheads resolve AFTER collision. Shields, tile armor, and
      * secondary blast/EMP all operate on real actual impact coordinates.
@@ -1818,7 +1825,7 @@ public final class Battle {
                 attacker==null?0:attacker.id,defender.id,impactX,impactY,defender.x,defender.y);
         double dx=attacker==null?-StrictMath.cos(defender.facing):attacker.x-defender.x;
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
-        hitAt(defender,raw,attacker,kind,dx,dy,payload.armorBypass());
+        hitAt(defender,raw,attacker,kind,dx,dy,payload.armorBypass(),impactX,impactY);
         if(payload.shieldDrain()>0){
             defender.defense.disruptShields(raw*payload.shieldDrain());
             defender.shields=defender.defense.totalShields();
@@ -1843,10 +1850,15 @@ public final class Battle {
     }
     /** Environmental impacts share directional protection with actual weapons. */
     private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,double dx,double dy) {
-        hitAt(defender,raw,attacker,kind,dx,dy,0);
+        hitAt(defender,raw,attacker,kind,dx,dy,0,Double.NaN,Double.NaN);
     }
     private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,
                        double dx,double dy,double armorBypass) {
+        hitAt(defender,raw,attacker,kind,dx,dy,armorBypass,Double.NaN,Double.NaN);
+    }
+    private void hitAt(Ship defender,double raw,Ship attacker,DamageType kind,
+                       double dx,double dy,double armorBypass,
+                       double impactWorldX,double impactWorldY) {
         if (!defender.alive()) return;
         hitCount++;
         double c=StrictMath.cos(defender.facing),s=StrictMath.sin(defender.facing);
@@ -1854,8 +1866,18 @@ public final class Battle {
         double distance=StrictMath.hypot(localX,localY);
         if(distance<1e-9){localX=1;localY=0;distance=1;}
         double radialX=localX/distance,radialY=localY/distance;
-        DirectionalDefense.Impact impact=defender.defense.impact(localX,localY,
-                radialX*0.85,radialY*0.65,raw,kind,armorBypass);
+        long salt=((long)tick<<32)^((long)defender.id*0x9e3779b97f4a7c15L)
+                ^((long)hitCount*0x632be59bd9b4e019L)^kind.ordinal();
+        double physicalDistance=StrictMath.hypot(impactWorldX-defender.x,
+                impactWorldY-defender.y);
+        boolean exactContact=Double.isFinite(physicalDistance)
+                &&physicalDistance>1e-6 &&physicalDistance<=16*defender.visualScale();
+        ShipDamageTargeting.Point point=exactContact
+                ?ShipDamageTargeting.physical(impactWorldX-defender.x,
+                        impactWorldY-defender.y,defender.facing)
+                :ShipDamageTargeting.module(defender.impactHardpoints,radialX,radialY,salt);
+        DirectionalDefense.Impact impact=defender.defense.impactSplash(localX,localY,
+                point.x(),point.y(),raw,kind,armorBypass,ShipDamageTargeting.radius(kind));
         defender.shields=defender.defense.totalShields();
         defender.armor=defender.defense.totalArmor();
         double damage=impact.hullDamage();
