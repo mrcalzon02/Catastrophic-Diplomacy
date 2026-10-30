@@ -128,7 +128,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean running = true;
     private boolean tacticalMenuOpen;
     private boolean resumeAfterMenu;
-    private int speed = 1;
+    private float speed = CombatPace.DEFAULT;
     /** Keyboard [ ] and the compact header controls select actual deployed ships per side. */
     private static final int[] FLEET_SIZES = {1,2,4,8,16,32,64,100,150,200};
     private int fleetIndex = 4;
@@ -416,8 +416,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.C) { manualZoom=1f; focusedShipId=-1; return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
-                if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = Math.min(16, speed * 2); return true; }
-                if (key == Input.Keys.MINUS) { speed = Math.max(1, speed / 2); return true; }
+                if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = CombatPace.faster(speed); return true; }
+                if (key == Input.Keys.MINUS) { speed = CombatPace.slower(speed); return true; }
                 if (key == Input.Keys.P) { togglePd(0); return true; }
                 if (key == Input.Keys.O) { togglePd(1); return true; }
                 if (key == Input.Keys.Q) { changeFaction(0); return true; }
@@ -495,8 +495,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else if (world.x >= 990) changeFleetSize(-1);
                     else if (world.x < 125) running = !running;
                     else if (world.x < 250) reset();
-                    else if (world.x < 365) speed = Math.max(1, speed / 2);
-                    else if (world.x < 475) speed = Math.min(16, speed * 2);
+                    else if (world.x < 365) speed = CombatPace.slower(speed);
+                    else if (world.x < 475) speed = CombatPace.faster(speed);
                     else if (world.x < 745) changeFaction(0);
                     else changeFaction(1);
                     return true;
@@ -1978,7 +1978,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch, running ? "PAUSE" : "RESUME", 15, 693);
         font.draw(batch, "RESTART", 167, 693);
         font.draw(batch, "SLOW", 270, 693);
-        font.draw(batch, "FAST x" + speed, 405, 693);
+        font.draw(batch, "FAST " + CombatPace.label(speed), 405, 693);
         font.setColor(left.r, left.g, left.b, 1);
         font.draw(batch, (playedCampaign?"":"< ") + left.displayName, 505, 693);
         font.setColor(right.r, right.g, right.b, 1);
