@@ -61,3 +61,19 @@ Additional weapon types can use the same approach:
 - Regression test: `core/src/test/java/diplomacy/sim/WeaponFxPipelineTest.java`
 
 This is intentionally modular and independent of whether a specific effect uses a beam, orb, bullet, torpedo or homing missile. The physics always decides what happened; the visuals are authored compositions of three effects triggered by that decision.
+
+## Shared combat lighting and exhaust (desktop / Android / battle screensaver)
+
+`game/src/main/java/diplomacy/client/CombatLightingRenderer.java` now shares the authoritative battle/world camera with the existing three-stage weapon composer. Its additive radial falloff pass is applied **after real hull sprites, genuine beam art, projectiles and the GL2 geometry fallback**. Consequently the local bloom brightens nearby hull pixels rather than drawing an unrelated HUD overlay. The emissive pass renders:
+
+- Facing- and speed-dependent engine nozzle lights and thrust cones for either ship renderer, with dim idle light.
+- Two-layer colored beam coronas and endpoint glow for **live** simulation beams, including fallback lines if beam textures are absent.
+- Separate simulation event-driven firing, impact and interception blooms; large kinetic shots receive stronger/longer muzzle illumination. TIMEOUT creates no explosion.
+- Illuminated guided missile/torpedo exhaust **only after cold-launch ignition**, attached to current projectile velocity and position.
+- Intentionally stylized smoke in vacuum, with sampled real missile positions, slight expansion, timed fading and short persistence after interception/impact.
+
+`CombatLightingModel` is a pure Java, tick-driven and battle-scoped history. No additional combat events, hit/damage calculations or gameplay randomness are introduced. Repeated render frames at a paused tick do not spawn extra smoke or advance flashes. Cosmetic histories are bounded to 640 smoke elements, 384 event flashes and 192 tracked missiles; the renderer caps illuminated beam/missile bodies to 256/192 respectively and culls world-space quads against the battle camera. One 64×64 gradient texture is generated at initialization and reused for all glows, without per-light shader compilation, FBO allocation or texture lookup. Normal alpha blending is restored before the HUD.
+
+**Quality boundary:** This is an efficient screen-space emissive illumination/bloom overlay, not normal-mapped shadow-casting light or a deferred light engine. The simulator's current FIRE event starts at the registered source-center; physical turret/nozzle sockets have not yet been introduced, so do not claim hardpoint-exact muzzle positioning. The original beam/hull artwork is preserved; this pass does not replace curated graphics or generate substitute ship sprites.
+
+**Tests and evidence:** `gradle :game:lightingSmoke` exercises real missile launch and plume retention, deterministic pause behavior, bounded effect counts, timeout behavior and battle replacement. This task is also a dependency of the existing `:game:menuFlowSmoke` functional gate on Linux and Windows, without adding a workflow. The existing Android 200v200 emulator test now requires at least one actually rendered lighting quad and reports peak `glowQuads` and `smokeQuads` alongside existing weapon-art diagnostics. Its framebuffer screenshots are the visual-review starting point, not automatic proof that the lighting aesthetics, exposure or battery/performance budget are acceptable. Review live 1× speed, zoom levels, long beam volleys, cold launches, huge kinetic salvos and 200v200 frame times on hardware before art sign-off.
