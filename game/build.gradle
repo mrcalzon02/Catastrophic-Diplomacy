@@ -80,3 +80,14 @@ tasks.register('battleTouchSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.BattleTouchNavigationTest'
 }
+
+tasks.register('screensaverCameraSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify timed seeded ship tracking, gentle pans, faction rotation and death retargeting.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ScreensaverCameraDirectorTest'
+}
+// Existing multiplatform release checks run menuFlowSmoke; require this director
+// regression there, rather than leaving a diagnostic-only test unexecuted.
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('screensaverCameraSmoke') }

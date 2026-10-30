@@ -77,6 +77,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private Battle battle;
     private boolean screensaverMode;
     private ScreensaverBattle.Round screensaverRound;
+    /** Unattended exhibition tracking is deliberately separate from the player camera. */
+    private final ScreensaverCameraDirector screensaverCamera=new ScreensaverCameraDirector();
     private final java.util.Random screensaverRandom=new java.util.Random(System.nanoTime());
     private float screensaverResultPause,previousSpeed,previousZoom;
     private int previousLevel,previousFocusedId;
@@ -2027,6 +2029,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void nextScreensaverRound(){
         screensaverRound=ScreensaverBattle.create(screensaverRandom.nextLong(),technology);
         battle=screensaverRound.battle();
+        // Each battle is a new shot sequence. Never follow stale/dead previous-round IDs.
+        screensaverCamera.reset(battle,screensaverRound.seed());
         battlefieldLevel=screensaverRound.environmentLevel();
         battle.configureWeather(LevelEnvironment.forLevel(battlefieldLevel).weather());
         if(starfield!=null)starfield.useLevel(battlefieldLevel);
@@ -2151,7 +2155,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
-        updateBattleCamera();
+        if(screensaverMode){
+            ScreensaverCameraDirector.Shot cinematic=screensaverCamera.update(battle,delta);
+            battleCamera.zoom=cinematic.zoom();
+            battleCamera.position.set(cinematic.centerX(),cinematic.centerY(),0);
+            battleCamera.update();
+        }else updateBattleCamera();
         if (audio != null) audio.advance(battle,battleCamera.position.x,
                 battleCamera.position.y,battleCamera.zoom,
                 running && !tacticalMenuOpen && !shipyard.open()
