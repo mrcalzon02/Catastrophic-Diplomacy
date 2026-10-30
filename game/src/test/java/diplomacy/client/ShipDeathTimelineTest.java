@@ -27,6 +27,37 @@ public final class ShipDeathTimelineTest {
         require(burst.smoke.size()==10,"ten sparse smoke puffs");
         require(burst.ship.faction()==Battle.Faction.UZIPT,"real faction retained");
         require(survived.alive(),"other team unaffected");
+        // Lethal weapon families choose distinct presentation recipes, while
+        // exact same physics, hull and death count remain authoritative.
+        var snapshot=burst.ship;
+        var leftHit=new ShipDeathTimeline.Impact(
+                ShipDeathTimeline.Cause.KINETIC,snapshot.x()-25,snapshot.y());
+        var rightHit=new ShipDeathTimeline.Impact(
+                ShipDeathTimeline.Cause.KINETIC,snapshot.x()+25,snapshot.y());
+        var fromLeft=ShipDeathTimeline.create(snapshot,burst.tick,burst.seed,leftHit);
+        var fromRight=ShipDeathTimeline.create(snapshot,burst.tick,burst.seed,rightHit);
+        require(fromLeft.directionX>.99f&&fromRight.directionX<-.99f,
+                "opposite strike faces make opposite directional shatter");
+        require(fromLeft.fragments.get(0).vx()>fromRight.fragments.get(0).vx(),
+                "fracture inherits the impact direction");
+        var laser=ShipDeathTimeline.create(snapshot,burst.tick,burst.seed,
+                new ShipDeathTimeline.Impact(ShipDeathTimeline.Cause.LASER,
+                        snapshot.x()-25,snapshot.y()));
+        var plasma=ShipDeathTimeline.create(snapshot,burst.tick,burst.seed,
+                new ShipDeathTimeline.Impact(ShipDeathTimeline.Cause.PLASMA,
+                        snapshot.x()-25,snapshot.y()));
+        var torpedo=ShipDeathTimeline.create(snapshot,burst.tick,burst.seed,
+                new ShipDeathTimeline.Impact(ShipDeathTimeline.Cause.TORPEDO,
+                        snapshot.x()-25,snapshot.y()));
+        require(Math.abs(torpedo.fragments.get(0).spin())>
+                Math.abs(laser.fragments.get(0).spin()),
+                "torpedo fracture spins harder than laser splitting");
+        require(plasma.smoke.get(0).radius()>laser.smoke.get(0).radius(),
+                "plasma produces heavier residual smoke than a laser");
+        require(ShipDeathTimeline.Cause.fromWeapon("TORPEDO")==
+                ShipDeathTimeline.Cause.TORPEDO,"actual torpedo event maps correctly");
+        require(ShipDeathTimeline.Cause.fromWeapon("ENVIRONMENT")==
+                ShipDeathTimeline.Cause.OTHER,"unknown cause uses safe fallback");
         require(destroyed.hull==0,"no resurrection or changed hit status");
         // Shared cut lines join at the exact same kink: no cracks in the
         // sprite before breakup or overlapping duplicated hull slices.

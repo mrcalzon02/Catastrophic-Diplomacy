@@ -88,7 +88,25 @@ final class ShipDeathRenderer implements Disposable {
                 float x=ship.x()+puff.offsetX()+puff.vx()*age*.70f;
                 float y=ship.y()+puff.offsetY()+puff.vy()*age*.70f;
                 if(view!=null&&!view.circle(x,y,radius))continue;
-                polygons.setColor(.22f,.25f,.31f,.30f*fade*fade);
+                float smokeOpacity=switch(burst.cause){
+                    case LASER -> .14f;
+                    case KINETIC -> .25f;
+                    case PLASMA -> .37f;
+                    case PARTICLE -> .27f;
+                    case MISSILE -> .30f;
+                    case TORPEDO -> .39f;
+                    case OTHER -> .30f;
+                };
+                float smokeRed=switch(burst.cause){
+                    case PLASMA -> .31f;
+                    case PARTICLE -> .29f;
+                    default -> .22f;
+                };
+                float smokeBlue=switch(burst.cause){
+                    case PLASMA,PARTICLE -> .45f;
+                    default -> .31f;
+                };
+                polygons.setColor(smokeRed,.25f,smokeBlue,smokeOpacity*fade*fade);
                 polygons.draw(smoke,x-radius,y-radius,radius*2,radius*2);
                 lastSmoke++;
             }
@@ -96,7 +114,31 @@ final class ShipDeathRenderer implements Disposable {
             if(age<.32f){
                 float radius=CombatEffectScale.of((75f+age*55)*scale);
                 float alpha=(1-age/.32f)*.62f;
-                polygons.setColor(1f,.46f,.15f,alpha);
+                float hotRed=switch(burst.cause){
+                    case LASER -> .22f;
+                    case PARTICLE -> .48f;
+                    default -> 1f;
+                };
+                float hotGreen=switch(burst.cause){
+                    case LASER -> .84f;
+                    case PLASMA -> .36f;
+                    case PARTICLE -> .18f;
+                    default -> .46f;
+                };
+                float hotBlue=switch(burst.cause){
+                    case LASER -> 1f;
+                    case PLASMA,PARTICLE -> .94f;
+                    default -> .15f;
+                };
+                polygons.setColor(hotRed,hotGreen,hotBlue,alpha);
+                polygons.draw(smoke,ship.x()-radius,ship.y()-radius,
+                        radius*2,radius*2);
+            }
+            // Torpedo kills leave a brief, restrained expanding blast front;
+            // this is cosmetic and does not affect nearby vessels.
+            if(burst.cause==ShipDeathTimeline.Cause.TORPEDO && age<.48f){
+                float radius=CombatEffectScale.of((42+110*age)*scale);
+                polygons.setColor(1f,.61f,.32f,(1-age/.48f)*.20f);
                 polygons.draw(smoke,ship.x()-radius,ship.y()-radius,
                         radius*2,radius*2);
             }

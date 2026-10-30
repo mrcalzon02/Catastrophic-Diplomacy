@@ -23,6 +23,40 @@ final class ShipDeathTimeline {
     static final short[] PENTAGON_TRIANGLES={0,1,2,0,2,3,0,3,4};
     private static final long DEATH_SALT=0x5368617474657265L;
 
+    /** Visual response to the actual lethal impact; not a new damage mechanic. */
+    enum Cause {
+        LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, OTHER;
+        static Cause fromWeapon(String weapon){
+            if(weapon==null)return OTHER;
+            try{return valueOf(weapon);}catch(IllegalArgumentException unknown){
+                return OTHER;
+            }
+        }
+        float violence(){
+            return switch(this){
+                case LASER -> .65f;
+                case KINETIC -> 1.17f;
+                case PLASMA -> .83f;
+                case PARTICLE -> .92f;
+                case MISSILE -> 1.20f;
+                case TORPEDO -> 1.50f;
+                case OTHER -> 1f;
+            };
+        }
+        float smokeStrength(){
+            return switch(this){
+                case LASER -> .42f;
+                case KINETIC -> .77f;
+                case PLASMA -> 1.30f;
+                case PARTICLE -> .87f;
+                case MISSILE -> 1.11f;
+                case TORPEDO -> 1.55f;
+                case OTHER -> 1f;
+            };
+        }
+    }
+    record Impact(Cause cause,float x,float y) {}
+
     record Snapshot(int id,int team,Battle.Faction faction,Shipyard.Hull hull,
                     float x,float y,float facing,float vx,float vy,float scale){}
     /** Normalized vertices are indexed around one ragged wedge of the full sprite. */
@@ -32,12 +66,18 @@ final class ShipDeathTimeline {
                 float drift) {}
     static final class Burst {
         final Snapshot ship;
+        final Cause cause;
+        final float impactX,impactY,directionX,directionY;
         final long seed,tick;
         final List<Fragment> fragments;
         final List<Puff> smoke;
         float age;
-        Burst(Snapshot ship,long seed,long tick,List<Fragment> pieces,List<Puff> puffs){
+        Burst(Snapshot ship,long seed,long tick,Impact impact,
+              float directionX,float directionY,
+              List<Fragment> pieces,List<Puff> puffs){
             this.ship=ship;this.seed=seed;this.tick=tick;
+            this.cause=impact.cause();this.impactX=impact.x();this.impactY=impact.y();
+            this.directionX=directionX;this.directionY=directionY;
             this.fragments=List.copyOf(pieces);this.smoke=List.copyOf(puffs);
         }
     }
@@ -67,7 +107,7 @@ final class ShipDeathTimeline {
             if(active.size()>=MAX_ACTIVE)active.removeFirst();
             long seed=mix(current.seed() ^ DEATH_SALT ^
                     (((long)ship.id)<<32) ^ current.tick);
-            active.addLast(create(before,current.tick,seed));
+            active.addLast(create(before,current.tick,seed,lethalImpact(current,ship)));
         }
         livingBefore.clear();
     }
@@ -92,8 +132,38 @@ final class ShipDeathTimeline {
         x^=x>>>27;x*=0x94d049bb133111ebL;
         return x^(x>>>31);
     }
+    /** Use only this tick's final recorded hit, not an old shot at a surviving ship. */
+    private static Impact lethalImpact(Battle current,Battle.Ship victim){
+        List<Battle.VisualEvent> history=current.visualEvents();
+        for(int i=history.size()-1;i>=0;i--){
+            Battle.VisualEvent event=history.get(i);
+            if(event.tick()<current.tick)break;
+            if(event.tick()==current.tick
+                    && event.phase()==Battle.VisualPhase.IMPACT
+                    && event.targetId()==victim.id)
+                return new Impact(Cause.fromWeapon(event.weapon()),
+                        (float)event.x(),(float)event.y());
+        }
+        return new Impact(Cause.OTHER,(float)victim.x,(float)victim.y);
+    }
     static Burst create(Snapshot ship,long tick,long seed){
+        return create(ship,tick,seed,new Impact(Cause.OTHER,ship.x(),ship.y()));
+    }
+    static Burst create(Snapshot ship,long tick,long seed,Impact impact){
         Random random=new Random(seed);
+        // The strike travels from the impact point toward the ship center.
+        // Kinetic and explosive fragments inherit that direction; lasers make
+        // comparatively clean, slow splits. Centered hits use the hull heading.
+        float dx=ship.x()-impact.x(),dy=ship.y()-impact.y();
+        float length=(float)Math.hypot(dx,dy);
+        if(!Float.isFinite(length)||length<.005f){
+            dx=(float)Math.cos(ship.facing());
+            dy=(float)Math.sin(ship.facing());
+            length=1;
+        }
+        float directionX=dx/length,directionY=dy/length;
+        float violence=impact.cause().violence();
+        float smokeStrength=impact.cause().smokeStrength();
         // The perimeter closes at all four corners; shared inward kinks
         // preserve continuous coverage at t=0, then separate along zigzag seams.
         float cx=.44f+random.nextFloat()*.12f;
@@ -125,17 +195,18 @@ final class ShipDeathTimeline {
             float dx=(edges[i][0]+edges[next][0])*.5f-cx;
             float dy=(edges[i][1]+edges[next][1])*.5f-cy;
             float size=(float)Math.max(.001,Math.hypot(dx,dy));
-            float force=(12+random.nextFloat()*36)*ship.scale();
-            float vx=dx/size*force+ship.vx()*.20f;
-            float vy=dy/size*force+ship.vy()*.20f;
-            float spin=(random.nextBoolean()?1:-1)*(45+random.nextFloat()*190);
+            float force=(12+random.nextFloat()*36)*ship.scale()*violence;
+            float push=(11+random.nextFloat()*15)*ship.scale()*violence;
+            float vx=dx/size*force+directionX*push+ship.vx()*.20f;
+            float vy=dy/size*force+directionY*push+ship.vy()*.20f;
+            float spin=(random.nextBoolean()?1:-1)*(45+random.nextFloat()*190)*violence;
             pieces.add(new Fragment(vertex,vx,vy,spin,.70f+random.nextFloat()*.30f));
         }
         List<Puff> smoke=new ArrayList<>(SMOKE_PER_HULL);
         for(int i=0;i<SMOKE_PER_HULL;i++){
             float angle=(float)(random.nextFloat()*Math.PI*2);
-            float speed=(4+random.nextFloat()*20)*ship.scale();
-            float r=(5+random.nextFloat()*10)*ship.scale();
+            float speed=(4+random.nextFloat()*20)*ship.scale()*smokeStrength;
+            float r=(5+random.nextFloat()*10)*ship.scale()*smokeStrength;
             smoke.add(new Puff(
                     (random.nextFloat()-.5f)*12*ship.scale(),
                     (random.nextFloat()-.5f)*12*ship.scale(),
@@ -143,6 +214,6 @@ final class ShipDeathTimeline {
                     (float)Math.sin(angle)*speed+ship.vy()*.12f,
                     r,.55f+random.nextFloat()*.75f));
         }
-        return new Burst(ship,seed,tick,pieces,smoke);
+        return new Burst(ship,seed,tick,impact,directionX,directionY,pieces,smoke);
     }
 }
