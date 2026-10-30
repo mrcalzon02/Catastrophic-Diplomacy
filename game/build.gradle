@@ -60,3 +60,13 @@ tasks.register('announcerSmoke', JavaExec) {
     mainClass = 'diplomacy.client.AnnouncerAudioTest'
 }
 tasks.named('audioSmoke') { finalizedBy(tasks.named('announcerSmoke')) }
+
+
+tasks.register('fighterVoiceSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless validation of all 26 recorded interceptor/pilot subtitle-to-OGG mappings.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.FighterVoiceAudioTest'
+}
+tasks.named('audioSmoke') { finalizedBy(tasks.named('fighterVoiceSmoke')) }

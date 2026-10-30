@@ -13,6 +13,7 @@ tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareStage1Art')
     dependsOn rootProject.tasks.named('prepareFighterArt')
     dependsOn rootProject.tasks.named('prepareAnnouncerVoiceAssets')
+    dependsOn rootProject.tasks.named('prepareFighterVoiceAssets')
     dependsOn rootProject.tasks.named('prepareLegacyFactionArt')
     from(rootProject.file('assets'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-ui'))
@@ -20,6 +21,7 @@ tasks.register('stageDesktopAssets', Sync) {
     from(rootProject.layout.buildDirectory.dir('generated/cd-stage1'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-fighters'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-announcer'))
+    from(rootProject.layout.buildDirectory.dir('generated/cd-fighter-voice'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-legacy-factions'))
     into(layout.buildDirectory.dir('runtime-assets'))
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE

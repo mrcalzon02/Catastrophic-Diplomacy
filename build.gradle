@@ -570,3 +570,66 @@ tasks.register('prepareAnnouncerVoiceAssets') {
 tasks.named('verifyBattleAudioResources') {
     dependsOn tasks.named('prepareAnnouncerVoiceAssets')
 }
+
+
+/**
+ * Original fighter/cockpit spoken audio. Runtime copies are reconstructed only
+ * from the ZIP supplied by the owner and transferred via Google Drive first.
+ */
+def fighterVoiceArchive = file('asset_packs/audio/fighter-voice-batch-003.zip')
+def fighterVoiceRuntime = layout.buildDirectory.dir('generated/cd-fighter-voice')
+tasks.register('prepareFighterVoiceAssets') {
+    group = 'assets'
+    description = 'Verify and stage 26 original interceptor voice clips for desktop and Android.'
+    inputs.file fighterVoiceArchive
+    outputs.dir fighterVoiceRuntime
+    doLast {
+        if (!fighterVoiceArchive.isFile())
+            throw new GradleException('Missing original fighter voice archive')
+        def sha256 = { byte[] bytes ->
+            java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(bytes).encodeHex().toString()
+        }
+        if (sha256(fighterVoiceArchive.bytes) !=
+                '82db162b06fccd39ff504ade08edc080f0e5c5c09f55430899f1e489a3ead861')
+            throw new GradleException('Fighter voice archive checksum mismatch')
+        def destination = fighterVoiceRuntime.get().asFile
+        project.delete(destination)
+        new File(destination,'audio/fighter').mkdirs()
+        new java.util.zip.ZipFile(fighterVoiceArchive).withCloseable { archive ->
+            def record = archive.getEntry('manifest.json')
+            if (record == null) throw new GradleException('Fighter manifest absent')
+            def manifest = new groovy.json.JsonSlurper().parseText(
+                    archive.getInputStream(record).withCloseable {
+                        new String(it.bytes, 'UTF-8')
+                    })
+            if (manifest.batch != '003' || manifest.hull != 'INTERCEPTOR'
+                    || manifest.clips.size() != 26)
+                throw new GradleException('Unexpected fighter voice inventory')
+            def seen = [] as Set
+            manifest.clips.each { clip ->
+                String id = clip.id as String
+                if (!(id ==~ /INTERCEPTOR_[A-Z_]+_0[12]/) || !seen.add(id))
+                    throw new GradleException('Invalid or duplicate fighter cue '+id)
+                String path = 'ogg/'+id.toLowerCase(java.util.Locale.ROOT)+'.ogg'
+                String target = 'audio/fighter/'+id.toLowerCase(java.util.Locale.ROOT)+'.ogg'
+                if (clip.ogg != path || clip.path != target)
+                    throw new GradleException('Unexpected fighter cue mapping '+id)
+                def entry = archive.getEntry(path)
+                if (entry == null) throw new GradleException('Missing OGG cue '+id)
+                byte[] bytes = archive.getInputStream(entry).withCloseable { it.bytes }
+                if (bytes.length < 1000 || bytes.length != (clip.ogg_bytes as int)
+                    || new String(bytes,0,4,'US-ASCII') != 'OggS'
+                    || sha256(bytes) != clip.ogg_sha256)
+                    throw new GradleException('Fighter voice content invalid '+id)
+                new File(destination,target).bytes = bytes
+            }
+            new File(destination,'audio/fighter/manifest.json').bytes =
+                    archive.getInputStream(record).withCloseable { it.bytes }
+        }
+        println('PASS: 26 user-recorded fighter lines staged on Android and desktop')
+    }
+}
+tasks.named('verifyBattleAudioResources') {
+    dependsOn tasks.named('prepareFighterVoiceAssets')
+}

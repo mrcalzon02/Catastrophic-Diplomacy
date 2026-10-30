@@ -74,6 +74,8 @@ public final class AnnouncerAudio implements AutoCloseable {
         }
     }
 
+    public boolean playing() { return active != null && active.isPlaying(); }
+
     /** Reclaim a finished streaming track; never overlap announcer lines. */
     public void advance() {
         if (!suspended && active != null && !active.isPlaying()) {
