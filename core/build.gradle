@@ -124,6 +124,15 @@ tasks.register('supportSystemsSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('moduleResearchSmoke') { finalizedBy(tasks.named('supportSystemsSmoke')) }
+tasks.register('fleetLogisticsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify four-channel long-range service, weak auras, finite support drone charges and paid rearming.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetLogisticsTest'
+    dependsOn testClasses
+}
+tasks.named('supportSystemsSmoke') { finalizedBy(tasks.named('fleetLogisticsSmoke')) }
+
 
 
 
