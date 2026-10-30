@@ -116,6 +116,50 @@ public final class FleetLogisticsTest {
                     &&far.power<far.maxPower&&far.shields<far.maxShields,
                     "Far ship incorrectly gained service outside spherical field");
         }
+        // All four drone doctrines must actually restore their intended
+        // depleted capacity, not merely exist in the technology catalog.
+        for(String code:drone){
+            Battle visit=new Battle(8711);
+            visit.spawnWing(0,fitted(tech,code),tech,1,300,280);
+            visit.spawnWing(0,ordinary,tech,1,650,280);
+            Battle.Ship owner=visit.ships().get(0),patient=visit.ships().get(1);
+            owner.speed=0;patient.speed=0;patient.damageControl=0;
+            damaged(patient);
+            SupportDoctrine.Channel channel=switch(code){
+                case "DSH" -> SupportDoctrine.Channel.SHIELD;
+                case "DAR" -> SupportDoctrine.Channel.ARMOR;
+                case "DPW" -> SupportDoctrine.Channel.POWER;
+                default -> SupportDoctrine.Channel.HULL;
+            };
+            double before=switch(channel){
+                case HULL -> patient.hull;
+                case SHIELD -> patient.shields;
+                case ARMOR -> patient.armor;
+                case POWER -> patient.power;
+            };
+            for(int i=0;i<200;i++)visit.step();
+            double after=switch(channel){
+                case HULL -> patient.hull;
+                case SHIELD -> patient.shields;
+                case ARMOR -> patient.armor;
+                case POWER -> patient.power;
+            };
+            check(owner.repairDronesLaunched>0&&after>before,
+                    "Real "+code+" service craft did not deliver its own supply type");
+        }
+        // A concentrated near-field discharge is distinct from tiny continuous
+        // wide-range benefits; both remain finite and consume carrier power.
+        Battle fieldBattle=new Battle(987);
+        fieldBattle.spawnWing(0,fitted(tech,"AHL"),tech,1,300,280);
+        fieldBattle.spawnWing(0,ordinary,tech,1,335,280);
+        fieldBattle.spawnWing(0,ordinary,tech,1,435,280);
+        for(Battle.Ship ship:fieldBattle.ships()){ship.speed=0;ship.damageControl=0;}
+        Battle.Ship close=fieldBattle.ships().get(1),outer=fieldBattle.ships().get(2);
+        close.hull=close.maxHull-80;outer.hull=outer.maxHull-80;
+        for(int i=0;i<301;i++)fieldBattle.step();
+        check(close.hull>outer.hull+1,
+                "Rare short-range aura discharge must exceed distant passive field");
+
         // Physically operated hull service drone flies to a distant allied
         // vessel, exhausts finite charge, returns and costs power to rearm.
         Battle servicing=new Battle(879);
