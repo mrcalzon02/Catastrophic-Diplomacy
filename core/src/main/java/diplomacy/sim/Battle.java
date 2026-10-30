@@ -57,6 +57,7 @@ public final class Battle {
         public List<Shipyard.Slot> impactHardpoints=List.of();
         /** Installed weapon-family emitters in the original faction hull layout. */
         public List<WeaponMuzzles.Emitter> weaponEmitters=List.of();
+        public Map<Integer,LaserFamilies.Type> laserFittings=Map.of();
         public Map<Integer,Subsystem> installedSubsystems=Map.of();
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
@@ -337,12 +338,20 @@ public final class Battle {
         public final DamageType type;
         /** A distinct defensive emitter, not another full-sized main laser. */
         public final boolean pointDefense;
+        public final LaserFamilies.Type laserType;
         public double lifetime = 0.13;
-        Beam(long visualId,long spawnTick, double startX, double startY, double endX, double endY, int side, DamageType weapon) {
-            this(visualId,spawnTick,startX,startY,endX,endY,side,weapon,false);
+        Beam(long visualId,long spawnTick,double x1,double y1,double x2,double y2,int team,DamageType type) {
+            this(visualId,spawnTick,x1,y1,x2,y2,team,type,false,LaserFamilies.Type.PULSE);
         }
-        Beam(long visualId,long spawnTick, double startX, double startY, double endX, double endY, int side, DamageType weapon, boolean pd) {
-            this.visualId=visualId;this.spawnTick=spawnTick;x1 = startX; y1 = startY; x2 = endX; y2 = endY; team = side; type = weapon;pointDefense=pd;
+        Beam(long visualId,long spawnTick,double x1,double y1,double x2,double y2,int team,DamageType type,boolean pointDefense) {
+            this(visualId,spawnTick,x1,y1,x2,y2,team,type,pointDefense,LaserFamilies.Type.PULSE);
+        }
+        Beam(long visualId,long spawnTick,double startX,double startY,double endX,double endY,
+             int side,DamageType weapon,boolean pd,LaserFamilies.Type laser){
+            this.visualId=visualId;this.spawnTick=spawnTick;
+            x1=startX;y1=startY;x2=endX;y2=endY;team=side;type=weapon;pointDefense=pd;
+            laserType=laser==null?LaserFamilies.Type.PULSE:laser;
+            if(weapon==DamageType.LASER&&!pd)lifetime=laserType.lifetime;
         }
     }
 
@@ -604,6 +613,7 @@ public final class Battle {
         }
         s.impactHardpoints=List.copyOf(installed);
         s.weaponEmitters=WeaponMuzzles.equipped(design,HullLayouts.slots(design.faction,design.hull));
+        s.laserFittings=LaserFamilies.fitted(design);
         s.installedSubsystems=Map.copyOf(located);
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.fittedCrewSystems=true;
@@ -1128,16 +1138,26 @@ public final class Battle {
         var torpedo=WeaponBehaviorTable.gun(DamageType.TORPEDO);
         // Preserve firing-family ordering: LASER, MISSILE, KINETIC, PLASMA,
         // PARTICLE, TORPEDO. No extra RNG calls or synthetic salvo events.
-        if(laser.available(s.laserDamage,0,distance,s.weapons.laserRange(),
-                s.laserReload,s.power,s.heat,s.maxHeat,
-                s.weaponsCondition,s.magazineCondition)){
-            s.laserReload=laser.reload(s.weapons.laserCycle(),s.weaponsCondition);
-            chargeGun(s,laser);
+        // Each shot uses the selected installed LAS module's true muzzle and pattern.
+        WeaponMuzzles.Origin laserMuzzle=WeaponMuzzles.at(
+                s,WeaponMuzzles.Family.LASER,nextVisualShotId);
+        LaserFamilies.Type laserType=LaserFamilies.selected(s,laserMuzzle.slotId());
+        double laserPower=laser.powerPerShot()*laserType.power;
+        double laserHeat=laser.heatPerShot()*laserType.heat;
+        boolean readyLaser=s.laserDamage>0
+                &&distance<laser.range(s.weapons.laserRange())*laserType.range
+                &&s.laserReload<=0 &&s.power>laserPower
+                &&s.heat<s.maxHeat*laser.heatFractionLimit()
+                &&s.heat+laserHeat<=s.maxHeat
+                &&s.weaponsCondition>laser.requiredWeaponCondition();
+        if(readyLaser){
+            s.laserReload=laser.reload(s.weapons.laserCycle(),s.weaponsCondition)
+                    *laserType.cycle;
+            s.power-=laserPower;s.heat+=laserHeat;
             long shotId=nextVisualShotId++;
             SurfaceAim aim=surfaceAim(s,target,shotId);
             boolean landed=random.nextDouble()<laser.aim(
-                    s.accuracy,s.weapons.laserTracking(),weatherAim,lock);
-            // Keep a missed beam from appearing to strike and erode its target.
+                    s.accuracy*laserType.aim,s.weapons.laserTracking(),weatherAim,lock);
             double endX=aim.x(),endY=aim.y();
             if(!landed){
                 double deviation=28+(shotId%5)*4;
@@ -1146,11 +1166,13 @@ public final class Battle {
                 endX+=StrictMath.cos(angle)*deviation;
                 endY+=StrictMath.sin(angle)*deviation;
             }
-            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.LASER,shotId);
-            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.LASER));
-            visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,
-                    muzzle.x(),muzzle.y(),endX,endY);
-            if(landed)hit(target,s.laserDamage,s,DamageType.LASER,shotId,aim.x(),aim.y());
+            beams.add(new Beam(shotId,tick,laserMuzzle.x(),laserMuzzle.y(),
+                    endX,endY,s.team,DamageType.LASER,false,laserType));
+            String label=LaserFamilies.eventWeapon(laserType);
+            visual(shotId,VisualPhase.FIRE,label,s.team,s.id,target.id,
+                    laserMuzzle.x(),laserMuzzle.y(),endX,endY);
+            if(landed)hitLaser(target,s.laserDamage*laserType.damage,
+                    s,shotId,aim.x(),aim.y(),label);
         }
         if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
                 s.missileReload,s.power,s.heat,s.maxHeat,
@@ -2137,6 +2159,16 @@ public final class Battle {
         double dy=attacker==null?-StrictMath.sin(defender.facing):attacker.y-defender.y;
         hitAt(defender,raw,attacker,kind,dx,dy,0,impactX,impactY);
     }
+    /** Variant labels follow the shot into its actual directional damage event. */
+    private void hitLaser(Ship target,double damage,Ship attacker,long shotId,
+                          double hitX,double hitY,String label){
+        if(!target.alive())return;
+        target.lastAttackerId=attacker.id;
+        visual(shotId,VisualPhase.IMPACT,label,attacker.team,attacker.id,
+                target.id,hitX,hitY,target.x,target.y);
+        hitAt(target,damage,attacker,DamageType.LASER,
+                attacker.x-target.x,attacker.y-target.y,0,hitX,hitY);
+    }
     /** Physical warheads resolve AFTER collision. Shields, tile armor, and
      * secondary blast/EMP all operate on real actual impact coordinates.
      */
@@ -2295,6 +2327,11 @@ public final class Battle {
             hash=mix(hash,s.kineticType.ordinal());
             hash=mix(hash,s.warhead(DamageType.MISSILE).ordinal());
             hash=mix(hash,s.warhead(DamageType.TORPEDO).ordinal());
+            for(WeaponMuzzles.Emitter emitter:s.weaponEmitters)
+                if(emitter.family()==WeaponMuzzles.Family.LASER){
+                    hash=mix(hash,emitter.slotId());
+                    hash=mix(hash,LaserFamilies.selected(s,emitter.slotId()).ordinal());
+                }
             hash=mix(hash,s.launchMode(DamageType.MISSILE).ordinal());
             hash=mix(hash,s.launchMode(DamageType.TORPEDO).ordinal());
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
