@@ -60,6 +60,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private BitmapFont font;
     private InstancedShipRenderer instanced;
     private TerranPlaceholderSprites terranSprites;
+    private FighterCraftSprites craftSprites;
     private WeaponBeamSprites weaponBeams;
     private ModularWeaponFxRenderer weaponFx;
     private ProceduralStarfield starfield;
@@ -169,6 +170,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
         audio = new CombatAudio();
         terranSprites = new TerranPlaceholderSprites();
+        craftSprites = new FighterCraftSprites();
         weaponBeams = new WeaponBeamSprites();
         weaponFx = new ModularWeaponFxRenderer();
         uiIcons = new TacticalUiIcons();
@@ -1990,6 +1992,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
+        if(craftSprites!=null)craftSprites.render(battle,batch);
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams);
         drawArmorDamage();
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
@@ -2015,37 +2018,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(texturedBallistics.contains(shell.visualId))continue;
             shapes.setColor(Color.GOLD);
             shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
-        }
-        for (Battle.Craft craft : battle.crafts()) {
-            float x=(float)craft.x,y=(float)craft.y;
-            shapes.setColor(craft.repair?Color.GREEN:craft.team==0?Color.CYAN:Color.CORAL);
-            if(!craft.fighter){
-                shapes.circle(x,y,craft.repair?3.0f:2.4f,8);
-                continue;
-            }
-            // Weapon-class silhouettes are functional art fallbacks until
-            // each faction receives individually approved strike-craft sprites.
-            switch(craft.profile.hull()) {
-                case INTERCEPTOR -> shapes.triangle(x+5,y,x-4,y+2,x-4,y-2);
-                case ASSAULT_GUNSHIP -> shapes.rect(x-4,y-3,8,6);
-                case LASER_FIGHTER -> {
-                    shapes.triangle(x+5,y,x-3,y+4,x-3,y-4);
-                    shapes.circle(x,y,1.3f,6);
-                }
-                case PARTICLE_FIGHTER -> {
-                    shapes.triangle(x+5,y,x-4,y+4,x-4,y-4);
-                    shapes.rect(x-1,y-1,2,2);
-                }
-                case MISSILE_FIGHTER -> {
-                    shapes.rect(x-4,y-2,8,4);
-                    shapes.circle(x-3,y+3,1.5f,6);
-                    shapes.circle(x-3,y-3,1.5f,6);
-                }
-                case TORPEDO_BOMBER -> {
-                    shapes.rect(x-6,y-4,12,8);
-                    shapes.circle(x+3,y,2.3f,7);
-                }
-            }
         }
         shapes.end();
         // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
@@ -2298,6 +2270,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Reuse existing hull geometry and approved sprite renderer for the authoritative poses.
         Battle solo=battle;try{battle=remotePresentation;drawShipsFallback();}finally{battle=solo;}
         batch.setProjectionMatrix(battleCamera.combined);if(terranSprites!=null&&terranSprites.loaded()>0)terranSprites.render(remotePresentation,batch);
+        batch.setProjectionMatrix(battleCamera.combined);if(craftSprites!=null)craftSprites.render(remotePresentation,batch);
         batch.setProjectionMatrix(camera.combined);batch.begin();font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+" / TAB: CONNECTION AND FLEET ORDERS",24,696);batch.end();
     }
     @Override public void resize(int width, int height) { viewport.update(width, height, true); }
@@ -2312,6 +2285,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (audio != null) audio.close();
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
+        if(craftSprites!=null)craftSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
         if(weaponFx!=null)weaponFx.dispose();
         if(uiIcons!=null)uiIcons.dispose();
