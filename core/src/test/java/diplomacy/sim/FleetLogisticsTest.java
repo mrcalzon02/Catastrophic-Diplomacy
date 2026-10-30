@@ -111,6 +111,30 @@ public final class FleetLogisticsTest {
                     &&far.power<far.maxPower&&far.shields<far.maxShields,
                     "Far ship incorrectly gained service outside spherical field");
         }
+        // Physically operated hull service drone flies to a distant allied
+        // vessel, exhausts finite charge, returns and costs power to rearm.
+        Battle servicing=new Battle(879);
+        var carrierFit=fitted(tech,"DHL");
+        servicing.spawnWing(0,carrierFit,tech,1,300,300);
+        servicing.spawnWing(0,ordinary,tech,1,660,300);
+        Battle.Ship carrier=servicing.ships().get(0),patient=servicing.ships().get(1);
+        carrier.speed=0;patient.speed=0;
+        carrier.damageControl=0;patient.damageControl=0;
+        patient.hull=patient.maxHull-52;
+        patient.powerRegen=0;
+        int startingBays=carrier.serviceDroneReserve[SupportDoctrine.Channel.HULL.ordinal()];
+        check(startingBays>0,"Physical support carrier must have launch slots");
+        for(int i=0;i<850;i++)servicing.step();
+        check(carrier.repairDronesLaunched>0&&patient.hull>patient.maxHull-52,
+                "Purpose-built service drone failed to travel and restore a remote ship");
+        check(carrier.serviceDronesRearmed>0,
+                "Expended service drones must return and pay for rearm, not disappear");
+        check(carrier.serviceDroneReserve[SupportDoctrine.Channel.HULL.ordinal()]<=startingBays,
+                "Docking may never clone a carrier's reusable drone complement");
+        check(servicing.crafts().stream().filter(c->c.repair).allMatch(c->
+                c.repairReserve>=0&&c.repairReserve<=c.serviceMaxCharge+1e-8),
+                "Service drone charge exceeded finite onboard stores");
+
         System.out.println("PASS four-channel logistics: purpose-fitted remote range/cost, "+
                 "independent limited drone magazines, gentle spherical auras and no free SHD relay");
     }
