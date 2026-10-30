@@ -27,7 +27,11 @@ public final class TerranPlaceholderSprites implements Disposable {
             new java.util.IdentityHashMap<>();
     private final java.util.Map<Texture,Texture> severeLayers =
             new java.util.IdentityHashMap<>();
-    private final Pixmap damagedMaterial, destroyedMaterial;
+    private final Pixmap damagedMaterial, destroyedMaterial, shieldMaterial;
+    // Four shield facings share real source pixels and alpha-masked overlays;
+    // textures are created per hull, not per vessel or recharge tick.
+    private final java.util.Map<Texture,Texture[]> shieldSections =
+            new java.util.IdentityHashMap<>();
     // A compact per-vessel overlay keeps irregular hull peeling inexpensive
     // even when several hundred damaged vessels share the same original PNG.
     private static final int MASK_W=96, MASK_H=144;
@@ -57,6 +61,7 @@ public final class TerranPlaceholderSprites implements Disposable {
     public TerranPlaceholderSprites() {
         damagedMaterial=loadMaterial("materials/structure_damaged.png");
         destroyedMaterial=loadMaterial("materials/structure_destroyed.png");
+        shieldMaterial=loadMaterial("materials/shield_energy_blue.png");
         // Legacy factions share the approved source images with their derivative
         // civilizations. Reuse GPU textures by full asset path, not by faction.
         java.util.Map<String,Texture> uniqueTextures=new java.util.HashMap<>();
@@ -155,6 +160,44 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(tile.occupied && tile.exposure()>0.001)return true;
         }
         return false;
+    }
+
+    /**
+     * Make four TRUE shield-material images following this sprite's silhouette.
+     * A sector with zero shield energy is invisible even while the other three
+     * facings remain energized. The mechanical shield model remains authoritative.
+     */
+    private void prepareShields(Texture original) {
+        if(shieldSections.containsKey(original))return;
+        Pixmap source=sourcePixels(original);
+        Texture[] layers=new Texture[DirectionalDefense.Facing.values().length];
+        for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+            Pixmap pix=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
+            pix.setBlending(Pixmap.Blending.None);
+            try {
+                for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
+                    double towardBow=1-(y+0.5)*2.0/MASK_H;
+                    double towardPort=1-(x+0.5)*2.0/MASK_W;
+                    if(DirectionalDefense.facingFor(towardBow,towardPort)!=face)
+                        continue;
+                    int art=source.getPixel(x*source.getWidth()/MASK_W,
+                            y*source.getHeight()/MASK_H);
+                    int alpha=art&255;
+                    if(alpha==0)continue;
+                    int material=shieldMaterial.getPixel(
+                            x*shieldMaterial.getWidth()/MASK_W,
+                            y*shieldMaterial.getHeight()/MASK_H);
+                    int materialAlpha=material&255;
+                    int strength=alpha*materialAlpha/255;
+                    if(strength==0)continue;
+                    pix.drawPixel(x,y,(material&0xffffff00)|strength);
+                }
+                Texture layer=new Texture(pix);
+                layer.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                layers[face.ordinal()]=layer;
+            } finally {pix.dispose();}
+        }
+        shieldSections.put(original,layers);
     }
 
     private Pixmap sourcePixels(Texture texture){
@@ -278,10 +321,13 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
         // Upload damage masks outside the SpriteBatch; only changed quantized
         // armor cells rebuild. One damaged ship draws two hull quads, not 256.
-        for(Battle.Ship ship:battle.ships())if(hasSprite(ship)&&breached(ship)){
+        for(Battle.Ship ship:battle.ships())if(hasSprite(ship)){
             Texture tex=texture(ship.faction,ship.hullClass);
-            exposedInterior(tex,ship.hull<ship.maxHull*0.30);
-            erodedExterior(ship,tex);
+            if(ship.shields>0)prepareShields(tex);
+            if(breached(ship)){
+                exposedInterior(tex,ship.hull<ship.maxHull*0.30);
+                erodedExterior(ship,tex);
+            }
         }
         batch.begin();
         for(Battle.Ship ship:battle.ships()) {
@@ -315,11 +361,17 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
                             float width,float height,float rotation) {
-        if(ship.maxShields<=0 || ship.shields<=0)return;
-        float strength=(float)Math.min(1,ship.shields/ship.maxShields);
-        // Shield sheen also follows the true hull mask, not a stretched oval.
-        batch.setColor(0.70f,0.88f,1f,0.10f*strength);
-        drawWhole(batch,original,ship,width,height,rotation);
+        if(ship.maxShields<=0||ship.shields<=0)return;
+        Texture[] sectors=shieldSections.get(original);
+        if(sectors==null)throw new IllegalStateException("Missing actual shield texture overlay");
+        for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+            double maximum=ship.defense.maxShields(face);
+            if(maximum<=0)continue;
+            float strength=(float)Math.min(1,ship.defense.shields(face)/maximum);
+            if(strength<=0.003f)continue;
+            batch.setColor(1,1,1,0.38f*strength);
+            drawWhole(batch,sectors[face.ordinal()],ship,width,height,rotation);
+        }
         batch.setColor(1,1,1,1);
     }
     private static void drawWhole(SpriteBatch batch,Texture tex,Battle.Ship ship,
@@ -335,6 +387,9 @@ public final class TerranPlaceholderSprites implements Disposable {
             for(Texture image:fleet.values())if(disposed.add(image))image.dispose();
         textures.clear();
         resetPeelCache();activeBattle=null;
+        for(Texture[] sections:shieldSections.values())
+            for(Texture sector:sections)if(sector!=null)sector.dispose();
+        shieldSections.clear();
         for(Pixmap pixels:sourcePixels.values())pixels.dispose();
         sourcePixels.clear();
         for(Texture image:damagedLayers.values())image.dispose();
@@ -342,5 +397,6 @@ public final class TerranPlaceholderSprites implements Disposable {
         damagedLayers.clear();severeLayers.clear();originals.clear();
         damagedMaterial.dispose();
         destroyedMaterial.dispose();
+        shieldMaterial.dispose();
     }
 }
