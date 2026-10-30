@@ -683,10 +683,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             var rightFile=Gdx.files.local("shipyard/skirmish-right.cdfleet");
             leftFile.writeString(leftData,false,"UTF-8");
             rightFile.writeString(rightData,false,"UTF-8");
-            if(!SkirmishFleetCodec.decode(leftFile.readString("UTF-8"),technology)
-                    .equals(skirmishLeftFleet)||
-                    !SkirmishFleetCodec.decode(rightFile.readString("UTF-8"),technology)
-                    .equals(skirmishRightFleet))
+            if(!leftData.equals(SkirmishFleetCodec.encode(
+                    SkirmishFleetCodec.decode(leftFile.readString("UTF-8"),technology),technology))||
+                    !rightData.equals(SkirmishFleetCodec.encode(
+                    SkirmishFleetCodec.decode(rightFile.readString("UTF-8"),technology),technology)))
                 throw new IllegalStateException("Export readback mismatch");
             deploymentNotice="EXPORTED BOTH FLEETS to shipyard/skirmish-left.cdfleet and skirmish-right.cdfleet";
         }catch(RuntimeException failure){
