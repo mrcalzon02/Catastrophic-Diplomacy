@@ -326,6 +326,12 @@ tasks.register('demoWeaponSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+tasks.register('desktopUpdaterPolicySmoke', JavaExec) {
+    description = 'Verify GitHub release ordering, prerelease acceptance and exact Windows/Linux update package policy.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.update.DesktopUpdatePolicyTest'
+    dependsOn testClasses
+}
 tasks.register('updaterPolicySmoke', JavaExec) {
     group = 'verification'
     description = 'Validate stable, prerelease and test-channel version, signature-origin and integrity policy.'

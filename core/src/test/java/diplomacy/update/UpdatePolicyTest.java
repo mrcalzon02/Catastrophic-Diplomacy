@@ -26,8 +26,8 @@ public final class UpdatePolicyTest {
         reject(()->UpdatePolicy.requireCandidate(nightly,"0.1.1",54),"older build code");
         reject(()->UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate(
                 "any","0.1.2",53,"other.package",1,"app.apk",8192,""),"0.1.1",52),"wrong app");
-        reject(()->UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate(
-                "any","0.1.2",53,UpdatePolicy.PACKAGE_ID,4,"app.apk",8192,""),"0.1.1",52),"schema");
+        UpdatePolicy.requireCandidate(new UpdatePolicy.Candidate(
+                "any","0.1.2",53,UpdatePolicy.PACKAGE_ID,4,"app.apk",8192,""),"0.1.1",52); // save schema does not block new releases
         var noManifest=UpdatePolicy.provisional("rc_28","provisional.apk",8192,"");
         check(noManifest.versionCode()==-1,"unknown versionCode must be inspected on APK download");
         for(String bad: new String[]{"../../bad.apk","test.zip","bad/name.apk","fake.apk/"})

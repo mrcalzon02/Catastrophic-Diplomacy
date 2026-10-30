@@ -39,3 +39,25 @@ tasks.named('jar') {
         attributes 'Main-Class': application.mainClass.get()
     }
 }
+
+// Embed the actual release tag. Desktop must NEVER trust the stale project
+// version (0.1.0-SNAPSHOT) when checking GitHub's published release sequence.
+def generatedReleaseTag = layout.buildDirectory.file('generated/update-tag/cd-update-tag.txt')
+tasks.register('generateDesktopReleaseTag') {
+    inputs.file(rootProject.file('android/build.gradle'))
+    outputs.file(generatedReleaseTag)
+    doLast {
+        def androidScript = rootProject.file('android/build.gradle').text
+        def match = (androidScript =~ /versionName\s+'([^']+)'/)
+        if (!match.find()) throw new GradleException('Android release versionName not found')
+        def versionName = match.group(1)
+        if (!(versionName ==~ /[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/))
+            throw new GradleException('Invalid updater release version')
+        def output = generatedReleaseTag.get().asFile
+        output.parentFile.mkdirs()
+        output.text = 'cd-v' + versionName + '\n'
+        println("Desktop updater release tag: cd-v" + versionName)
+    }
+}
+sourceSets.main.resources.srcDir(layout.buildDirectory.dir('generated/update-tag'))
+tasks.named('processResources') { dependsOn tasks.named('generateDesktopReleaseTag') }

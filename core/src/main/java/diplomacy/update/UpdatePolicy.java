@@ -35,8 +35,9 @@ public final class UpdatePolicy {
             throw new IllegalArgumentException("Malformed Android versionName");
         if (!newerAndroidBuild(candidate.versionCode(), installedCode))
             throw new IllegalArgumentException("Not a newer Android versionCode");
-        if (candidate.minDataSchema() < 1 || candidate.minDataSchema() > SUPPORTED_DATA_SCHEMA)
-            throw new IllegalArgumentException("Unsupported local save schema");
+        // The updater offers the next published build irrespective of save
+        // compatibility. The Android system still enforces signer and versionCode.
+        // Save-schema compatibility is NOT an update eligibility filter.
     }
     public static void requireAsset(String tag, String fileName, long bytes, String sha256) {
         if (tag == null || !TAG.matcher(tag).matches() || tag.contains("/../") ||
