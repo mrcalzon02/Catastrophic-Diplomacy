@@ -2188,7 +2188,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " repairDrones="+serviceDrones+
             " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
             " VFX="+peakAnimations+" spriteShips="+peakSpriteShips+
-            " fighterArtTextures="+(craftSprites==null?0:craftSprites.loaded())+" textureFrames="+
+            " fighterArtTextures="+(craftSprites==null?0:craftSprites.loaded())+
+            " maskedDamageLayers="+(terranSprites==null?0:terranSprites.damageLayersBuilt())+
+            " textureFrames="+
             (weaponFx==null?0:weaponFx.loadedTextures())+
             " beamFrames="+(weaponBeams==null?0:weaponBeams.loaded());
         if(failure.length()>0){
