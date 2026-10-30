@@ -21,16 +21,16 @@ public final class CampaignNarrative {
         "Catastrophic Diplomacy"
     };
     private static final String[] INTEL={
-        "Small screens contest the frontier",
-        "Command vessels join the fighting",
-        "Torpedo raids threaten supply lanes",
-        "Frigate commands coordinate attacks",
-        "Destroyer screens protect convoys",
-        "Mobile command hubs hold the line",
-        "Cruiser tenders fight attrition",
-        "Heavy flagships reclaim strongholds",
-        "Battlecruisers cut supply chains",
-        "Capital squadrons settle the war"
+        "Baseline interceptors and corvettes secure the frontier",
+        "Upgraded frigates, destroyers and torpedoes contest the lanes",
+        "Cruiser and battlecruiser hulls expand the line of battle",
+        "Carriers and dreadnoughts complete the base fleet families",
+        "Specialist strike and flak screens complicate every engagement",
+        "Electronic warfare and command variants contest targeting",
+        "Logistics tenders turn battles into contests of endurance",
+        "Tech VII veteran formations defend the old worlds",
+        "Tech VIII experimental ships harass every supply route",
+        "Tech IX apex fleets challenge the final sector capitals"
     };
     private static final String[] BEATS={
         "First contact","Reconnaissance","Escalation","Counterstroke","Sector confrontation"
