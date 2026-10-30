@@ -154,14 +154,14 @@ final class ShipDeathTimeline {
         // The strike travels from the impact point toward the ship center.
         // Kinetic and explosive fragments inherit that direction; lasers make
         // comparatively clean, slow splits. Centered hits use the hull heading.
-        float dx=ship.x()-impact.x(),dy=ship.y()-impact.y();
-        float length=(float)Math.hypot(dx,dy);
-        if(!Float.isFinite(length)||length<.005f){
-            dx=(float)Math.cos(ship.facing());
-            dy=(float)Math.sin(ship.facing());
-            length=1;
+        float impactDx=ship.x()-impact.x(),impactDy=ship.y()-impact.y();
+        float impactDistance=(float)Math.hypot(impactDx,impactDy);
+        if(!Float.isFinite(impactDistance)||impactDistance<.005f){
+            impactDx=(float)Math.cos(ship.facing());
+            impactDy=(float)Math.sin(ship.facing());
+            impactDistance=1;
         }
-        float directionX=dx/length,directionY=dy/length;
+        float directionX=impactDx/impactDistance,directionY=impactDy/impactDistance;
         float violence=impact.cause().violence();
         float smokeStrength=impact.cause().smokeStrength();
         // The perimeter closes at all four corners; shared inward kinks
