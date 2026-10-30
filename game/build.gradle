@@ -73,3 +73,10 @@ tasks.named('audioSmoke') { finalizedBy(tasks.named('fighterVoiceSmoke')) }
 
 // Release CI already invokes menuFlowSmoke: prove voice routing in those builds too.
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('fighterVoiceSmoke') }
+
+tasks.register('battleTouchSmoke', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.BattleTouchNavigationTest'
+}

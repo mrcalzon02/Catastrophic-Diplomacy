@@ -115,7 +115,7 @@ final class CombatLightingRenderer implements Disposable {
             float age = (float) (battle.tick - smoke.bornTick())
                     / CombatLightingModel.SMOKE_LIFETIME_TICKS;
             if (age < 0 || age >= 1) continue;
-            float radius = (smoke.heavy() ? 7.5f : 4.8f) * (1 + age * 1.65f);
+            float radius = CombatEffectScale.of((smoke.heavy() ? 7.5f : 4.8f) * (1 + age * 1.65f));
             if (!visible(camera, smoke.x(), smoke.y(), radius)) continue;
             float fade = (1 - age);
             batch.setColor(.55f, .59f, .65f, .43f * fade * fade);
@@ -164,11 +164,11 @@ final class CombatLightingRenderer implements Disposable {
             if (++beams > MAX_BEAM_LIGHTS) break;
             Color tint = weaponColor(beam.type);
             streak(batch, camera, beam.x1, beam.y1, beam.x2, beam.y2,
-                    31, tint, .22f);
+                    CombatEffectScale.of(31), tint, .22f);
             streak(batch, camera, beam.x1, beam.y1, beam.x2, beam.y2,
-                    12, tint, .40f);
-            spot(batch, camera, beam.x1, beam.y1, 21, tint, .32f);
-            spot(batch, camera, beam.x2, beam.y2, 23, tint, .38f);
+                    CombatEffectScale.of(12), tint, .40f);
+            spot(batch, camera, beam.x1, beam.y1, CombatEffectScale.of(21), tint, .32f);
+            spot(batch, camera, beam.x2, beam.y2, CombatEffectScale.of(23), tint, .38f);
         }
 
         // Missile light is on ONLY after ignition. Smoke is sampled separately
@@ -179,11 +179,11 @@ final class CombatLightingRenderer implements Disposable {
             if (missile.ignitionDelayTicks > 0 || missile.fuel <= 0) continue;
             double heading = StrictMath.atan2(missile.vy, missile.vx);
             double dx = StrictMath.cos(heading), dy = StrictMath.sin(heading);
-            double x = missile.x - dx * (missile.torpedo ? 8 : 5);
-            double y = missile.y - dy * (missile.torpedo ? 8 : 5);
+            double x = missile.x - dx * CombatEffectScale.of(missile.torpedo ? 8 : 5);
+            double y = missile.y - dy * CombatEffectScale.of(missile.torpedo ? 8 : 5);
             Color color = missile.torpedo ? Color.ORANGE : Color.GOLD;
-            spot(batch, camera, x, y, missile.torpedo ? 30 : 20, color, .53f);
-            spot(batch, camera, x, y, missile.torpedo ? 11 : 7, Color.WHITE, .7f);
+            spot(batch, camera, x, y, CombatEffectScale.of(missile.torpedo ? 30 : 20), color, .53f);
+            spot(batch, camera, x, y, CombatEffectScale.of(missile.torpedo ? 11 : 7), Color.WHITE, .7f);
         }
 
         // Only true simulation FIRE, IMPACT or INTERCEPT events cause bursts.
@@ -194,7 +194,7 @@ final class CombatLightingRenderer implements Disposable {
             float age = (float) (battle.tick - e.tick()) / lifetime;
             if (age < 0 || age >= 1) continue;
             boolean large = e.weapon().equals("KINETIC") || e.weapon().equals("TORPEDO");
-            float baseRadius = large ? 47 : 29;
+            float baseRadius = CombatEffectScale.of(large ? 47 : 29);
             float intensity = 1 - age;
             Color tint = eventColor(e.weapon());
             float expansion = .7f + age * .65f;

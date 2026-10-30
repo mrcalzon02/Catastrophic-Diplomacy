@@ -87,6 +87,8 @@ final class ModularWeaponFxRenderer implements Disposable {
 
     private static void drawCentered(SpriteBatch batch,Texture image,
                                      float x,float y,float width,float height,float angle) {
+        width=CombatEffectScale.of(width);
+        height=CombatEffectScale.of(height);
         batch.draw(image,x-width/2,y-height/2,
                 width/2,height/2,width,height,1,1,angle,
                 0,0,image.getWidth(),image.getHeight(),false,false);

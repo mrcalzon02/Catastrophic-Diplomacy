@@ -99,7 +99,7 @@ public final class WeaponBeamSprites implements Disposable {
             double dx=beam.x2-beam.x1,dy=beam.y2-beam.y1;
             float length=(float)StrictMath.hypot(dx,dy);
             if(length<0.01f)continue;
-            float thickness=beam.type==Battle.DamageType.KINETIC?4.0f:6.3f;
+            float thickness=CombatEffectScale.of(beam.type==Battle.DamageType.KINETIC?4.0f:6.3f);
             float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
             batch.draw(image,(float)beam.x1,(float)beam.y1-thickness/2,
                     0,thickness/2,length,thickness,1,1,rotation,
@@ -111,7 +111,7 @@ public final class WeaponBeamSprites implements Disposable {
             double dx=link.x2-link.x1,dy=link.y2-link.y1;
             float length=(float)StrictMath.hypot(dx,dy);
             if(length<0.01f)continue;
-            float thickness=link.kind==Battle.SupportKind.SHIELD?4.0f:2.8f;
+            float thickness=CombatEffectScale.of(link.kind==Battle.SupportKind.SHIELD?4.0f:2.8f);
             float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
             batch.draw(image,(float)link.x1,(float)link.y1-thickness/2,
                     0,thickness/2,length,thickness,1,1,rotation,
@@ -126,7 +126,7 @@ public final class WeaponBeamSprites implements Disposable {
             Texture image=ballisticTexture(shell,battle.tick);
             if(image==null)continue;
             float angle=(float)StrictMath.toDegrees(StrictMath.atan2(shell.vy,shell.vx));
-            float length=11.5f,thickness=3.1f;
+            float length=CombatEffectScale.of(11.5f),thickness=CombatEffectScale.of(3.1f);
             batch.draw(image,(float)shell.x-length/2,(float)shell.y-thickness/2,
                     length/2,thickness/2,length,thickness,1,1,angle,
                     0,0,image.getWidth(),image.getHeight(),false,false);

@@ -80,7 +80,7 @@ final class CombatLightingModel {
             float velocityLength = (float) StrictMath.hypot(missile.vx, missile.vy);
             float ux = velocityLength > 0.0001f ? (float) missile.vx / velocityLength : 1;
             float uy = velocityLength > 0.0001f ? (float) missile.vy / velocityLength : 0;
-            float tail = missile.torpedo ? 10 : 6;
+            float tail = CombatEffectScale.of(missile.torpedo ? 10 : 6);
             float tx = x - ux * tail, ty = y - uy * tail;
             if (previous == null) {
                 smoke.addLast(new Smoke(tx, ty, battle.tick, missile.torpedo));

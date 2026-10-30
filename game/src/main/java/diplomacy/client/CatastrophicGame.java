@@ -156,6 +156,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int fleetIndex = 4;
     private float manualZoom = 1f;
     private int focusedShipId = -1;
+    private float battlePanX,battlePanY;
+    private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
@@ -474,7 +476,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.W) { if(!playedCampaign){weatherEnabled = !weatherEnabled; reset();} return true; }
                 if (key == Input.Keys.Z) { zoomBy(-1); return true; }
                 if (key == Input.Keys.X) { zoomBy(1); return true; }
-                if (key == Input.Keys.C) { manualZoom=1f; focusedShipId=-1; return true; }
+                if (key == Input.Keys.C) { resetBattleView(); return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
                 if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = CombatPace.faster(speed); return true; }
@@ -488,6 +490,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
                 if(screensaverMode){stopScreensaver();return true;}
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
+                if(screen==GameMenuPanel.Screen.BATTLE && battle!=null &&
+                        !shipyard.open() && !tacticalMenuOpen &&
+                        (fleetOrdersPanel==null || !fleetOrdersPanel.open()) &&
+                        world.y>125 && world.y<610 &&
+                        battleTouch.start(pointer,world.x,world.y))return true;
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(screen==GameMenuPanel.Screen.DEPLOYMENT &&
                             world.x>=45&&world.x<=795&&world.y>=155&&world.y<=606){
@@ -540,7 +547,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if (world.x>=18 && world.x<118) { zoomBy(-1); return true; }
                     if (world.x>=126 && world.x<226) { zoomBy(1); return true; }
                     if (world.x>=235 && world.x<330) {
-                        focusedShipId=-1;manualZoom=1f;return true;
+                        resetBattleView();return true;
                     }
                 }
                 if (world.y >= 613 && world.y < 649) {
@@ -563,14 +570,27 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else changeFaction(1);
                     return true;
                 }
-                if (world.y>25 && world.y<610) {
-                    focusNearest(world.x,world.y);
-                    return true;
-                }
+                // Ship selection is deferred until a tap releases; dragging pans.
                 return false;
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
+                if(battleTouch.owns(pointer)){
+                    BattleTouchNavigation.Motion m=battleTouch.move(pointer,world.x,world.y);
+                    if(m.changed()){
+                        if(m.pinch()){
+                            float oldZoom=battleCamera.zoom;
+                            manualZoom=(float)Math.max(.18,Math.min(4,manualZoom*m.scale()));
+                            updateBattleCamera();
+                            moveBattleView((m.oldX()-W*.5f)*oldZoom-
+                                            (m.newX()-W*.5f)*battleCamera.zoom,
+                                    (m.oldY()-H*.5f)*oldZoom-
+                                            (m.newY()-H*.5f)*battleCamera.zoom);
+                        }else moveBattleView(-m.dx()*battleCamera.zoom,
+                                -m.dy()*battleCamera.zoom);
+                    }
+                    return true;
+                }
                 if(screen==GameMenuPanel.Screen.DEPLOYMENT&&pointer==placementDragPointer){
                     try{
                         deployment=deployment.withPlacement(selectedDeploymentShip,
@@ -589,6 +609,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.drag(world.x,world.y,pointer);
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
+                if(battleTouch.owns(pointer)){
+                    com.badlogic.gdx.math.Vector2 world=viewport.unproject(
+                            new com.badlogic.gdx.math.Vector2(x,y));
+                    if(battleTouch.end(pointer,world.x,world.y))
+                        focusNearest(world.x,world.y);
+                    return true;
+                }
                 if(pointer==placementDragPointer){
                     placementDragPointer=-1;
                     return true;
@@ -611,6 +638,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void zoomBy(float steps) {
         manualZoom=(float)Math.max(0.18,Math.min(4.0,manualZoom*Math.pow(1.18,steps)));
     }
+    private void resetBattleView(){
+        manualZoom=1f;focusedShipId=-1;
+        battlePanX=battlePanY=0f;battleTouch.cancel();
+        if(battle!=null)updateBattleCamera();
+    }
+    private void moveBattleView(float x,float y){
+        if(battle==null)return;
+        if(focusedShipId>=0){
+            BattleView.Frame automatic=BattleView.of(battle);
+            battlePanX=battleCamera.position.x-(float)automatic.centerX();
+            battlePanY=battleCamera.position.y-(float)automatic.centerY();
+            focusedShipId=-1;
+        }
+        battlePanX+=x;battlePanY+=y;updateBattleCamera();
+    }
     /** Tap a vessel to follow it while zoomed in. Empty space clears focus. */
     private void focusNearest(float uiX,float uiY) {
         if(battle==null)return;
@@ -623,6 +665,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(d<nearest){nearest=d;chosen=ship.id;}
         }
         focusedShipId=chosen;
+        battlePanX=battlePanY=0f;
     }
 
     private void selectScenario(ScenarioCatalog.Preset choice){
@@ -1975,6 +2018,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         previousSpeed=speed;previousZoom=manualZoom;
         previousLevel=battlefieldLevel;previousFocusedId=focusedShipId;
         screensaverMode=true;playedCampaign=false;
+        battlePanX=battlePanY=0f;battleTouch.cancel();
         screen=GameMenuPanel.Screen.BATTLE;
         speed=CombatPace.DEFAULT;manualZoom=1f;focusedShipId=-1;
         nextScreensaverRound();
@@ -1999,6 +2043,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         screensaverMode=false;screensaverRound=null;
         screen=GameMenuPanel.Screen.HOME;running=false;battle=null;
         speed=previousSpeed;manualZoom=previousZoom;focusedShipId=previousFocusedId;
+        battlePanX=battlePanY=0f;battleTouch.cancel();
         battlefieldLevel=previousLevel;
         if(starfield!=null)starfield.useLevel(battlefieldLevel);
         Gdx.app.log("CD-SCREENSAVER","EXIT HOME");
@@ -2233,12 +2278,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (Battle.Missile m : battle.missiles()) {
             if(texturedMissiles.contains(m.visualId))continue;
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
-            shapes.circle((float) m.x, (float) m.y, m.torpedo?4.4f:2.8f, 7);
+            shapes.circle((float) m.x, (float) m.y, CombatEffectScale.of(m.torpedo?4.4f:2.8f), 7);
         }
         for (Battle.Ballistic shell:battle.ballistics()) {
             if(texturedBallistics.contains(shell.visualId))continue;
             shapes.setColor(Color.GOLD);
-            shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
+            shapes.circle((float)shell.x,(float)shell.y,CombatEffectScale.of(2.1f),6);
         }
         shapes.end();
         // Final additive world-space pass illuminates actual ship and projectile
@@ -2485,7 +2530,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(followed==null)focusedShipId=-1;
             else {cx=followed.x;cy=followed.y;}
         }
-        battleCamera.position.set((float)cx,(float)cy,0);
+        battleCamera.position.set((float)cx+battlePanX,(float)cy+battlePanY,0);
         battleCamera.update();
     }
 
