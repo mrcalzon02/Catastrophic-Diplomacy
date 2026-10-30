@@ -224,8 +224,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         screen==GameMenuPanel.Screen.DEPLOYMENT&&
                         skirmishLeftFleet!=null&&skirmishRightFleet!=null){
                     try{
-                        if(team==0)skirmishLeftFleet=skirmishLeftFleet.with(selectedDeploymentShip,design);
-                        else skirmishRightFleet=skirmishRightFleet.with(selectedDeploymentShip,design);
+                        if(team==0)skirmishLeftFleet=activeSkirmishFleet(0).with(selectedDeploymentShip,design);
+                        else skirmishRightFleet=activeSkirmishFleet(1).with(selectedDeploymentShip,design);
                         deploymentNotice="Ship #"+(selectedDeploymentShip+1)+
                                 " equipped independently for this skirmish.";
                     }catch(IllegalArgumentException rejected){
@@ -638,8 +638,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             try{
                 int count=scenario==ScenarioCatalog.Preset.CUSTOM?
                         FLEET_SIZES[fleetIndex]:scenario.ships;
-                skirmishLeftFleet=SkirmishFleet.repeat(leftDesign,count);
-                skirmishRightFleet=SkirmishFleet.repeat(rightDesign,count);
+                skirmishLeftFleet=skirmishLeftFleet!=null&&skirmishLeftFleet.faction()==left?
+                        skirmishLeftFleet.resize(count):SkirmishFleet.repeat(leftDesign,count);
+                skirmishRightFleet=skirmishRightFleet!=null&&skirmishRightFleet.faction()==right?
+                        skirmishRightFleet.resize(count):SkirmishFleet.repeat(rightDesign,count);
                 skirmishLeftFleet.requireAllowed(skirmishRules,technology);
                 skirmishRightFleet.requireAllowed(skirmishRules,technology);
             }catch(IllegalArgumentException blocked){
@@ -1849,12 +1851,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void changeFaction(int team) {
         if(playedCampaign && screen==GameMenuPanel.Screen.BATTLE)return;
         if(team==0) {
+            skirmishLeftFleet=null;
             left=next(left);
             leftDesign=screen==GameMenuPanel.Screen.SKIRMISH && scenario!=ScenarioCatalog.Preset.CUSTOM?
                     ScenarioCatalog.defaultDesign(scenario,left,true,technology):
                     Shipyard.starter(left,leftDesign.hull);
             shipyard.sync(0,leftDesign);
         } else {
+            skirmishRightFleet=null;
             right=next(right);
             rightDesign=screen==GameMenuPanel.Screen.SKIRMISH && scenario!=ScenarioCatalog.Preset.CUSTOM?
                     ScenarioCatalog.defaultDesign(scenario,right,false,technology):
