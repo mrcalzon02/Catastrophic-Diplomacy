@@ -43,6 +43,7 @@ public final class GameMenuFlowTest {
         for(int i=0;i<6;i++)
             check(GameMenuPanel.homeHit(600,512-i*64)==i,"Home action "+i);
         check(GameMenuPanel.homeHit(15,650)==-1,"Off-menu tap activated an action");
+        check(GameMenuPanel.homeHit(600,60)==7,"Battle screensaver must be clickable");
         check(GameMenuPanel.Screen.valueOf("CAMPAIGN_SETUP")!=null,
                 "New-campaign confirmation view is missing");
         ScenarioCatalog.Preset[] presets=ScenarioCatalog.Preset.values();

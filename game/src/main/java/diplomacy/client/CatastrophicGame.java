@@ -17,6 +17,7 @@ import diplomacy.sim.BattleOrders;
 import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
 import diplomacy.sim.DemonstrationBattle;
+import diplomacy.sim.ScreensaverBattle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignEncounter;
 import diplomacy.sim.CampaignFleet;
@@ -73,6 +74,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
     private Battle battle;
+    private boolean screensaverMode;
+    private ScreensaverBattle.Round screensaverRound;
+    private final java.util.Random screensaverRandom=new java.util.Random(System.nanoTime());
+    private float screensaverResultPause,previousSpeed,previousZoom;
+    private int previousLevel,previousFocusedId;
     private MultiplayerPanel multiplayer;
     private Battle remotePresentation;
     private GameMenuPanel menuPanel;
@@ -266,6 +272,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
+                if(screensaverMode){stopScreensaver();return true;}
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
@@ -284,6 +291,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(screen==GameMenuPanel.Screen.HOME){
                         if(key>=Input.Keys.NUM_1 && key<=Input.Keys.NUM_7)
                             tapFrontEnd(610,512-(key-Input.Keys.NUM_1)*64);
+                        if(key==Input.Keys.NUM_8)startScreensaver();
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.SQUADRONS){
@@ -470,6 +478,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return false;
             }
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
+                if(screensaverMode){stopScreensaver();return true;}
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(screen==GameMenuPanel.Screen.DEPLOYMENT &&
@@ -1444,6 +1453,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     try{multiplayer=new MultiplayerPanel(font,()->{multiplayer=null;screen=GameMenuPanel.Screen.HOME;},this::drawRemoteBattle);}
                     catch(Exception unavailable){Gdx.app.error("NETWORK","Local network profile unavailable (NET-20)");}
                 }
+                case 7 -> startScreensaver();
             }
             return;
         }
@@ -1950,7 +1960,40 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Battle.Faction[] values = Battle.Faction.values();
         return values[(f.ordinal() + 1) % values.length];
     }
+    private void startScreensaver(){
+        previousSpeed=speed;previousZoom=manualZoom;
+        previousLevel=battlefieldLevel;previousFocusedId=focusedShipId;
+        screensaverMode=true;playedCampaign=false;
+        screen=GameMenuPanel.Screen.BATTLE;
+        speed=CombatPace.DEFAULT;manualZoom=1f;focusedShipId=-1;
+        nextScreensaverRound();
+        Gdx.app.log("CD-SCREENSAVER","START seed="+screensaverRound.seed());
+    }
+    private void nextScreensaverRound(){
+        screensaverRound=ScreensaverBattle.create(screensaverRandom.nextLong(),technology);
+        battle=screensaverRound.battle();
+        battlefieldLevel=screensaverRound.environmentLevel();
+        battle.configureWeather(LevelEnvironment.forLevel(battlefieldLevel).weather());
+        if(starfield!=null)starfield.useLevel(battlefieldLevel);
+        screensaverResultPause=0;
+        accumulator=0;running=true;
+        if(audio!=null)audio.resetForBattle();
+        Gdx.app.log("CD-SCREENSAVER","ROUND seed="+screensaverRound.seed()
+                +" sides="+screensaverRound.left()+"("+screensaverRound.leftFleet().size()
+                +",T"+screensaverRound.leftTier()+") / "+screensaverRound.right()
+                +"("+screensaverRound.rightFleet().size()+",T"+screensaverRound.rightTier()
+                +") backdrop="+battlefieldLevel);
+    }
+    private void stopScreensaver(){
+        screensaverMode=false;screensaverRound=null;
+        screen=GameMenuPanel.Screen.HOME;running=false;battle=null;
+        speed=previousSpeed;manualZoom=previousZoom;focusedShipId=previousFocusedId;
+        battlefieldLevel=previousLevel;
+        if(starfield!=null)starfield.useLevel(battlefieldLevel);
+        Gdx.app.log("CD-SCREENSAVER","EXIT HOME");
+    }
     private void reset() {
+        if(screensaverMode){nextScreensaverRound();return;}
         // Menus and the shipyard must not instantiate a combat sandbox on startup.
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE)return;
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
@@ -2002,7 +2045,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     @Override public void render() {
         if(multiplayer!=null){multiplayer.draw();return;}
-        if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished()) {
+        if(screensaverMode&&battle.finished()){
+            screensaverResultPause+=Math.min(0.08f,Gdx.graphics.getDeltaTime());
+            if(screensaverResultPause>=ScreensaverBattle.RESULT_PAUSE_SECONDS)
+                nextScreensaverRound();
+        }
+        if(!screensaverMode&&!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished()) {
             if(playedCampaign && campaignEncounter!=null) {
                 CampaignEncounter.Advance advance=campaignEncounter.advance();
                 if(advance==CampaignEncounter.Advance.VICTORY ||
@@ -2074,8 +2122,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
-        for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
-        for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
+        if(!screensaverMode){
+            for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
+            for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
+        }
         // Purpose-built auras are actual spherical local fields. Draw only a
         // faint range boundary when zoomed in; never fabricate fleetwide beams.
         if(battleCamera.zoom<=1.55f)for(Battle.Ship ship:battle.ships())
@@ -2177,6 +2227,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
         }
         shapes.end();
+        if(screensaverMode){
+            batch.setProjectionMatrix(camera.combined);
+            batch.begin();
+            font.setColor(Color.LIGHT_GRAY);
+            font.draw(batch,"EXHIBITION  /  SEED "+Long.toUnsignedString(screensaverRound.seed())
+                    +"  /  BACKDROP "+battlefieldLevel,20,695);
+            font.setColor(screensaverRound.left().r,screensaverRound.left().g,screensaverRound.left().b,1);
+            font.draw(batch,screensaverRound.left().displayName+"  TECH "+screensaverRound.leftTier()
+                    +"  /  "+battle.alive(0)+" ships",20,670);
+            font.setColor(screensaverRound.right().r,screensaverRound.right().g,screensaverRound.right().b,1);
+            font.draw(batch,screensaverRound.right().displayName+"  TECH "+screensaverRound.rightTier()
+                    +"  /  "+battle.alive(1)+" ships",720,670);
+            if(battle.finished()){
+                font.setColor(Color.GOLD);
+                String winner=battle.alive(0)>0?screensaverRound.left().displayName:
+                        battle.alive(1)>0?screensaverRound.right().displayName:"DRAW";
+                font.draw(batch,"VICTORY: "+winner+"  /  NEXT BATTLE SOON",355,370);
+            }
+            font.setColor(Color.LIGHT_GRAY);
+            font.draw(batch,"PRESS ANY KEY OR TAP TO RETURN TO MENU",20,28);
+            batch.end();
+            return;
+        }
         // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
         shapes.setProjectionMatrix(camera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);

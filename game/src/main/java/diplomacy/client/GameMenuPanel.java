@@ -58,6 +58,7 @@ final class GameMenuPanel {
     static int homeHit(float x,float y){
         for(int i=0;i<HOME_ACTIONS.length;i++)
             if(hit(x,y,438,487-i*64,404,50))return i;
+        if(hit(x,y,438,35,404,50))return 7; // Unattended battle screensaver
         return -1;
     }
     static int skirmishHit(float x,float y){
@@ -308,6 +309,7 @@ final class GameMenuPanel {
         switch(screen){
             case HOME -> {
                 for(int i=0;i<HOME_ACTIONS.length;i++)button(shapes,438,487-i*64,404,50,false);
+                button(shapes,438,35,404,50,false);
             }
             case CAMPAIGN_SETUP -> {
                 Battle.Faction[] factions=Battle.Faction.values();
@@ -542,7 +544,8 @@ final class GameMenuPanel {
                 title(batch,font,"CATASTROPHIC DIPLOMACY","TACTICAL FLEET COMMAND");
                 for(int i=0;i<HOME_ACTIONS.length;i++)
                     label(batch,font,HOME_ACTIONS[i],474,520-i*64,Color.WHITE);
-                label(batch,font,"CAMPAIGN  /  SKIRMISH  /  SHIP ENGINEERING",438,73,MUTED);
+                label(batch,font,"BATTLE SCREENSAVER",474,68,Color.WHITE);
+                label(batch,font,"CAMPAIGN  /  SKIRMISH  /  SHIP ENGINEERING",438,15,MUTED);
             }
             case CAMPAIGN_SETUP -> {
                 title(batch,font,"NEW CAMPAIGN","SELECT THE FACTION YOU WILL COMMAND");
