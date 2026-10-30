@@ -34,7 +34,7 @@ jobs:
             :core:desktopUpdaterPolicySmoke :core:shipLineagesSmoke \
             :core:technologySmoke :core:campaignResearchSmoke \
             :core:campaignTechnologySmoke :core:skirmishTechSmoke :server:check \
-            :game:menuFlowSmoke :desktop:installDist
+            :game:menuFlowSmoke :game:battleTouchSmoke :desktop:installDist
       - name: Create native Linux app image with bundled Java
         run: python3 tools/package_desktop.py
       - name: Verify Linux package and launch executable
