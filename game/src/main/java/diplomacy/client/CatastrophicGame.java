@@ -2159,7 +2159,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         // Shared visual clock: current authoritative state minus one fixed-tick.
         // Paused battles draw the exact state, not an old snapshot.
-        renderPoses.fraction(battle,!running || battle.finished()?1f:accumulator/Battle.DT);
+        renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
         if(screensaverMode){
             ScreensaverCameraDirector.Shot cinematic=screensaverCamera.update(battle,delta);
             battleCamera.zoom=cinematic.zoom();
