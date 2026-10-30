@@ -337,11 +337,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.SKIRMISH){
-                        if(key==Input.Keys.Q&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(0);
-                        if(key==Input.Keys.E&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(1);
+                        if(key==Input.Keys.Q&&!scenario.demonstration)changeFaction(0);
+                        if(key==Input.Keys.E&&!scenario.demonstration)changeFaction(1);
                         if(key==Input.Keys.LEFT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(-1);
                         if(key==Input.Keys.RIGHT_BRACKET&&scenario==ScenarioCatalog.Preset.CUSTOM)changeFleetSize(1);
-                        if((key==Input.Keys.S||key==Input.Keys.TAB)&&scenario!=ScenarioCatalog.Preset.PROVING_GROUND)openSkirmishShipyard();
+                        if((key==Input.Keys.S||key==Input.Keys.TAB)&&!scenario.demonstration)openSkirmishShipyard();
                         if(key==Input.Keys.ENTER){openSkirmishDeployment();return true;}
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             int step=key==Input.Keys.UP?-1:1;
@@ -663,7 +663,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
     private void openSkirmishShipyard(){
-        if(scenario==ScenarioCatalog.Preset.PROVING_GROUND)return;
+        if(scenario.demonstration)return;
         shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         shipyard.showSkirmish();
     }
@@ -1341,18 +1341,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(screen==GameMenuPanel.Screen.SKIRMISH){
             if(GameMenuPanel.hit(x,y,30,35,160,49)){screen=GameMenuPanel.Screen.HOME;return;}
             if(GameMenuPanel.hit(x,y,702,35,225,49)){
-                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)openSkirmishShipyard();
+                if(!scenario.demonstration)openSkirmishShipyard();
                 return;
             }
             if(GameMenuPanel.hit(x,y,969,35,277,49)){openSkirmishDeployment();return;}
             int selected=GameMenuPanel.skirmishHit(x,y);
             if(selected>=0){selectScenario(ScenarioCatalog.Preset.values()[selected]);return;}
             if(GameMenuPanel.hit(x,y,661,332,545,42)){
-                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(0);
+                if(!scenario.demonstration)changeFaction(0);
                 return;
             }
             if(GameMenuPanel.hit(x,y,661,271,545,42)){
-                if(scenario!=ScenarioCatalog.Preset.PROVING_GROUND)changeFaction(1);
+                if(!scenario.demonstration)changeFaction(1);
                 return;
             }
             if(GameMenuPanel.hit(x,y,661,210,545,42)){
