@@ -536,3 +536,12 @@ tasks.register('hullVoiceSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.HullVoiceChatterTest'
 }
 tasks.named('smoke') { finalizedBy(tasks.named('hullVoiceSmoke')) }
+
+tasks.register('weaponMuzzleSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify real fitted firing events, guided launch origins, alternation and rotated hardpoints.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WeaponMuzzlesTest'
+    dependsOn testClasses
+}
+tasks.named('projectileModuleSmoke') { finalizedBy(tasks.named('weaponMuzzleSmoke')) }

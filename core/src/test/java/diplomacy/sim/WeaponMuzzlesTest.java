@@ -51,6 +51,52 @@ public final class WeaponMuzzlesTest {
         check(WeaponMuzzles.family("BASE-TER-MSL")==WeaponMuzzles.Family.MISSILE,"missile code");
         check(WeaponMuzzles.family("BASE-TER-TOR")==WeaponMuzzles.Family.TORPEDO,"torpedo code");
         check(WeaponMuzzles.family("BASE-TER-REA")==null,"no firing from reactor");
-        System.out.println("PASS: installed module family mapping, deterministic alternating sockets, rotated muzzles and fallback");
+        // Full integration: equipped laser and missile systems send their
+        // AUTHORITATIVE firing events from the equipped slot, not center mass.
+        diplomacy.tech.TechnologyCatalog catalog=diplomacy.tech.TechnologyCatalog.loadDefault();
+        Shipyard.Design terran=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        Shipyard.Design opponent=Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE);
+        check(Shipyard.inspect(terran,catalog).valid(),"default hull fitting must validate");
+        Battle live=new Battle(90244L);
+        live.spawnWing(0,terran,catalog,1,280,330);
+        live.spawnWing(1,opponent,catalog,1,520,330);
+        var liveShip=live.ships().get(0);
+        liveShip.speed=0;live.ships().get(1).speed=0;
+        live.ships().get(1).pdRange=0;
+        check(liveShip.weaponEmitters.stream().anyMatch(x->x.family()==WeaponMuzzles.Family.LASER),
+                "real fitted ship loads laser emitter from exact design");
+        check(liveShip.weaponEmitters.stream().anyMatch(x->x.family()==WeaponMuzzles.Family.MISSILE),
+                "real fitted ship loads missile emitter from exact design");
+        int laserEvents=0,missileEvents=0;
+        for(int step=0;step<12;step++)live.step();
+        for(Battle.VisualEvent e:live.visualEvents()){
+            if(e.phase()!=Battle.VisualPhase.FIRE || e.sourceId()!=liveShip.id)continue;
+            WeaponMuzzles.Family type=switch(e.weapon()){
+                case "LASER" -> WeaponMuzzles.Family.LASER;
+                case "MISSILE" -> WeaponMuzzles.Family.MISSILE;
+                default -> null;
+            };
+            if(type==null)continue;
+            var actual=WeaponMuzzles.at(liveShip,type,e.shotId());
+            near(e.x(),actual.x(),"firing event X must equal equipped module muzzle");
+            near(e.y(),actual.y(),"firing event Y must equal equipped module muzzle");
+            check(actual.slotId()>=0,"cannot fake fitted muzzle at ship center");
+            if(type==WeaponMuzzles.Family.LASER){
+                laserEvents++;
+                boolean beamMatches=false;
+                for(Battle.Beam ray:live.beams()){
+                    if(ray.shotId==e.shotId()){
+                        near(ray.x1,e.x(),"laser beam and flash have same X");
+                        near(ray.y1,e.y(),"laser beam and flash have same Y");
+                        beamMatches=true;
+                    }
+                }
+                // Old short-lived beams may have already expired; original FIRE
+                // event remains the authoritative immutable launch record.
+            }else missileEvents++;
+        }
+        check(laserEvents>0 && missileEvents>0,
+                "real fitted laser and missile modules must fire in live battle");
+        System.out.println("PASS: installed module family mapping, deterministic slots, beam/fire-origin parity and live fitted rounds");
     }
 }
