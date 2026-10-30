@@ -91,3 +91,11 @@ tasks.register('screensaverCameraSmoke', JavaExec) {
 // Existing multiplatform release checks run menuFlowSmoke; require this director
 // regression there, rather than leaving a diagnostic-only test unexecuted.
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('screensaverCameraSmoke') }
+
+tasks.register('renderPosesSmoke', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.BattleRenderPosesTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('renderPosesSmoke') }
