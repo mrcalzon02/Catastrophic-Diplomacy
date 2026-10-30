@@ -2452,7 +2452,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.end();
         // Final additive world-space pass illuminates actual ship and projectile
         // pixels as well as space around real weapon and engine light sources.
-        if(lighting!=null)lighting.renderGlow(battle,batch,battleCamera,renderPoses);
+        if(lighting!=null)lighting.renderGlow(battle,batch,battleCamera,renderPoses,shieldFx);
         if(screensaverMode){
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
