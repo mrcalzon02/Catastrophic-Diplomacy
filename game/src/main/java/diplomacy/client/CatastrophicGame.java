@@ -1477,9 +1477,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         var node=CampaignMap.page(CampaignMap.pageOf(activeMission)).get((activeMission-1)%10);
         left=campaign.faction();right=node.opponent();
         if(leftDesign.faction!=left)leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
-        // The opposing fleet is authored by the mission, never by the shipyard editor.
-        rightDesign=Shipyard.starter(right,stage.index()<15?
-                Shipyard.Hull.CORVETTE:stage.index()<75?Shipyard.Hull.FRIGATE:Shipyard.Hull.CRUISER);
+        // Show the first actual generated hostile ship as the preview instead
+        // of pretending every enemy uses one arbitrary hull template.
+        rightDesign=diplomacy.sim.CampaignOpposition.fleet(activeMission,1,1,
+                right,technology).get(0);
         shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         campaignAfterAction=null;afterActionPage=0;
         deployedAtLaunch=deployment.ships();
