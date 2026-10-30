@@ -2076,6 +2076,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
         for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
         for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
+        // Purpose-built auras are actual spherical local fields. Draw only a
+        // faint range boundary when zoomed in; never fabricate fleetwide beams.
+        if(battleCamera.zoom<=1.55f)for(Battle.Ship ship:battle.ships())
+            if(ship.alive()&&ship.logistics!=null){
+                for(var field:ship.logistics.auras()){
+                    switch(field.channel()){
+                        case SHIELD -> shapes.setColor(0.12f,0.29f,0.44f,0.24f);
+                        case HULL -> shapes.setColor(0.12f,0.32f,0.19f,0.24f);
+                        case ARMOR -> shapes.setColor(0.39f,0.31f,0.11f,0.24f);
+                        case POWER -> shapes.setColor(0.31f,0.18f,0.38f,0.24f);
+                    }
+                    shapes.circle((float)ship.x,(float)ship.y,
+                            (float)field.range(),64);
+                    // The infrequent concentrated discharge is the small
+                    // moving inner ring; the external aura remains weak.
+                    long pulseAge=battle.tick%300;
+                    if(pulseAge<18){
+                        float p=(pulseAge+1)/18f;
+                        shapes.circle((float)ship.x,(float)ship.y,
+                                (float)(StrictMath.min(85,field.range()*0.42)*p),48);
+                    }
+                }
+            }
         for (Battle.Beam beam : battle.beams()) {
             if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
             shapes.setColor(switch(beam.type) {
