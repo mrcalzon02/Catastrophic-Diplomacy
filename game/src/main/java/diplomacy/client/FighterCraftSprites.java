@@ -93,7 +93,8 @@ public final class FighterCraftSprites implements Disposable {
         wire.dispose();
     }
     public int loaded() { return originals.size(); }
-    public void render(Battle battle,SpriteBatch batch) {
+    public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null);}
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses) {
         Map<Integer,Battle.Ship> vesselById=new HashMap<>();
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
         batch.begin();
@@ -115,10 +116,15 @@ public final class FighterCraftSprites implements Disposable {
             }:11f;
             float width=height*picture.getWidth()/(float)picture.getHeight();
             Battle.Ship target=vesselById.get(craft.targetId);
-            double bearing=target!=null ?
-                    StrictMath.atan2(target.y-craft.y,target.x-craft.x) : source.facing;
+            BattleRenderPoses.Pose position=poses==null?
+                    new BattleRenderPoses.Pose((float)craft.x,(float)craft.y,0):poses.craft(craft);
+            BattleRenderPoses.Pose aim=target==null?null:poses==null?
+                    new BattleRenderPoses.Pose((float)target.x,(float)target.y,(float)target.facing):
+                    poses.ship(target);
+            double bearing=aim!=null?
+                    StrictMath.atan2(aim.y()-position.y(),aim.x()-position.x()):source.facing;
             float rotation=(float)StrictMath.toDegrees(bearing)-90f;
-            batch.draw(picture,(float)craft.x-width/2,(float)craft.y-height/2,
+            batch.draw(picture,position.x()-width/2,position.y()-height/2,
                     width/2,height/2,width,height,1,1,rotation,
                     0,0,picture.getWidth(),picture.getHeight(),false,false);
         }

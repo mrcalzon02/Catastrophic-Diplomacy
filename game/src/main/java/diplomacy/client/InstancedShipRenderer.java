@@ -66,6 +66,11 @@ public final class InstancedShipRenderer implements AutoCloseable {
     /** Avoid duplicate geometry under an actual, successfully loaded sprite. */
     public void render(Battle battle,OrthographicCamera camera,
                        java.util.function.Predicate<Battle.Ship> hasArt) {
+        render(battle,camera,hasArt,null);
+    }
+    public void render(Battle battle,OrthographicCamera camera,
+                       java.util.function.Predicate<Battle.Ship> hasArt,
+                       BattleRenderPoses poses) {
         drawCalls=0;instances=0;
         shader.bind();
         shader.setUniformMatrix("u_proj",camera.combined);
@@ -77,12 +82,15 @@ public final class InstancedShipRenderer implements AutoCloseable {
                     if(!ship.alive()||ship.faction!=faction||type!=hull||hasArt.test(ship))continue;
                     if(n>=4096)throw new IllegalStateException("Hull instance batch exceeded 4096");
                     int offset=n++*4;
-                    positions[offset]=(float)ship.x;
-                    positions[offset+1]=(float)ship.y;
+                    BattleRenderPoses.Pose pose=poses==null?
+                            new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
+                            poses.ship(ship);
+                    positions[offset]=pose.x();
+                    positions[offset+1]=pose.y();
                     float scale=(float)ship.visualScale();
                     // Native shipyard outlines point +Y; combat heading zero points +X.
-                    positions[offset+2]=(float)Math.sin(ship.facing)*scale;
-                    positions[offset+3]=(float)-Math.cos(ship.facing)*scale;
+                    positions[offset+2]=(float)Math.sin(pose.angle())*scale;
+                    positions[offset+3]=(float)-Math.cos(pose.angle())*scale;
                 }
                 if(n==0)continue;
                 Mesh mesh=hulls[faction.ordinal()][hull.ordinal()];

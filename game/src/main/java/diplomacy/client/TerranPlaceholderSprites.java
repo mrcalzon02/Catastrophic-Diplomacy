@@ -316,7 +316,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         return ship != null && ship.alive() && ship.hullClass != null
                 && texture(ship.faction,ship.hullClass)!=null;
     }
-    public void render(Battle battle,SpriteBatch batch) {
+    public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null);}
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses) {
         if(textures.isEmpty())return;
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
         // Upload damage masks outside the SpriteBatch; only changed quantized
@@ -336,31 +337,34 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(tex==null)continue;
             float height=(float)(34*ship.visualScale());
             float width=height*tex.getWidth()/(float)tex.getHeight();
-            float rotation=(float)(StrictMath.toDegrees(ship.facing)-90);
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
+                    poses.ship(ship);
+            float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
             boolean damaged=breached(ship);
             if(!damaged) {
                 // Ship PNGs already contain the approved civilization palette.
                 // Multiply by white: class tint belongs to geometry fallback only.
                 batch.setColor(1,1,1,1);
-                drawWhole(batch,tex,ship,width,height,rotation);
-                drawShield(batch,ship,tex,width,height,rotation);
+                drawWhole(batch,tex,pose,width,height,rotation);
+                drawShield(batch,ship,tex,pose,width,height,rotation);
                 continue;
             }
             batch.setColor(1,1,1,1);
             // The understructure uses the ORIGINAL sprite's alpha/UV mask.
             // Damaged hulls never become opaque gray ovals.
             drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*0.30),
-                    ship,width,height,rotation);
+                    pose,width,height,rotation);
             // Progressive pixel-level peeling: irregular alpha reveals the
             // original silhouette-masked damaged surface directly beneath.
-            drawWhole(batch,peeled.get(ship.id).overlay,ship,width,height,rotation);
-            drawShield(batch,ship,tex,width,height,rotation);
+            drawWhole(batch,peeled.get(ship.id).overlay,pose,width,height,rotation);
+            drawShield(batch,ship,tex,pose,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
         batch.end();
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
-                            float width,float height,float rotation) {
+                            BattleRenderPoses.Pose pose,float width,float height,float rotation) {
         if(ship.maxShields<=0||ship.shields<=0)return;
         Texture[] sectors=shieldSections.get(original);
         if(sectors==null)throw new IllegalStateException("Missing actual shield texture overlay");
@@ -370,13 +374,13 @@ public final class TerranPlaceholderSprites implements Disposable {
             float strength=(float)Math.min(1,ship.defense.shields(face)/maximum);
             if(strength<=0.003f)continue;
             batch.setColor(1,1,1,0.38f*strength);
-            drawWhole(batch,sectors[face.ordinal()],ship,width,height,rotation);
+            drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
     }
-    private static void drawWhole(SpriteBatch batch,Texture tex,Battle.Ship ship,
+    private static void drawWhole(SpriteBatch batch,Texture tex,BattleRenderPoses.Pose pose,
                                   float width,float height,float rotation) {
-        batch.draw(tex,(float)ship.x-width/2,(float)ship.y-height/2,
+        batch.draw(tex,pose.x()-width/2,pose.y()-height/2,
                 width/2,height/2,width,height,1,1,rotation,
                 0,0,tex.getWidth(),tex.getHeight(),false,false);
     }
