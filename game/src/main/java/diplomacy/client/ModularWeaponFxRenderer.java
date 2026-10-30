@@ -101,7 +101,8 @@ final class ModularWeaponFxRenderer implements Disposable {
         // The already integrated real atlas-derived strip is the BEAM PAYLOAD part.
         // Its animation is started per shot using Beam.spawnTick, not global tick.
         if(existingBeamPayload!=null && existingBeamPayload.loaded()>0)
-            existingBeamPayload.render(battle,batch);
+            existingBeamPayload.render(battle,batch,
+                    shell -> !hasBallisticPayload(shell,battle.tick));
         batch.begin();
         batch.setColor(1,1,1,1);
         // Local FIRING and terminal IMPACT/INTERCEPT are separate, independent clips.

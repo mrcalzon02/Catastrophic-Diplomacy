@@ -73,8 +73,23 @@ public final class WeaponBeamSprites implements Disposable {
     public boolean canDrawSupport(Battle.SupportLink link,long tick){
         return supportTexture(link,tick)!=null;
     }
+    // A real gold beam-strip frame doubles as a SHORT ballistic tracer, not a
+    // fabricated physical missile or a line drawn by ShapeRenderer.
+    private Texture ballisticTexture(Battle.Ballistic shell,long tick) {
+        int frame=(int)Math.min(FRAMES-1,Math.max(0,tick-shell.spawnTick));
+        Texture selected=beams[4][frame];
+        return selected!=null?selected:beams[4][0];
+    }
+    public boolean canDrawBallistic(Battle.Ballistic shell,long tick) {
+        return ballisticTexture(shell,tick)!=null;
+    }
+
     /** World-aligned textured beam geometry; its origin remains the actual simulation muzzle. */
     public void render(Battle battle,SpriteBatch batch) {
+        render(battle,batch,shell -> true);
+    }
+    public void render(Battle battle,SpriteBatch batch,
+                       java.util.function.Predicate<Battle.Ballistic> showTracer) {
         if(loaded==0)return;
         batch.begin();
         batch.setColor(1,1,1,1);
@@ -101,6 +116,21 @@ public final class WeaponBeamSprites implements Disposable {
             batch.draw(image,(float)link.x1,(float)link.y1-thickness/2,
                     0,thickness/2,length,thickness,1,1,rotation,
                     0,0,image.getWidth(),image.getHeight(),false,false);
+        }
+        // Spatially correct 2D tracer. Real ballistic collision remains entirely
+        // simulation-controlled; never interpolate along a fictional hit line.
+        int traced=0;
+        for(Battle.Ballistic shell:battle.ballistics()){
+            if(traced>=512)break;
+            if(!showTracer.test(shell))continue;
+            Texture image=ballisticTexture(shell,battle.tick);
+            if(image==null)continue;
+            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(shell.vy,shell.vx));
+            float length=11.5f,thickness=3.1f;
+            batch.draw(image,(float)shell.x-length/2,(float)shell.y-thickness/2,
+                    length/2,thickness/2,length,thickness,1,1,angle,
+                    0,0,image.getWidth(),image.getHeight(),false,false);
+            traced++;
         }
         batch.setColor(1,1,1,1);
         batch.end();

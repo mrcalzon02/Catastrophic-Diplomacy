@@ -73,6 +73,96 @@ tasks.register('prepareStage1Art') {
 }
 
 
+
+// Reconstruct the user's approved 63 laser/kinetic/plasma/particle firing and
+// impact frames from the exact-byte Library source archive, transferred to Git
+// as bounded base64 text blobs. No runtime network access or fallback-only builds.
+def modularFxParts = (0..<20).collect {
+    file('asset_packs/weapon-fx/part-' + String.format('%02d', it) + '.b64')
+}
+def modularFxOutput = layout.buildDirectory.dir('generated/cd-weapon-fx')
+tasks.register('prepareModularWeaponFx') {
+    group = 'assets'
+    description = 'Restore and authenticate 63 original modular firing/impact PNGs.'
+    inputs.files modularFxParts
+    outputs.dir modularFxOutput
+    doLast {
+        modularFxParts.each { p ->
+            if (!p.isFile()) throw new GradleException('Missing original weapon FX part ' + p)
+        }
+        def encoded = new StringBuilder(8670856)
+        modularFxParts.eachWithIndex { p, i ->
+            def part = p.getText('US-ASCII').trim()
+            if (part.length() != (i == 19 ? 120856 : 450000)
+                    || !(part ==~ /[A-Za-z0-9+\/=]+/))
+                throw new GradleException('Invalid original FX transfer segment: ' + p.name)
+            encoded.append(part)
+        }
+        byte[] archiveBytes = java.util.Base64.decoder.decode(encoded.toString())
+        def digest = { byte[] b ->
+            java.security.MessageDigest.getInstance('SHA-256').digest(b).encodeHex().toString()
+        }
+        if (archiveBytes.length != 6503142
+                || digest(archiveBytes) != '1d65ce25dbe0fb4fccf0f85b6054fadf380b7ab8aaff3a9ce9129a39bcbf338a')
+            throw new GradleException('Original modular FX archive SHA-256 mismatch')
+        def archive = layout.buildDirectory.file('tmp/approved-modular-weapon-fx.zip').get().asFile
+        archive.parentFile.mkdirs()
+        archive.bytes = archiveBytes
+        def output = modularFxOutput.get().asFile
+        project.delete(output)
+        output.mkdirs()
+        new java.util.zip.ZipFile(archive).withCloseable { zip ->
+            def manifestEntry = zip.getEntry('assets/effects/weapon_fx/extraction_manifest.json')
+            if (manifestEntry == null) throw new GradleException('Original FX manifest absent')
+            def manifest = zip.getInputStream(manifestEntry).withCloseable {
+                new groovy.json.JsonSlurper().parse(it)
+            }
+            if (manifest.version != 1 || manifest.frameCount.firing_and_impact != 63
+                    || manifest.frameCount.payload != 35
+                    || manifest.frames.size() != 63 || manifest.payloadSha256.size() != 35)
+                throw new GradleException('Unexpected original modular FX inventory')
+            def expected = [:]
+            ['laser', 'kinetic', 'particle', 'plasma'].each { family ->
+                ['firing', 'impact'].each { phase ->
+                    int count = family == 'plasma' && phase == 'firing' ? 7 : 8
+                    (1..count).each { index ->
+                        def name = 'assets/effects/weapon_fx/' + family + '/' + phase + '_' +
+                                String.format('%02d', index) + '.png'
+                        expected[name] = true
+                    }
+                }
+            }
+            if (manifest.frames.keySet() as Set != expected.keySet() as Set)
+                throw new GradleException('Unexpected curated FX names or missing frames')
+            manifest.frames.each { name, metadata ->
+                if (metadata.stage != (name.contains('/firing_') ? 'firing' : 'impact')
+                        || !(metadata.status in ['CUTOUT_REVIEW_REQUIRED','APPROVED']))
+                    throw new GradleException('Unexpected effect provenance metadata: ' + name)
+                def source = zip.getEntry(name)
+                if (source == null) throw new GradleException('Missing curated FX: ' + name)
+                byte[] image = zip.getInputStream(source).withCloseable { it.bytes }
+                if (digest(image) != metadata.sha256
+                        || image.length < 1000
+                        || !java.util.Arrays.equals(
+                            java.util.Arrays.copyOf(image, 8),
+                            [137,80,78,71,13,10,26,10].collect { (byte) it } as byte[]))
+                    throw new GradleException('Damaged original weapon FX: ' + name)
+                def destination = new File(output, name.substring('assets/'.length()))
+                destination.parentFile.mkdirs()
+                destination.bytes = image
+            }
+            // Beam payloads are already staged by prepareStage1Art. Verify
+            // this source archive's payload identities but do not duplicate them.
+            manifest.payloadSha256.each { name, sha ->
+                if (!(name ==~ /assets\/effects\/beams\/(blue|red|green|gold|violet)_[0-9]{2}\.png/)
+                        || digest(zip.getInputStream(zip.getEntry(name)).withCloseable { it.bytes }) != sha)
+                    throw new GradleException('Original beam payload mismatch: ' + name)
+            }
+        }
+        println('PASS: 63 source-checked modular weapon FX PNGs staged for Android and desktop')
+    }
+}
+
 /**
  * The user's original five-faction, ten-roles-per-faction fighter art.
  * Binary chunks reconstruct the original ZIP byte-for-byte. Do not substitute

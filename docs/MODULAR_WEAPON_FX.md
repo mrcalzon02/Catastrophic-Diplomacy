@@ -77,3 +77,32 @@ This is intentionally modular and independent of whether a specific effect uses 
 **Quality boundary:** This is an efficient screen-space emissive illumination/bloom overlay, not normal-mapped shadow-casting light or a deferred light engine. The simulator's current FIRE event starts at the registered source-center; physical turret/nozzle sockets have not yet been introduced, so do not claim hardpoint-exact muzzle positioning. The original beam/hull artwork is preserved; this pass does not replace curated graphics or generate substitute ship sprites.
 
 **Tests and evidence:** `gradle :game:lightingSmoke` exercises real missile launch and plume retention, deterministic pause behavior, bounded effect counts, timeout behavior and battle replacement. This task is also a dependency of the existing `:game:menuFlowSmoke` functional gate on Linux and Windows, without adding a workflow. The existing Android 200v200 emulator test now requires at least one actually rendered lighting quad and reports peak `glowQuads` and `smokeQuads` alongside existing weapon-art diagnostics. Its framebuffer screenshots are the visual-review starting point, not automatic proof that the lighting aesthetics, exposure or battery/performance budget are acceptable. Review live 1× speed, zoom levels, long beam volleys, cold launches, huge kinetic salvos and 200v200 frame times on hardware before art sign-off.
+
+## Restored original modular weapon sprites (October 30, 2026)
+
+The original `Catastrophic_Diplomacy_Modular_FX_Existing_Art.zip` was
+retrieved from the project Library, inspected as a 2160×858 checkerboard
+contact sheet, and byte-verified against its embedded frame/payload manifest.
+The exact original 6,503,142-byte archive (SHA-256
+`1d65ce25dbe0fb4fccf0f85b6054fadf380b7ab8aaff3a9ce9129a39bcbf338a`)
+is now represented as twenty **base64 transport chunks** under
+`asset_packs/weapon-fx/`. `prepareModularWeaponFx` reconstructs it,
+verifies its original full-archive SHA-256, manifest inventory, each PNG
+SHA-256 and PNG signature, then stages **63 original firing/impact sprites**
+into `effects/weapon_fx/`. The **35 original beam strips** remain sourced
+from the already-committed, separately validated stage-1 runtime pack.
+Both Android asset merge and desktop asset staging require this new task.
+
+The weapon composer now actually finds its laser, kinetic, plasma and particle
+firing/impact frames in normal distributions, rather than silently skipping
+these optional textures. Kinetic shells also use an authored, time-relative
+gold tracer strip as a render-only payload when a dedicated physical shell
+sprite is absent; the collision-tested shell position remains authoritative.
+
+**Not yet art-approved:** These images passed source-hash and preliminary
+contact-sheet checks, not a completed in-game frame-by-frame aesthetic QA.
+Guided missile/torpedo **bodies**, flak, dedicated point-defense flashes,
+fighter and drone launch art still need source review and correct individual
+runtime sprites. Do not repurpose a UI missile glyph or entire arsenal
+sheet as a missile. Debug geometry is retained ONLY when the corresponding
+real art is missing, while the lighting/exhaust pass remains active.

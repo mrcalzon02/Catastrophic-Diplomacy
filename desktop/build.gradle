@@ -11,6 +11,7 @@ application { mainClass = 'diplomacy.desktop.DesktopLauncher' }
 tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareUiAssets')
     dependsOn rootProject.tasks.named('prepareStage1Art')
+    dependsOn rootProject.tasks.named('prepareModularWeaponFx')
     dependsOn rootProject.tasks.named('prepareFighterArt')
     dependsOn rootProject.tasks.named('prepareAnnouncerVoiceAssets')
     dependsOn rootProject.tasks.named('prepareFighterVoiceAssets')
@@ -20,6 +21,7 @@ tasks.register('stageDesktopAssets', Sync) {
     from(rootProject.layout.buildDirectory.dir('generated/cd-ui'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-music'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-stage1'))
+    from(rootProject.layout.buildDirectory.dir('generated/cd-weapon-fx'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-fighters'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-announcer'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-fighter-voice'))

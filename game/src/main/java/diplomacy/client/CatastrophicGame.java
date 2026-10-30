@@ -2224,7 +2224,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(weaponFx.hasMissilePayload(missile,battle.tick))
                     texturedMissiles.add(missile.visualId);
             for(Battle.Ballistic shell:battle.ballistics())
-                if(weaponFx.hasBallisticPayload(shell,battle.tick))
+                if(weaponFx.hasBallisticPayload(shell,battle.tick)
+                        || (weaponBeams!=null && weaponBeams.canDrawBallistic(shell,battle.tick)))
                     texturedBallistics.add(shell.visualId);
         }
         shapes.setProjectionMatrix(battleCamera.combined);
@@ -2431,6 +2432,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             failure.append("dedicated remote support inactive; ");
         if(specialists!=4)failure.append("unexpected specialist count "+specialists+"; ");
         if(peakAnimations==0)failure.append("VFX compositor unused; ");
+        if(weaponFx==null || weaponFx.loadedTextures()==0)
+            failure.append("approved firing/impact sprite frames not drawn; ");
+        if(weaponBeams==null || weaponBeams.loaded()!=35)
+            failure.append("curated 35-beam payload package missing; ");
         if(peakLightQuads==0)failure.append("emissive combat lighting not rendered; ");
         // Exactly 400 fitted ships spawn; a single missing faction can hide
         // behind hundreds of successful draws unless the count is strict.
