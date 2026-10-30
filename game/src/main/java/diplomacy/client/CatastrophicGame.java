@@ -2164,7 +2164,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(peakOrdnance==0||peakCraft==0)failure.append("no ordnance/craft; ");
         if(self<=0||remote<=0||shield<=0||serviceDrones==0)failure.append("inactive support; ");
         if(peakAnimations==0)failure.append("VFX compositor unused; ");
-        if(peakSpriteShips==0)failure.append("approved hull sprites not drawn; ");
+        // Exactly 400 fitted ships spawn; a single missing faction can hide
+        // behind hundreds of successful draws unless the count is strict.
+        if(peakSpriteShips!=400)failure.append("only ").append(peakSpriteShips)
+                .append("/400 living ships rendered with original hull art; ");
+        if(craftSprites==null || craftSprites.loaded()!=51)
+            failure.append("original autonomous fighter/drone art missing; ");
         verificationReported=true;
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
             " shots="+verifiedShots+" hits="+battle.hitCount+
@@ -2173,7 +2178,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " self="+self+" remote="+remote+" shield="+shield+
             " repairDrones="+serviceDrones+
             " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
-            " VFX="+peakAnimations+" spriteShips="+peakSpriteShips+" textureFrames="+
+            " VFX="+peakAnimations+" spriteShips="+peakSpriteShips+
+            " fighterArtTextures="+(craftSprites==null?0:craftSprites.loaded())+" textureFrames="+
             (weaponFx==null?0:weaponFx.loadedTextures())+
             " beamFrames="+(weaponBeams==null?0:weaponBeams.loaded());
         if(failure.length()>0){
