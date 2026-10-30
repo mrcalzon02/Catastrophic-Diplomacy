@@ -126,3 +126,11 @@ tasks.register('shipDeathSmoke', JavaExec) {
     mainClass = 'diplomacy.client.ShipDeathTimelineTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipDeathSmoke') }
+
+tasks.register('voiceMenuSmoke', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.VoiceMenuControlsTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('voiceMenuSmoke') }

@@ -50,6 +50,7 @@ public final class AnnouncerAudio implements AutoCloseable {
     private Music active;
     private boolean suspended;
     private boolean resumeVoice;
+    private float gain=1f;
     private long nextAllowedNs;
 
     public void play(Cue cue, boolean interrupt) {
@@ -65,7 +66,7 @@ public final class AnnouncerAudio implements AutoCloseable {
             if (!source.exists()) throw new IllegalStateException("Missing recorded announcement: " + source.path());
             active = Gdx.audio.newMusic(source);
             active.setLooping(false);
-            active.setVolume(0.63f);
+            active.setVolume(0.63f*gain);
             active.play();
             nextAllowedNs = now + 2_000_000_000L;
         } catch (RuntimeException error) {
@@ -74,6 +75,10 @@ public final class AnnouncerAudio implements AutoCloseable {
         }
     }
 
+    public void setVolume(float value){
+        gain=VoiceVolumeControl.clamp(value);
+        if(active!=null)active.setVolume(.63f*gain);
+    }
     public boolean playing() { return active != null && active.isPlaying(); }
 
     /** Reclaim a finished streaming track; never overlap announcer lines. */

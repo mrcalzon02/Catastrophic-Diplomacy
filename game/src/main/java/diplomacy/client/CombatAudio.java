@@ -22,7 +22,7 @@ public final class CombatAudio implements AutoCloseable {
     private final SpatialAudioRuntime spatial;
     private final AnnouncerAudio announcer;
     private final RecordedHullVoiceAudio hullVoice;
-    private Sound radioOpen, radioClose;
+    private Sound radioOpen, radioClose, uiHoverSound, uiPressSound, uiBackSound, uiBlockedSound, uiAdjustSound;
     private String lastLogEntry;
     private long lastRadioTick = -1000000L;
     private boolean radioFlip;
@@ -32,7 +32,8 @@ public final class CombatAudio implements AutoCloseable {
     private int seenDestructions;
     private boolean musicOn = true, effectsOn = true, useBattleMusic = true;
     private boolean suspended;
-    private float musicVolume = 0.19f, effectsVolume = 0.42f;
+    private float musicVolume = 0.19f, effectsVolume = 0.42f, voiceVolume=1f;
+    private long lastHoverSoundNs, lastAdjustSoundNs;
 
     public CombatAudio() {
         Arrays.fill(lastPlayedTick, -1000000L);
@@ -41,6 +42,7 @@ public final class CombatAudio implements AutoCloseable {
             musicOn = prefs.getBoolean("music", true);
             effectsOn = prefs.getBoolean("effects", true);
             useBattleMusic = prefs.getBoolean("battleTrack", true);
+            voiceVolume=VoiceVolumeControl.clamp(prefs.getFloat("voiceVolume",1f));
         } catch (RuntimeException error) {
             Gdx.app.error("AUDIO", "Audio settings unavailable; using defaults", error);
         }
@@ -57,8 +59,12 @@ public final class CombatAudio implements AutoCloseable {
         spatial = new SpatialAudioRuntime(cues);
         announcer = new AnnouncerAudio();
         hullVoice = new RecordedHullVoiceAudio();
+        announcer.setVolume(voiceVolume);hullVoice.setVolume(voiceVolume);
         radioOpen = loadRadio("radio_open");
         radioClose = loadRadio("radio_close");
+        uiHoverSound=loadRadio("ui_hover");uiPressSound=loadRadio("ui_press");
+        uiBackSound=loadRadio("ui_back");uiBlockedSound=loadRadio("ui_blocked");
+        uiAdjustSound=loadRadio("ui_adjust");
         ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3");
         battleMusic = loadMusic("audio/music/final_surge.mp3");
         switchTrack();
@@ -118,6 +124,7 @@ public final class CombatAudio implements AutoCloseable {
             prefs.putBoolean("music", musicOn);
             prefs.putBoolean("effects", effectsOn);
             prefs.putBoolean("battleTrack", useBattleMusic);
+            prefs.putFloat("voiceVolume",voiceVolume);
             prefs.flush();
         } catch (RuntimeException error) {
             Gdx.app.error("AUDIO", "Cannot persist audio settings", error);
@@ -127,21 +134,32 @@ public final class CombatAudio implements AutoCloseable {
     public boolean musicEnabled() { return musicOn; }
     public boolean effectsEnabled() { return effectsOn; }
     public boolean battleTrack() { return useBattleMusic; }
+    public float voiceVolume(){return voiceVolume;}
+    /** Drag previews are instantaneous, without a filesystem write on every pixel. */
+    public void setVoiceVolume(float gain,boolean save){
+        voiceVolume=VoiceVolumeControl.clamp(gain);
+        announcer.setVolume(voiceVolume);hullVoice.setVolume(voiceVolume);
+        if(save)persist();
+    }
+    public void stepVoiceVolume(int direction){
+        setVoiceVolume(VoiceVolumeControl.step(voiceVolume,direction),true);uiAdjust();
+    }
+    public void saveVoiceVolume(){persist();}
     public void toggleMusic() {
         musicOn = !musicOn;
         if (!musicOn && activeMusic != null) activeMusic.pause();
         else switchTrack();
         persist();
     }
-    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn){spatial.silence();announcer.stop();hullVoice.stop();} persist(); }
+    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn)spatial.silence(); persist(); }
     public void toggleTrack() { useBattleMusic = !useBattleMusic; switchTrack(); persist(); }
 
     /** Announcements are the game narrator only; ship RADIO events remain text plus quiet bleeps. */
     public void announce(AnnouncerAudio.Cue cue) {
-        if (effectsOn && !suspended) { hullVoice.stop(); announcer.play(cue, false); }
+        if (voiceVolume>0f && !suspended) { hullVoice.stop(); announcer.play(cue, false); }
     }
     public void announcePriority(AnnouncerAudio.Cue cue) {
-        if (effectsOn && !suspended) { hullVoice.stop(); announcer.play(cue, true); }
+        if (voiceVolume>0f && !suspended) { hullVoice.stop(); announcer.play(cue, true); }
     }
 
     public void resetForBattle() {
@@ -179,7 +197,7 @@ public final class CombatAudio implements AutoCloseable {
         }
         // Consume unseen entries even while muted, paused, or viewing menus.
         lastLogEntry = log.get(log.size()-1);
-        if (!visible || suspended || !effectsOn) return;
+        if (!visible || suspended) return;
         boolean received = false;
         String hullCue = null;
         for (int i=start;i<log.size();i++) {
@@ -192,8 +210,8 @@ public final class CombatAudio implements AutoCloseable {
         }
         // The original recording is rare cockpit speech, not 400 simultaneous pilots.
         // Ordinary ship messages continue to receive quiet radio bleeps.
-        if (hullCue != null && !announcer.playing()) hullVoice.play(hullCue,battle.tick);
-        if (!received || battle.tick-lastRadioTick<45) return;
+        if (voiceVolume>0f && hullCue!=null && !announcer.playing()) hullVoice.play(hullCue,battle.tick);
+        if (!effectsOn || !received || battle.tick-lastRadioTick<45) return;
         Sound tone = radioFlip ? radioClose : radioOpen;
         radioFlip = !radioFlip;
         lastRadioTick = battle.tick;
@@ -213,6 +231,24 @@ public final class CombatAudio implements AutoCloseable {
         }
     }
 
+    private void uiSound(Sound sound,float level){
+        if(!effectsOn||suspended||sound==null)return;
+        try{sound.play(effectsVolume*level);}
+        catch(RuntimeException err){if(Gdx.app!=null)Gdx.app.error("AUDIO","UI feedback failed",err);}
+    }
+    public void uiHover(){
+        long now=System.nanoTime();
+        if(now-lastHoverSoundNs<90_000_000L)return;
+        lastHoverSoundNs=now;uiSound(uiHoverSound,.16f);
+    }
+    public void uiPress(){uiSound(uiPressSound,.35f);}
+    public void uiBack(){uiSound(uiBackSound,.34f);}
+    public void uiBlocked(){uiSound(uiBlockedSound,.29f);}
+    public void uiAdjust(){
+        long now=System.nanoTime();
+        if(now-lastAdjustSoundNs<65_000_000L)return;
+        lastAdjustSoundNs=now;uiSound(uiAdjustSound,.28f);
+    }
     public void pause() {
         suspended = true;
         spatial.silence();
@@ -228,6 +264,11 @@ public final class CombatAudio implements AutoCloseable {
         spatial.close();
         if (radioOpen != null) radioOpen.dispose();
         if (radioClose != null) radioClose.dispose();
+        if(uiHoverSound!=null)uiHoverSound.dispose();
+        if(uiPressSound!=null)uiPressSound.dispose();
+        if(uiBackSound!=null)uiBackSound.dispose();
+        if(uiBlockedSound!=null)uiBlockedSound.dispose();
+        if(uiAdjustSound!=null)uiAdjustSound.dispose();
         if (activeMusic != null) activeMusic.stop();
         for (Sound sound : cues.values()) sound.dispose();
         cues.clear();

@@ -12,7 +12,8 @@ public final class SynthesizedSounds {
     public static final String[] NAMES = {
         "engine_loop", "fleet_bed", "thruster", "shield_up", "shield_down",
         "heavy_fire", "reactor_hit", "metal_creak", "pd_tick",
-        "radio_open", "radio_close"
+        "radio_open", "radio_close",
+        "ui_hover", "ui_press", "ui_back", "ui_blocked", "ui_adjust"
     };
     private SynthesizedSounds() { }
 
@@ -29,6 +30,10 @@ public final class SynthesizedSounds {
             case "pd_tick" -> 0.20;
             case "radio_open" -> 0.22;
             case "radio_close" -> 0.18;
+            case "ui_hover", "ui_adjust" -> 0.07;
+            case "ui_press" -> 0.09;
+            case "ui_back" -> 0.13;
+            case "ui_blocked" -> 0.16;
             default -> throw new IllegalArgumentException("Unknown synthesized cue: "+name);
         };
     }
@@ -109,6 +114,26 @@ public final class SynthesizedSounds {
                     double second=name.equals("radio_open")?650:480;
                     double freq=t<len*0.48?first:second;
                     out=0.19*e*(sin(freq*t)+0.12*sin(freq*2*t));
+                }
+                case "ui_hover", "ui_press", "ui_back", "ui_blocked", "ui_adjust" -> {
+                    // Five soft electronic confirmations with differentiated pitch.
+                    double e=env(t,len,0.007,Math.min(.06,len*.55));
+                    double f=switch(name){
+                        case "ui_hover" -> 770;
+                        case "ui_press" -> 485;
+                        case "ui_back" -> 560;
+                        case "ui_blocked" -> 310;
+                        default -> 865;
+                    };
+                    double sweep=switch(name){
+                        case "ui_hover" -> 20;
+                        case "ui_press" -> -95;
+                        case "ui_back" -> -215;
+                        case "ui_blocked" -> -75;
+                        default -> 115;
+                    };
+                    double phase=(f+sweep*p*.5)*t;
+                    out=e*(.20*sin(phase)+.045*sin(phase*2.01));
                 }
                 case "pd_tick" -> {
                     double e=env(t,len,0.002,0.09);

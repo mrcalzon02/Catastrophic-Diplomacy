@@ -21,6 +21,7 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
     private long nextTick = Long.MIN_VALUE;
     private boolean suspended;
     private boolean resumeVoice;
+    private float gain=1f;
 
     private static Map<String,String> buildIndex() {
         Map<String,String> result = new HashMap<>();
@@ -83,7 +84,7 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
             if (!file.exists()) throw new IllegalStateException("Missing recorded hull voice: " + path);
             active = Gdx.audio.newMusic(file);
             active.setLooping(false);
-            active.setVolume(0.44f);
+            active.setVolume(0.44f*gain);
             active.play();
             nextTick = tick + MIN_SPACING_TICKS;
             return true;
@@ -93,6 +94,10 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
             nextTick = tick + MIN_SPACING_TICKS;
             return false;
         }
+    }
+    public void setVolume(float value){
+        gain=VoiceVolumeControl.clamp(value);
+        if(active!=null)active.setVolume(.44f*gain);
     }
     public void advance() {
         if (!suspended && active != null && !active.isPlaying()) closeActive();
