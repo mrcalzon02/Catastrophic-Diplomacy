@@ -37,3 +37,5 @@ The fighter/drone render pass now reuses its source-ship lookup table across fra
 ## Strategic shader bypass
 
 At extreme tactical zoom-out (4,000+ world units across), the normal/emissive renderer uses the actual built-in SpriteBatch unlit shader rather than sampling unnecessary normal/emissive textures. Its vertex colors remain white to prevent packed heading values from tinting approved original art. Hull material uploads are deferred while this flat LOD is active, avoiding first-frame material allocation during distant surveys. Close views still use full surface lighting and current emitted-light behavior. The headless shader contract checks both full and flat routes; this performance gate requires no new draw passes.
+
+The same `CombatLightingRenderer.eventColor` palette now controls both outer bloom and per-pixel hull lighting for all five installed laser families. Point-defense beams are separately subdued green emitters, preventing dozens of tiny interceptors from overwhelming capital-ship lighting. The headless probe test compares all five laser-family light colors to their authoritative combat-rendering counterparts.

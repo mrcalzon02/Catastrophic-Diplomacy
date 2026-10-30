@@ -18,6 +18,17 @@ public final class ShipLightProbesTest {
         near(p.power(0),.9f);near(p.power(1),.8f);
         p.reset(camera);
         near(p.power(0),0);near(p.power(1),0);
+        // The same installed laser family must color its beam and nearby hull.
+        for(diplomacy.sim.LaserFamilies.Type type:
+                diplomacy.sim.LaserFamilies.Type.values()){
+            p.reset(camera);
+            String event=diplomacy.sim.LaserFamilies.eventWeapon(type);
+            p.offerWeapon(12,5,100,.7f,event);
+            com.badlogic.gdx.graphics.Color reference=CombatLightingRenderer.eventColor(event);
+            near(p.red(0),reference.r);
+            near(p.green(0),reference.g);
+            near(p.blue(0),reference.b);
+        }
         near(ShipLightProbes.detail(new CombatViewBounds(0,0,800,600)),1);
         near(ShipLightProbes.detail(new CombatViewBounds(0,0,4000,500)),0);
         near(ShipLightProbes.detail(new CombatViewBounds(0,0,2500,500)),.5f);

@@ -1,6 +1,8 @@
 package diplomacy.client;
 
 import diplomacy.sim.Battle;
+import diplomacy.sim.LaserFamilies;
+import com.badlogic.gdx.graphics.Color;
 import java.util.List;
 
 /**
@@ -69,8 +71,15 @@ final class ShipLightProbes {
         int counted=0;
         for(Battle.Beam beam:battle.beams()) {
             if(++counted>MAX_BEAMS)break;
-            offerWeapon(beam.x1,beam.y1,110f,.43f,beam.type.name());
-            offerWeapon(beam.x2,beam.y2,150f,.55f,beam.type.name());
+            if(beam.pointDefense){
+                offer(beam.x1,beam.y1,70f,.17f,.36f,.85f,.34f);
+                offer(beam.x2,beam.y2,88f,.22f,.36f,.85f,.34f);
+            }else{
+                String type=beam.type==Battle.DamageType.LASER
+                        ?LaserFamilies.eventWeapon(beam.laserType):beam.type.name();
+                offerWeapon(beam.x1,beam.y1,110f,.43f,type);
+                offerWeapon(beam.x2,beam.y2,150f,.55f,type);
+            }
         }
         counted=0;
         for(Battle.Missile missile:battle.missiles()) {
@@ -80,14 +89,10 @@ final class ShipLightProbes {
                     missile.torpedo?.50f:.37f,missile.torpedo?"TORPEDO":"MISSILE");
         }
     }
-    private void offerWeapon(double x,double y,float range,float gain,String kind) {
-        switch(kind) {
-            case "KINETIC","FLAK" -> offer(x,y,range,gain,1f,.69f,.28f);
-            case "PLASMA" -> offer(x,y,range,gain,1f,.25f,.23f);
-            case "PARTICLE" -> offer(x,y,range,gain,.68f,.48f,1f);
-            case "MISSILE","TORPEDO","DECOY" -> offer(x,y,range,gain,1f,.53f,.19f);
-            default -> offer(x,y,range,gain,.35f,.85f,1f);
-        }
+    /** Authoritative weapon palette also drives beam/impact art and bloom. */
+    void offerWeapon(double x,double y,float range,float gain,String kind) {
+        Color color=CombatLightingRenderer.eventColor(kind);
+        offer(x,y,range,gain,color.r,color.g,color.b);
     }
     float x(int i){return x[i];}
     float y(int i){return y[i];}
