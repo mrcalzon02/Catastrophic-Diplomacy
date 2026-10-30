@@ -84,7 +84,11 @@ public final class FleetLogisticsTest {
             Battle.Ship source=battle.ships().get(0),friend=battle.ships().get(1);
             source.speed=0;friend.speed=0;source.powerRegen=0;
             damaged(friend);
-            double before=code.equals("APR")?friend.armor:friend.power;
+            double before=switch(code){
+                case "HPR" -> friend.hull;
+                case "APR" -> friend.armor;
+                default -> friend.power;
+            };
             double afterOther=code.equals("APR")?friend.power:friend.armor;
             for(int i=0;i<36;i++)battle.step();
             check((code.equals("APR")?friend.armor:friend.power)>before,
