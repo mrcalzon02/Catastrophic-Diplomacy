@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/fleet-logistics-diagnostics.yml'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
+      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
       - 'core/src/main/java/diplomacy/shipyard/SupportDoctrine.java'
       - 'core/src/test/java/diplomacy/sim/FleetLogisticsTest.java'
       - 'core/src/main/java/diplomacy/sim/DemonstrationBattle.java'
