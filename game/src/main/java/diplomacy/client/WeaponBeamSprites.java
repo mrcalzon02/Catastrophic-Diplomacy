@@ -60,7 +60,12 @@ public final class WeaponBeamSprites implements Disposable {
     }
 
     private Texture supportTexture(Battle.SupportLink link,long tick){
-        int color=link.kind==Battle.SupportKind.SHIELD?0:2; // approved blue / green beam art
+        int color=switch(link.kind){
+            case SHIELD,DRONE_SHIELD -> 0; // blue
+            case ARMOR,DRONE_ARMOR -> 4; // gold
+            case POWER,DRONE_POWER -> 3; // violet
+            case HULL,DRONE -> 2; // green
+        };
         int frame=(int)Math.min(FRAMES-1,Math.max(0,tick-link.spawnTick));
         Texture image=beams[color][frame];
         return image!=null?image:beams[color][0];
