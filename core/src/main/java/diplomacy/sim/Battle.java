@@ -1365,6 +1365,7 @@ public final class Battle {
                 }
             }
         }
+        updateExtendedSupport(seconds);
     }
 
     /** Existing shield/armor caps, not free health or unlimited aura buffers. */
@@ -1466,7 +1467,6 @@ public final class Battle {
                 }
             }
         }
-        updateExtendedSupport(seconds);
     }
 
     /** Screen nearby threats; protect responds to actual attack orders and last attackers. */
