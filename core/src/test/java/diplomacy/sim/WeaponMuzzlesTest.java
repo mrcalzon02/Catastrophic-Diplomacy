@@ -85,7 +85,7 @@ public final class WeaponMuzzlesTest {
                 laserEvents++;
                 boolean beamMatches=false;
                 for(Battle.Beam ray:live.beams()){
-                    if(ray.shotId==e.shotId()){
+                    if(ray.visualId==e.shotId()){
                         near(ray.x1,e.x(),"laser beam and flash have same X");
                         near(ray.y1,e.y(),"laser beam and flash have same Y");
                         beamMatches=true;
