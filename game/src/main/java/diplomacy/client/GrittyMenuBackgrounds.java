@@ -14,7 +14,7 @@ final class GrittyMenuBackgrounds {
         return switch(screen){
             case HOME, CAMPAIGN_SETUP, DOCK, NAME_THEMES, OPTIONS, RESULTS ->
                     "blank_armor_bulkhead";
-            case CAMPAIGN, SQUADRONS, RESEARCH, DEPLOYMENT, SHIP_ORDERS -> "armored_interface";
+            case CAMPAIGN, SQUADRONS, RESEARCH, TECHNOLOGY, DEPLOYMENT, SHIP_ORDERS -> "armored_interface";
             case SKIRMISH -> "fleet_approach";
             case BATTLE -> null;
         };
