@@ -22,3 +22,12 @@ test provenance share the one versioned release. Android versionCode 6 is above
 the published RC1 code 5; publisher never overwrites occupied tags. Windows
 Authenticode, Linux signing, physical device performance and Android upgrade
 testing are not yet certified.
+
+## 0.1.5 RC1 Windows MSI correction
+Windows now builds a real jpackage/WiX MSI rather than putting a loose
+executable into a ZIP. Its Start Menu and desktop shortcuts, bundled Java 17,
+stable upgrade UUID, normal per-user installation and uninstall are
+CI smoke-tested on Windows. The MSI is distributed as a direct release asset,
+not as nested ZIP archives. Windows Authenticode signing remains unavailable;
+Windows may display an untrusted publisher warning. The published RC1 tag is
+retained; installer-only source adjustments are tracked separately.

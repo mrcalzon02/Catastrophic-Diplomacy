@@ -8,6 +8,7 @@ on:
       - 'android/**'
       - 'desktop/**'
       - 'tools/package_desktop.py'
+      - 'tools/verify_windows_msi.ps1'
       - 'assets/ui/tactical/selected_manifest.json'
       - 'asset_packs/ui-kit/**'
       - 'build.gradle'
@@ -22,6 +23,7 @@ on:
       - 'android/**'
       - 'desktop/**'
       - 'tools/package_desktop.py'
+      - 'tools/verify_windows_msi.ps1'
       - 'assets/ui/tactical/selected_manifest.json'
       - 'asset_packs/ui-kit/**'
       - 'build.gradle'
@@ -61,14 +63,19 @@ jobs:
           python tools/verify_tactical_ui.py
           python tools/test_verify_tactical_ui_packages.py
           python tools/verify_tactical_ui_packages.py --desktop-dir desktop/build/libs
-      - name: Package actual Windows/Linux executable and bundled Java 17 runtime
+      - name: Build real Windows MSI or Linux app with bundled Java 17 runtime
         run: python tools/package_desktop.py
+      - name: Smoke-install and uninstall Windows MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tools/verify_windows_msi.ps1
       - name: Upload runnable desktop package and checksums
         uses: actions/upload-artifact@v4
         with:
           name: cd-desktop-${{ matrix.os }}-${{ github.sha }}
           path: |
             desktop/build/platform-packages/*.zip
+            desktop/build/platform-packages/*.msi
             desktop/build/platform-packages/*.sha256
           if-no-files-found: error
           retention-days: 30

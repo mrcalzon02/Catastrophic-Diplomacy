@@ -1,0 +1,144 @@
+name: Publish verified Windows MSI directly to RC1
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/package_desktop.py'
+      - 'tools/verify_windows_msi.ps1'
+      - '.github/workflows/fighter-wings.yml'
+      - '.github/workflows/windows-msi-release.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: cd-windows-msi-release
+  cancel-in-progress: false
+
+jobs:
+  publish-msi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      GAME_TAG: cd-v0.1.5-rc.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm MSI is built from exactly the already-released game sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="$(git rev-parse "refs/tags/$GAME_TAG^{commit}")"
+          # Refuse publishing a different game build behind an existing release.
+          git diff --quiet "$source" "$GITHUB_SHA" -- \
+            core game android desktop assets asset_packs build.gradle \
+            gradle.properties settings.gradle || {
+              echo 'BLOCKED: game code/assets changed from existing release tag'
+              exit 1
+            }
+          echo "GAME_SOURCE=$source" >> "$GITHUB_ENV"
+          echo "PASS: only packaging/CI/docs changed since released game source"
+
+      - name: Require complete new Windows MSI install/uninstall and combat smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 100); do
+            info="$(gh api -X GET "repos/$GH_REPO/actions/runs" -f head_sha="$GITHUB_SHA" -f per_page=100 |
+              jq -r --arg sha "$GITHUB_SHA" '
+                [.workflow_runs[] | select(.name=="Fighter wings combat and multiplatform smoke" and .head_sha==$sha)] |
+                sort_by(.created_at, .run_attempt) | last |
+                if .==null then "missing|missing|missing"
+                else "\(.id)|\(.status)|\(.conclusion // "pending")" end')"
+            IFS='|' read -r id state result <<< "$info"
+            echo "MSI test run: $info"
+            if [[ "$state" == completed ]]; then
+              if [[ "$result" != success ]]; then
+                echo 'BLOCKED: MSI install/uninstall or combat smoke failed'
+                exit 1
+              fi
+              echo "SMOKE_RUN=$id" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 25
+          done
+          echo 'BLOCKED: no full successful Windows MSI smoke for this exact revision'
+          exit 1
+
+      - name: Download actual MSI (not nested ZIPs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download "$SMOKE_RUN" -R "$GH_REPO" \
+            -n "cd-desktop-windows-latest-$GITHUB_SHA" -D dist
+          test -s dist/Catastrophic-Diplomacy-Windows-x64.msi
+          (cd dist && sha256sum -c Catastrophic-Diplomacy-Windows-x64.msi.sha256)
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import is_zipfile
+          msi=Path('dist/Catastrophic-Diplomacy-Windows-x64.msi')
+          assert msi.open('rb').read(8)==bytes.fromhex('d0cf11e0a1b11ae1')
+          assert not is_zipfile(msi)
+          assert msi.stat().st_size>1_000_000
+          print('PASS: standalone Windows Installer, no ZIP wrapper or nested EXE')
+          PY
+
+      - name: Add checked MSI and installer evidence to published prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The already-published tag must remain the original game commit.
+          existing="$(gh release view "$GAME_TAG" -R "$GH_REPO" --json isDraft,isPrerelease,targetCommitish)"
+          jq -e --arg sha "$GAME_SOURCE" '
+            .isDraft==false and .isPrerelease==true and .targetCommitish==$sha' <<< "$existing"
+          if gh release view "$GAME_TAG" -R "$GH_REPO" --json assets \
+              --jq '.assets[].name' | grep -Fxq 'Catastrophic-Diplomacy-Windows-x64.msi'; then
+            echo 'BLOCKED: MSI already published; never clobber release files'
+            exit 1
+          fi
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          path=Path('dist/Catastrophic-Diplomacy-Windows-x64.msi')
+          proof={
+            'schema':'cd-windows-msi-v1',
+            'game_source_sha':os.environ['GAME_SOURCE'],
+            'packager_revision_sha':os.environ['GITHUB_SHA'],
+            'msi_install_and_uninstall_smoke_run':int(os.environ['SMOKE_RUN']),
+            'package_file':path.name,
+            'package_sha256':hashlib.file_digest(path.open('rb'),'sha256').hexdigest(),
+            'bundled_java_runtime':True,
+            'authenticode_signed':False,
+            'upgrade_identity':'cfc2e09f-fbaa-4b95-9f20-d59ac1148057',
+          }
+          Path('dist/Windows-MSI-provenance.json').write_text(
+            json.dumps(proof,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          PY
+          gh release upload "$GAME_TAG" -R "$GH_REPO" \
+            dist/Catastrophic-Diplomacy-Windows-x64.msi \
+            dist/Catastrophic-Diplomacy-Windows-x64.msi.sha256 \
+            dist/Windows-MSI-provenance.json
+          gh release view "$GAME_TAG" -R "$GH_REPO" --json assets \
+            --jq '[.assets[].name] | map(select(endswith(".msi")))'
+          gh release view "$GAME_TAG" -R "$GH_REPO" --json body --jq .body > dist/release-notes.md
+          cat >> dist/release-notes.md <<EOF
+
+          ### Windows installer correction
+          **Use `Catastrophic-Diplomacy-Windows-x64.msi` for Windows.**
+          This is a normal MSI installer, not an EXE inside nested ZIP files.
+          It provides bundled Java, Start Menu/desktop shortcuts and Windows
+          Installer removal. MSI install/uninstall passed actual Windows CI:
+          https://github.com/$GH_REPO/actions/runs/$SMOKE_RUN
+
+          Game source is unchanged from this release tag; packaging-repair
+          revision: $GITHUB_SHA. Windows MSI is **not Authenticode-signed**,
+          so Windows may display an unverified publisher prompt.
+          EOF
+          gh release edit "$GAME_TAG" -R "$GH_REPO" --notes-file dist/release-notes.md
+          echo 'PASS: direct Windows MSI available on published 0.1.5 RC1 release'
