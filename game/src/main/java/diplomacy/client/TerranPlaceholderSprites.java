@@ -62,8 +62,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         damagedMaterial=loadMaterial("materials/structure_damaged.png");
         destroyedMaterial=loadMaterial("materials/structure_destroyed.png");
         shieldMaterial=loadMaterial("materials/shield_energy_blue.png");
-        // Legacy factions share the approved source images with their derivative
-        // civilizations. Reuse GPU textures by full asset path, not by faction.
+        // Only the owning civilization may use its approved sheet.
+        // Share GPU textures when hull variants use one image, never across races.
         java.util.Map<String,Texture> uniqueTextures=new java.util.HashMap<>();
         for(Battle.Faction faction:Battle.Faction.values()){
             EnumMap<Shipyard.Hull,Texture> fleet=new EnumMap<>(Shipyard.Hull.class);
@@ -102,11 +102,15 @@ public final class TerranPlaceholderSprites implements Disposable {
         // hulls for a missing PNG. The 200v200 verification previously accepted
         // 333 sprites while ignoring 67 missing Terran ships.
         for(Battle.Faction faction:Battle.Faction.values())
-            for(Shipyard.Hull hull:Shipyard.Hull.values())
-                if(texture(faction,hull)==null)
-                    throw new IllegalStateException(
-                            "Approved combat ship sprite missing from packaged assets: "+
-                            faction+"/"+hull);
+            if(faction==Battle.Faction.TERRAN||FactionArt.supports(faction))
+                for(Shipyard.Hull hull:Shipyard.Hull.values())
+                    if(texture(faction,hull)==null)
+                        throw new IllegalStateException(
+                                "Approved combat ship sprite missing from packaged assets: "+
+                                faction+"/"+hull);
+        // Five original non-Terran civilizations still require their own
+        // complete, named sprite packages. Do not impersonate their mechanics
+        // derivatives, and do not crash while rendering a supported legacy game.
     }
     private static Pixmap loadMaterial(String path) {
         if(!Gdx.files.internal(path).exists())
