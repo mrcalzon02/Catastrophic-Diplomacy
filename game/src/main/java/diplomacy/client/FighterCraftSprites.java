@@ -28,6 +28,8 @@ public final class FighterCraftSprites implements Disposable {
         "electronic_warfare","support_drone"
     };
     private final Map<String,Texture> originals=new HashMap<>();
+    private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
+    public int litCraftMaterials(){return surfaces.materialCount();}
     private final Texture unassignedWireframe;
     private final EnumMap<Battle.Faction,Map<String,Texture>> palettes=
             new EnumMap<>(Battle.Faction.class);
@@ -72,6 +74,7 @@ public final class FighterCraftSprites implements Disposable {
                         throw new IllegalStateException("Original fighter art missing from game build: "+path);
                     picture=new Texture(Gdx.files.internal(path));
                     picture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                    surfaces.prepare(picture,path);
                     originals.put(path,picture);
                 }
                 palette.put(role,picture);
@@ -101,7 +104,7 @@ public final class FighterCraftSprites implements Disposable {
                        CombatViewBounds view) {
         Map<Integer,Battle.Ship> vesselById=new HashMap<>();
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
-        batch.begin();
+        surfaces.begin(batch);
         batch.setColor(1,1,1,1);
         for(Battle.Craft craft:battle.crafts()) {
             Battle.Ship source=vesselById.get(craft.sourceId);
@@ -130,13 +133,16 @@ public final class FighterCraftSprites implements Disposable {
             float rotation=(float)StrictMath.toDegrees(bearing)-90f;
             if(view!=null&&!view.circle(position.x(),position.y(),
                     Math.max(width,height)*.72))continue;
+            if(picture==unassignedWireframe)surfaces.unlit(batch);
+            else surfaces.bind(batch,picture);
             batch.draw(picture,position.x()-width/2,position.y()-height/2,
                     width/2,height/2,width,height,1,1,rotation,
                     0,0,picture.getWidth(),picture.getHeight(),false,false);
         }
-        batch.end();
+        surfaces.end(batch);
     }
     @Override public void dispose(){
+        surfaces.dispose();
         for(Texture texture:originals.values())texture.dispose();
         originals.clear();palettes.clear();
         unassignedWireframe.dispose();
