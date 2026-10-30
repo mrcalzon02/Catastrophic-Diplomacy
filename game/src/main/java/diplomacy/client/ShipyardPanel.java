@@ -394,6 +394,8 @@ final class ShipyardPanel {
             if(x>=1096&&x<=1255)return 4;
         }
         if(y>=159&&y<=202){
+            if(x>=341&&x<564)return 12;
+            if(x>=568&&x<=792)return 13;
             if(x>=809&&x<940)return 5;
             if(x>=943&&x<1076)return 6;
             if(x>=1080&&x<=1255)return 7;
@@ -467,6 +469,18 @@ final class ShipyardPanel {
         }
         if(action==10){exportChallenge();return;}
         if(action==11){importChallenge();return;}
+        if(action==12||action==13){
+            if(usage!=Usage.SKIRMISH){notice="Campaign hull permissions are researched in the campaign.";return;}
+            var current=challenge();
+            java.util.Set<Shipyard.Hull> allowed=new java.util.HashSet<>(current.allowedHulls());
+            if(action==13)allowed.clear();
+            else if(allowed.isEmpty())allowed.add(draft.hull);
+            else if(!allowed.remove(draft.hull))allowed.add(draft.hull);
+            updateSkirmishRules.accept(current.withHulls(allowed));
+            notice="SKIRMISH HULL CLASSES: "+
+                    (allowed.isEmpty()?"ALL":allowed.size()+" explicitly allowed");
+            return;
+        }
         if(action==5||action==6||action==7||action==8||action==9){
             if(usage!=Usage.SKIRMISH){notice="Only skirmish challenges can change their tech gates.";return;}
             var rules=challenge();
@@ -719,6 +733,8 @@ final class ShipyardPanel {
                 new Color(.12f,.18f,.25f,1));
         for(int i=0;i<2;i++)rectangle(shapes,809+i*194,111,i==1?250:191,42,
                 new Color(.12f,.18f,.25f,1));
+        rectangle(shapes,341,159,221,43,new Color(.12f,.18f,.25f,1));
+        rectangle(shapes,568,159,224,43,new Color(.12f,.18f,.25f,1));
         rectangle(shapes,341,111,221,42,new Color(.12f,.25f,.29f,1));
         rectangle(shapes,568,111,224,42,new Color(.12f,.25f,.29f,1));
         shapes.end();
@@ -779,11 +795,14 @@ final class ShipyardPanel {
         }
         font.setColor(Color.CYAN);
         font.draw(batch,campaign?"CAMPAIGN DISCOVERIES":
-                "SKIRMISH RULES / INDEPENDENT OF CAMPAIGN",345,224);
+                "SKIRMISH RULES / INDEPENDENT OF CAMPAIGN",345,238);
         font.setColor(Color.WHITE);
         font.draw(batch,campaign?(permittedResearch()==null?"NO RESEARCH INVENTORY":
                 permittedResearch().unlocked().size()+" PERMANENT RESEARCH UNLOCKS"):
-                "TECH CAP "+rules.maxStage()+"/6  HULL GEN "+rules.maxHullGeneration()+"/10",345,194);
+                "TECH "+rules.maxStage()+"/6 / GEN "+rules.maxHullGeneration()+
+                "/10 / HULLS "+(rules.allowedHulls().isEmpty()?"ALL":rules.allowedHulls().size()),345,212);
+        font.draw(batch,"TOGGLE HULL CLASS",355,185);
+        font.draw(batch,"ALLOW ALL HULLS",582,185);
         font.draw(batch,"EXPORT SHIP",357,136);
         font.draw(batch,"IMPORT + RULES",584,136);
         for(int branch=0;branch<4;branch++){
