@@ -381,6 +381,15 @@ tasks.register('shipTechnologyFitSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignTechnologySmoke') { finalizedBy(tasks.named('shipTechnologyFitSmoke')) }
+tasks.register('skirmishTechSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check independent skirmish technology tiers, hull-class gates and exchange safety.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SkirmishTechnologyRulesTest'
+    dependsOn testClasses
+}
+tasks.named('shipTechnologyFitSmoke') { finalizedBy(tasks.named('skirmishTechSmoke')) }
+
 
 
 
