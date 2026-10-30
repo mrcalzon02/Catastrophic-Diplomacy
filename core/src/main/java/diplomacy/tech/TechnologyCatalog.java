@@ -100,6 +100,7 @@ public final class TechnologyCatalog {
         if(includeNewCivilizations){
             expandNativeFactions(bases,rows);
             addHabitatFamilies(bases,rows);
+            addShieldTransferProjectors(bases,rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
@@ -251,6 +252,46 @@ public final class TechnologyCatalog {
                         "1.0","1.0","1.0",ratio(1+0.016*rank,1),
                         branch+" improves a physical habitat module with costs and tradeoffs"));
             }
+        }
+    }
+
+    /**
+     * Shield generation is NOT shield transfer. Each civilization gets one
+     * distinct SUPPORT-slot shield-transfer projector with its own engineering
+     * cost and exclusive upgrade branches. Derive from the existing full SHD
+     * catalog so all 11 factions retain native prices and research chains.
+     * Do not modify the legacy six-faction CSV or older saved blueprints.
+     */
+    private static void addShieldTransferProjectors(List<List<String>> bases,
+                                                     List<List<String>> upgrades) {
+        List<List<String>> generators=List.copyOf(bases);
+        List<List<String>> generatorResearch=List.copyOf(upgrades);
+        for(int i=1;i<generators.size();i++){
+            List<String> source=generators.get(i);
+            if(!"SHD".equals(source.get(2)))continue;
+            List<String> module=new ArrayList<>(source);
+            module.set(0,module.get(0).replace("-SHD","-XFR"));
+            module.set(2,"XFR");
+            module.set(3,"Shield Transfer Projector");
+            module.set(4,"support");
+            module.set(6,ratio(Double.parseDouble(module.get(6)),0.80));
+            module.set(7,ratio(Double.parseDouble(module.get(7)),0.85));
+            module.set(8,ratio(Double.parseDouble(module.get(8)),0.90));
+            module.set(10,Integer.toString((int)Math.ceil(Integer.parseInt(module.get(10))*1.35)));
+            module.set(11,ratio(Double.parseDouble(module.get(11)),0.82));
+            module.set(12,"Dedicated powered allied shield transfer; supplies no independent shields");
+            bases.add(module);
+        }
+        for(int i=1;i<generatorResearch.size();i++){
+            List<String> source=generatorResearch.get(i);
+            if(!"SHD".equals(source.get(2)))continue;
+            List<String> tech=new ArrayList<>(source);
+            tech.set(0,tech.get(0).replace("-SHD-","-XFR-"));
+            tech.set(2,"XFR");
+            tech.set(5,tech.get(5).replace("Shield Generator","Shield Transfer Projector"));
+            tech.set(6,tech.get(6).replace("-SHD-","-XFR-").replace("-SHD","-XFR"));
+            tech.set(19,"Dedicated transfer projector: "+tech.get(19));
+            upgrades.add(tech);
         }
     }
 
