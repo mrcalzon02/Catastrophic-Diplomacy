@@ -103,17 +103,23 @@ final class ModularWeaponFxRenderer implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch,WeaponBeamSprites existingBeamPayload,
                        BattleRenderPoses poses) {
+        render(battle,batch,existingBeamPayload,poses,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,WeaponBeamSprites existingBeamPayload,
+                       BattleRenderPoses poses,CombatViewBounds view) {
         sync(battle);
         // The already integrated real atlas-derived strip is the BEAM PAYLOAD part.
         // Its animation is started per shot using Beam.spawnTick, not global tick.
         if(existingBeamPayload!=null && existingBeamPayload.loaded()>0)
             existingBeamPayload.render(battle,batch,
-                    shell -> !hasBallisticPayload(shell,battle.tick),poses);
+                    shell -> !hasBallisticPayload(shell,battle.tick),poses,view);
         batch.begin();
         batch.setColor(1,1,1,1);
         // Local FIRING and terminal IMPACT/INTERCEPT are separate, independent clips.
         for(OneShot shot:oneShots){
             Battle.VisualEvent event=shot.event();
+            if(view!=null&&!view.circle(event.x(),event.y(),
+                    Math.max(shot.clip().width(),shot.clip().height())*.5f))continue;
             Texture image=frame(shot.clip(),battle.tick-event.tick());
             if(image==null)continue;
             float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
@@ -127,11 +133,13 @@ final class ModularWeaponFxRenderer implements Disposable {
             Profile profile=WeaponFxProfile.forType(
                     missile.torpedo?Battle.DamageType.TORPEDO:Battle.DamageType.MISSILE);
             Clip clip=profile.payload();
-            Texture image=frame(clip,battle.tick-missile.spawnTick);
-            if(image==null)continue;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),
+                    Math.max(clip.width(),clip.height())*.5f))continue;
+            Texture image=frame(clip,battle.tick-missile.spawnTick);
+            if(image==null)continue;
             float angle=(float)StrictMath.toDegrees(pose.angle());
             drawCentered(batch,image,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
@@ -142,11 +150,13 @@ final class ModularWeaponFxRenderer implements Disposable {
         Profile kinetic=WeaponFxProfile.forType(Battle.DamageType.KINETIC);
         for(Battle.Ballistic shell:battle.ballistics()){
             Clip clip=kinetic.payload();
-            Texture image=frame(clip,battle.tick-shell.spawnTick);
-            if(image==null)continue;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),
+                    Math.max(clip.width(),clip.height())*.5f))continue;
+            Texture image=frame(clip,battle.tick-shell.spawnTick);
+            if(image==null)continue;
             float angle=(float)StrictMath.toDegrees(pose.angle());
             drawCentered(batch,image,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);

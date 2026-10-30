@@ -95,10 +95,16 @@ public final class WeaponBeamSprites implements Disposable {
     public void render(Battle battle,SpriteBatch batch,
                        java.util.function.Predicate<Battle.Ballistic> showTracer,
                        BattleRenderPoses poses) {
+        render(battle,batch,showTracer,poses,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,
+                       java.util.function.Predicate<Battle.Ballistic> showTracer,
+                       BattleRenderPoses poses,CombatViewBounds view) {
         if(loaded==0)return;
         batch.begin();
         batch.setColor(1,1,1,1);
         for(Battle.Beam beam:battle.beams()){
+            if(view!=null&&!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,6.3))continue;
             Texture image=texture(beam,battle.tick);
             if(image==null)continue;
             double dx=beam.x2-beam.x1,dy=beam.y2-beam.y1;
@@ -111,6 +117,7 @@ public final class WeaponBeamSprites implements Disposable {
                     0,0,image.getWidth(),image.getHeight(),false,false);
         }
         for(Battle.SupportLink link:battle.supportLinks()){
+            if(view!=null&&!view.segment(link.x1,link.y1,link.x2,link.y2,4))continue;
             Texture image=supportTexture(link,battle.tick);
             if(image==null)continue;
             double dx=link.x2-link.x1,dy=link.y2-link.y1;
@@ -135,6 +142,7 @@ public final class WeaponBeamSprites implements Disposable {
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
             float angle=(float)StrictMath.toDegrees(pose.angle());
             float length=CombatEffectScale.of(11.5f),thickness=CombatEffectScale.of(3.1f);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),length))continue;
             batch.draw(image,pose.x()-length/2,pose.y()-thickness/2,
                     length/2,thickness/2,length,thickness,1,1,angle,
                     0,0,image.getWidth(),image.getHeight(),false,false);
