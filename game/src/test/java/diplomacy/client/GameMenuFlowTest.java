@@ -15,6 +15,18 @@ public final class GameMenuFlowTest {
         if(!pass)throw new AssertionError(detail);
     }
     public static void main(String[] args) throws Exception {
+        check(Math.abs(CombatPace.DEFAULT-0.20f)<0.0001f,
+                "Normal battle must start five times slower than legacy full speed");
+        check(Math.abs(CombatPace.faster(CombatPace.DEFAULT)-0.40f)<0.0001f,
+                "FAST must double fractional pacing, not jump to legacy 1x");
+        check(Math.abs(CombatPace.slower(CombatPace.DEFAULT)-0.10f)<0.0001f,
+                "SLOW must permit actual sub-1x tactical pacing");
+        check(Math.abs(CombatPace.slower(CombatPace.MINIMUM)-CombatPace.MINIMUM)<0.0001f,
+                "SLOW must clamp to minimum safe pace");
+        check(Math.abs(CombatPace.faster(CombatPace.MAXIMUM)-CombatPace.MAXIMUM)<0.0001f,
+                "FAST must retain maximum bounded simulation pace");
+        check("x0.20".equals(CombatPace.label(CombatPace.DEFAULT)),
+                "HUD must disclose real simulation pacing");
         // Background selection must not replace simulation-owned battle or map content.
         check("blank_armor_bulkhead".equals(GrittyMenuBackgrounds.nameFor(
                         GameMenuPanel.Screen.HOME)),
