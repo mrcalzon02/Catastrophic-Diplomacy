@@ -58,6 +58,13 @@ if (( !completed )); then
     exit 1
 fi
 adb exec-out screencap -p > "$report/late.png"
+# Additional *diagnostic* real-device frame: select a living vessel in the
+# engagement and zoom in four steps so hull/damage texture quality can be
+# inspected at meaningful size. This is evidence, not an aesthetic CI gate.
+adb shell input tap 950 420 || true
+for step in 1 2 3 4; do adb shell input tap 65 920 || true; done
+sleep 2
+adb exec-out screencap -p > "$report/late-hull-detail.png" || true
 test "$(wc -c < "$report/early.png")" -gt 2000
 test "$(wc -c < "$report/late.png")" -gt 2000
 if cmp -s "$report/early.png" "$report/late.png"; then
