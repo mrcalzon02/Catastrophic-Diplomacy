@@ -1465,6 +1465,19 @@ public final class Battle {
                             field.rate(),field.energyPerUnit(),true);
                     source.auraService+=received;
                 }
+                // Infrequent, short-radius discharge: substantially stronger
+                // than the wide passive field, with the SAME energy limits.
+                // It cannot jump between ships or bypass an actual deficit.
+                if(tick%300==0){
+                    double inner=StrictMath.min(85,field.range()*0.42);
+                    for(Ship friend:ships)if(friend.alive()&&friend.team==source.team
+                            &&(friend!=source||field.channel()!=SupportDoctrine.Channel.POWER)
+                            &&StrictMath.hypot(friend.x-source.x,friend.y-source.y)<=inner){
+                        double burst=deliverSupport(source,friend,field.channel(),
+                                field.rate()*85,field.energyPerUnit()*1.6,true);
+                        source.auraService+=burst;
+                    }
+                }
             }
         }
     }
