@@ -114,7 +114,9 @@ public final class ShipTechnologyFit {
             throw new IllegalArgumentException("Technology outside this skirmish challenge");
         Shipyard.Design result=fit(original,catalog,
                 (CampaignTechnology.State)null,slot,track,stage,scope);
-        rules.requireAllowed(result,catalog);
+        // Do not require the rest of the DRAFT to be compliant yet:
+        // players must be able to downgrade one over-tier socket at a time.
+        // Whole-ship authorization is enforced on save/apply/deploy/host.
         return result;
     }
     public static Shipyard.Design doctrine(Shipyard.Design original,TechnologyCatalog catalog,
@@ -127,7 +129,9 @@ public final class ShipTechnologyFit {
             int stage=highestAvailable(original,catalog,rules,slot,track);
             if(stage>0)result=replace(result,slot,track,stage);
         }
-        rules.requireAllowed(result,catalog);
+        // Do not require the rest of the DRAFT to be compliant yet:
+        // players must be able to downgrade one over-tier socket at a time.
+        // Whole-ship authorization is enforced on save/apply/deploy/host.
         return result;
     }
 
