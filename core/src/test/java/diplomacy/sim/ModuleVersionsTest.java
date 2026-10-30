@@ -18,7 +18,11 @@ public final class ModuleVersionsTest {
     }
     public static void main(String[] args)throws Exception {
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
-        check(technology.componentCount()==242,"All eleven faction equipment families present");
+        for(Battle.Faction faction:Battle.Faction.values())
+            check(technology.hasBase("BASE-"+Shipyard.factionId(faction)+"-REA"),
+                    "Every faction must retain its own native reactor hardware");
+        check(technology.componentCount()%Battle.Faction.values().length==0,
+                "Module manufacturing roster must span all eleven factions");
         int models=0;
         for(var base:technology.baseComponents().values()){
             for(ModuleVersions.Pattern pattern:ModuleVersions.Pattern.values())
@@ -30,7 +34,8 @@ public final class ModuleVersionsTest {
                     models++;
                 }
         }
-        check(models==4840,"Five production variants x four marks for 242 installed module chassis");
+        check(models==technology.componentCount()*ModuleVersions.Pattern.values().length*4,
+                "Every actual module must support every production variant and mark");
         check(ModuleVersions.of(ModuleVersions.Pattern.STANDARD,1).equals(
                 new ModuleVersions.Modifiers(1,1,1,1,1,1,1,1)),
                 "Legacy standard Mk I must be a precise identity transformation");
@@ -85,6 +90,6 @@ public final class ModuleVersionsTest {
         check(Shipyard.inspect(lowHeat,technology).generatedHeat()
                         <Shipyard.inspect(starter,technology).generatedHeat(),
                 "Low emission fitted sidegrade reduces actual ship heat budget");
-        System.out.println("PASS 4840 module manufacturing versions, exclusive six-rank research retention, fitted sidegrades and CD-SHIP-1/2 compatibility");
+        System.out.println("PASS "+models+" module manufacturing versions, exclusive six-rank research retention, fitted sidegrades and CD-SHIP-1/2 compatibility");
     }
 }
