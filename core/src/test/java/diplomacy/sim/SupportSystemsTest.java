@@ -38,7 +38,7 @@ public final class SupportSystemsTest {
     }
     private static void checkBranches(){
         for(String kind:new String[]{"LAS","KIN","MSL","TOR","PAR","PLA",
-                "PD","FLK","REP","SHD","DRN","SEN"}){
+                "PD","FLK","REP","XFR","SHD","DRN","SEN"}){
             for(Shipyard.Track track:Shipyard.Track.values()){
                 ModuleBranchEffects.Tuning first=ModuleBranchEffects.tune(kind,track,1);
                 ModuleBranchEffects.Tuning last=ModuleBranchEffects.tune(kind,track,6);
@@ -56,8 +56,8 @@ public final class SupportSystemsTest {
         check(ModuleBranchEffects.tune("REP",Shipyard.Track.SPECIALIST,6).remoteRepair()
                 >ModuleBranchEffects.tune("REP",Shipyard.Track.SPECIALIST,1).remoteRepair(),
                 "Repair specialists require six levels of remote repair");
-        check(ModuleBranchEffects.tune("SHD",Shipyard.Track.SPECIALIST,6).shieldTransfer()
-                >ModuleBranchEffects.tune("SHD",Shipyard.Track.SPECIALIST,1).shieldTransfer(),
+        check(ModuleBranchEffects.tune("XFR",Shipyard.Track.SPECIALIST,6).shieldTransfer()
+                >ModuleBranchEffects.tune("XFR",Shipyard.Track.SPECIALIST,1).shieldTransfer(),
                 "Shield charger specialist ranks increase actual transfer");
     }
     private static void checkFitted()throws Exception{
@@ -66,14 +66,26 @@ public final class SupportSystemsTest {
         int rep=slot(hull,Shipyard.Mount.SUPPORT,0);
         int drone=slot(hull,Shipyard.Mount.SUPPORT,1);
         int shield=slot(hull,Shipyard.Mount.DEFENSE,0);
+        int relay=slot(hull,Shipyard.Mount.SUPPORT,2);
         Shipyard.Design base=Shipyard.starter(Battle.Faction.TERRAN,hull)
                 .install(rep,"BASE-TER-REP")
                 .install(drone,"BASE-TER-DRN")
                 // The full support fit has meaningful reactor/cooling costs.
                 .install(slot(hull,Shipyard.Mount.SYSTEM,3),"BASE-TER-REA")
                 .install(slot(hull,Shipyard.Mount.SYSTEM,4),"BASE-TER-RAD");
-        // Existing starter shield generator is already in first defense mount.
-        Shipyard.Fitted fitted=Shipyard.fit(base,tech);
+        // Ordinary shield generators protect their OWN vessels, never allies.
+        Shipyard.Fitted withoutRelay=Shipyard.fit(base,tech);
+        check(withoutRelay.shields()>0 && withoutRelay.support().shieldTransferRate()==0,
+                "Basic SHD incorrectly grants an entire fleet free shield beams");
+        check(Shipyard.fit(Shipyard.starter(Battle.Faction.TERRAN,hull),tech)
+                        .support().shieldTransferRate()==0,
+                "Starter ships must have no remote shield-transfer machinery");
+        Shipyard.Design transfer=base.install(relay,"BASE-TER-XFR");
+        if(!Shipyard.inspect(transfer,tech).valid())
+            transfer=transfer.install(slot(hull,Shipyard.Mount.SYSTEM,5),"BASE-TER-REA");
+        check(Shipyard.inspect(transfer,tech).valid(),
+                "Dedicated physical shield-transfer fitting must be buildable");
+        Shipyard.Fitted fitted=Shipyard.fit(transfer,tech);
         check(fitted.support().selfRepairRate()>0
                         &&fitted.support().remoteRepairRate()>0
                         &&fitted.support().shieldTransferRate()>0,
@@ -96,9 +108,12 @@ public final class SupportSystemsTest {
         Shipyard.Design remote=base.stage(rep,Shipyard.Track.SPECIALIST,4);
         check(Shipyard.fit(remote,tech).support().repairRange()>fitted.support().repairRange(),
                 "Remote repair research must modify actual service reach");
-        Shipyard.Design charge=base.stage(shield,Shipyard.Track.SPECIALIST,4);
+        Shipyard.Design charge=transfer.stage(relay,Shipyard.Track.SPECIALIST,4);
         check(Shipyard.fit(charge,tech).support().shieldRange()>fitted.support().shieldRange(),
-                "Shield specialist research must affect actual charging beam range");
+                "Dedicated projector research must affect real allied charging beam range");
+        Shipyard.Design ownShield=base.stage(shield,Shipyard.Track.SPECIALIST,4);
+        check(Shipyard.fit(ownShield,tech).support().shieldTransferRate()==0,
+                "Even a specialized self-shield generator cannot conjure an external projector");
         Shipyard.Design laser=base.stage(slot(hull,Shipyard.Mount.WEAPON,0),
                 Shipyard.Track.SPECIALIST,4);
         check(Shipyard.fit(laser,tech).weapons().laserRange()>fitted.weapons().laserRange(),
