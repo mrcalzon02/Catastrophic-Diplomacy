@@ -47,7 +47,7 @@ tasks.register('prepareStage1Art') {
                 byte[] original = archive.getInputStream(entry).withCloseable { it.bytes }
                 if (original.length != (record.bytes as int) ||
                         digest(original) != record.sha256 ||
-                        !java.util.Arrays.equals(original.take(8) as byte[],
+                        !java.util.Arrays.equals(java.util.Arrays.copyOf(original,8),
                                 [137,80,78,71,13,10,26,10].collect { (byte)it } as byte[]))
                     throw new GradleException('Corrupted original Stage 1 PNG: ' + name)
                 if (name.startsWith('assets/materials/')) {
