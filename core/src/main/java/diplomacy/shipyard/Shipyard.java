@@ -470,6 +470,49 @@ public final class Shipyard {
                           boolean repairDrones,double repairDroneRate,
                           double droneEndurance,double powerEfficiency,
                           int repairDroneCapacity) { }
+    /**
+     * Physical logistics is independent of starter shield hardware and ordinary
+     * defensive drones. Each supported channel needs a fitted support module.
+     * Projectors reach far but are energy-inefficient; service craft have finite
+     * charges and a real return trip; auras have deliberately tiny individual
+     * throughput and broad, but not infinite, local coverage.
+     */
+    public static SupportDoctrine supportDoctrine(Design design,TechnologyCatalog catalog){
+        if(!inspect(design,catalog).valid())
+            throw new IllegalArgumentException("Invalid specialized support fitting");
+        List<SupportDoctrine.Emitter> direct=new ArrayList<>();
+        List<SupportDoctrine.Emitter> drones=new ArrayList<>();
+        List<SupportDoctrine.Emitter> auras=new ArrayList<>();
+        for(Part p:fittedParts(design,catalog,new ArrayList<>())){
+            String id=p.base.subsystem;
+            SupportDoctrine.Channel channel=switch(id){
+                case "APR","DAR","AAR" -> SupportDoctrine.Channel.ARMOR;
+                case "PWR","DPW","APW" -> SupportDoctrine.Channel.POWER;
+                case "DSH","ASH" -> SupportDoctrine.Channel.SHIELD;
+                case "DHL","AHL" -> SupportDoctrine.Channel.HULL;
+                default -> null;
+            };
+            if(channel==null)continue;
+            var tune=p.tuning();
+            if(id.equals("APR")||id.equals("PWR")){
+                direct.add(new SupportDoctrine.Emitter(channel,
+                        Math.max(0.05,p.effect*0.030*tune.shieldTransfer()),
+                        450*tune.reach(),3.3/tune.supportEfficiency(),0,0));
+            }else if(id.startsWith("D")){
+                drones.add(new SupportDoctrine.Emitter(channel,
+                        Math.max(1.5,p.effect*0.10*tune.remoteRepair()),
+                        1150*tune.reach(),1.6/tune.supportEfficiency(),
+                        Math.max(1,Math.min(5,2+(int)(p.effect/42))),
+                        26*tune.droneEndurance()));
+            }else{
+                auras.add(new SupportDoctrine.Emitter(channel,
+                        Math.max(0.005,p.effect*0.00065*tune.shieldTransfer()),
+                        200*tune.reach(),1.1/tune.supportEfficiency(),0,0));
+            }
+        }
+        return new SupportDoctrine(direct,drones,auras);
+    }
+
     /** Bounded combat parameters directly consumed by the authoritative Battle simulation. */
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
