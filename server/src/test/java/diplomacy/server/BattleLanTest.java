@@ -13,6 +13,8 @@ public final class BattleLanTest {
         for(int size:new int[]{1,16,200})try(BattleServer server=BattleServer.openLan("127.0.0.1",0,2479,size);
             BattleConnection a=BattleConnection.openLan("localhost",server.port(),false);BattleConnection b=BattleConnection.openLan("localhost",server.port(),false)){
             until(()->a.snapshot()!=null&&b.snapshot()!=null);if(a.team!=0||b.team!=1)throw new AssertionError("fleet authority");
+            if(a.matchRules!=null||b.matchRules!=null)
+                throw new AssertionError("Ordinary battle server falsely advertised a PvP host cap");
             final long seq=a.order(BattleOrders.PointDefense.HOLD_FIRE,BattleOrders.Position.HOLD);until(()->a.acknowledged()==seq&&server.pointDefense(0)==BattleOrders.PointDefense.HOLD_FIRE);
             final long expected=b.order(BattleOrders.PointDefense.ANTI_CRAFT,BattleOrders.Position.KEEP_MOVING);until(()->b.acknowledged()==expected&&server.pointDefense(1)==BattleOrders.PointDefense.ANTI_CRAFT);
             until(()->b.snapshot().tick()>15);if(b.snapshot().entities().stream().filter(s->s.startsWith("SHIP|")).count()!=size*2L)throw new AssertionError("incomplete snapshot");

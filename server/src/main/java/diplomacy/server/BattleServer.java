@@ -21,6 +21,8 @@ import java.util.concurrent.*;
 public final class BattleServer implements AutoCloseable {
     private final ServerSocket listener;
     private final Hbnet.Server transport;
+    /** The server's complete immutable match policy, encoded for a bounded welcome frame. */
+    private final String matchRulesWire;
     private final Battle battle;
     private final Object lock=new Object();
     private final String session=UUID.randomUUID().toString();
@@ -75,12 +77,18 @@ public final class BattleServer implements AutoCloseable {
         left.requireAllowed(hostRules,catalog);
         right.requireAllowed(hostRules,catalog);
         Battle match=Battle.duel(seed,left.ships(),right.ships(),catalog);
-        return new BattleServer(local.getHostAddress(),port,match);
+        return new BattleServer(local.getHostAddress(),port,match,hostRules);
     }
-    private BattleServer(String bind,int port,Battle authoritativeMatch)throws Exception{
-        if(authoritativeMatch==null)throw new IllegalArgumentException("Missing authoritative PvP battle");
+    private BattleServer(String bind,int port,Battle authoritativeMatch,
+                         SkirmishTechnologyRules hostRules)throws Exception{
+        if(authoritativeMatch==null||hostRules==null)
+            throw new IllegalArgumentException("Missing authoritative PvP battle or host rules");
         this.transport=null;
         this.battle=authoritativeMatch;
+        this.matchRulesWire=Base64.getUrlEncoder().withoutPadding().encodeToString(
+                SkirmishTechnologyRules.encode(hostRules).getBytes(StandardCharsets.UTF_8));
+        if(matchRulesWire.length()>3000)
+            throw new IllegalArgumentException("Host match policy exceeds the bounded welcome frame");
         listener=new ServerSocket(port,16,InetAddress.getByName(bind));
         workers.execute(this::accept);
         clock.scheduleWithFixedDelay(this::pump,5,5,TimeUnit.MILLISECONDS);
@@ -94,6 +102,7 @@ public final class BattleServer implements AutoCloseable {
                          SkirmishShipExchange.Package right)throws Exception{
         if(count<1||count>200)throw new IllegalArgumentException("Fleet size must be 1-200");
         this.transport=transport;
+        this.matchRulesWire=null; // Ordinary battle servers do not claim a PvP lobby policy.
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         if(left!=null||right!=null){
             if(left==null||right==null||!left.rules().equals(right.rules()))
@@ -128,7 +137,8 @@ public final class BattleServer implements AutoCloseable {
                     if(seats.size()>=64)throw Hbnet.failure();seat=new Seat(team);seats.put(signer,seat);
                 }
                 if(seat.active)throw Hbnet.failure();seat.active=true;peer=new Peer(socket,seat);
-                Hbnet.write(socket.getOutputStream(),"WELCOME|1|"+session+"|"+seat.team+"|"+battle.seed()+"|"+seat.sequence);
+                Hbnet.write(socket.getOutputStream(),"WELCOME|1|"+session+"|"+seat.team+"|"+battle.seed()+"|"+seat.sequence+
+                        (matchRulesWire==null?"":"|"+matchRulesWire));
                 peers.add(peer);peer.send(snapshot());
             }
             final Peer current=peer;

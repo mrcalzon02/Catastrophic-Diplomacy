@@ -23,6 +23,10 @@ public final class PvpFleetTest {
                 laser=i;break;
             }
         check(laser>=0,"No laser slot");
+        var rank3=ShipTechnologyFit.fit(basic,tech,SkirmishTechnologyRules.unrestricted(),
+                laser,Shipyard.Track.EFFICIENCY,3,ShipTechnologyFit.Scope.SOCKET);
+        var rank4=ShipTechnologyFit.fit(basic,tech,SkirmishTechnologyRules.unrestricted(),
+                laser,Shipyard.Track.EFFICIENCY,4,ShipTechnologyFit.Scope.SOCKET);
         var rank6=ShipTechnologyFit.fit(basic,tech,SkirmishTechnologyRules.unrestricted(),
                 laser,Shipyard.Track.EFFICIENCY,6,ShipTechnologyFit.Scope.SOCKET);
         if(!Shipyard.inspect(rank6,tech).valid())
@@ -34,6 +38,22 @@ public final class PvpFleetTest {
                 Shipyard.Hull.CORVETTE),2);
         reject(()->BattleServer.openLan("127.0.0.1",0,42L,left,right,low),
                 "Tech III host accepted a Tier VI imported ship");
+        reject(()->BattleServer.openLan("127.0.0.1",0,42L,
+                new SkirmishFleet(List.of(basic,rank4)),right,low),
+                "Tech III host accepted a Tier IV fitted ship");
+        try(BattleServer host=BattleServer.openLan("127.0.0.1",0,42L,
+                new SkirmishFleet(List.of(basic,rank3)),right,low);
+            BattleConnection playerA=BattleConnection.openLan("127.0.0.1",host.port(),false);
+            BattleConnection playerB=BattleConnection.openLan("127.0.0.1",host.port(),false)){
+            check(low.equals(playerA.matchRules)&&low.equals(playerB.matchRules),
+                    "Two clients did not receive identical authoritative Tech III rules");
+            long deadline=System.nanoTime()+6_000_000_000L;
+            while(System.nanoTime()<deadline&&
+                    (playerA.snapshot()==null||playerB.snapshot()==null))Thread.sleep(20);
+            check(playerA.snapshot()!=null&&playerB.snapshot()!=null,
+                    "Tech III host did not deliver both real client snapshots");
+            check(playerA.team==0&&playerB.team==1,"Tech III clients did not get independent seats");
+        }
         try(BattleServer host=BattleServer.openLan("127.0.0.1",0,42L,left,right,high);
             BattleConnection playerA=BattleConnection.openLan("127.0.0.1",host.port(),false);
             BattleConnection playerB=BattleConnection.openLan("127.0.0.1",host.port(),false)){
@@ -42,11 +62,18 @@ public final class PvpFleetTest {
                     (playerA.snapshot()==null||playerB.snapshot()==null))Thread.sleep(20);
             check(playerA.snapshot()!=null&&playerB.snapshot()!=null,
                     "Host failed to deliver authoritative battle snapshots");
+            check(high.equals(playerA.matchRules)&&high.equals(playerB.matchRules),
+                    "Two clients did not receive identical authoritative Tech VI rules");
+            low.requireAllowed(basic,tech);
+            high.requireAllowed(rank6,tech);
+            check(rank6.at(laser).stage(Shipyard.Track.EFFICIENCY)==6&&
+                    basic.at(laser).stage(Shipyard.Track.EFFICIENCY)==0,
+                    "Host rules mutated fitted source ships");
             long ships=playerA.snapshot().entities().stream().filter(x->x.startsWith("SHIP|")).count();
             check(ships==5,"Host did not spawn five individually selected ships");
             check(playerA.team==0&&playerB.team==1,
                     "LAN players were not assigned independent teams");
         }
-        System.out.println("PASS PVP inclusive host tier, mixed fleet authorization, real TCP snapshots");
+        System.out.println("PASS PVP two-client host-published Tech III/VI rules, mixed fleets, Tier IV rejection and real TCP snapshots");
     }
 }

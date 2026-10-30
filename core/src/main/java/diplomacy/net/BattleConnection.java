@@ -2,6 +2,7 @@ package diplomacy.net;
 
 import hbnet.Hbnet;
 import diplomacy.sim.BattleOrders;
+import diplomacy.shipyard.SkirmishTechnologyRules;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,8 @@ public final class BattleConnection implements AutoCloseable {
     private final Socket socket;
     public final int team;
     public final long seed;
+    /** Null for legacy/battle-only servers; never derived from a local fleet export. */
+    public final SkirmishTechnologyRules matchRules;
     private long sequence;
     public record Snapshot(long tick,long simulationHash,List<String> entities){}
     private volatile Snapshot snapshot;
@@ -31,7 +34,14 @@ public final class BattleConnection implements AutoCloseable {
         this.socket=socket;
         try{
             socket.setSoTimeout(5000);Hbnet.write(socket.getOutputStream(),spectate?"SPECTATE|1":"PLAYER|1");String[] hello=Hbnet.read(socket.getInputStream()).split("\\|");
-            if(hello.length!=6||!hello[0].equals("WELCOME")||!hello[1].equals("1"))throw Hbnet.failure();team=Integer.parseInt(hello[3]);seed=Long.parseLong(hello[4]);sequence=Long.parseLong(hello[5]);if(team< -1||team>1||sequence<0)throw Hbnet.failure();socket.setSoTimeout(30000);
+            if((hello.length!=6&&hello.length!=7)||!hello[0].equals("WELCOME")||!hello[1].equals("1"))throw Hbnet.failure();
+            team=Integer.parseInt(hello[3]);seed=Long.parseLong(hello[4]);sequence=Long.parseLong(hello[5]);
+            if(team< -1||team>1||sequence<0)throw Hbnet.failure();
+            // The authenticated host (or explicitly trusted OPEN_LAN endpoint) supplies
+            // the complete rules. Never accept a client-selected cap or a downgrade.
+            matchRules=hello.length==7?SkirmishTechnologyRules.decode(new String(
+                    Base64.getUrlDecoder().decode(hello[6]),StandardCharsets.UTF_8)):null;
+            socket.setSoTimeout(30000);
         }catch(IOException|RuntimeException e){socket.close();throw Hbnet.failure();}
         Thread reader=new Thread(this::read,"diplomacy-authoritative-events");reader.setDaemon(true);reader.start();
     }
