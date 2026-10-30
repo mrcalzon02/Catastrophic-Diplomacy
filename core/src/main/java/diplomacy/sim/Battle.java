@@ -327,7 +327,7 @@ public final class Battle {
     }
 
     /** Simulation-confirmed beam from a repair or shield support module. */
-    public enum SupportKind { HULL, SHIELD, ARMOR, POWER, DRONE }
+    public enum SupportKind { HULL, SHIELD, ARMOR, POWER, DRONE, DRONE_SHIELD, DRONE_ARMOR, DRONE_POWER }
     public static final class SupportLink {
         public final int sourceId,targetId,team;
         public final SupportKind kind;
