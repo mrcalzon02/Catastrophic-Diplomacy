@@ -12,6 +12,7 @@ import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.CampaignTechnology;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.ShipLineages;
@@ -36,6 +37,7 @@ final class ShipyardPanel {
     private final TerranPlaceholderSprites fleetArt;
     private TacticalUiIcons uiIcons;
     private Supplier<CampaignProgress.State> campaignWallet;
+    private Supplier<CampaignTechnology.State> campaignDiscoveries;
     private Function<Shipyard.Design,Boolean> campaignPurchase;
     private Supplier<CampaignFleet.Roster> commissionedFleet;
     private BiFunction<Long,Shipyard.Design,Boolean> campaignRefit;
@@ -76,6 +78,9 @@ final class ShipyardPanel {
                               Function<Shipyard.Design,Boolean> purchase){
         campaignWallet=wallet;campaignPurchase=purchase;
     }
+    void setCampaignDiscovery(Supplier<CampaignTechnology.State> discovery){
+        campaignDiscoveries=discovery;
+    }
     void setCampaignRefitting(Supplier<CampaignFleet.Roster> roster,
                              BiFunction<Long,Shipyard.Design,Boolean> refit){
         commissionedFleet=roster;campaignRefit=refit;
@@ -83,14 +88,16 @@ final class ShipyardPanel {
     private CampaignBudgetQuotes.Quote campaignQuote(){
         CampaignProgress.State wallet=campaignWallet==null?null:campaignWallet.get();
         if(wallet==null)throw new IllegalStateException("No active campaign budget");
+        CampaignTechnology.State research=campaignDiscoveries==null?null:campaignDiscoveries.get();
+        if(research==null)throw new IllegalStateException("Campaign discoveries not loaded");
         CampaignFleet.Roster roster=usage==Usage.CAMPAIGN_REFIT?
                 commissionedFleet.get():null;
         if(cachedQuote!=null&&cachedQuoteDraft==draft&&cachedQuoteWallet==wallet&&
                 cachedQuoteRoster==roster&&cachedQuoteMode==usage&&
                 cachedQuoteShipId==refitShipId)return cachedQuote;
         cachedQuote=usage==Usage.CAMPAIGN_REFIT?
-                CampaignBudgetQuotes.refit(wallet,roster,refitShipId,draft,catalog):
-                CampaignBudgetQuotes.hull(wallet,draft,catalog);
+                CampaignBudgetQuotes.refit(wallet,research,roster,refitShipId,draft,catalog):
+                CampaignBudgetQuotes.hull(wallet,research,draft,catalog);
         cachedQuoteDraft=draft;cachedQuoteWallet=wallet;
         cachedQuoteRoster=roster;cachedQuoteMode=usage;cachedQuoteShipId=refitShipId;
         return cachedQuote;
@@ -289,8 +296,11 @@ final class ShipyardPanel {
     }
     private boolean campaignPermitted(){
         try{
-            CampaignShipyardRules.requireAllowed(draft,active[0].faction,
-                    campaignRank,unlockedMission);
+            if(campaignWallet==null||campaignDiscoveries==null||
+                    campaignWallet.get()==null||campaignDiscoveries.get()==null)
+                throw new IllegalArgumentException("Campaign discoveries not loaded");
+            CampaignShipyardRules.requireAllowed(draft,campaignWallet.get(),
+                    campaignDiscoveries.get(),catalog);
             return true;
         }catch(IllegalArgumentException denied){
             notice="LOCKED: "+denied.getMessage();return false;
@@ -435,8 +445,20 @@ final class ShipyardPanel {
                                 +"Reduce "+chosen+" to stage 0 to respec before choosing "+track;
                     }else{
                         int level=Math.max(0,Math.min(6,installed.stage(track)+delta));
-                        if(usage==Usage.CAMPAIGN&&level>campaignRank){
+                        if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&
+                                level>campaignRank){
                             notice="LOCKED: purchase research rank "+level+" first";return true;
+                        }
+                        if(level>0&&(usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)){
+                            String technologyId=installed.component.replaceFirst("^BASE-","TECH-")+
+                                    "-"+track.name()+"-"+
+                                    String.format(Locale.ROOT,"%02d",level);
+                            if(campaignDiscoveries==null||campaignDiscoveries.get()==null||
+                                    !campaignDiscoveries.get().has(technologyId)){
+                                notice="NOT RESEARCHED: "+technologyId+
+                                        " - complete discovery in Campaign Technology Lab";
+                                return true;
+                            }
                         }
                         try{
                             draft=draft.stage(selectedSlot,track,level);
