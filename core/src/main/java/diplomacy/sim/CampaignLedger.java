@@ -20,18 +20,22 @@ import java.util.Optional;
  * atomic rename: the entire transaction is already committed on next boot.
  */
 public final class CampaignLedger {
-    private static final String MAGIC="CD-CAMPAIGN-LEDGER-1";
+    private static final String MAGIC="CD-CAMPAIGN-LEDGER-2";
+    private static final String PREVIOUS="CD-CAMPAIGN-LEDGER-1";
     private static final int MAX_BYTES=4_500_000;
     private CampaignLedger(){}
     public record Snapshot(long generation,CampaignProgress.State progress,
-                           CampaignFleet.Roster fleet){
+                           CampaignFleet.Roster fleet,CampaignTechnology.State technology){
+        public Snapshot(long generation,CampaignProgress.State progress,CampaignFleet.Roster fleet){
+            this(generation,progress,fleet,new CampaignTechnology.State(progress.faction()));
+        }
         public Snapshot {
-            if(generation<1||progress==null||fleet==null||
-                    progress.faction()!=fleet.faction())
-                throw new IllegalArgumentException("Campaign wallet/fleet identity mismatch");
+            if(generation<1||progress==null||fleet==null||technology==null||
+                    progress.faction()!=fleet.faction()||progress.faction()!=technology.faction())
+                throw new IllegalArgumentException("Campaign wallet/fleet/technology identity mismatch");
         }
         public Snapshot next(CampaignProgress.State state,CampaignFleet.Roster roster){
-            return new Snapshot(Math.addExact(generation,1),state,roster);
+            return new Snapshot(Math.addExact(generation,1),state,roster,technology);
         }
     }
     private static String checksum(String value){
@@ -57,7 +61,8 @@ public final class CampaignLedger {
         if(snapshot==null)throw new IllegalArgumentException("Missing campaign snapshot");
         String body=MAGIC+"\n"+snapshot.generation()+"\n"+
                 b64(CampaignProgress.encode(snapshot.progress()))+"\n"+
-                b64(CampaignFleetCodec.encode(snapshot.fleet()))+"\n";
+                b64(CampaignFleetCodec.encode(snapshot.fleet()))+"\n"+
+                b64(CampaignTechnology.encode(snapshot.technology()))+"\n";
         String payload=body+checksum(body)+"\n";
         if(payload.getBytes(StandardCharsets.UTF_8).length>MAX_BYTES)
             throw new IllegalArgumentException("Campaign snapshot exceeds capacity");
@@ -72,17 +77,23 @@ public final class CampaignLedger {
         if(data==null||catalog==null||data.length()>MAX_BYTES)
             throw new IllegalArgumentException("Missing or oversized campaign snapshot");
         String[] rows=data.split("\n",-1);
-        if(rows.length!=6||!MAGIC.equals(rows[0])||!rows[5].isEmpty())
+        boolean old=rows.length==6&&PREVIOUS.equals(rows[0]);
+        boolean current=rows.length==7&&MAGIC.equals(rows[0]);
+        if((!old&&!current)||!rows[rows.length-1].isEmpty())
             throw new IllegalArgumentException("Unknown campaign snapshot version");
-        String body=String.join("\n",rows[0],rows[1],rows[2],rows[3])+"\n";
-        if(!MessageDigest.isEqual(checksum(body).getBytes(StandardCharsets.US_ASCII),
-                rows[4].getBytes(StandardCharsets.US_ASCII)))
+        StringBuilder payload=new StringBuilder();
+        for(int i=0;i<rows.length-2;i++)payload.append(rows[i]).append('\n');
+        if(!MessageDigest.isEqual(checksum(payload.toString()).getBytes(StandardCharsets.US_ASCII),
+                rows[rows.length-2].getBytes(StandardCharsets.US_ASCII)))
             throw new IllegalArgumentException("Campaign snapshot checksum mismatch");
         try{
             long generation=Long.parseLong(rows[1]);
             CampaignProgress.State progress=CampaignProgress.decode(unb64(rows[2]));
             CampaignFleet.Roster fleet=CampaignFleetCodec.decode(unb64(rows[3]),catalog);
-            return new Snapshot(generation,progress,fleet);
+            CampaignTechnology.State research=old?
+                    new CampaignTechnology.State(progress.faction()):
+                    CampaignTechnology.decode(unb64(rows[4]),catalog);
+            return new Snapshot(generation,progress,fleet,research);
         }catch(RuntimeException invalid){
             throw new IllegalArgumentException("Invalid saved campaign wallet or fleet",invalid);
         }
