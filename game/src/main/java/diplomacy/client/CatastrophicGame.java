@@ -2198,6 +2198,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
             for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
             for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
         }
+        // A tracked hull receives a restrained in-world locator, not a giant
+        // selection halo that would obscure the weapon and shield effects.
+        if(!screensaverMode&&focusedShipId>=0)for(Battle.Ship followed:battle.ships()){
+            if(followed.id!=focusedShipId||!followed.alive())continue;
+            BattleRenderPoses.Pose pose=renderPoses.ship(followed);
+            if(view.ship(pose,followed.visualScale())){
+                shapes.setColor(0.32f,0.88f,1f,0.55f);
+                shapes.circle(pose.x(),pose.y(),
+                        (float)(25*followed.visualScale()),32);
+            }
+            break;
+        }
         // Purpose-built auras are actual spherical local fields. Draw only a
         // faint range boundary when zoomed in; never fabricate fleetwide beams.
         if(battleCamera.zoom<=1.55f)for(Battle.Ship ship:battle.ships())
@@ -2393,6 +2405,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,String.format(java.util.Locale.ROOT,"%.2fx  %s",battleCamera.zoom,
                 focusedShipId>=0?"FOLLOW #"+focusedShipId:"FLEET VIEW"),338,106);
+        if(focusedShipId>=0)for(Battle.Ship selected:battle.ships()){
+            if(selected.id!=focusedShipId||!selected.alive())continue;
+            font.setColor(Color.WHITE);
+            font.draw(batch,CombatShipStatus.line(selected),338,87);
+            break;
+        }
         font.setColor(Color.GOLD);
         SpaceWeather.Preset activeWeather = battle.weather().preset();
         String condition = activeWeather.enabled()

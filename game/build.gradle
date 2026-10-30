@@ -108,3 +108,12 @@ tasks.register('combatVisibilitySmoke', JavaExec) {
     mainClass = 'diplomacy.client.CombatViewBoundsTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatVisibilitySmoke') }
+
+tasks.register('combatShipStatusSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify tracked ship HUD shows physical ammunition and actual damage values.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatShipStatusTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatShipStatusSmoke') }
