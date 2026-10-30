@@ -344,6 +344,15 @@ tasks.register('researchVictoryFloorSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignResearchSmoke') { finalizedBy(tasks.named('researchVictoryFloorSmoke')) }
+tasks.register('campaignTechnologySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Test funded faction technology discoveries, prerequisites, shipyard authorization and atomic ledger.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignTechnologyTest'
+    dependsOn testClasses
+}
+tasks.named('campaignResearchSmoke') { finalizedBy(tasks.named('campaignTechnologySmoke')) }
+
 
 
 tasks.register('campaignDeploymentSmoke', JavaExec) {
