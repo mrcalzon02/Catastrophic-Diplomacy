@@ -47,9 +47,11 @@ final class ShieldFxTimeline {
     private final Map<Integer,Facings> states=new HashMap<>();
     private final ArrayDeque<Effect> events=new ArrayDeque<>();
     private long lastEventTick=-1;
+    private final long[] observed=new long[Kind.values().length];
     void sync(Battle battle){
         if(source==battle)return;
         source=battle;states.clear();events.clear();lastEventTick=-1;
+        java.util.Arrays.fill(observed,0);
     }
     void beforeStep(Battle battle){
         sync(battle);
@@ -185,6 +187,7 @@ final class ShieldFxTimeline {
         return center;
     }
     private void add(Effect effect){
+        observed[effect.kind.ordinal()]++;
         if(events.size()==MAX_EVENTS)events.removeFirst();
         events.addLast(effect);
     }
@@ -216,5 +219,6 @@ final class ShieldFxTimeline {
     }
     List<Effect> events(){return List.copyOf(events);}
     int count(){return events.size();}
+    long total(Kind kind){return observed[kind.ordinal()];}
     long lastEventTick(){return lastEventTick;}
 }
