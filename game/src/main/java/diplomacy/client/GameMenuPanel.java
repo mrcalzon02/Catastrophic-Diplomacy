@@ -322,10 +322,10 @@ final class GameMenuPanel {
                 for(int i=0;i<presets.length;i++)
                     button(shapes,30,592-i*48,550,44,presets[i]==preset);
                 button(shapes,30,35,160,49,false);
-                if(preset!=ScenarioCatalog.Preset.PROVING_GROUND)
+                if(!preset.demonstration)
                     button(shapes,702,35,225,49,false);
                 actionButton(shapes,969,35,277,49,MilitaryUiTheme.Intent.PRIMARY);
-                if(preset!=ScenarioCatalog.Preset.PROVING_GROUND){
+                if(!preset.demonstration){
                     button(shapes,661,332,545,42,false);
                     button(shapes,661,271,545,42,false);
                 }
@@ -561,9 +561,13 @@ final class GameMenuPanel {
                 label(batch,font,"FLEET SIZE  "+(preset==ScenarioCatalog.Preset.CUSTOM?fleetCount:preset.ships)+"v"+
                     (preset==ScenarioCatalog.Preset.CUSTOM?fleetCount:preset.ships),654,453,Color.GOLD);
                 label(batch,font,"ENVIRONMENT LEVEL "+preset.environmentLevel,654,409,Color.WHITE);
-                if(preset==ScenarioCatalog.Preset.PROVING_GROUND){
-                    label(batch,font,"FACTIONS: CANONICAL SIX-WEAPON FLEETS",677,359,Color.CYAN);
-                    label(batch,font,"LOADOUTS: FIXED VERIFICATION FIXTURE",677,298,MUTED);
+                if(preset.demonstration){
+                    label(batch,font,preset==ScenarioCatalog.Preset.HULL_COVERAGE?
+                            "HULLS: ALL 11 SIZES / 22 ACTUAL SHIPS":
+                            "FACTIONS: CANONICAL SIX-WEAPON FLEETS",677,359,Color.CYAN);
+                    label(batch,font,preset==ScenarioCatalog.Preset.HULL_COVERAGE?
+                            "FITTINGS: MIXED MODULE AND FACTION LAYOUTS":
+                            "LOADOUTS: FIXED VERIFICATION FIXTURE",677,298,MUTED);
                 }else{
                     label(batch,font,"LEFT FACTION: "+left.displayName+"  >",677,359,Color.WHITE);
                     label(batch,font,"RIGHT FACTION: "+right.displayName+"  >",677,298,Color.WHITE);
@@ -572,7 +576,7 @@ final class GameMenuPanel {
                         "CUSTOM FLEET SIZE: -  "+fleetCount+"  +":
                         "FLEET SIZE DEFINED BY SCENARIO",677,237,MUTED);
                 label(batch,font,"BACK",70,67,Color.WHITE);
-                if(preset!=ScenarioCatalog.Preset.PROVING_GROUND)
+                if(!preset.demonstration)
                     label(batch,font,"SHIPYARD",743,67,Color.WHITE);
                 label(batch,font,preset.demonstration?"LAUNCH TEST":"DEPLOY FLEET",998,67,Color.WHITE);
             }
