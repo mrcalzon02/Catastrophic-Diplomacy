@@ -6,17 +6,18 @@ import diplomacy.shipyard.Shipyard;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Headless test: seven recorded hull roles with explicit missile-frigate distinction. */
+/** Headless test: nine recorded hull roles with explicit missile-frigate distinction. */
 public final class FighterVoiceAudioTest {
     public static void main(String[] args) {
-        if (RecordedHullVoiceAudio.registeredCues() != 182)
-            throw new AssertionError("Expected 182 recorded hull voice cues");
+        if (RecordedHullVoiceAudio.registeredCues() != 234)
+            throw new AssertionError("Expected 234 recorded hull voice cues");
         Set<String> paths = new HashSet<>();
         int n = 0;
         for (Shipyard.Hull hull : new Shipyard.Hull[]{
                 Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER,
                 Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT,
-                Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE}) {
+                Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE,
+                Shipyard.Hull.CRUISER, Shipyard.Hull.LIGHT_CRUISER}) {
             for (CrewChatter.Event event : CrewChatter.Event.values()) {
                 for (CrewChatter.Tone tone : new CrewChatter.Tone[]{
                         CrewChatter.Tone.PROFESSIONAL, CrewChatter.Tone.VETERAN}) {
@@ -44,8 +45,8 @@ public final class FighterVoiceAudioTest {
                 CrewChatter.Event.ATTACK,0,0,CrewChatter.Tone.PROFESSIONAL);
         if (RecordedHullVoiceAudio.assetPathForRadio("RADIO Ordinary Frigate: "+sameLine) != null)
             throw new AssertionError("Missile frigate voice leaked onto ordinary frigate");
-        if(n != 182 || paths.size() != 182)
-            throw new AssertionError("Incomplete seven-hull voice bank");
-        System.out.println("PASS: 182 unique original recorded cues across 7 fixed hull voices");
+        if(n != 234 || paths.size() != 234)
+            throw new AssertionError("Incomplete nine-hull voice bank");
+        System.out.println("PASS: 234 unique original recorded cues across 9 fixed hull voices");
     }
 }

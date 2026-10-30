@@ -64,7 +64,7 @@ tasks.named('audioSmoke') { finalizedBy(tasks.named('announcerSmoke')) }
 
 tasks.register('fighterVoiceSmoke', JavaExec) {
     group = 'verification'
-    description = 'Headless validation of all 182 original subtitle-to-OGG mappings across 7 hull voice roles.'
+    description = 'Headless validation of all 234 original subtitle-to-OGG mappings across 9 hull voice roles.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.FighterVoiceAudioTest'

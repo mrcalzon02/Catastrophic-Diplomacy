@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * User-recorded hull voices across seven hull roles, including the missile frigate; 182 cues.
+ * User-recorded hull voices across nine hull roles, including the missile frigate; 234 cues.
  * One clip at a time, with a global cooldown suitable for 200v200 engagements.
  * All routing is cosmetic; no simulation RNG, no synthetic pilot impersonation.
  */
@@ -27,7 +27,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
         Shipyard.Hull[] recorded = {
                 Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER,
                 Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT,
-                Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE
+                Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE,
+                Shipyard.Hull.CRUISER, Shipyard.Hull.LIGHT_CRUISER
         };
         for (Shipyard.Hull hull : recorded) {
             for (CrewChatter.Event event : CrewChatter.Event.values()) {
@@ -52,8 +53,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
                 }
             }
         }
-        if (result.size() != 182)
-            throw new IllegalStateException("Incomplete 7-hull voice bank");
+        if (result.size() != 234)
+            throw new IllegalStateException("Incomplete 9-hull voice bank");
         return Collections.unmodifiableMap(result);
     }
 
