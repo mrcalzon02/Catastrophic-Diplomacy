@@ -70,6 +70,8 @@ final class ShipDeathRenderer implements Disposable {
         // Drop polygon metadata immediately after its matching debris expires.
         java.util.Set<Long> present=new java.util.HashSet<>();
         for(ShipDeathTimeline.Burst burst:timeline.bursts())present.add(burst.seed);
+        for(ShipDeathTimeline.Wreck wreck:timeline.wrecks())
+            present.add(wreck.source.seed);
         regions.keySet().removeIf(seed->!present.contains(seed));
         if(present.isEmpty())return;
 
@@ -147,6 +149,16 @@ final class ShipDeathRenderer implements Disposable {
             if(hull==null)continue;
             drawFragments(burst,geometry(burst,hull),hull);
         }
+        // Heavy vessels retain a few actual hull sections long after the flash
+        // and smoke dissolve. All share source PNG UVs and remain non-colliding.
+        for(ShipDeathTimeline.Wreck wreck:timeline.wrecks()){
+            if(wreck.age<ShipDeathTimeline.FRAGMENT_LIFE)continue;
+            var ship=wreck.source.ship;
+            if(view!=null&&!view.circle(ship.x(),ship.y(),
+                    150*ship.scale()+wreck.age*12*ship.scale()))continue;
+            Texture hull=sprites==null?null:sprites.sourceTexture(ship.faction(),ship.hull());
+            if(hull!=null)drawWreck(wreck,geometry(wreck.source,hull),hull);
+        }
         polygons.setColor(Color.WHITE);
         polygons.end();
 
@@ -168,7 +180,75 @@ final class ShipDeathRenderer implements Disposable {
                 }
                 fallbackFragments(geometryFallback,burst);
             }
+            // Outline-based wreck sections for missing PNGs: same faction
+            // geometry as the original hull, never invented square fragments.
+            for(ShipDeathTimeline.Wreck wreck:timeline.wrecks()){
+                if(wreck.age<ShipDeathTimeline.FRAGMENT_LIFE)continue;
+                var ship=wreck.source.ship;
+                if(view!=null&&!view.circle(ship.x(),ship.y(),
+                        150*ship.scale()+wreck.age*12*ship.scale()))continue;
+                if(sprites!=null&&sprites.sourceTexture(ship.faction(),ship.hull())!=null)
+                    continue;
+                if(!drawing){
+                    geometryFallback.begin(ShapeRenderer.ShapeType.Filled);
+                    drawing=true;
+                }
+                fallbackWreck(geometryFallback,wreck);
+            }
             if(drawing)geometryFallback.end();
+        }
+    }
+
+    private void drawWreck(ShipDeathTimeline.Wreck wreck,
+                          PolygonRegion[] regions,Texture texture){
+        var ship=wreck.source.ship;
+        float scale=ship.scale(),time=wreck.age;
+        float after=time-ShipDeathTimeline.FRAGMENT_LIFE;
+        float drift=(float)(1-Math.exp(-1.15*ShipDeathTimeline.FRAGMENT_LIFE))/1.15f;
+        float alpha=.46f*Math.max(0,
+                1-after/(ShipDeathTimeline.WRECK_LIFETIME-
+                         ShipDeathTimeline.FRAGMENT_LIFE));
+        float width=34*scale*texture.getWidth()/(float)texture.getHeight();
+        float height=34*scale;
+        for(int index:ShipDeathTimeline.WRECK_PIECES){
+            var piece=wreck.source.fragments.get(index);
+            float distance=drift+after*.13f;
+            float x=ship.x()-width*.5f+piece.vx()*distance;
+            float y=ship.y()-height*.5f+piece.vy()*distance;
+            float rotation=(float)Math.toDegrees(ship.facing())-90+
+                    piece.spin()*(ShipDeathTimeline.FRAGMENT_LIFE+after*.12f);
+            polygons.setColor(.62f,.65f,.70f,alpha*piece.intensity());
+            polygons.draw(regions[index],x,y,width*.5f,height*.5f,
+                    width,height,1,1,rotation);
+            lastFragments++;
+        }
+    }
+
+    private void fallbackWreck(ShapeRenderer shapes,ShipDeathTimeline.Wreck wreck){
+        var ship=wreck.source.ship;
+        float after=wreck.age-ShipDeathTimeline.FRAGMENT_LIFE;
+        float alpha=.38f*Math.max(0,
+                1-after/(ShipDeathTimeline.WRECK_LIFETIME-
+                         ShipDeathTimeline.FRAGMENT_LIFE));
+        float scale=ship.scale(),angle=ship.facing()-(float)Math.PI*.5f;
+        float cos=(float)Math.cos(angle),sin=(float)Math.sin(angle);
+        float[] triangles=HullSilhouette.of(ship.faction(),ship.hull());
+        // Deliberately retain disconnected pieces, not a ghost of the full ship.
+        for(int i=0;i<triangles.length;i+=18){
+            if(i+5>=triangles.length)break;
+            float offsetX=(float)Math.cos(i*1.6)*after*1.5f*scale;
+            float offsetY=(float)Math.sin(i*1.6)*after*1.5f*scale;
+            float[] points=new float[6];
+            for(int j=0;j<6;j+=2){
+                float px=triangles[i+j],py=triangles[i+j+1];
+                points[j]=ship.x()+offsetX+scale*(px*cos-py*sin);
+                points[j+1]=ship.y()+offsetY+scale*(px*sin+py*cos);
+            }
+            shapes.setColor(ship.faction().r*.4f,ship.faction().g*.4f,
+                    ship.faction().b*.4f,alpha);
+            shapes.triangle(points[0],points[1],points[2],points[3],
+                    points[4],points[5]);
+            lastFragments++;
         }
     }
 

@@ -21,6 +21,11 @@ public final class ShipDeathTimelineTest {
         battle.tick++;
         fx.afterStep(battle);
         require(fx.count()==1,"one shattered hull");
+        require(fx.wreckCount()==0,"corvette must leave no long-lived wreck");
+        require(ShipDeathTimeline.capitalHull(diplomacy.shipyard.Shipyard.Hull.CARRIER_COMMAND),
+                "capital variants inherit the correct parent class");
+        require(!ShipDeathTimeline.capitalHull(diplomacy.shipyard.Shipyard.Hull.DESTROYER),
+                "destroyer should not clutter battles with permanent wreckage");
         var burst=fx.bursts().get(0);
         require(burst.ship.id()==destroyed.id,"correct dying vessel");
         require(burst.fragments.size()==8,"eight jagged hull shards");
@@ -91,8 +96,33 @@ public final class ShipDeathTimelineTest {
         fx.afterStep(massive);
         require(fx.count()==ShipDeathTimeline.MAX_ACTIVE,
                 "bounded visual count even after 400 deaths");
-        Set<Integer> unique=new HashSet<>();
-        for(var effect:fx.bursts())require(unique.add(effect.ship.id()),"no duplicate death");
+        Set<Integer> uniqueAfterMassDeath=new HashSet<>();
+        for(var effect:fx.bursts())
+            require(uniqueAfterMassDeath.add(effect.ship.id()),"no duplicate death");
+        require(fx.wreckCount()==0,
+                "non-capital 400-kill stress must not fill the wreck queue");
+        // Full capital-ship stress: make all cruisers and verify both queues
+        // respect their independent maximums and timed eviction.
+        Battle capitalBattle=new Battle(901L);
+        for(int i=0;i<90;i++){
+            Battle.Ship s=capitalBattle.addShip(i%2,Battle.Faction.CARNELIAN,
+                    i*20,i%2*20);
+            s.hullClass=diplomacy.shipyard.Shipyard.Hull.CARRIER;
+        }
+        fx.beforeStep(capitalBattle);
+        for(Battle.Ship s:capitalBattle.ships()){s.hull=0;s.retired=true;}
+        capitalBattle.tick++;
+        fx.afterStep(capitalBattle);
+        require(fx.wreckCount()==ShipDeathTimeline.MAX_WRECKS,
+                "wreck count capped even after a capital-fleet catastrophe");
+        require(fx.count()==ShipDeathTimeline.MAX_ACTIVE,
+                "explosion count remains independently bounded");
+        for(int i=0;i<75;i++)fx.advance(capitalBattle,.08f,true);
+        require(fx.count()==0,"short blasts expire before wreck sections");
+        require(fx.wreckCount()>0,"capital wrecks outlast smoke and flashes");
+        for(int i=0;i<180;i++)fx.advance(capitalBattle,.08f,true);
+        require(fx.wreckCount()==0,"long-lived wrecks eventually expire");
+        require(fx.wreckCount()==0,"expired wrecks no longer retained");
         Battle fresh=new Battle(900L);
         fx.sync(fresh);
         require(fx.count()==0,"new battle removes old wreckage");

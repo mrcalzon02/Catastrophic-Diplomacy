@@ -16,6 +16,10 @@ import java.util.Random;
  */
 final class ShipDeathTimeline {
     static final int MAX_ACTIVE=24;
+    /** Retained larger-ship wreckage is a capped cosmetic feature, not an obstacle. */
+    static final int MAX_WRECKS=16;
+    static final float WRECK_LIFETIME=18.0f;
+    static final int[] WRECK_PIECES={0,3,6};
     static final float LIFETIME=3.75f;
     static final float FRAGMENT_LIFE=2.55f;
     static final int FRAGMENTS_PER_HULL=8;
@@ -81,14 +85,30 @@ final class ShipDeathTimeline {
             this.fragments=List.copyOf(pieces);this.smoke=List.copyOf(puffs);
         }
     }
+    /** Retains source-art polygon fragments beyond the short smoke/explosion. */
+    static final class Wreck {
+        final Burst source;
+        float age;
+        Wreck(Burst source){this.source=source;}
+    }
+    static boolean capitalHull(Shipyard.Hull hull){
+        if(hull==null)return false;
+        return switch(hull.spriteHull()){
+            case LIGHT_CRUISER, CRUISER, HEAVY_CRUISER, BATTLECRUISER,
+                 CARRIER, DREADNOUGHT -> true;
+            default -> false;
+        };
+    }
     private final Map<Integer,Snapshot> livingBefore=new HashMap<>();
     private final ArrayDeque<Burst> active=new ArrayDeque<>();
+    private final ArrayDeque<Wreck> wrecks=new ArrayDeque<>();
     private Battle battle;
     private long lastObservedTick=-1;
 
     void sync(Battle current){
         if(battle==current)return;
-        battle=current;livingBefore.clear();active.clear();lastObservedTick=-1;
+        battle=current;livingBefore.clear();active.clear();wrecks.clear();
+        lastObservedTick=-1;
     }
     void beforeStep(Battle current){
         sync(current);
@@ -107,7 +127,12 @@ final class ShipDeathTimeline {
             if(active.size()>=MAX_ACTIVE)active.removeFirst();
             long seed=mix(current.seed() ^ DEATH_SALT ^
                     (((long)ship.id)<<32) ^ current.tick);
-            active.addLast(create(before,current.tick,seed,lethalImpact(current,ship)));
+            Burst burst=create(before,current.tick,seed,lethalImpact(current,ship));
+            active.addLast(burst);
+            if(capitalHull(before.hull())){
+                if(wrecks.size()>=MAX_WRECKS)wrecks.removeFirst();
+                wrecks.addLast(new Wreck(burst));
+            }
         }
         livingBefore.clear();
     }
@@ -116,11 +141,16 @@ final class ShipDeathTimeline {
         if(!running)return;
         float dt=Float.isFinite(delta)?Math.max(0,Math.min(.08f,delta)):0;
         for(Burst burst:active)burst.age+=dt;
+        for(Wreck wreck:wrecks)wreck.age+=dt;
         while(!active.isEmpty()&&active.peekFirst().age>=LIFETIME)
             active.removeFirst();
+        while(!wrecks.isEmpty()&&wrecks.peekFirst().age>=WRECK_LIFETIME)
+            wrecks.removeFirst();
     }
     List<Burst> bursts(){return List.copyOf(active);}
+    List<Wreck> wrecks(){return List.copyOf(wrecks);}
     int count(){return active.size();}
+    int wreckCount(){return wrecks.size();}
 
     private static Snapshot snapshot(Battle.Ship s){
         return new Snapshot(s.id,s.team,s.faction,s.hullClass,
