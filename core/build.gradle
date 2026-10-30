@@ -172,6 +172,14 @@ tasks.register('directionalDefenseSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.DirectionalDefenseTest'
     dependsOn testClasses
 }
+tasks.register('shipSurfaceDamageSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check shield-first, fitted-module scatter, localized radial armor erosion and campaign persistence.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipSurfaceDamageTest'
+    dependsOn testClasses
+}
+tasks.named('directionalDefenseSmoke') { finalizedBy(tasks.named('shipSurfaceDamageSmoke')) }
 // Preserve the existing routine smoke chain and include directional defenses.
 tasks.named('fleetScaleSmoke') { finalizedBy(tasks.named('directionalDefenseSmoke')) }
 
