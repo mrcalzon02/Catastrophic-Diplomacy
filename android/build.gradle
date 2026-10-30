@@ -67,6 +67,7 @@ tasks.configureEach { task ->
         task.dependsOn rootProject.tasks.named('prepareMusicAssets')
         task.dependsOn rootProject.tasks.named('prepareStage1Art')
         task.dependsOn rootProject.tasks.named('prepareModularWeaponFx')
+        task.dependsOn rootProject.tasks.named('verifyGuidedOrdnanceSprites')
         task.dependsOn rootProject.tasks.named('prepareFighterArt')
         task.dependsOn rootProject.tasks.named('prepareAnnouncerVoiceAssets')
         task.dependsOn rootProject.tasks.named('prepareFighterVoiceAssets')

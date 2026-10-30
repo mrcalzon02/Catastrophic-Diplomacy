@@ -12,6 +12,7 @@ tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareUiAssets')
     dependsOn rootProject.tasks.named('prepareStage1Art')
     dependsOn rootProject.tasks.named('prepareModularWeaponFx')
+    dependsOn rootProject.tasks.named('verifyGuidedOrdnanceSprites')
     dependsOn rootProject.tasks.named('prepareFighterArt')
     dependsOn rootProject.tasks.named('prepareAnnouncerVoiceAssets')
     dependsOn rootProject.tasks.named('prepareFighterVoiceAssets')

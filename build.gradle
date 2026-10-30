@@ -74,6 +74,33 @@ tasks.register('prepareStage1Art') {
 
 
 
+// Combat munitions must not silently regress to colored circles in release
+// packages. Use exact checksums of the two reviewed source-cropped bodies.
+tasks.register('verifyGuidedOrdnanceSprites') {
+    group = 'verification'
+    description = 'Require the original source-cropped missile and torpedo bodies.'
+    def originals = [
+        'missile/payload_01.png':'a60e59ae9ef171cf1b37f816f975e25b72eddfd364544943601b09785179f4f2',
+        'torpedo/payload_01.png':'08bece0712eaf2b91dbdb449d2b43f831f360aa8c656a4e994ec426d3c49777f'
+    ]
+    def inputsList = originals.keySet().collect { file('assets/effects/weapon_fx/' + it) }
+    inputs.files inputsList
+    doLast {
+        def signature = [137,80,78,71,13,10,26,10].collect { (byte)it } as byte[]
+        originals.each { name, sha ->
+            def path = file('assets/effects/weapon_fx/' + name)
+            if (!path.isFile()) throw new GradleException('Missing guided ordnance art: ' + name)
+            byte[] raw = path.bytes
+            def actual = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(raw).encodeHex().toString()
+            if (raw.length < 1000 || !java.util.Arrays.equals(
+                    java.util.Arrays.copyOf(raw,8), signature) || actual != sha)
+                throw new GradleException('Corrupted original guided ordnance art: ' + name)
+        }
+        println('PASS: original guided missile and heavy torpedo PNGs present and unmodified')
+    }
+}
+
 // Reconstruct the user's approved 63 laser/kinetic/plasma/particle firing and
 // impact frames from the exact-byte Library source archive, transferred to Git
 // as bounded base64 text blobs. No runtime network access or fallback-only builds.
@@ -132,7 +159,7 @@ tasks.register('prepareModularWeaponFx') {
                     }
                 }
             }
-            if (manifest.frames.keySet() as Set != expected.keySet() as Set)
+            if ((manifest.frames.keySet() as Set) != (expected.keySet() as Set))
                 throw new GradleException('Unexpected curated FX names or missing frames')
             manifest.frames.each { name, metadata ->
                 if (metadata.stage != (name.contains('/firing_') ? 'firing' : 'impact')
