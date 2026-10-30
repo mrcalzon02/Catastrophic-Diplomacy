@@ -36,7 +36,7 @@ jobs:
           gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke \
             :core:massBattleSmoke :core:updaterPolicySmoke \
             :core:desktopUpdaterPolicySmoke :core:shipLineagesSmoke \
-            :core:technologySmoke :core:campaignResearchSmoke \
+            :core:technologySmoke :core:weaponMuzzleSmoke :core:campaignResearchSmoke \
             :core:campaignTechnologySmoke :core:skirmishTechSmoke :server:check \
             :game:menuFlowSmoke :game:battleTouchSmoke :desktop:installDist
       - name: Create native Linux app image with bundled Java
@@ -106,7 +106,7 @@ jobs:
       - name: Build runnable Windows game and test essential functionality
         shell: pwsh
         run: |
-          gradle --no-daemon :core:gameFlowSmoke :core:desktopUpdaterPolicySmoke :game:menuFlowSmoke :desktop:installDist
+          gradle --no-daemon :core:gameFlowSmoke :core:weaponMuzzleSmoke :core:desktopUpdaterPolicySmoke :game:menuFlowSmoke :desktop:installDist
           if ($LASTEXITCODE -ne 0) { throw 'Windows game failed gameplay/compile' }
           python tools/package_desktop.py
           python tools/generate_app_icons.py --check
