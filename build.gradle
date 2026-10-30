@@ -421,3 +421,97 @@ tasks.register('verifyGrittyUiAssets') {
         println('PASS: 8 textless runtime button states, 182 strict source candidates and 9 isolated panels verified.')
     }
 }
+
+
+/**
+ * Preserve the user's ORIGINAL legacy faction fleet sheets already committed
+ * under assets/ships/alien/lineups/series-01/. Each of five original
+ * civilizations gets its own 10 real ship textures, generated before Android
+ * or desktop packs assets. No reused modern faction artwork, recolored blobs
+ * or extra binary source downloads.
+ *
+ * This is an asset producer, not a CI design-quality release gate.
+ */
+def originalLegacyManifest = file('assets/ships/factions/legacy-sheets.json')
+def originalLegacyOutput = layout.buildDirectory.dir('generated/cd-legacy-factions')
+tasks.register('prepareLegacyFactionArt') {
+    group = 'assets'
+    description = 'Extract 50 real original legacy-faction hulls from five checksum-pinned fleet sprite sheets.'
+    inputs.file originalLegacyManifest
+    inputs.files fileTree('assets/ships/alien/lineups/series-01')
+    outputs.dir originalLegacyOutput
+    doLast {
+        def spec = new groovy.json.JsonSlurper().parse(originalLegacyManifest)
+        def roles = ['interceptor','corvette','missile_corvette','frigate','destroyer',
+                     'light_cruiser','heavy_cruiser','battlecruiser','carrier','dreadnought']
+        def factions = ['draxian','uzipt','mandrally','carnelian','zippledrow'] as Set
+        if (spec.schema != 'cd-original-legacy-faction-sheets-v1' ||
+            spec.roles != roles || spec.factions.size() != 5 ||
+            (spec.factions.collect { it.id } as Set) != factions)
+            throw new GradleException('Invalid original legacy fleet source register')
+        def output = originalLegacyOutput.get().asFile
+        project.delete(output)
+        output.mkdirs()
+        // Separators are based on the original sheet ship centers, not equal
+        // 1/5 image strips (which amputate capital-ship wings and attach shards).
+        int[] edges = [0,242,478,720,946,1254] as int[]
+        int count = 0
+        spec.factions.each { entry ->
+            if (!(entry.id in factions) ||
+                !(entry.sheet ==~ /[a-z0-9_]+\.png/))
+                throw new GradleException('Invalid original faction source entry: ' + entry)
+            def source = file(spec.source_root + entry.sheet)
+            if (!source.isFile())
+                throw new GradleException('Original faction source sheet missing: ' + source)
+            def hash = java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(source.bytes).encodeHex().toString()
+            if (hash != entry.sha256)
+                throw new GradleException('Original Drive/Git artwork checksum mismatch: ' + source)
+            def atlas = javax.imageio.ImageIO.read(source)
+            if (atlas == null || atlas.width != 1254 || atlas.height != 1254)
+                throw new GradleException('Legacy fleet source dimensions changed: ' + source)
+            roles.eachWithIndex { role, index ->
+                int col = index % 5
+                int row = (int)(index / 5)
+                int x0 = edges[col], x1 = edges[col + 1]
+                int y0 = row == 0 ? 0 : 490
+                int y1 = row == 0 ? 448 : 1138
+                int width = x1-x0, height = y1-y0
+                def rgba = new java.awt.image.BufferedImage(
+                    width,height,java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                int minX=width,minY=height,maxX=-1,maxY=-1
+                for (int y=0; y<height; y++) {
+                    for (int x=0; x<width; x++) {
+                        int pixel=atlas.getRGB(x0+x,y0+y)
+                        int red=(pixel >>> 16)&255
+                        int green=(pixel >>> 8)&255
+                        int blue=pixel&255
+                        int brightness=Math.max(red,Math.max(green,blue))
+                        // Sheets were authored on black. Convert only their
+                        // dark matte to transparency, preserving source RGB.
+                        int alpha=brightness<=12?0:
+                             Math.min(255,(int)(((brightness-12)*255)/30))
+                        rgba.setRGB(x,y,(alpha<<24)|(pixel&0x00ffffff))
+                        if(alpha>50) {
+                            minX=Math.min(minX,x);minY=Math.min(minY,y)
+                            maxX=Math.max(maxX,x);maxY=Math.max(maxY,y)
+                        }
+                    }
+                }
+                if(maxX<minX || maxY<minY || maxX-minX<20 || maxY-minY<40)
+                    throw new GradleException('Empty or broken sprite extraction: '+entry.id+'/'+role)
+                minX=Math.max(0,minX-2);minY=Math.max(0,minY-2)
+                maxX=Math.min(width,maxX+3);maxY=Math.min(height,maxY+3)
+                def sprite=rgba.getSubimage(minX,minY,maxX-minX,maxY-minY)
+                def dest=new File(output,'ships/legacy_factions/'+entry.id+'/'+role+'.png')
+                dest.parentFile.mkdirs()
+                if (!javax.imageio.ImageIO.write(sprite,'png',dest) || dest.length()<1000)
+                    throw new GradleException('Legacy fleet image generation failed: '+dest)
+                count++
+            }
+        }
+        if (count != 50)
+            throw new GradleException('Legacy art registry did not generate 50 real sprites')
+        println('PASS: 50 original Drive-sourced legacy faction hulls generated for both release platforms.')
+    }
+}

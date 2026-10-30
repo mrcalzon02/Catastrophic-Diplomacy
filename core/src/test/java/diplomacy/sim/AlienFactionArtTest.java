@@ -56,8 +56,12 @@ public final class AlienFactionArtTest {
             Battle.Faction modern=item.getKey();
             Battle.Faction original=item.getValue().mechanics();
             for(Shipyard.Hull hull:Shipyard.Hull.values()){
-                check(FactionArt.runtimePath(original,hull)==null,
-                        "Legacy faction must not impersonate "+modern+" with alien PNGs");
+                String originalPath=FactionArt.runtimePath(original,hull);
+                check(FactionArt.hasLegacyArt(original) && originalPath!=null
+                        && originalPath.startsWith("ships/legacy_factions/"),
+                        "Original faction must resolve its own source-sheet sprite");
+                check(!originalPath.equals(FactionArt.runtimePath(modern,hull)),
+                        "Original faction must not impersonate "+modern+" with alien PNGs");
                 check(FactionArt.runtimePath(modern,hull).contains(
                         "/"+item.getValue().id()+"/"),
                         "Runtime art must match the selected civilization");
@@ -67,6 +71,6 @@ public final class AlienFactionArtTest {
             check(FactionArt.runtimePath(Battle.Faction.TERRAN,hull)==null,
                     "Do not silently give Terran an unrelated alien sprite");
         check(images==50&&paths.size()==50,"Require exact 50 original non-placeholder sprites");
-        System.out.println("PASS alien factions: 5 distinct civilizations, 50 identity-locked PNGs; no cross-faction aliasing");
+        System.out.println("PASS ship art: 5 original fleets plus 5 newer fleets have independent identities; 100 hull textures registered");
     }
 }

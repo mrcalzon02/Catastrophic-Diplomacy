@@ -1,0 +1,60 @@
+{
+  "schema": "cd-original-legacy-faction-sheets-v1",
+  "status": "runtime-sliced-from-original-GitHub-binaries",
+  "source_root": "assets/ships/alien/lineups/series-01/",
+  "drive_source_folder": "https://drive.google.com/drive/folders/1QBd3sLlxNeFUvTf58PqMf65vp785JGeW",
+  "expected_dimensions": [
+    1254,
+    1254
+  ],
+  "layout": "two-rows-of-five: class order below; black background and title plaques removed",
+  "roles": [
+    "interceptor",
+    "corvette",
+    "missile_corvette",
+    "frigate",
+    "destroyer",
+    "light_cruiser",
+    "heavy_cruiser",
+    "battlecruiser",
+    "carrier",
+    "dreadnought"
+  ],
+  "factions": [
+    {
+      "id": "draxian",
+      "enum": "DRAXIAN",
+      "sheet": "alien_warship_fleet_concept_sheet.png",
+      "sha256": "ff01ed6659ef41352de3f250b767c39ff64945bea54e39dea5c9a7280339789a",
+      "design": "Angular purple-magenta crystal-spined warships"
+    },
+    {
+      "id": "uzipt",
+      "enum": "UZIPT",
+      "sheet": "alien_manta_starship_fleet_showcase.png",
+      "sha256": "93811159b34626f24dded3baf37d5e703f37c5222267a0a844eaa792acfc683f",
+      "design": "Ivory-bronze manta wings, cyan drives and energy cores"
+    },
+    {
+      "id": "mandrally",
+      "enum": "MANDRALLY",
+      "sheet": "angelic_cathedral_fleet_tech_sheet.png",
+      "sha256": "6bfb20ebbd67e901ad62de2a6ec8888b7219c5eac30af2cbb0c7cea1c4b2828c",
+      "design": "Ceremonial ivory naval architecture and red-blue cathedral machinery"
+    },
+    {
+      "id": "carnelian",
+      "enum": "CARNELIAN",
+      "sheet": "sci_fi_warship_roster_sheet.png",
+      "sha256": "cc8a925fb4ccec313c2b18a62c320da611b1949fb31ebd6aa102c4e1c4a8024f",
+      "design": "Green-ringed armored technology with broad circular engineering hulls"
+    },
+    {
+      "id": "zippledrow",
+      "enum": "ZIPPLEDROW",
+      "sheet": "alien_fleet_roster_neon_dreadnoughts.png",
+      "sha256": "832566b5c6533376f51cd7078af954ab4858780eacebecd92e6cd3f8a76ea274",
+      "design": "Openwork ivory-violet trusses, high-performance blue drives"
+    }
+  ]
+}

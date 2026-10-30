@@ -17,6 +17,34 @@ public final class FactionArt {
     private FactionArt(){}
     public record Entry(String id,String name,Battle.Faction mechanics){}
     private static final EnumMap<Battle.Faction,Entry> ALIENS=new EnumMap<>(Battle.Faction.class);
+    // These are the five ORIGINAL civilizations: they keep independent
+    // approved source sheets and never impersonate their newer mechanics cousins.
+    private static final EnumMap<Battle.Faction,String> LEGACY=new EnumMap<>(Battle.Faction.class);
+    static {
+        LEGACY.put(Battle.Faction.DRAXIAN,"draxian");
+        LEGACY.put(Battle.Faction.UZIPT,"uzipt");
+        LEGACY.put(Battle.Faction.MANDRALLY,"mandrally");
+        LEGACY.put(Battle.Faction.CARNELIAN,"carnelian");
+        LEGACY.put(Battle.Faction.ZIPPLEDROW,"zippledrow");
+    }
+    public static Map<Battle.Faction,String> legacyFactions(){return Map.copyOf(LEGACY);}
+    public static boolean hasLegacyArt(Battle.Faction faction){return LEGACY.containsKey(faction);}
+    /** The ten legacy sheets have distinct dreadnoughts; CRUISER shares LIGHT_CRUISER. */
+    private static String legacyHullFile(Shipyard.Hull hull){
+        return switch(hull.spriteHull()){
+            case INTERCEPTOR -> "interceptor";
+            case CORVETTE -> "corvette";
+            case MISSILE_CORVETTE -> "missile_corvette";
+            case FRIGATE -> "frigate";
+            case DESTROYER -> "destroyer";
+            case LIGHT_CRUISER,CRUISER -> "light_cruiser";
+            case HEAVY_CRUISER -> "heavy_cruiser";
+            case BATTLECRUISER -> "battlecruiser";
+            case CARRIER -> "carrier";
+            case DREADNOUGHT -> "dreadnought";
+            default -> throw new IllegalArgumentException("Unsupported legacy hull "+hull);
+        };
+    }
     static {
         ALIENS.put(Battle.Faction.VAERITH_PRISM,new Entry("vaerith_prism",
                 "Vaerith Prism Dominion",Battle.Faction.DRAXIAN));
@@ -60,6 +88,8 @@ public final class FactionArt {
     }
     /** Prefix relative to the shared assets directory, not the source sheet. */
     public static String runtimePath(Battle.Faction faction,Shipyard.Hull hull){
+        String original=LEGACY.get(faction);
+        if(original!=null)return "ships/legacy_factions/"+original+"/"+legacyHullFile(hull)+".png";
         Entry art=visualArt(faction);
         if(art==null)return null;
         return "ships/factions/"+art.id()+"/"+hullFile(hull)+".png";

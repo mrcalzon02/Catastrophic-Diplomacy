@@ -102,15 +102,15 @@ public final class TerranPlaceholderSprites implements Disposable {
         // hulls for a missing PNG. The 200v200 verification previously accepted
         // 333 sprites while ignoring 67 missing Terran ships.
         for(Battle.Faction faction:Battle.Faction.values())
-            if(faction==Battle.Faction.TERRAN||FactionArt.supports(faction))
+            if(faction==Battle.Faction.TERRAN||FactionArt.supports(faction)||FactionArt.hasLegacyArt(faction))
                 for(Shipyard.Hull hull:Shipyard.Hull.values())
                     if(texture(faction,hull)==null)
                         throw new IllegalStateException(
                                 "Approved combat ship sprite missing from packaged assets: "+
                                 faction+"/"+hull);
-        // Five original non-Terran civilizations still require their own
-        // complete, named sprite packages. Do not impersonate their mechanics
-        // derivatives, and do not crash while rendering a supported legacy game.
+        // All original civilizations now load their own source-sheet sprites.
+        // Missing generated art is a genuine packaging failure, not permission
+        // to display blue geometric hulls for those factions.
     }
     private static Pixmap loadMaterial(String path) {
         if(!Gdx.files.internal(path).exists())
