@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.shipyard.ModuleVersions;
+import diplomacy.sim.LaserFamilies;
 import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
@@ -299,7 +300,10 @@ final class ShipyardPanel {
             notice="LOCKED: advanced patterns require research rank II";return;
         }
         draft=draft.withModuleVersion(selectedSlot,next,p.mark);
-        notice="Hardware: "+next.name().replace('_',' ')+" Mk "+p.mark+
+        notice=p.component.endsWith("-LAS")?
+                "LASER "+LaserFamilies.fromPattern(next)+" / "+next.name().replace('_',' ')+
+                " Mk "+p.mark+" (research preserved)":
+                "Hardware: "+next.name().replace('_',' ')+" Mk "+p.mark+
                 " (research branch preserved)";
     }
     private void cycleMark(){
@@ -311,7 +315,7 @@ final class ShipyardPanel {
         }
         draft=draft.withModuleVersion(selectedSlot,p.pattern,next);
         notice="Hardware: "+p.pattern.name().replace('_',' ')+" Mk "+next+
-                " (separate from six-rank research)";
+                " (independent of nine-stage research)";
     }
     private boolean campaignPermitted(){
         try{
@@ -1021,7 +1025,12 @@ final class ShipyardPanel {
                     case "DRN" -> tuning.remoteRepair()>1
                             ?"SPECIALIST SERVICE / REPAIR DRONES"
                             :"INTERCEPTOR / POINT DEFENSE DRONES";
-                    case "LAS","PLA","PAR" -> String.format(Locale.ROOT,
+                    case "LAS" -> String.format(Locale.ROOT,
+                            "%s LASER | DAMAGE x%.2f  RANGE x%.2f",
+                            LaserFamilies.fromPattern(installed.pattern).name(),
+                            tuning.damage()*LaserFamilies.fromPattern(installed.pattern).damage,
+                            tuning.reach()*LaserFamilies.fromPattern(installed.pattern).range);
+                    case "PLA","PAR" -> String.format(Locale.ROOT,
                             "DAMAGE x%.2f  |  RANGE x%.2f",
                             tuning.damage(),tuning.reach());
                     default -> String.format(Locale.ROOT,
@@ -1074,7 +1083,9 @@ final class ShipyardPanel {
                 (usage==Usage.CAMPAIGN?" | LICENSE "+campaignRank+"/9":""),813,112);
         if(installed!=null){
             font.setColor(Color.GOLD);
-            font.draw(batch,"V: "+installed.pattern.name().replace('_',' '),813,84);
+            font.draw(batch,installed.component.endsWith("-LAS")?
+                    "V: "+LaserFamilies.fromPattern(installed.pattern).name()+" LASER":
+                    "V: "+installed.pattern.name().replace('_',' '),813,84);
             font.draw(batch,"B: Mk "+installed.mark+" / 4",1087,84);
         }else{
             font.setColor(Color.GRAY);
