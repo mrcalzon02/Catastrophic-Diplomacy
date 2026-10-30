@@ -52,7 +52,7 @@ tactical coverage without repeating the exact same order:
 10. Fleet action — combined arms with broad hull distribution
 
 The final system of the fifth front (level 50n) is **Sector capital**,
-replacing the regular fleet action with a heavier flagship-oriented mission.
+replacing the scheduled operation with a heavier flagship-oriented mission.
 Where early tiers cannot support a named advanced hull, choose a valid earlier
 combat hull rather than bypass its technology authorization.
 
@@ -68,7 +68,9 @@ friendly hull damage, ammunition, crew or surviving craft.
   wave number and enemy faction. Replaying the same mission and wave produces
   the same hardware, modulo intentional changes to the engineering corpus.
 - Weapons (laser, kinetic, missiles, torpedoes, plasma, particle) and their
-  upgrades occupy real mounts. Every fitting passes Shipyard.inspect before
+  upgrades occupy real mounts. Later capital ships can install additional
+  batteries only when spare physical reactor, cooling, weapon and defensive
+  sockets support those fittings. Every fitting passes Shipyard.inspect before
   reaching the battle. Module research stages and manufactured marks remain
   at or below that ship's actual tier.
 - Specialist vessels are relatively uncommon. Empty/unpowered experimental
