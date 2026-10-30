@@ -30,7 +30,7 @@ public final class ModuleBranchEffects {
         if(rank==0)return NEUTRAL;
         // Every newly installed logistics family has its own research ID but
         // uses the corresponding calibrated doctrine rather than neutral tuning.
-        if(Set.of("APR","PWR","AHL","ASH","AAR","APW").contains(subsystem))
+        if(Set.of("HPR","APR","PWR","AHL","ASH","AAR","APW").contains(subsystem))
             return tune("XFR",branch,rank);
         if(Set.of("DHL","DSH","DAR","DPW").contains(subsystem))
             return tune("DRN",branch,rank);
