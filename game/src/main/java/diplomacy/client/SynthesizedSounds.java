@@ -11,7 +11,8 @@ public final class SynthesizedSounds {
     public static final int RATE = 22050;
     public static final String[] NAMES = {
         "engine_loop", "fleet_bed", "thruster", "shield_up", "shield_down",
-        "heavy_fire", "reactor_hit", "metal_creak", "pd_tick"
+        "heavy_fire", "reactor_hit", "metal_creak", "pd_tick",
+        "radio_open", "radio_close"
     };
     private SynthesizedSounds() { }
 
@@ -26,6 +27,8 @@ public final class SynthesizedSounds {
             case "reactor_hit" -> 1.15;
             case "metal_creak" -> 0.90;
             case "pd_tick" -> 0.20;
+            case "radio_open" -> 0.22;
+            case "radio_close" -> 0.18;
             default -> throw new IllegalArgumentException("Unknown synthesized cue: "+name);
         };
     }
@@ -98,6 +101,14 @@ public final class SynthesizedSounds {
                     double e=env(t,len,0.08,0.23);
                     out=e*(0.35*sin(310*t+85*Math.sin(t*7))
                         +0.23*sin(164*t-35*t*t)+0.28*noiseSmooth);
+                }
+                case "radio_open", "radio_close" -> {
+                    // Gentle two-note radio handshake with soft edges and no static burst.
+                    double e=env(t,len,0.018,0.065);
+                    double first=name.equals("radio_open")?510:620;
+                    double second=name.equals("radio_open")?650:480;
+                    double freq=t<len*0.48?first:second;
+                    out=0.19*e*(sin(freq*t)+0.12*sin(freq*2*t));
                 }
                 case "pd_tick" -> {
                     double e=env(t,len,0.002,0.09);
