@@ -99,3 +99,12 @@ tasks.register('renderPosesSmoke', JavaExec) {
     mainClass = 'diplomacy.client.BattleRenderPosesTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('renderPosesSmoke') }
+
+tasks.register('combatVisibilitySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check safe viewport culling, beam edge cases and zoomed-in battle geometry.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatViewBoundsTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatVisibilitySmoke') }
