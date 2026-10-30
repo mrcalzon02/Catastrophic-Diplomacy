@@ -612,6 +612,31 @@ public final class Battle {
         }
         log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
     }
+    /** Different fitted vessels may share a battle without losing their
+     * individual technology, ammunition, hull class or installed systems. */
+    public void spawnFleet(int team,List<Shipyard.Design> designs,TechnologyCatalog catalog,
+                           double centerX,double centerY){
+        if(designs==null||designs.isEmpty()||designs.size()>200||catalog==null||
+                designs.stream().anyMatch(d->d==null))
+            throw new IllegalArgumentException("Invalid custom fleet");
+        List<Shipyard.Fitted> fittings=new ArrayList<>(designs.size());
+        for(Shipyard.Design design:designs)fittings.add(Shipyard.fit(design,catalog));
+        for(int i=0;i<designs.size();i++){
+            double[] point=formationPosition(i,designs.size(),centerX,centerY,random);
+            addShip(team,designs.get(i),fittings.get(i),point[0],point[1]);
+        }
+        log("Team "+team+" deployed "+designs.size()+" individual engineering configurations");
+    }
+    public static Battle duel(long seed,List<Shipyard.Design> left,
+                              List<Shipyard.Design> right,TechnologyCatalog catalog){
+        if(left==null||right==null||left.isEmpty()||right.isEmpty()||
+                left.size()>200||right.size()>200)
+            throw new IllegalArgumentException("Both custom fleets must contain 1-200 vessels");
+        Battle battle=new Battle(seed);
+        battle.spawnFleet(0,left,catalog,310,335);
+        battle.spawnFleet(1,right,catalog,970,335);
+        return battle;
+    }
     public static Battle duel(long seed, int shipsPerSide, Shipyard.Design left,
                               Shipyard.Design right, TechnologyCatalog catalog) {
         Battle battle = new Battle(seed);
