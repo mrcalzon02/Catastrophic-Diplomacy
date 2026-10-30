@@ -850,6 +850,9 @@ tasks.register('prepareShipSurfaceMaps') {
     dependsOn tasks.named('prepareFighterArt')
     dependsOn tasks.named('prepareLegacyFactionArt')
     inputs.file file('tools/ShipSurfaceMapGenerator.java')
+    // Treat the three generated original-art trees as real incremental inputs.
+    inputs.files tasks.named('prepareStage1Art'), tasks.named('prepareFighterArt'),
+            tasks.named('prepareLegacyFactionArt')
     inputs.files fileTree('assets/ships') { include '**/*.png' }
     outputs.dir shipSurfaceOutput
     doLast {
@@ -871,7 +874,7 @@ tasks.register('prepareShipSurfaceMaps') {
         }
         def normal=fileTree(dest) { include 'ships/**/*_n.png' }.files
         def emit=fileTree(dest) { include 'ships/**/*_e.png' }.files
-        if(normal.size()<60 || normal.size()!=emit.size())
+        if(normal.size()<160 || normal.size()!=emit.size())
             throw new GradleException('Incomplete approved ship surface maps: '+
                     normal.size()+' normal / '+emit.size()+' emissive')
     }
