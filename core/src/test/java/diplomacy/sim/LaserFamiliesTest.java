@@ -84,6 +84,38 @@ public final class LaserFamiliesTest {
                     "roundtrip laser event label");
             fireOnce(TYPES[i]);
         }
+        // A single hull with two real laser modules alternates its type
+        // per installed muzzle. No ship-wide mode may overwrite other mounts.
+        Battle mixed=new Battle(96888);
+        Battle.Ship guns=mixed.addShip(0,Battle.Faction.TERRAN,100,220);
+        Battle.Ship victim=mixed.addShip(1,Battle.Faction.CARNELIAN,370,220);
+        guns.speed=victim.speed=0;
+        guns.pdRange=victim.pdRange=0;
+        guns.laserDamage=26;guns.accuracy=3;
+        guns.missileDamage=guns.kineticDamage=guns.plasmaDamage=0;
+        guns.particleDamage=guns.torpedoDamage=0;
+        guns.missileAmmo=guns.kineticAmmo=guns.torpedoAmmo=0;
+        victim.laserDamage=victim.missileDamage=victim.kineticDamage=0;
+        victim.plasmaDamage=victim.particleDamage=victim.torpedoDamage=0;
+        victim.missileAmmo=victim.kineticAmmo=victim.torpedoAmmo=0;
+        victim.maxHull=victim.hull=1000000;
+        guns.weaponEmitters=List.of(
+                new WeaponMuzzles.Emitter(4,WeaponMuzzles.Family.LASER,-28,30),
+                new WeaponMuzzles.Emitter(9,WeaponMuzzles.Family.LASER,28,30));
+        guns.laserFittings=Map.of(4,LaserFamilies.Type.NEEDLE,
+                9,LaserFamilies.Type.OVERDRIVE);
+        for(int i=0;i<180;i++)mixed.step();
+        boolean needle=false,overdrive=false;
+        for(Battle.VisualEvent e:mixed.visualEvents()){
+            if(e.sourceId()!=guns.id||e.phase()!=Battle.VisualPhase.FIRE)continue;
+            LaserFamilies.Type kind=LaserFamilies.fromWeapon(e.weapon());
+            if(kind==LaserFamilies.Type.NEEDLE)needle=true;
+            if(kind==LaserFamilies.Type.OVERDRIVE)overdrive=true;
+            ok(kind==LaserFamilies.Type.NEEDLE||
+                    kind==LaserFamilies.Type.OVERDRIVE,
+                    "mixed fitted ship must not emit a phantom third type");
+        }
+        ok(needle&&overdrive,"two different installed LAS modules both fire");
         ok(LaserFamilies.fromWeapon("LASER_GHOST")==null,"unrecognized tag safe");
         ok(LaserFamilies.fromWeapon("PLASMA")==null,"not all beams are lasers");
         ok(LaserFamilies.Type.RAPID.cycle<LaserFamilies.Type.PULSE.cycle,
