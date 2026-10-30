@@ -72,6 +72,7 @@ public final class InstancedShipRenderer implements AutoCloseable {
                        java.util.function.Predicate<Battle.Ship> hasArt,
                        BattleRenderPoses poses) {
         drawCalls=0;instances=0;
+        CombatViewBounds view=CombatViewBounds.from(camera);
         shader.bind();
         shader.setUniformMatrix("u_proj",camera.combined);
         for(Battle.Faction faction:Battle.Faction.values())
@@ -81,10 +82,11 @@ public final class InstancedShipRenderer implements AutoCloseable {
                     Shipyard.Hull type=ship.hullClass==null?Shipyard.Hull.CORVETTE:ship.hullClass;
                     if(!ship.alive()||ship.faction!=faction||type!=hull||hasArt.test(ship))continue;
                     if(n>=4096)throw new IllegalStateException("Hull instance batch exceeded 4096");
-                    int offset=n++*4;
                     BattleRenderPoses.Pose pose=poses==null?
                             new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                             poses.ship(ship);
+                    if(!view.ship(pose,ship.visualScale()))continue;
+                    int offset=n++*4;
                     positions[offset]=pose.x();
                     positions[offset+1]=pose.y();
                     float scale=(float)ship.visualScale();

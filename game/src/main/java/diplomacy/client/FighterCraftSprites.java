@@ -93,8 +93,12 @@ public final class FighterCraftSprites implements Disposable {
         wire.dispose();
     }
     public int loaded() { return originals.size(); }
-    public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null);}
+    public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses) {
+        render(battle,batch,poses,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
+                       CombatViewBounds view) {
         Map<Integer,Battle.Ship> vesselById=new HashMap<>();
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
         batch.begin();
@@ -124,6 +128,8 @@ public final class FighterCraftSprites implements Disposable {
             double bearing=aim!=null?
                     StrictMath.atan2(aim.y()-position.y(),aim.x()-position.x()):source.facing;
             float rotation=(float)StrictMath.toDegrees(bearing)-90f;
+            if(view!=null&&!view.circle(position.x(),position.y(),
+                    Math.max(width,height)*.72))continue;
             batch.draw(picture,position.x()-width/2,position.y()-height/2,
                     width/2,height/2,width,height,1,1,rotation,
                     0,0,picture.getWidth(),picture.getHeight(),false,false);

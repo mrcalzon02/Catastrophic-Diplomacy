@@ -316,13 +316,21 @@ public final class TerranPlaceholderSprites implements Disposable {
         return ship != null && ship.alive() && ship.hullClass != null
                 && texture(ship.faction,ship.hullClass)!=null;
     }
-    public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null);}
+    public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses) {
+        render(battle,batch,poses,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
+                       CombatViewBounds view) {
         if(textures.isEmpty())return;
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
         // Upload damage masks outside the SpriteBatch; only changed quantized
         // armor cells rebuild. One damaged ship draws two hull quads, not 256.
         for(Battle.Ship ship:battle.ships())if(hasSprite(ship)){
+            BattleRenderPoses.Pose position=poses==null?
+                    new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
+                    poses.ship(ship);
+            if(view!=null&&!view.ship(position,ship.visualScale()))continue;
             Texture tex=texture(ship.faction,ship.hullClass);
             if(ship.shields>0)prepareShields(tex);
             if(breached(ship)){
@@ -340,6 +348,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
+            if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
             float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
             boolean damaged=breached(ship);
             if(!damaged) {
