@@ -344,6 +344,10 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
                        CombatViewBounds view) {
+        render(battle,batch,poses,view,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
+                       CombatViewBounds view,ShieldFxTimeline shieldFx) {
         if(textures.isEmpty())return;
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
         // Upload damage masks outside the SpriteBatch; only changed quantized
@@ -404,14 +408,14 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(!ShieldSurfaceModel.drawable(height,view==null?1280: view.right-view.left))
                 continue;
             drawShield(batch,ship,tex,pose,width,height,
-                    (float)(StrictMath.toDegrees(pose.angle())-90),battle.tick);
+                    (float)(StrictMath.toDegrees(pose.angle())-90),battle.tick,shieldFx);
         }
         batch.setColor(1,1,1,1);
         batch.end();
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
                             BattleRenderPoses.Pose pose,float width,float height,
-                            float rotation,long tick) {
+                            float rotation,long tick,ShieldFxTimeline shieldFx) {
         if(ship.maxShields<=0||ship.shields<=0)return;
         Texture[] sectors=shieldSections.get(original);
         if(sectors==null)throw new IllegalStateException("Missing actual shield texture overlay");
@@ -420,6 +424,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(maximum<=0)continue;
             float strength=(float)Math.min(1,ship.defense.shields(face)/maximum);
             float opacity=ShieldSurfaceModel.opacity(strength,tick,ship.id,face.ordinal());
+            if(shieldFx!=null)opacity=shieldFx.opacity(ship,face,opacity);
             if(opacity<=0f)continue;
             batch.setColor(1,1,1,opacity);
             drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
