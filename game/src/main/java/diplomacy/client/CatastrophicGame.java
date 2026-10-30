@@ -2247,6 +2247,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 deathTimeline.beforeStep(battle);
                 hitFeedback.beforeStep(battle);
                 battle.step(); accumulator -= Battle.DT;
+                // Capture every real missile pose and motor transition here.
+                // Rendering may skip ticks at 4x/8x without losing exhaust.
+                if(lighting!=null)lighting.captureTick(battle);
                 deathTimeline.afterStep(battle);
                 hitFeedback.afterStep(battle);
             }
