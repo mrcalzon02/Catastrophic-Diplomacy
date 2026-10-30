@@ -198,6 +198,18 @@ public final class Battle {
         public final boolean decoy;
         /** Cold launches wait before ignition and can be killed by PD while coasting. */
         public int ignitionDelayTicks;
+        public OrdnancePropulsion.Mode propulsionMode=OrdnancePropulsion.Mode.CONSTANT_BURN;
+        /** Read by the effects renderer: true, simulation-owned engine state. */
+        public OrdnancePropulsion.Phase thrustPhase=OrdnancePropulsion.Phase.CRUISE;
+        public int flightTicks;
+        void setPropulsion(OrdnancePropulsion.Mode mode){
+            if(mode==null)throw new IllegalArgumentException("No propulsion mode");
+            propulsionMode=mode;
+            thrustPhase=ignitionDelayTicks>0?OrdnancePropulsion.Phase.COLD_EJECT:
+                    mode==OrdnancePropulsion.Mode.BOOST_COAST_TERMINAL
+                    ||mode==OrdnancePropulsion.Mode.PULSE_BURN?
+                    OrdnancePropulsion.Phase.BOOST:OrdnancePropulsion.Phase.CRUISE;
+        }
         Missile(long visualId,long spawnTick, int source, int owner, int target,
                 double sx,double sy,double dx,double dy,double amount,
                 boolean heavy,ProjectileModel.Spec profile,double launchGuidance){
@@ -231,6 +243,7 @@ public final class Battle {
             if(decoy && amount!=0)
                 throw new IllegalArgumentException("Countermeasures are forbidden from damaging ships");
             ignitionDelayTicks=ignitionTicks;
+            if(ignitionTicks>0)thrustPhase=OrdnancePropulsion.Phase.COLD_EJECT;
             spec=profile;guidanceQuality=launchGuidance;
             fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds()
                     +ignitionTicks*DT;
@@ -1301,6 +1314,7 @@ public final class Battle {
                     muzzle.x(),muzzle.y(),velocityX,velocityY,damage,heavy,actual,
                     heavy?source.weapons.torpedoTracking():source.weapons.missileTracking(),
                     subtype,order.pattern.ignitionDelayTicks(),warhead);
+            body.setPropulsion(OrdnancePropulsion.forDoctrine(order.pattern.mode()));
             missiles.add(body);
             visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
                     source.team,source.id,target.id,muzzle.x(),muzzle.y(),target.x,target.y);
@@ -1943,7 +1957,8 @@ public final class Battle {
                         defender.pointDefenseProfile,m.spec);
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
-                        m.x,m.y,m.vx,m.vy,m.spec.speed());
+                        m.x,m.y,m.vx,m.vy,
+                        m.spec.speed()*OrdnancePropulsion.speedMultiplier(m.thrustPhase));
                 if(defender.standingOrders!=null&&eta>=1000 &&
                         defender.standingOrders.directives().interceptStrategy()!=
                                 ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
@@ -2053,12 +2068,14 @@ public final class Battle {
                         m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
                 continue;
             }
-            if(m.ignitionDelayTicks>0){
-                // Cold-launch canisters are live PD targets while ignition is delayed.
-                m.ignitionDelayTicks--;
-                continue;
-            }
+            // Resolve real propulsion state before maneuvering. Cold-launched
+            // canisters eject slowly without thrust, then light their main
+            // engine. Heavy strikes boost/coast/restart for terminal attack.
             double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
+            m.flightTicks++;
+            m.thrustPhase=OrdnancePropulsion.phase(m.propulsionMode,m.flightTicks,
+                    m.ignitionDelayTicks,range,m.torpedo);
+            if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
             if (range < 13) {
                 if(m.decoy){
                     // A decoy has NO warhead and may never apply hull damage.
@@ -2073,13 +2090,16 @@ public final class Battle {
                 double guidance=Math.min(0.35,WeaponBehaviorTable.gun(
                         m.torpedo?DamageType.TORPEDO:DamageType.MISSILE).guidancePerTick()
                         *m.guidanceQuality
-                        *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition));
+                        *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition)
+                        *OrdnancePropulsion.guidanceMultiplier(m.thrustPhase));
                 m.vx = (1-guidance)*m.vx + guidance*dx/range;
                 m.vy = (1-guidance)*m.vy + guidance*dy/range;
                 double magnitude = StrictMath.hypot(m.vx,m.vy);
                 if(magnitude<1e-9)continue;
-                double nextX=m.x+(m.vx/magnitude)*m.spec.speed()*DT;
-                double nextY=m.y+(m.vy/magnitude)*m.spec.speed()*DT;
+                double actualSpeed=m.spec.speed()*
+                        OrdnancePropulsion.speedMultiplier(m.thrustPhase);
+                double nextX=m.x+(m.vx/magnitude)*actualSpeed*DT;
+                double nextY=m.y+(m.vy/magnitude)*actualSpeed*DT;
                 // Fast module-upgraded ordnance must never tunnel through the
                 // target between two 30 Hz ticks. Use the same swept test as
                 // independently tracked kinetic shells.
@@ -2303,6 +2323,9 @@ public final class Battle {
             hash=mix(hash,m.payload.ordinal());
             hash=mix(hash,m.warhead.ordinal());
             hash=mix(hash,m.ignitionDelayTicks);
+            hash=mix(hash,m.flightTicks);
+            hash=mix(hash,m.propulsionMode.ordinal());
+            hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.visualId);
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
             hash=mix(hash,Double.doubleToLongBits(m.x));
