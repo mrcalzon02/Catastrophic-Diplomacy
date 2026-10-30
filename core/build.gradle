@@ -360,6 +360,15 @@ tasks.register('campaignTechnologySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('campaignResearchSmoke') { finalizedBy(tasks.named('campaignTechnologySmoke')) }
+tasks.register('shipTechnologyFitSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate per-vessel research fitting, module templates, whole-ship doctrines and blueprint persistence.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ShipTechnologyFitTest'
+    dependsOn testClasses
+}
+tasks.named('campaignTechnologySmoke') { finalizedBy(tasks.named('shipTechnologyFitSmoke')) }
+
 
 
 
