@@ -298,6 +298,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(screensaverMode){stopScreensaver();return true;}
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
+                        if(audio!=null)audio.uiBack();
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
                         else if(screen==GameMenuPanel.Screen.RESEARCH)screen=researchReturn;
                         else if(screen==GameMenuPanel.Screen.NAME_THEMES)
@@ -1677,17 +1678,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
-            if(VoiceVolumeControl.hit(x,y)){
-                audio.setVoiceVolume(VoiceVolumeControl.valueAt(x),true);return;
+            switch(GameMenuPanel.optionsAction(x,y,updateCheck!=null)){
+                case 0 -> audio.setVoiceVolume(VoiceVolumeControl.valueAt(x),true);
+                case 1 -> audio.toggleMusic();
+                case 2 -> audio.toggleEffects();
+                case 3 -> audio.toggleTrack();
+                case 4 -> {if(updateCheck!=null)updateCheck.run();}
+                case 5 -> {screen=GameMenuPanel.Screen.HOME;audio.uiBack();menuButtonPointer=-1;}
+                default -> {}
             }
-            if(GameMenuPanel.hit(x,y,405,472,470,59)){audio.toggleMusic();return;}
-            if(GameMenuPanel.hit(x,y,405,394,470,59)){audio.toggleEffects();return;}
-            if(GameMenuPanel.hit(x,y,405,316,470,59)){audio.toggleTrack();return;}
-            if(GameMenuPanel.hit(x,y,405,238,470,59)){
-                if(updateCheck!=null)updateCheck.run();
-                return;
-            }
-            if(GameMenuPanel.hit(x,y,405,160,470,59))screen=GameMenuPanel.Screen.HOME;
             return;
         }
         if(screen==GameMenuPanel.Screen.RESULTS){
