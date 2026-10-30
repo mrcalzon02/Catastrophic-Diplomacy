@@ -101,6 +101,7 @@ public final class TechnologyCatalog {
             expandNativeFactions(bases,rows);
             addHabitatFamilies(bases,rows);
             addShieldTransferProjectors(bases,rows);
+            addSpecializedSupportFamilies(bases,rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
@@ -292,6 +293,63 @@ public final class TechnologyCatalog {
             tech.set(6,tech.get(6).replace("-SHD-","-XFR-").replace("-SHD","-XFR"));
             tech.set(19,"Dedicated transfer projector: "+tech.get(19));
             upgrades.add(tech);
+        }
+    }
+
+    /**
+     * Explicitly researched, PURPOSE-FITTED logistics modules. All are placed
+     * in real support hardpoints, own their energy/heat/mass budgets, and have
+     * independent six-stage upgrades per track and civilization.
+     * Legacy SHD and REP remain distinct and do not acquire these abilities.
+     */
+    private static void addSpecializedSupportFamilies(List<List<String>> bases,
+                                                       List<List<String>> upgrades){
+        String[][] types={
+            {"APR","Armor Restoration Projector","XFR"},
+            {"PWR","Power Transfer Projector","XFR"},
+            {"DHL","Hull Service Drone Bay","DRN"},
+            {"DSH","Shield Service Drone Bay","DRN"},
+            {"DAR","Armor Service Drone Bay","DRN"},
+            {"DPW","Power Service Drone Bay","DRN"},
+            {"AHL","Hull Restoration Aura","XFR"},
+            {"ASH","Shield Restoration Aura","XFR"},
+            {"AAR","Armor Restoration Aura","XFR"},
+            {"APW","Power Restoration Aura","XFR"}
+        };
+        // Include already-generated native families and XFR projectors.
+        List<List<String>> sourceBases=List.copyOf(bases);
+        List<List<String>> sourceUpgrades=List.copyOf(upgrades);
+        for(String[] type:types){
+            String code=type[0],parent=type[2];
+            for(int i=1;i<sourceBases.size();i++){
+                List<String> source=sourceBases.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> entry=new ArrayList<>(source);
+                entry.set(0,entry.get(0).replace("-"+parent,"-"+code));
+                entry.set(2,code);
+                entry.set(3,type[1]);
+                entry.set(4,"support");
+                entry.set(6,ratio(Double.parseDouble(entry.get(6)),1.04));
+                entry.set(7,ratio(Double.parseDouble(entry.get(7)),1.12));
+                entry.set(8,ratio(Double.parseDouble(entry.get(8)),1.10));
+                entry.set(10,Integer.toString((int)Math.ceil(Integer.parseInt(entry.get(10))*1.15)));
+                entry.set(11,ratio(Double.parseDouble(entry.get(11)),0.80));
+                entry.set(12,"Physical specialized service module; no passive hull-wide transfer");
+                bases.add(entry);
+            }
+            for(int i=1;i<sourceUpgrades.size();i++){
+                List<String> source=sourceUpgrades.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> entry=new ArrayList<>(source);
+                entry.set(0,entry.get(0).replace("-"+parent+"-","-"+code+"-"));
+                entry.set(2,code);
+                entry.set(5,entry.get(5).replace(parent.equals("DRN")?"Drone Controller":
+                        "Shield Transfer Projector",type[1]));
+                entry.set(6,entry.get(6).replace("-"+parent+"-","-"+code+"-")
+                        .replace("-"+parent,"-"+code));
+                entry.set(19,type[1]+": "+entry.get(19));
+                upgrades.add(entry);
+            }
         }
     }
 
