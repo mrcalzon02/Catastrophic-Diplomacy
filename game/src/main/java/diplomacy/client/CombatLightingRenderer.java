@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.sim.Battle;
+import diplomacy.sim.OrdnancePropulsion;
 
 /**
  * World-space emissive lighting overlay shared by GL2/ES2 and GL3 paths.
@@ -25,6 +26,7 @@ final class CombatLightingRenderer implements Disposable {
     private static final int MAX_MISSILE_LIGHTS = 192;
     private final CombatLightingModel timeline = new CombatLightingModel();
     private final Texture glow;
+    private final Texture smokeMask;
     private int lastGlowQuads;
     private int lastSmokeQuads;
 
@@ -45,6 +47,23 @@ final class CombatLightingRenderer implements Disposable {
         glow = new Texture(pixels);
         pixels.dispose();
         glow.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        Pixmap cloud=new Pixmap(GLOW_SIZE,GLOW_SIZE,Pixmap.Format.RGBA8888);
+        cloud.setBlending(Pixmap.Blending.None);
+        for(int py=0;py<GLOW_SIZE;py++)for(int px=0;px<GLOW_SIZE;px++){
+            float dx=(px+.5f-GLOW_SIZE*.5f)/(GLOW_SIZE*.5f);
+            float dy=(py+.5f-GLOW_SIZE*.5f)/(GLOW_SIZE*.5f);
+            float angle=(float)StrictMath.atan2(dy,dx);
+            float wobble=1f+.13f*(float)StrictMath.sin(angle*5+1.2)
+                    +.09f*(float)StrictMath.cos(angle*9-.7);
+            float distance=(float)StrictMath.sqrt(dx*dx+dy*dy)/wobble;
+            float density=Math.max(0,1-distance);
+            density=density*density*(3-2*density);
+            cloud.setColor(1,1,1,density*.78f);
+            cloud.drawPixel(px,py);
+        }
+        smokeMask=new Texture(cloud);
+        cloud.dispose();
+        smokeMask.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
     }
 
     private static boolean visible(OrthographicCamera camera, double x, double y, double radius) {
@@ -104,6 +123,9 @@ final class CombatLightingRenderer implements Disposable {
         };
     }
 
+    /** Capture source positions at every fixed simulation step, not per frame. */
+    void captureTick(Battle battle){timeline.update(battle);}
+
     /** Dusty decorative smoke in space: alpha blended, persistent and tick-aged. */
     void renderSmoke(Battle battle, SpriteBatch batch, OrthographicCamera camera) {
         timeline.update(battle);
@@ -117,9 +139,11 @@ final class CombatLightingRenderer implements Disposable {
             if (age < 0 || age >= 1) continue;
             float radius = CombatEffectScale.of((smoke.heavy() ? 7.5f : 4.8f) * (1 + age * 1.65f));
             if (!visible(camera, smoke.x(), smoke.y(), radius)) continue;
-            float fade = (1 - age);
-            batch.setColor(.55f, .59f, .65f, .43f * fade * fade);
-            batch.draw(glow, smoke.x() - radius, smoke.y() - radius,
+            float fade=1-age;
+            if(smoke.decoy())batch.setColor(.36f,.53f,.69f,.25f*fade*fade);
+            else if(smoke.heavy())batch.setColor(.47f,.42f,.40f,.50f*fade*fade);
+            else batch.setColor(.55f,.59f,.65f,.39f*fade*fade);
+            batch.draw(smokeMask,smoke.x()-radius,smoke.y()-radius,
                     radius * 2, radius * 2);
             lastSmokeQuads++;
         }
@@ -186,21 +210,49 @@ final class CombatLightingRenderer implements Disposable {
                     tint,beam.pointDefense?.27f:.38f);
         }
 
-        // Missile light is on ONLY after ignition. Smoke is sampled separately
-        // and survives the projectile for a short time after impact/interception.
+        // A new ignition burst whenever the actual engine switches from
+        // cold/coasting to thrust, including the terminal motor restart.
+        for(CombatLightingModel.Ignition ignition:timeline.ignitions()){
+            float age=(float)(battle.tick-ignition.bornTick())
+                    /CombatLightingModel.IGNITION_LIFETIME_TICKS;
+            if(age<0||age>=1)continue;
+            Color tint=ignition.decoy()?Color.SKY:
+                    ignition.terminal()?Color.SCARLET:
+                    ignition.heavy()?Color.ORANGE:Color.GOLD;
+            float base=CombatEffectScale.of(
+                    ignition.terminal()?29:ignition.heavy()?24:15);
+            float fade=(1-age)*(1-age);
+            spot(batch,camera,ignition.x(),ignition.y(),
+                    base*(.8f+age*.9f),tint,.72f*fade);
+            spot(batch,camera,ignition.x(),ignition.y(),
+                    base*.42f,Color.WHITE,.76f*fade);
+            streak(batch,camera,ignition.x(),ignition.y(),
+                    ignition.x()-ignition.dx()*base*(1+age*1.5f),
+                    ignition.y()-ignition.dy()*base*(1+age*1.5f),
+                    base*.42f,tint,.50f*fade);
+        }
+
+        // Active emitters only: no exhaust glow during cold eject or coasting.
         int missiles = 0;
         for (Battle.Missile missile : battle.missiles()) {
             if (++missiles > MAX_MISSILE_LIGHTS) break;
-            if (missile.ignitionDelayTicks > 0 || missile.fuel <= 0) continue;
+            if (!OrdnancePropulsion.burning(missile.thrustPhase)
+                    || missile.fuel<=0)continue;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
             double dx=StrictMath.cos(pose.angle()),dy=StrictMath.sin(pose.angle());
             double x=pose.x()-dx*CombatEffectScale.of(missile.torpedo ? 8 : 5);
             double y=pose.y()-dy*CombatEffectScale.of(missile.torpedo ? 8 : 5);
-            Color color = missile.torpedo ? Color.ORANGE : Color.GOLD;
-            spot(batch, camera, x, y, CombatEffectScale.of(missile.torpedo ? 30 : 20), color, .53f);
-            spot(batch, camera, x, y, CombatEffectScale.of(missile.torpedo ? 11 : 7), Color.WHITE, .7f);
+            boolean terminal=missile.thrustPhase==OrdnancePropulsion.Phase.TERMINAL;
+            Color color=missile.decoy?Color.SKY:
+                    terminal?Color.SCARLET:missile.torpedo?Color.ORANGE:Color.GOLD;
+            float strength=missile.thrustPhase==OrdnancePropulsion.Phase.BOOST?1.16f:
+                    terminal?1.28f:1f;
+            spot(batch,camera,x,y,
+                    CombatEffectScale.of(missile.torpedo?30:20)*strength,color,.53f);
+            spot(batch,camera,x,y,
+                    CombatEffectScale.of(missile.torpedo?11:7)*strength,Color.WHITE,.70f);
         }
 
         // Only true simulation FIRE, IMPACT or INTERCEPT events cause bursts.
@@ -210,15 +262,17 @@ final class CombatLightingRenderer implements Disposable {
             int lifetime = CombatLightingModel.flashLife(e);
             float age = (float) (battle.tick - e.tick()) / lifetime;
             if (age < 0 || age >= 1) continue;
-            boolean large = e.weapon().equals("KINETIC") || e.weapon().equals("TORPEDO");
-            float baseRadius = CombatEffectScale.of(large ? 47 : 29);
-            float intensity = 1 - age;
-            Color tint = eventColor(e.weapon());
-            float expansion = .7f + age * .65f;
-            spot(batch, camera, e.x(), e.y(), baseRadius * expansion,
-                    tint, .76f * intensity);
-            spot(batch, camera, e.x(), e.y(), baseRadius * .37f,
-                    Color.WHITE, .67f * intensity * intensity);
+            boolean intercepted=e.phase()==Battle.VisualPhase.INTERCEPT;
+            boolean large=e.weapon().equals("KINETIC")||e.weapon().equals("TORPEDO");
+            float baseRadius=CombatEffectScale.of(intercepted?
+                    (large?18:13):(large?47:29));
+            float intensity=1-age;
+            Color tint=intercepted?Color.GREEN:eventColor(e.weapon());
+            float expansion=intercepted?1+age*.5f:.7f+age*.65f;
+            spot(batch,camera,e.x(),e.y(),baseRadius*expansion,
+                    tint,(intercepted?.44f:.76f)*intensity);
+            spot(batch,camera,e.x(),e.y(),baseRadius*.37f,
+                    Color.WHITE,(intercepted?.28f:.67f)*intensity*intensity);
         }
         batch.setColor(Color.WHITE);
         batch.end();
@@ -228,5 +282,5 @@ final class CombatLightingRenderer implements Disposable {
     int glowQuads() { return lastGlowQuads; }
     int smokeQuads() { return lastSmokeQuads; }
     int smokeParticles() { return timeline.smokeCount(); }
-    @Override public void dispose() { glow.dispose(); }
+    @Override public void dispose() { glow.dispose();smokeMask.dispose(); }
 }
