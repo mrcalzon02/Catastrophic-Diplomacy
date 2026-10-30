@@ -1673,8 +1673,11 @@ public final class Battle {
                 if(craft.returning){
                     double dx=source.x-craft.x,dy=source.y-craft.y;
                     double distance=StrictMath.hypot(dx,dy);
-                    if(distance>15){
-                        double advance=StrictMath.min(distance-15,220*DT);
+                    // Keep docking tolerance wider than the movement stop
+                    // radius; subpixel floating point residuals cannot trap a
+                    // fully depleted craft forever just outside its carrier.
+                    if(distance>18){
+                        double advance=StrictMath.min(distance-12,220*DT);
                         if(distance>0){
                             craft.x+=dx/distance*advance;
                             craft.y+=dy/distance*advance;
