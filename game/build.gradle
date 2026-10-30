@@ -161,3 +161,12 @@ tasks.register('shipSurfaceSmoke', JavaExec) {
     mainClass = 'diplomacy.client.ShipSurfaceShaderTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipSurfaceSmoke') }
+
+tasks.register('shipLightProbesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify bounded local weapon lights, zoom LOD, and alpha-safe armor scorch.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipLightProbesTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipLightProbesSmoke') }

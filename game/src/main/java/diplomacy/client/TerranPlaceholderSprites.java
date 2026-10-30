@@ -269,7 +269,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                         damage*1.16f+rough*Math.min(0.45f,damage*0.70f)));
                 int alpha=Math.max(0,Math.min(255,
                         (int)(originalAlpha*(1f-erosion)+0.5f)));
-                output.drawPixel(x,y,(originalPixel&0xffffff00)|alpha);
+                int darkened=ShipDamageScorch.darken(originalPixel,damage,rough);
+                output.drawPixel(x,y,(darkened&0xffffff00)|alpha);
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);
@@ -347,7 +348,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 erodedExterior(ship,tex);
             }
         }
-        surfaces.begin(batch);
+        surfaces.begin(batch,battle,view);
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship))continue;
             Texture tex=texture(ship.faction,ship.hullClass);

@@ -104,7 +104,7 @@ public final class FighterCraftSprites implements Disposable {
                        CombatViewBounds view) {
         Map<Integer,Battle.Ship> vesselById=new HashMap<>();
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
-        surfaces.begin(batch);
+        surfaces.begin(batch,battle,view);
         batch.setColor(1,1,1,1);
         for(Battle.Craft craft:battle.crafts()) {
             Battle.Ship source=vesselById.get(craft.sourceId);

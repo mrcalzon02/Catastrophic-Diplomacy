@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.utils.Disposable;
+import diplomacy.sim.Battle;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
@@ -22,18 +23,37 @@ final class ShipSurfaceLighting implements Disposable {
         "uniform mat4 u_projTrans;\n"+
         "varying vec4 v_color;\n"+
         "varying vec2 v_uv;\n"+
-        "void main(){v_color=a_color;v_uv=a_texCoord0;gl_Position=u_projTrans*a_position;}\n";
+        "varying vec2 v_world;\n"+
+        "void main(){v_color=a_color;v_uv=a_texCoord0;v_world=a_position.xy;gl_Position=u_projTrans*a_position;}\n";
     static final String FRAGMENT =
         "#ifdef GL_ES\nprecision mediump float;\n#endif\n"+
         "varying vec4 v_color;\n"+
         "varying vec2 v_uv;\n"+
+        "varying vec2 v_world;\n"+
+        "uniform float u_detail;\n"+
+        "uniform vec4 u_light0;\n"+
+        "uniform vec4 u_light1;\n"+
+        "uniform vec3 u_color0;\n"+
+        "uniform vec3 u_color1;\n"+
         "uniform sampler2D u_texture;\n"+
         "uniform sampler2D u_normal;\n"+
         "uniform sampler2D u_emission;\n"+
+        "vec3 localLight(vec4 spot,vec3 tint,vec3 normal,vec2 axis){\n"+
+        " if(spot.w<=0.0)return vec3(0.0);\n"+
+        " vec2 ray=spot.xy-v_world;\n"+
+        " float distance=length(ray);\n"+
+        " float attenuation=clamp(1.0-distance/max(1.0,spot.z),0.0,1.0);\n"+
+        " if(attenuation<=0.0)return vec3(0.0);\n"+
+        " vec2 direction=ray/max(0.01,distance);\n"+
+        " vec2 local=vec2(dot(direction,axis),-direction.x*axis.y+direction.y*axis.x);\n"+
+        " float facing=max(dot(normal,normalize(vec3(local,0.85))),0.0);\n"+
+        " return tint*(0.20+0.80*facing)*spot.w*attenuation*attenuation;\n"+
+        "}\n"+
         "void main(){\n"+
         " vec4 albedo=texture2D(u_texture,v_uv);\n"+
         " albedo.a*=v_color.a;\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
+        " if(u_detail<0.01){gl_FragColor=albedo;return;}\n"+
         " vec3 n=normalize(texture2D(u_normal,v_uv).rgb*2.0-1.0);\n"+
         " vec2 axis=normalize(v_color.rg*2.0-1.0);\n"+
         " vec3 key=normalize(vec3(-0.52*axis.x+0.45*axis.y,\n"+
@@ -44,6 +64,9 @@ final class ShipSurfaceLighting implements Disposable {
         " vec3 emitted=texture2D(u_emission,v_uv).rgb*v_color.b;\n"+
         " vec3 lit=albedo.rgb*(0.67+0.40*diffuse)+vec3(0.19)*glint;\n"+
         " lit+=vec3(0.055,0.10,0.13)*rim+emitted*0.95;\n"+
+        " lit+=localLight(u_light0,u_color0,n,axis)*u_detail;\n"+
+        " lit+=localLight(u_light1,u_color1,n,axis)*u_detail;\n"+
+        " lit=mix(albedo.rgb,lit,u_detail);\n"+
         " gl_FragColor=vec4(min(lit,vec3(1.0)),albedo.a);\n"+
         "}\n";
 
@@ -54,6 +77,7 @@ final class ShipSurfaceLighting implements Disposable {
     }
     private final Map<Texture,Pair> pairs=new IdentityHashMap<>();
     private final ShaderProgram shader;
+    private final ShipLightProbes probes=new ShipLightProbes();
     private Texture active;
     private boolean started;
     private int binds;
@@ -112,12 +136,19 @@ final class ShipSurfaceLighting implements Disposable {
                        (float)(.5+.5*Math.sin(theta)),
                        Math.max(0f,Math.min(1f,integrity)),1f);
     }
-    void begin(SpriteBatch batch){
+    void begin(SpriteBatch batch){begin(batch,null,null);}
+    void begin(SpriteBatch batch,Battle battle,CombatViewBounds view){
         active=null;binds=0;started=true;
+        probes.select(battle,view);
         batch.setShader(shader);
         batch.begin();
         shader.setUniformi("u_normal",1);
         shader.setUniformi("u_emission",2);
+        shader.setUniformf("u_detail",ShipLightProbes.detail(view));
+        shader.setUniformf("u_light0",probes.x(0),probes.y(0),probes.radius(0),probes.power(0));
+        shader.setUniformf("u_light1",probes.x(1),probes.y(1),probes.radius(1),probes.power(1));
+        shader.setUniformf("u_color0",probes.red(0),probes.green(0),probes.blue(0));
+        shader.setUniformf("u_color1",probes.red(1),probes.green(1),probes.blue(1));
     }
     /** In the hot draw loop: only flush when the *source sprite* changes. */
     void bind(SpriteBatch batch,Texture original){
