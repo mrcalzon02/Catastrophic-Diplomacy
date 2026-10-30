@@ -41,7 +41,7 @@ final class ShipSurfaceLighting implements Disposable {
         " float diffuse=max(dot(n,key),0.0);\n"+
         " float glint=pow(max(dot(reflect(-key,n),vec3(0.0,0.0,1.0)),0.0),24.0);\n"+
         " float rim=pow(clamp(1.0-n.z,0.0,1.0),2.0);\n"+
-        " vec3 emitted=texture2D(u_emission,v_uv).rgb;\n"+
+        " vec3 emitted=texture2D(u_emission,v_uv).rgb*v_color.b;\n"+
         " vec3 lit=albedo.rgb*(0.67+0.40*diffuse)+vec3(0.19)*glint;\n"+
         " lit+=vec3(0.055,0.10,0.13)*rim+emitted*0.95;\n"+
         " gl_FragColor=vec4(min(lit,vec3(1.0)),albedo.a);\n"+
@@ -104,9 +104,13 @@ final class ShipSurfaceLighting implements Disposable {
      * No per-vessel uniform upload, shader rebind, or forced draw-call flush.
      */
     static void heading(SpriteBatch batch,float spriteRotationDegrees){
+        heading(batch,spriteRotationDegrees,1f);
+    }
+    static void heading(SpriteBatch batch,float spriteRotationDegrees,float integrity){
         double theta=Math.toRadians(spriteRotationDegrees);
         batch.setColor((float)(.5+.5*Math.cos(theta)),
-                       (float)(.5+.5*Math.sin(theta)),1f,1f);
+                       (float)(.5+.5*Math.sin(theta)),
+                       Math.max(0f,Math.min(1f,integrity)),1f);
     }
     void begin(SpriteBatch batch){
         active=null;binds=0;started=true;
