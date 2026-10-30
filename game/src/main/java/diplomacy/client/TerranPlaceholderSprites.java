@@ -77,6 +77,15 @@ public final class TerranPlaceholderSprites implements Disposable {
             }
             if(!fleet.isEmpty())textures.put(faction,fleet);
         }
+        // A full artwork release may NOT silently substitute colored geometric
+        // hulls for a missing PNG. The 200v200 verification previously accepted
+        // 333 sprites while ignoring 67 missing Terran ships.
+        for(Battle.Faction faction:Battle.Faction.values())
+            for(Shipyard.Hull hull:Shipyard.Hull.values())
+                if(texture(faction,hull)==null)
+                    throw new IllegalStateException(
+                            "Approved combat ship sprite missing from packaged assets: "+
+                            faction+"/"+hull);
     }
     /** Procedural generic plating, lattice ribs and longitudinal inner structure. */
     private static Texture createGenericStructure(String sourcePath) {
