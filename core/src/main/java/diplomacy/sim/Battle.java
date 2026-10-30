@@ -1353,7 +1353,7 @@ public final class Battle {
                 if(weakest!=null){
                     double desired=support.shieldTransferRate()*seconds;
                     double efficiency=support.powerEfficiency();
-                    double affordable=Math.min(desired,(source.power-5)*efficiency/1.1);
+                    double affordable=Math.min(desired,(source.power-5)*efficiency/3.2);
                     double gained=weakest.defense.receiveShieldTransfer(affordable);
                     if(gained>0){
                         source.power-=gained*1.1/efficiency;source.heat+=gained*0.13;
