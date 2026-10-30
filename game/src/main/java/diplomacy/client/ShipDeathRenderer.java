@@ -151,33 +151,45 @@ final class ShipDeathRenderer implements Disposable {
         }
     }
 
+    /** Preserve the actual native hull silhouette when source PNG art is absent. */
     private void fallbackFragments(ShapeRenderer shapes,ShipDeathTimeline.Burst burst){
-        float elapsed=burst.age,scale=burst.ship.scale();
-        float width=34*scale,height=34*scale;
-        float drift=(float)(1-Math.exp(-1.15f*elapsed))/1.15f;
-        float fade=Math.max(0,1-elapsed/ShipDeathTimeline.FRAGMENT_LIFE);
-        float[] points=new float[10];
-        for(var frag:burst.fragments){
-            float rotation=(float)Math.toRadians(Math.toDegrees(burst.ship.facing())-90+
-                    frag.spin()*elapsed);
-            float co=(float)Math.cos(rotation),si=(float)Math.sin(rotation);
-            for(int v=0;v<10;v+=2){
-                float lx=(frag.vertices()[v]-.5f)*width;
-                float ly=(frag.vertices()[v+1]-.5f)*height;
-                points[v]=burst.ship.x()+frag.vx()*drift+lx*co-ly*si;
-                points[v+1]=burst.ship.y()+frag.vy()*drift+lx*si+ly*co;
+        var ship=burst.ship;
+        float age=burst.age,scale=ship.scale();
+        float drift=(float)(1-Math.exp(-1.15f*age))/1.15f;
+        float fade=Math.max(0,1-age/ShipDeathTimeline.FRAGMENT_LIFE);
+        float base=ship.facing()-(float)Math.PI*.5f;
+        float co=(float)Math.cos(base),si=(float)Math.sin(base);
+        // The same faction-specific triangulation used by the live ship renderer.
+        // A missing PNG must never become a shattered rectangular placeholder.
+        float[] silhouette=HullSilhouette.of(ship.faction(),ship.hull());
+        for(int i=0;i<silhouette.length;i+=6){
+            float cx=(silhouette[i]+silhouette[i+2]+silhouette[i+4])/3;
+            float cy=(silhouette[i+1]+silhouette[i+3]+silhouette[i+5])/3;
+            float offsetX=scale*(cx*co-cy*si);
+            float offsetY=scale*(cx*si+cy*co);
+            long pattern=ShipDeathTimeline.mix(burst.seed+i*0x9e3779b97f4a7c15L);
+            float phase=(float)((pattern>>>24)&65535)/65535f;
+            float twist=(phase-.5f)*4.5f*age;
+            float spinAngle=base+twist;
+            float cs=(float)Math.cos(spinAngle),sn=(float)Math.sin(spinAngle);
+            float direction=(float)Math.max(.2,Math.hypot(offsetX,offsetY));
+            float push=(13+phase*37)*scale*drift;
+            float dx=offsetX/direction*push+ship.vx()*.20f*drift;
+            float dy=offsetY/direction*push+ship.vy()*.20f*drift;
+            float[] points=new float[6];
+            for(int v=0;v<3;v++){
+                float localX=silhouette[i+v*2]-cx;
+                float localY=silhouette[i+v*2+1]-cy;
+                points[v*2]=ship.x()+offsetX+dx+
+                        scale*(localX*cs-localY*sn);
+                points[v*2+1]=ship.y()+offsetY+dy+
+                        scale*(localX*sn+localY*cs);
             }
-            shapes.setColor(burst.ship.faction().r*.8f,
-                    burst.ship.faction().g*.8f,burst.ship.faction().b*.8f,
-                    fade*frag.intensity());
-            for(int t=0;t<ShipDeathTimeline.PENTAGON_TRIANGLES.length;t+=3){
-                int a=ShipDeathTimeline.PENTAGON_TRIANGLES[t]*2;
-                int b=ShipDeathTimeline.PENTAGON_TRIANGLES[t+1]*2;
-                int c=ShipDeathTimeline.PENTAGON_TRIANGLES[t+2]*2;
-                shapes.triangle(points[a],points[a+1],points[b],points[b+1],
-                        points[c],points[c+1]);
-                lastFragments++;
-            }
+            shapes.setColor(ship.faction().r*.8f,ship.faction().g*.8f,
+                    ship.faction().b*.8f,fade);
+            shapes.triangle(points[0],points[1],points[2],points[3],
+                    points[4],points[5]);
+            lastFragments++;
         }
     }
 
