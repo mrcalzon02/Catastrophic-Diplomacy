@@ -14,6 +14,19 @@ public final class VoiceMenuControlsTest{
         near(VoiceVolumeControl.step(1,1),1);
         near(VoiceVolumeControl.step(0,-1),0);
         near(VoiceVolumeControl.clamp(Float.NaN),1);
+        // Coordinates must agree with rendered settings buttons, not a parallel mock UI.
+        if(GameMenuPanel.optionsAction(500,575,true)!=0||
+            GameMenuPanel.optionsAction(500,500,true)!=1||
+            GameMenuPanel.optionsAction(500,400,true)!=2||
+            GameMenuPanel.optionsAction(500,330,true)!=3||
+            GameMenuPanel.optionsAction(500,252,true)!=4||
+            GameMenuPanel.optionsAction(500,252,false)!=-2||
+            GameMenuPanel.optionsAction(500,180,false)!=5||
+            GameMenuPanel.optionsAction(10,10,true)!=-1)
+            throw new AssertionError("Options hit routing/disabled updater");
+        if(java.util.Arrays.equals(SynthesizedSounds.wav("ui_hover"),
+                SynthesizedSounds.wav("ui_adjust")))
+            throw new AssertionError("Hover and adjustment cannot sound identical");
         for(String name:new String[]{"ui_hover","ui_press","ui_back","ui_blocked","ui_adjust"}){
             byte[] wav=SynthesizedSounds.wav(name);
             if(wav.length<2500||
