@@ -55,8 +55,13 @@ def read_verified(archive):
             if not data.startswith(bytes((137,80,78,71,13,10,26,10))):
                 raise ValueError("Not a PNG: "+path)
             # Width/height and RGBA are read directly from the PNG IHDR.
-            if len(data)<26 or data[25]!=6:
-                raise ValueError("Expected source RGBA PNG: "+path)
+            if len(data)<26:
+                raise ValueError("Truncated PNG header: "+path)
+            # Original shield/damage materials are indexed-color PNGs (type 3);
+            # the Terran hull cutouts and beam frames are transparent RGBA (6).
+            acceptable=(3,6) if path.startswith("assets/materials/") else (6,)
+            if data[25] not in acceptable:
+                raise ValueError("Unexpected original PNG color type: "+path)
             width=int.from_bytes(data[16:20],"big")
             height=int.from_bytes(data[20:24],"big")
             if [width,height]!=record["size"]:
