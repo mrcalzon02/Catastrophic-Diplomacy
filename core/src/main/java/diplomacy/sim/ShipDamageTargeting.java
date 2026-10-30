@@ -80,7 +80,7 @@ public final class ShipDamageTargeting {
         if(component==null||component.length()<3)return null;
         String kind=component.substring(component.lastIndexOf('-')+1);
         return switch(kind){
-            case "REA","SIF","SHD" -> Battle.Subsystem.REACTOR;
+            case "REA","SIF","SHD","XFR" -> Battle.Subsystem.REACTOR;
             case "ENG" -> Battle.Subsystem.ENGINES;
             case "RAD" -> Battle.Subsystem.COOLING;
             case "SEN" -> Battle.Subsystem.SENSORS;
