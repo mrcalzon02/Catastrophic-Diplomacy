@@ -28,6 +28,12 @@ public final class ModuleBranchEffects {
                 ||(branch!=null&&rank==0))
             throw new IllegalArgumentException("Invalid specialized module");
         if(rank==0)return NEUTRAL;
+        // Every newly installed logistics family has its own research ID but
+        // uses the corresponding calibrated doctrine rather than neutral tuning.
+        if(Set.of("APR","PWR","AHL","ASH","AAR","APW").contains(subsystem))
+            return tune("XFR",branch,rank);
+        if(Set.of("DHL","DSH","DAR","DPW").contains(subsystem))
+            return tune("DRN",branch,rank);
         double damage=1,cycle=1,reach=1,tracking=1,self=1,remote=1,shield=1,efficiency=1,drone=1;
         if(GUNS.contains(subsystem)){
             // Weapon-specific upgrades improve practical fire behavior, on top
