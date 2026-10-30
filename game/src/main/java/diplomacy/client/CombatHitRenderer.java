@@ -25,10 +25,10 @@ final class CombatHitRenderer {
                 // huge full-screen shield disc or arbitrary omnidirectional hit.
                 float angle=(float)Math.toDegrees(Math.atan2(hit.normalY,hit.normalX));
                 shapes.setColor(.22f,.79f,1f,.85f*fade);
-                shapes.arc(hit.shipX,hit.shipY,radius*(1+.20f*t),
+                ShieldFxRenderer.arc(shapes,hit.shipX,hit.shipY,radius*(1+.20f*t),
                         angle-34,68,12);
                 shapes.setColor(.70f,.94f,1f,.38f*fade);
-                shapes.arc(hit.shipX,hit.shipY,radius*(.83f+.20f*t),
+                ShieldFxRenderer.arc(shapes,hit.shipX,hit.shipY,radius*(.83f+.20f*t),
                         angle-22,44,9);
             }else{
                 boolean armor=hit.layer==CombatHitFeedback.Layer.ARMOR;
