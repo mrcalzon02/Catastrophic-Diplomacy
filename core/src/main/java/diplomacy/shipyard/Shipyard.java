@@ -487,6 +487,7 @@ public final class Shipyard {
             String id=p.base.subsystem;
             SupportDoctrine.Channel channel=switch(id){
                 case "APR","DAR","AAR" -> SupportDoctrine.Channel.ARMOR;
+                case "HPR" -> SupportDoctrine.Channel.HULL;
                 case "PWR","DPW","APW" -> SupportDoctrine.Channel.POWER;
                 case "DSH","ASH" -> SupportDoctrine.Channel.SHIELD;
                 case "DHL","AHL" -> SupportDoctrine.Channel.HULL;
