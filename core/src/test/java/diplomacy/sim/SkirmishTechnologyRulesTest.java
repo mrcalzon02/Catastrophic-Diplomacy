@@ -29,6 +29,14 @@ public final class SkirmishTechnologyRulesTest {
         var upgraded=ShipTechnologyFit.fit(ship,catalog,tierOne,laser,
                 Shipyard.Track.OUTPUT,1,ShipTechnologyFit.Scope.SOCKET);
         tierOne.requireAllowed(upgraded,catalog);
+        check(ScenarioCatalog.create(ScenarioCatalog.Preset.CUSTOM,upgraded,ship,
+                catalog,1,tierOne).ships().size()==2,
+                "Legal skirmish challenge was not deployed");
+        reject(()->ScenarioCatalog.create(ScenarioCatalog.Preset.CUSTOM,
+                ShipTechnologyFit.fit(ship,catalog,open,selected,
+                        Shipyard.Track.OUTPUT,4,ShipTechnologyFit.Scope.SOCKET),
+                ship,catalog,1,tierOne),
+                "Battle creation ignored an over-tier enemy or player blueprint");
         reject(()->tierOne.withStage(0).requireAllowed(upgraded,catalog),
                 "Ship evaded strict zero-tech skirmish");
         reject(()->tierOne.toggleTrack(Shipyard.Track.OUTPUT).requireAllowed(upgraded,catalog),
