@@ -83,7 +83,7 @@ public final class ShipSurfaceMapGenerator {
                         String relative=root.relativize(p).toString().replace('\\','/');
                         // Accept only the game's original faction, fighter and Terran fleet families.
                         if(relative.startsWith("terran/")||relative.startsWith("factions/")
-                                ||relative.startsWith("fighters/")) {
+                                ||relative.startsWith("fighters/")||relative.startsWith("legacy_factions/")) {
                             Path prior=sources.putIfAbsent(relative,p);
                             if(prior!=null){
                                 try{
