@@ -132,6 +132,14 @@ tasks.register('fleetLogisticsSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('supportSystemsSmoke') { finalizedBy(tasks.named('fleetLogisticsSmoke')) }
+tasks.register('demoSupportSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check real 400-ship combat with precisely fitted specialist service vessels.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.DemonstrationBattleTest'
+    dependsOn testClasses
+}
+
 
 
 
