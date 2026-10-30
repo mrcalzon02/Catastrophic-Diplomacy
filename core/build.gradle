@@ -527,3 +527,12 @@ tasks.named('campaignFleetSmoke') { finalizedBy(tasks.named('squadronOperationsS
 
 
 
+
+tasks.register('hullVoiceSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless coverage for all 11 stable hull radio personalities and 13 event types.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.HullVoiceChatterTest'
+}
+tasks.named('smoke') { finalizedBy(tasks.named('hullVoiceSmoke')) }

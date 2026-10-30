@@ -445,11 +445,12 @@ public final class Battle {
     String radioMessage(Ship source,CrewChatter.Event event,boolean fighter){
         if(source==null||event==null)
             throw new IllegalArgumentException("Radio message requires a ship and situation");
-        CrewChatter.Scale scale=fighter?CrewChatter.Scale.FIGHTER:
-                CrewChatter.scale(source.hullClass);
-        return "RADIO "+source.name+(fighter?" / Flight":"")+": "+
-                CrewChatter.line(scale,event,tick,source.id,
-                        source.squadronRadio==null?teamRadioTone(source.team):source.squadronRadio);
+        CrewChatter.Tone register=source.squadronRadio==null?
+                teamRadioTone(source.team):source.squadronRadio;
+        String spoken=fighter?
+                CrewChatter.line(CrewChatter.Scale.FIGHTER,event,tick,source.id,register):
+                HullVoiceChatter.line(source.hullClass,event,tick,source.id,register);
+        return "RADIO "+source.name+(fighter?" / Flight":"")+": "+spoken;
     }
     /**
      * Team-wide edits update existing combatants and future fleet deployments.
