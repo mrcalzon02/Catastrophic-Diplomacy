@@ -67,6 +67,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private FighterCraftSprites craftSprites;
     private WeaponBeamSprites weaponBeams;
     private ModularWeaponFxRenderer weaponFx;
+    private CombatLightingRenderer lighting;
     private ProceduralStarfield starfield;
     private BattlefieldWeatherVfx weatherVfx;
     private CombatAudio audio;
@@ -185,6 +186,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         craftSprites = new FighterCraftSprites();
         weaponBeams = new WeaponBeamSprites();
         weaponFx = new ModularWeaponFxRenderer();
+        try {
+            lighting = new CombatLightingRenderer();
+        } catch (RuntimeException failed) {
+            Gdx.app.error("COMBAT-LIGHT", "Emissive lighting unavailable; keeping core combat", failed);
+            lighting = null;
+        }
         uiIcons = new TacticalUiIcons();
         try {
             starfield = new ProceduralStarfield();
@@ -2171,8 +2178,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             });
             shapes.line((float)link.x1,(float)link.y1,(float)link.x2,(float)link.y2);
         }
-        // Engine exhaust is displayed by both GPU-instanced and fallback hull paths.
-        for (Battle.Ship ship : battle.ships()) if(ship.alive()) {
+        // The old exhaust line remains solely as a low-end / failed-GL fallback.
+        // The normal path uses speed-scaled emissive engine cones and local glow.
+        if (lighting == null) for (Battle.Ship ship : battle.ships()) if(ship.alive()) {
             double scale=ship.visualScale(),dx=StrictMath.cos(ship.facing),dy=StrictMath.sin(ship.facing);
             shapes.setColor(ship.team==0?Color.SKY:Color.ORANGE);
             shapes.line((float)(ship.x-dx*10*scale),(float)(ship.y-dy*10*scale),
@@ -2199,6 +2207,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch);
         if(craftSprites!=null)craftSprites.render(battle,batch);
+        if(lighting!=null)lighting.renderSmoke(battle,batch,battleCamera);
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
@@ -2227,6 +2236,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.circle((float)shell.x,(float)shell.y,2.1f,6);
         }
         shapes.end();
+        // Final additive world-space pass illuminates actual ship and projectile
+        // pixels as well as space around real weapon and engine light sources.
+        if(lighting!=null)lighting.renderGlow(battle,batch,battleCamera);
         if(screensaverMode){
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
@@ -2521,6 +2533,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(craftSprites!=null)craftSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
         if(weaponFx!=null)weaponFx.dispose();
+        if(lighting!=null)lighting.dispose();
         if(uiIcons!=null)uiIcons.dispose();
         if(menuPanel!=null)menuPanel.dispose();
         if(shipyard!=null)shipyard.dispose();
