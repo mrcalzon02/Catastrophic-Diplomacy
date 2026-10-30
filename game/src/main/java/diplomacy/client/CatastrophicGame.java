@@ -2161,7 +2161,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Paused battles draw the exact state, not an old snapshot.
         renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
         if(screensaverMode){
-            ScreensaverCameraDirector.Shot cinematic=screensaverCamera.update(battle,delta);
+            ScreensaverCameraDirector.Shot cinematic=screensaverCamera.update(battle,delta,renderPoses);
             battleCamera.zoom=cinematic.zoom();
             battleCamera.position.set(cinematic.centerX(),cinematic.centerY(),0);
             battleCamera.update();
@@ -2186,6 +2186,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipyard.draw(shapes,batch,font);
             return;
         }
+        // The camera and interpolated poses define one shared drawable world rectangle.
+        CombatViewBounds view=CombatViewBounds.from(battleCamera);
         // World-space sky & hazard layers render before tactical grid, weapons and hulls.
         if (starfield != null) starfield.render(batch,camera,battleCamera,W,H);
         if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
@@ -2200,26 +2202,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // faint range boundary when zoomed in; never fabricate fleetwide beams.
         if(battleCamera.zoom<=1.55f)for(Battle.Ship ship:battle.ships())
             if(ship.alive()&&ship.logistics!=null){
+                BattleRenderPoses.Pose pose=renderPoses.ship(ship);
                 for(var field:ship.logistics.auras()){
+                    if(!view.circle(pose.x(),pose.y(),field.range()))continue;
                     switch(field.channel()){
                         case SHIELD -> shapes.setColor(0.12f,0.29f,0.44f,0.24f);
                         case HULL -> shapes.setColor(0.12f,0.32f,0.19f,0.24f);
                         case ARMOR -> shapes.setColor(0.39f,0.31f,0.11f,0.24f);
                         case POWER -> shapes.setColor(0.31f,0.18f,0.38f,0.24f);
                     }
-                    shapes.circle((float)ship.x,(float)ship.y,
+                    shapes.circle(pose.x(),pose.y(),
                             (float)field.range(),64);
                     // The infrequent concentrated discharge is the small
                     // moving inner ring; the external aura remains weak.
                     long pulseAge=battle.tick%300;
                     if(pulseAge<18){
                         float p=(pulseAge+1)/18f;
-                        shapes.circle((float)ship.x,(float)ship.y,
+                        shapes.circle(pose.x(),pose.y(),
                                 (float)(StrictMath.min(85,field.range()*0.42)*p),48);
                     }
                 }
             }
         for (Battle.Beam beam : battle.beams()) {
+            if(!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,7))continue;
             if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
             shapes.setColor(switch(beam.type) {
                 case KINETIC -> Color.GOLD;
@@ -2232,6 +2237,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Preserve visibility of genuine service links when an approved
         // atlas strip is absent (no fabricated replacement sprite).
         for(Battle.SupportLink link:battle.supportLinks()){
+            if(!view.segment(link.x1,link.y1,link.x2,link.y2,5))continue;
             if(weaponBeams!=null&&weaponBeams.canDrawSupport(link,battle.tick))continue;
             shapes.setColor(switch(link.kind){
                 case SHIELD,DRONE_SHIELD -> Color.SKY;
@@ -2244,35 +2250,38 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // The old exhaust line remains solely as a low-end / failed-GL fallback.
         // The normal path uses speed-scaled emissive engine cones and local glow.
         if (lighting == null) for (Battle.Ship ship : battle.ships()) if(ship.alive()) {
-            double scale=ship.visualScale(),dx=StrictMath.cos(ship.facing),dy=StrictMath.sin(ship.facing);
+            BattleRenderPoses.Pose pose=renderPoses.ship(ship);
+            double scale=ship.visualScale(),dx=StrictMath.cos(pose.angle()),dy=StrictMath.sin(pose.angle());
+            if(!view.ship(pose,scale))continue;
             shapes.setColor(ship.team==0?Color.SKY:Color.ORANGE);
-            shapes.line((float)(ship.x-dx*10*scale),(float)(ship.y-dy*10*scale),
-                    (float)(ship.x-dx*23*scale),(float)(ship.y-dy*23*scale));
+            shapes.line((float)(pose.x()-dx*10*scale),(float)(pose.y()-dy*10*scale),
+                    (float)(pose.x()-dx*23*scale),(float)(pose.y()-dy*23*scale));
         }
         shapes.end();
-        if (instanced == null) drawShipsFallback();
+        if (instanced == null) drawShipsFallback(view);
         else {
             try {
                 instanced.render(battle,battleCamera,
                         ship -> terranSprites!=null && terranSprites.hasSprite(ship),renderPoses);
                 int expected=0;
                 for(Battle.Ship ship:battle.ships())
-                    if(ship.alive() && (terranSprites==null || !terranSprites.hasSprite(ship)))expected++;
+                    if(ship.alive() && (terranSprites==null || !terranSprites.hasSprite(ship))
+                            && view.ship(renderPoses.ship(ship),ship.visualScale()))expected++;
                 if(instanced.instances!=expected)
                     throw new IllegalStateException("GPU instance count disagrees with non-sprite ships");
             }
             catch (RuntimeException error) {
                 Gdx.app.error("GPU", "Switching to per-ship rendering", error);
                 instanced.close(); instanced = null; renderer = "software geometry";
-                drawShipsFallback();
+                drawShipsFallback(view);
             }
         }
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
-        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses);
-        if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses);
+        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view);
+        if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses,view);
         if(lighting!=null)lighting.renderSmoke(battle,batch,battleCamera);
-        if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses);
+        if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses,view);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
@@ -2294,12 +2303,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(texturedMissiles.contains(m.visualId))continue;
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
             BattleRenderPoses.Pose pose=renderPoses.missile(m);
+            if(!view.circle(pose.x(),pose.y(),4))continue;
             shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(m.torpedo?4.4f:2.8f),7);
         }
         for (Battle.Ballistic shell:battle.ballistics()) {
             if(texturedBallistics.contains(shell.visualId))continue;
             shapes.setColor(Color.GOLD);
             BattleRenderPoses.Pose pose=renderPoses.shell(shell);
+            if(!view.circle(pose.x(),pose.y(),3))continue;
             shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(2.1f),6);
         }
         shapes.end();
@@ -2552,12 +2563,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         battleCamera.update();
     }
 
-    private void drawShipsFallback() {
+    private void drawShipsFallback() { drawShipsFallback(null); }
+    private void drawShipsFallback(CombatViewBounds view) {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Ship s : battle.ships()) if (s.alive()
                 && (terranSprites==null||!terranSprites.hasSprite(s))) {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             BattleRenderPoses.Pose pose=renderPoses.ship(s);
+            if(view!=null&&!view.ship(pose,s.visualScale()))continue;
             float x=pose.x(),y=pose.y();
             float scale=(float)s.visualScale();
             // Keep Stage 2's distinct faction/class art in the GL2 fallback path.

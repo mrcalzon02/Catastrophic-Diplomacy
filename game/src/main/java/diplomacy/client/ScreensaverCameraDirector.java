@@ -77,6 +77,9 @@ final class ScreensaverCameraDirector {
     }
 
     Shot update(Battle battle,float elapsedSeconds) {
+        return update(battle,elapsedSeconds,null);
+    }
+    Shot update(Battle battle,float elapsedSeconds,BattleRenderPoses poses) {
         if(battle==null)throw new IllegalArgumentException("Exhibition battle required");
         if(currentBattle!=battle)reset(battle,battle.seed());
         // Cap a delayed frame so suspending/resuming Android cannot skip
@@ -89,8 +92,13 @@ final class ScreensaverCameraDirector {
         }
         double aimX,aimY;
         if(subject!=null){
-            aimX=subject.x;
-            aimY=subject.y;
+            // Follow the exact same visual pose as the hull sprite rather than
+            // chasing its un-interpolated physics position by one fixed tick.
+            BattleRenderPoses.Pose aim=poses==null?
+                    new BattleRenderPoses.Pose((float)subject.x,(float)subject.y,(float)subject.facing):
+                    poses.ship(subject);
+            aimX=aim.x();
+            aimY=aim.y();
         }else{
             BattleView.Frame frame=BattleView.of(battle);
             aimX=frame.centerX();aimY=frame.centerY();
