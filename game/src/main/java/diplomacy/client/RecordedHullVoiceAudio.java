@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * User-recorded hull voices: interceptor, corvette, destroyer, carrier, dreadnought; 130 cues.
+ * User-recorded hull voices across seven hull roles, including the missile frigate; 182 cues.
  * One clip at a time, with a global cooldown suitable for 200v200 engagements.
  * All routing is cosmetic; no simulation RNG, no synthetic pilot impersonation.
  */
@@ -26,7 +26,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
         Map<String,String> result = new HashMap<>();
         Shipyard.Hull[] recorded = {
                 Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER,
-                Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT
+                Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT,
+                Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE
         };
         for (Shipyard.Hull hull : recorded) {
             for (CrewChatter.Event event : CrewChatter.Event.values()) {
@@ -34,7 +35,12 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
                     CrewChatter.Tone register = i == 0 ?
                             CrewChatter.Tone.PROFESSIONAL : CrewChatter.Tone.VETERAN;
                     String subtitle = HullVoiceChatter.line(hull, event, 0L, 0, register);
-                    String cue = hull.name().toLowerCase(java.util.Locale.ROOT) + "_"
+                    // Explicit class metadata prevents an ordinary frigate with
+                    // the same spoken words from being voiced as a missile frigate.
+                    if (hull == Shipyard.Hull.FRIGATE_MISSILE)
+                        subtitle = "MISSILE_FRIGATE|" + subtitle;
+                    String cue = (hull == Shipyard.Hull.FRIGATE_MISSILE ? "missile_frigate" :
+                            hull.name().toLowerCase(java.util.Locale.ROOT)) + "_"
                             + event.name().toLowerCase(java.util.Locale.ROOT)
                             + "_0" + (i + 1);
                     String parent = hull == Shipyard.Hull.INTERCEPTOR ?
@@ -46,8 +52,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
                 }
             }
         }
-        if (result.size() != 130)
-            throw new IllegalStateException("Incomplete 5-hull voice bank");
+        if (result.size() != 182)
+            throw new IllegalStateException("Incomplete 7-hull voice bank");
         return Collections.unmodifiableMap(result);
     }
 
@@ -56,7 +62,10 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
         if (eventLine == null || !eventLine.startsWith("RADIO ")) return null;
         int colon = eventLine.indexOf(": ");
         if (colon < 0) return null;
-        return SUBTITLE_TO_ASSET.get(eventLine.substring(colon + 2));
+        String text = eventLine.substring(colon + 2);
+        if (eventLine.substring(0, colon).endsWith(" / Missile Frigate"))
+            text = "MISSILE_FRIGATE|" + text;
+        return SUBTITLE_TO_ASSET.get(text);
     }
     public static int registeredCues() { return SUBTITLE_TO_ASSET.size(); }
 

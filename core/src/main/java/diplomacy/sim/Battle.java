@@ -450,7 +450,9 @@ public final class Battle {
         String spoken=fighter?
                 HullVoiceChatter.line(diplomacy.shipyard.Shipyard.Hull.INTERCEPTOR,event,tick,source.id,register):
                 HullVoiceChatter.line(source.hullClass,event,tick,source.id,register);
-        return "RADIO "+source.name+(fighter?" / Flight":"")+": "+spoken;
+        return "RADIO "+source.name+(fighter?" / Flight":
+                source.hullClass==diplomacy.shipyard.Shipyard.Hull.FRIGATE_MISSILE?
+                        " / Missile Frigate":"")+": "+spoken;
     }
     /**
      * Team-wide edits update existing combatants and future fleet deployments.

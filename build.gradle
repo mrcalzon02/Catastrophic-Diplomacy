@@ -644,12 +644,16 @@ def additionalHullVoicePacks = [
     [hull: 'CARRIER', batch: '006', file: file('asset_packs/audio/carrier-voice-batch-006.zip'),
      checksum: '77e20b9e589459f77581b81d8071797f030346a5cb5256d9fb52506144e0ed39'],
     [hull: 'DREADNOUGHT', batch: '007', file: file('asset_packs/audio/dreadnought-voice-batch-007.zip'),
-     checksum: '90c65e4af2d71f759be3762fa8d320a513d7d405a6327fac77cec5575da511b6']
+     checksum: '90c65e4af2d71f759be3762fa8d320a513d7d405a6327fac77cec5575da511b6'],
+    [hull: 'BATTLECRUISER', batch: '008', file: file('asset_packs/audio/battlecruiser-voice-batch-008.zip'),
+     checksum: '2081b79f05a850edc4d1ca0938ba5e64d0701389465b50eae94af39c7eb6a9fb'],
+    [hull: 'MISSILE_FRIGATE', batch: '009', file: file('asset_packs/audio/missile-frigate-voice-batch-009.zip'),
+     checksum: 'b425ceb64adc0b024205ef4fed7fb0571d3da33e1956e5cb0124c0ef76e65954']
 ]
 def additionalHullVoicesOutput = layout.buildDirectory.dir('generated/cd-hull-voices')
 tasks.register('prepareAdditionalHullVoiceAssets') {
     group = 'assets'
-    description = 'Verify four Drive-transferred hull voice archives and stage 104 original OGG clips.'
+    description = 'Verify six Drive-transferred hull voice archives and stage 156 original OGG clips.'
     inputs.files additionalHullVoicePacks.collect { it.file }
     outputs.dir additionalHullVoicesOutput
     doLast {
@@ -675,7 +679,7 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
                 def seen = [] as Set
                 manifest.clips.each { cue ->
                     String id = cue.id as String
-                    if (!(id ==~ /(?:CORVETTE|DESTROYER|CARRIER|DREADNOUGHT)_[A-Z_]+_0[12]/)
+                    if (!(id ==~ /(?:CORVETTE|DESTROYER|CARRIER|DREADNOUGHT|BATTLECRUISER|MISSILE_FRIGATE)_[A-Z_]+_0[12]/)
                             || !id.startsWith(pack.hull+'_') || !seen.add(id))
                         throw new GradleException('Invalid/duplicate hull voice ID: '+id)
                     String filename = id.toLowerCase(java.util.Locale.ROOT)+'.ogg'
@@ -704,7 +708,7 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
                 new File(target,pack.hull.toLowerCase(java.util.Locale.ROOT)+'-manifest.json').bytes = record
             }
         }
-        println('PASS: 104 user-recorded corvette/destroyer/carrier/dreadnought voice clips verified and staged')
+        println('PASS: 156 original hull voice clips verified across six Drive-first archives')
     }
 }
 tasks.named('verifyBattleAudioResources') {
