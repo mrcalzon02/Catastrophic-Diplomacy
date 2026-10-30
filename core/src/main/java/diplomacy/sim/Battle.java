@@ -1017,6 +1017,19 @@ public final class Battle {
         s.power-=behavior.powerPerShot();
         s.heat+=behavior.heatPerShot();
     }
+    /** Module-directed beam endpoint, with visual and damage coordinates equal. */
+    private record SurfaceAim(double x,double y) { }
+    private SurfaceAim surfaceAim(Ship shooter,Ship target,long shotId) {
+        double c=StrictMath.cos(target.facing),s=StrictMath.sin(target.facing);
+        double dx=shooter.x-target.x,dy=shooter.y-target.y;
+        double localX=dx*c+dy*s,localY=-dx*s+dy*c;
+        var point=ShipDamageTargeting.module(target.impactHardpoints,localX,localY,
+                shotId^((long)target.id*0x9e3779b97f4a7c15L));
+        // Same local bow/port dimensions as physical() so an on-target beam
+        // peels exactly the panel it is visually striking, not a second slot.
+        double bow=point.x()*25.0,port=point.y()*19.0;
+        return new SurfaceAim(target.x+bow*c-port*s,target.y+bow*s+port*c);
+    }
     private void fire(Ship s, Ship target) {
         if(s.crewReadiness()<0.05)return;
         double distance=StrictMath.hypot(target.x-s.x,target.y-s.y);
@@ -1038,10 +1051,21 @@ public final class Battle {
             s.laserReload=laser.reload(s.weapons.laserCycle(),s.weaponsCondition);
             chargeGun(s,laser);
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.LASER));
-            visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<laser.aim(s.accuracy,s.weapons.laserTracking(),weatherAim,lock))
-                hit(target,s.laserDamage,s,DamageType.LASER,shotId);
+            SurfaceAim aim=surfaceAim(s,target,shotId);
+            boolean landed=random.nextDouble()<laser.aim(
+                    s.accuracy,s.weapons.laserTracking(),weatherAim,lock);
+            // Keep a missed beam from appearing to strike and erode its target.
+            double endX=aim.x(),endY=aim.y();
+            if(!landed){
+                double deviation=28+(shotId%5)*4;
+                double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
+                        +(shotId%2==0?1:-1)*1.15;
+                endX+=StrictMath.cos(angle)*deviation;
+                endY+=StrictMath.sin(angle)*deviation;
+            }
+            beams.add(new Beam(shotId,tick,s.x,s.y,endX,endY,s.team,DamageType.LASER));
+            visual(shotId,VisualPhase.FIRE,"LASER",s.team,s.id,target.id,s.x,s.y,endX,endY);
+            if(landed)hit(target,s.laserDamage,s,DamageType.LASER,shotId,aim.x(),aim.y());
         }
         if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
                 s.missileReload,s.power,s.heat,s.maxHeat,
@@ -1086,10 +1110,21 @@ public final class Battle {
             s.plasmaReload=plasma.reload(s.weapons.plasmaCycle(),s.weaponsCondition);
             chargeGun(s,plasma);
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PLASMA));
-            visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<plasma.aim(s.accuracy,s.weapons.plasmaTracking(),weatherAim,lock))
-                hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId);
+            SurfaceAim aim=surfaceAim(s,target,shotId);
+            boolean landed=random.nextDouble()<plasma.aim(
+                    s.accuracy,s.weapons.plasmaTracking(),weatherAim,lock);
+            // Keep a missed beam from appearing to strike and erode its target.
+            double endX=aim.x(),endY=aim.y();
+            if(!landed){
+                double deviation=28+(shotId%5)*4;
+                double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
+                        +(shotId%2==0?1:-1)*1.15;
+                endX+=StrictMath.cos(angle)*deviation;
+                endY+=StrictMath.sin(angle)*deviation;
+            }
+            beams.add(new Beam(shotId,tick,s.x,s.y,endX,endY,s.team,DamageType.PLASMA));
+            visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,s.x,s.y,endX,endY);
+            if(landed)hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId,aim.x(),aim.y());
         }
         if(particle.available(s.particleDamage,0,distance,s.weapons.particleRange(),
                 s.particleReload,s.power,s.heat,s.maxHeat,
@@ -1097,10 +1132,21 @@ public final class Battle {
             s.particleReload=particle.reload(s.weapons.particleCycle(),s.weaponsCondition);
             chargeGun(s,particle);
             long shotId=nextVisualShotId++;
-            beams.add(new Beam(shotId,tick,s.x,s.y,target.x,target.y,s.team,DamageType.PARTICLE));
-            visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,target.x,target.y);
-            if(random.nextDouble()<particle.aim(s.accuracy,s.weapons.particleTracking(),weatherAim,lock))
-                hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId);
+            SurfaceAim aim=surfaceAim(s,target,shotId);
+            boolean landed=random.nextDouble()<particle.aim(
+                    s.accuracy,s.weapons.particleTracking(),weatherAim,lock);
+            // Keep a missed beam from appearing to strike and erode its target.
+            double endX=aim.x(),endY=aim.y();
+            if(!landed){
+                double deviation=28+(shotId%5)*4;
+                double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
+                        +(shotId%2==0?1:-1)*1.15;
+                endX+=StrictMath.cos(angle)*deviation;
+                endY+=StrictMath.sin(angle)*deviation;
+            }
+            beams.add(new Beam(shotId,tick,s.x,s.y,endX,endY,s.team,DamageType.PARTICLE));
+            visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,s.x,s.y,endX,endY);
+            if(landed)hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId,aim.x(),aim.y());
         }
         if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
                 s.torpedoReload,s.power,s.heat,s.maxHeat,
@@ -1879,7 +1925,7 @@ public final class Battle {
         double physicalDistance=StrictMath.hypot(impactWorldX-defender.x,
                 impactWorldY-defender.y);
         boolean exactContact=Double.isFinite(physicalDistance)
-                &&physicalDistance>1e-6 &&physicalDistance<=16*defender.visualScale();
+                &&physicalDistance>1e-6 &&physicalDistance<=30*defender.visualScale();
         ShipDamageTargeting.Point point=exactContact
                 ?ShipDamageTargeting.physical(impactWorldX-defender.x,
                         impactWorldY-defender.y,defender.facing)
