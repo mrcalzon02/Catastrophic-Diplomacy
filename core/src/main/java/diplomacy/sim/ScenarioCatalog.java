@@ -78,7 +78,7 @@ public final class ScenarioCatalog {
     public static SkirmishTechnologyRules challenge(Preset preset){
         if(preset==null)throw new IllegalArgumentException("Missing skirmish preset");
         int cap=switch(preset){
-            case CUSTOM,PROVING_GROUND,CAPITALS,ARMADA -> 6;
+            case CUSTOM,PROVING_GROUND,HULL_COVERAGE,CAPITALS,ARMADA -> 6;
             case DUEL -> 1;
             case PATROL -> 2;
             case ESCORT -> 3;
