@@ -42,6 +42,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         severeHull=createGenericStructure("materials/structure_destroyed.png");
         shieldHull=Gdx.files.internal("materials/shield_energy_blue.png").exists()
                 ? createGenericStructure("materials/shield_energy_blue.png") : null;
+        // Legacy factions share the approved source images with their derivative
+        // civilizations. Reuse GPU textures by full asset path, not by faction.
+        java.util.Map<String,Texture> uniqueTextures=new java.util.HashMap<>();
         for(Battle.Faction faction:Battle.Faction.values()){
             EnumMap<Shipyard.Hull,Texture> fleet=new EnumMap<>(Shipyard.Hull.class);
             for(Shipyard.Hull hull:Shipyard.Hull.values()){
@@ -61,8 +64,12 @@ public final class TerranPlaceholderSprites implements Disposable {
                     continue;
                 }
                 try{
-                    Texture tex=new Texture(Gdx.files.internal(file));
-                    tex.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                    Texture tex=uniqueTextures.get(file);
+                    if(tex==null){
+                        tex=new Texture(Gdx.files.internal(file));
+                        tex.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                        uniqueTextures.put(file,tex);
+                    }
                     fleet.put(hull,tex);
                 }catch(RuntimeException ex){
                     Gdx.app.error("SPRITES","Unable to load selected faction sprite: "+file,ex);
@@ -145,8 +152,9 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(tile.occupied && tile.exposure()>0.001) {damaged=true;break;}
             }
             if(!damaged) {
-                batch.setColor(ship.hullClass.tintRed(),ship.hullClass.tintGreen(),
-                        ship.hullClass.tintBlue(),1);
+                // Ship PNGs already contain the approved civilization palette.
+                // Multiply by white: class tint belongs to geometry fallback only.
+                batch.setColor(1,1,1,1);
                 drawWhole(batch,tex,ship,width,height,rotation);
                 drawShield(batch,ship,width,height,rotation);
                 continue;
@@ -169,8 +177,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float offY=height*(0.5f-(sy+ey)*0.5f/tex.getHeight());
                 float midX=(float)ship.x+offX*cos-offY*sin;
                 float midY=(float)ship.y+offX*sin+offY*cos;
-                batch.setColor(ship.hullClass.tintRed(),ship.hullClass.tintGreen(),
-                        ship.hullClass.tintBlue(),(float)(1-tile.exposure()));
+                batch.setColor(1,1,1,(float)(1-tile.exposure()));
                 batch.draw(tex,midX-tileW/2,midY-tileH/2,
                         tileW/2,tileH/2,tileW,tileH,1,1,rotation,
                         sx,sy,ex-sx,ey-sy,false,false);
