@@ -18,7 +18,8 @@ public final class CombatPropulsionFxTest {
         attacker.setLaunchMode(Battle.DamageType.MISSILE,mode);
         attacker.laserDamage=attacker.kineticDamage=attacker.plasmaDamage=0;
         attacker.particleDamage=attacker.torpedoDamage=0;
-        attacker.missileAmmo=12;attacker.missileDamage=22;
+        attacker.missileAmmo=mode==OrdnanceDoctrine.Mode.HEAVY_STRIKE?2:1;
+        attacker.missileDamage=22;
         target.laserDamage=target.missileDamage=target.kineticDamage=0;
         target.plasmaDamage=target.particleDamage=target.torpedoDamage=0;
         target.missileAmmo=target.kineticAmmo=target.torpedoAmmo=0;
@@ -75,6 +76,8 @@ public final class CombatPropulsionFxTest {
         int unchanged=trail.ignitionCount();
         trail.update(heavy);
         check(trail.ignitionCount()==unchanged,"two render frames cannot restart motor");
+        // Stop the engine after the terminal burn so old exhaust can expire.
+        missile.thrustPhase=OrdnancePropulsion.Phase.COAST;
         for(int i=0;i<80;i++){heavy.tick++;trail.update(heavy);}
         check(trail.smokeCount()==0&&trail.ignitionCount()==0,
                 "bounded effects expire regardless of frame rate");
