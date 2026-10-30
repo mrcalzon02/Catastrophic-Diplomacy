@@ -644,7 +644,7 @@ def additionalHullVoicePacks = [
     [hull: 'CARRIER', batch: '006', file: file('asset_packs/audio/carrier-voice-batch-006.zip'),
      checksum: '77e20b9e589459f77581b81d8071797f030346a5cb5256d9fb52506144e0ed39'],
     [hull: 'DREADNOUGHT', batch: '007', file: file('asset_packs/audio/dreadnought-voice-batch-007.zip'),
-     checksum: '90c65e4af2d71f759be3762fa8d320a513d7d405a6327fac77cec5575da511b6'
+     checksum: '90c65e4af2d71f759be3762fa8d320a513d7d405a6327fac77cec5575da511b6']
 ]
 def additionalHullVoicesOutput = layout.buildDirectory.dir('generated/cd-hull-voices')
 tasks.register('prepareAdditionalHullVoiceAssets') {
