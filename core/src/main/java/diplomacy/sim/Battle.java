@@ -54,6 +54,7 @@ public final class Battle {
         public Shipyard.Hull hullClass;
         /** Installed and physically located shipyard modules available for hit targeting. */
         public List<Shipyard.Slot> impactHardpoints=List.of();
+        public Map<Integer,Subsystem> installedSubsystems=Map.of();
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
         public double x, y, vx, vy, facing;
@@ -544,9 +545,16 @@ public final class Battle {
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
         List<Shipyard.Slot> installed=new ArrayList<>();
-        for(Shipyard.Slot slot:HullLayouts.slots(design.faction,design.hull))
-            if(design.at(slot.index())!=null)installed.add(slot);
+        Map<Integer,Subsystem> located=new HashMap<>();
+        for(Shipyard.Slot slot:HullLayouts.slots(design.faction,design.hull)) {
+            Shipyard.Installed component=design.at(slot.index());
+            if(component==null)continue;
+            installed.add(slot);
+            Subsystem system=ShipDamageTargeting.subsystem(component.component);
+            if(system!=null)located.put(slot.index(),system);
+        }
         s.impactHardpoints=List.copyOf(installed);
+        s.installedSubsystems=Map.copyOf(located);
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.fittedCrewSystems=true;
         s.crewRequired=machinery.crew().minimum();
@@ -1904,7 +1912,10 @@ public final class Battle {
         if(secondary.addedHeat()>0)
             defender.heat+=damage*secondary.addedHeat();
         if (damage > 5 && random.nextDouble() < 0.24) {
-            Subsystem part = Subsystem.values()[random.nextInt(Subsystem.values().length)];
+            int socket=point.slotIndex()>=0?point.slotIndex():
+                    ShipDamageTargeting.nearestModule(defender.impactHardpoints,point);
+            Subsystem part=defender.installedSubsystems.get(socket);
+            if(part==null)part=Subsystem.values()[random.nextInt(Subsystem.values().length)];
             double loss = Math.min(0.36, damage / defender.maxHull * 0.7);
             switch (part) {
                 case REACTOR: defender.reactorCondition = Math.max(0, defender.reactorCondition - loss); break;
