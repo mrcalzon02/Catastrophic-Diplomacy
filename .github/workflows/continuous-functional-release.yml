@@ -27,6 +27,10 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install deterministic icon exporter
+        run: python -m pip install Pillow==11.3.0
       - name: Validate gameplay, 200v200, LAN/PvP, updater and installed Linux application
         run: |
           gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke \
@@ -59,6 +63,7 @@ jobs:
           unzip -q desktop/build/platform-packages/Catastrophic-Diplomacy-Linux-x64.zip -d "$extract_dir"
           test -x "$extract_dir/CatastrophicDiplomacy/bin/CatastrophicDiplomacy"
           test -f "$extract_dir/CatastrophicDiplomacy/lib/runtime/release"
+          test -s "$extract_dir/CatastrophicDiplomacy/share/icons/hicolor/512x512/apps/catastrophic-diplomacy.png"
           if ! command -v xvfb-run >/dev/null; then
             sudo apt-get update -qq
             sudo apt-get install -y xvfb
@@ -96,12 +101,15 @@ jobs:
         with: {gradle-version: '8.11.1'}
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - name: Install deterministic icon exporter
+        run: python -m pip install Pillow==11.3.0
       - name: Build runnable Windows game and test essential functionality
         shell: pwsh
         run: |
           gradle --no-daemon :core:gameFlowSmoke :core:desktopUpdaterPolicySmoke :game:menuFlowSmoke :desktop:installDist
           if ($LASTEXITCODE -ne 0) { throw 'Windows game failed gameplay/compile' }
           python tools/package_desktop.py
+          python tools/generate_app_icons.py --check
           if ($LASTEXITCODE -ne 0) { throw 'Native MSI packaging failed' }
       - name: Install, launch and uninstall real Windows MSI
         shell: pwsh
@@ -147,6 +155,10 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install deterministic icon exporter
+        run: python -m pip install Pillow==11.3.0
       - name: Restore retained signing certificate, build debug and signed release
         shell: bash
         run: |
@@ -160,6 +172,8 @@ jobs:
           test -s .local-secrets/android-release.p12
           manager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
           "$manager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;35.0.0'
+          python tools/generate_app_icons.py
+          python tools/generate_app_icons.py --check
           gradle --no-daemon :android:assembleDebug :android:assembleRelease
       - name: Verify signed Android APK and updater manifest
         shell: bash
@@ -171,6 +185,8 @@ jobs:
           cp android/build/outputs/apk/debug/android-debug.apk package/verify-debug.apk
           apksigner verify --verbose --print-certs package/Catastrophic-Diplomacy-Android.apk > package/signature-verification.txt
           aapt dump badging package/Catastrophic-Diplomacy-Android.apk | grep '^package:' > package/package-identity.txt
+          aapt dump resources package/Catastrophic-Diplomacy-Android.apk | grep -q 'ic_launcher'
+          python tools/generate_app_icons.py --check
           grep -F "name='games.catastrophicdiplomacy' versionCode='$((1000+CD_ANDROID_BUILD_SEQUENCE))' versionName='$CD_ANDROID_VERSION_NAME'" package/package-identity.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' package/signature-verification.txt
           python3 tools/prepare_android_update_manifest.py package/Catastrophic-Diplomacy-Android.apk --output package/release-manifest.json

@@ -35,12 +35,19 @@ def main() -> int:
             raise SystemExit("Desktop main class missing")
     if shutil.which("jpackage") is None:
         raise SystemExit("JDK 17 jpackage is required")
+    # Packaging may never silently use Java's generic coffee-cup icon.
+    subprocess.run([sys.executable, str(ROOT / "tools/generate_app_icons.py")], check=True)
+    icon_dir = ROOT / "build" / "generated" / "app-icons"
+    icon = icon_dir / ("catastrophic-diplomacy.ico" if system == "Windows"
+                       else "catastrophic-diplomacy.png")
+    if not icon.is_file() or icon.stat().st_size < 1000:
+        raise SystemExit(f"Required native app icon missing: {icon}")
     OUT.mkdir(parents=True, exist_ok=True)
     cmd = [
         "jpackage", "--name", NAME,
         "--input", str(LIB), "--main-jar", jars[0].name,
         "--main-class", "diplomacy.desktop.DesktopLauncher",
-        "--dest", str(OUT), "--java-options", "-Dfile.encoding=UTF-8",
+        "--dest", str(OUT), "--icon", str(icon), "--java-options", "-Dfile.encoding=UTF-8",
     ]
     if system == "Windows":
         parts = MSI_APP_VERSION.split(".")
@@ -87,6 +94,9 @@ def main() -> int:
         if not (image / "bin" / NAME).is_file() or not (runtime / "release").is_file() or \
            not (runtime / "lib" / "modules").is_file():
             raise SystemExit("Linux launcher or bundled runtime missing")
+        linux_icon = image / "share/icons/hicolor/512x512/apps/catastrophic-diplomacy.png"
+        linux_icon.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(icon, linux_icon)
         target = OUT / "Catastrophic-Diplomacy-Linux-x64.zip"
         with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
             for source in sorted(image.rglob("*")):
