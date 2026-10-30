@@ -71,6 +71,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ProceduralStarfield starfield;
     private BattlefieldWeatherVfx weatherVfx;
     private CombatAudio audio;
+    private int voiceSliderPointer=-1, menuButtonPointer=-1;
     private int battlefieldLevel = 1;
     private boolean weatherEnabled = true;
     private TacticalUiIcons uiIcons;
@@ -366,6 +367,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.U)audio.toggleMusic();
                         if(key==Input.Keys.I)audio.toggleEffects();
                         if(key==Input.Keys.J)audio.toggleTrack();
+                        if(key==Input.Keys.LEFT){audio.stepVoiceVolume(-1);return true;}
+                        if(key==Input.Keys.RIGHT){audio.stepVoiceVolume(1);return true;}
                         if(key==Input.Keys.K&&updateCheck!=null)updateCheck.run();
                         return true;
                     }
@@ -507,6 +510,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         world.y>125 && world.y<610 &&
                         battleTouch.start(pointer,world.x,world.y))return true;
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+                    if(screen==GameMenuPanel.Screen.OPTIONS&&VoiceVolumeControl.hit(world.x,world.y)){
+                        voiceSliderPointer=pointer;
+                        audio.setVoiceVolume(VoiceVolumeControl.valueAt(world.x),false);
+                        audio.uiAdjust();
+                        return true;
+                    }
+                    int control=menuPanel.controlAt(world.x,world.y);
+                    if(control==-2){audio.uiBlocked();return true;}
+                    if(control>=0){
+                        menuPanel.press(screen,world.x,world.y);
+                        menuButtonPointer=pointer;
+                        audio.uiPress();
+                    }
                     if(screen==GameMenuPanel.Screen.DEPLOYMENT &&
                             world.x>=45&&world.x<=795&&world.y>=155&&world.y<=606){
                         int hit=GameMenuPanel.shipHit(world.x,world.y,deployment,false);
@@ -586,6 +602,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
+                if(pointer==voiceSliderPointer){
+                    float next=VoiceVolumeControl.valueAt(world.x);
+                    if(Math.abs(next-audio.voiceVolume())>.004f){
+                        audio.setVoiceVolume(next,false);
+                        audio.uiAdjust();
+                    }
+                    return true;
+                }
                 if(battleTouch.owns(pointer)){
                     BattleTouchNavigation.Motion m=battleTouch.move(pointer,world.x,world.y);
                     if(m.changed()){
@@ -620,6 +644,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.drag(world.x,world.y,pointer);
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
+                if(pointer==voiceSliderPointer){
+                    voiceSliderPointer=-1;
+                    audio.saveVoiceVolume();
+                    return true;
+                }
+                if(pointer==menuButtonPointer){
+                    menuButtonPointer=-1;
+                    if(audio!=null)audio.ui();
+                    return true;
+                }
                 if(battleTouch.owns(pointer)){
                     com.badlogic.gdx.math.Vector2 world=viewport.unproject(
                             new com.badlogic.gdx.math.Vector2(x,y));
@@ -1642,6 +1676,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
+            if(VoiceVolumeControl.hit(x,y)){
+                audio.setVoiceVolume(VoiceVolumeControl.valueAt(x),true);return;
+            }
             if(GameMenuPanel.hit(x,y,405,472,470,59)){audio.toggleMusic();return;}
             if(GameMenuPanel.hit(x,y,405,394,470,59)){audio.toggleEffects();return;}
             if(GameMenuPanel.hit(x,y,405,316,470,59)){audio.toggleTrack();return;}
@@ -2133,7 +2170,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setProjectionMatrix(camera.combined);
             batch.setProjectionMatrix(camera.combined);
             if(shipyard.open())shipyard.draw(shapes,batch,font);
-            else menuPanel.draw(screen,shapes,batch,font,scenario,left,right,pendingFaction,
+            else {
+                com.badlogic.gdx.math.Vector2 pointer=viewport.unproject(
+                        new com.badlogic.gdx.math.Vector2(Gdx.input.getX(),Gdx.input.getY()));
+                boolean held=Gdx.input.isTouched();
+                boolean mouse=Gdx.app.getType()!=com.badlogic.gdx.Application.ApplicationType.Android;
+                menuPanel.pointer(pointer.x,pointer.y,mouse||held,held);
+                menuPanel.draw(screen,shapes,batch,font,scenario,left,right,pendingFaction,
                     FLEET_SIZES[fleetIndex],screen==GameMenuPanel.Screen.RESULTS && !playedCampaign?null:campaign,campaignPage,
                     screen==GameMenuPanel.Screen.DEPLOYMENT?activeMission:selectedMission,
                     deployment,leftDesign.hull.name(),selectedDeploymentShip,
@@ -2146,13 +2189,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                     technology):0L,
                     screen==GameMenuPanel.Screen.RESEARCH?researchNotice:
                             screen==GameMenuPanel.Screen.SKIRMISH?skirmishNotice:dockNotice,
-                    audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
+                    audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,
+                    audio.voiceVolume(),lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
                     afterActionPage,themePage,themeCandidate,
                     selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn,
                     technology,discoveries,technologyPage,technologyModule,technologyTrack,
                     technologyStage,technologyNotice,armedTechnology);
+                if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
+            }
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
