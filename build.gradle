@@ -633,3 +633,66 @@ tasks.register('prepareFighterVoiceAssets') {
 tasks.named('verifyBattleAudioResources') {
     dependsOn tasks.named('prepareFighterVoiceAssets')
 }
+
+
+/** Recorded hull voices are transferred to GitHub FROM the verified Drive copies. */
+def additionalHullVoicePacks = [
+    [hull: 'CORVETTE', batch: '004', file: file('asset_packs/audio/corvette-voice-batch-004.zip'),
+     checksum: '5f65fb476fe84d98d2f6d9746bc90e0553b089b4ba6803ec57c0408c20261346'],
+    [hull: 'DESTROYER', batch: '005', file: file('asset_packs/audio/destroyer-voice-batch-005.zip'),
+     checksum: '1b1705174e305c8894d38750965e72b0961d7fb8242cf55fdb1cc3aa4d9431ec']
+]
+def additionalHullVoicesOutput = layout.buildDirectory.dir('generated/cd-hull-voices')
+tasks.register('prepareAdditionalHullVoiceAssets') {
+    group = 'assets'
+    description = 'Verify both Drive-transferred hull voice archives and stage 52 original OGG clips.'
+    inputs.files additionalHullVoicePacks.collect { it.file }
+    outputs.dir additionalHullVoicesOutput
+    doLast {
+        def digest = { byte[] data ->
+            java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(data).encodeHex().toString()
+        }
+        def root = additionalHullVoicesOutput.get().asFile
+        project.delete(root)
+        def target = new File(root, 'audio/hull_voice')
+        target.mkdirs()
+        additionalHullVoicePacks.each { pack ->
+            if (!pack.file.isFile() || digest(pack.file.bytes) != pack.checksum)
+                throw new GradleException('Missing or altered Drive-origin '+pack.hull+' voice ZIP')
+            new java.util.zip.ZipFile(pack.file).withCloseable { archive ->
+                def entry = archive.getEntry('manifest.json')
+                if (entry == null) throw new GradleException('Missing '+pack.hull+' voice manifest')
+                byte[] record = archive.getInputStream(entry).withCloseable { it.bytes }
+                def manifest = new groovy.json.JsonSlurper().parseText(new String(record,'UTF-8'))
+                if (manifest.hull != pack.hull || manifest.batch != pack.batch
+                        || manifest.clips.size() != 26)
+                    throw new GradleException('Invalid '+pack.hull+' voice manifest')
+                def seen = [] as Set
+                manifest.clips.each { cue ->
+                    String id = cue.id as String
+                    if (!(id ==~ /(?:CORVETTE|DESTROYER)_[A-Z_]+_0[12]/)
+                            || !id.startsWith(pack.hull+'_') || !seen.add(id))
+                        throw new GradleException('Invalid/duplicate hull voice ID: '+id)
+                    String filename = id.toLowerCase(java.util.Locale.ROOT)+'.ogg'
+                    String path = 'ogg/'+filename
+                    if (cue.ogg != path || cue.path != 'audio/hull_voice/'+filename)
+                        throw new GradleException('Bad hull voice path: '+id)
+                    def raw = archive.getEntry(path)
+                    if (raw == null) throw new GradleException('Missing hull voice clip '+id)
+                    byte[] bytes = archive.getInputStream(raw).withCloseable { it.bytes }
+                    if (bytes.length < 1000 || bytes.length != (cue.ogg_bytes as int)
+                            || new String(bytes,0,4,'US-ASCII') != 'OggS'
+                            || digest(bytes) != cue.ogg_sha256)
+                        throw new GradleException('Corrupt hull voice clip '+id)
+                    new File(target,filename).bytes = bytes
+                }
+                new File(target,pack.hull.toLowerCase(java.util.Locale.ROOT)+'-manifest.json').bytes = record
+            }
+        }
+        println('PASS: 52 user-recorded corvette/destroyer voice clips verified and staged')
+    }
+}
+tasks.named('verifyBattleAudioResources') {
+    dependsOn tasks.named('prepareAdditionalHullVoiceAssets')
+}

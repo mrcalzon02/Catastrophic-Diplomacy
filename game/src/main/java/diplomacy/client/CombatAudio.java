@@ -21,7 +21,7 @@ public final class CombatAudio implements AutoCloseable {
     private final long[] lastPlayedTick = new long[CombatAudioCue.Cue.values().length];
     private final SpatialAudioRuntime spatial;
     private final AnnouncerAudio announcer;
-    private final FighterVoiceAudio fighterVoice;
+    private final RecordedHullVoiceAudio hullVoice;
     private Sound radioOpen, radioClose;
     private String lastLogEntry;
     private long lastRadioTick = -1000000L;
@@ -56,7 +56,7 @@ public final class CombatAudio implements AutoCloseable {
         load(CombatAudioCue.Cue.UI, "audio/sfx/ui_confirm.wav");
         spatial = new SpatialAudioRuntime(cues);
         announcer = new AnnouncerAudio();
-        fighterVoice = new FighterVoiceAudio();
+        hullVoice = new RecordedHullVoiceAudio();
         radioOpen = loadRadio("radio_open");
         radioClose = loadRadio("radio_close");
         ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3");
@@ -133,15 +133,15 @@ public final class CombatAudio implements AutoCloseable {
         else switchTrack();
         persist();
     }
-    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn){spatial.silence();announcer.stop();fighterVoice.stop();} persist(); }
+    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn){spatial.silence();announcer.stop();hullVoice.stop();} persist(); }
     public void toggleTrack() { useBattleMusic = !useBattleMusic; switchTrack(); persist(); }
 
     /** Announcements are the game narrator only; ship RADIO events remain text plus quiet bleeps. */
     public void announce(AnnouncerAudio.Cue cue) {
-        if (effectsOn && !suspended) announcer.play(cue, false);
+        if (effectsOn && !suspended) { hullVoice.stop(); announcer.play(cue, false); }
     }
     public void announcePriority(AnnouncerAudio.Cue cue) {
-        if (effectsOn && !suspended) announcer.play(cue, true);
+        if (effectsOn && !suspended) { hullVoice.stop(); announcer.play(cue, true); }
     }
 
     public void resetForBattle() {
@@ -151,7 +151,7 @@ public final class CombatAudio implements AutoCloseable {
         lastLogEntry = null;
         lastRadioTick = -1000000L;
         radioFlip = false;
-        fighterVoice.reset();
+        hullVoice.reset();
     }
 
     /**
@@ -161,7 +161,7 @@ public final class CombatAudio implements AutoCloseable {
     public void advance(Battle battle,double cameraX,double cameraY,float zoom,
                         boolean battleVisible) {
         announcer.advance();
-        fighterVoice.advance();
+        hullVoice.advance();
         spatial.advance(battle,cameraX,cameraY,zoom,battleVisible&&!suspended,
                 effectsOn,effectsVolume);
         radioBleep(battle, battleVisible);
@@ -181,18 +181,18 @@ public final class CombatAudio implements AutoCloseable {
         lastLogEntry = log.get(log.size()-1);
         if (!visible || suspended || !effectsOn) return;
         boolean received = false;
-        String fighterCue = null;
+        String hullCue = null;
         for (int i=start;i<log.size();i++) {
             String line = log.get(i);
             if (line.startsWith("RADIO ")) {
                 received = true;
-                if (fighterCue == null && FighterVoiceAudio.assetPathForRadio(line) != null)
-                    fighterCue = line;
+                if (hullCue == null && RecordedHullVoiceAudio.assetPathForRadio(line) != null)
+                    hullCue = line;
             }
         }
         // The original recording is rare cockpit speech, not 400 simultaneous pilots.
         // Ordinary ship messages continue to receive quiet radio bleeps.
-        if (fighterCue != null && !announcer.playing()) fighterVoice.play(fighterCue,battle.tick);
+        if (hullCue != null && !announcer.playing()) hullVoice.play(hullCue,battle.tick);
         if (!received || battle.tick-lastRadioTick<45) return;
         Sound tone = radioFlip ? radioClose : radioOpen;
         radioFlip = !radioFlip;
@@ -217,14 +217,14 @@ public final class CombatAudio implements AutoCloseable {
         suspended = true;
         spatial.silence();
         announcer.pause();
-        fighterVoice.pause();
+        hullVoice.pause();
         if (activeMusic != null) activeMusic.pause();
     }
-    public void resume() { suspended = false; announcer.resume(); fighterVoice.resume(); switchTrack(); }
+    public void resume() { suspended = false; announcer.resume(); hullVoice.resume(); switchTrack(); }
 
     @Override public void close() {
         announcer.close();
-        fighterVoice.close();
+        hullVoice.close();
         spatial.close();
         if (radioOpen != null) radioOpen.dispose();
         if (radioClose != null) radioClose.dispose();

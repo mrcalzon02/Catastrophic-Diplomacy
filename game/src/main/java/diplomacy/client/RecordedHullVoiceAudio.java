@@ -10,11 +10,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Original user-recorded fighter/interceptor voice: 26 OGG cues, 13 events.
+ * User-recorded hull voices: interceptor, corvette and destroyer; 78 cues.
  * One clip at a time, with a global cooldown suitable for 200v200 engagements.
  * All routing is cosmetic; no simulation RNG, no synthetic pilot impersonation.
  */
-public final class FighterVoiceAudio implements AutoCloseable {
+public final class RecordedHullVoiceAudio implements AutoCloseable {
     private static final Map<String, String> SUBTITLE_TO_ASSET = buildIndex();
     private static final long MIN_SPACING_TICKS = 150L; // 5 sec at 30Hz
     private Music active;
@@ -24,21 +24,29 @@ public final class FighterVoiceAudio implements AutoCloseable {
 
     private static Map<String,String> buildIndex() {
         Map<String,String> result = new HashMap<>();
-        for (CrewChatter.Event event : CrewChatter.Event.values()) {
-            CrewChatter.Tone[] registers = {
-                    CrewChatter.Tone.PROFESSIONAL, CrewChatter.Tone.VETERAN
-            };
-            for (int i = 0; i < registers.length; i++) {
-                String subtitle = HullVoiceChatter.line(Shipyard.Hull.INTERCEPTOR,
-                        event, 0L, 0, registers[i]);
-                String cue = "interceptor_" + event.name().toLowerCase(java.util.Locale.ROOT)
-                        + "_0" + (i + 1);
-                String path = "audio/fighter/" + cue + ".ogg";
-                if (result.putIfAbsent(subtitle, path) != null)
-                    throw new IllegalStateException("Duplicate fighter subtitle: " + subtitle);
+        Shipyard.Hull[] recorded = {
+                Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER
+        };
+        for (Shipyard.Hull hull : recorded) {
+            for (CrewChatter.Event event : CrewChatter.Event.values()) {
+                for (int i = 0; i < 2; i++) {
+                    CrewChatter.Tone register = i == 0 ?
+                            CrewChatter.Tone.PROFESSIONAL : CrewChatter.Tone.VETERAN;
+                    String subtitle = HullVoiceChatter.line(hull, event, 0L, 0, register);
+                    String cue = hull.name().toLowerCase(java.util.Locale.ROOT) + "_"
+                            + event.name().toLowerCase(java.util.Locale.ROOT)
+                            + "_0" + (i + 1);
+                    String parent = hull == Shipyard.Hull.INTERCEPTOR ?
+                            "audio/fighter/" : "audio/hull_voice/";
+                    String path = parent + cue + ".ogg";
+                    if (result.putIfAbsent(subtitle, path) != null)
+                        throw new IllegalStateException(
+                                "Non-unique hull voice subtitle: " + subtitle);
+                }
             }
         }
-        if (result.size() != 26) throw new IllegalStateException("Incomplete fighter voice bank");
+        if (result.size() != 78)
+            throw new IllegalStateException("Incomplete 3-hull voice bank");
         return Collections.unmodifiableMap(result);
     }
 
@@ -61,7 +69,7 @@ public final class FighterVoiceAudio implements AutoCloseable {
         }
         try {
             var file = Gdx.files.internal(path);
-            if (!file.exists()) throw new IllegalStateException("Missing recorded fighter voice: " + path);
+            if (!file.exists()) throw new IllegalStateException("Missing recorded hull voice: " + path);
             active = Gdx.audio.newMusic(file);
             active.setLooping(false);
             active.setVolume(0.44f);
@@ -69,7 +77,7 @@ public final class FighterVoiceAudio implements AutoCloseable {
             nextTick = tick + MIN_SPACING_TICKS;
             return true;
         } catch (RuntimeException error) {
-            if (Gdx.app != null) Gdx.app.error("FIGHTER-VOICE", "Playback failed: " + path, error);
+            if (Gdx.app != null) Gdx.app.error("HULL-VOICE", "Playback failed: " + path, error);
             closeActive();
             nextTick = tick + MIN_SPACING_TICKS;
             return false;
@@ -94,7 +102,7 @@ public final class FighterVoiceAudio implements AutoCloseable {
         if (active == null) return;
         try { active.stop(); active.dispose(); }
         catch (RuntimeException error) {
-            if (Gdx.app != null) Gdx.app.error("FIGHTER-VOICE","Cleanup failed",error);
+            if (Gdx.app != null) Gdx.app.error("HULL-VOICE","Cleanup failed",error);
         }
         finally { active = null; }
     }
