@@ -12,7 +12,7 @@ public final class WeaponMuzzlesTest {
     static void near(double a,double b,String message){
         check(Math.abs(a-b)<.00001,message+" "+a+" / "+b);
     }
-    public static void main(String[] ignored){
+    public static void main(String[] ignored) throws java.io.IOException {
         Battle battle=new Battle(122);
         Battle.Ship ship=battle.addShip(0,Battle.Faction.TERRAN,500,250);
         ship.hullClass=Shipyard.Hull.CRUISER;
