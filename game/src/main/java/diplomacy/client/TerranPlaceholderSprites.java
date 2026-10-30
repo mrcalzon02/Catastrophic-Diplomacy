@@ -113,6 +113,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         Pixmap src=new Pixmap(Gdx.files.internal(path));
         Pixmap material=severe?destroyedMaterial:damagedMaterial;
         Pixmap masked=new Pixmap(src.getWidth(),src.getHeight(),Pixmap.Format.RGBA8888);
+        masked.setBlending(Pixmap.Blending.None);
         try {
             for(int y=0;y<src.getHeight();y++)for(int x=0;x<src.getWidth();x++){
                 int pixel=src.getPixel(x,y),alpha=pixel&255;
