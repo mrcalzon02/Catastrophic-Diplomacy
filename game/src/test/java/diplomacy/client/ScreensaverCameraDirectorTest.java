@@ -1,6 +1,9 @@
 package diplomacy.client;
 
 import diplomacy.sim.Battle;
+import diplomacy.sim.FighterModel;
+import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.TechnologyCatalog;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,7 +21,62 @@ public final class ScreensaverCameraDirectorTest {
         }
         return battle;
     }
-    public static void main(String[] args) {
+    /**
+     * Real simulation fixtures: the director must select actual launched
+     * fighters and missiles, not just ship names or synthetic camera markers.
+     */
+    private static void mobileSubjectCoverage() throws Exception {
+        TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        int support=-1;
+        for(Shipyard.Slot slot:Shipyard.Hull.CRUISER.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){support=slot.index();break;}
+        require(support>=0,"carrier must have a physical fighter launch socket");
+        Battle b=new Battle(51994L);
+        Shipyard.Design carrier=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CRUISER).install(support,"BASE-TER-FTR")
+                .withFighterHull(FighterModel.Hull.MISSILE_FIGHTER);
+        b.spawnWing(0,carrier,catalog,1,290,350);
+        b.spawnWing(1,Shipyard.starter(Battle.Faction.DRAXIAN,
+                Shipyard.Hull.CRUISER),catalog,1,550,350);
+        for(Battle.Ship s:b.ships()){
+            s.speed=0;s.laserDamage=s.missileDamage=s.kineticDamage=0;
+            s.plasmaDamage=s.particleDamage=s.torpedoDamage=0;
+            s.pdRange=0;s.missileAmmo=s.torpedoAmmo=0;
+            s.maxHull=15000;s.hull=15000;
+        }
+        boolean launched=false,foundFighter=false,foundMissile=false;
+        ScreensaverCameraDirector d=new ScreensaverCameraDirector();
+        for(int tick=0;tick<180;tick++){
+            b.step();
+            if(b.crafts().stream().noneMatch(c->c.fighter&&c.integrity>0&&c.fuel>0)
+                    ||b.missiles().stream().noneMatch(m->!m.decoy&&m.integrity>0&&m.fuel>0))
+                continue;
+            launched=true;
+            for(int seed=0;seed<180;seed++){
+                d.reset(b,seed);
+                var shot=d.update(b,.05f);
+                if(shot.kind()==ScreensaverCameraDirector.TargetKind.FIGHTER){
+                    foundFighter=true;
+                    require(shot.subjectId()>0&&shot.shipId()<0,
+                            "fighter shot follows an actual craft identity");
+                    require(Float.isFinite(shot.zoom()),"fighter camera must be finite");
+                }
+                if(shot.kind()==ScreensaverCameraDirector.TargetKind.MISSILE){
+                    foundMissile=true;
+                    require(shot.subjectId()>0&&shot.shipId()<0,
+                            "missile shot follows an actual guided projectile identity");
+                    require(Float.isFinite(shot.zoom()),"missile camera must be finite");
+                }
+                if(foundFighter&&foundMissile)break;
+            }
+            break;
+        }
+        require(launched,"live carrier must launch fighters and ordnance for camera test");
+        require(foundFighter&&foundMissile,"camera must sometimes choose both mobile subject types");
+    }
+
+    public static void main(String[] args) throws Exception {
+        mobileSubjectCoverage();
         Battle battle=fixture();
         ScreensaverCameraDirector camera=new ScreensaverCameraDirector();
         camera.reset(battle,991L);

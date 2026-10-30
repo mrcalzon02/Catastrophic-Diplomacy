@@ -153,6 +153,7 @@ final class ScreensaverCameraDirector {
         shotTimeRemaining=0;
     }
 
+    float currentZoom(){return zoom;}
     boolean manual(){return manualHold>0;}
     int targetChanges(){return targetChanges;}
 

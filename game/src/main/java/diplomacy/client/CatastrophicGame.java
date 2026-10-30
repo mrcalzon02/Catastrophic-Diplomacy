@@ -656,7 +656,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         BattleTouchNavigation.Motion motion=battleTouch.move(pointer,ui.x,ui.y);
                         if(motion.changed()){
                             if(motion.pinch()){
-                                float oldZoom=battleCamera.zoom;
+                                float oldZoom=screensaverCamera.currentZoom();
                                 float newZoom=screensaverCamera.manualScale(motion.scale());
                                 screensaverCamera.manualPan(
                                         (motion.oldX()-W*.5f)*oldZoom-
@@ -664,8 +664,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                         (motion.oldY()-H*.5f)*oldZoom-
                                         (motion.newY()-H*.5f)*newZoom);
                             }else screensaverCamera.manualPan(
-                                    -motion.dx()*battleCamera.zoom,
-                                    -motion.dy()*battleCamera.zoom);
+                                    -motion.dx()*screensaverCamera.currentZoom(),
+                                    -motion.dy()*screensaverCamera.currentZoom());
                         }
                     }
                     return true;
