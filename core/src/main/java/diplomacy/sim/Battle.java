@@ -1737,7 +1737,13 @@ public final class Battle {
                             1,false);
                     if(actual>0){
                         craft.repairReserve-=actual;
-                        supportLinks.add(new SupportLink(source,target,SupportKind.DRONE,
+                        SupportKind kind=switch(craft.serviceChannel){
+                            case HULL -> SupportKind.DRONE;
+                            case SHIELD -> SupportKind.DRONE_SHIELD;
+                            case ARMOR -> SupportKind.DRONE_ARMOR;
+                            case POWER -> SupportKind.DRONE_POWER;
+                        };
+                        supportLinks.add(new SupportLink(source,target,kind,
                                 tick,craft.x,craft.y));
                     }
                     craft.reload=0.8;
