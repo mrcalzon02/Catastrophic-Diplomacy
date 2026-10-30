@@ -91,7 +91,8 @@ public final class FleetLogisticsTest {
             };
             double afterOther=code.equals("APR")?friend.power:friend.armor;
             for(int i=0;i<36;i++)battle.step();
-            check((code.equals("APR")?friend.armor:friend.power)>before,
+            check((code.equals("HPR")?friend.hull:code.equals("APR")?
+                    friend.armor:friend.power)>before,
                     "Distant fitted projector failed to restore "+code);
             check((code.equals("APR")?friend.power:friend.armor)==afterOther,
                     "Projector must not grant unrelated armor/power "+code);
