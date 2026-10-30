@@ -20,6 +20,7 @@ public final class CombatAudio implements AutoCloseable {
     private final Map<CombatAudioCue.Cue, Sound> cues = new EnumMap<>(CombatAudioCue.Cue.class);
     private final long[] lastPlayedTick = new long[CombatAudioCue.Cue.values().length];
     private final SpatialAudioRuntime spatial;
+    private final AnnouncerAudio announcer;
     private Sound radioOpen, radioClose;
     private String lastLogEntry;
     private long lastRadioTick = -1000000L;
@@ -53,6 +54,7 @@ public final class CombatAudio implements AutoCloseable {
         load(CombatAudioCue.Cue.EXPLOSION, "audio/sfx/grenade.wav");
         load(CombatAudioCue.Cue.UI, "audio/sfx/ui_confirm.wav");
         spatial = new SpatialAudioRuntime(cues);
+        announcer = new AnnouncerAudio();
         radioOpen = loadRadio("radio_open");
         radioClose = loadRadio("radio_close");
         ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3");
@@ -129,8 +131,16 @@ public final class CombatAudio implements AutoCloseable {
         else switchTrack();
         persist();
     }
-    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn)spatial.silence(); persist(); }
+    public void toggleEffects() { effectsOn = !effectsOn; if(!effectsOn){spatial.silence();announcer.stop();} persist(); }
     public void toggleTrack() { useBattleMusic = !useBattleMusic; switchTrack(); persist(); }
+
+    /** Announcements are the game narrator only; ship RADIO events remain text plus quiet bleeps. */
+    public void announce(AnnouncerAudio.Cue cue) {
+        if (effectsOn && !suspended) announcer.play(cue, false);
+    }
+    public void announcePriority(AnnouncerAudio.Cue cue) {
+        if (effectsOn && !suspended) announcer.play(cue, true);
+    }
 
     public void resetForBattle() {
         seenSequence=0;seenDestructions=0;
@@ -147,6 +157,7 @@ public final class CombatAudio implements AutoCloseable {
      */
     public void advance(Battle battle,double cameraX,double cameraY,float zoom,
                         boolean battleVisible) {
+        announcer.advance();
         spatial.advance(battle,cameraX,cameraY,zoom,battleVisible&&!suspended,
                 effectsOn,effectsVolume);
         radioBleep(battle, battleVisible);
@@ -192,11 +203,13 @@ public final class CombatAudio implements AutoCloseable {
     public void pause() {
         suspended = true;
         spatial.silence();
+        announcer.pause();
         if (activeMusic != null) activeMusic.pause();
     }
-    public void resume() { suspended = false; switchTrack(); }
+    public void resume() { suspended = false; announcer.resume(); switchTrack(); }
 
     @Override public void close() {
+        announcer.close();
         spatial.close();
         if (radioOpen != null) radioOpen.dispose();
         if (radioClose != null) radioClose.dispose();

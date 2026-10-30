@@ -50,3 +50,13 @@ tasks.register('lightingSmoke', JavaExec) {
 // Existing release CI already executes menuFlowSmoke on desktop + Windows,
 // so this functional lighting test is not an orphan or a new workflow.
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('lightingSmoke') }
+
+
+tasks.register('announcerSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless validation of all 30 ordered, unique recorded narrator cue paths.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.AnnouncerAudioTest'
+}
+tasks.named('audioSmoke') { finalizedBy(tasks.named('announcerSmoke')) }

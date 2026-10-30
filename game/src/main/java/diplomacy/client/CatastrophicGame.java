@@ -275,7 +275,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel();
         if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
-        else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");}
+        else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
+            audio.announce(AnnouncerAudio.Cue.WELCOME);}
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
@@ -749,6 +750,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         deployedAtLaunch=preparedSkirmish?deployment.ships():
                 scenario==ScenarioCatalog.Preset.CUSTOM?FLEET_SIZES[fleetIndex]:scenario.ships;
         reset();
+        if(audio!=null)audio.announcePriority(AnnouncerAudio.Cue.BATTLE_START);
         Gdx.app.log("CD-GAME-FLOW","BATTLE "+scenario.name());
         if(scenario==ScenarioCatalog.Preset.HULL_COVERAGE){
             java.util.EnumSet<Shipyard.Hull> first=java.util.EnumSet.noneOf(Shipyard.Hull.class);
@@ -1387,10 +1389,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         battlefieldLevel=activeMission;
         playedCampaign=true;screen=GameMenuPanel.Screen.BATTLE;
         reset();
+        if(audio!=null)audio.announcePriority(AnnouncerAudio.Cue.BATTLE_START);
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_BATTLE "+activeMission+" "+deployment.ships()+" "+deployment.formation());
     }
     private void finishEngagement(){
         lastWon=battle.engaged(0)>0&&battle.alive(1)==0;
+        if(audio!=null)audio.announcePriority(lastWon?AnnouncerAudio.Cue.VICTORY:AnnouncerAudio.Cue.MISSION_FAILED);
         survivorsAtEnd=battle.engaged(0);
         withdrawingAtEnd=battle.withdrawing(0);
         escapedAtEnd=battle.escaped(0);
