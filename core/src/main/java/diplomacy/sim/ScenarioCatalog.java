@@ -3,6 +3,7 @@ package diplomacy.sim;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.ShipLineages;
 import diplomacy.shipyard.SkirmishTechnologyRules;
+import diplomacy.shipyard.SkirmishFleet;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Shared user-facing skirmish presets and real combat fixtures. */
@@ -96,6 +97,18 @@ public final class ScenarioCatalog {
 
     /** Live skirmish route: validate BOTH players under the same rules before
      * spawning any vessels. The demonstration fixture remains deterministic. */
+    /** User-assembled per-vessel fleets, subject to one shared inclusive
+     * technology ceiling. Demonstration fixtures remain non-customizable. */
+    public static Battle create(Preset preset,SkirmishFleet left,SkirmishFleet right,
+                                TechnologyCatalog technology,SkirmishTechnologyRules rules){
+        if(preset==null||left==null||right==null||technology==null||rules==null)
+            throw new IllegalArgumentException("Missing skirmish fleet or challenge");
+        if(preset.demonstration)
+            throw new IllegalArgumentException("Verification battle has fixed authored fleets");
+        left.requireAllowed(rules,technology);
+        right.requireAllowed(rules,technology);
+        return Battle.duel(preset.seed,left.ships(),right.ships(),technology);
+    }
     public static Battle create(Preset preset,Shipyard.Design left,Shipyard.Design right,
                                 TechnologyCatalog technology,int customShips,
                                 SkirmishTechnologyRules rules){
