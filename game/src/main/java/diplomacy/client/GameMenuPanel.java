@@ -383,6 +383,11 @@ final class GameMenuPanel {
                     if(index>=modules)break;
                     button(shapes,48,551-row*51,270,44,index==technologyModule);
                 }
+                shapes.setColor(MilitaryUiTheme.FRAME_BRIGHT);
+                for(int track=0;track<4;track++)
+                    for(int link=0;link<5;link++)
+                        shapes.rectLine(438+link*74,463-track*100,
+                                448+link*74,463-track*100,2f);
                 for(int track=0;track<4;track++)
                     for(int stage=0;stage<6;stage++)
                         button(shapes,374+stage*74,439-track*100,64,49,
@@ -691,7 +696,11 @@ final class GameMenuPanel {
                         865,275,Color.WHITE);
                 label(batch,font,"WORK: "+discoveries.remaining()+
                         " MISSIONS / UNLOCKED "+discoveries.unlocked().size(),865,245,Color.WHITE);
-                label(batch,font,shortLabel(technologyNotice,50),855,197,Color.CYAN);
+                label(batch,font,shortLabel(upgrade.tradeoff,48),865,215,MUTED);
+                label(batch,font,String.format(java.util.Locale.ROOT,
+                        "OUTPUT x%.2f / MASS x%.2f / HEAT x%.2f",
+                        upgrade.output,upgrade.mass,upgrade.heat),865,184,Color.CYAN);
+                label(batch,font,shortLabel(technologyNotice,100),352,104,Color.CYAN);
                 label(batch,font,"BACK TO LICENSES",49,68,Color.WHITE);
                 label(batch,font,armedTechnology!=null&&armedTechnology.equals(id)?
                         "CONFIRM RESEARCH":"AUTHORIZE PROJECT",945,68,Color.WHITE);
