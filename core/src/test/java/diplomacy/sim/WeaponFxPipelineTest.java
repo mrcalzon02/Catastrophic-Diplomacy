@@ -3,6 +3,8 @@ package diplomacy.sim;
 import diplomacy.fx.WeaponFxProfile;
 import diplomacy.fx.WeaponFxProfile.Clip;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 /** Headless contract test: visual stages must never re-run weapon physics or invent impacts. */
@@ -53,16 +55,24 @@ public final class WeaponFxPipelineTest {
         require(one.fingerprint()==copy.fingerprint(),"art events must not change deterministic physics");
         require(serialize(one).equals(serialize(copy)),"firing and impact events are deterministic");
         Set<Long> fireIds=new HashSet<>();
+        Map<Long,double[]> firedAt=new HashMap<>();
         boolean hit=false;
         long lastSequence=0;
         for(Battle.VisualEvent e:one.visualEvents()){
             require(e.sequence()>lastSequence,"monotonic notification sequence");
             lastSequence=e.sequence();
-            if(e.phase()==Battle.VisualPhase.FIRE && e.weapon().equals("LASER"))
+            if(e.phase()==Battle.VisualPhase.FIRE && e.weapon().equals("LASER")){
                 fireIds.add(e.shotId());
+                firedAt.put(e.shotId(),new double[]{e.targetX(),e.targetY()});
+            }
             if(e.phase()==Battle.VisualPhase.IMPACT && e.weapon().equals("LASER")){
                 require(fireIds.contains(e.shotId()),"impact must reference its earlier firing");
-                require(e.x()==e.targetX()&&e.y()==e.targetY(),"impact anchored to collision target");
+                double[] aimed=firedAt.get(e.shotId());
+                require(aimed!=null&&e.x()==aimed[0]&&e.y()==aimed[1],
+                        "damage must land exactly where the beam actually aimed");
+                double radial=StrictMath.hypot(e.x()-e.targetX(),e.y()-e.targetY());
+                require(radial>1e-5 && radial<=32,
+                        "impact must hit a local surface module, not empty space or center mass");
                 hit=true;
             }
         }
