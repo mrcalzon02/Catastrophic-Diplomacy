@@ -28,6 +28,17 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final java.util.Map<Texture,Texture> severeLayers =
             new java.util.IdentityHashMap<>();
     private final Pixmap damagedMaterial, destroyedMaterial;
+    // A compact per-vessel overlay keeps irregular hull peeling inexpensive
+    // even when several hundred damaged vessels share the same original PNG.
+    private static final int MASK_W=96, MASK_H=144;
+    private static final class Peel {
+        Texture overlay, original;
+        long signature=Long.MIN_VALUE;
+    }
+    private final java.util.Map<Integer,Peel> peeled=new java.util.HashMap<>();
+    private final java.util.Map<Texture,Pixmap> sourcePixels =
+            new java.util.IdentityHashMap<>();
+    private Battle activeBattle;
     private static String spriteName(Shipyard.Hull hull) {
         return switch(hull.spriteHull()) {
             case INTERCEPTOR -> "interceptor";
@@ -146,6 +157,90 @@ public final class TerranPlaceholderSprites implements Disposable {
         return false;
     }
 
+    private Pixmap sourcePixels(Texture texture){
+        Pixmap source=sourcePixels.get(texture);
+        if(source!=null)return source;
+        String path=originals.get(texture);
+        if(path==null)throw new IllegalStateException("Original hull art source not indexed");
+        source=new Pixmap(Gdx.files.internal(path));
+        sourcePixels.put(texture,source);
+        return source;
+    }
+    /** Only armor changes invalidate the overlay; regenerating shields do not. */
+    private static long armorSignature(Battle.Ship ship) {
+        long result=0xcbf29ce484222325L;
+        for(int row=0;row<GRID;row++)for(int col=0;col<GRID;col++){
+            var tile=ship.defense.tile(row,col);
+            long quantized=tile.occupied?StrictMath.round(tile.exposure()*128.0):0;
+            result=(result^quantized)*0x100000001b3L;
+        }
+        return result;
+    }
+    private static float exposure(Battle.Ship ship,int row,int col) {
+        if(row<0||col<0||row>=GRID||col>=GRID)return 0;
+        var tile=ship.defense.tile(row,col);
+        return tile.occupied?(float)tile.exposure():0;
+    }
+    private static float surfaceExposure(Battle.Ship ship,double row,double col) {
+        int r=(int)StrictMath.floor(row),c=(int)StrictMath.floor(col);
+        float dy=(float)(row-r),dx=(float)(col-c);
+        float first=exposure(ship,r,c)*(1-dx)+exposure(ship,r,c+1)*dx;
+        float second=exposure(ship,r+1,c)*(1-dx)+exposure(ship,r+1,c+1)*dx;
+        return first*(1-dy)+second*dy;
+    }
+    private static float noise(int x,int y,int salt) {
+        int hash=x*374761393+y*668265263+salt*224682251;
+        hash=(hash^(hash>>>13))*1274126177;
+        return ((hash^(hash>>>16))&0xffff)/65535f-0.5f;
+    }
+    /**
+     * Per-pixel original hull opacity is eroded by the actual tile armor loss.
+     * Neighbor bilinear sampling removes grid edges; stable fine/coarse noise
+     * makes irregular crater lips instead of square checkerboard transparency.
+     * The pixel's existing RGBA alpha is never increased or extended off-hull.
+     */
+    private Texture erodedExterior(Battle.Ship ship,Texture original){
+        Peel item=peeled.computeIfAbsent(ship.id,id->new Peel());
+        long signature=armorSignature(ship);
+        if(item.original==original && item.overlay!=null && item.signature==signature)
+            return item.overlay;
+        Pixmap source=sourcePixels(original);
+        Pixmap output=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
+        output.setBlending(Pixmap.Blending.None);
+        try {
+            for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
+                int originalPixel=source.getPixel(x*source.getWidth()/MASK_W,
+                        y*source.getHeight()/MASK_H);
+                int originalAlpha=originalPixel&255;
+                if(originalAlpha==0){output.drawPixel(x,y,0);continue;}
+                double tileRow=(y+0.5)*GRID/MASK_H-0.5;
+                double tileCol=(x+0.5)*GRID/MASK_W-0.5;
+                float damage=surfaceExposure(ship,tileRow,tileCol);
+                float rough=noise(x/4,y/4,ship.id)*0.70f+
+                        noise(x,y,ship.id*31)*0.30f;
+                float erosion=Math.max(0,Math.min(1,
+                        damage*1.16f+rough*Math.min(0.45f,damage*0.70f)));
+                int alpha=Math.max(0,Math.min(255,
+                        (int)(originalAlpha*(1f-erosion)+0.5f)));
+                output.drawPixel(x,y,(originalPixel&0xffffff00)|alpha);
+            }
+            if(item.overlay==null){
+                item.overlay=new Texture(output);
+                item.overlay.setFilter(Texture.TextureFilter.Linear,
+                        Texture.TextureFilter.Linear);
+            }else item.overlay.draw(output,0,0);
+            item.original=original;
+            item.signature=signature;
+            return item.overlay;
+        } finally { output.dispose(); }
+    }
+    private void resetPeelCache() {
+        for(Peel item:peeled.values())if(item.overlay!=null)item.overlay.dispose();
+        peeled.clear();
+    }
+    /** Current count of individual ship masks, useful for mass-fleet verification. */
+    public int individualPeelMasks(){return peeled.size();}
+
     /** Runtime diagnostic: distinct original-art silhouettes with generated, alpha-masked internal layers. */
     public int damageLayersBuilt() { return damagedLayers.size()+severeLayers.size(); }
 
@@ -180,11 +275,14 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch) {
         if(textures.isEmpty())return;
-        // Texture uploads must complete OUTSIDE SpriteBatch's active GL draw.
-        // Most undamaged ships never allocate a second texture.
-        for(Battle.Ship ship:battle.ships())if(hasSprite(ship)&&breached(ship))
-            exposedInterior(texture(ship.faction,ship.hullClass),
-                    ship.hull<ship.maxHull*0.30);
+        if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
+        // Upload damage masks outside the SpriteBatch; only changed quantized
+        // armor cells rebuild. One damaged ship draws two hull quads, not 256.
+        for(Battle.Ship ship:battle.ships())if(hasSprite(ship)&&breached(ship)){
+            Texture tex=texture(ship.faction,ship.hullClass);
+            exposedInterior(tex,ship.hull<ship.maxHull*0.30);
+            erodedExterior(ship,tex);
+        }
         batch.begin();
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship))continue;
@@ -207,26 +305,9 @@ public final class TerranPlaceholderSprites implements Disposable {
             // Damaged hulls never become opaque gray ovals.
             drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*0.30),
                     ship,width,height,rotation);
-            // One shared UV/grid layout for exterior and internal structure.
-            // Only breached ships need the more expensive 16x16 texture draws.
-            final float radians=(float)StrictMath.toRadians(rotation);
-            final float cos=(float)StrictMath.cos(radians),sin=(float)StrictMath.sin(radians);
-            for(int row=0;row<GRID;row++)for(int col=0;col<GRID;col++) {
-                var tile=ship.defense.tile(row,col);
-                if(!tile.occupied || tile.exposure()>=0.999)continue;
-                int sx=col*tex.getWidth()/GRID,ex=(col+1)*tex.getWidth()/GRID;
-                int sy=row*tex.getHeight()/GRID,ey=(row+1)*tex.getHeight()/GRID;
-                float tileW=width*(ex-sx)/tex.getWidth();
-                float tileH=height*(ey-sy)/tex.getHeight();
-                float offX=width*((sx+ex)*0.5f/tex.getWidth()-0.5f);
-                float offY=height*(0.5f-(sy+ey)*0.5f/tex.getHeight());
-                float midX=(float)ship.x+offX*cos-offY*sin;
-                float midY=(float)ship.y+offX*sin+offY*cos;
-                batch.setColor(1,1,1,(float)(1-tile.exposure()));
-                batch.draw(tex,midX-tileW/2,midY-tileH/2,
-                        tileW/2,tileH/2,tileW,tileH,1,1,rotation,
-                        sx,sy,ex-sx,ey-sy,false,false);
-            }
+            // Progressive pixel-level peeling: irregular alpha reveals the
+            // original silhouette-masked damaged surface directly beneath.
+            drawWhole(batch,peeled.get(ship.id).overlay,ship,width,height,rotation);
             drawShield(batch,ship,tex,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
@@ -253,6 +334,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(var fleet:textures.values())
             for(Texture image:fleet.values())if(disposed.add(image))image.dispose();
         textures.clear();
+        resetPeelCache();activeBattle=null;
+        for(Pixmap pixels:sourcePixels.values())pixels.dispose();
+        sourcePixels.clear();
         for(Texture image:damagedLayers.values())image.dispose();
         for(Texture image:severeLayers.values())image.dispose();
         damagedLayers.clear();severeLayers.clear();originals.clear();
