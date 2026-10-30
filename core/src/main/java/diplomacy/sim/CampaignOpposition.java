@@ -48,8 +48,14 @@ public final class CampaignOpposition {
 
     public static Operation operation(int mission){
         LevelEconomy.Level level=LevelEconomy.level(mission);
-        return level.inSector()==50?Operation.SECTOR_CAPITAL:
-                CIRCUIT[(level.inSector()-1)%CIRCUIT.length];
+        if(level.inSector()==50)return Operation.SECTOR_CAPITAL;
+        int position=(level.inSector()-1)%CIRCUIT.length;
+        int front=(level.inSector()-1)/CIRCUIT.length;
+        // Every ten-system front contains a full combined-arms circuit, but
+        // rotate the order between fronts/chapters instead of repeating the
+        // same tactical script fifty times. Mission 1 is always a patrol.
+        int rotation=(front+(level.sector()-1)*2)%CIRCUIT.length;
+        return CIRCUIT[(position+rotation)%CIRCUIT.length];
     }
 
     /** Sector I is Tech 0, sectors II-X advance inclusively to Tech IX. */
