@@ -72,13 +72,9 @@ public final class TerranPlaceholderSprites implements Disposable {
                         ?"ships/terran/"+spriteName(hull)+".png"
                         :FactionArt.runtimePath(faction,hull);
                 if(file==null||!Gdx.files.internal(file).exists())continue;
-                // Carrier/dreadnought share one atlas ship until an eleventh
-                // capital image exists. Avoid loading duplicate GPU textures.
-                if(hull.spriteHull()==Shipyard.Hull.DREADNOUGHT &&
-                        fleet.containsKey(Shipyard.Hull.CARRIER)){
-                    fleet.put(hull,fleet.get(Shipyard.Hull.CARRIER));
-                    continue;
-                }
+                // Source art may contain a UNIQUE dreadnought (Terran and the
+                // five legacy fleets). Reuse textures only when runtime paths
+                // actually match, via the shared per-path cache below.
                 if(fleet.containsKey(hull.spriteHull())){
                     fleet.put(hull,fleet.get(hull.spriteHull()));
                     continue;
