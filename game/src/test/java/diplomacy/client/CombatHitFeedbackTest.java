@@ -43,7 +43,7 @@ public final class CombatHitFeedbackTest {
         check(feedback.count()==3,"zero damage does not invent a shield hit");
         feedback.afterStep(battle,List.of(hit(4,battle.tick,ship.id,105,200)));
         check(feedback.count()==3,"duplicate event sequence ignored");
-        float originalHull=(float)ship.hull;
+        double originalHull=ship.hull;
         for(int i=0;i<8;i++)feedback.advance(battle,.08f,false);
         check(feedback.count()==3,"pausing holds effects");
         for(int i=0;i<8;i++)feedback.advance(battle,.08f,true);
