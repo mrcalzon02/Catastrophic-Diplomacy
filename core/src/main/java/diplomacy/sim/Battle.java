@@ -1356,7 +1356,7 @@ public final class Battle {
                     double affordable=Math.min(desired,(source.power-5)*efficiency/3.2);
                     double gained=weakest.defense.receiveShieldTransfer(affordable);
                     if(gained>0){
-                        source.power-=gained*1.1/efficiency;source.heat+=gained*0.13;
+                        source.power-=gained*3.2/efficiency;source.heat+=gained*0.20;
                         weakest.shields=weakest.defense.totalShields();
                         source.shieldsTransferred+=gained;
                         supportLinks.add(new SupportLink(source,weakest,SupportKind.SHIELD,
