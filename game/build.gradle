@@ -179,3 +179,12 @@ tasks.register('combatPropulsionFxSmoke', JavaExec) {
     mainClass = 'diplomacy.client.CombatPropulsionFxTest'
 }
 tasks.named('lightingSmoke') { dependsOn tasks.named('combatPropulsionFxSmoke') }
+
+tasks.register('shieldSurfaceSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify silhouette-safe shield rims, real facing depletion, tick-stable shimmer and shield LOD.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShieldSurfaceModelTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('shieldSurfaceSmoke') }

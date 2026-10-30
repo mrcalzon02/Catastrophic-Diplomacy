@@ -28,6 +28,7 @@ public final class FighterCraftSprites implements Disposable {
         "electronic_warfare","support_drone"
     };
     private final Map<String,Texture> originals=new HashMap<>();
+    private final Map<Integer,Battle.Ship> vesselById=new HashMap<>();
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
     public int litCraftMaterials(){return surfaces.materialCount();}
     private final Texture unassignedWireframe;
@@ -102,7 +103,7 @@ public final class FighterCraftSprites implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
                        CombatViewBounds view) {
-        Map<Integer,Battle.Ship> vesselById=new HashMap<>();
+        vesselById.clear();
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
         surfaces.begin(batch,battle,view);
         batch.setColor(1,1,1,1);

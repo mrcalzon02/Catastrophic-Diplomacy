@@ -175,6 +175,13 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(shieldSections.containsKey(original))return;
         Pixmap source=sourcePixels(original);
         Texture[] layers=new Texture[DirectionalDefense.Facing.values().length];
+        // One downsample of the *original* silhouette is reused for all four
+        // quadrants, rather than sampling a Pixmap 4x for every neighbor.
+        int[] alpha=new int[MASK_W*MASK_H];
+        for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
+            alpha[y*MASK_W+x]=source.getPixel(x*source.getWidth()/MASK_W,
+                    y*source.getHeight()/MASK_H)&255;
+        }
         for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
             Pixmap pix=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
             pix.setBlending(Pixmap.Blending.None);
@@ -184,17 +191,23 @@ public final class TerranPlaceholderSprites implements Disposable {
                     double towardPort=1-(x+0.5)*2.0/MASK_W;
                     if(DirectionalDefense.facingFor(towardBow,towardPort)!=face)
                         continue;
-                    int art=source.getPixel(x*source.getWidth()/MASK_W,
-                            y*source.getHeight()/MASK_H);
-                    int alpha=art&255;
-                    if(alpha==0)continue;
+                    int offset=y*MASK_W+x;
+                    int sourceAlpha=alpha[offset];
+                    if(sourceAlpha==0)continue;
+                    int left=alpha[y*MASK_W+Math.max(0,x-1)];
+                    int right=alpha[y*MASK_W+Math.min(MASK_W-1,x+1)];
+                    int up=alpha[Math.max(0,y-1)*MASK_W+x];
+                    int down=alpha[Math.min(MASK_H-1,y+1)*MASK_W+x];
+                    int left2=alpha[y*MASK_W+Math.max(0,x-2)];
+                    int right2=alpha[y*MASK_W+Math.min(MASK_W-1,x+2)];
+                    int up2=alpha[Math.max(0,y-2)*MASK_W+x];
+                    int down2=alpha[Math.min(MASK_H-1,y+2)*MASK_W+x];
+                    int edge=ShieldSurfaceModel.edge(sourceAlpha,left,right,up,down,
+                            left2,right2,up2,down2);
                     int material=shieldMaterial.getPixel(
                             x*shieldMaterial.getWidth()/MASK_W,
                             y*shieldMaterial.getHeight()/MASK_H);
-                    int materialAlpha=material&255;
-                    int strength=alpha*materialAlpha/255;
-                    if(strength==0)continue;
-                    pix.drawPixel(x,y,(material&0xffffff00)|strength);
+                    pix.drawPixel(x,y,ShieldSurfaceModel.material(material,sourceAlpha,edge));
                 }
                 Texture layer=new Texture(pix);
                 layer.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
@@ -387,14 +400,17 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
             float height=(float)(34*ship.visualScale());
             float width=height*tex.getWidth()/(float)tex.getHeight();
+            if(!ShieldSurfaceModel.drawable(height,view==null?1280: view.right-view.left))
+                continue;
             drawShield(batch,ship,tex,pose,width,height,
-                    (float)(StrictMath.toDegrees(pose.angle())-90));
+                    (float)(StrictMath.toDegrees(pose.angle())-90),battle.tick);
         }
         batch.setColor(1,1,1,1);
         batch.end();
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
-                            BattleRenderPoses.Pose pose,float width,float height,float rotation) {
+                            BattleRenderPoses.Pose pose,float width,float height,
+                            float rotation,long tick) {
         if(ship.maxShields<=0||ship.shields<=0)return;
         Texture[] sectors=shieldSections.get(original);
         if(sectors==null)throw new IllegalStateException("Missing actual shield texture overlay");
@@ -402,8 +418,9 @@ public final class TerranPlaceholderSprites implements Disposable {
             double maximum=ship.defense.maxShields(face);
             if(maximum<=0)continue;
             float strength=(float)Math.min(1,ship.defense.shields(face)/maximum);
-            if(strength<=0.003f)continue;
-            batch.setColor(1,1,1,0.38f*strength);
+            float opacity=ShieldSurfaceModel.opacity(strength,tick,ship.id,face.ordinal());
+            if(opacity<=0f)continue;
+            batch.setColor(1,1,1,opacity);
             drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
