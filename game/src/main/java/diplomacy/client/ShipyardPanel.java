@@ -226,7 +226,7 @@ final class ShipyardPanel {
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         if(!report.valid()){notice="Cannot save unserviceable ship: "+report.explanation();return;}
         if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&!campaignPermitted())return;
-        if(usage==Usage.SKIRMISH){
+        if(!campaignTechnology()){
             try{skirmishRules.get().requireAllowed(draft,catalog);}
             catch(IllegalArgumentException blocked){notice=blocked.getMessage();return;}
         }
@@ -333,7 +333,7 @@ final class ShipyardPanel {
             return;
         }
         if(usage==Usage.CAMPAIGN&&!campaignPermitted())return;
-        if(usage==Usage.SKIRMISH){
+        if(!campaignTechnology()){
             try{skirmishRules.get().requireAllowed(draft,catalog);}
             catch(IllegalArgumentException blocked){notice="CHALLENGE BLOCKED: "+blocked.getMessage();return;}
         }
@@ -415,7 +415,7 @@ final class ShipyardPanel {
         return campaignTechnology()&&campaignDiscoveries!=null?campaignDiscoveries.get():null;
     }
     private SkirmishTechnologyRules challenge(){
-        return usage==Usage.SKIRMISH?skirmishRules.get():SkirmishTechnologyRules.unrestricted();
+        return campaignTechnology()?SkirmishTechnologyRules.unrestricted():skirmishRules.get();
     }
     private String technologyId(){
         Shipyard.Installed selected=draft.at(selectedSlot);
@@ -428,8 +428,8 @@ final class ShipyardPanel {
         return ShipTechnologyFit.available(draft,catalog,challenge(),slot,track,stage);
     }
     private void exportChallenge(){
-        if(usage!=Usage.SKIRMISH){
-            notice="Portable challenges are exported from the skirmish shipyard.";return;
+        if(campaignTechnology()){
+            notice="Campaign blueprints use the campaign research authority.";return;
         }
         try{
             String encoded=SkirmishShipExchange.encode(draft,challenge(),catalog);
@@ -439,8 +439,8 @@ final class ShipyardPanel {
         }catch(RuntimeException rejected){notice="EXPORT BLOCKED: "+rejected.getMessage();}
     }
     private void importChallenge(){
-        if(usage!=Usage.SKIRMISH){
-            notice="Import a skirmish challenge from the skirmish shipyard.";return;
+        if(campaignTechnology()){
+            notice="Campaign research is not overwritten by challenge imports.";return;
         }
         try{
             var file=Gdx.files.local("shipyard/import.cdship");
@@ -461,7 +461,7 @@ final class ShipyardPanel {
             return;
         }
         if(action>=30&&action<34){
-            if(usage!=Usage.SKIRMISH){notice="Campaign research is owned in the laboratory.";return;}
+            if(campaignTechnology()){notice="Campaign research is owned in the laboratory.";return;}
             Shipyard.Track branch=Shipyard.Track.values()[action-30];
             updateSkirmishRules.accept(challenge().toggleTrack(branch));
             notice="SKIRMISH "+branch+" branch permitted: "+challenge().allowedTracks().contains(branch);
@@ -470,7 +470,7 @@ final class ShipyardPanel {
         if(action==10){exportChallenge();return;}
         if(action==11){importChallenge();return;}
         if(action==12||action==13){
-            if(usage!=Usage.SKIRMISH){notice="Campaign hull permissions are researched in the campaign.";return;}
+            if(campaignTechnology()){notice="Campaign hull permissions are researched in the campaign.";return;}
             var current=challenge();
             java.util.Set<Shipyard.Hull> allowed=new java.util.HashSet<>(current.allowedHulls());
             if(action==13)allowed.clear();
@@ -482,7 +482,7 @@ final class ShipyardPanel {
             return;
         }
         if(action==5||action==6||action==7||action==8||action==9){
-            if(usage!=Usage.SKIRMISH){notice="Only skirmish challenges can change their tech gates.";return;}
+            if(campaignTechnology()){notice="Campaign research cannot be edited in the shipyard.";return;}
             var rules=challenge();
             try{
                 if(action==5)rules=rules.withStage(Math.max(0,rules.maxStage()-1));
@@ -821,8 +821,8 @@ final class ShipyardPanel {
         font.draw(batch,"FIT SOCKET",816,240);
         font.draw(batch,"FIT FAMILY",955,240);
         font.draw(batch,"SHIP DOCTRINE",1101,240);
-        font.draw(batch,usage==Usage.SKIRMISH?"TECH CAP -":"CLEAR SLOT",814,185);
-        font.draw(batch,usage==Usage.SKIRMISH?"TECH CAP +":"CONFIG",954,185);
+        font.draw(batch,campaign?"CAMPAIGN":"TECH CAP -",814,185);
+        font.draw(batch,campaign?"OWNED":"TECH CAP +",954,185);
         font.draw(batch,"BAN/ALLOW TECH",1086,185);
         font.draw(batch,"HULL GEN -",817,138);
         font.draw(batch,"HULL GEN +",1016,138);
