@@ -36,6 +36,16 @@ public final class ShipSurfaceDamageTest {
         var world=ShipDamageTargeting.physical(0,10,StrictMath.PI/2);
         equal(world.x(),.4,"World collision rotates into bow-local coordinates");
         equal(world.y(),0,"World collision respects hull heading");
+        check(ShipDamageTargeting.nearestModule(slots,one)==one.slotIndex(),
+                "Physical impact must find the fitted module at that exact surface location");
+        check(ShipDamageTargeting.subsystem("BASE-TER-REA")==Battle.Subsystem.REACTOR,
+                "Damaged fitted reactor must affect reactor condition");
+        check(ShipDamageTargeting.subsystem("BASE-TER-LAS")==Battle.Subsystem.WEAPONS,
+                "Damaged laser mount must affect weapon systems");
+        check(ShipDamageTargeting.subsystem("BASE-TER-FTR")==Battle.Subsystem.HANGAR,
+                "Damaged fighter hangar must affect launch machinery");
+        check(ShipDamageTargeting.subsystem("BASE-TER-ECM")==Battle.Subsystem.ELECTRONIC_WARFARE,
+                "Electronic warfare modules must retain a localized damage identity");
         check(ShipDamageTargeting.radius(Battle.DamageType.TORPEDO)>
                 ShipDamageTargeting.radius(Battle.DamageType.LASER),
                 "Heavy warheads must affect a wider armor neighborhood");
