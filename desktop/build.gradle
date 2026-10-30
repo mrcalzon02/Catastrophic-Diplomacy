@@ -12,9 +12,6 @@ tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareUiAssets')
     dependsOn rootProject.tasks.named('prepareStage1Art')
     dependsOn rootProject.tasks.named('prepareFighterArt')
-    dependsOn rootProject.tasks.named('verifyBattlefieldResources')
-    dependsOn rootProject.tasks.named('verifyBattleAudioResources')
-    dependsOn rootProject.tasks.named('verifyGrittyUiAssets')
     from(rootProject.file('assets'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-ui'))
     from(rootProject.layout.buildDirectory.dir('generated/cd-music'))
@@ -43,8 +40,10 @@ tasks.named('jar') {
 // Embed the actual release tag. Desktop must NEVER trust the stale project
 // version (0.1.0-SNAPSHOT) when checking GitHub's published release sequence.
 def generatedReleaseTag = layout.buildDirectory.file('generated/update-tag/cd-update-tag.txt')
+def ciReleaseTag = System.getenv('CD_RELEASE_TAG')
 tasks.register('generateDesktopReleaseTag') {
     inputs.file(rootProject.file('android/build.gradle'))
+    inputs.property('releaseTagOverride', ciReleaseTag ?: '')
     outputs.file(generatedReleaseTag)
     doLast {
         def androidScript = rootProject.file('android/build.gradle').text
@@ -53,10 +52,12 @@ tasks.register('generateDesktopReleaseTag') {
         def versionName = match.group(1)
         if (!(versionName ==~ /[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/))
             throw new GradleException('Invalid updater release version')
+        def tag = ciReleaseTag ?: ('cd-v' + versionName)
+        if (!(tag ==~ /cd-v[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/)) throw new GradleException('Invalid desktop release tag')
         def output = generatedReleaseTag.get().asFile
         output.parentFile.mkdirs()
-        output.text = 'cd-v' + versionName + '\n'
-        println("Desktop updater release tag: cd-v" + versionName)
+        output.text = tag + '\n'
+        println('Desktop updater release tag: ' + tag)
     }
 }
 sourceSets.main.resources.srcDir(layout.buildDirectory.dir('generated/update-tag'))

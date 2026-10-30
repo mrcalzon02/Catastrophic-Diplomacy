@@ -35,7 +35,8 @@ if ([string]::IsNullOrWhiteSpace($upgrade)) {
   if ($null -eq $row) { throw 'No upgrade identity in MSI Upgrade table' }
   $upgrade = $row.StringData(1)
 }
-if ($version -ne '0.1.5') { throw "MSI version mismatch: $version" }
+$expectedVersion = if ($env:CD_MSI_APP_VERSION) { $env:CD_MSI_APP_VERSION } else { '0.1.5' }
+if ($version -ne $expectedVersion) { throw "MSI version mismatch: $version; expected $expectedVersion" }
 # COM Automation values may be null or variant types. Normalize using a
 # PowerShell string conversion BEFORE any method calls on those values.
 $normalizedUpgrade = [string]$upgrade
@@ -64,6 +65,16 @@ try {
   if ($null -eq $launcher) { throw 'Installed MSI launcher not found under per-user application directory' }
   if (!(Test-Path (Join-Path $launcher.DirectoryName 'runtime/release'))) {
     throw 'Installed MSI does not include the Java runtime'
+  }
+  $game = Start-Process -FilePath $launcher.FullName -WorkingDirectory $launcher.DirectoryName -PassThru
+  try {
+    Start-Sleep -Seconds 12
+    $game.Refresh()
+    if ($game.HasExited) { throw "Installed Windows game exited during startup (code $($game.ExitCode))" }
+    Write-Host 'PASS: installed Windows game stayed running'
+  } finally {
+    $game.Refresh()
+    if (-not $game.HasExited) { Stop-Process -Id $game.Id -Force -ErrorAction SilentlyContinue }
   }
   Write-Host "PASS: MSI installed launcher and bundled Java at $($launcher.FullName)"
 }

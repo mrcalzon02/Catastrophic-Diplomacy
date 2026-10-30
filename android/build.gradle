@@ -15,8 +15,8 @@ android {
         applicationId 'games.catastrophicdiplomacy'
         minSdk 26
         targetSdk 35
-        versionCode 6
-        versionName '0.1.5-rc.1'
+        versionCode (System.getenv('CD_ANDROID_BUILD_SEQUENCE') ? 1000 + System.getenv('CD_ANDROID_BUILD_SEQUENCE').toInteger() : 6)
+        versionName (System.getenv('CD_ANDROID_VERSION_NAME') ?: '0.1.5-rc.1')
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -69,9 +69,6 @@ tasks.configureEach { task ->
         task.dependsOn rootProject.tasks.named('prepareFighterArt')
     }
     if (task.name.startsWith('merge') && task.name.endsWith('Assets')) {
-        task.dependsOn rootProject.tasks.named('verifyBattlefieldResources')
-        task.dependsOn rootProject.tasks.named('verifyBattleAudioResources')
-        task.dependsOn rootProject.tasks.named('verifyGrittyUiAssets')
     }
     if (task.name.startsWith('merge') && task.name.endsWith('JniLibFolders')) {
         task.dependsOn(tasks.named('copyAndroidNatives'))

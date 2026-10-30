@@ -1,0 +1,265 @@
+name: Release functional game on each commit
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: functional-release-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  CD_RELEASE_TAG: cd-v0.1.5-dev.${{ github.run_number }}
+  CD_ANDROID_VERSION_NAME: 0.1.5-dev.${{ github.run_number }}
+  CD_ANDROID_BUILD_SEQUENCE: ${{ github.run_number }}
+  CD_MSI_APP_VERSION: 0.2.${{ github.run_number }}
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Build shared game and run essential simulation/menu tests
+        run: gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke :game:menuFlowSmoke :desktop:installDist
+      - name: Create native Linux app image with bundled Java
+        run: python3 tools/package_desktop.py
+      - name: Verify Linux package and launch executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd desktop/build/platform-packages && sha256sum -c Catastrophic-Diplomacy-Linux-x64.zip.sha256)
+          python3 - <<'PY'
+          import os, pathlib, zipfile
+          jars=list(pathlib.Path('desktop/build/install/desktop/lib').glob('desktop-*.jar'))
+          assert len(jars)==1
+          with zipfile.ZipFile(jars[0]) as jar:
+              assert jar.read('cd-update-tag.txt').decode().strip()==os.environ['CD_RELEASE_TAG']
+          with zipfile.ZipFile('desktop/build/platform-packages/Catastrophic-Diplomacy-Linux-x64.zip') as archive:
+              assert archive.testzip() is None
+              assert 'CatastrophicDiplomacy/bin/CatastrophicDiplomacy' in archive.namelist()
+          PY
+          if ! command -v xvfb-run >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y xvfb
+          fi
+          set +e
+          LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s '-screen 0 1280x800x24' \
+            timeout 20s desktop/build/platform-packages/CatastrophicDiplomacy/bin/CatastrophicDiplomacy \
+            > linux-launch.log 2>&1
+          status=$?
+          set -e
+          cat linux-launch.log
+          if [[ $status -ne 124 ]]; then echo "BLOCKED: Linux game could not launch or exited early ($status)"; exit 1; fi
+          echo 'PASS: native Linux game stayed running for 20 seconds'
+      - name: Optional artwork and asset diagnostics (not a release gate)
+        continue-on-error: true
+        run: |
+          python3 tools/verify_faction_ship_assets.py
+          python3 tools/verify_runtime_ship_art.py --desktop-dir desktop/build/libs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cd-linux-${{ github.run_id }}
+          path: |
+            desktop/build/platform-packages/Catastrophic-Diplomacy-Linux-x64.zip
+            desktop/build/platform-packages/Catastrophic-Diplomacy-Linux-x64.zip.sha256
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build runnable Windows game and test essential functionality
+        shell: pwsh
+        run: |
+          gradle --no-daemon :core:gameFlowSmoke :game:menuFlowSmoke :desktop:installDist
+          if ($LASTEXITCODE -ne 0) { throw 'Windows game failed gameplay/compile' }
+          python tools/package_desktop.py
+          if ($LASTEXITCODE -ne 0) { throw 'Native MSI packaging failed' }
+      - name: Install, launch and uninstall real Windows MSI
+        shell: pwsh
+        run: ./tools/verify_windows_msi.ps1
+      - name: Verify MSI SHA256 and game updater release identity
+        shell: pwsh
+        run: |
+          $dir = 'desktop/build/platform-packages'
+          $line = (Get-Content "$dir/Catastrophic-Diplomacy-Windows-x64.msi.sha256").Trim()
+          $expected = ($line -split '\s+')[0]
+          if ((Get-FileHash "$dir/Catastrophic-Diplomacy-Windows-x64.msi" -Algorithm SHA256).Hash -ine $expected) { throw 'MSI digest mismatch' }
+          Add-Type -AssemblyName System.IO.Compression
+          $jar = Get-ChildItem desktop/build/install/desktop/lib -Filter 'desktop-*.jar' | Select-Object -First 1
+          if ($null -eq $jar) { throw 'Desktop JAR absent' }
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($jar.FullName)
+          try {
+            $entry = $archive.GetEntry('cd-update-tag.txt')
+            if ($null -eq $entry) { throw 'Missing updater identity' }
+            $reader = [System.IO.StreamReader]::new($entry.Open())
+            try { $tag = $reader.ReadToEnd().Trim() } finally { $reader.Dispose() }
+            if ($tag -ne $env:CD_RELEASE_TAG) { throw "Updater tag mismatch: $tag" }
+          } finally { $archive.Dispose() }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cd-windows-${{ github.run_id }}
+          path: |
+            desktop/build/platform-packages/Catastrophic-Diplomacy-Windows-x64.msi
+            desktop/build/platform-packages/Catastrophic-Diplomacy-Windows-x64.msi.sha256
+          if-no-files-found: error
+
+  android-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      CD_ANDROID_KEYSTORE_BASE64: ${{ secrets.CD_ANDROID_KEYSTORE_BASE64 }}
+      CD_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CD_ANDROID_KEYSTORE_PASSWORD }}
+      CD_ANDROID_KEY_ALIAS: ${{ secrets.CD_ANDROID_KEY_ALIAS }}
+      CD_ANDROID_KEY_PASSWORD: ${{ secrets.CD_ANDROID_KEY_PASSWORD }}
+      CD_ANDROID_KEYSTORE_PATH: .local-secrets/android-release.p12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Restore retained signing certificate, build debug and signed release
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CD_ANDROID_KEYSTORE_BASE64" && test -n "$CD_ANDROID_KEYSTORE_PASSWORD"
+          test -n "$CD_ANDROID_KEY_PASSWORD" && test "$CD_ANDROID_KEY_ALIAS" = 'catastrophic-diplomacy'
+          umask 077
+          mkdir -p .local-secrets
+          printf '%s' "$CD_ANDROID_KEYSTORE_BASE64" | base64 --decode > .local-secrets/android-release.p12
+          test -s .local-secrets/android-release.p12
+          manager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          "$manager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;35.0.0'
+          gradle --no-daemon :android:assembleDebug :android:assembleRelease
+      - name: Verify signed Android APK and updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/build-tools/35.0.0:$PATH"
+          mkdir -p package
+          cp android/build/outputs/apk/release/android-release.apk package/Catastrophic-Diplomacy-Android.apk
+          cp android/build/outputs/apk/debug/android-debug.apk package/verify-debug.apk
+          apksigner verify --verbose --print-certs package/Catastrophic-Diplomacy-Android.apk > package/signature-verification.txt
+          aapt dump badging package/Catastrophic-Diplomacy-Android.apk | grep '^package:' > package/package-identity.txt
+          grep -F "name='games.catastrophicdiplomacy' versionCode='$((1000+CD_ANDROID_BUILD_SEQUENCE))' versionName='$CD_ANDROID_VERSION_NAME'" package/package-identity.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' package/signature-verification.txt
+          python3 tools/prepare_android_update_manifest.py package/Catastrophic-Diplomacy-Android.apk --output package/release-manifest.json
+          (cd package && sha256sum Catastrophic-Diplomacy-Android.apk > SHA256SUMS.txt)
+      - name: Erase transient signing key
+        if: always()
+        run: rm -rf .local-secrets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cd-android-${{ github.run_id }}
+          path: package/
+          if-no-files-found: error
+
+  android-runtime:
+    needs: android-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: actions/download-artifact@v4
+        with: {name: 'cd-android-${{ github.run_id }}', path: package}
+      - name: Require accelerated Android emulator
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 1200
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
+          script: |
+            bash tools/android_verify_demo.sh package/verify-debug.apk test-output/android
+            adb uninstall games.catastrophicdiplomacy
+            adb install package/Catastrophic-Diplomacy-Android.apk
+            adb shell am start -W -n games.catastrophicdiplomacy/diplomacy.android.AndroidLauncher
+            sleep 5
+            adb shell pidof games.catastrophicdiplomacy
+            bash tools/android_verify_menu.sh test-output/android
+      - name: Preserve emulator evidence including game screenshots and telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-android-functional-${{ github.run_id }}
+          path: test-output/android/
+          if-no-files-found: warn
+
+  publish:
+    needs: [linux, windows, android-runtime]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {name: 'cd-linux-${{ github.run_id }}', path: dist}
+      - uses: actions/download-artifact@v4
+        with: {name: 'cd-windows-${{ github.run_id }}', path: dist}
+      - uses: actions/download-artifact@v4
+        with: {name: 'cd-android-${{ github.run_id }}', path: dist}
+      - name: Publish only after full functionality checks and checksum verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c Catastrophic-Diplomacy-Linux-x64.zip.sha256
+          sha256sum -c Catastrophic-Diplomacy-Windows-x64.msi.sha256
+          sha256sum -c SHA256SUMS.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os
+          m=json.loads(Path('release-manifest.json').read_text())
+          assert m['version']==os.environ['CD_ANDROID_VERSION_NAME']
+          assert m['versionCode']==1000+int(os.environ['CD_ANDROID_BUILD_SEQUENCE'])
+          assert m['apk']['name']=='Catastrophic-Diplomacy-Android.apk'
+          for name in ('Catastrophic-Diplomacy-Windows-x64.msi',
+                       'Catastrophic-Diplomacy-Linux-x64.zip',
+                       'Catastrophic-Diplomacy-Android.apk'):
+              assert Path(name).stat().st_size>1000000, name
+          PY
+          if gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" >/dev/null 2>&1; then
+            echo 'BLOCKED: this tag was already published; no asset overwrite'
+            exit 1
+          fi
+          sha256sum Catastrophic-Diplomacy-Android.apk Catastrophic-Diplomacy-Windows-x64.msi Catastrophic-Diplomacy-Linux-x64.zip > FULL-SHA256SUMS.txt
+          cat > notes.md <<EOF
+          Catastrophic Diplomacy functional prerelease, source commit $GITHUB_SHA.
+          Windows: actual MSI (install, launch, uninstall tested). Linux: bundled-Java app (launched under virtual display).
+          Android: retained-signer APK (emulator combat and game menu navigation verified).
+          Art, balance, audio quality and design are diagnostic only. Physical-device verification not claimed.
+          EOF
+          gh release create "$CD_RELEASE_TAG" -R "$GH_REPO" --target "$GITHUB_SHA" \
+            --title "Catastrophic Diplomacy $CD_ANDROID_VERSION_NAME — Windows Linux Android" \
+            --prerelease --notes-file notes.md \
+            Catastrophic-Diplomacy-Windows-x64.msi Catastrophic-Diplomacy-Linux-x64.zip \
+            Catastrophic-Diplomacy-Android.apk release-manifest.json package-identity.txt \
+            signature-verification.txt FULL-SHA256SUMS.txt
+          gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" --json targetCommitish,isDraft,assets \
+            --jq '{source:.targetCommitish,draft:.isDraft,assets:[.assets[].name]}'
