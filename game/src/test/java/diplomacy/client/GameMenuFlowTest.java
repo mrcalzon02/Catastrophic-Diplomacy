@@ -75,6 +75,26 @@ public final class GameMenuFlowTest {
                 "Campaign research authorization/return controls are unmapped");
         check(GameMenuPanel.researchAction(790,490)==-1,
                 "Research editor hits outside actual buttons");
+        check(GameMenuPanel.researchAction(450,60)==3,
+                "Campaign technology laboratory entry is not clickable");
+        check(GameMenuPanel.Screen.valueOf("TECHNOLOGY")!=null,
+                "Faction technology browser screen not present");
+        check(GameMenuPanel.technologyAction(110,575)==100&&
+                GameMenuPanel.technologyAction(390,458)==200&&
+                GameMenuPanel.technologyAction(760,160)==223,
+                "Tech subsystem/branch/stage hit targets do not match displayed controls");
+        check(GameMenuPanel.technologyAction(1050,59)==3&&
+                GameMenuPanel.technologyAction(108,60)==0,
+                "Technology lab confirmation and return are missing");
+        try{
+            TechnologyCatalog engineering=TechnologyCatalog.loadDefault();
+            var nativeParts=GameMenuPanel.technologySubsystems(engineering,Battle.Faction.TERRAN);
+            check(nativeParts.size()==22,"Technology browser must list all 22 native subsystem families");
+            check(engineering.get(GameMenuPanel.technologyId(Battle.Faction.TERRAN,
+                    "LAS",0,1))!=null,"Selected faction technology ID does not exist");
+        }catch(java.io.IOException missing){
+            throw new IllegalStateException("Native technology catalog not loadable",missing);
+        }
         var budget=new CampaignProgress.State(Battle.Faction.values()[0],1,1000000,0);
         var license=CampaignBudgetQuotes.research(budget,CampaignProgress.Project.LICENSE);
         check(license.allowed()&&license.cost()==budget.nextResearchCost()&&
