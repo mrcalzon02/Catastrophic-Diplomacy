@@ -4,6 +4,7 @@ import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.CampaignTechnology;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Read-only campaign budget preview. Ledger methods remain the only writers. */
@@ -61,4 +62,29 @@ final class CampaignBudgetQuotes {
             return quote(campaign.credits(),0,blocked.getMessage());
         }
     }
+    /** Production campaign quotations must check discoveries as well as licenses. */
+    static Quote refit(CampaignProgress.State campaign,CampaignTechnology.State discoveries,
+                       CampaignFleet.Roster roster,long shipId,Shipyard.Design design,
+                       TechnologyCatalog technology){
+        if(campaign==null||discoveries==null||roster==null||design==null||technology==null)
+            throw new IllegalArgumentException("Refit needs campaign research and a commissioned ship");
+        try{
+            CampaignShipyardRules.requireAllowed(design,campaign,discoveries,technology);
+            return quote(campaign.credits(),roster.refitCost(shipId,design,technology),null);
+        }catch(IllegalArgumentException blocked){
+            return quote(campaign.credits(),0,blocked.getMessage());
+        }
+    }
+    static Quote hull(CampaignProgress.State campaign,CampaignTechnology.State discoveries,
+                      Shipyard.Design design,TechnologyCatalog technology){
+        if(campaign==null||discoveries==null||design==null||technology==null)
+            throw new IllegalArgumentException("Campaign fitting and discoveries required");
+        try{
+            CampaignShipyardRules.requireAllowed(design,campaign,discoveries,technology);
+            return quote(campaign.credits(),CampaignFleet.purchaseCost(design,technology),null);
+        }catch(IllegalArgumentException blocked){
+            return quote(campaign.credits(),0,blocked.getMessage());
+        }
+    }
+
 }
