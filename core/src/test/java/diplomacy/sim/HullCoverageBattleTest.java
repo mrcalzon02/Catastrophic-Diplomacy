@@ -77,8 +77,8 @@ public final class HullCoverageBattleTest {
                 DirectionalDefense restored=new DirectionalDefense(
                         ship.maxShields,ship.maxArmor,ship.maxHull);
                 restored.restoreIntegrity(saved);
-                check(restored.fingerprint()==surface.fingerprint(),
-                        "Armor and shield exposure must survive save roundtrip");
+                check(restored.saveIntegrity().equals(surface.saveIntegrity()),
+                        "All armor cells and directional shield levels must survive save roundtrip");
             }
             // Rebuild the exact same seed and compare complete real combat replay.
             long first=run(battle,100);
