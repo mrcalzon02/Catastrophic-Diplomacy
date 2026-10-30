@@ -2640,6 +2640,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 .append("/400 living ships rendered with original hull art; ");
         if(craftSprites==null || craftSprites.loaded()!=51)
             failure.append("original autonomous fighter/drone art missing; ");
+        if(terranSprites==null || terranSprites.litMaterialCount()==0)
+            failure.append("original hull normal/emissive material pass inactive; ");
+        if(craftSprites==null || craftSprites.litCraftMaterials()!=51)
+            failure.append("fighter normal/emissive materials missing; ");
         verificationReported=true;
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
             " shots="+verifiedShots+" hits="+battle.hitCount+
@@ -2652,6 +2656,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " VFX="+peakAnimations+" glowQuads="+peakLightQuads+
             " smokeQuads="+peakSmokeQuads+" spriteShips="+peakSpriteShips+
             " fighterArtTextures="+(craftSprites==null?0:craftSprites.loaded())+
+            " hullMaterials="+(terranSprites==null?0:terranSprites.litMaterialCount())+
+            " fighterMaterials="+(craftSprites==null?0:craftSprites.litCraftMaterials())+
             " maskedDamageLayers="+(terranSprites==null?0:terranSprites.damageLayersBuilt())+
             " textureFrames="+
             (weaponFx==null?0:weaponFx.loadedTextures())+
