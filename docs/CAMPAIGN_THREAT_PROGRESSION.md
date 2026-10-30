@@ -36,7 +36,9 @@ to variants, not ever-larger raw hull sizes.
 
 ## Ten-operation circuit
 
-Within each ten-system front, encounters follow this sequence:
+The opening ten-system front follows this sequence. Subsequent fronts rotate
+its starting operation deterministically by front and sector, so they retain
+tactical coverage without repeating the exact same order:
 
 1. Patrol — light reconnaissance vessels and general-purpose guns
 2. Interdiction — missile pickets and pursuit hulls
@@ -49,7 +51,7 @@ Within each ten-system front, encounters follow this sequence:
 9. Command fleet — carriers and command cruisers when licensed
 10. Fleet action — combined arms with broad hull distribution
 
-The tenth system of the fifth front (level 50n) is **Sector capital**,
+The final system of the fifth front (level 50n) is **Sector capital**,
 replacing the regular fleet action with a heavier flagship-oriented mission.
 Where early tiers cannot support a named advanced hull, choose a valid earlier
 combat hull rather than bypass its technology authorization.
