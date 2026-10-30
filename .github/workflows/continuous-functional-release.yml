@@ -27,8 +27,8 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1'}
-      - name: Build shared game and run essential simulation/menu tests
-        run: gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke :game:menuFlowSmoke :desktop:installDist
+      - name: Build shared game and verify essential combat, menus and LAN/PvP server
+        run: gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke :game:menuFlowSmoke :server:check :desktop:installDist
       - name: Create native Linux app image with bundled Java
         run: python3 tools/package_desktop.py
       - name: Verify Linux package and launch executable
@@ -46,13 +46,20 @@ jobs:
               assert archive.testzip() is None
               assert 'CatastrophicDiplomacy/bin/CatastrophicDiplomacy' in archive.namelist()
           PY
+          # Launch the contents of the actual distributable, not an unarchived
+          # staging image that could differ from what users download.
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf "$extract_dir"' EXIT
+          unzip -q desktop/build/platform-packages/Catastrophic-Diplomacy-Linux-x64.zip -d "$extract_dir"
+          test -x "$extract_dir/CatastrophicDiplomacy/bin/CatastrophicDiplomacy"
+          test -f "$extract_dir/CatastrophicDiplomacy/lib/runtime/release"
           if ! command -v xvfb-run >/dev/null; then
             sudo apt-get update -qq
             sudo apt-get install -y xvfb
           fi
           set +e
           LIBGL_ALWAYS_SOFTWARE=1 xvfb-run -a -s '-screen 0 1280x800x24' \
-            timeout 20s desktop/build/platform-packages/CatastrophicDiplomacy/bin/CatastrophicDiplomacy \
+            timeout 20s "$extract_dir/CatastrophicDiplomacy/bin/CatastrophicDiplomacy" \
             > linux-launch.log 2>&1
           status=$?
           set -e
@@ -261,5 +268,16 @@ jobs:
             Catastrophic-Diplomacy-Windows-x64.msi Catastrophic-Diplomacy-Linux-x64.zip \
             Catastrophic-Diplomacy-Android.apk release-manifest.json package-identity.txt \
             signature-verification.txt FULL-SHA256SUMS.txt
-          gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" --json targetCommitish,isDraft,assets \
-            --jq '{source:.targetCommitish,draft:.isDraft,assets:[.assets[].name]}'
+          # Read back the published release and require exactly this source's
+          # public three-platform package set. A successful upload command
+          # alone is not an independently verified publication.
+          gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" \
+            --json tagName,targetCommitish,isDraft,isPrerelease,assets \
+            | jq -e --arg tag "$CD_RELEASE_TAG" --arg sha "$GITHUB_SHA" '
+              .tagName==$tag and .targetCommitish==$sha and
+              .isDraft==false and .isPrerelease==true and
+              ([.assets[].name] |
+                index("Catastrophic-Diplomacy-Windows-x64.msi")!=null and
+                index("Catastrophic-Diplomacy-Linux-x64.zip")!=null and
+                index("Catastrophic-Diplomacy-Android.apk")!=null)'
+          echo 'PASS: exact game commit and all three public release assets independently read back'
