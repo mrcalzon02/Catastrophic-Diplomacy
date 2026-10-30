@@ -127,7 +127,7 @@ final class ShipyardPanel {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
         draft=active[team];selectedSlot=0;scroll=0;artPreview=false;
         purchaseArmedDesign=null;refitShipId=0;
-        notice="FREE DESIGN WORKSHOP: all factions and technology available.";
+        notice="DESIGN SANDBOX: configure fitted modules; campaign technology is researched separately.";
     }
     void showSkirmish(){
         show();usage=Usage.SKIRMISH;
@@ -441,8 +441,8 @@ final class ShipyardPanel {
                         try{
                             draft=draft.stage(selectedSlot,track,level);
                             notice=level==0
-                                    ?"Module research reset; choose any one technology branch"
-                                    :track+" research stage "+level+" / 6 (other branches locked)";
+                                    ?"Fitted specialization cleared; choose another available variant"
+                                    :track+" fitting stage "+level+" / 6 (other branches locked)";
                         }catch(IllegalArgumentException rejected){
                             notice=rejected.getMessage();
                         }
@@ -711,7 +711,7 @@ final class ShipyardPanel {
         }
         Shipyard.Track activeResearch=installed==null?null:installed.branch();
         font.setColor(Color.WHITE);
-        font.draw(batch,"EXCLUSIVE RESEARCH - "+selected.mount()+" #"+(selectedSlot+1),813,372);
+        font.draw(batch,"MODULE SPECIALIZATION - "+selected.mount()+" #"+(selectedSlot+1),813,372);
         for(int n=0;n<Shipyard.Track.values().length;n++){
             Shipyard.Track track=Shipyard.Track.values()[n];
             int level=installed==null?0:installed.stage(track);
@@ -725,7 +725,7 @@ final class ShipyardPanel {
         font.draw(batch,"VOLUME "+units(report.volume())+" / "+units(draft.hull.volumeCapacity),813,185);
         font.draw(batch,"POWER "+units(report.demand())+" / "+units(report.generation())+" MW",813,161);
         font.draw(batch,"HEAT  "+units(report.generatedHeat())+" / "+units(report.cooling())+" MW",813,137);
-        font.draw(batch,"COST "+report.industry()+" | RESEARCH "+report.research()+
+        font.draw(batch,"BUILD COST "+report.industry()+" | TECH VALUE "+report.research()+
                 (usage==Usage.CAMPAIGN?" | LICENSE "+campaignRank+"/6":""),813,112);
         if(installed!=null){
             font.setColor(Color.GOLD);
