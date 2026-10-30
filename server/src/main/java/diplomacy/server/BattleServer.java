@@ -3,6 +3,7 @@ package diplomacy.server;
 import hbnet.Hbnet;
 import diplomacy.sim.*;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.SkirmishShipExchange;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.*;
 import java.net.*;
@@ -45,10 +46,39 @@ public final class BattleServer implements AutoCloseable {
         if(!local.isLoopbackAddress()&&!local.isSiteLocalAddress()&&!local.isLinkLocalAddress())throw Hbnet.failure();
         return new BattleServer(local.getHostAddress(),port,seed,count,null,true);
     }
-    private BattleServer(String bind,int port,long seed,int count,Hbnet.Server transport,boolean trustedLan)throws Exception{
-        if(count<1||count>200)throw new IllegalArgumentException("Fleet size must be 1-200");this.transport=transport;
+    /** LAN challenge: host-selected portable ships are checked by the server,
+     * never accepted solely because the remote client says they are legal. */
+    public static BattleServer openLan(String bind,int port,long seed,int count,
+                                       SkirmishShipExchange.Package left,
+                                       SkirmishShipExchange.Package right)throws Exception{
+        if(left==null||right==null||!left.rules().equals(right.rules()))
+            throw new IllegalArgumentException("Both PvP ships need matching challenge rules");
+        InetAddress local=InetAddress.getByName(Hbnet.host(bind));
+        if(!local.isLoopbackAddress()&&!local.isSiteLocalAddress()&&!local.isLinkLocalAddress())
+            throw Hbnet.failure();
+        return new BattleServer(local.getHostAddress(),port,seed,count,null,true,left,right);
+    }
+    private BattleServer(String bind,int port,long seed,int count,Hbnet.Server transport,
+                         boolean trustedLan)throws Exception{
+        this(bind,port,seed,count,transport,trustedLan,null,null);
+    }
+    private BattleServer(String bind,int port,long seed,int count,Hbnet.Server transport,
+                         boolean trustedLan,SkirmishShipExchange.Package left,
+                         SkirmishShipExchange.Package right)throws Exception{
+        if(count<1||count>200)throw new IllegalArgumentException("Fleet size must be 1-200");
+        this.transport=transport;
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
-        battle=Battle.duel(seed,count,Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE),Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE),catalog);
+        if(left!=null||right!=null){
+            if(left==null||right==null||!left.rules().equals(right.rules()))
+                throw new IllegalArgumentException("PvP challenge rule mismatch");
+            left.rules().requireAllowed(left.design(),catalog);
+            left.rules().requireAllowed(right.design(),catalog);
+        }
+        Shipyard.Design first=left==null?
+                Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE):left.design();
+        Shipyard.Design second=right==null?
+                Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE):right.design();
+        battle=Battle.duel(seed,count,first,second,catalog);
         listener=trustedLan?new ServerSocket(port,16,InetAddress.getByName(bind)):transport.listen(bind,port);workers.execute(this::accept);
         // At most three catch-up steps per pump; never an unbounded fixed-rate task backlog.
         clock.scheduleWithFixedDelay(this::pump,5,5,TimeUnit.MILLISECONDS);
