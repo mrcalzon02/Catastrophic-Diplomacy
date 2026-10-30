@@ -1434,6 +1434,14 @@ public final class Battle {
         }
         return gained;
     }
+    private static SupportKind supportKind(SupportDoctrine.Channel channel){
+        return switch(channel){
+            case HULL -> SupportKind.HULL;
+            case SHIELD -> SupportKind.SHIELD;
+            case ARMOR -> SupportKind.ARMOR;
+            case POWER -> SupportKind.POWER;
+        };
+    }
     private void updateExtendedSupport(double seconds){
         for(Ship source:ships)if(source.alive()&&source.crewReadiness()>0.05
                 &&source.reactorCondition>0.15&&source.power>7){
@@ -1443,8 +1451,7 @@ public final class Battle {
                 double received=deliverSupport(source,target,device.channel(),
                         device.rate()*seconds,device.energyPerUnit(),true);
                 if(received>0)supportLinks.add(new SupportLink(source,target,
-                        device.channel()==SupportDoctrine.Channel.ARMOR?SupportKind.ARMOR:
-                                SupportKind.POWER,tick,source.x,source.y));
+                        supportKind(device.channel()),tick,source.x,source.y));
             }
             // A small constant per-vessel benefit inside the spherical radius,
             // not an unlimited fleet multiplier or a new network of blue lines.
