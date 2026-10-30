@@ -561,6 +561,10 @@ final class GameMenuPanel {
                 label(batch,font,"FLEET SIZE  "+(preset==ScenarioCatalog.Preset.CUSTOM?fleetCount:preset.ships)+"v"+
                     (preset==ScenarioCatalog.Preset.CUSTOM?fleetCount:preset.ships),654,453,Color.GOLD);
                 label(batch,font,"ENVIRONMENT LEVEL "+preset.environmentLevel,654,409,Color.WHITE);
+                if(!preset.demonstration){
+                    label(batch,font,shortLabel(dockNotice,62),654,201,Color.CYAN);
+                    label(batch,font,"TECH LOADOUT AND HULL GATES: EDIT IN SHIPYARD",654,166,MUTED);
+                }
                 if(preset.demonstration){
                     label(batch,font,preset==ScenarioCatalog.Preset.HULL_COVERAGE?
                             "HULLS: ALL 11 SIZES / 22 ACTUAL SHIPS":
