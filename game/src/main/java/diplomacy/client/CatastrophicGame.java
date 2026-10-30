@@ -143,7 +143,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final boolean verifyDemo;
     private final Runnable updateCheck;
     private long verifiedSequence;
-    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance;
+    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips;
     private boolean verificationReported;
     private final EnumSet<Battle.DamageType> verifiedTypes=EnumSet.noneOf(Battle.DamageType.class);
     private final Set<Long> verifiedShotIds=new HashSet<>();
@@ -1773,7 +1773,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (audio != null) audio.resetForBattle();
         running = true;
         if(verifyDemo){
-            verifiedSequence=0;verifiedFrames=verifiedShots=verifiedImpacts=peakAnimations=peakCraft=peakOrdnance=0;
+            verifiedSequence=0;verifiedFrames=verifiedShots=verifiedImpacts=peakAnimations=peakCraft=peakOrdnance=peakSpriteShips=0;
             verificationReported=false;verifiedTypes.clear();verifiedShotIds.clear();
             Gdx.app.log("CD-DEMO-VERIFY","START 200v200 module/weapon/service suite seed="+DemonstrationBattle.SEED);
         }
@@ -2057,6 +2057,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(weaponFx!=null)peakAnimations=Math.max(peakAnimations,weaponFx.activeAnimations());
         peakCraft=Math.max(peakCraft,battle.crafts().size());
         peakOrdnance=Math.max(peakOrdnance,battle.missiles().size()+battle.ballistics().size());
+        int texturedShips=0;
+        if(terranSprites!=null)for(Battle.Ship ship:battle.ships())
+            if(terranSprites.hasSprite(ship))texturedShips++;
+        peakSpriteShips=Math.max(peakSpriteShips,texturedShips);
         for(Battle.VisualEvent event:battle.visualEvents()){
             if(event.sequence()<=verifiedSequence)continue;
             verifiedSequence=event.sequence();
@@ -2094,6 +2098,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(peakOrdnance==0||peakCraft==0)failure.append("no ordnance/craft; ");
         if(self<=0||remote<=0||shield<=0||serviceDrones==0)failure.append("inactive support; ");
         if(peakAnimations==0)failure.append("VFX compositor unused; ");
+        if(peakSpriteShips==0)failure.append("approved hull sprites not drawn; ");
         verificationReported=true;
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
             " shots="+verifiedShots+" hits="+battle.hitCount+
@@ -2102,7 +2107,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " self="+self+" remote="+remote+" shield="+shield+
             " repairDrones="+serviceDrones+
             " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
-            " VFX="+peakAnimations+" textureFrames="+
+            " VFX="+peakAnimations+" spriteShips="+peakSpriteShips+" textureFrames="+
             (weaponFx==null?0:weaponFx.loadedTextures())+
             " beamFrames="+(weaponBeams==null?0:weaponBeams.loaded());
         if(failure.length()>0){
