@@ -37,6 +37,16 @@ public final class ShieldSurfaceModelTest {
                 "Far-away shield should not cost four blended quads");
         check(ShieldSurfaceModel.drawable(34f,1280),
                 "Close camera must retain shield details");
+        check(ShieldSurfaceModel.energizedOpacity(0,.8f,.4f)==0,
+                "Collapsed facing cannot be relit by a lingering flash");
+        check(ShieldSurfaceModel.energizedOpacity(.36f,0,0)==.36f,
+                "No event must preserve authored shield material opacity");
+        check(ShieldSurfaceModel.energizedOpacity(.36f,1,0)>.36f,
+                "Real hit raises material luminosity");
+        check(ShieldSurfaceModel.energizedOpacity(.36f,0,1)>.36f,
+                "Real recharge creates a visible material pulse");
+        check(ShieldSurfaceModel.energizedOpacity(.9f,1,1)<=.92f,
+                "Full-charge effects remain capped to avoid overdraw blooms");
         System.out.println("PASS silhouette shields, pulse, depletion, max alpha and strategic LOD");
     }
 }
