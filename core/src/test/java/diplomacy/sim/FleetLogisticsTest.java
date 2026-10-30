@@ -132,8 +132,18 @@ public final class FleetLogisticsTest {
         for(int i=0;i<850;i++)servicing.step();
         check(carrier.repairDronesLaunched>0&&patient.hull>patient.maxHull-52,
                 "Purpose-built service drone failed to travel and restore a remote ship");
+        var firstCraft=servicing.crafts().stream().filter(c->c.repair).findFirst().orElse(null);
         check(carrier.serviceDronesRearmed>0,
-                "Expended service drones must return and pay for rearm, not disappear");
+                "Expended service drones must return and pay for rearm, not disappear"
+                +" launched="+carrier.repairDronesLaunched
+                +" reserve="+carrier.serviceDroneReserve[SupportDoctrine.Channel.HULL.ordinal()]
+                +" active="+servicing.crafts().size()
+                +" sourcePower="+carrier.power
+                +" targetMissing="+(patient.maxHull-patient.hull)
+                +" craft="+(firstCraft==null?"none":"charge="+firstCraft.repairReserve+
+                        " returning="+firstCraft.returning+" fuel="+firstCraft.fuel+
+                        " distance="+StrictMath.hypot(firstCraft.x-carrier.x,
+                                firstCraft.y-carrier.y)));
         check(carrier.serviceDroneReserve[SupportDoctrine.Channel.HULL.ordinal()]<=startingBays,
                 "Docking may never clone a carrier's reusable drone complement");
         check(servicing.crafts().stream().filter(c->c.repair).allMatch(c->
