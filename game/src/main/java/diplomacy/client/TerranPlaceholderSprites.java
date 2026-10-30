@@ -354,7 +354,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                     poses.ship(ship);
             if(view!=null&&!view.ship(position,ship.visualScale()))continue;
             Texture tex=texture(ship.faction,ship.hullClass);
-            surfaces.prepare(tex,originals.get(tex));
+            if(!ShipSurfaceLighting.flatAt(view))
+                surfaces.prepare(tex,originals.get(tex));
             if(ship.shields>0)prepareShields(tex);
             if(breached(ship)){
                 exposedInterior(tex,ship.hull<ship.maxHull*0.30);
@@ -374,7 +375,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
             float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
             surfaces.bind(batch,tex);
-            ShipSurfaceLighting.heading(batch,rotation,(float)Math.max(0,
+            surfaces.color(batch,rotation,(float)Math.max(0,
                     Math.min(1,ship.hull/Math.max(1,ship.maxHull))));
             if(!breached(ship)){
                 drawWhole(batch,tex,pose,width,height,rotation);

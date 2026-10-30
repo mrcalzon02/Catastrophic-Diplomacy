@@ -139,7 +139,7 @@ public final class FighterCraftSprites implements Disposable {
                 batch.setColor(1,1,1,1);
             }else{
                 surfaces.bind(batch,picture);
-                ShipSurfaceLighting.heading(batch,rotation);
+                surfaces.color(batch,rotation);
             }
             batch.draw(picture,position.x()-width/2,position.y()-height/2,
                     width/2,height/2,width,height,1,1,rotation,

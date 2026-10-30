@@ -18,6 +18,10 @@ public final class ShipSurfaceShaderTest {
                 throw new AssertionError("Missing real surface shader input: "+token);
         if(ShipSurfaceLighting.FRAGMENT.contains("gl_FragColor=vec4(1.0"))
             throw new AssertionError("Flat placeholder shader");
-        System.out.println("PASS: faction/fighter UV paths, normal lighting, emissive and alpha compositing");
+        CombatViewBounds far=new CombatViewBounds(0,0,4100,800);
+        CombatViewBounds close=new CombatViewBounds(0,0,900,700);
+        if(!ShipSurfaceLighting.flatAt(far)||ShipSurfaceLighting.flatAt(close))
+            throw new AssertionError("Strategic flat pass not selected correctly");
+        System.out.println("PASS: normal/emissive UVs, shader alpha, strategic unlit path");
     }
 }

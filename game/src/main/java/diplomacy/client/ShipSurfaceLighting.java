@@ -80,6 +80,7 @@ final class ShipSurfaceLighting implements Disposable {
     private final ShipLightProbes probes=new ShipLightProbes();
     private Texture active;
     private boolean started;
+    private boolean flat;
     private int binds;
 
     ShipSurfaceLighting(){
@@ -136,9 +137,25 @@ final class ShipSurfaceLighting implements Disposable {
                        (float)(.5+.5*Math.sin(theta)),
                        Math.max(0f,Math.min(1f,integrity)),1f);
     }
+    /** Strategic LOD uses the actual original art path, avoiding all material
+     * texture binds and the three-sampler shader for distant fleet views. */
+    static boolean flatAt(CombatViewBounds view){
+        return ShipLightProbes.detail(view)<.01f;
+    }
+    void color(SpriteBatch batch,float rotation,float integrity){
+        if(flat)batch.setColor(1f,1f,1f,1f);
+        else heading(batch,rotation,integrity);
+    }
+    void color(SpriteBatch batch,float rotation){color(batch,rotation,1f);}
     void begin(SpriteBatch batch){begin(batch,null,null);}
     void begin(SpriteBatch batch,Battle battle,CombatViewBounds view){
         active=null;binds=0;started=true;
+        flat=flatAt(view);
+        if(flat){
+            batch.setShader(null);
+            batch.begin();
+            return;
+        }
         probes.select(battle,view);
         batch.setShader(shader);
         batch.begin();
@@ -152,6 +169,7 @@ final class ShipSurfaceLighting implements Disposable {
     }
     /** In the hot draw loop: only flush when the *source sprite* changes. */
     void bind(SpriteBatch batch,Texture original){
+        if(flat)return;
         Pair pair=pairs.get(original);
         if(pair==null)throw new IllegalStateException("Unprepared ship surface texture");
         if(batch.getShader()!=shader){
@@ -177,7 +195,7 @@ final class ShipSurfaceLighting implements Disposable {
         if(!started)return;
         batch.end();
         batch.setShader(null);
-        active=null;started=false;
+        active=null;started=false;flat=false;
     }
     int materialCount(){return pairs.size();}
     int textureBindings(){return binds;}
