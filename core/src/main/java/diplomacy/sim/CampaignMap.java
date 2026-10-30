@@ -10,7 +10,8 @@ public final class CampaignMap {
     public static final int PAGE_COUNT=LevelEconomy.LEVEL_COUNT/PAGE_SIZE;
     private CampaignMap(){}
     public record SystemNode(int level,int sector,String name,Battle.Faction opponent,
-                             float x,float y,boolean sectorFinale){}
+                             float x,float y,boolean sectorFinale,
+                             CampaignOpposition.Operation operation,int enemyTier){}
     public static int pageOf(int level){return (LevelEconomy.level(level).index()-1)/PAGE_SIZE;}
     public static List<SystemNode> page(int page){
         if(page<0||page>=PAGE_COUNT)throw new IllegalArgumentException("Unknown map page");
@@ -21,11 +22,16 @@ public final class CampaignMap {
             long variation=LevelSky.mix(stage.seed());
             float x=112+index*77;
             float y=235+((index*43)%180)+((variation>>>4)&31);
+            CampaignOpposition.Operation operation=CampaignOpposition.operation(level);
             String name=(level%50==0?"SECTOR CAPITAL ":"SYSTEM ")+
-                    String.format(Locale.ROOT,"%03d",level);
+                    String.format(Locale.ROOT,"%03d",level)+" / "+operation.title;
+            // A contiguous ten-system campaign front has one opposing power.
+            // Separate map pages can change allegiance without a random
+            // opponent switch in the middle of a tactical operation.
             Battle.Faction opponent=Battle.Faction.values()[
-                    Math.floorMod(level/4+stage.sector(),Battle.Faction.values().length)];
-            systems.add(new SystemNode(level,stage.sector(),name,opponent,x,y,level%50==0));
+                    Math.floorMod(stage.sector()*2+page,Battle.Faction.values().length)];
+            systems.add(new SystemNode(level,stage.sector(),name,opponent,x,y,
+                    level%50==0,operation,CampaignOpposition.maximumTier(level)));
         }
         return List.copyOf(systems);
     }
