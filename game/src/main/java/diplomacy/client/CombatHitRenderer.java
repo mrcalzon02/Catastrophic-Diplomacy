@@ -32,9 +32,9 @@ final class CombatHitRenderer {
                         angle-22,44,9);
             }else{
                 boolean armor=hit.layer==CombatHitFeedback.Layer.ARMOR;
-                shapes.setColor(armor?
-                        new Color(1f,.72f,.31f,.95f*fade):
-                        new Color(1f,.38f,.31f,.72f*fade));
+                // No per-spark Color allocations in a 200v200 firefight.
+                if(armor)shapes.setColor(1f,.72f,.31f,.95f*fade);
+                else shapes.setColor(1f,.38f,.31f,.72f*fade);
                 float centerX=hit.x,centerY=hit.y;
                 // Four coherent sparks emanate from the real impact position;
                 // directional normal prevents the visual from bursting across
