@@ -7,6 +7,10 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
 import diplomacy.sim.CampaignProgress;
+import diplomacy.sim.CampaignTechnology;
+import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.TechnologyCatalog.Component;
+import java.util.Comparator;
 import diplomacy.sim.CampaignDeployment;
 import diplomacy.sim.CampaignFleet;
 import diplomacy.sim.CampaignAfterAction;
@@ -22,7 +26,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, SQUADRONS, RESEARCH, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, SQUADRONS, RESEARCH, TECHNOLOGY, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color PANEL=MilitaryUiTheme.PANEL;
     private static final Color SELECT=MilitaryUiTheme.SELECTION;
@@ -180,6 +184,7 @@ final class GameMenuPanel {
     /** Inspect campaign licenses/laboratories, or authorize an actual paid project. */
     static int researchAction(float x,float y){
         if(hit(x,y,35,35,250,54))return 0;
+        if(hit(x,y,306,35,255,54))return 3;
         if(hit(x,y,592,35,294,54))return 1;
         if(hit(x,y,906,35,330,54))return 2;
         for(int i=0;i<6;i++)
@@ -187,6 +192,34 @@ final class GameMenuPanel {
         for(int i=0;i<4;i++)
             if(hit(x,y,62+i*176,250,160,70))return 200+i;
         return -1;
+    }
+
+    /** One shared input map for desktop mouse and Android touch. */
+    static int technologyAction(float x,float y){
+        if(hit(x,y,35,35,208,55))return 0;
+        if(hit(x,y,48,144,112,45))return 1;
+        if(hit(x,y,174,144,125,45))return 2;
+        if(hit(x,y,917,35,317,55))return 3;
+        for(int row=0;row<8;row++)
+            if(hit(x,y,48,551-row*51,270,44))return 100+row;
+        for(int track=0;track<4;track++)for(int stage=0;stage<6;stage++)
+            if(hit(x,y,374+stage*74,439-track*100,64,49))
+                return 200+track*6+stage;
+        return -1;
+    }
+    static List<Component> technologySubsystems(TechnologyCatalog catalog,Battle.Faction faction){
+        String code=CampaignTechnology.factionCode(faction);
+        return catalog.baseComponents().values().stream()
+                .filter(c->c.faction.equals(code))
+                .sorted(Comparator.comparing((Component c)->c.category)
+                        .thenComparing(c->c.name)).toList();
+    }
+    static String technologyId(Battle.Faction faction,String subsystem,int track,int stage){
+        if(track<0||track>=4||stage<1||stage>6)
+            throw new IllegalArgumentException("Invalid technology branch selection");
+        String[] branches={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
+        return "TECH-"+CampaignTechnology.factionCode(faction)+"-"+subsystem+"-"+
+                branches[track]+"-"+String.format(java.util.Locale.ROOT,"%02d",stage);
     }
     /** Eight persistent roster groups independent of temporary tactical slots. */
     static int squadronAction(float x,float y,int current){
@@ -254,7 +287,10 @@ final class GameMenuPanel {
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
                int themePage,FleetNames.Style themeCandidate,
                int selectedSquadron,Screen namingReturn,
-               int selectedResearchNode,CampaignProgress.Project armedResearch,Screen researchReturn){
+               int selectedResearchNode,CampaignProgress.Project armedResearch,Screen researchReturn,
+               TechnologyCatalog techCatalog,CampaignTechnology.State discoveries,
+               int technologyPage,int technologyModule,int technologyTrack,int technologyStage,
+               String technologyNotice,String armedTechnology){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -329,12 +365,34 @@ final class GameMenuPanel {
                 for(int i=0;i<4;i++)
                     button(shapes,62+i*176,250,160,70,selectedResearchNode==100+i);
                 button(shapes,35,35,250,54,false);
+                button(shapes,306,35,255,54,false);
                 actionButton(shapes,592,35,294,54,
                         armedResearch==CampaignProgress.Project.ACCELERATOR?
                                 MilitaryUiTheme.Intent.CONFIRM:MilitaryUiTheme.Intent.NORMAL);
                 actionButton(shapes,906,35,330,54,
                         armedResearch==CampaignProgress.Project.LICENSE?
                                 MilitaryUiTheme.Intent.CONFIRM:MilitaryUiTheme.Intent.PRIMARY);
+            }
+            case TECHNOLOGY -> {
+                rectangle(shapes,30,130,304,484,PANEL);
+                rectangle(shapes,345,130,488,484,PANEL);
+                rectangle(shapes,844,130,406,484,PANEL);
+                int modules=technologySubsystems(techCatalog,progress.faction()).size();
+                for(int row=0;row<8;row++){
+                    int index=technologyPage*8+row;
+                    if(index>=modules)break;
+                    button(shapes,48,551-row*51,270,44,index==technologyModule);
+                }
+                for(int track=0;track<4;track++)
+                    for(int stage=0;stage<6;stage++)
+                        button(shapes,374+stage*74,439-track*100,64,49,
+                                track==technologyTrack&&stage+1==technologyStage);
+                button(shapes,48,144,112,45,false);
+                button(shapes,174,144,125,45,false);
+                button(shapes,35,35,208,55,false);
+                actionButton(shapes,917,35,317,55,
+                        armedTechnology!=null?MilitaryUiTheme.Intent.CONFIRM:
+                                MilitaryUiTheme.Intent.PRIMARY);
             }
             case DOCK -> {
                 rectangle(shapes,33,108,771,509,PANEL);
@@ -574,10 +632,69 @@ final class GameMenuPanel {
                         56,183,MUTED);
                 label(batch,font,researchReturn==Screen.DOCK?"BACK TO DOCK":"BACK TO CAMPAIGN",
                         66,68,Color.WHITE);
+                label(batch,font,"TECHNOLOGY LAB",323,67,Color.CYAN);
                 label(batch,font,armedResearch==CampaignProgress.Project.ACCELERATOR?
                         "CONFIRM LAB SPEND":"AUTHORIZE NEXT LAB",605,67,Color.WHITE);
                 label(batch,font,armedResearch==CampaignProgress.Project.LICENSE?
                         "CONFIRM LICENSE SPEND":"AUTHORIZE NEXT LICENSE",921,67,Color.WHITE);
+            }
+            case TECHNOLOGY -> {
+                title(batch,font,"FACTION TECHNOLOGY LAB",
+                        "INDIVIDUAL DISCOVERIES / PAID ONCE / PERSISTENT CAMPAIGN UNLOCKS");
+                List<Component> components=technologySubsystems(techCatalog,progress.faction());
+                label(batch,font,"SUBSYSTEM CATALOG",50,588,Color.CYAN);
+                label(batch,font,"BRANCH / SIX DEVELOPMENT STAGES",366,585,Color.CYAN);
+                for(int row=0;row<8;row++){
+                    int index=technologyPage*8+row;
+                    if(index>=components.size())break;
+                    Component c=components.get(index);
+                    label(batch,font,shortLabel(c.name,30),57,580-row*51,
+                            index==technologyModule?Color.GOLD:Color.WHITE);
+                    label(batch,font,c.subsystem+"  /  "+c.category.toUpperCase(java.util.Locale.ROOT),
+                            57,563-row*51,MUTED);
+                }
+                label(batch,font,"PREV",64,174,Color.WHITE);
+                label(batch,font,"NEXT",191,174,Color.WHITE);
+                label(batch,font,"PAGE "+(technologyPage+1)+" / "+
+                        Math.max(1,(components.size()+7)/8),55,124,MUTED);
+                Component selected=components.get(Math.min(components.size()-1,technologyModule));
+                String[] tracks={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
+                for(int track=0;track<4;track++){
+                    label(batch,font,tracks[track],369,530-track*100,Color.CYAN);
+                    for(int stage=1;stage<=6;stage++){
+                        String id=technologyId(progress.faction(),selected.subsystem,track,stage);
+                        boolean known=discoveries.has(id);
+                        boolean current=id.equals(discoveries.activeId());
+                        Color color=known?Color.GREEN:current?Color.CYAN:
+                                technologyTrack==track&&technologyStage==stage?Color.GOLD:Color.WHITE;
+                        label(batch,font,""+stage,391+(stage-1)*74,469-track*100,color);
+                    }
+                }
+                String id=technologyId(progress.faction(),selected.subsystem,
+                        technologyTrack,technologyStage);
+                TechnologyCatalog.Upgrade upgrade=techCatalog.get(id);
+                CampaignTechnology.Quote quote=discoveries.quote(id,progress,techCatalog);
+                label(batch,font,"PROJECT DOSSIER",867,583,Color.CYAN);
+                label(batch,font,shortLabel(selected.name,29),865,548,Color.GOLD);
+                label(batch,font,tracks[technologyTrack]+" / STAGE "+technologyStage,
+                        865,515,Color.WHITE);
+                label(batch,font,"RESEARCH COST: "+quote.cost()+" CR",865,477,Color.WHITE);
+                label(batch,font,"AVAILABLE: "+progress.credits()+" CR",865,447,Color.GOLD);
+                label(batch,font,"AFTER PAYMENT: "+(progress.credits()-quote.cost())+" CR",
+                        865,417,progress.credits()>=quote.cost()?Color.GREEN:Color.SCARLET);
+                label(batch,font,"PREREQUISITE:",865,379,MUTED);
+                label(batch,font,shortLabel(upgrade.prerequisite,37),865,350,Color.WHITE);
+                label(batch,font,"STATUS: "+shortLabel(quote.reason(),29),865,312,
+                        quote.allowed()?Color.CYAN:Color.GOLD);
+                label(batch,font,"ACTIVE: "+
+                        shortLabel(discoveries.activeId()==null?"NONE":discoveries.activeId(),27),
+                        865,275,Color.WHITE);
+                label(batch,font,"WORK: "+discoveries.remaining()+
+                        " MISSIONS / UNLOCKED "+discoveries.unlocked().size(),865,245,Color.WHITE);
+                label(batch,font,shortLabel(technologyNotice,50),855,197,Color.CYAN);
+                label(batch,font,"BACK TO LICENSES",49,68,Color.WHITE);
+                label(batch,font,armedTechnology!=null&&armedTechnology.equals(id)?
+                        "CONFIRM RESEARCH":"AUTHORIZE PROJECT",945,68,Color.WHITE);
             }
             case DOCK -> {
                 title(batch,font,"CAMPAIGN FLEET DOCK",
