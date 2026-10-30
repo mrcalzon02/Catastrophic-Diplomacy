@@ -1,9 +1,9 @@
 name: Build and publish actual Windows MSI for 0.1.5 RC1
 
+# Historical 0.1.5 RC1 installer recovery only. Its direct MSI asset is already
+# published; the ongoing per-commit release owns current Windows packaging.
+# Never trigger this fixed-tag publisher on an unrelated main commit.
 on:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/windows-msi-release.yml', 'tools/verify_windows_msi.ps1']
   workflow_dispatch:
 
 permissions:

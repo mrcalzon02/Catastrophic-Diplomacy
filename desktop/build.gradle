@@ -46,13 +46,17 @@ tasks.register('generateDesktopReleaseTag') {
     inputs.property('releaseTagOverride', ciReleaseTag ?: '')
     outputs.file(generatedReleaseTag)
     doLast {
-        def androidScript = rootProject.file('android/build.gradle').text
-        def match = (androidScript =~ /versionName\s+'([^']+)'/)
-        if (!match.find()) throw new GradleException('Android release versionName not found')
-        def versionName = match.group(1)
-        if (!(versionName ==~ /[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/))
-            throw new GradleException('Invalid updater release version')
-        def tag = ciReleaseTag ?: ('cd-v' + versionName)
+        // CI supplies the exact release identity. Do not parse Android build
+        // source when it is already provided: Android may compute versionName.
+        def tag = ciReleaseTag
+        if (!tag) {
+            // Local builds continue to follow the Android default version.
+            // Match the version literal, not the environment-variable name.
+            def androidScript = rootProject.file('android/build.gradle').text
+            def match = (androidScript =~ /versionName[^\n]*?'([0-9]+\.[0-9]+\.[0-9]+[A-Za-z0-9._+-]*)'/)
+            if (!match.find()) throw new GradleException('Android default release versionName not found')
+            tag = 'cd-v' + match.group(1)
+        }
         if (!(tag ==~ /cd-v[A-Za-z0-9][A-Za-z0-9._+-]{0,99}/)) throw new GradleException('Invalid desktop release tag')
         def output = generatedReleaseTag.get().asFile
         output.parentFile.mkdirs()
