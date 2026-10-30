@@ -100,8 +100,8 @@ jobs:
           mkdir -p dist/windows dist/linux dist/android dist/fireos dist/evidence
           gh run download "$SMOKE_RUN" -R "$GH_REPO" -n "cd-desktop-windows-latest-$SOURCE_SHA" -D dist/windows
           gh run download "$SMOKE_RUN" -R "$GH_REPO" -n "cd-desktop-ubuntu-latest-$SOURCE_SHA" -D dist/linux
-          gh run download "$SIGNED_RUN" -R "$GH_REPO" -n "cd-signed-android-0.1.4-rc.1-$SOURCE_SHA" -D dist/android
-          gh run download "$SIGNED_RUN" -R "$GH_REPO" -n "cd-fire-tablet-sideload-0.1.4-rc.1-$SOURCE_SHA" -D dist/fireos
+          gh run download "$SIGNED_RUN" -R "$GH_REPO" -n "cd-signed-android-0.1.5-rc.1-$SOURCE_SHA" -D dist/android
+          gh run download "$SIGNED_RUN" -R "$GH_REPO" -n "cd-fire-tablet-sideload-0.1.5-rc.1-$SOURCE_SHA" -D dist/fireos
           gh run download "$SIGNED_RUN" -R "$GH_REPO" -n "cd-release-functional-evidence-$SOURCE_SHA" -D dist/evidence
 
       - name: Validate hashes signer results package identity and Fire OS byte parity
@@ -112,8 +112,8 @@ jobs:
           (cd dist/linux && sha256sum -c Catastrophic-Diplomacy-Linux-x64.zip.sha256)
           (cd dist/android && sha256sum -c SHA256SUMS.txt)
           (cd dist/fireos && sha256sum -c SHA256SUMS.txt)
-          cmp dist/android/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk dist/fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk
-          grep -q "name='games.catastrophicdiplomacy' versionCode='5' versionName='0.1.4-rc.1'" dist/android/package-identity.txt
+          cmp dist/android/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk dist/fireos/Catastrophic-Diplomacy-0.1.5-rc.1-FireOS.apk
+          grep -q "name='games.catastrophicdiplomacy' versionCode='6' versionName='0.1.5-rc.1'" dist/android/package-identity.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' dist/android/signature-verification.txt
           test -s dist/android/release-manifest.json
           test -s dist/evidence/late.png
@@ -134,8 +134,8 @@ jobs:
           names=[
             'windows/Catastrophic-Diplomacy-Windows-x64.zip',
             'linux/Catastrophic-Diplomacy-Linux-x64.zip',
-            'android/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk',
-            'fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk',
+            'android/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk',
+            'fireos/Catastrophic-Diplomacy-0.1.5-rc.1-FireOS.apk',
             'Catastrophic-Diplomacy-Android-qualification.zip'
           ]
           details={}
@@ -160,37 +160,41 @@ jobs:
           print('PASS: combined manifest bound to exact source SHA and successful run IDs')
           PY
 
-      - name: Attach all four platforms to the existing qualified prerelease
+      - name: Publish newly qualified four-platform prerelease
         shell: bash
         run: |
           set -euo pipefail
-          tag=cd-v0.1.4-rc.1
-          # Signed Android workflow owns initial release publication, and only
-          # reaches it after the real live emulator gate. Never publish first.
-          gh release view "$tag" -R "$GH_REPO" --json isPrerelease,isDraft,targetCommitish > dist/existing.json
-          jq -e --arg sha "$SOURCE_SHA" '
-            .isPrerelease==true and .isDraft==false and .targetCommitish==$sha' dist/existing.json
-          mkdir -p dist/release-check
-          gh release download "$tag" -R "$GH_REPO" -p 'Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk' -D dist/release-check
-          cmp dist/release-check/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk dist/android/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
-          gh release upload "$tag" -R "$GH_REPO"             dist/windows/Catastrophic-Diplomacy-Windows-x64.zip             dist/linux/Catastrophic-Diplomacy-Linux-x64.zip             dist/fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk             dist/release-provenance.json dist/FULL-SHA256SUMS.txt             dist/Catastrophic-Diplomacy-Android-qualification.zip
+          tag=cd-v0.1.5-rc.1
+          if gh release view "$tag" -R "$GH_REPO" >/dev/null 2>&1; then
+            echo 'BLOCKED: version tag exists; never replace previously published binaries'
+            exit 1
+          fi
           cat > dist/full-notes.md <<EOF
-          Catastrophic Diplomacy 0.1.4 RC1 — four-platform verified prerelease.
+          Catastrophic Diplomacy 0.1.5 RC1 — Windows, Linux, Android and Fire OS prerelease.
+          Exact built source: $SOURCE_SHA
+          Passed desktop/native/200v200 test: https://github.com/$GH_REPO/actions/runs/$SMOKE_RUN
+          Passed signed APK + emulator 200v200/menu test: https://github.com/$GH_REPO/actions/runs/$SIGNED_RUN
 
-          Game source: $SOURCE_SHA.
-          Windows and Linux native packages include their own Java 17 runtime.
-          Android is signed using the retained PKCS12 repository identity.
-          Fire OS receives the same signed APK bytes, validated for sideload compatibility.
-
-          Mandatory passing Actions:
-          - Windows/Linux native builds and deterministic 200v200 combat: https://github.com/$GH_REPO/actions/runs/$SMOKE_RUN
-          - Signed Android + real emulator 200v200 combat, signed-app launch, menu navigation: https://github.com/$GH_REPO/actions/runs/$SIGNED_RUN
-
-          SHA-256 hashes and exact test provenance are attached.
-          Windows executables have NOT been Authenticode-signed; the Linux app image has NOT been separately signed.
-          Fire OS physical-tablet install, physical-device performance and upgrade/save-retention are NOT certified.
-          This is a prerelease, not a stable or Play Store release.
+          Windows and Linux include bundled Java 17. Android and Fire OS contain the
+          same retained-signer APK bytes, with Android versionCode 6.
+          SHA-256 checksums, release manifest, and qualification evidence are attached.
+          Windows is not Authenticode-signed and the Linux ZIP is not signed.
+          Physical-device testing, in-place upgrades, and hardware frame-rate
+          acceptance are still outstanding. This is not a stable/Play release.
           EOF
-          gh release edit "$tag" -R "$GH_REPO"             --title 'Catastrophic Diplomacy 0.1.4 RC1 — Windows Linux Android Fire OS'             --notes-file dist/full-notes.md
-          gh release view "$tag" -R "$GH_REPO" --json assets,targetCommitish,isPrerelease             --jq '{source:.targetCommitish,prerelease:.isPrerelease,assets:[.assets[].name]}'
-          echo 'PASS: exact-test-artifact four-platform prerelease published without bypassing Android qualification'
+          gh release create "$tag" -R "$GH_REPO" --target "$SOURCE_SHA" \
+            --title 'Catastrophic Diplomacy 0.1.5 RC1 — Windows Linux Android Fire OS' \
+            --prerelease --notes-file dist/full-notes.md \
+            dist/windows/Catastrophic-Diplomacy-Windows-x64.zip \
+            dist/linux/Catastrophic-Diplomacy-Linux-x64.zip \
+            dist/android/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk \
+            dist/android/release-manifest.json \
+            dist/android/signature-verification.txt \
+            dist/android/package-identity.txt \
+            dist/fireos/Catastrophic-Diplomacy-0.1.5-rc.1-FireOS.apk \
+            dist/release-provenance.json \
+            dist/FULL-SHA256SUMS.txt \
+            dist/Catastrophic-Diplomacy-Android-qualification.zip
+          gh release view "$tag" -R "$GH_REPO" --json assets,targetCommitish,isPrerelease \
+            --jq '{source:.targetCommitish,prerelease:.isPrerelease,assets:[.assets[].name]}'
+          echo 'PASS: all four platform packages published from exactly qualified source'

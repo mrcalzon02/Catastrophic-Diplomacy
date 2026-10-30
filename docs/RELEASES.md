@@ -13,3 +13,12 @@ The authoritative repository is `mrcalzon02/Catastrophic-Diplomacy` and the rele
 ## Android release policy acceptance
 
 Android release candidates, whether locally side-loaded or intended for future Google Play distribution, are subject to the mandatory [38-control APK release gate](APK_RELEASE_COMPLIANCE_GATE.md) and the source/test + per-artifact evidence checker at `tools/verify_apk_release_gate.py`. The future `google-play` branch adds a full functional-test preflight and **must not** be used to publish until Play upload signing, API compliance, Play Console review, asset compliance and device upgrades are verified. `main` remains the authoritative sideload-development branch; no CI/Actions or release workflow is activated by this policy update.
+
+## 0.1.5 RC1 four-platform prerelease
+A full-platform release is assembled only from successful, exact-commit native
+Windows/Linux, Android and real emulator 200v200 runs. Windows/Linux desktop ZIP
+app images, retained-signer Android and byte-identical Fire OS APK, checksums and
+test provenance share the one versioned release. Android versionCode 6 is above
+the published RC1 code 5; publisher never overwrites occupied tags. Windows
+Authenticode, Linux signing, physical device performance and Android upgrade
+testing are not yet certified.

@@ -112,25 +112,25 @@ jobs:
           source=android/build/outputs/apk/release/android-release.apk
           test -s "$source"
           mkdir -p release
-          apk=release/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
+          apk=release/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk
           cp "$source" "$apk"
           apksigner verify --verbose --print-certs "$apk" | tee release/signature-verification.txt
           aapt dump badging "$apk" | grep '^package:' | tee release/package-identity.txt
-          grep -q "name='games.catastrophicdiplomacy' versionCode='5' versionName='0.1.4-rc.1'" release/package-identity.txt
+          grep -q "name='games.catastrophicdiplomacy' versionCode='6' versionName='0.1.5-rc.1'" release/package-identity.txt
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' release/signature-verification.txt
           python3 tools/prepare_android_update_manifest.py "$apk" --output release/release-manifest.json
-          (cd release && sha256sum Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk > SHA256SUMS.txt)
+          (cd release && sha256sum Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk > SHA256SUMS.txt)
           echo "PASS: signed release artifact verified (identity, APK signature, digest, updater metadata)"
       - name: Verify Amazon Fire tablet sideload compatibility using the actual signed APK
         shell: bash
         run: |
           set -euo pipefail
-          apk=release/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
+          apk=release/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk
           python3 tools/verify_fire_tablet_target.py --apk "$apk"
           mkdir -p fireos
-          cp "$apk" fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk
-          (cd fireos && sha256sum Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk > SHA256SUMS.txt)
-          cmp "$apk" fireos/Catastrophic-Diplomacy-0.1.4-rc.1-FireOS.apk
+          cp "$apk" fireos/Catastrophic-Diplomacy-0.1.5-rc.1-FireOS.apk
+          (cd fireos && sha256sum Catastrophic-Diplomacy-0.1.5-rc.1-FireOS.apk > SHA256SUMS.txt)
+          cmp "$apk" fireos/Catastrophic-Diplomacy-0.1.5-rc.1-FireOS.apk
           echo "PASS: Fire OS tablet sideload candidate uses the exact retained Android signer and game build"
       - name: Remove restored private signing identity
         if: always()
@@ -139,14 +139,14 @@ jobs:
       - name: Upload verified signed release candidate and checksums
         uses: actions/upload-artifact@v4
         with:
-          name: cd-signed-android-0.1.4-rc.1-${{ github.sha }}
+          name: cd-signed-android-0.1.5-rc.1-${{ github.sha }}
           path: release/
           if-no-files-found: error
           retention-days: 30
       - name: Upload Amazon Fire tablet compatible signed sideload APK
         uses: actions/upload-artifact@v4
         with:
-          name: cd-fire-tablet-sideload-0.1.4-rc.1-${{ github.sha }}
+          name: cd-fire-tablet-sideload-0.1.5-rc.1-${{ github.sha }}
           path: fireos/
           if-no-files-found: error
           retention-days: 30
@@ -178,7 +178,7 @@ jobs:
         run: gradle --no-daemon --stacktrace :android:assembleDebug
       - uses: actions/download-artifact@v4
         with:
-          name: cd-signed-android-0.1.4-rc.1-${{ github.sha }}
+          name: cd-signed-android-0.1.5-rc.1-${{ github.sha }}
           path: release
       - name: Require hardware-accelerated Android emulator (KVM)
         shell: bash
@@ -214,7 +214,7 @@ jobs:
           script: |
             bash tools/android_verify_demo.sh android/build/outputs/apk/debug/android-debug.apk test-output/android
             adb uninstall games.catastrophicdiplomacy
-            adb install release/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
+            adb install release/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk
             adb shell am start -W -n games.catastrophicdiplomacy/diplomacy.android.AndroidLauncher
             sleep 5
             adb shell pidof games.catastrophicdiplomacy
@@ -239,7 +239,7 @@ jobs:
           retention-days: 30
 
   publish-prerelease:
-    # This fixed 0.1.4-rc.1 tag is already published. Pushes still build and
+    # This fixed 0.1.5-rc.1 tag is already published. Pushes still build and
     # exercise the signed APK; publication requires an explicit dispatch and
     # a vacant, version-bumped tag. Never overwrite a released APK.
     name: Publish verified signed Android prerelease (manual only)
@@ -249,7 +249,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: cd-signed-android-0.1.4-rc.1-${{ github.sha }}
+          name: cd-signed-android-0.1.5-rc.1-${{ github.sha }}
           path: release
       - name: Publish signed Android prerelease after functional emulator pass
         shell: bash
@@ -258,13 +258,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag=cd-v0.1.4-rc.1
+          tag=cd-v0.1.5-rc.1
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "BLOCKED: tag already exists; will not overwrite a release or rotate identity"
             exit 1
           fi
           gh release create "$tag" \
-            release/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk \
+            release/Catastrophic-Diplomacy-0.1.5-rc.1-Android.apk \
             release/release-manifest.json release/SHA256SUMS.txt \
             release/signature-verification.txt release/package-identity.txt \
             --repo "$GH_REPO" --target "$GITHUB_SHA" \
