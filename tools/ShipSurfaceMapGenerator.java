@@ -1,4 +1,6 @@
 import java.awt.image.BufferedImage;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
@@ -55,11 +57,29 @@ public final class ShipSurfaceMapGenerator {
         }
         return new BufferedImage[]{n,e};
     }
+    // Material data needs far less resolution than painted albedo at tactical
+    // zoom. Capping at 320px avoids tripling GPU memory on Android/Fire OS.
+    private static final int MAX_AXIS=320;
+    static BufferedImage bounded(BufferedImage input){
+        int width=input.getWidth(),height=input.getHeight();
+        if(Math.max(width,height)<=MAX_AXIS)return input;
+        double scale=MAX_AXIS/(double)Math.max(width,height);
+        int w=Math.max(2,(int)Math.round(width*scale));
+        int h=Math.max(2,(int)Math.round(height*scale));
+        BufferedImage target=new BufferedImage(w,h,BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g=target.createGraphics();
+        try{
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                    RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g.drawImage(input,0,0,w,h,null);
+        }finally{g.dispose();}
+        return target;
+    }
     static void generate(Path source,Path destination) throws IOException{
         BufferedImage image=ImageIO.read(source.toFile());
         if(image==null || image.getWidth()<2||image.getHeight()<2)
             throw new IOException("Invalid approved hull PNG "+source);
-        BufferedImage[] maps=derive(image);
+        BufferedImage[] maps=derive(bounded(image));
         Files.createDirectories(destination.getParent());
         for(int i=0;i<2;i++){
             String name=destination.getFileName().toString();
