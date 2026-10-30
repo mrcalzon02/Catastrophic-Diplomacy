@@ -163,6 +163,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private final BattleRenderPoses renderPoses=new BattleRenderPoses();
     private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
+    private final CombatAftermathGate aftermath=new CombatAftermathGate();
     private ShipDeathRenderer deathRenderer;
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
@@ -2156,7 +2157,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(screensaverResultPause>=ScreensaverBattle.RESULT_PAUSE_SECONDS)
                 nextScreensaverRound();
         }
-        if(!screensaverMode&&!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE&&battle.finished()) {
+        // Keep the final wreck visible long enough for the fracture to disperse.
+        if(!screensaverMode&&!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE
+                &&aftermath.ready(battle,Gdx.graphics.getDeltaTime(),
+                        running&&!tacticalMenuOpen&&!shipyard.open())) {
             if(playedCampaign && campaignEncounter!=null) {
                 CampaignEncounter.Advance advance=campaignEncounter.advance();
                 if(advance==CampaignEncounter.Advance.VICTORY ||

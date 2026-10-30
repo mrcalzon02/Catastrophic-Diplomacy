@@ -134,3 +134,12 @@ tasks.register('voiceMenuSmoke', JavaExec) {
     mainClass = 'diplomacy.client.VoiceMenuControlsTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('voiceMenuSmoke') }
+
+tasks.register('combatAftermathSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify the final shattering hull is visible before results.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatAftermathGateTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatAftermathSmoke') }
