@@ -292,11 +292,14 @@ public final class Battle {
             profile=offensive?source.fighterProfile:null;
             integrity=offensive?profile.health():service?20:15;
             maxIntegrity=integrity;armor=offensive?profile.armor():0;
-            fuel=offensive?profile.fuel():service?26:22;
+            fuel=offensive?profile.fuel():service?52:22;
             ammunition=offensive?profile.ammunition():0;
             repairReserve=service?32*source.support.droneEndurance():0;
             serviceChannel=service?SupportDoctrine.Channel.HULL:null;
             serviceMaxCharge=repairReserve;
+            servicePulse=service?source.support.repairDroneRate()*0.80:0;
+            serviceRange=service?300:0;
+            reusable=service;
         }
         Craft(int identifier,Ship source,SupportDoctrine.Emitter emitter,int target){
             this(identifier,source,false,true,target);
@@ -1519,6 +1522,23 @@ public final class Battle {
                 ship.power-=5;ship.heat+=2;
             }
         }
+        // New dedicated support hangars launch reusable finite-charge drones,
+        // not weapons. One launch controller per vessel prevents 400-ship spam.
+        if(ship.power>=5 && ship.repairDroneReload<=0&&crafts.size()<2000)
+            for(SupportDoctrine.Emitter emitter:ship.logistics.drones()){
+                int channel=emitter.channel().ordinal();
+                if(ship.serviceDroneReserve[channel]<=0)continue;
+                Ship needy=serviceTarget(ship,emitter.channel(),emitter.range(),true);
+                if(needy==null)continue;
+                crafts.add(new Craft(nextCraftId++,ship,emitter,needy.id));
+                ship.serviceDroneReserve[channel]--;
+                ship.repairDronesLaunched++;
+                ship.repairDroneReload=5.5/ship.hangarCondition;
+                ship.power-=5;ship.heat+=2;
+                visual(nextVisualShotId++,VisualPhase.FIRE,"SERVICE_DRONE",
+                        ship.team,ship.id,needy.id,ship.x,ship.y,needy.x,needy.y);
+                break;
+            }
     }
 
     /** Small craft maintain independent sensor locks and fire real projectiles. */
@@ -1634,38 +1654,63 @@ public final class Battle {
             } else if(craft.repair){
                 Ship source=findShip(craft.sourceId);
                 if(source==null||!source.alive()){crafts.remove(i);continue;}
-                Ship target=findShip(craft.targetId);
-                if(target==null||!target.alive()||target.team!=craft.team
-                        ||target.hull>=target.maxHull-1e-8){
-                    target=mostDamagedAlly(source,300,false);
-                    craft.targetId=target==null?0:target.id;
-                }
-                if(target==null){
+                // Finite charge and fuel mandate return to the owning carrier.
+                if(craft.repairReserve<=1e-8||craft.fuel<9)craft.returning=true;
+                if(craft.returning){
                     double dx=source.x-craft.x,dy=source.y-craft.y;
-                    double d=StrictMath.hypot(dx,dy);
-                    if(d>26){craft.x+=dx/d*110*DT;craft.y+=dy/d*110*DT;}
+                    double distance=StrictMath.hypot(dx,dy);
+                    if(distance>15){
+                        double advance=StrictMath.min(distance-15,220*DT);
+                        if(distance>0){
+                            craft.x+=dx/distance*advance;
+                            craft.y+=dy/distance*advance;
+                        }
+                    }else{
+                        // Dock, pay for every new service charge, replenish fuel
+                        // and free a launch slot. Without energy, wait aboard.
+                        double cost=StrictMath.max(12,craft.serviceMaxCharge*0.36);
+                        if(source.power>=cost+5){
+                            source.power-=cost;source.heat+=cost*0.17;
+                            craft.repairReserve=craft.serviceMaxCharge;
+                            craft.fuel=52;
+                            if(craft.serviceRange>300)
+                                source.serviceDroneReserve[craft.serviceChannel.ordinal()]++;
+                            else source.repairDroneReserve++;
+                            crafts.remove(i);
+                        }else craft.fuel=StrictMath.max(1,craft.fuel);
+                    }
                     continue;
                 }
+                Ship target=findShip(craft.targetId);
+                if(target==null||!target.alive()||target.team!=craft.team
+                        ||serviceNeed(target,craft.serviceChannel)<=1e-8){
+                    target=serviceTarget(source,craft.serviceChannel,
+                            craft.serviceRange,true);
+                    craft.targetId=target==null?0:target.id;
+                }
+                if(target==null){craft.returning=true;continue;}
                 double dx=target.x-craft.x,dy=target.y-craft.y;
                 double distance=StrictMath.hypot(dx,dy);
                 if(distance>25){
-                    double advance=Math.min(distance-25,145*DT);
-                    if(distance>0){craft.x+=dx/distance*advance;craft.y+=dy/distance*advance;}
+                    double advance=StrictMath.min(distance-25,145*DT);
+                    if(distance>0){
+                        craft.x+=dx/distance*advance;
+                        craft.y+=dy/distance*advance;
+                    }
                 }
-                craft.reload=Math.max(0,craft.reload-DT);
+                craft.reload=StrictMath.max(0,craft.reload-DT);
                 if(StrictMath.hypot(target.x-craft.x,target.y-craft.y)<=29
                         &&craft.reload<=0&&craft.repairReserve>0){
-                    double gained=Math.min(craft.repairReserve,Math.min(
-                            source.support.repairDroneRate()*0.80,target.maxHull-target.hull));
-                    if(gained>0){
-                        target.hull+=gained;craft.repairReserve-=gained;
-                        source.remoteHullRepaired+=gained;
+                    double actual=deliverSupport(source,target,craft.serviceChannel,
+                            StrictMath.min(craft.repairReserve,craft.servicePulse),
+                            1,false);
+                    if(actual>0){
+                        craft.repairReserve-=actual;
                         supportLinks.add(new SupportLink(source,target,SupportKind.DRONE,
                                 tick,craft.x,craft.y));
                     }
                     craft.reload=0.8;
                 }
-                if(craft.repairReserve<=1e-8)crafts.remove(i);
             } else {
                 Ship controller=findShip(craft.sourceId);
                 ProjectileModel.Defense suite=controller==null?ProjectileModel.STANDARD_PD
