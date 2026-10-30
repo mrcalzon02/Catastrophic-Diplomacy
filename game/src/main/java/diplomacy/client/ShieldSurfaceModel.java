@@ -44,6 +44,13 @@ final class ShieldSurfaceModel {
         float modulation=(float)(.925+.075*Math.sin(phase));
         return .40f*(float)Math.sqrt(energy)*modulation;
     }
+    /** Brief material response on the real silhouette, with no unpowered glow. */
+    static float energizedOpacity(float base,float contact,float charge){
+        if(!Float.isFinite(base)||base<=0)return 0f;
+        float hit=Float.isFinite(contact)?Math.max(0,Math.min(1,contact)):0f;
+        float regen=Float.isFinite(charge)?Math.max(0,Math.min(1,charge)):0f;
+        return Math.min(.92f,base+hit*.32f+regen*.13f);
+    }
     /** Never spend overdraw on shield shells smaller than a handful of pixels. */
     static boolean drawable(float spriteHeight,double viewWidth) {
         if(!(spriteHeight>0)||!(viewWidth>0))return false;
