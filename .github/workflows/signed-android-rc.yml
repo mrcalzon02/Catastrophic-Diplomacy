@@ -55,7 +55,7 @@ jobs:
         run: |
           gradle --no-daemon :core:smoke :core:demoWeaponSmoke :core:massBattleCampaign \
             :core:fighterCraftSmoke :core:projectileModuleSmoke \
-            :core:supportSystemsSmoke :core:shipSurfaceDamageSmoke :core:moduleResearchSmoke \
+            :core:supportSystemsSmoke :core:hullCoverageSmoke :core:shipSurfaceDamageSmoke :core:moduleResearchSmoke \
             :core:updaterPolicySmoke :game:classes :desktop:classes
 
   signed-android:
