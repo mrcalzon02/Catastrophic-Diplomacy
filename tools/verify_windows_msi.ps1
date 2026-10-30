@@ -36,14 +36,14 @@ if ([string]::IsNullOrWhiteSpace($upgrade)) {
   $upgrade = $row.StringData(1)
 }
 if ($version -ne '0.1.5') { throw "MSI version mismatch: $version" }
-if ([string]::IsNullOrWhiteSpace($upgrade)) {
-  # WiX/jpackage may omit a public UpgradeCode property (and Upgrade table
-  # rows) for a first-time install. We still test real MSI registration,
-  # payload, and uninstall. An actual upgrade remains a separate test.
-  Write-Host 'NOTE: UpgradeCode is not queryable in this MSI; installation, not upgrade, is qualified.'
-}
-elseif ($upgrade.Trim('{}').ToLowerInvariant() -ne 'cfc2e09f-fbaa-4b95-9f20-d59ac1148057') {
-  throw "MSI upgrade identity mismatch: $upgrade"
+# COM Automation values may be null or variant types. Normalize using a
+# PowerShell string conversion BEFORE any method calls on those values.
+$normalizedUpgrade = [string]$upgrade
+$normalizedUpgrade = ($normalizedUpgrade -replace '[{}]', '').Trim().ToLowerInvariant()
+if ($normalizedUpgrade.Length -eq 0) {
+  Write-Host 'NOTE: first-install MSI does not expose an upgrade GUID; upgrade QA remains outstanding.'
+} elseif ($normalizedUpgrade -ne 'cfc2e09f-fbaa-4b95-9f20-d59ac1148057') {
+  throw "MSI upgrade identity mismatch: $normalizedUpgrade"
 }
 $installLog = Join-Path $env:RUNNER_TEMP 'cd-msi-install.log'
 $uninstallLog = Join-Path $env:RUNNER_TEMP 'cd-msi-uninstall.log'
