@@ -296,6 +296,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         var fleet=textures.get(faction);
         return fleet==null?null:fleet.get(hull);
     }
+    /** Retired hulls still retain their authentic faction art for post-mortem shards. */
+    Texture sourceTexture(Battle.Faction faction,Shipyard.Hull hull){
+        return hull==null?null:texture(faction,hull);
+    }
     /** Preview is an art reference, not yet a source of fitted module UV anchors. */
     public boolean hasHull(Battle.Faction faction, Shipyard.Hull hull) {
         return texture(faction,hull)!=null;

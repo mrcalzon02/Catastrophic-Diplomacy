@@ -161,6 +161,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private float battlePanX,battlePanY;
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private final BattleRenderPoses renderPoses=new BattleRenderPoses();
+    private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
+    private ShipDeathRenderer deathRenderer;
     private String renderer = "software geometry";
     private String saveState = "FLEETS NOT SAVED";
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
@@ -191,6 +193,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         craftSprites = new FighterCraftSprites();
         weaponBeams = new WeaponBeamSprites();
         weaponFx = new ModularWeaponFxRenderer();
+        try {
+            deathRenderer = new ShipDeathRenderer();
+        } catch (RuntimeException failed) {
+            Gdx.app.error("SHIP-DEATH","Polygon shatter unavailable; combat remains active",failed);
+            deathRenderer = null;
+        }
         try {
             lighting = new CombatLightingRenderer();
         } catch (RuntimeException failed) {
@@ -2153,10 +2161,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
                 renderPoses.beforeStep(battle);
+                deathTimeline.beforeStep(battle);
                 battle.step(); accumulator -= Battle.DT;
+                deathTimeline.afterStep(battle);
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
+        // Simulation death detection is tick-exact; fragments evolve only while
+        // combat runs (and through the four-second post-battle victory pause).
+        deathTimeline.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
         // Shared visual clock: current authoritative state minus one fixed-tick.
         // Paused battles draw the exact state, not an old snapshot.
         renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
@@ -2294,6 +2307,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses,view);
         if(lighting!=null)lighting.renderSmoke(battle,batch,battleCamera);
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses,view);
+        // No second hull is rendered after a kill: real source-art pieces fly
+        // apart across irregular cuts, surrounded by smoke, for a bounded time.
+        if(deathRenderer!=null)
+            deathRenderer.render(deathTimeline,terranSprites,battleCamera,view,shapes);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
@@ -2649,6 +2666,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(craftSprites!=null)craftSprites.dispose();
         if(weaponBeams!=null)weaponBeams.dispose();
         if(weaponFx!=null)weaponFx.dispose();
+        if(deathRenderer!=null)deathRenderer.dispose();
         if(lighting!=null)lighting.dispose();
         if(uiIcons!=null)uiIcons.dispose();
         if(menuPanel!=null)menuPanel.dispose();
