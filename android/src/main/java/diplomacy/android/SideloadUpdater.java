@@ -205,6 +205,14 @@ final class SideloadUpdater {
                             .setPositiveButton("OK", null).show();
                     return;
                 }
+                // Automatic startup checks must never hijack gameplay with a
+                // modal, even when release candidates exist. Only the player's
+                // explicit UPDATES button opens the selection dialog.
+                if (!manual) {
+                    android.util.Log.i("CD-Updater", "Background update scan found "
+                            + available.size() + " candidate APK releases (no modal)");
+                    return;
+                }
                 // Every possible published APK is selectable. Without a manifest, actual
                 // versionCode is verified from the downloaded APK *before* installation.
                 String[] descriptions = new String[available.size()];
