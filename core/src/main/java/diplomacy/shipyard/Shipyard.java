@@ -573,7 +573,7 @@ public final class Shipyard {
                 }
                 case "XFR" -> {
                     shieldRate+=p.effect*0.028*tuning.shieldTransfer();
-                    shieldRange=Math.max(shieldRange,175*tuning.reach());
+                    shieldRange=Math.max(shieldRange,450*tuning.reach());
                     efficiency=Math.max(efficiency,tuning.supportEfficiency());
                 }
                 case "SIF" -> sif+=p.effect*0.0065*p.integrity/p.base.integrity;
