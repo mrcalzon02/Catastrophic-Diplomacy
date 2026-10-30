@@ -2090,7 +2090,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // atlas strip is absent (no fabricated replacement sprite).
         for(Battle.SupportLink link:battle.supportLinks()){
             if(weaponBeams!=null&&weaponBeams.canDrawSupport(link,battle.tick))continue;
-            shapes.setColor(link.kind==Battle.SupportKind.SHIELD?Color.SKY:Color.GREEN);
+            shapes.setColor(switch(link.kind){
+                case SHIELD,DRONE_SHIELD -> Color.SKY;
+                case ARMOR,DRONE_ARMOR -> Color.GOLD;
+                case POWER,DRONE_POWER -> Color.VIOLET;
+                case HULL,DRONE -> Color.GREEN;
+            });
             shapes.line((float)link.x1,(float)link.y1,(float)link.x2,(float)link.y2);
         }
         // Engine exhaust is displayed by both GPU-instanced and fallback hull paths.
