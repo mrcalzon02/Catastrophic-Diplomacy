@@ -86,6 +86,52 @@ public final class ShieldFxTimelineTest {
         fx.afterStep(battle,List.of());
         check(has(fx,ShieldFxTimeline.Kind.RECHARGE,front),
                 "Existing sector recharge drives a quiet filament");
+        // Two independent weapons strike opposite sides in one fixed tick.
+        // Render labels and contact angles must not be inherited from the
+        // last ship-wide hit, even when both impact points are hull-centered.
+        Battle paired=new Battle(304L);
+        Battle.Ship defender=paired.addShip(0,Battle.Faction.TERRAN,300,400);
+        Battle.Ship bowShooter=paired.addShip(1,Battle.Faction.TERRAN,500,400);
+        Battle.Ship portShooter=paired.addShip(1,Battle.Faction.TERRAN,300,600);
+        ShieldFxTimeline pairedFx=new ShieldFxTimeline();
+        pairedFx.beforeStep(paired);
+        defender.defense.impact(1,0,1,0,2,Battle.DamageType.LASER);
+        defender.defense.impact(0,1,0,1,3,Battle.DamageType.PLASMA);
+        defender.shields=defender.defense.totalShields();
+        paired.tick++;
+        Battle.VisualEvent bowHit=new Battle.VisualEvent(1,1,paired.tick,
+                Battle.VisualPhase.IMPACT,"LASER_LANCE",1,bowShooter.id,
+                defender.id,defender.x,defender.y,defender.x,defender.y);
+        Battle.VisualEvent portHit=new Battle.VisualEvent(2,2,paired.tick,
+                Battle.VisualPhase.IMPACT,"PLASMA",1,portShooter.id,
+                defender.id,defender.x,defender.y,defender.x,defender.y);
+        pairedFx.afterStep(paired,List.of(bowHit,portHit));
+        check(pairedFx.events().stream().anyMatch(e->
+                e.kind==ShieldFxTimeline.Kind.IMPACT&&e.facing==front
+                &&e.weapon==Battle.DamageType.LASER),
+                "Bow laser must keep its own weapon attribution");
+        check(pairedFx.events().stream().anyMatch(e->
+                e.kind==ShieldFxTimeline.Kind.IMPACT&&e.facing==port
+                &&e.weapon==Battle.DamageType.PLASMA),
+                "Port plasma cannot overwrite bow laser impact");
+        check(ShieldFxTimeline.contactFacing(defender,bowHit,bowShooter)==front
+                &&ShieldFxTimeline.contactFacing(defender,portHit,portShooter)==port,
+                "Mechanical incoming direction decides contact sector");
+        check(Math.abs(ShieldFxTimeline.impactAngle(defender,port,portHit,portShooter)-90f)<1f,
+                "Center-positioned contact must use attacker direction");
+        pairedFx.beforeStep(paired);
+        // Cross the genuine critical-integrity threshold without emptying the
+        // facing, producing strain rather than premature shield collapse.
+        defender.defense.disruptShields(17);
+        defender.shields=defender.defense.totalShields();
+        paired.tick++;
+        pairedFx.afterStep(paired,List.of(new Battle.VisualEvent(3,3,paired.tick,
+                Battle.VisualPhase.IMPACT,"KINETIC",1,bowShooter.id,
+                defender.id,defender.x,defender.y,defender.x,defender.y)));
+        check(has(pairedFx,ShieldFxTimeline.Kind.STRAIN,front),
+                "Critical-but-alive sector needs an overload warning flare");
+        check(!has(pairedFx,ShieldFxTimeline.Kind.COLLAPSE,front),
+                "Critical charge is not the same as shield destruction");
         Battle mass=new Battle(303L);
         for(int i=0;i<400;i++)mass.addShip(i%2,Battle.Faction.TERRAN,i*4,0);
         fx.beforeStep(mass);
