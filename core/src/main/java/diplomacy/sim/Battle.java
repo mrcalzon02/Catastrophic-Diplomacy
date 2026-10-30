@@ -1357,6 +1357,101 @@ public final class Battle {
         }
     }
 
+    /** Existing shield/armor caps, not free health or unlimited aura buffers. */
+    private static double serviceNeed(Ship target,SupportDoctrine.Channel channel){
+        return switch(channel){
+            case HULL -> StrictMath.max(0,target.maxHull-target.hull);
+            case SHIELD -> StrictMath.max(0,target.maxShields-target.defense.totalShields());
+            case ARMOR -> StrictMath.max(0,target.defense.maxArmor()-target.defense.totalArmor());
+            case POWER -> StrictMath.max(0,target.maxPower*target.reactorCondition-target.power);
+        };
+    }
+    private Ship serviceTarget(Ship source,SupportDoctrine.Channel channel,
+                               double range,boolean includeSelf){
+        Ship best=null;
+        double score=0;
+        for(Ship friend:ships)if(friend.team==source.team&&friend.alive()
+                &&(includeSelf||friend!=source)){
+            double distance=StrictMath.hypot(source.x-friend.x,source.y-friend.y);
+            if(distance>range)continue;
+            double missing=serviceNeed(friend,channel);
+            if(missing<=1e-8)continue;
+            double capacity=switch(channel){
+                case HULL -> friend.maxHull;
+                case SHIELD -> friend.maxShields;
+                case ARMOR -> friend.maxArmor;
+                case POWER -> friend.maxPower;
+            };
+            double urgency=missing/StrictMath.max(1,capacity);
+            if(urgency>score){score=urgency;best=friend;}
+        }
+        return best;
+    }
+    /**
+     * All support actually consumes a deficit. Powered beams/auras pay energy
+     * at the originating ship; drone charges are paid for during rearming.
+     * Armor restores depleted tiles instead of increasing their maximum.
+     */
+    private double deliverSupport(Ship source,Ship target,SupportDoctrine.Channel channel,
+                                  double offered,double energyPerUnit,boolean powered){
+        if(source==null||target==null||!source.alive()||!target.alive()
+                ||source.team!=target.team||offered<=0)return 0;
+        double supply=StrictMath.min(offered,serviceNeed(target,channel));
+        if(powered){
+            if(source.power<=7)return 0;
+            supply=StrictMath.min(supply,(source.power-7)/energyPerUnit);
+        }
+        if(supply<=1e-10)return 0;
+        double gained=switch(channel){
+            case HULL -> {target.hull+=supply;yield supply;}
+            case SHIELD -> target.defense.receiveShieldTransfer(supply);
+            case ARMOR -> target.defense.receiveArmorRepair(supply);
+            case POWER -> {target.power=StrictMath.min(
+                    target.maxPower*target.reactorCondition,target.power+supply);yield supply;}
+        };
+        if(gained<=0)return 0;
+        if(powered){
+            source.power-=gained*energyPerUnit;
+            source.heat+=gained*0.12;
+        }
+        target.shields=target.defense.totalShields();
+        target.armor=target.defense.totalArmor();
+        switch(channel){
+            case HULL -> source.remoteHullRepaired+=gained;
+            case SHIELD -> source.shieldsTransferred+=gained;
+            case ARMOR -> source.armorServiced+=gained;
+            case POWER -> source.powerSupplied+=gained;
+        }
+        return gained;
+    }
+    private void updateExtendedSupport(double seconds){
+        for(Ship source:ships)if(source.alive()&&source.crewReadiness()>0.05
+                &&source.reactorCondition>0.15&&source.power>7){
+            for(SupportDoctrine.Emitter device:source.logistics.direct()){
+                Ship target=serviceTarget(source,device.channel(),device.range(),false);
+                if(target==null)continue;
+                double received=deliverSupport(source,target,device.channel(),
+                        device.rate()*seconds,device.energyPerUnit(),true);
+                if(received>0)supportLinks.add(new SupportLink(source,target,
+                        device.channel()==SupportDoctrine.Channel.ARMOR?SupportKind.ARMOR:
+                                SupportKind.POWER,tick,source.x,source.y));
+            }
+            // A small constant per-vessel benefit inside the spherical radius,
+            // not an unlimited fleet multiplier or a new network of blue lines.
+            if(tick%30==0)for(SupportDoctrine.Emitter field:source.logistics.auras()){
+                for(Ship friend:ships)if(friend.alive()&&friend.team==source.team
+                        &&(friend!=source||field.channel()!=SupportDoctrine.Channel.POWER)
+                        &&StrictMath.hypot(friend.x-source.x,friend.y-source.y)
+                                <=field.range()){
+                    double received=deliverSupport(source,friend,field.channel(),
+                            field.rate(),field.energyPerUnit(),true);
+                    source.auraService+=received;
+                }
+            }
+        }
+        updateExtendedSupport(seconds);
+    }
+
     /** Screen nearby threats; protect responds to actual attack orders and last attackers. */
     private Ship protectedThreat(Ship source,boolean screen){
         Ship chosen=null;
