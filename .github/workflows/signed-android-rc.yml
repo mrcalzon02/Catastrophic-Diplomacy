@@ -56,7 +56,7 @@ jobs:
           gradle --no-daemon :core:smoke :core:demoWeaponSmoke :core:massBattleCampaign \
             :core:fighterCraftSmoke :core:projectileModuleSmoke \
             :core:supportSystemsSmoke :core:hullCoverageSmoke :core:shipSurfaceDamageSmoke :core:moduleResearchSmoke \
-            :core:updaterPolicySmoke :game:classes :desktop:classes
+            :core:updaterPolicySmoke :server:check :game:classes :desktop:classes
 
   signed-android:
     name: Sign Android release APK with retained repository identity
