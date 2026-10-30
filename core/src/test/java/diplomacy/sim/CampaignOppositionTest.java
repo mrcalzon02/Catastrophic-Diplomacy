@@ -56,7 +56,7 @@ public final class CampaignOppositionTest {
 
         Set<Shipyard.Hull> encountered=new HashSet<>();
         Set<String> weapons=new HashSet<>();
-        int upgraded=0;
+        int upgraded=0,advancedBatteries=0;
         for(int mission:new int[]{1,10,50,51,91,101,151,201,250,251,301,351,401,451,499,500}){
             int ceiling=CampaignOpposition.maximumTier(mission);
             for(Battle.Faction faction:new Battle.Faction[]{
@@ -78,11 +78,14 @@ public final class CampaignOppositionTest {
                                     Shipyard.inspect(design,catalog).explanation());
                     encountered.add(design.hull);
                     variations.add(Shipyard.encode(design));
+                    int weaponsInstalled=0;
                     for(int slot=0;slot<design.slots();slot++){
                         Shipyard.Installed part=design.at(slot);
                         if(part==null)continue;
-                        if(design.hull.slots.get(slot).mount()==Shipyard.Mount.WEAPON)
+                        if(design.hull.slots.get(slot).mount()==Shipyard.Mount.WEAPON){
                             weapons.add(part.component);
+                            weaponsInstalled++;
+                        }
                         for(Shipyard.Track track:Shipyard.Track.values()){
                             check(part.stage(track)<=ceiling,
                                     "Enemy module outruns authorized level technology");
@@ -91,10 +94,13 @@ public final class CampaignOppositionTest {
                         check(part.mark<=Math.min(4,ceiling+1),
                                 "Enemy hardware variant exceeds manufacturing ceiling");
                     }
+                    if(mission>=451&&weaponsInstalled>2)advancedBatteries++;
                 }
                 check(variations.size()>1,"Entire campaign fleet is one cloned loadout");
             }
         }
+        check(advancedBatteries>0,
+                "Late capital ships still use only the two starter weapon hardpoints");
         check(encountered.size()>=8&&weapons.size()>=6&&upgraded>30,
                 "Campaign still lacks hull, weapon, or engineering diversity");
 
