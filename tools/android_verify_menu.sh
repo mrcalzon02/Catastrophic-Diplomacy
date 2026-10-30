@@ -149,6 +149,42 @@ if cmp -s "$report/skirmish-menu.png" "$report/skirmish-battle.png"; then
   echo "FAIL: battle navigation produced an unchanged screen" >&2
   exit 1
 fi
+# Separate small-fleet visual/functional fixture: every canonical hull
+# silhouette appears once per team. Capture both fleet-wide and closer views
+# from the REAL signed APK, rather than simulated diagrams.
+adb shell am force-stop "$package"
+adb logcat -c
+adb shell am start -W -n "$package/diplomacy.android.AndroidLauncher"
+sleep 5
+dismiss_optional_updater hull-relaunch
+capture hull-home
+assert_step MAIN_MENU
+touch_ui hull-home 640 384
+sleep 2
+capture hull-scenarios
+assert_step SKIRMISH_SETUP
+# HULL_COVERAGE is the tenth row, starting at virtual y=592-9*48.
+touch_ui hull-scenarios 285 181
+sleep 1
+capture hull-coverage-selected
+touch_ui hull-coverage-selected 1107 60
+sleep 4
+capture hull-coverage-battle
+assert_step 'BATTLE HULL_COVERAGE'
+adb logcat -d -v time > "$report/hull-coverage-logcat.txt"
+grep 'CD-HULL-COVERAGE' "$report/hull-coverage-logcat.txt" > "$report/hull-coverage-telemetry.txt" || true
+grep -q 'START 11v11 every size, 22 fitted ships, 11 distinct hulls per side' \
+     "$report/hull-coverage-telemetry.txt" || {
+    echo "FAIL: real small mixed battle does not contain every hull size" >&2
+    exit 1
+}
+# Native zoom controls remain interactive while the heterogeneous fleet fights.
+touch_ui hull-coverage-battle 65 100
+touch_ui hull-coverage-battle 65 100
+sleep 1
+capture hull-coverage-detail
+echo "PASS: signed APK launched a real 11v11 every-size skirmish and saved zoomed framebuffer proof."
+
 # Relaunch the same installed signed APK and use its real interactive controls.
 # This is a state transition/gameplay smoke, not a cosmetic pixel comparison.
 adb shell am force-stop "$package"
