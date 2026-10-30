@@ -55,6 +55,12 @@ public final class SkirmishTechnologyRulesTest {
                 Shipyard.Track.OUTPUT,4,ShipTechnologyFit.Scope.SOCKET);
         reject(()->tierOne.requireAllowed(independent,catalog),
                 "Over-tier exported ship entered weaker challenge");
+        var downgraded=ShipTechnologyFit.fit(independent,catalog,tierOne,laser,
+                Shipyard.Track.OUTPUT,1,ShipTechnologyFit.Scope.SOCKET);
+        tierOne.requireAllowed(downgraded,catalog);
+        check(downgraded.at(laser).stage(Shipyard.Track.OUTPUT)==1&&
+                independent.at(laser).stage(Shipyard.Track.OUTPUT)==4,
+                "Down-ranking a ship for a lower-tier match rewrote the original design");
         check(ship.at(laser).stage(Shipyard.Track.OUTPUT)==0,
                 "Rule selection mutated source blueprint");
         var rules=new SkirmishTechnologyRules(1,10,EnumSet.allOf(Shipyard.Track.class),
