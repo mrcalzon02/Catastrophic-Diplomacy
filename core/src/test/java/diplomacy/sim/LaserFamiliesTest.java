@@ -40,11 +40,6 @@ public final class LaserFamiliesTest {
                 .findFirst().orElseThrow(()->new AssertionError(type+" did not fire"));
         ok(fire.weapon().equals(LaserFamilies.eventWeapon(type)),
                 "real firing event must identify the selected variant");
-        var impact=battle.visualEvents().stream()
-                .filter(e->e.shotId()==fire.shotId() &&
-                        e.phase()==Battle.VisualPhase.IMPACT)
-                .findFirst().orElseThrow(()->new AssertionError("Fitted laser did not impact"));
-        ok(impact.weapon().equals(fire.weapon()),"impact keeps laser identity");
         var beam=battle.beams().stream().filter(b->b.visualId==fire.shotId())
                 .findFirst().orElseThrow(()->new AssertionError("No real beam"));
         ok(beam.laserType==type,"beam must carry real firing module type");
@@ -58,6 +53,16 @@ public final class LaserFamiliesTest {
                     .reload(source.weapons.laserCycle(),source.weaponsCondition)*type.cycle,
                 "firing interval");
         ok(source.heat>0,"real weapon generates heat");
+        // Every beam uses a real aim roll capped at 98%, even for expert
+        // gunners. A regression must not depend on the FIRST shot hitting.
+        boolean impactSeen=false;
+        for(int frame=0;frame<220 && !impactSeen;frame++){
+            for(Battle.VisualEvent e:battle.visualEvents())
+                if(e.sourceId()==source.id && e.phase()==Battle.VisualPhase.IMPACT
+                        &&e.weapon().equals(fire.weapon()))impactSeen=true;
+            if(!impactSeen)battle.step();
+        }
+        ok(impactSeen,"fitted laser must eventually resolve a real impact with correct type");
         return source;
     }
     public static void main(String[] ignored){
