@@ -23,7 +23,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
     private final Map<String,Sound> synth = new HashMap<>();
     private final Map<String,Long> lastCueTick = new HashMap<>();
     private final Map<Integer,EngineVoice> localEngines = new HashMap<>();
-    private final Map<Integer,Double> shieldStates = new HashMap<>();
+    private final Map<Integer,double[]> shieldStates = new HashMap<>();
     private final Set<Integer> seenDead = new HashSet<>();
     private long lastSequence = 0, fleetLoop = -1;
     private int lastDestructions = 0;
@@ -135,20 +135,43 @@ final class SpatialAudioRuntime implements AutoCloseable {
                 CombatAudioCue.cooldownTicks(cue),mix.gain()*strength,mix.pan(),
                 pitch,weight(layer,event.phase()));
     }
+    private double[] cachedShieldFacings(Battle.Ship ship){
+        return shieldStates.computeIfAbsent(ship.id,id->{
+            double[] values=new double[4];
+            java.util.Arrays.fill(values,Double.NaN);
+            return values;
+        });
+    }
+    private void rememberShieldFacings(Battle.Ship ship){
+        double[] values=cachedShieldFacings(ship);
+        for(diplomacy.sim.DirectionalDefense.Facing facing:
+                diplomacy.sim.DirectionalDefense.Facing.values()){
+            double max=ship.defense.maxShields(facing);
+            values[facing.ordinal()]=max<=0?0:ship.defense.shields(facing)/max;
+        }
+    }
+    /** Sector-by-sector collapse/restoration; healthy other facings cannot hide it. */
     private void shieldChanges(List<Pending> list,Battle battle,double cx,double cy,double zoom) {
-        for(Battle.Ship ship:battle.ships())if(ship.alive()) {
-            double ratio=ship.maxShields<=0?0:ship.shields/ship.maxShields;
-            Double old=shieldStates.put(ship.id,ratio);
-            if(old==null)continue; // Full shields at spawn are NOT false recharge events.
-            String cue=null;
-            if(old>0.10&&ratio<0.06)cue="shield_down";
-            else if(old<0.09&&ratio>0.24)cue="shield_up";
-            if(cue==null)continue;
-            SpatialAudioModel.Layer layer=ship.visualScale()>1.4
-                    ? SpatialAudioModel.Layer.CAPITAL : SpatialAudioModel.Layer.TACTICAL;
-            SpatialAudioModel.Mix mix=SpatialAudioModel.at(layer,cx,cy,zoom,ship.x,ship.y);
-            add(list,synth.get(cue),cue,battle.tick,20,mix.gain()*0.85f,
-                    mix.pan(),1f,3.6);
+        for(Battle.Ship ship:battle.ships())if(ship.alive()){
+            double[] previous=cachedShieldFacings(ship);
+            for(diplomacy.sim.DirectionalDefense.Facing facing:
+                    diplomacy.sim.DirectionalDefense.Facing.values()){
+                int index=facing.ordinal();
+                double max=ship.defense.maxShields(facing);
+                double ratio=max<=0?0:ship.defense.shields(facing)/max;
+                double old=previous[index];
+                previous[index]=ratio;
+                if(Double.isNaN(old))continue; // Spawn is never an artificial startup.
+                String cue=null;
+                if(old>.02&&ratio<=.02)cue="shield_down";
+                else if(old<=.02&&ratio>.02)cue="shield_up";
+                if(cue==null)continue;
+                SpatialAudioModel.Layer layer=ship.visualScale()>1.4
+                        ? SpatialAudioModel.Layer.CAPITAL : SpatialAudioModel.Layer.TACTICAL;
+                SpatialAudioModel.Mix mix=SpatialAudioModel.at(layer,cx,cy,zoom,ship.x,ship.y);
+                add(list,synth.get(cue),cue,battle.tick,20,mix.gain()*.85f,
+                        mix.pan(),1f,3.6);
+            }
         }
     }
     private void destructions(List<Pending> list,Battle battle,double cx,double cy,double zoom) {
@@ -264,7 +287,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
         }else{
             lastDestructions=battle.destructions;
             for(Battle.Ship ship:battle.ships())if(ship.alive())
-                shieldStates.put(ship.id,ship.maxShields==0?0:ship.shields/ship.maxShields);
+                rememberShieldFacings(ship);
         }
         engines(battle,cx,cy,zoom,effectsVolume,active&&!battle.finished());
     }
