@@ -232,6 +232,70 @@ public final class DirectionalDefense {
         return new Impact(facing,t.column,t.row,shieldUsed,armorUsed,structural,tileLoss);
     }
     /**
+     * Real radial armor erosion around a precise hull/module hit. Shield energy
+     * is consumed BEFORE any armor cell is altered, respecting the incoming
+     * facing's resistance. Afterward the weapon's remaining energy is split
+     * among neighboring occupied cells; that allocation conserves raw damage.
+     * This avoids a uniform hull-wide fade and retains directional armor.
+     *
+     * The legacy point-impact method remains available for tests and explicit
+     * narrow hits. A zero radius is strictly equivalent to the old operation.
+     */
+    public Impact impactSplash(double incomingX,double incomingY,
+                               double hitLocalX,double hitLocalY,
+                               double raw,Battle.DamageType kind,
+                               double bypass,double radiusCells) {
+        valid(raw);
+        if(!Double.isFinite(radiusCells)||radiusCells<0||radiusCells>5)
+            throw new IllegalArgumentException("Invalid armor splash radius");
+        if(!Double.isFinite(bypass)||bypass<0||bypass>0.85)
+            throw new IllegalArgumentException("Invalid physical armor bypass");
+        if(radiusCells==0)
+            return impact(incomingX,incomingY,hitLocalX,hitLocalY,raw,kind,bypass);
+        Facing facing=facingFor(incomingX,incomingY);
+        Tile center=tileAt(hitLocalX,hitLocalY);
+        Zone zone=zones[facing.ordinal()];
+        double shieldFactor=damageFactor(Layer.SHIELD,facing,kind);
+        double shieldUsed=StrictMath.min(zone.shield,raw*shieldFactor);
+        zone.shield-=shieldUsed;
+        if(raw>0)zone.delayRemaining=zone.rechargeDelay;
+        double energy=StrictMath.max(0,raw-shieldUsed/shieldFactor);
+        if(energy<=1e-12)
+            return new Impact(facing,center.column,center.row,shieldUsed,0,0,0);
+
+        double weightTotal=0;
+        // Center-weighted, tapering footprint. Occupancy is authoritative;
+        // never damage an empty corner just because the weapon has splash.
+        for(Tile[] line:tiles)for(Tile tile:line)if(tile.occupied)
+            weightTotal+=weight(tile,center,radiusCells);
+        if(weightTotal<=0)throw new IllegalStateException("No occupied armor splash tiles");
+        double armorUsed=0,structural=0,tileLoss=0;
+        for(Tile[] line:tiles)for(Tile tile:line)if(tile.occupied){
+            double part=energy*weight(tile,center,radiusCells)/weightTotal;
+            if(part<=0)continue;
+            double armorFactor=damageFactor(Layer.ARMOR,tile.facing,kind);
+            double penetrating=part*bypass;
+            double stopped=part-penetrating;
+            double absorbed=StrictMath.min(tile.armor,stopped*armorFactor);
+            tile.armor-=absorbed;
+            armorUsed+=absorbed;
+            double residual=penetrating+StrictMath.max(0,stopped-absorbed/armorFactor);
+            double damage=residual*damageFactor(Layer.STRUCTURE,tile.facing,kind);
+            double lost=StrictMath.min(tile.structure,damage);
+            tile.structure-=lost;structural+=damage;tileLoss+=lost;
+        }
+        return new Impact(facing,center.column,center.row,
+                shieldUsed,armorUsed,structural,tileLoss);
+    }
+    private static double weight(Tile tile,Tile center,double radius){
+        double dx=tile.row-center.row,dy=tile.column-center.column;
+        double distance=StrictMath.sqrt(dx*dx+dy*dy);
+        if(distance>radius)return 0;
+        double taper=1-distance/(radius+0.5);
+        return taper*taper;
+    }
+
+    /**
      * Exact per-facing shields and occupied tile armor/structure persist between
      * campaign sorties. This is never a cosmetic approximation of hit regions.
      */
