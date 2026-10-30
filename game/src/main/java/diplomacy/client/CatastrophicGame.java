@@ -181,7 +181,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final boolean verifyDemo;
     private final Runnable updateCheck;
     private long verifiedSequence;
-    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads;
+    private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads,peakShieldEvents,peakShieldDrawn;
     private boolean verificationReported;
     private final EnumSet<Battle.DamageType> verifiedTypes=EnumSet.noneOf(Battle.DamageType.class);
     private final Set<Long> verifiedShotIds=new HashSet<>();
@@ -2609,6 +2609,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verificationReported)return;
         verifiedFrames++;
         if(weaponFx!=null)peakAnimations=Math.max(peakAnimations,weaponFx.activeAnimations());
+        peakShieldEvents=Math.max(peakShieldEvents,shieldFx.count());
+        peakShieldDrawn=Math.max(peakShieldDrawn,shieldFxRenderer.rendered());
         if(lighting!=null){
             peakLightQuads=Math.max(peakLightQuads,lighting.glowQuads());
             peakSmokeQuads=Math.max(peakSmokeQuads,lighting.smokeQuads());
@@ -2637,7 +2639,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-DEMO-VERIFY","PROGRESS tick="+battle.tick+
                     " frames="+verifiedFrames+" shots="+verifiedShots+
                     " impacts="+verifiedImpacts+" hits="+battle.hitCount+
-                    " craft="+peakCraft+" ordnance="+peakOrdnance);
+                    " craft="+peakCraft+" ordnance="+peakOrdnance+
+                    " shieldImpacts="+shieldFx.total(ShieldFxTimeline.Kind.IMPACT)+
+                    " shieldDrawn="+peakShieldDrawn);
         if(battle.tick<480&&!battle.finished())return;
         double self=0,remote=0,shield=0;
         int serviceDrones=0,specialists=0;
@@ -2693,7 +2697,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " remote="+remote+" shield="+shield+
             " repairDrones="+serviceDrones+
             " pdInterceptions="+(battle.missileIntercepts+battle.ballisticIntercepts)+
-            " VFX="+peakAnimations+" glowQuads="+peakLightQuads+
+            " VFX="+peakAnimations+" shieldEvents="+peakShieldEvents+
+            " shieldDrawn="+peakShieldDrawn+
+            " shieldImpacts="+shieldFx.total(ShieldFxTimeline.Kind.IMPACT)+
+            " shieldStrains="+shieldFx.total(ShieldFxTimeline.Kind.STRAIN)+
+            " shieldCollapses="+shieldFx.total(ShieldFxTimeline.Kind.COLLAPSE)+
+            " shieldRecharges="+shieldFx.total(ShieldFxTimeline.Kind.RECHARGE)+
+            " shieldRestarts="+shieldFx.total(ShieldFxTimeline.Kind.RESTART)+
+            " glowQuads="+peakLightQuads+
             " smokeQuads="+peakSmokeQuads+" spriteShips="+peakSpriteShips+
             " fighterArtTextures="+(craftSprites==null?0:craftSprites.loaded())+
             " hullMaterials="+(terranSprites==null?0:terranSprites.litMaterialCount())+
