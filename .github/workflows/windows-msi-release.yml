@@ -3,7 +3,7 @@ name: Build and publish actual Windows MSI for 0.1.5 RC1
 on:
   push:
     branches: [main]
-    paths: ['.github/workflows/windows-msi-release.yml']
+    paths: ['.github/workflows/windows-msi-release.yml', 'tools/verify_windows_msi.ps1']
   workflow_dispatch:
 
 permissions:
