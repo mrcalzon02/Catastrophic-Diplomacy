@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.FactionArt;
 import diplomacy.tech.TechnologyCatalog;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -34,6 +35,10 @@ public final class HullCoverageBattleTest {
             Battle battle=HullCoverageBattle.duel(tech,size);
             check(battle.ships().size()==2,"1v1 must deploy precisely two actual fitted vessels");
             for(Battle.Ship ship:battle.ships()){
+                check(ship.faction==HullCoverageBattle.SIDES[ship.team],
+                        "A duel has ships wearing another faction's sprites");
+                check(FactionArt.runtimePath(ship.faction,ship.hullClass)!=null,
+                        "Duel selected a faction with no approved runtime art");
                 check(ship.hullClass==HullCoverageBattle.SIZES.get(size),"Wrong sprite class in duel");
                 check(!ship.impactHardpoints.isEmpty(),"Fitted hull must contain real aim points");
                 check(!ship.installedSubsystems.isEmpty(),"Fitted hull subsystem locations missing");
@@ -95,6 +100,10 @@ public final class HullCoverageBattleTest {
             EnumSet<Shipyard.Hull> actual=EnumSet.noneOf(Shipyard.Hull.class);
             int ships=0;
             for(Battle.Ship ship:mixed.ships())if(ship.team==side){
+                check(ship.faction==HullCoverageBattle.SIDES[side],
+                        "Mixed-size fleet is wearing multiple unrelated civilization sheets");
+                check(FactionArt.runtimePath(ship.faction,ship.hullClass)!=null,
+                        "Actual fleet hull has no faction-matched sprite");
                 check(actual.add(ship.hullClass),
                         "Two copies of "+ship.hullClass+" replaced another hull size");
                 check(ship.x>40&&ship.x<1240&&ship.y>50&&ship.y<640,
