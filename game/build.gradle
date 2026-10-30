@@ -64,9 +64,12 @@ tasks.named('audioSmoke') { finalizedBy(tasks.named('announcerSmoke')) }
 
 tasks.register('fighterVoiceSmoke', JavaExec) {
     group = 'verification'
-    description = 'Headless validation of all 26 recorded interceptor/pilot subtitle-to-OGG mappings.'
+    description = 'Headless validation of all 182 original subtitle-to-OGG mappings across 7 hull voice roles.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.FighterVoiceAudioTest'
 }
 tasks.named('audioSmoke') { finalizedBy(tasks.named('fighterVoiceSmoke')) }
+
+// Release CI already invokes menuFlowSmoke: prove voice routing in those builds too.
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('fighterVoiceSmoke') }
