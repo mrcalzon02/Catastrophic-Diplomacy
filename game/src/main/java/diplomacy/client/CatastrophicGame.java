@@ -46,6 +46,7 @@ import diplomacy.sim.LevelEnvironment;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.CampaignBlueprintCodec;
 import diplomacy.shipyard.CampaignShipyardRules;
+import diplomacy.shipyard.SkirmishTechnologyRules;
 import diplomacy.shipyard.FleetPresets;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.IOException;
@@ -75,6 +76,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private GameMenuPanel menuPanel;
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
+    private SkirmishTechnologyRules skirmishRules=ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM);
+    private String skirmishNotice="Use SHIPYARD > TECH LOADOUT to configure challenge rules.";
     private CampaignProgress.State campaign;
     private CampaignTechnology.State discoveries;
     private CampaignFleet.Roster campaignFleet;
@@ -221,6 +224,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
+        shipyard.setSkirmishRules(()->skirmishRules,rules->{
+            skirmishRules=rules;
+            skirmishNotice="CHALLENGE TECH "+rules.maxStage()+"/6, HULL GEN "+rules.maxHullGeneration()+"/10";
+        });
         shipyard.setCampaignDiscovery(()->discoveries);
         shipyard.setCampaignPurchasing(()->campaign,design->{
             boolean purchased=purchaseCampaignHull(design);
@@ -588,6 +595,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void selectScenario(ScenarioCatalog.Preset choice){
         preparedSkirmish=false;
         scenario=choice;
+        skirmishRules=ScenarioCatalog.challenge(choice);
+        skirmishNotice="PRESET TECH LIMIT "+skirmishRules.maxStage()+
+                "/6 | HULL GEN <= "+skirmishRules.maxHullGeneration();
         if(choice!=ScenarioCatalog.Preset.CUSTOM&&!choice.demonstration){
             leftDesign=ScenarioCatalog.defaultDesign(choice,left,true,technology);
             rightDesign=ScenarioCatalog.defaultDesign(choice,right,false,technology);
@@ -607,6 +617,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return profiles;
     }
     private void openSkirmishDeployment(){
+        if(!scenario.demonstration){
+            try{
+                skirmishRules.requireAllowed(leftDesign,technology);
+                skirmishRules.requireAllowed(rightDesign,technology);
+            }catch(IllegalArgumentException blocked){
+                skirmishNotice="CHALLENGE VIOLATION: "+blocked.getMessage();
+                return;
+            }
+        }
         if(scenario.demonstration){
             preparedSkirmish=false;
             launchSkirmish(); // Canonical 200v200 verification never receives player overrides.
@@ -629,6 +648,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.app.log("CD-GAME-FLOW","SKIRMISH_DEPLOYMENT "+scenario.name());
     }
     private void launchSkirmish(){
+        if(!scenario.demonstration){
+            try{
+                skirmishRules.requireAllowed(leftDesign,technology);
+                skirmishRules.requireAllowed(rightDesign,technology);
+            }catch(IllegalArgumentException blocked){
+                skirmishNotice="BATTLE BLOCKED: "+blocked.getMessage();
+                screen=GameMenuPanel.Screen.SKIRMISH;return;
+            }
+        }
         playedCampaign=false;
         battlefieldLevel=scenario.environmentLevel;
         screen=GameMenuPanel.Screen.BATTLE;
@@ -1839,7 +1867,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         else if(screen==GameMenuPanel.Screen.BATTLE) {
             battle=ScenarioCatalog.create(scenario,leftDesign,rightDesign,technology,
-                    preparedSkirmish?deployment.ships():FLEET_SIZES[fleetIndex]);
+                    preparedSkirmish?deployment.ships():FLEET_SIZES[fleetIndex],skirmishRules);
             if(preparedSkirmish && !scenario.demonstration)deployment.apply(battle);
         }
         else battle=Battle.duel(nextSeed++,FLEET_SIZES[fleetIndex],leftDesign,rightDesign,technology);
@@ -1900,7 +1928,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     screen==GameMenuPanel.Screen.DOCK?
                             CampaignFleet.purchaseCost(campaignDesign==null?leftDesign:campaignDesign,
                                     technology):0L,
-                    screen==GameMenuPanel.Screen.RESEARCH?researchNotice:dockNotice,
+                    screen==GameMenuPanel.Screen.RESEARCH?researchNotice:
+                            screen==GameMenuPanel.Screen.SKIRMISH?skirmishNotice:dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,lastWon,lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
