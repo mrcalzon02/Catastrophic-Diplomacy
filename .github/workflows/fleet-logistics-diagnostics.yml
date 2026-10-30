@@ -1,0 +1,45 @@
+name: Four-channel fleet logistics diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fleet-logistics-diagnostics.yml'
+      - 'core/src/main/java/diplomacy/shipyard/SupportDoctrine.java'
+      - 'core/src/test/java/diplomacy/sim/FleetLogisticsTest.java'
+      - 'core/src/main/java/diplomacy/sim/DemonstrationBattle.java'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Standalone functional proof. No workflow concurrency, publication, or
+# cosmetic release gates; it survives routine unrelated main-branch changes.
+jobs:
+  service-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Test real powered projectors, auras, drone return and 200v200
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p test-output/fleet-logistics
+          gradle --no-daemon :core:fleetLogisticsSmoke :core:supportSystemsSmoke :core:demoSupportSmoke |
+            tee test-output/fleet-logistics/functional.log
+      - name: Preserve evidence including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-logistics-proof-${{ github.sha }}
+          path: test-output/fleet-logistics/
+          retention-days: 30
+          if-no-files-found: warn
