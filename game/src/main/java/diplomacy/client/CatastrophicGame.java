@@ -668,6 +668,53 @@ public final class CatastrophicGame extends ApplicationAdapter {
         screen=GameMenuPanel.Screen.DEPLOYMENT;
         Gdx.app.log("CD-GAME-FLOW","SKIRMISH_DEPLOYMENT "+scenario.name());
     }
+    /** Export both individually fitted fleets; files can be moved to a PvP
+     * host without embedding an obsolete match tier in the blueprints. */
+    private void exportSkirmishFleets(){
+        if(!preparedSkirmish||skirmishLeftFleet==null||skirmishRightFleet==null){
+            deploymentNotice="Prepare skirmish fleets before exporting.";return;
+        }
+        try{
+            skirmishLeftFleet.requireAllowed(skirmishRules,technology);
+            skirmishRightFleet.requireAllowed(skirmishRules,technology);
+            String leftData=SkirmishFleetCodec.encode(skirmishLeftFleet,technology);
+            String rightData=SkirmishFleetCodec.encode(skirmishRightFleet,technology);
+            var leftFile=Gdx.files.local("shipyard/skirmish-left.cdfleet");
+            var rightFile=Gdx.files.local("shipyard/skirmish-right.cdfleet");
+            leftFile.writeString(leftData,false,"UTF-8");
+            rightFile.writeString(rightData,false,"UTF-8");
+            if(!SkirmishFleetCodec.decode(leftFile.readString("UTF-8"),technology)
+                    .equals(skirmishLeftFleet)||
+                    !SkirmishFleetCodec.decode(rightFile.readString("UTF-8"),technology)
+                    .equals(skirmishRightFleet))
+                throw new IllegalStateException("Export readback mismatch");
+            deploymentNotice="EXPORTED BOTH FLEETS to shipyard/skirmish-left.cdfleet and skirmish-right.cdfleet";
+        }catch(RuntimeException failure){
+            deploymentNotice="FLEET EXPORT FAILED: "+failure.getMessage();
+        }
+    }
+    private void importSkirmishFleets(){
+        if(!preparedSkirmish||scenario.demonstration)return;
+        try{
+            SkirmishFleet leftLoaded=SkirmishFleetCodec.decode(Gdx.files.local(
+                    "shipyard/import-left.cdfleet").readString("UTF-8"),technology);
+            SkirmishFleet rightLoaded=SkirmishFleetCodec.decode(Gdx.files.local(
+                    "shipyard/import-right.cdfleet").readString("UTF-8"),technology);
+            if(leftLoaded.size()!=deployment.ships()||
+                    rightLoaded.size()!=deployment.ships())
+                throw new IllegalArgumentException("Import must contain exactly "+
+                        deployment.ships()+" ships per side");
+            if(leftLoaded.faction()!=left||rightLoaded.faction()!=right)
+                throw new IllegalArgumentException("Imported fleet factions differ from selected teams");
+            leftLoaded.requireAllowed(skirmishRules,technology);
+            rightLoaded.requireAllowed(skirmishRules,technology);
+            skirmishLeftFleet=leftLoaded;skirmishRightFleet=rightLoaded;
+            deploymentNotice="IMPORTED "+leftLoaded.size()+" individually engineered ships per side.";
+        }catch(RuntimeException failure){
+            deploymentNotice="FLEET IMPORT REJECTED: "+failure.getMessage();
+        }
+    }
+
     private void launchSkirmish(){
         if(!scenario.demonstration){
             try{
@@ -1494,6 +1541,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 6 -> {
                     if(preparingCampaign)launchCampaignMission();else launchSkirmish();
                 }
+                case 8 -> {if(!preparingCampaign)exportSkirmishFleets();}
+                case 9 -> {if(!preparingCampaign)importSkirmishFleets();}
                 case 7 -> {
                     screen=GameMenuPanel.Screen.SHIP_ORDERS;
                     standingPage=0;
