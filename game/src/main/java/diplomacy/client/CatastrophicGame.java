@@ -170,6 +170,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
     private final CombatHitFeedback hitFeedback=new CombatHitFeedback();
     private final CombatHitRenderer hitRenderer=new CombatHitRenderer();
+    private final ShieldFxTimeline shieldFx=new ShieldFxTimeline();
+    private final ShieldFxRenderer shieldFxRenderer=new ShieldFxRenderer();
     private final CombatAftermathGate aftermath=new CombatAftermathGate();
     private ShipDeathRenderer deathRenderer;
     private String renderer = "software geometry";
@@ -2252,12 +2254,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 renderPoses.beforeStep(battle);
                 deathTimeline.beforeStep(battle);
                 hitFeedback.beforeStep(battle);
+                shieldFx.beforeStep(battle);
                 battle.step(); accumulator -= Battle.DT;
                 // Capture every real missile pose and motor transition here.
                 // Rendering may skip ticks at 4x/8x without losing exhaust.
                 if(lighting!=null)lighting.captureTick(battle);
                 deathTimeline.afterStep(battle);
                 hitFeedback.afterStep(battle);
+                shieldFx.afterStep(battle);
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
@@ -2265,6 +2269,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // combat runs (and through the four-second post-battle victory pause).
         deathTimeline.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
         hitFeedback.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
+        shieldFx.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
         // Shared visual clock: current authoritative state minus one fixed-tick.
         // Paused battles draw the exact state, not an old snapshot.
         renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
@@ -2401,7 +2406,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
-        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view);
+        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view,shieldFx);
         if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses,view);
         if(lighting!=null)lighting.renderSmoke(battle,batch,battleCamera);
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses,view);
@@ -2412,6 +2417,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Shield contact arcs and plating sparks are tied to real protection
         // losses; no overlay appears for misses or cosmetic-only weapon events.
         hitRenderer.render(hitFeedback,shapes,battleCamera,view);
+        shieldFxRenderer.render(shieldFx,shapes,battleCamera,renderPoses,view);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
