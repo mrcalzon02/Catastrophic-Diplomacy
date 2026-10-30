@@ -170,3 +170,12 @@ tasks.register('shipLightProbesSmoke', JavaExec) {
     mainClass = 'diplomacy.client.ShipLightProbesTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipLightProbesSmoke') }
+
+tasks.register('combatPropulsionFxSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate cold eject, silent coast, terminal motor restart and bounded exhaust.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatPropulsionFxTest'
+}
+tasks.named('lightingSmoke') { dependsOn tasks.named('combatPropulsionFxSmoke') }
