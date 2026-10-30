@@ -83,6 +83,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int selectedResearchNode;
     private CampaignProgress.Project armedResearch=CampaignProgress.Project.NONE;
     private long armedResearchCost=-1,armedResearchWallet=-1;
+    private int technologyPage,technologyModule,technologyTrack,technologyStage=1;
+    private String technologyNotice="Select an individual subsystem technology.";
+    private String armedTechnology;
+    private long armedTechnologyWallet=-1;
     private final java.util.List<Long> campaignSortie=new java.util.ArrayList<>();
     private int dockPage,dockSelected;
     private int themePage;
@@ -291,6 +295,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             armedResearch=CampaignProgress.Project.NONE;
                             researchNotice="Authorization cancelled; credits unchanged.";
                         }
+                        if(key==Input.Keys.T)openTechnology();
+                        return true;
+                    }
+                    if(screen==GameMenuPanel.Screen.TECHNOLOGY){
+                        if(key==Input.Keys.ENTER)requestTechnology();
+                        else if(key==Input.Keys.R){
+                            armedTechnology=null;technologyNotice="Authorization cancelled.";
+                        }else if(key==Input.Keys.PAGE_UP)
+                            technologyAction(1);
+                        else if(key==Input.Keys.PAGE_DOWN)
+                            technologyAction(2);
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.OPTIONS){
@@ -699,6 +714,66 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "Select a license node or a milestone-locked laboratory upgrade.":
                 "Research advances only after a SUCCESSFUL full campaign mission.";
         screen=GameMenuPanel.Screen.RESEARCH;
+    }
+    private void openTechnology(){
+        if(campaign==null||discoveries==null)return;
+        technologyPage=0;technologyModule=0;technologyTrack=0;technologyStage=1;
+        armedTechnology=null;
+        technologyNotice="Discoveries are permanent; shipyards install researched specializations.";
+        screen=GameMenuPanel.Screen.TECHNOLOGY;
+    }
+    private String selectedTechnologyId(){
+        var subsystems=GameMenuPanel.technologySubsystems(technology,campaign.faction());
+        if(subsystems.isEmpty())throw new IllegalStateException("Faction lacks engineering catalog");
+        var part=subsystems.get(Math.max(0,Math.min(technologyModule,subsystems.size()-1)));
+        return GameMenuPanel.technologyId(campaign.faction(),part.subsystem,
+                technologyTrack,technologyStage);
+    }
+    private void technologyAction(int action){
+        if(action==0){
+            armedTechnology=null;screen=GameMenuPanel.Screen.RESEARCH;return;
+        }
+        int count=GameMenuPanel.technologySubsystems(technology,campaign.faction()).size();
+        if(action==1||action==2){
+            int pages=Math.max(1,(count+7)/8);
+            technologyPage=Math.max(0,Math.min(pages-1,
+                    technologyPage+(action==1?-1:1)));
+            technologyModule=technologyPage*8;
+        }else if(action==3){requestTechnology();return;}
+        else if(action>=100&&action<108){
+            int target=technologyPage*8+action-100;
+            if(target<count)technologyModule=target;
+        }else if(action>=200&&action<224){
+            technologyTrack=(action-200)/6;
+            technologyStage=(action-200)%6+1;
+        }else return;
+        armedTechnology=null;
+        technologyNotice="Inspect the selected technology and confirm its research budget.";
+    }
+    private void requestTechnology(){
+        if(campaign==null||discoveries==null||campaignFleet==null)return;
+        String id=selectedTechnologyId();
+        CampaignTechnology.Quote quote=discoveries.quote(id,campaign,technology);
+        if(!quote.allowed()){
+            armedTechnology=null;
+            technologyNotice="RESEARCH BLOCKED: "+quote.reason();return;
+        }
+        if(!id.equals(armedTechnology)||armedTechnologyWallet!=campaign.credits()){
+            armedTechnology=id;armedTechnologyWallet=campaign.credits();
+            technologyNotice="CONFIRM "+id+" / "+quote.cost()+" CR; press AUTHORIZE again.";
+            return;
+        }
+        armedTechnology=null;
+        try{
+            CampaignTechnology.State funded=discoveries.begin(id,campaign,technology);
+            CampaignProgress.State debited=campaign.spend(quote.cost());
+            if(commitCampaign(debited,campaignFleet,funded)){
+                technologyNotice="FUNDED "+id+" / "+funded.duration()+
+                        " victorious mission(s) required.";
+            }
+        }catch(IllegalArgumentException rejected){
+            technologyNotice="RESEARCH BLOCKED: "+rejected.getMessage();
+        }
     }
     private void requestResearch(CampaignProgress.Project project){
         if(campaign==null)return;
@@ -1301,8 +1376,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 0 -> {armedResearch=CampaignProgress.Project.NONE;screen=researchReturn;}
                 case 1 -> requestResearch(CampaignProgress.Project.ACCELERATOR);
                 case 2 -> requestResearch(CampaignProgress.Project.LICENSE);
+                case 3 -> openTechnology();
                 default -> inspectResearchNode(action);
             }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.TECHNOLOGY){
+            technologyAction(GameMenuPanel.technologyAction(x,y));
             return;
         }
         if(screen==GameMenuPanel.Screen.NAME_THEMES){
@@ -1823,7 +1903,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
                     afterActionPage,themePage,themeCandidate,
-                    selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn);
+                    selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn,
+                    technology,discoveries,technologyPage,technologyModule,technologyTrack,
+                    technologyStage,technologyNotice,armedTechnology);
             return;
         }
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
