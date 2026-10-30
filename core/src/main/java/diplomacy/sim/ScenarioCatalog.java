@@ -1,6 +1,8 @@
 package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.ShipLineages;
+import diplomacy.shipyard.SkirmishTechnologyRules;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Shared user-facing skirmish presets and real combat fixtures. */
@@ -72,6 +74,38 @@ public final class ScenarioCatalog {
         return d;
     }
 
+    /** Challenge tiers are independent of the campaign's permanent research. */
+    public static SkirmishTechnologyRules challenge(Preset preset){
+        if(preset==null)throw new IllegalArgumentException("Missing skirmish preset");
+        int cap=switch(preset){
+            case CUSTOM,PROVING_GROUND,CAPITALS,ARMADA -> 6;
+            case DUEL -> 1;
+            case PATROL -> 2;
+            case ESCORT -> 3;
+            case CRUISERS,STORM -> 4;
+            case CARRIERS -> 5;
+        };
+        // Default challenge ships must remain buildable, while an optional
+        // per-challenge exact hull whitelist can further narrow the roster.
+        int generation=Math.max(ShipLineages.of(preset.leftHull).generation(),
+                ShipLineages.of(preset.rightHull).generation());
+        return SkirmishTechnologyRules.unrestricted().withStage(cap)
+                .withHullGeneration(preset==Preset.CUSTOM||preset.demonstration?
+                        10:generation);
+    }
+
+    /** Live skirmish route: validate BOTH players under the same rules before
+     * spawning any vessels. The demonstration fixture remains deterministic. */
+    public static Battle create(Preset preset,Shipyard.Design left,Shipyard.Design right,
+                                TechnologyCatalog technology,int customShips,
+                                SkirmishTechnologyRules rules){
+        if(rules==null)throw new IllegalArgumentException("Challenge rules required");
+        if(!preset.demonstration){
+            rules.requireAllowed(left,technology);
+            rules.requireAllowed(right,technology);
+        }
+        return create(preset,left,right,technology,customShips);
+    }
     public static Battle create(Preset preset,Shipyard.Design left,Shipyard.Design right,
                                 TechnologyCatalog technology,int customShips) {
         if(preset==null||left==null||right==null||technology==null)
