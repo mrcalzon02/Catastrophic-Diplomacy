@@ -383,6 +383,15 @@ tasks.register('screensaverSmoke', JavaExec) {
 }
 // Both Linux and Windows functional release gates already invoke gameFlowSmoke.
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('screensaverSmoke')) }
+tasks.register('campaignOppositionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate all 500 campaign map operations, nine-tier real enemy loadouts and reinforcement behavior.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignOppositionTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignOppositionSmoke')) }
+
 
 // campaignResearchSmoke is registered once in the shipyard smoke chain above.
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('campaignResearchSmoke')) }
