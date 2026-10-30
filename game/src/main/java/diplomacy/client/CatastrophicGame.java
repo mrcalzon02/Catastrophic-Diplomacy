@@ -166,6 +166,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private final BattleRenderPoses renderPoses=new BattleRenderPoses();
     private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
+    private final CombatHitFeedback hitFeedback=new CombatHitFeedback();
+    private final CombatHitRenderer hitRenderer=new CombatHitRenderer();
     private final CombatAftermathGate aftermath=new CombatAftermathGate();
     private ShipDeathRenderer deathRenderer;
     private String renderer = "software geometry";
@@ -2243,14 +2245,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
             while (accumulator >= Battle.DT && turns++ < 64) {
                 renderPoses.beforeStep(battle);
                 deathTimeline.beforeStep(battle);
+                hitFeedback.beforeStep(battle);
                 battle.step(); accumulator -= Battle.DT;
                 deathTimeline.afterStep(battle);
+                hitFeedback.afterStep(battle);
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
         // Simulation death detection is tick-exact; fragments evolve only while
         // combat runs (and through the four-second post-battle victory pause).
         deathTimeline.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
+        hitFeedback.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
         // Shared visual clock: current authoritative state minus one fixed-tick.
         // Paused battles draw the exact state, not an old snapshot.
         renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
@@ -2392,6 +2397,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // apart across irregular cuts, surrounded by smoke, for a bounded time.
         if(deathRenderer!=null)
             deathRenderer.render(deathTimeline,terranSprites,battleCamera,view,shapes);
+        // Shield contact arcs and plating sparks are tied to real protection
+        // losses; no overlay appears for misses or cosmetic-only weapon events.
+        hitRenderer.render(hitFeedback,shapes,battleCamera,view);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
