@@ -36,7 +36,7 @@ def verify(path,kind,approved):
             if archive_name not in present:
                 raise ValueError(f"{kind} package missing approved sprite {archive_name}")
             image=z.read(archive_name)
-            if not image.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            if not image.startswith(bytes((137,80,78,71,13,10,26,10))):
                 raise ValueError("invalid packaged PNG "+archive_name)
             if hashlib.sha256(image).hexdigest()!=source_digest:
                 raise ValueError(f"{kind} package corrupted or replaced {archive_name}")
