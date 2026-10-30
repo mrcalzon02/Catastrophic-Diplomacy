@@ -132,6 +132,10 @@ final class CombatLightingRenderer implements Disposable {
      * Emissive falloff lightens nearby ship surfaces as well as space around them.
      */
     void renderGlow(Battle battle, SpriteBatch batch, OrthographicCamera camera) {
+        renderGlow(battle,batch,camera,null);
+    }
+    void renderGlow(Battle battle, SpriteBatch batch, OrthographicCamera camera,
+                    BattleRenderPoses poses) {
         timeline.update(battle);
         lastGlowQuads = 0;
         batch.setProjectionMatrix(camera.combined);
@@ -145,8 +149,11 @@ final class CombatLightingRenderer implements Disposable {
             float ratio = (float) Math.min(1, StrictMath.hypot(ship.vx, ship.vy)
                     / Math.max(1, ship.speed));
             float intensity = .14f + ratio * .7f;
-            double dx = StrictMath.cos(ship.facing), dy = StrictMath.sin(ship.facing);
-            double x = ship.x - dx * 12 * scale, y = ship.y - dy * 12 * scale;
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
+                    poses.ship(ship);
+            double dx=StrictMath.cos(pose.angle()),dy=StrictMath.sin(pose.angle());
+            double x=pose.x()-dx*12*scale,y=pose.y()-dy*12*scale;
             Color tint = ship.team == 0 ? Color.SKY : Color.ORANGE;
             spot(batch, camera, x, y, 12 * scale, tint, .65f * intensity);
             spot(batch, camera, x, y, 4.5f * scale, Color.WHITE, .52f * intensity);
@@ -177,10 +184,12 @@ final class CombatLightingRenderer implements Disposable {
         for (Battle.Missile missile : battle.missiles()) {
             if (++missiles > MAX_MISSILE_LIGHTS) break;
             if (missile.ignitionDelayTicks > 0 || missile.fuel <= 0) continue;
-            double heading = StrictMath.atan2(missile.vy, missile.vx);
-            double dx = StrictMath.cos(heading), dy = StrictMath.sin(heading);
-            double x = missile.x - dx * CombatEffectScale.of(missile.torpedo ? 8 : 5);
-            double y = missile.y - dy * CombatEffectScale.of(missile.torpedo ? 8 : 5);
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
+                            (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
+            double dx=StrictMath.cos(pose.angle()),dy=StrictMath.sin(pose.angle());
+            double x=pose.x()-dx*CombatEffectScale.of(missile.torpedo ? 8 : 5);
+            double y=pose.y()-dy*CombatEffectScale.of(missile.torpedo ? 8 : 5);
             Color color = missile.torpedo ? Color.ORANGE : Color.GOLD;
             spot(batch, camera, x, y, CombatEffectScale.of(missile.torpedo ? 30 : 20), color, .53f);
             spot(batch, camera, x, y, CombatEffectScale.of(missile.torpedo ? 11 : 7), Color.WHITE, .7f);

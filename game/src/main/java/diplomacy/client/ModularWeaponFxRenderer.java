@@ -99,12 +99,16 @@ final class ModularWeaponFxRenderer implements Disposable {
      * Rendering multiple frames per tick does not speed up animation.
      */
     public void render(Battle battle,SpriteBatch batch,WeaponBeamSprites existingBeamPayload) {
+        render(battle,batch,existingBeamPayload,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,WeaponBeamSprites existingBeamPayload,
+                       BattleRenderPoses poses) {
         sync(battle);
         // The already integrated real atlas-derived strip is the BEAM PAYLOAD part.
         // Its animation is started per shot using Beam.spawnTick, not global tick.
         if(existingBeamPayload!=null && existingBeamPayload.loaded()>0)
             existingBeamPayload.render(battle,batch,
-                    shell -> !hasBallisticPayload(shell,battle.tick));
+                    shell -> !hasBallisticPayload(shell,battle.tick),poses);
         batch.begin();
         batch.setColor(1,1,1,1);
         // Local FIRING and terminal IMPACT/INTERCEPT are separate, independent clips.
@@ -125,8 +129,11 @@ final class ModularWeaponFxRenderer implements Disposable {
             Clip clip=profile.payload();
             Texture image=frame(clip,battle.tick-missile.spawnTick);
             if(image==null)continue;
-            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(missile.vy,missile.vx));
-            drawCentered(batch,image,(float)missile.x,(float)missile.y,
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
+                            (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
+            float angle=(float)StrictMath.toDegrees(pose.angle());
+            drawCentered(batch,image,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
         }
         // Slow ballistic PAYLOADs use their real collision-tested world positions.
@@ -137,8 +144,11 @@ final class ModularWeaponFxRenderer implements Disposable {
             Clip clip=kinetic.payload();
             Texture image=frame(clip,battle.tick-shell.spawnTick);
             if(image==null)continue;
-            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(shell.vy,shell.vx));
-            drawCentered(batch,image,(float)shell.x,(float)shell.y,
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
+                            (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
+            float angle=(float)StrictMath.toDegrees(pose.angle());
+            drawCentered(batch,image,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
         }
         batch.setColor(1,1,1,1);

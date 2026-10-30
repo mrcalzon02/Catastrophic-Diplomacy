@@ -90,6 +90,11 @@ public final class WeaponBeamSprites implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch,
                        java.util.function.Predicate<Battle.Ballistic> showTracer) {
+        render(battle,batch,showTracer,null);
+    }
+    public void render(Battle battle,SpriteBatch batch,
+                       java.util.function.Predicate<Battle.Ballistic> showTracer,
+                       BattleRenderPoses poses) {
         if(loaded==0)return;
         batch.begin();
         batch.setColor(1,1,1,1);
@@ -125,9 +130,12 @@ public final class WeaponBeamSprites implements Disposable {
             if(!showTracer.test(shell))continue;
             Texture image=ballisticTexture(shell,battle.tick);
             if(image==null)continue;
-            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(shell.vy,shell.vx));
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
+                            (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
+            float angle=(float)StrictMath.toDegrees(pose.angle());
             float length=CombatEffectScale.of(11.5f),thickness=CombatEffectScale.of(3.1f);
-            batch.draw(image,(float)shell.x-length/2,(float)shell.y-thickness/2,
+            batch.draw(image,pose.x()-length/2,pose.y()-thickness/2,
                     length/2,thickness/2,length,thickness,1,1,angle,
                     0,0,image.getWidth(),image.getHeight(),false,false);
             traced++;
