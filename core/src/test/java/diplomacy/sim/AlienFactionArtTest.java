@@ -50,21 +50,23 @@ public final class AlienFactionArtTest {
             for(int i=0;i<12;i++)test.step();
             check(test.ships().size()==4,"Distinct race must work in live combat");
         }
-        // The original five non-Terran civilizations must no longer use blank
-        // polygon silhouettes when their approved derivative art is available.
+        // Faction identity is nonnegotiable: sharing a combat archetype does
+        // NOT allow displaying another civilization's visual identity.
         for(var item:FactionArt.alienFactions().entrySet()){
             Battle.Faction modern=item.getKey();
             Battle.Faction original=item.getValue().mechanics();
             for(Shipyard.Hull hull:Shipyard.Hull.values()){
-                check(FactionArt.runtimePath(original,hull).equals(
-                        FactionArt.runtimePath(modern,hull)),
-                        "Legacy faction must resolve actual committed PNG: "+original+"/"+hull);
+                check(FactionArt.runtimePath(original,hull)==null,
+                        "Legacy faction must not impersonate "+modern+" with alien PNGs");
+                check(FactionArt.runtimePath(modern,hull).contains(
+                        "/"+item.getValue().id()+"/"),
+                        "Runtime art must match the selected civilization");
             }
         }
         for(Shipyard.Hull hull:Shipyard.Hull.values())
             check(FactionArt.runtimePath(Battle.Faction.TERRAN,hull)==null,
                     "Do not silently give Terran an unrelated alien sprite");
         check(images==50&&paths.size()==50,"Require exact 50 original non-placeholder sprites");
-        System.out.println("PASS alien factions: 5 playable races, 50 original PNG mappings and shared new chassis artwork");
+        System.out.println("PASS alien factions: 5 distinct civilizations, 50 identity-locked PNGs; no cross-faction aliasing");
     }
 }
