@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.SupportDoctrine;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.tech.TechnologyCatalog;
 
@@ -85,6 +86,9 @@ public final class Battle {
         public Shipyard.Weapons weapons=new Shipyard.Weapons(
                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);
         public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
+        public SupportDoctrine logistics=SupportDoctrine.NONE;
+        public final int[] serviceDroneReserve=new int[SupportDoctrine.Channel.values().length];
+        public double armorServiced,powerSupplied,auraService;
         public double hullRepaired,shieldRecharged,remoteHullRepaired,shieldsTransferred;
         public int repairDronesLaunched;
         /** Installed machinery determines operating headroom and thermal rejection. */
@@ -268,6 +272,9 @@ public final class Battle {
         public final int id, sourceId, team;
         public final boolean fighter,repair;
         public double x, y, integrity, maxIntegrity,armor,fuel,reload,repairReserve;
+        public SupportDoctrine.Channel serviceChannel;
+        public boolean reusable,returning;
+        public double serviceRange,servicePulse,serviceMaxCharge;
         public int targetId,targetCraftId,ammunition,shotsFired;
         /** Null for legacy defense and repair drones; non-null for autonomous fighters. */
         public final FighterModel.Profile profile;
@@ -288,6 +295,19 @@ public final class Battle {
             fuel=offensive?profile.fuel():service?26:22;
             ammunition=offensive?profile.ammunition():0;
             repairReserve=service?32*source.support.droneEndurance():0;
+            serviceChannel=service?SupportDoctrine.Channel.HULL:null;
+            serviceMaxCharge=repairReserve;
+        }
+        Craft(int identifier,Ship source,SupportDoctrine.Emitter emitter,int target){
+            this(identifier,source,false,true,target);
+            serviceChannel=emitter.channel();
+            reusable=true;
+            fuel=52;
+            repairReserve=emitter.charge();
+            serviceMaxCharge=repairReserve;
+            serviceRange=emitter.range();
+            servicePulse=emitter.rate();
+            integrity=26;maxIntegrity=integrity;
         }
     }
 
@@ -303,13 +323,14 @@ public final class Battle {
     }
 
     /** Simulation-confirmed beam from a repair or shield support module. */
-    public enum SupportKind { HULL, SHIELD, DRONE }
+    public enum SupportKind { HULL, SHIELD, ARMOR, POWER, DRONE }
     public static final class SupportLink {
         public final int sourceId,targetId,team;
         public final SupportKind kind;
         public final double x1,y1,x2,y2;
         public final long spawnTick;
-        public double life=0.36;
+        // A distinct short transfer pulse, not a continuously drawn tether.
+        public double life=0.10;
         SupportLink(Ship source,Ship target,SupportKind type,long time,double fromX,double fromY){
             sourceId=source.id;targetId=target.id;team=source.team;kind=type;
             x1=fromX;y1=fromY;x2=target.x;y2=target.y;spawnTick=time;
@@ -592,6 +613,9 @@ public final class Battle {
         s.setWarhead(DamageType.MISSILE,design.ammoSelection.missile());
         s.setWarhead(DamageType.TORPEDO,design.ammoSelection.torpedo());
         s.support=machinery.support();
+        s.logistics=Shipyard.supportDoctrine(design,catalog);
+        for(SupportDoctrine.Channel channel:SupportDoctrine.Channel.values())
+            s.serviceDroneReserve[channel.ordinal()]=s.logistics.droneCapacity(channel);
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
