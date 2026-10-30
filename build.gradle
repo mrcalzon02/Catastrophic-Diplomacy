@@ -1,6 +1,76 @@
 plugins {
     id 'com.android.application' version '8.9.2' apply false
 }
+
+
+/**
+ * Production stage-1 runtime artwork. Original bytes are preserved in Git,
+ * not at an external Drive URL or in a developer's private working tree.
+ * Copying happens before BOTH desktop and Android asset packaging.
+ */
+def stage1Archive = file('asset_packs/stage1-runtime/approved.zip')
+def stage1Output = layout.buildDirectory.dir('generated/cd-stage1')
+tasks.register('prepareStage1Art') {
+    group = 'assets'
+    description = 'Restore 10 original Terran hull sprites and 35 original beam frames with SHA-256 verification.'
+    inputs.file stage1Archive
+    outputs.dir stage1Output
+    doLast {
+        if (!stage1Archive.isFile()) throw new GradleException('Missing original Terran/beam asset ZIP')
+        def digest = { byte[] value ->
+            java.security.MessageDigest.getInstance('SHA-256').digest(value).encodeHex().toString()
+        }
+        if (digest(stage1Archive.bytes) !=
+                '5d1035bb7ca5684dd4027f22e73e46fe043cad2fa14356adb41349da9436aaaa')
+            throw new GradleException('Original Stage 1 asset ZIP SHA-256 mismatch')
+        def target = stage1Output.get().asFile
+        project.delete(target)
+        target.mkdirs()
+        new java.util.zip.ZipFile(stage1Archive).withCloseable { archive ->
+            def manifestEntry = archive.getEntry('runtime-art-manifest.json')
+            if (manifestEntry == null) throw new GradleException('Missing original Stage 1 art manifest')
+            def manifest = new groovy.json.JsonSlurper().parse(
+                    archive.getInputStream(manifestEntry).withCloseable { it })
+            if (manifest.schema != 'cd-runtime-art-stage1-v1' ||
+                    manifest.counts.terran_hulls != 10 ||
+                    manifest.counts.emitter_free_beam_frames != 35 ||
+                    manifest.counts.damage_and_shield_materials != 3 ||
+                    manifest.files.size() != 48)
+                throw new GradleException('Unexpected Stage 1 art inventory')
+            int terran = 0, beams = 0, materials = 0
+            manifest.files.each { name, record ->
+                if (!(name ==~ /assets\/(ships\/terran|effects\/beams|materials)\/[a-z_0-9]+\.png/))
+                    throw new GradleException('Unapproved Stage 1 path: ' + name)
+                def entry = archive.getEntry(name)
+                if (entry == null) throw new GradleException('Missing Stage 1 PNG: ' + name)
+                byte[] original = archive.getInputStream(entry).withCloseable { it.bytes }
+                if (original.length != (record.bytes as int) ||
+                        digest(original) != record.sha256 ||
+                        !java.util.Arrays.equals(original.take(8) as byte[],
+                                [137,80,78,71,13,10,26,10].collect { (byte)it } as byte[]))
+                    throw new GradleException('Corrupted original Stage 1 PNG: ' + name)
+                if (name.startsWith('assets/materials/')) {
+                    // Three materials already exist as committed binaries; reject alteration.
+                    def existing = file(name)
+                    if (!existing.isFile() || digest(existing.bytes) != record.sha256)
+                        throw new GradleException('Material differs from approved source: ' + name)
+                    materials++
+                } else {
+                    if (name.startsWith('assets/ships/terran/')) terran++
+                    else beams++
+                    def dest = new File(target,name.substring('assets/'.length()))
+                    dest.parentFile.mkdirs()
+                    dest.bytes = original
+                }
+            }
+            if (terran != 10 || beams != 35 || materials != 3)
+                throw new GradleException('Stage 1 art incomplete: ' +
+                        terran + ' Terran, ' + beams + ' beams, ' + materials + ' materials')
+        }
+        println('PASS: 10 Terran hull sprites + 35 beam frames restored from original Git archive.')
+    }
+}
+
 allprojects {
     group = 'games.catastrophicdiplomacy'
     version = '0.1.0-SNAPSHOT'
