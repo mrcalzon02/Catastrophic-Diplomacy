@@ -523,7 +523,11 @@ public final class Shipyard {
             switch(p.base.subsystem) {
                 case "ARM" -> armor+=p.effect*2.0*p.integrity/p.base.integrity;
                 case "SHD" -> {
+                    // A normal shield generator protects ONLY its owning hull.
+                    // No allied transfer without a dedicated SUPPORT-slot XFR.
                     shields+=p.effect*2.6*p.shields;
+                }
+                case "XFR" -> {
                     shieldRate+=p.effect*0.028*tuning.shieldTransfer();
                     shieldRange=Math.max(shieldRange,175*tuning.reach());
                     efficiency=Math.max(efficiency,tuning.supportEfficiency());
