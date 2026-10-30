@@ -143,3 +143,12 @@ tasks.register('combatAftermathSmoke', JavaExec) {
     mainClass = 'diplomacy.client.CombatAftermathGateTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatAftermathSmoke') }
+
+tasks.register('combatHitFeedbackSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify shield arcs and armor sparks at authoritative impacts without phantom hits.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatHitFeedbackTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatHitFeedbackSmoke') }
