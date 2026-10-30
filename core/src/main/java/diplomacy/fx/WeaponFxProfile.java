@@ -1,6 +1,7 @@
 package diplomacy.fx;
 
 import diplomacy.sim.Battle;
+import diplomacy.sim.LaserFamilies;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -91,6 +92,7 @@ public final class WeaponFxProfile {
     public static Profile forType(Battle.DamageType type){return DEFAULTS.get(type);}
     public static Profile forWeapon(String weapon){
         if(weapon==null)return null;
+        if(LaserFamilies.fromWeapon(weapon)!=null)return forType(Battle.DamageType.LASER);
         if(weapon.equals("POINT_DEFENSE"))
             return new Profile("point_defense",Motion.HITSCAN,
                     new Clip("effects/weapon_fx/laser/firing_%02d.png",8,1,false,14,14),

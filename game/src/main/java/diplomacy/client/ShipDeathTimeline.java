@@ -32,6 +32,7 @@ final class ShipDeathTimeline {
         LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, OTHER;
         static Cause fromWeapon(String weapon){
             if(weapon==null)return OTHER;
+            if(weapon.equals("LASER")||weapon.startsWith("LASER_"))return LASER;
             try{return valueOf(weapon);}catch(IllegalArgumentException unknown){
                 return OTHER;
             }

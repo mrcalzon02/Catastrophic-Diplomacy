@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.sim.Battle;
+import diplomacy.sim.LaserFamilies;
 import java.util.EnumMap;
 
 /**
@@ -36,7 +37,14 @@ public final class WeaponBeamSprites implements Disposable {
     public int loaded(){return loaded;}
 
     private static int color(Battle.Beam beam){
-        if(beam.pointDefense)return 2; // shorter-lived green defensive optic
+        if(beam.pointDefense)return 2; // green defensive optic
+        if(beam.type==Battle.DamageType.LASER)return switch(beam.laserType){
+            case PULSE -> 0;     // blue
+            case RAPID -> 2;     // green
+            case LANCE -> 3;     // violet
+            case OVERDRIVE -> 1;// red
+            case NEEDLE -> 4;    // gold
+        };
         return switch(beam.type){
             case KINETIC -> 4; // gold
             case PLASMA -> 1; // red, matching crimson plasma atlas
@@ -112,6 +120,7 @@ public final class WeaponBeamSprites implements Disposable {
             float length=(float)StrictMath.hypot(dx,dy);
             if(length<0.01f)continue;
             float thickness=CombatEffectScale.of(beam.pointDefense?2.8f:
+                    beam.type==Battle.DamageType.LASER?beam.laserType.thickness:
                     beam.type==Battle.DamageType.KINETIC?4.0f:6.3f);
             float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
             batch.draw(image,(float)beam.x1,(float)beam.y1-thickness/2,

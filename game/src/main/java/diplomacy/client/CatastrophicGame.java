@@ -13,6 +13,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import diplomacy.sim.Battle;
+import diplomacy.sim.LaserFamilies;
 import diplomacy.sim.BattleOrders;
 import diplomacy.sim.BattleOrdersCodec;
 import diplomacy.sim.BattleView;
@@ -2340,12 +2341,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (Battle.Beam beam : battle.beams()) {
             if(!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,7))continue;
             if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
-            shapes.setColor(beam.pointDefense?Color.GREEN:switch(beam.type) {
-                case KINETIC -> Color.GOLD;
-                case PLASMA -> Color.ORANGE;
-                case PARTICLE -> Color.VIOLET;
-                default -> beam.team==0?Color.CYAN:Color.CORAL;
-            });
+            shapes.setColor(beam.pointDefense?Color.GREEN:
+                    beam.type==Battle.DamageType.LASER?
+                    CombatLightingRenderer.laserColor(beam.laserType):
+                    switch(beam.type) {
+                        case KINETIC -> Color.GOLD;
+                        case PLASMA -> Color.ORANGE;
+                        case PARTICLE -> Color.VIOLET;
+                        default -> beam.team==0?Color.CYAN:Color.CORAL;
+                    });
             shapes.line((float) beam.x1, (float) beam.y1, (float) beam.x2, (float) beam.y2);
         }
         // Preserve visibility of genuine service links when an approved

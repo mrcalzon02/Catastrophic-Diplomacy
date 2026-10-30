@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.sim.Battle;
+import diplomacy.sim.LaserFamilies;
 import diplomacy.sim.OrdnancePropulsion;
 
 /**
@@ -113,7 +114,19 @@ final class CombatLightingRenderer implements Disposable {
         };
     }
 
+    static Color laserColor(LaserFamilies.Type type){
+        return switch(type){
+            case PULSE -> Color.CYAN;
+            case RAPID -> Color.GREEN;
+            case LANCE -> Color.VIOLET;
+            case OVERDRIVE -> Color.SCARLET;
+            case NEEDLE -> Color.GOLD;
+        };
+    }
+
     static Color eventColor(String weapon) {
+        LaserFamilies.Type laser=LaserFamilies.fromWeapon(weapon);
+        if(laser!=null)return laserColor(laser);
         return switch (weapon) {
             case "KINETIC", "FLAK" -> Color.GOLD;
             case "PLASMA" -> Color.SCARLET;
@@ -193,20 +206,25 @@ final class CombatLightingRenderer implements Disposable {
         int beams = 0;
         for (Battle.Beam beam : battle.beams()) {
             if (++beams > MAX_BEAM_LIGHTS) break;
-            Color tint=beam.pointDefense?Color.GREEN:weaponColor(beam.type);
-            // Defensive beams are deliberately thinner and emit a restrained
-            // corona, so hundreds of interceptions don't conceal the fleet.
+            Color tint=beam.pointDefense?Color.GREEN:
+                    beam.type==Battle.DamageType.LASER?
+                    laserColor(beam.laserType):weaponColor(beam.type);
+            // True beam family controls core/corona width, not an unrelated
+            // second light strip. Existing shared atlas remains authoritative.
+            float scale=beam.pointDefense?.30f:
+                    beam.type==Battle.DamageType.LASER?
+                    beam.laserType.thickness/6.3f:1f;
             streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
-                    CombatEffectScale.of(beam.pointDefense?9:31),
+                    CombatEffectScale.of(31)*scale,
                     tint,beam.pointDefense?.11f:.22f);
             streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
-                    CombatEffectScale.of(beam.pointDefense?4:12),
+                    CombatEffectScale.of(12)*scale,
                     tint,beam.pointDefense?.24f:.40f);
             spot(batch,camera,beam.x1,beam.y1,
-                    CombatEffectScale.of(beam.pointDefense?7:21),
+                    CombatEffectScale.of(21)*scale,
                     tint,beam.pointDefense?.24f:.32f);
             spot(batch,camera,beam.x2,beam.y2,
-                    CombatEffectScale.of(beam.pointDefense?8:23),
+                    CombatEffectScale.of(23)*scale,
                     tint,beam.pointDefense?.27f:.38f);
         }
 
