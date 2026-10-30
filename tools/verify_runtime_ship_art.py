@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove all 50 approved ship sprites are inside the actual desktop JAR / APK.
+"""Prove all 98 original approved ship, beam and material PNGs are inside the actual desktop JAR / APK.
 
 This checks runtime deliverables rather than merely testing whether the PNGs
 exist in the source checkout. Desktop libGDX assets live at the JAR root;
@@ -23,7 +23,27 @@ def expected():
             path=f"ships/factions/{faction['id']}/{vessel['hull']}.png"
             if path in result:raise ValueError("duplicate approved sprite "+path)
             result[path]=vessel["sha256"]
-    if len(result)!=50:raise ValueError("must have exactly 50 approved ship PNG paths")
+    if len(result)!=50:raise ValueError("must have exactly 50 approved alien hull paths")
+    original=ROOT/"asset_packs/stage1-runtime/approved.zip"
+    if hashlib.sha256(original.read_bytes()).hexdigest()!=(
+            "5d1035bb7ca5684dd4027f22e73e46fe043cad2fa14356adb41349da9436aaaa"):
+        raise ValueError("Original Terran/beam archive SHA-256 mismatch")
+    with ZipFile(original) as source:
+        manifest=json.loads(source.read("runtime-art-manifest.json"))
+        if manifest.get("schema")!="cd-runtime-art-stage1-v1" or len(manifest["files"])!=48:
+            raise ValueError("Unexpected approved Terran/beam archive inventory")
+        for path,record in manifest["files"].items():
+            if not path.startswith(("assets/ships/terran/","assets/effects/beams/",
+                                    "assets/materials/")):
+                raise ValueError("Unexpected source path "+path)
+            raw=source.read(path)
+            if hashlib.sha256(raw).hexdigest()!=record["sha256"]:
+                raise ValueError("Source PNG hash mismatch "+path)
+            short=path.removeprefix("assets/")
+            if short in result:raise ValueError("duplicate runtime asset "+short)
+            result[short]=record["sha256"]
+    if len(result)!=98:
+        raise ValueError("Expected 50 alien hulls, 10 Terran hulls, 35 beams, 3 materials")
     return result
 
 def verify(path,kind,approved):
@@ -40,7 +60,7 @@ def verify(path,kind,approved):
                 raise ValueError("invalid packaged PNG "+archive_name)
             if hashlib.sha256(image).hexdigest()!=source_digest:
                 raise ValueError(f"{kind} package corrupted or replaced {archive_name}")
-    print(f"PASS {kind}: all 50 verified original sprite images embedded in {path}")
+    print(f"PASS {kind}: all 98 original approved sprite/material images embedded in {path}")
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
