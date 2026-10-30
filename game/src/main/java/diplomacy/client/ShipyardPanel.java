@@ -677,6 +677,143 @@ final class ShipyardPanel {
         for(Shipyard.Slot s:slots)if(s.mount()==mount)result++;
         return result;
     }
+    /** A ship-specific interpretation of the same catalog as the campaign
+     * research laboratory, but with its own skirmish challenge permissions. */
+    private void drawTechnology(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font){
+        var report=Shipyard.inspect(draft,catalog);
+        Shipyard.Installed selected=draft.at(selectedSlot);
+        SkirmishTechnologyRules rules=challenge();
+        boolean campaign=campaignTechnology();
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        rectangle(shapes,0,0,1280,720,MilitaryUiTheme.BACKGROUND);
+        rectangle(shapes,0,630,1280,90,new Color(.06f,.09f,.15f,1));
+        rectangle(shapes,24,83,300,524,new Color(.045f,.075f,.11f,1));
+        rectangle(shapes,332,83,463,524,new Color(.03f,.052f,.081f,1));
+        rectangle(shapes,803,83,452,524,new Color(.045f,.075f,.11f,1));
+        for(int n=0;n<SLOT_ROWS;n++){
+            int index=scroll+n;
+            if(index>=draft.slots())break;
+            if(index==selectedSlot)rectangle(shapes,30,561-n*26,286,25,
+                    new Color(.13f,.23f,.33f,1));
+        }
+        for(int branch=0;branch<4;branch++){
+            float bottom=479-branch*62;
+            Shipyard.Track track=Shipyard.Track.values()[branch];
+            boolean branchEnabled=campaign||rules.allowedTracks().contains(track);
+            rectangle(shapes,810,bottom,126,43,branchEnabled?
+                    new Color(.10f,.20f,.27f,1):new Color(.25f,.08f,.12f,1));
+            for(int rank=1;rank<=6;rank++){
+                boolean allowed=selected!=null&&technologyAvailable(selectedSlot,track,rank);
+                boolean active=selected!=null&&selected.stage(track)==rank;
+                boolean chosen=track==technologyTrack&&rank==technologyStage;
+                rectangle(shapes,943+(rank-1)*49,bottom,42,43,
+                        active?new Color(.24f,.44f,.23f,1):
+                        chosen?new Color(.30f,.25f,.12f,1):
+                        allowed?new Color(.10f,.27f,.24f,1):
+                                new Color(.13f,.13f,.16f,1));
+            }
+        }
+        for(int i=0;i<3;i++)rectangle(shapes,809+i*145,211,i==2?159:136,46,
+                new Color(.11f,.23f,.31f,1));
+        for(int i=0;i<3;i++)rectangle(shapes,809+i*137,159,i==2?172:131,43,
+                new Color(.12f,.18f,.25f,1));
+        for(int i=0;i<2;i++)rectangle(shapes,809+i*194,111,i==1?250:191,42,
+                new Color(.12f,.18f,.25f,1));
+        rectangle(shapes,341,111,221,42,new Color(.12f,.25f,.29f,1));
+        rectangle(shapes,568,111,224,42,new Color(.12f,.25f,.29f,1));
+        shapes.end();
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch,campaign?"CAMPAIGN ENGINEERING / TECH LOADOUT":
+                usage==Usage.SKIRMISH?"SKIRMISH ENGINEERING / CHALLENGE TECH":
+                        "DESIGN WORKSHOP / TECH LOADOUT",22,704);
+        font.draw(batch,"LEFT FLEET",34,660);
+        if(!playerOnly)font.draw(batch,"RIGHT FLEET",175,660);
+        font.draw(batch,"<",345,660);
+        font.draw(batch,shortText(draft.hull.name().replace('_',' '),20),392,660);
+        font.draw(batch,">",652,660);
+        font.draw(batch,playerOnly?"BLUEPRINT":"APPLY",717,660);
+        font.draw(batch,"SAVE",831,660);
+        font.draw(batch,"LOAD",938,660);
+        font.draw(batch,playerOnly?"PURCHASE":"FACTION >",1022,660);
+        font.draw(batch,"CLOSE",1171,660);
+        font.setColor(Color.CYAN);
+        font.draw(batch,"SELECTED HARDPOINT",36,587);
+        font.draw(batch,"VESSEL TECHNOLOGY PLAN",346,587);
+        font.draw(batch,"< MODULES",812,587);
+        font.draw(batch,"TECH LOADOUT",1004,587);
+        for(int n=0;n<SLOT_ROWS;n++){
+            int index=scroll+n;
+            if(index>=draft.slots())break;
+            Shipyard.Slot place=draft.placements().get(index);
+            Shipyard.Installed part=draft.at(index);
+            font.setColor(index==selectedSlot?Color.GOLD:mountColor(place.mount()));
+            font.draw(batch,String.format(Locale.ROOT,"%02d  %-7s %s",
+                    index+1,place.mount().name(),
+                    part==null?"EMPTY":part.component.substring(5)),36,581-n*26);
+        }
+        font.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
+        font.draw(batch,draft.faction.displayName,345,553);
+        font.setColor(Color.WHITE);
+        font.draw(batch,"HULL "+draft.hull.name().replace('_',' '),345,516);
+        font.draw(batch,"SOCKET "+(selectedSlot+1)+"/"+draft.slots(),345,483);
+        font.draw(batch,selected==null?"NO COMPONENT":selected.component,345,449);
+        font.setColor(Color.CYAN);
+        font.draw(batch,"SELECTED TECHNOLOGY",345,402);
+        font.setColor(Color.WHITE);
+        font.draw(batch,shortText(technologyId(),47),345,373);
+        font.setColor(technologyAvailable(selectedSlot,technologyTrack,technologyStage)?
+                Color.GREEN:Color.GOLD);
+        font.draw(batch,technologyAvailable(selectedSlot,technologyTrack,technologyStage)?
+                "UNLOCKED FOR THIS BUILD":"LOCKED BY CURRENT ENTITLEMENT",345,346);
+        if(selected!=null){
+            var upgrade=catalog.get(technologyId());
+            if(upgrade!=null){
+                font.setColor(Color.LIGHT_GRAY);
+                font.draw(batch,shortText(upgrade.name,53),345,316);
+                font.draw(batch,shortText(upgrade.tradeoff,55),345,285);
+            }
+            font.setColor(Color.WHITE);
+            font.draw(batch,"CURRENT "+(selected.branch()==null?"STOCK":
+                    selected.branch()+" RANK "+selected.stage(selected.branch())),345,255);
+        }
+        font.setColor(Color.CYAN);
+        font.draw(batch,campaign?"CAMPAIGN DISCOVERIES":
+                "SKIRMISH RULES / INDEPENDENT OF CAMPAIGN",345,224);
+        font.setColor(Color.WHITE);
+        font.draw(batch,campaign?(permittedResearch()==null?"NO RESEARCH INVENTORY":
+                permittedResearch().unlocked().size()+" PERMANENT RESEARCH UNLOCKS"):
+                "TECH CAP "+rules.maxStage()+"/6  HULL GEN "+rules.maxHullGeneration()+"/10",345,194);
+        font.draw(batch,"EXPORT SHIP",357,136);
+        font.draw(batch,"IMPORT + RULES",584,136);
+        for(int branch=0;branch<4;branch++){
+            Shipyard.Track track=Shipyard.Track.values()[branch];
+            int bottom=479-branch*62;
+            font.setColor(campaign||rules.allowedTracks().contains(track)?Color.CYAN:Color.SCARLET);
+            font.draw(batch,shortText(track.name(),13),815,bottom+28);
+            for(int rank=1;rank<=6;rank++){
+                boolean unlocked=selected!=null&&technologyAvailable(selectedSlot,track,rank);
+                font.setColor(selected!=null&&selected.stage(track)==rank?Color.GREEN:
+                        unlocked?Color.WHITE:Color.GRAY);
+                font.draw(batch,rank+"",959+(rank-1)*49,bottom+28);
+            }
+        }
+        font.setColor(Color.WHITE);
+        font.draw(batch,"FIT SOCKET",816,240);
+        font.draw(batch,"FIT FAMILY",955,240);
+        font.draw(batch,"SHIP DOCTRINE",1101,240);
+        font.draw(batch,usage==Usage.SKIRMISH?"TECH CAP -":"CLEAR SLOT",814,185);
+        font.draw(batch,usage==Usage.SKIRMISH?"TECH CAP +":"CONFIG",954,185);
+        font.draw(batch,"BAN/ALLOW TECH",1086,185);
+        font.draw(batch,"HULL GEN -",817,138);
+        font.draw(batch,"HULL GEN +",1016,138);
+        font.setColor(report.valid()?Color.GREEN:Color.SCARLET);
+        font.draw(batch,shortText(report.explanation(),75),344,62);
+        font.setColor(Color.LIGHT_GRAY);
+        font.draw(batch,shortText(notice,128),25,35);
+        batch.end();
+    }
+
     void draw(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font) {
         if(technologyView){drawTechnology(shapes,batch,font);return;}
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
