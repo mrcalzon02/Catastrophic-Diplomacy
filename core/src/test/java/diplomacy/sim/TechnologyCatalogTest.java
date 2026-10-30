@@ -14,7 +14,7 @@ public final class TechnologyCatalogTest {
         require(c.upgradeCount() == 8976, "full technology count");
         require(c.componentCount() == 374, "all base components");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
-            for(String role: new String[]{"APR","PWR","DHL","DSH","DAR","DPW",
+            for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
                 require(c.base("BASE-"+faction+"-"+role)!=null
                         && "support".equals(c.base("BASE-"+faction+"-"+role).category),
