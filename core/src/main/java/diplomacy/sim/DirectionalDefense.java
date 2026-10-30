@@ -174,6 +174,21 @@ public final class DirectionalDefense {
     public double totalArmor() {
         double sum=0;for(Tile[] line:tiles)for(Tile t:line)sum+=t.armor;return sum;
     }
+    /** Repair EXISTING peeled armor, never create extra maximum capacity. */
+    public double receiveArmorRepair(double offered) {
+        valid(offered);
+        double missing=0;
+        for(Tile[] line:tiles)for(Tile tile:line)
+            if(tile.occupied)missing+=StrictMath.max(0,tile.maxArmor-tile.armor);
+        if(missing<=1e-10||offered<=0)return 0;
+        double restored=StrictMath.min(offered,missing);
+        for(Tile[] line:tiles)for(Tile tile:line)if(tile.occupied){
+            double gap=StrictMath.max(0,tile.maxArmor-tile.armor);
+            tile.armor=StrictMath.min(tile.maxArmor,
+                    tile.armor+restored*gap/missing);
+        }
+        return restored;
+    }
     public double armor(Facing facing) {
         double sum=0;for(Tile[] line:tiles)for(Tile t:line)
             if(t.occupied&&t.facing==facing)sum+=t.armor;return sum;
