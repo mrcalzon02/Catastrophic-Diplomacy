@@ -20,8 +20,8 @@ public final class HullCoverageBattleTest {
         }
         return battle.fingerprint();
     }
-    public static void main(String[] args){
-        TechnologyCatalog tech=TechnologyCatalog.standard();
+    public static void main(String[] args) throws Exception {
+        TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         check(HullCoverageBattle.SIZES.size()==11,"One actual vessel of each of 11 canonical hull sizes");
         Set<Shipyard.Hull> distinct=new HashSet<>();
         for(Shipyard.Hull hull:HullCoverageBattle.SIZES)
