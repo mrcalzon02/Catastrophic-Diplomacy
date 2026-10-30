@@ -146,6 +146,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         return false;
     }
 
+    /** Runtime diagnostic: distinct original-art silhouettes with generated, alpha-masked internal layers. */
+    public int damageLayersBuilt() { return damagedLayers.size()+severeLayers.size(); }
+
     public int loaded() {
         int count=0;
         for(var fleet:textures.values())count+=fleet.size();
