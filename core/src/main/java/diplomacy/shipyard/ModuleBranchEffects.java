@@ -76,9 +76,14 @@ public final class ModuleBranchEffects {
                 }
             }
             case "SHD" -> {
-                // Ordinary local shields: never grant cross-vessel capability.
-                // Their own shield capacity still follows catalog research.
-                if(branch==Shipyard.Track.EFFICIENCY)efficiency+=0.047*rank;
+                // All four branches meaningfully evolve the owner's generator,
+                // but only explicit XFR hardware can charge allied shields.
+                switch(branch){
+                    case OUTPUT -> shield+=0.050*rank;
+                    case EFFICIENCY -> efficiency+=0.047*rank;
+                    case RESILIENCE -> shield+=0.035*rank;
+                    case SPECIALIST -> {shield+=0.042*rank;tracking+=0.010*rank;}
+                }
             }
             case "DRN" -> {
                 switch(branch){
