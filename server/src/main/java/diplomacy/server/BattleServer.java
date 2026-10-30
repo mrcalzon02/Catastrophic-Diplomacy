@@ -4,6 +4,8 @@ import hbnet.Hbnet;
 import diplomacy.sim.*;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.SkirmishShipExchange;
+import diplomacy.shipyard.SkirmishFleet;
+import diplomacy.shipyard.SkirmishTechnologyRules;
 import diplomacy.tech.TechnologyCatalog;
 import java.io.*;
 import java.net.*;
@@ -13,7 +15,8 @@ import java.util.*;
 import java.util.concurrent.*;
 
 /** Standalone authoritative Java 17 battle. No libGDX, graphics, assets or audio.
- * This bounded slice hosts server-fitted starter fleets, never client blueprints or campaign wallets.
+ * The host validates imported fleet blueprints against its match technology tier;
+ * campaign wallets and client-asserted technology permissions are never trusted.
  */
 public final class BattleServer implements AutoCloseable {
     private final ServerSocket listener;
@@ -57,6 +60,30 @@ public final class BattleServer implements AutoCloseable {
         if(!local.isLoopbackAddress()&&!local.isSiteLocalAddress()&&!local.isLinkLocalAddress())
             throw Hbnet.failure();
         return new BattleServer(local.getHostAddress(),port,seed,count,null,true,left,right);
+    }
+    /** Host-selected inclusive tech tier is the sole authority here, NOT
+     * whichever rules or tier were used when a player exported a design. */
+    public static BattleServer openLan(String bind,int port,long seed,
+                                       SkirmishFleet left,SkirmishFleet right,
+                                       SkirmishTechnologyRules hostRules)throws Exception{
+        if(left==null||right==null||hostRules==null)
+            throw new IllegalArgumentException("PvP requires two fleets and a host match tier");
+        InetAddress local=InetAddress.getByName(Hbnet.host(bind));
+        if(!local.isLoopbackAddress()&&!local.isSiteLocalAddress()&&!local.isLinkLocalAddress())
+            throw Hbnet.failure();
+        TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        left.requireAllowed(hostRules,catalog);
+        right.requireAllowed(hostRules,catalog);
+        Battle match=Battle.duel(seed,left.ships(),right.ships(),catalog);
+        return new BattleServer(local.getHostAddress(),port,match);
+    }
+    private BattleServer(String bind,int port,Battle authoritativeMatch)throws Exception{
+        if(authoritativeMatch==null)throw new IllegalArgumentException("Missing authoritative PvP battle");
+        this.transport=null;
+        this.battle=authoritativeMatch;
+        listener=new ServerSocket(port,16,InetAddress.getByName(bind));
+        workers.execute(this::accept);
+        clock.scheduleWithFixedDelay(this::pump,5,5,TimeUnit.MILLISECONDS);
     }
     private BattleServer(String bind,int port,long seed,int count,Hbnet.Server transport,
                          boolean trustedLan)throws Exception{
