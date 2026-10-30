@@ -20,6 +20,10 @@ public final class CombatAudio implements AutoCloseable {
     private final Map<CombatAudioCue.Cue, Sound> cues = new EnumMap<>(CombatAudioCue.Cue.class);
     private final long[] lastPlayedTick = new long[CombatAudioCue.Cue.values().length];
     private final SpatialAudioRuntime spatial;
+    private Sound radioOpen, radioClose;
+    private String lastLogEntry;
+    private long lastRadioTick = -1000000L;
+    private boolean radioFlip;
     private Preferences prefs;
     private Music battleMusic, ambientMusic, activeMusic;
     private long seenSequence;
@@ -49,6 +53,8 @@ public final class CombatAudio implements AutoCloseable {
         load(CombatAudioCue.Cue.EXPLOSION, "audio/sfx/grenade.wav");
         load(CombatAudioCue.Cue.UI, "audio/sfx/ui_confirm.wav");
         spatial = new SpatialAudioRuntime(cues);
+        radioOpen = loadRadio("radio_open");
+        radioClose = loadRadio("radio_close");
         ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3");
         battleMusic = loadMusic("audio/music/final_surge.mp3");
         switchTrack();
@@ -61,6 +67,17 @@ public final class CombatAudio implements AutoCloseable {
             cues.put(cue, Gdx.audio.newSound(Gdx.files.internal(path)));
         } catch (RuntimeException error) {
             Gdx.app.error("AUDIO", "Unable to load " + path, error);
+        }
+    }
+    private Sound loadRadio(String name) {
+        try {
+            com.badlogic.gdx.files.FileHandle file = Gdx.files.local("audio/synth/v2/"+name+".wav");
+            byte[] bytes = SynthesizedSounds.wav(name);
+            if (!file.exists() || file.length() != bytes.length) file.writeBytes(bytes,false);
+            return Gdx.audio.newSound(file);
+        } catch (RuntimeException error) {
+            Gdx.app.error("AUDIO", "Optional radio tone unavailable: "+name,error);
+            return null;
         }
     }
     private Music loadMusic(String path) {
@@ -119,6 +136,9 @@ public final class CombatAudio implements AutoCloseable {
         seenSequence=0;seenDestructions=0;
         Arrays.fill(lastPlayedTick,-1000000L);
         spatial.reset();
+        lastLogEntry = null;
+        lastRadioTick = -1000000L;
+        radioFlip = false;
     }
 
     /**
@@ -129,6 +149,34 @@ public final class CombatAudio implements AutoCloseable {
                         boolean battleVisible) {
         spatial.advance(battle,cameraX,cameraY,zoom,battleVisible&&!suspended,
                 effectsOn,effectsVolume);
+        radioBleep(battle, battleVisible);
+    }
+
+    private void radioBleep(Battle battle, boolean visible) {
+        if (battle == null) return;
+        java.util.List<String> log = battle.events();
+        if (log.isEmpty()) return;
+        int start = 0;
+        if (lastLogEntry != null) {
+            for (int i=log.size()-1;i>=0;i--) {
+                if (lastLogEntry.equals(log.get(i))) { start=i+1; break; }
+            }
+        }
+        // Consume unseen entries even while muted, paused, or viewing menus.
+        lastLogEntry = log.get(log.size()-1);
+        if (!visible || suspended || !effectsOn) return;
+        boolean received = false;
+        for (int i=start;i<log.size();i++) {
+            if (log.get(i).startsWith("RADIO ")) { received=true; break; }
+        }
+        if (!received || battle.tick-lastRadioTick<45) return;
+        Sound tone = radioFlip ? radioClose : radioOpen;
+        radioFlip = !radioFlip;
+        lastRadioTick = battle.tick;
+        if (tone != null) {
+            try { tone.play(effectsVolume*0.28f); }
+            catch (RuntimeException error) { Gdx.app.error("AUDIO", "Radio cue failed",error); }
+        }
     }
 
     public void ui() {
@@ -150,6 +198,8 @@ public final class CombatAudio implements AutoCloseable {
 
     @Override public void close() {
         spatial.close();
+        if (radioOpen != null) radioOpen.dispose();
+        if (radioClose != null) radioClose.dispose();
         if (activeMusic != null) activeMusic.stop();
         for (Sound sound : cues.values()) sound.dispose();
         cues.clear();
