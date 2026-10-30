@@ -49,6 +49,15 @@ public final class ScreensaverCameraDirectorTest {
             }
             previous=shot;
         }
+        require(previous.zoom()<.45f,"close-up ship camera must zoom far past old 0.48 floor");
+        camera.manualPan(130,60);
+        var manualShot=camera.update(battle,.05f);
+        require(camera.manual()&&Math.abs(manualShot.centerX()-previous.centerX())>110,
+                "manual drag must override automatic shot");
+        float closer=camera.manualScale(.5f);
+        require(closer<manualShot.zoom(),"manual pinch must zoom in");
+        camera.resumeAuto();
+        require(!camera.manual(),"AUTO action must restore cinematic camera");
         require(seen.size()>=5,"must visit multiple distinct ships");
         require(teams.size()==2,"must show both fleets");
         require(camera.targetChanges()>=9,"camera must regularly change subjects");

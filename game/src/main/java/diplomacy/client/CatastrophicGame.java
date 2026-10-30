@@ -85,6 +85,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private ScreensaverBattle.Round screensaverRound;
     /** Unattended exhibition tracking is deliberately separate from the player camera. */
     private final ScreensaverCameraDirector screensaverCamera=new ScreensaverCameraDirector();
+    private final ScreensaverWakeGesture screensaverWake=new ScreensaverWakeGesture();
+    private boolean screensaverControlsVisible;
+    private int screensaverControlPointer=-1;
+    private float screensaverControlDownX,screensaverControlDownY;
     private final java.util.Random screensaverRandom=new java.util.Random(System.nanoTime());
     private float screensaverResultPause,previousSpeed,previousZoom;
     private int previousLevel,previousFocusedId;
@@ -304,7 +308,26 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
-                if(screensaverMode){stopScreensaver();return true;}
+                if(screensaverMode){
+                    if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
+                        stopScreensaver();
+                    }else if(key==Input.Keys.SPACE){
+                        screensaverControlsVisible=!screensaverControlsVisible;
+                    }else if(key==Input.Keys.C){
+                        screensaverCamera.resumeAuto();
+                    }else if(key==Input.Keys.Z){
+                        screensaverCamera.manualScale(1.35f);
+                    }else if(key==Input.Keys.X){
+                        screensaverCamera.manualScale(1f/1.35f);
+                    }else if(key==Input.Keys.PLUS||key==Input.Keys.EQUALS){
+                        speed=CombatPace.faster(speed);
+                    }else if(key==Input.Keys.MINUS){
+                        speed=CombatPace.slower(speed);
+                    }else if(key==Input.Keys.P){
+                        running=!running;
+                    }
+                    return true;
+                }
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(audio!=null)audio.uiBack();
@@ -513,7 +536,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return false;
             }
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
-                if(screensaverMode){stopScreensaver();return true;}
+                if(screensaverMode){
+                    com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
+                            new com.badlogic.gdx.math.Vector2(x,y));
+                    if(screensaverControlsVisible&&ui.y>=0&&ui.y<=66){
+                        screensaverControlPointer=pointer;
+                        screensaverControlDownX=ui.x;
+                        screensaverControlDownY=ui.y;
+                        return true;
+                    }
+                    screensaverWake.down(pointer,x,y,System.nanoTime());
+                    battleTouch.start(pointer,ui.x,ui.y);
+                    return true;
+                }
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
                 if(screen==GameMenuPanel.Screen.BATTLE && battle!=null &&
                         !shipyard.open() && !tacticalMenuOpen &&
@@ -612,6 +647,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return false;
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
+                if(screensaverMode){
+                    if(pointer==screensaverControlPointer)return true;
+                    screensaverWake.move(pointer,x,y);
+                    com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
+                            new com.badlogic.gdx.math.Vector2(x,y));
+                    if(battleTouch.owns(pointer)){
+                        BattleTouchNavigation.Motion motion=battleTouch.move(pointer,ui.x,ui.y);
+                        if(motion.changed()){
+                            if(motion.pinch()){
+                                float oldZoom=battleCamera.zoom;
+                                float newZoom=screensaverCamera.manualScale(motion.scale());
+                                screensaverCamera.manualPan(
+                                        (motion.oldX()-W*.5f)*oldZoom-
+                                        (motion.newX()-W*.5f)*newZoom,
+                                        (motion.oldY()-H*.5f)*oldZoom-
+                                        (motion.newY()-H*.5f)*newZoom);
+                            }else screensaverCamera.manualPan(
+                                    -motion.dx()*battleCamera.zoom,
+                                    -motion.dy()*battleCamera.zoom);
+                        }
+                    }
+                    return true;
+                }
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
                 if(pointer==voiceSliderPointer){
                     float next=VoiceVolumeControl.valueAt(world.x);
@@ -655,6 +713,24 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.drag(world.x,world.y,pointer);
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
+                if(screensaverMode){
+                    com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
+                            new com.badlogic.gdx.math.Vector2(x,y));
+                    if(pointer==screensaverControlPointer){
+                        screensaverControlPointer=-1;
+                        if(Math.hypot(ui.x-screensaverControlDownX,
+                                ui.y-screensaverControlDownY)<28 && ui.y>=0&&ui.y<=66)
+                            tapScreensaverControl(ui.x);
+                        return true;
+                    }
+                    if(battleTouch.owns(pointer))battleTouch.end(pointer,ui.x,ui.y);
+                    if(screensaverWake.up(pointer,x,y,System.nanoTime())){
+                        screensaverControlsVisible=!screensaverControlsVisible;
+                        if(audio!=null)audio.ui();
+                        Gdx.app.log("CD-SCREENSAVER","CONTROLS "+(screensaverControlsVisible?"WAKE":"HIDE"));
+                    }
+                    return true;
+                }
                 if(pointer==voiceSliderPointer){
                     voiceSliderPointer=-1;
                     audio.saveVoiceVolume();
@@ -682,6 +758,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return activated;
             }
             @Override public boolean scrolled(float amountX,float amountY) {
+                if(screensaverMode){
+                    screensaverCamera.manualScale((float)Math.pow(1.18,amountY));
+                    return true;
+                }
                 if(shipyard.open())return shipyard.scroll(amountY);
                 if(tacticalMenuOpen || (fleetOrdersPanel!=null&&fleetOrdersPanel.open()))return false;
                 zoomBy(amountY);
@@ -2101,7 +2181,23 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Battle.Faction[] values = Battle.Faction.values();
         return values[(f.ordinal() + 1) % values.length];
     }
+    private void tapScreensaverControl(float x){
+        if(x<135)screensaverCamera.manualScale(1.4f);
+        else if(x<270)screensaverCamera.manualScale(1f/1.4f);
+        else if(x<405)running=!running;
+        else if(x<535)speed=CombatPace.slower(speed);
+        else if(x<665)speed=CombatPace.faster(speed);
+        else if(x<805)screensaverCamera.resumeAuto();
+        else if(x<955)nextScreensaverRound();
+        else if(x<1095)screensaverControlsVisible=false;
+        else {stopScreensaver();return;}
+        if(audio!=null)audio.ui();
+    }
+
     private void startScreensaver(){
+        screensaverWake.reset();
+        screensaverControlsVisible=false;
+        screensaverControlPointer=-1;
         previousSpeed=speed;previousZoom=manualZoom;
         previousLevel=battlefieldLevel;previousFocusedId=focusedShipId;
         screensaverMode=true;playedCampaign=false;
@@ -2129,6 +2225,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 +") backdrop="+battlefieldLevel);
     }
     private void stopScreensaver(){
+        screensaverWake.reset();
+        screensaverControlsVisible=false;
+        screensaverControlPointer=-1;
         screensaverMode=false;screensaverRound=null;
         screen=GameMenuPanel.Screen.HOME;running=false;battle=null;
         speed=previousSpeed;manualZoom=previousZoom;focusedShipId=previousFocusedId;
@@ -2473,8 +2572,30 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 font.draw(batch,"VICTORY: "+winner+"  /  NEXT BATTLE SOON",355,370);
             }
             font.setColor(Color.LIGHT_GRAY);
-            font.draw(batch,"PRESS ANY KEY OR TAP TO RETURN TO MENU",20,28);
+            if(!screensaverControlsVisible)
+                font.draw(batch,"DOUBLE TAP FOR CONTROLS  /  DRAG TO PAN  /  PINCH TO ZOOM",20,28);
             batch.end();
+            if(screensaverControlsVisible){
+                shapes.setProjectionMatrix(camera.combined);
+                shapes.begin(ShapeRenderer.ShapeType.Filled);
+                shapes.setColor(0.025f,0.065f,0.12f,0.95f);
+                shapes.rect(0,0,W,66);
+                shapes.end();
+                batch.setProjectionMatrix(camera.combined);
+                batch.begin();
+                font.setColor(Color.WHITE);
+                font.draw(batch,"ZOOM -",16,39);
+                font.draw(batch,"ZOOM +",150,39);
+                font.draw(batch,running?"PAUSE":"PLAY",285,39);
+                font.draw(batch,"SLOW",420,39);
+                font.draw(batch,"FAST",550,39);
+                font.draw(batch,"AUTO CAM",680,39);
+                font.draw(batch,"NEXT",823,39);
+                font.draw(batch,"HIDE",977,39);
+                font.setColor(Color.SALMON);
+                font.draw(batch,"EXIT",1125,39);
+                batch.end();
+            }
             return;
         }
         // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
