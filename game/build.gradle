@@ -189,6 +189,16 @@ tasks.register('shieldSurfaceSmoke', JavaExec) {
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('shieldSurfaceSmoke') }
 
+tasks.register('shieldFxSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless shield impacts, facing collapse, regeneration, restart and 400-ship FX cap.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShieldFxTimelineTest'
+}
+// The existing multiplatform functional-release pipeline runs menuFlowSmoke.
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('shieldFxSmoke') }
+
 tasks.register('renderPerformanceSmoke', JavaExec) {
     group = 'verification'
     description = 'Check CPU frame, draw-call and material-bind telemetry accounting without FPS assertions.'
