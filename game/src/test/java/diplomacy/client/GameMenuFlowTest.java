@@ -61,6 +61,32 @@ public final class GameMenuFlowTest {
         }
         check(GameMenuPanel.factionHit(1250,650)==null,"Invalid faction hit region");
 
+        // Shipyard's technology tree is a per-vessel view, shared by
+        // campaign and skirmish but never a campaign research purchase.
+        check(ShipyardPanel.technologyHit(1100,588)==1&&
+                ShipyardPanel.technologyHit(850,588)==0,
+                "Shipyard tech-loadout and module tabs are unmapped");
+        check(ShipyardPanel.technologyHit(956,490)==100&&
+                ShipyardPanel.technologyHit(1201,305)==123,
+                "Per-module technology tree ranks are not clickable");
+        check(ShipyardPanel.technologyHit(840,230)==2&&
+                ShipyardPanel.technologyHit(1010,230)==3&&
+                ShipyardPanel.technologyHit(1170,230)==4,
+                "Socket/family/ship doctrine actions are not independently mapped");
+        check(ShipyardPanel.technologyHit(830,175)==5&&
+                ShipyardPanel.technologyHit(960,175)==6&&
+                ShipyardPanel.technologyHit(1150,175)==7&&
+                ShipyardPanel.technologyHit(840,126)==8&&
+                ShipyardPanel.technologyHit(1150,126)==9,
+                "Skirmish restriction controls are missing");
+        check(ShipyardPanel.technologyHit(410,127)==10&&
+                ShipyardPanel.technologyHit(620,127)==11,
+                "Ship exchange controls are missing");
+        check(ScenarioCatalog.challenge(ScenarioCatalog.Preset.DUEL).maxStage()==1&&
+                ScenarioCatalog.challenge(ScenarioCatalog.Preset.PATROL).maxStage()==2&&
+                ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM).maxStage()==6,
+                "Scenario-specific technology tiers were not loaded");
+
         // Campaign tech-tree node selection is separated from payment.
         check(GameMenuPanel.researchAction(100,489)==100,
                 "License I is not selectable on the technology tree");
