@@ -30,9 +30,9 @@ public final class OrdnancePropulsionTest {
                 "unpowered coasting cannot turn its velocity vector");
         check(OrdnancePropulsion.phase(heavy,60,0,160,true)==
                 OrdnancePropulsion.Phase.TERMINAL,"terminal attack restarts engine");
-        check(OrdnancePropulsion.speedMultiplier(OrdnancePropulsion.Phase.TERMINAL)>
-                OrdnancePropulsion.speedMultiplier(OrdnancePropulsion.Phase.COAST),
-                "terminal approach is accelerated physically");
+        check(OrdnancePropulsion.accelerationMultiplier(OrdnancePropulsion.Phase.TERMINAL)>0
+                &&OrdnancePropulsion.accelerationMultiplier(OrdnancePropulsion.Phase.COAST)==0,
+                "terminal approach has thrust; coast has none");
         check(OrdnancePropulsion.guidanceMultiplier(OrdnancePropulsion.Phase.TERMINAL)>
                 OrdnancePropulsion.guidanceMultiplier(OrdnancePropulsion.Phase.COAST),
                 "terminal attack improves real maneuverability");
@@ -42,6 +42,41 @@ public final class OrdnancePropulsionTest {
                 OrdnancePropulsion.Phase.COAST,"pulse off");
         check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.PULSE_BURN,20,0,700,false)==
                 OrdnancePropulsion.Phase.BOOST,"pulse restart");
-        System.out.println("PASS constant burn, cold eject, boost-coast-terminal and pulse cycles");
+        // Physics contract: no velocity or heading change without propellant/thrust.
+        var coast=OrdnancePropulsion.advanceVelocity(180,40,-900,0,220,1,
+                OrdnancePropulsion.Phase.COAST,Battle.DT,1000);
+        check(coast.vx()==180&&coast.vy()==40,"inertial coast preserves full velocity");
+        var eject=OrdnancePropulsion.advanceVelocity(44,0,0,500,220,1,
+                OrdnancePropulsion.Phase.COLD_EJECT,Battle.DT,1000);
+        check(eject.vx()==44&&eject.vy()==0,"cold eject cannot steer or accelerate");
+        var noFuel=OrdnancePropulsion.advanceVelocity(180,40,-900,0,220,1,
+                OrdnancePropulsion.Phase.TERMINAL,Battle.DT,0);
+        check(noFuel.vx()==180&&noFuel.vy()==40,"exhausted thrusters cannot turn");
+        var sprint=OrdnancePropulsion.advanceVelocity(180,40,900,0,220,1,
+                OrdnancePropulsion.Phase.TERMINAL,Battle.DT,1000);
+        double spent=StrictMath.hypot(sprint.vx()-180,sprint.vy()-40);
+        check(spent>0&&spent<=220*7.0*Battle.DT+1e-7,
+                "terminal thrust consumes bounded delta-v");
+        var capped=OrdnancePropulsion.advanceVelocity(180,40,900,0,220,1,
+                OrdnancePropulsion.Phase.TERMINAL,Battle.DT,2);
+        check(StrictMath.hypot(capped.vx()-180,capped.vy()-40)<=2+1e-7,
+                "finite propellant bounds actual velocity change");
+        check(OrdnancePropulsion.emissionMultiplier(OrdnancePropulsion.Phase.COAST)
+                    <OrdnancePropulsion.emissionMultiplier(OrdnancePropulsion.Phase.BOOST),
+                "coasting missile has lower real emission than active booster");
+        var profile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
+        double quiet=ProjectileModel.acquisitionRange(250,1,1,
+                ProjectileModel.STANDARD_PD,profile,
+                OrdnancePropulsion.emissionMultiplier(OrdnancePropulsion.Phase.COAST));
+        double burning=ProjectileModel.acquisitionRange(250,1,1,
+                ProjectileModel.STANDARD_PD,profile,
+                OrdnancePropulsion.emissionMultiplier(OrdnancePropulsion.Phase.TERMINAL));
+        check(quiet>0&&quiet<burning,"quiet coast remains detectable by real cross section");
+        check(ProjectileModel.interceptionChance(profile,ProjectileModel.STANDARD_PD,
+                1,1,440)<ProjectileModel.interceptionChance(profile,
+                ProjectileModel.STANDARD_PD,1,1,110),
+                "fast terminal missile is actually harder to track");
+        System.out.println("PASS inertial coasting, cold ejection, finite acceleration,"
+                +" dynamic PD signatures, physical terminal sprint and motor phases");
     }
 }

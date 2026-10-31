@@ -85,10 +85,12 @@ public final class OrdnanceDoctrineTest {
         Battle world=scenario(Battle.DamageType.MISSILE,OrdnanceDoctrine.Mode.COLD_LAUNCH,4);
         world.step();
         Battle.Missile m=world.missiles().get(0);
-        double x=m.x,y=m.y;
+        double x=m.x,y=m.y,vx=m.vx,vy=m.vy;
         for(int i=0;i<8;i++)world.step();
-        check(m.x==x&&m.y==y &&m.ignitionDelayTicks>0,
-                "Cold launch is a vulnerable physical canister before ignition");
+        check(m.x>x && StrictMath.abs(m.x-(x+8*vx*Battle.DT))<1e-6
+                &&StrictMath.abs(m.y-(y+8*vy*Battle.DT))<1e-6
+                &&m.vx==vx&&m.vy==vy&&m.ignitionDelayTicks>0,
+                "Cold ejection must preserve its small physical impulse without thrust");
         for(int i=0;i<20;i++)world.step();
         check(m.ignitionDelayTicks==0 &&m.x>x,
                 "Delayed ignition produces propulsion later, not instant damage");

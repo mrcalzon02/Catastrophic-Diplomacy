@@ -313,6 +313,15 @@ tasks.register('ordnanceDoctrineSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.OrdnanceDoctrineTest'
 }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnanceDoctrineSmoke') }
+tasks.register('ordnancePropulsionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Missile inertia, finite acceleration, cold ejection, motor phases and dynamic PD acquisition.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnancePropulsionTest'
+    dependsOn testClasses
+}
+tasks.named('ordnanceDoctrineSmoke') { finalizedBy(tasks.named('ordnancePropulsionSmoke')) }
+tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
 
 
 tasks.register('ammunitionTypesSmoke', JavaExec) {

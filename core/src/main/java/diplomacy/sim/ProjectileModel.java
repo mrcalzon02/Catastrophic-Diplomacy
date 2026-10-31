@@ -97,7 +97,15 @@ public final class ProjectileModel {
     public static double acquisitionRange(double baseRange,double sensorCondition,
                                           double weatherFactor,Defense system,Spec target){
         if(target==null||system==null)return 0;
-        double effective=clamp(target.crossSection*target.signature,0.005,64);
+        return acquisitionRange(baseRange,sensorCondition,weatherFactor,system,target,1);
+    }
+    /** Sensor acquisition consumes the *current* motor signature, without per-PD allocations. */
+    public static double acquisitionRange(double baseRange,double sensorCondition,
+                                          double weatherFactor,Defense system,Spec target,
+                                          double phaseEmission){
+        if(target==null||system==null)return 0;
+        double effective=clamp(target.crossSection*target.signature*
+                clamp(phaseEmission,0.05,4),0.005,64);
         return StrictMath.max(0,baseRange)*clamp(sensorCondition,0,1)
                 *clamp(weatherFactor,0,2.5)*system.detectionMultiplier
                 *clamp(StrictMath.sqrt(StrictMath.sqrt(effective)),0.30,2.2);
@@ -107,8 +115,15 @@ public final class ProjectileModel {
     public static double interceptionChance(Spec target,Defense system,
                                             double crewCondition,double weatherAccuracy){
         if(target==null||system==null)return 0;
+        return interceptionChance(target,system,crewCondition,weatherAccuracy,target.speed);
+    }
+    /** A real moving projectile uses its current world speed in the PD tracking solution. */
+    public static double interceptionChance(Spec target,Defense system,
+                                            double crewCondition,double weatherAccuracy,
+                                            double actualSpeed){
+        if(target==null||system==null)return 0;
         double area=clamp(StrictMath.sqrt(target.crossSection),0.32,1.8);
-        double speedFactor=clamp(220.0/target.speed,0.42,1.60);
+        double speedFactor=clamp(220.0/StrictMath.max(10,actualSpeed),0.42,1.60);
         return clamp(0.68*clamp(crewCondition,0,1)
                 *clamp(weatherAccuracy,0,1.5)*system.tracking
                 *area*speedFactor,0,0.96);

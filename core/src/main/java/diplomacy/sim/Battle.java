@@ -189,7 +189,8 @@ public final class Battle {
         public final long visualId, spawnTick;
         public final int sourceId, team;
         public int targetId;
-        public double x, y, vx, vy, fuel, damage, integrity;
+        /** vx/vy are world-units/second, never normalized heading components. */
+        public double x, y, vx, vy, fuel, damage, integrity, propellant;
         public final boolean torpedo;
         public final ProjectileModel.Spec spec;
         public final double guidanceQuality;
@@ -210,6 +211,11 @@ public final class Battle {
                     mode==OrdnancePropulsion.Mode.BOOST_COAST_TERMINAL
                     ||mode==OrdnancePropulsion.Mode.PULSE_BURN?
                     OrdnancePropulsion.Phase.BOOST:OrdnancePropulsion.Phase.CRUISE;
+            double priorSpeed=StrictMath.hypot(vx,vy);
+            double ejectSpeed=spec.speed()*OrdnancePropulsion.initialSpeedMultiplier(thrustPhase);
+            if(priorSpeed>0){vx*=ejectSpeed/priorSpeed;vy*=ejectSpeed/priorSpeed;}
+            propellant=spec.speed()*(mode==OrdnancePropulsion.Mode.BOOST_COAST_TERMINAL?1.85:
+                    mode==OrdnancePropulsion.Mode.PULSE_BURN?3.2:2.6);
         }
         Missile(long visualId,long spawnTick, int source, int owner, int target,
                 double sx,double sy,double dx,double dy,double amount,
@@ -246,6 +252,10 @@ public final class Battle {
             ignitionDelayTicks=ignitionTicks;
             if(ignitionTicks>0)thrustPhase=OrdnancePropulsion.Phase.COLD_EJECT;
             spec=profile;guidanceQuality=launchGuidance;
+            // Legacy direct construction starts at rated speed; queued launch
+            // schemes then set the appropriate ejection/boost impulse.
+            vx*=spec.speed();vy*=spec.speed();
+            propellant=spec.speed()*2.6;
             fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds()
                     +ignitionTicks*DT;
             damage=amount;integrity=profile.health();
@@ -1814,7 +1824,8 @@ public final class Battle {
                 for(Missile m:missiles)if(m.team!=craft.team){
                     double d=StrictMath.hypot(m.x-craft.x,m.y-craft.y);
                     double detection=ProjectileModel.acquisitionRange(150,sensor,
-                            weather.sensorFactor(),suite,m.spec);
+                            weather.sensorFactor(),suite,m.spec,
+                            OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
                     if(d<nearest&&d<=detection){nearest=d;missileTarget=m;shellTarget=null;}
                 }
                 for(Ballistic p:ballistics)if(p.team!=craft.team){
@@ -1835,7 +1846,9 @@ public final class Battle {
                                 ?missileTarget.spec:shellTarget.spec;
                         if(random.nextDouble()<ProjectileModel.interceptionChance(
                                 incoming,suite,controller==null?1:controller.pointDefenseCondition,
-                                weather.accuracyFactor())){
+                                weather.accuracyFactor(),missileTarget!=null?
+                                StrictMath.hypot(missileTarget.vx,missileTarget.vy):
+                                incoming.speed())){
                         if(missileTarget!=null){
                             missileTarget.integrity-=Math.max(3,suite.damage());
                             if(missileTarget.integrity<=0 && missiles.remove(missileTarget)){
@@ -1976,11 +1989,11 @@ public final class Battle {
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
                         defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
-                        defender.pointDefenseProfile,m.spec);
+                        defender.pointDefenseProfile,m.spec,
+                        OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
-                        m.x,m.y,m.vx,m.vy,
-                        m.spec.speed()*OrdnancePropulsion.speedMultiplier(m.thrustPhase));
+                        m.x,m.y,m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
                 if(defender.standingOrders!=null&&eta>=1000 &&
                         defender.standingOrders.directives().interceptStrategy()!=
                                 ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
@@ -2024,7 +2037,8 @@ public final class Battle {
             ProjectileModel.Spec incoming=chosenMissile!=null?chosenMissile.spec:chosenShell.spec;
             double chance=ProjectileModel.interceptionChance(incoming,
                     defender.pointDefenseProfile,defender.pointDefenseCondition,
-                    weather.accuracyFactor());
+                    weather.accuracyFactor(),chosenMissile!=null?
+                    StrictMath.hypot(chosenMissile.vx,chosenMissile.vy):incoming.speed());
             if(random.nextDouble()<chance){
                 if(chosenMissile!=null){
                     chosenMissile.integrity-=defender.pointDefenseProfile.damage();
@@ -2114,14 +2128,19 @@ public final class Battle {
                         *m.guidanceQuality
                         *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition)
                         *OrdnancePropulsion.guidanceMultiplier(m.thrustPhase));
-                m.vx = (1-guidance)*m.vx + guidance*dx/range;
-                m.vy = (1-guidance)*m.vy + guidance*dy/range;
-                double magnitude = StrictMath.hypot(m.vx,m.vy);
-                if(magnitude<1e-9)continue;
-                double actualSpeed=m.spec.speed()*
-                        OrdnancePropulsion.speedMultiplier(m.thrustPhase);
-                double nextX=m.x+(m.vx/magnitude)*actualSpeed*DT;
-                double nextY=m.y+(m.vy/magnitude)*actualSpeed*DT;
+                // Apply bounded thrust/steering to persistent world-space
+                // velocity. Coast and cold eject preserve inertial motion.
+                if(m.propellant<=1e-9&&OrdnancePropulsion.burning(m.thrustPhase))
+                    m.thrustPhase=OrdnancePropulsion.Phase.COAST;
+                var nextVelocity=OrdnancePropulsion.advanceVelocity(
+                        m.vx,m.vy,dx,dy,m.spec.speed(),guidance,m.thrustPhase,
+                        DT,m.propellant);
+                double spent=StrictMath.hypot(nextVelocity.vx()-m.vx,
+                        nextVelocity.vy()-m.vy);
+                m.propellant=StrictMath.max(0,m.propellant-spent);
+                m.vx=nextVelocity.vx();m.vy=nextVelocity.vy();
+                double nextX=m.x+m.vx*DT;
+                double nextY=m.y+m.vy*DT;
                 // Fast module-upgraded ordnance must never tunnel through the
                 // target between two 30 Hz ticks. Use the same swept test as
                 // independently tracked kinetic shells.
@@ -2361,6 +2380,9 @@ public final class Battle {
             hash=mix(hash,m.warhead.ordinal());
             hash=mix(hash,m.ignitionDelayTicks);
             hash=mix(hash,m.flightTicks);
+            hash=mix(hash,Double.doubleToLongBits(m.vx));
+            hash=mix(hash,Double.doubleToLongBits(m.vy));
+            hash=mix(hash,Double.doubleToLongBits(m.propellant));
             hash=mix(hash,m.propulsionMode.ordinal());
             hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.visualId);
