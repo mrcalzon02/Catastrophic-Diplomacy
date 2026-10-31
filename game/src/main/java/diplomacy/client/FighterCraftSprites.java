@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.shipyard.FactionArt;
+import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
 import java.util.EnumMap;
@@ -16,9 +17,10 @@ import java.util.Map;
  * colored squares/triangles over a successfully loaded craft sprite.
  * Every alien sprite belongs ONLY to its named civilization. Gameplay
  * archetypes do not imply permission to borrow another faction's graphics.
- * The six founding civilizations use their OWN approved interceptor artwork
- * for fighter and drone roles until role-specific sheets are approved.
- * No faction ever substitutes a generic triangle or another faction's art.
+ * The six founding civilizations use selected silhouettes from their OWN
+ * approved ten-hull sprite sheets until individual craft sheets exist.
+ * Their craft roles no longer all draw as the same interceptor.
+ * No faction substitutes a generic triangle or another civilization's art.
  */
 public final class FighterCraftSprites implements Disposable {
     private static final String[] ROLES={
@@ -34,19 +36,46 @@ public final class FighterCraftSprites implements Disposable {
     private final EnumMap<Battle.Faction,Map<String,Texture>> palettes=
             new EnumMap<>(Battle.Faction.class);
 
+    /**
+     * Role-appropriate family-owned art for founding civilizations without
+     * purpose-built fighter atlases. These are small-ship silhouettes from
+     * their genuine approved fleets, NOT mislabelled alien fighter assets.
+     *
+     * Keep drones/interceptors on actual light silhouettes. Large capital
+     * silhouettes (carrier, dreadnought) must never masquerade as drones.
+     */
+    static Shipyard.Hull originalHullForCraftRole(String role) {
+        return switch(role) {
+            case "interceptor", "recon_fighter", "support_drone" -> Shipyard.Hull.INTERCEPTOR;
+            case "superiority_fighter", "point_defense_fighter" -> Shipyard.Hull.CORVETTE;
+            case "assault_gunship" -> Shipyard.Hull.FRIGATE;
+            case "missile_fighter" -> Shipyard.Hull.MISSILE_CORVETTE;
+            case "torpedo_bomber" -> Shipyard.Hull.DESTROYER;
+            case "heavy_bomber" -> Shipyard.Hull.HEAVY_CRUISER;
+            case "electronic_warfare" -> Shipyard.Hull.LIGHT_CRUISER;
+            default -> throw new IllegalArgumentException("Unknown fighter/drone role: "+role);
+        };
+    }
     /** Stable original-art path used in both APK assets and desktop JAR. */
     public static String spritePath(Battle.Faction faction,String role) {
         if(faction==null||role==null)throw new IllegalArgumentException("Craft identity required");
         String chosen=null;
         for(String candidate:ROLES)if(candidate.equals(role)){chosen=role;break;}
         if(chosen==null)throw new IllegalArgumentException("Unapproved fighter role: "+role);
+        Shipyard.Hull sibling=originalHullForCraftRole(role);
         if(faction==Battle.Faction.TERRAN)
-            return "ships/terran/interceptor.png";
-        // These five original factions already have genuine, distinct hull
-        // sprites. Until their class-specific fighter atlases are approved,
-        // their own interceptor is the correct stand-in, just like Terran.
+            return "ships/terran/"+switch(sibling) {
+                case INTERCEPTOR -> "interceptor";
+                case CORVETTE -> "corvette";
+                case MISSILE_CORVETTE -> "missile_corvette";
+                case FRIGATE -> "frigate";
+                case DESTROYER -> "destroyer";
+                case LIGHT_CRUISER -> "light_cruiser";
+                case HEAVY_CRUISER -> "heavy_cruiser";
+                default -> throw new IllegalStateException("No approved small craft silhouette: "+sibling);
+            }+".png";
         if(FactionArt.hasLegacyArt(faction))
-            return FactionArt.runtimePath(faction,diplomacy.shipyard.Shipyard.Hull.INTERCEPTOR);
+            return FactionArt.runtimePath(faction,sibling);
         FactionArt.Entry art=FactionArt.visualArt(faction);
         if(art==null)throw new IllegalStateException("No approved fighter art family: "+faction);
         return "ships/fighters/"+art.id()+"/"+chosen+".png";
@@ -82,10 +111,13 @@ public final class FighterCraftSprites implements Disposable {
             }
             palettes.put(faction,palette);
         }
-        // One true interceptor each for Terran and the five legacy factions,
-        // plus fifty specialized sprites for the five newer civilizations.
-        if(originals.size()!=56)
-            throw new IllegalStateException("Expected all 56 original faction fighter/interceptor sprites: "+originals.size());
+        // Seven distinct original-hull silhouettes for each of six founding
+        // factions, plus 50 specialized fighters for the five newer factions.
+        // Sprite sharing between multiple roles is intentional and verified.
+        if(originals.size()!=92)
+            throw new IllegalStateException(
+                    "Expected 42 faction-owned founding sprites plus 50 specialist fighters: "+
+                    originals.size());
     }
     public int loaded() { return originals.size(); }
     public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
