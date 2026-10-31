@@ -64,3 +64,16 @@ This measures the original concern ("ships die before their armor holes can be
 seen") rather than falsely assuming that a perfect cutout algorithm guarantees
 visibility. It is completely independent of gameplay balancing and is never a
 release gate; device screenshots remain necessary.
+
+
+## Bounded Android source-art cache
+
+Previously, each unique faction/hull's full decoded original PNG remained
+resident in CPU heap after the first shield/damage lookup, despite all three
+consumers reading only 96×144 sampled coordinates. The CPU cache now retains
+**one 96×144 RGBA Pixmap (55,296 bytes)** per unique ship texture, retaining
+the exact integer source-pixel mapping previously used by the mask builder,
+shield sector stencil, and armor anchor registration. The full-resolution
+approved original texture remains uploaded on the GPU and is never modified.
+Temporary full-resolution decoding is disposed immediately. This bounds the
+persistent source-pixel cache independently of the original fleet art size.

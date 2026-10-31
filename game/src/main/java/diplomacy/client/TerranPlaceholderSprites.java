@@ -293,13 +293,32 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
     }
     private Pixmap sourcePixels(Texture texture){
-        Pixmap source=sourcePixels.get(texture);
-        if(source!=null)return source;
+        Pixmap cached=sourcePixels.get(texture);
+        if(cached!=null)return cached;
         String path=originals.get(texture);
         if(path==null)throw new IllegalStateException("Original hull art source not indexed");
-        source=new Pixmap(Gdx.files.internal(path));
-        sourcePixels.put(texture,source);
-        return source;
+        // The full-resolution PNG still lives in the ORIGINAL GPU texture.
+        // All three CPU consumers (shield stencil, armor registration, damage
+        // overlay) sample only these same fixed 96x144 positions. Retaining
+        // full decoded Pixmaps for all faction hulls needlessly consumes
+        // hundreds of MB of heap on older Android phones.
+        Pixmap decoded=new Pixmap(Gdx.files.internal(path));
+        Pixmap sampled=null;
+        try {
+            sampled=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
+            sampled.setBlending(Pixmap.Blending.None);
+            for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++)
+                sampled.drawPixel(x,y,decoded.getPixel(
+                        ShipSurfaceSampleGrid.sourcePixel(x,decoded.getWidth(),MASK_W),
+                        ShipSurfaceSampleGrid.sourcePixel(y,decoded.getHeight(),MASK_H)));
+            sourcePixels.put(texture,sampled);
+            return sampled;
+        }catch(RuntimeException failure){
+            if(sampled!=null)sampled.dispose();
+            throw failure;
+        }finally{
+            decoded.dispose();
+        }
     }
     private ShipArmorStampAnchors armorAnchors(Texture original){
         ShipArmorStampAnchors registered=armorAnchors.get(original);

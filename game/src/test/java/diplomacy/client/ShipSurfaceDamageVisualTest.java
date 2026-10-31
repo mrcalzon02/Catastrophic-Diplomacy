@@ -7,6 +7,20 @@ public final class ShipSurfaceDamageVisualTest {
     private static int alpha(int rgba){return rgba&255;}
     public static void main(String[] args) throws Exception {
         ShipDamageMaskRegionTest.verify();
+        for(int width:new int[]{64,96,399,1024,2200}){
+            for(int x=0;x<96;x++)
+                check(ShipSurfaceSampleGrid.sourcePixel(x,width,96)==x*width/96,
+                        "CPU source cache must sample the exact authored art pixel");
+        }
+        for(int height:new int[]{144,333,768,1800})
+            for(int y=0;y<144;y++)
+                check(ShipSurfaceSampleGrid.sourcePixel(y,height,144)==y*height/144,
+                        "Damage mask row and shield overlay must use identical source UVs");
+        check(ShipSurfaceSampleGrid.maskBytes(96,144)==55296,
+                "Per-sprite CPU cache must remain exactly one small RGBA mask");
+        check(ShipSurfaceSampleGrid.originalBytes(1024,1536)>
+                ShipSurfaceSampleGrid.maskBytes(96,144)*100,
+                "The source-pixel cache must reduce retained decoded memory by over 100x for large PNGs");
         int source=0xb0a090ff;
         check(ShipSurfaceDamageVisual.pixel(source,0,0,0)==source,"Intact hull pixels changed");
         check(ShipSurfaceDamageVisual.pixel(0x11223300,1,1,0)==0,"Original transparent silhouette expanded");
