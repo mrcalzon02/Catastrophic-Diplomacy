@@ -26,8 +26,10 @@ public final class AndroidLauncher extends AndroidApplication {
                 android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0;
         boolean verify=debug && getIntent()!=null &&
                 getIntent().getBooleanExtra("cd.verify_200v200",false);
-        initialize(new CatastrophicGame(updater::checkForUpdates,verify), config);
-        updater.checkForUpdates(false); // non-blocking; prereleases are eligible
+        boolean review=debug && getIntent()!=null &&
+                getIntent().getBooleanExtra("cd.verify_surface_damage",false);
+        initialize(new CatastrophicGame(updater::checkForUpdates,verify,review), config);
+        if(!verify && !review)updater.checkForUpdates(false); // prereleases eligible
     }
     @Override protected void onDestroy(){
         if(updater!=null)updater.close();

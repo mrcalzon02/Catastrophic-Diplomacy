@@ -188,16 +188,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
     private static final String ORDERS_FILE = "fleet/orders-v1.dat";
     private final boolean verifyDemo;
+    /** Hidden, debug-APK-only comparison of real armor/structure render states. */
+    private final boolean verifySurfaceReview;
     private final Runnable updateCheck;
     private long verifiedSequence;
     private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads,peakShieldEvents,peakShieldDrawn;
     private boolean verificationReported;
     private final EnumSet<Battle.DamageType> verifiedTypes=EnumSet.noneOf(Battle.DamageType.class);
     private final Set<Long> verifiedShotIds=new HashSet<>();
-    public CatastrophicGame(){this(null,false);}
-    public CatastrophicGame(boolean verifyDemo){this(null,verifyDemo);}
-    public CatastrophicGame(Runnable updater,boolean verifyDemo){
+    public CatastrophicGame(){this(null,false,false);}
+    public CatastrophicGame(boolean verifyDemo){this(null,verifyDemo,false);}
+    public CatastrophicGame(Runnable updater,boolean verifyDemo){this(updater,verifyDemo,false);}
+    public CatastrophicGame(Runnable updater,boolean verifyDemo,boolean verifySurfaceReview){
         this.updateCheck=updater;this.verifyDemo=verifyDemo;
+        this.verifySurfaceReview=verifySurfaceReview;
         if(verifyDemo){fleetIndex=FLEET_SIZES.length-1;speed=8;}
     }
 
@@ -315,7 +319,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel(Gdx.app.getType()==
                 com.badlogic.gdx.Application.ApplicationType.Android);
-        if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
+        if(verifySurfaceReview){
+            // The ordinary ship/surface renderer runs against fitted hulls
+            // populated by genuine DirectionalDefense impact calculations.
+            // No generated diagrams, fake geometry or gameplay stat changes.
+            screen=GameMenuPanel.Screen.BATTLE;
+            battle=ShipSurfaceDamageFixture.create(technology);
+            manualZoom=.88f;
+            running=false;
+            Gdx.app.log("CD-SURFACE-VERIFY",
+                    "READY 4 fitted original sprites: INTACT / SCORCHED / EXPOSED / PENETRATED");
+        }else if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
         else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
             audio.announce(AnnouncerAudio.Cue.WELCOME);}
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
@@ -2821,6 +2835,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
             font.setColor(Color.CYAN);
             font.draw(batch,message,22,208-traffic*24);
             traffic++;
+        }
+        if(verifySurfaceReview){
+            font.setColor(Color.GOLD);
+            String[] labels={"INTACT", "ARMOR SCORED", "EXPOSED METAL", "PENETRATED"};
+            for(int i=0;i<4;i++){
+                Battle.Ship subject=battle.ships().get(i);
+                BattleRenderPoses.Pose shown=renderPoses.ship(subject);
+                float sx=(shown.x()-battleCamera.position.x)/battleCamera.zoom+W*.5f;
+                float sy=(shown.y()-battleCamera.position.y)/battleCamera.zoom+H*.5f;
+                font.draw(batch,labels[i],sx-70,sy+116);
+            }
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
