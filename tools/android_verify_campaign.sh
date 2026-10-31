@@ -151,17 +151,21 @@ for idx in $(seq "$first" "$last"); do
   touch "$current-deployment" 1050 62
   wait_log 'CD-GAME-FLOW.*CAMPAIGN_BATTLE 1 1 ' 20
   wait_log 'CD-CAMPAIGN-RUNTIME.*BATTLE_FRAME mission=1 tick=[1-9][0-9]* ' 35
+  # The first rendered combat frame only proves startup. Require another
+  # telemetry bucket after at least 60 actual simulation ticks so a late
+  # game-thread failure cannot masquerade as a playable campaign.
+  wait_log 'CD-CAMPAIGN-RUNTIME.*BATTLE_FRAME mission=1 tick=([6-9][0-9]|[1-9][0-9]{2,}) ' 60
   capture "$current-real-battle"
   assert_no_crash
-  echo "PASS: Android 10 $faction -> map -> dock -> deployment -> actual drawn combat"
-  if (( idx==0 )); then
-    current="resume-$faction"
-    start_game
-    touch "$current-home" 210 512
-    wait_log "CD-CAMPAIGN-RUNTIME.*MENU_RENDER CAMPAIGN:$faction:1" 20
-    capture "$current-reopened-map"
-    assert_no_crash
-    echo "PASS: Android 10 persisted campaign loads into management interface"
-  fi
+  echo "PASS: Android 10 $faction -> map -> dock -> deployment -> sustained drawn combat (tick>=60)"
+  # Every faction has independent campaign save state. Verify each one
+  # survives a genuine Android process restart, not just TERRAN at index 0.
+  current="resume-$faction"
+  start_game
+  touch "$current-home" 210 512
+  wait_log "CD-CAMPAIGN-RUNTIME.*MENU_RENDER CAMPAIGN:$faction:1" 20
+  capture "$current-reopened-map"
+  assert_no_crash
+  echo "PASS: Android 10 $faction persisted campaign reopens into rendered management"
 done
 echo "PASS: Android 10 campaign + live mission rendering for shard ${first}..${last}; release requires every matrix shard"
