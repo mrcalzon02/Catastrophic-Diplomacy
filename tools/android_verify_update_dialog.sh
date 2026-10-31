@@ -33,7 +33,7 @@ buttons = [n for n in nodes if n.get("class") == "android.widget.Button" and
 if len(buttons) != 1:
     raise SystemExit("FAIL: ambiguous Later button")
 bounds = buttons[0].get("bounds", "")
-match = re.fullmatch(r"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]", bounds)
+match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
 if not match:
     raise SystemExit("FAIL: Later button has invalid bounds")
 x0, y0, x1, y1 = map(int, match.groups())
