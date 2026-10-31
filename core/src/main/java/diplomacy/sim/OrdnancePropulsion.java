@@ -15,7 +15,8 @@ public final class OrdnancePropulsion {
         return switch(doctrine){
             case COLD_LAUNCH -> Mode.COLD_START;
             case HEAVY_STRIKE -> Mode.BOOST_COAST_TERMINAL;
-            case MICRO_SWARM -> Mode.PULSE_BURN;
+            case MICRO_SWARM,CASCADE_SWARM -> Mode.PULSE_BURN;
+            case CLUSTER_CARRIER -> Mode.BOOST_COAST_TERMINAL;
             default -> Mode.CONSTANT_BURN;
         };
     }

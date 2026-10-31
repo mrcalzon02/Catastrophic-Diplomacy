@@ -38,9 +38,12 @@ final class OrdnanceLibrarySprites implements Disposable {
         int start, count;
         if(torpedo){ start=TORPEDO_START;count=TORPEDO_COUNT; }
         else if(payload==OrdnanceDoctrine.Payload.MICRO ||
+                payload==OrdnanceDoctrine.Payload.MICRO_CLUSTER_CARRIER ||
+                payload==OrdnanceDoctrine.Payload.ULTRA_MICRO ||
                 payload==OrdnanceDoctrine.Payload.DECOY){
             start=MICRO_START;count=MICRO_COUNT;
-        } else if(payload==OrdnanceDoctrine.Payload.HEAVY){
+        } else if(payload==OrdnanceDoctrine.Payload.HEAVY ||
+                payload==OrdnanceDoctrine.Payload.CLUSTER_CARRIER){
             start=HEAVY_START;count=HEAVY_COUNT;
         } else {start=STANDARD_START;count=STANDARD_COUNT;}
         long key=visualId*0x9E3779B97F4A7C15L ^ ((long)sourceId*0xBF58476D1CE4E5B9L)

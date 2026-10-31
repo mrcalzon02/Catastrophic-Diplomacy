@@ -261,6 +261,8 @@ public final class Battle {
         public final double guidanceQuality;
         /** Payload kind controls actual warhead/countermeasure effects. */
         public final OrdnanceDoctrine.Payload payload;
+        /** Physical target distance at which this one-generation canister opens. */
+        public final double releaseRange;
         public final AmmunitionTable.Warhead warhead;
         public final boolean decoy;
         /** Cold launches wait before ignition and can be killed by PD while coasting. */
@@ -320,6 +322,7 @@ public final class Battle {
             if(launchPayload==null||ignitionTicks<0||ignitionTicks>90)
                 throw new IllegalArgumentException("Invalid guided payload");
             payload=launchPayload;decoy=launchPayload==OrdnanceDoctrine.Payload.DECOY;
+            releaseRange=OrdnanceSubmunitions.releaseDistance(launchPayload,magnitude);
             AmmunitionTable.warhead(warheadType);warhead=warheadType;
             if(decoy && amount!=0)
                 throw new IllegalArgumentException("Countermeasures are forbidden from damaging ships");
@@ -465,6 +468,7 @@ public final class Battle {
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
+    private static final int MAX_GUIDED_BODIES=12000;
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
     /** Queued physical salvo is owned by one socket, or -1 for legacy fleets. */
@@ -495,6 +499,8 @@ public final class Battle {
     }
     private final List<PendingLaunch> launchQueue=new ArrayList<>();
     public int decoysLaunched,decoysIntercepted,salvosStarted,roundsFiredBySalvos;
+    /** Actual in-flight deployments, not fictitious visual particle counts. */
+    public int carriersSplit,submunitionsDeployed;
     private final List<Craft> crafts = new ArrayList<>();
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
@@ -1487,7 +1493,7 @@ public final class Battle {
                 continue;
             }
             // Bounded deployment protects large fleets from unbounded salvo queues.
-            if(missiles.size()>=12000)continue;
+            if(missiles.size()>=MAX_GUIDED_BODIES)continue;
             int index=order.nextIndex;
             boolean decoy=order.pattern.isDecoy(index);
             ProjectileModel.Spec standard=heavy?source.torpedoProjectile:source.missileProjectile;
@@ -2157,6 +2163,52 @@ public final class Battle {
             case FASTEST_IMPACT -> eta;        // earliest arriving threat
         };
     }
+    /** A live dispenser opens only if it survived point defense. Child bodies
+     * have independent shot IDs, seekers, collisions and remaining fuel. */
+    private void releaseSubmunitions(Missile parent,Ship primary) {
+        int count=OrdnanceSubmunitions.children(parent.payload);
+        if(count==0)return;
+        carriersSplit++;
+        visual(parent.visualId,VisualPhase.TIMEOUT,
+                parent.torpedo?"TORPEDO":"MISSILE",parent.team,parent.sourceId,
+                parent.targetId,parent.x,parent.y,parent.x,parent.y);
+        // A local cluster can fan out across nearby enemy hulls. The assigned
+        // target remains the fallback, so empty space never creates a projectile.
+        List<Ship> candidates=new ArrayList<>();
+        candidates.add(primary);
+        for(Ship ship:ships)if(ship!=primary&&ship.team!=parent.team&&ship.alive()
+                &&StrictMath.hypot(ship.x-primary.x,ship.y-primary.y)<=185)
+            candidates.add(ship);
+        int available=StrictMath.min(count,MAX_GUIDED_BODIES-missiles.size());
+        ProjectileModel.Spec childSpec=OrdnanceSubmunitions.childSpec(parent.spec,parent.payload);
+        OrdnanceDoctrine.Payload type=OrdnanceSubmunitions.childPayload(parent.payload);
+        double heading=StrictMath.atan2(parent.vy,parent.vx);
+        for(int j=0;j<available;j++){
+            Ship target=candidates.get(j%candidates.size());
+            // Physically separated launcher fans: not overlapping render copies.
+            double fan=(j-(count-1)*.5)*(OrdnanceSubmunitions.ultra(parent.payload)?.17:.12);
+            double angle=heading+fan;
+            double dx=StrictMath.cos(angle),dy=StrictMath.sin(angle);
+            double x=parent.x+dx*4,y=parent.y+dy*4;
+            long id=nextVisualShotId++;
+            Missile child=new Missile(id,tick,parent.sourceId,parent.team,target.id,
+                    x,y,dx,dy,OrdnanceSubmunitions.childDamage(parent.damage,parent.payload),
+                    false,childSpec,parent.guidanceQuality,type,0,parent.warhead);
+            child.guidanceMode=parent.guidanceMode;
+            child.approachSide=j%2==0?1:-1;
+            child.setPropulsion(OrdnanceSubmunitions.ultra(parent.payload)
+                    ?OrdnancePropulsion.Mode.PULSE_BURN
+                    :OrdnancePropulsion.Mode.TERMINAL_SPRINT);
+            child.lastKnownX=target.x;child.lastKnownY=target.y;
+            child.lastKnownVX=target.vx;child.lastKnownVY=target.vy;
+            child.fuel=StrictMath.min(child.fuel,StrictMath.max(2,parent.fuel));
+            missiles.add(child);
+            submunitionsDeployed++;
+            visual(id,VisualPhase.FIRE,"MISSILE",parent.team,parent.sourceId,
+                    target.id,x,y,target.x,target.y);
+        }
+    }
+
     private void updateMissiles() {
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
@@ -2294,6 +2346,13 @@ public final class Battle {
             // engine. Heavy strikes boost/coast/restart for terminal attack.
             double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
             m.flightTicks++;
+            if(OrdnanceSubmunitions.carrier(m.payload)&&range<=m.releaseRange){
+                // The parent has not reached the ship: deploying is not a hit.
+                // Children appended here are advanced starting on the NEXT tick.
+                missiles.remove(i);
+                releaseSubmunitions(m,target);
+                continue;
+            }
             m.thrustPhase=OrdnancePropulsion.phase(m.propulsionMode,m.flightTicks,
                     m.ignitionDelayTicks,range,m.torpedo);
             if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
@@ -2600,8 +2659,13 @@ public final class Battle {
         hash=mix(hash,decoysIntercepted);
         hash=mix(hash,salvosStarted);
         hash=mix(hash,roundsFiredBySalvos);
+        hash=mix(hash,carriersSplit);
+        hash=mix(hash,submunitionsDeployed);
         for (Missile m : missiles) {
             hash=mix(hash,m.payload.ordinal());
+            hash=mix(hash,Double.doubleToLongBits(m.releaseRange));
+            hash=mix(hash,Double.doubleToLongBits(m.damage));
+            hash=mix(hash,m.targetId);
             hash=mix(hash,m.warhead.ordinal());
             hash=mix(hash,m.ignitionDelayTicks);
             hash=mix(hash,m.flightTicks);

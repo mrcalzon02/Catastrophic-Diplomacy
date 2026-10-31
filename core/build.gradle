@@ -353,6 +353,14 @@ tasks.register('ordnanceSeekerSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('ordnanceRacksSmoke') { finalizedBy(tasks.named('ordnanceSeekerSmoke')) }
+tasks.register('ordnanceSubmunitionsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Physical in-flight cluster and cascade split, real child collisions, finite ammo, point-defense and replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceSubmunitionsTest'
+    dependsOn testClasses
+}
+tasks.named('ordnanceSeekerSmoke') { finalizedBy(tasks.named('ordnanceSubmunitionsSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
 // The functional release's gameFlowSmoke task is registered later in this file.
 
@@ -415,7 +423,7 @@ tasks.register('gameFlowSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
-// Verify the real seven-mode salvos and physical flight during functional releases.
+// Verify all guided salvos and physical flight during functional releases.
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
 
 tasks.register('screensaverSmoke', JavaExec) {

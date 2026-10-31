@@ -54,6 +54,8 @@ public final class OrdnanceFitting {
             case RIPPLE,COLD_LAUNCH -> 1;
             case SATURATION,HEAVY_STRIKE -> 2;
             case MICRO_SWARM,DECOY_CLOUD -> 3;
+            case CLUSTER_CARRIER -> 4;
+            case CASCADE_SWARM -> 5;
         };
     }
     public static int requiredTier(OrdnancePropulsion.Mode mode){

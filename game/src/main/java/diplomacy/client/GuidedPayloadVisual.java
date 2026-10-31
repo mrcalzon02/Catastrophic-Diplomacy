@@ -35,10 +35,14 @@ final class GuidedPayloadVisual {
         if(payload==null||warhead==null||phase==null||
                 !Double.isFinite(crossSection)||crossSection<=0)
             throw new IllegalArgumentException("Invalid physical guided-body appearance");
-        boolean heavy=torpedo||payload==OrdnanceDoctrine.Payload.HEAVY;
+        boolean heavy=torpedo||payload==OrdnanceDoctrine.Payload.HEAVY
+                ||payload==OrdnanceDoctrine.Payload.CLUSTER_CARRIER;
         // Six independent silhouettes cut from the archived ballistic arsenal.
-        int cell=torpedo?4:payload==OrdnanceDoctrine.Payload.HEAVY?1:
+        int cell=torpedo?4:payload==OrdnanceDoctrine.Payload.HEAVY
+                ||payload==OrdnanceDoctrine.Payload.CLUSTER_CARRIER?1:
                 payload==OrdnanceDoctrine.Payload.MICRO||
+                payload==OrdnanceDoctrine.Payload.MICRO_CLUSTER_CARRIER||
+                payload==OrdnanceDoctrine.Payload.ULTRA_MICRO||
                 payload==OrdnanceDoctrine.Payload.DECOY?3:
                 switch(warhead){
                     case ARMOR_PIERCING -> 2;
@@ -51,6 +55,9 @@ final class GuidedPayloadVisual {
         // Values below are BEFORE the common one-third combat-FX draw scale.
         float size=heavy?1.25f:1f;
         if(payload==OrdnanceDoctrine.Payload.MICRO)size=.43f;
+        if(payload==OrdnanceDoctrine.Payload.MICRO_CLUSTER_CARRIER)size=.55f;
+        if(payload==OrdnanceDoctrine.Payload.ULTRA_MICRO)size=.22f;
+        if(payload==OrdnanceDoctrine.Payload.CLUSTER_CARRIER)size=1.28f;
         if(payload==OrdnanceDoctrine.Payload.DECOY)size=.66f;
         if(payload==OrdnanceDoctrine.Payload.HEAVY)size=1.38f;
         if(payload==OrdnanceDoctrine.Payload.STANDARD&&!torpedo)

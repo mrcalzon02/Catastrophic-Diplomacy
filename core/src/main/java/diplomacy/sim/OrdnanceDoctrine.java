@@ -16,9 +16,9 @@ public final class OrdnanceDoctrine {
     private OrdnanceDoctrine(){}
     public enum Mode {
         SINGLE, RIPPLE, SATURATION, MICRO_SWARM, HEAVY_STRIKE,
-        COLD_LAUNCH, DECOY_CLOUD
+        COLD_LAUNCH, DECOY_CLOUD, CLUSTER_CARRIER, CASCADE_SWARM
     }
-    public enum Payload { STANDARD, MICRO, HEAVY, DECOY }
+    public enum Payload { STANDARD, MICRO, HEAVY, DECOY, CLUSTER_CARRIER, MICRO_CLUSTER_CARRIER, ULTRA_MICRO }
     public record Pattern(Mode mode,int real,int decoys,int intervalTicks,
                           int ignitionDelayTicks,double reloadMultiplier,
                           double damageMultiplier,double velocityMultiplier,
@@ -57,6 +57,14 @@ public final class OrdnanceDoctrine {
         insert(m,new Pattern(Mode.HEAVY_STRIKE,heavy?2:2,0,7,0,3.4,1.45,.78,1.85,1.52,1.55,Payload.HEAVY));
         insert(m,new Pattern(Mode.COLD_LAUNCH,1,0,0,15,1.22,1,1,1,.90,.56,Payload.STANDARD));
         insert(m,new Pattern(Mode.DECOY_CLOUD,1,4,2,0,2.7,1,.94,1,1,1.06,Payload.STANDARD));
+        // The carrier itself has no contact warhead: it opens partway through
+        // flight and releases six independently guided, damageable bodies.
+        insert(m,new Pattern(Mode.CLUSTER_CARRIER,1,0,0,0,2.3,.90,.94,1.4,1.2,1.1,
+                Payload.CLUSTER_CARRIER));
+        // Four small carrier rounds, six ultra-micro seekers in each.
+        // Damage is split across the children, not multiplied by the fan-out.
+        insert(m,new Pattern(Mode.CASCADE_SWARM,4,0,2,0,4.2,.21,1.20,.53,.50,.70,
+                Payload.MICRO_CLUSTER_CARRIER));
         return Map.copyOf(m);
     }
     private static void insert(EnumMap<Mode,Pattern> list,Pattern data){
