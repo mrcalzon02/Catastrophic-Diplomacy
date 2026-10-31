@@ -85,7 +85,8 @@ final class GrittyUiChrome {
         else if(hover&&variant==base)batch.setColor(1f,1f,.88f,1f);
         else batch.setColor(1f,1f,1f,1f);
         float inset=down?2f:0f;
-        tiles[variant].draw(batch,x+inset,y-inset,width-2f*inset,height);
+        tiles[variant].draw(batch,x+inset,y+inset,
+                width-2f*inset,height-2f*inset);
         batch.setPackedColor(color);
     }
 
