@@ -63,7 +63,8 @@ final class MultiplayerPanel implements AutoCloseable {
         root.add(matchRule).colspan(4).left().row();
         row("Fleet file",fleetFile,"Local directory",new Label("shipyard/ (read-only preview)",skin));
         button(root,"Check fleet vs host",this::checkFleet);
-        root.add(new Label("Preview only: no roster submission or ready-up yet",skin)).colspan(3).left().row();
+        button(root,"Submit fleet to host",this::submitFleet);
+        root.add(new Label("Host validates both fleets before spawning; no ready-up yet",skin)).colspan(2).left().row();
         root.add(new ScrollPane(fleetChecks,skin)).height(78).growX().colspan(4).row();
         root.add(new Label("SAVED SERVERS",skin)).colspan(2);root.add(new Label("FRIENDS / NO GLOBAL PRESENCE",skin)).colspan(2).row();
         root.add(new ScrollPane(servers,skin)).height(95).growX().colspan(2);root.add(new ScrollPane(friends,skin)).height(95).growX().colspan(2).row();
@@ -97,19 +98,21 @@ final class MultiplayerPanel implements AutoCloseable {
                     "HOST RULE: Tech 0-"+link.matchRules.maxStage()+" inclusive (authoritative)");
             status.setText(lan?"OPEN_LAN: unencrypted trusted-network session":"Pinned TLS session connected");});}catch(Exception e){Gdx.app.postRunnable(()->{busy=false;status.setText("Connection unavailable (NET-04). No insecure fallback.");});}},"diplomacy-connect");t.setDaemon(true);t.start();
     }
-    /** Read only the existing exported fleet, and apply the exact policy received
-     * from the host to each fitted ship. Never rewrite or submit a blueprint. */
-    private void checkFleet()throws Exception{
-        BattleConnection link=connection;
-        if(link==null||!link.connected()||link.matchRules==null)throw Hbnet.failure();
+    /** A local preview is advisory; the host always revalidates the actual fittings. */
+    private String selectedFleetText()throws Exception{
         String name=fleetFile.getText().trim();
         if(!name.matches("[A-Za-z0-9][A-Za-z0-9 _.-]{0,120}\\.cdfleet"))
             throw new IllegalArgumentException("Select a local .cdfleet filename only");
         var source=Gdx.files.local("shipyard/"+name);
-        if(!source.exists()||source.length()>2_000_000L)
-            throw new IllegalArgumentException("Missing or oversized fleet export");
+        if(!source.exists()||source.length()>120_000L)
+            throw new IllegalArgumentException("Missing or oversized network fleet export (120 KB limit)");
+        return source.readString("UTF-8");
+    }
+    private void checkFleet()throws Exception{
+        BattleConnection link=connection;
+        if(link==null||!link.connected()||link.matchRules==null)throw Hbnet.failure();
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
-        SkirmishFleet fleet=SkirmishFleetCodec.decode(source.readString("UTF-8"),catalog);
+        SkirmishFleet fleet=SkirmishFleetCodec.decode(selectedFleetText(),catalog);
         ArrayList<String> results=new ArrayList<>();int legal=0;
         for(int i=0;i<fleet.size();i++){
             var ship=fleet.ship(i);
@@ -123,7 +126,17 @@ final class MultiplayerPanel implements AutoCloseable {
         }
         fleetChecks.setItems(results.toArray(new String[0]));
         status.setText("Host Tech "+link.matchRules.maxStage()+": "+legal+"/"+fleet.size()+
-                " ships legal. Preview only; fleet not submitted.");
+                " ships legal. Submit to request host validation.");
+    }
+    private void submitFleet()throws Exception{
+        BattleConnection link=connection;
+        if(link==null||!link.connected()||link.matchRules==null)throw Hbnet.failure();
+        String saved=selectedFleetText();
+        TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        SkirmishFleet fleet=SkirmishFleetCodec.decode(saved,catalog);
+        fleet.requireAllowed(link.matchRules,catalog); // early UI feedback; host checks again
+        link.submitFleet(saved);
+        status.setText("Fleet submitted for independent host validation");
     }
     private void order(BattleOrders.PointDefense pd)throws Exception{if(connection==null)throw Hbnet.failure();connection.order(pd,BattleOrders.Position.FREE);}
     void draw(){
@@ -133,6 +146,7 @@ final class MultiplayerPanel implements AutoCloseable {
         Gdx.gl.glClearColor(.015f,.025f,.055f,1);Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);stage.getViewport().update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight(),true);stage.act(Math.min(.05f,Gdx.graphics.getDeltaTime()));stage.draw();
         BattleConnection link=connection;if(link!=null&&!link.connected())matchRule.setText("HOST RULE: disconnected");
         if(link!=null&&link.snapshot()!=null){var s=link.snapshot();status.setText("Authoritative tick "+s.tick()+" / fleet "+link.team+" / ack "+link.acknowledged()+" / "+(link.connected()?"connected":"connection ended"));}
+        else if(link!=null&&link.matchRules!=null)status.setText(link.fleetStatus()+" / "+link.lobbyStatus());
     }
     boolean closed(){return closed;}
     public void close(){if(closed)return;closed=true;if(connection!=null)connection.close();if(secure!=null)secure.clear();Gdx.input.setOnscreenKeyboardVisible(false);Gdx.input.setInputProcessor(previous);stage.dispose();shapes.dispose();skin.get("pixel",Texture.class).dispose();/* shared font belongs to game */back.run();}

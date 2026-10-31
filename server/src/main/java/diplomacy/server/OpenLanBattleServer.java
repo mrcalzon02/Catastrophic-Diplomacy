@@ -15,13 +15,18 @@ import java.nio.charset.StandardCharsets;
 public final class OpenLanBattleServer {
     private OpenLanBattleServer(){}
     public static void main(String[] args)throws Exception{
-        if(args.length>5||args.length==4)
+        if(args.length>5||(args.length==4&&!"lobby".equals(args[2])))
             throw new IllegalArgumentException(
                 "Use [private-bind] [port] [fleet-size], or [private-bind] [port] [match-tech-0..9] [left.cdfleet] [right.cdfleet]");
         String bind=args.length>0?args[0]:"127.0.0.1";
         int port=args.length>1?hbnet.Hbnet.port(args[1]):27817;
         BattleServer server;
-        if(args.length==5&&args[3].endsWith(".cdfleet")&&args[4].endsWith(".cdfleet")){
+        if(args.length==4&&"lobby".equals(args[2])){
+            int ceiling=Integer.parseInt(args[3]);
+            server=BattleServer.openLanLobby(bind,port,2479L,
+                    SkirmishTechnologyRules.unrestricted().withStage(ceiling));
+            System.out.println("HOST LOBBY TECH "+ceiling+"/9; awaiting two fitted .cdfleet submissions.");
+        }else if(args.length==5&&args[3].endsWith(".cdfleet")&&args[4].endsWith(".cdfleet")){
             int ceiling=Integer.parseInt(args[2]);
             SkirmishTechnologyRules match=SkirmishTechnologyRules.unrestricted().withStage(ceiling);
             TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
@@ -56,7 +61,7 @@ public final class OpenLanBattleServer {
             var input=new java.io.BufferedReader(new java.io.InputStreamReader(System.in));
             String line;
             while((line=input.readLine())!=null&&!line.equals("stop")){
-                if(line.equals("status"))System.out.println("Authoritative tick "+server.tick());
+                if(line.equals("status"))System.out.println(server.lobbyWaiting()?"Waiting for two legal fleet submissions":"Authoritative tick "+server.tick());
             }
         }
     }

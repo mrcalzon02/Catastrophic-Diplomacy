@@ -18,3 +18,12 @@ tasks.register('pvpFleetSmoke', JavaExec) {
     mainClass = 'diplomacy.server.PvpFleetTest'
 }
 tasks.named('networkSmoke') { finalizedBy(tasks.named('pvpFleetSmoke')) }
+
+tasks.register('fleetLobbySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Real two-client bounded fleet submission and host authorization.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.server.FleetLobbyTest'
+}
+tasks.named('pvpFleetSmoke') { finalizedBy(tasks.named('fleetLobbySmoke')) }

@@ -22,6 +22,9 @@ public final class BattleConnection implements AutoCloseable {
     private volatile Snapshot snapshot;
     private volatile long acknowledged;
     private volatile boolean connected=true;
+    private volatile String fleetStatus="No fleet submitted",lobbyStatus="Waiting for lobby";
+    public String fleetStatus(){return fleetStatus;}
+    public String lobbyStatus(){return lobbyStatus;}
     public BattleConnection(String address,int port,Hbnet.Client transport,boolean spectate)throws IOException{
         this(transport.connect(address,port),spectate);
     }
@@ -51,9 +54,29 @@ public final class BattleConnection implements AutoCloseable {
     public synchronized long order(BattleOrders.PointDefense pd,BattleOrders.Position position)throws IOException{
         if(team<0||snapshot==null)throw Hbnet.failure();long next=++sequence;Hbnet.write(socket.getOutputStream(),"ORDER|"+next+"|"+snapshot.tick()+"|"+team+"|"+pd+"|"+position);return next;
     }
+    /** Upload a saved .cdfleet over the existing authenticated/pinned-TLS or explicitly
+     * trusted-LAN socket. The host independently decodes every ship and owns team IDs. */
+    public synchronized void submitFleet(String savedFleet)throws IOException{
+        if(!connected||team<0||matchRules==null||snapshot!=null||savedFleet==null)throw Hbnet.failure();
+        byte[] raw=savedFleet.getBytes(StandardCharsets.UTF_8);
+        if(raw.length<1||raw.length>120_000)throw Hbnet.failure();
+        String wire=Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
+        if(wire.length()>160_000)throw Hbnet.failure();
+        int parts=(wire.length()+2799)/2800;
+        fleetStatus="Submitting to host";
+        Hbnet.write(socket.getOutputStream(),"FLEET_BEGIN|"+wire.length()+"|"+parts+"|"+
+                Hbnet.hash(wire.getBytes(StandardCharsets.US_ASCII)));
+        for(int i=0;i<parts;i++)Hbnet.write(socket.getOutputStream(),
+                "FLEET_PART|"+i+"|"+wire.substring(i*2800,Math.min(wire.length(),(i+1)*2800)));
+        Hbnet.write(socket.getOutputStream(),"FLEET_END");
+    }
     private void read(){try{
         while(connected){String[] p=Hbnet.read(socket.getInputStream()).split("\\|",-1);
             if(p[0].equals("ACK")&&p.length==3){acknowledged=Long.parseLong(p[1]);continue;}
+            if(p[0].equals("FLEET_ACCEPT")&&p.length==3){fleetStatus="Accepted by host: "+p[2]+" ships for seat "+p[1];continue;}
+            if(p[0].equals("FLEET_REJECT")&&p.length==2){fleetStatus="Rejected by host: "+p[1];continue;}
+            if(p[0].equals("LOBBY")&&p.length==3){lobbyStatus="Accepted seats "+p[1]+"/"+p[2];continue;}
+            if(p[0].equals("BATTLE_START")&&p.length==2){lobbyStatus="Authoritative battle started";continue;}
             if(!p[0].equals("SNAP"))continue;
             if(p.length!=4)throw Hbnet.failure();long tick=Long.parseLong(p[1]),hash=Long.parseLong(p[2]);int count=Integer.parseInt(p[3]);if(count<0||count>8192)throw Hbnet.failure();
             List<String> body=new ArrayList<>();for(int i=0;i<count;i++){String line=Hbnet.read(socket.getInputStream());if(!(line.startsWith("SHIP|")||line.startsWith("MISSILE|")||line.startsWith("BALLISTIC|")||line.startsWith("CRAFT|")))throw Hbnet.failure();body.add(line);}
