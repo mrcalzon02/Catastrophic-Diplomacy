@@ -251,3 +251,12 @@ tasks.named('fighterVoiceSmoke') { dependsOn tasks.named('radioVoiceProximitySmo
 // Keep narration cue mappings and actual audio event routing under real
 // functional regression coverage on Linux and Windows.
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('audioSmoke') }
+
+tasks.register('capitalTurretSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check fitted turret family sprite indices and exact aim rotation math.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CapitalTurretSpritesTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('capitalTurretSmoke') }

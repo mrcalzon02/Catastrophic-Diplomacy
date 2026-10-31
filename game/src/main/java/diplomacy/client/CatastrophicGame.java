@@ -66,6 +66,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private InstancedShipRenderer instanced;
     private TerranPlaceholderSprites terranSprites;
     private FighterCraftSprites craftSprites;
+    private CapitalTurretSprites capitalTurrets;
     private WeaponBeamSprites weaponBeams;
     private ModularWeaponFxRenderer weaponFx;
     private CombatLightingRenderer lighting;
@@ -209,6 +210,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         audio = new CombatAudio();
         terranSprites = new TerranPlaceholderSprites();
         craftSprites = new FighterCraftSprites();
+        try {
+            capitalTurrets = new CapitalTurretSprites();
+        } catch (RuntimeException unavailable) {
+            // Optional art cannot block combat, launch or updates.
+            Gdx.app.error("CAPITAL-TURRETS","Unable to load turret atlas; using hull art",unavailable);
+            capitalTurrets = null;
+        }
         weaponBeams = new WeaponBeamSprites();
         weaponFx = new ModularWeaponFxRenderer();
         try {
@@ -2595,6 +2603,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view,shieldFx);
         if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses,view);
+        // Hulls and physical hardpoint hardware share the interpolated combat
+        // camera. Weapon discharge is still emitted by authoritative Battle.
+        if(capitalTurrets!=null)
+            capitalTurrets.render(battle,batch,renderPoses,view,battleCamera.zoom);
         if(lighting!=null){
             long beforeLight=System.nanoTime();
             lighting.renderSmoke(battle,batch,battleCamera);
@@ -3038,6 +3050,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced != null) instanced.close();
         if(terranSprites!=null)terranSprites.dispose();
         if(craftSprites!=null)craftSprites.dispose();
+        if(capitalTurrets!=null)capitalTurrets.close();
         if(weaponBeams!=null)weaponBeams.dispose();
         if(weaponFx!=null)weaponFx.dispose();
         if(deathRenderer!=null)deathRenderer.dispose();

@@ -1,0 +1,14 @@
+# Capital-ship turrets (top-down 2D)
+Author-approved 12-cut turret sprite family, as generated in chat on 2026-10-30.
+Real artwork, **not** placeholder hull components.
+
+- **Runtime:** `capital_turrets_atlas.png`, 1024×768 RGBA; 4 columns × 3 rows, 256×256 cells.
+- **Individual sprites:** `sprites/*.png`, same transparent 256×256 pivot-centred cuts.
+- **Rotation:** source barrels face world -Y (down). When aimed at world bearing `atan2(dy,dx)`, draw at `bearingDegrees + 90`. Pivot is (128,128) in each cell.
+- **Placement:** mount at `WeaponMuzzles.Emitter` socket, using the same HullLayouts scale and interpolated ship pose. No fictional hardpoints.
+- **Firing:** the authoritative Battle sim still spawns actual beams, shells, guided munitions and FIRE events from the corresponding physical emitter. Sprite drawing never creates damage or shots.
+- **LOD:** only destroyer-plus capital hulls; skip turret overlay at distant camera zoom, without blocking any build.
+- **Source provenance:** SHA-256 `ca1548e22ba2b87423b31172a0b1c21842273a98445105f2e2d707a964cf21b5`. The original image, slicing script, manifest and all 12 PNGs are preserved in [the Drive source archive](https://drive.google.com/file/d/1ZvwYhruprru2zHzBaIugQZpS3aMDDSwS/view?usp=drivesdk); [individual artwork and atlas folder](https://drive.google.com/drive/folders/1_SuyMD5PLYB5p9fOjbVgTXzKv4BB4K4g).
+- **Asset IDs in row-major order:** `0` heavy_dual_cannon, `1` heavy_triple_cannon, `2` laser_beam, `3` particle_beam, `4` plasma_cannon, `5` flak_battery, `6` point_defense_gatling, `7` missile_pod, `8` torpedo_tubes, `9` railgun_battery, `10` medium_dual_cannon, `11` siege_cannon.
+
+The grayscale armor and restrained emissives are the source colors, not runtime recolors. This file is a static art mapping; it does not modify weapon balance or research.

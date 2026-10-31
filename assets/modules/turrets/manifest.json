@@ -1,0 +1,175 @@
+{
+  "schema": "cd-capital-turrets-v1",
+  "width": 1024,
+  "height": 768,
+  "columns": 4,
+  "rows": 3,
+  "cellSize": 256,
+  "pivot": [
+    128,
+    128
+  ],
+  "sourceFacingDegrees": -90,
+  "rotationOffsetDegrees": 90,
+  "sourceSha256": "ca1548e22ba2b87423b31172a0b1c21842273a98445105f2e2d707a964cf21b5",
+  "atlas": "capital_turrets_atlas.png",
+  "sprites": [
+    {
+      "name": "heavy_dual_cannon",
+      "file": "sprites/heavy_dual_cannon.png",
+      "index": 0,
+      "row": 0,
+      "column": 0,
+      "sourceBBox": [
+        48,
+        27,
+        273,
+        303
+      ]
+    },
+    {
+      "name": "heavy_triple_cannon",
+      "file": "sprites/heavy_triple_cannon.png",
+      "index": 1,
+      "row": 0,
+      "column": 1,
+      "sourceBBox": [
+        400,
+        27,
+        273,
+        301
+      ]
+    },
+    {
+      "name": "laser_beam",
+      "file": "sprites/laser_beam.png",
+      "index": 2,
+      "row": 0,
+      "column": 2,
+      "sourceBBox": [
+        773,
+        11,
+        270,
+        327
+      ]
+    },
+    {
+      "name": "particle_beam",
+      "file": "sprites/particle_beam.png",
+      "index": 3,
+      "row": 0,
+      "column": 3,
+      "sourceBBox": [
+        1134,
+        12,
+        278,
+        326
+      ]
+    },
+    {
+      "name": "plasma_cannon",
+      "file": "sprites/plasma_cannon.png",
+      "index": 4,
+      "row": 1,
+      "column": 0,
+      "sourceBBox": [
+        47,
+        373,
+        271,
+        282
+      ]
+    },
+    {
+      "name": "flak_battery",
+      "file": "sprites/flak_battery.png",
+      "index": 5,
+      "row": 1,
+      "column": 1,
+      "sourceBBox": [
+        388,
+        376,
+        304,
+        261
+      ]
+    },
+    {
+      "name": "point_defense_gatling",
+      "file": "sprites/point_defense_gatling.png",
+      "index": 6,
+      "row": 1,
+      "column": 2,
+      "sourceBBox": [
+        766,
+        389,
+        271,
+        230
+      ]
+    },
+    {
+      "name": "missile_pod",
+      "file": "sprites/missile_pod.png",
+      "index": 7,
+      "row": 1,
+      "column": 3,
+      "sourceBBox": [
+        1126,
+        375,
+        292,
+        271
+      ]
+    },
+    {
+      "name": "torpedo_tubes",
+      "file": "sprites/torpedo_tubes.png",
+      "index": 8,
+      "row": 2,
+      "column": 0,
+      "sourceBBox": [
+        36,
+        710,
+        290,
+        291
+      ]
+    },
+    {
+      "name": "railgun_battery",
+      "file": "sprites/railgun_battery.png",
+      "index": 9,
+      "row": 2,
+      "column": 1,
+      "sourceBBox": [
+        404,
+        677,
+        279,
+        335
+      ]
+    },
+    {
+      "name": "medium_dual_cannon",
+      "file": "sprites/medium_dual_cannon.png",
+      "index": 10,
+      "row": 2,
+      "column": 2,
+      "sourceBBox": [
+        756,
+        712,
+        289,
+        322
+      ]
+    },
+    {
+      "name": "siege_cannon",
+      "file": "sprites/siege_cannon.png",
+      "index": 11,
+      "row": 2,
+      "column": 3,
+      "sourceBBox": [
+        1119,
+        665,
+        297,
+        410
+      ]
+    }
+  ],
+  "sourceArchiveDriveUrl": "https://drive.google.com/file/d/1ZvwYhruprru2zHzBaIugQZpS3aMDDSwS/view?usp=drivesdk"
+}
