@@ -40,6 +40,20 @@ public final class FighterCraftArtBridgeDiagnostic {
             byFaction.put(faction,paths);
         }
         require(allSprites.size()==50,"Expected precisely 50 original specialist craft images");
+        // Specialized flight variants must resolve to their actual authored
+        // recon and heavy-bomber art, not dormant archive entries.
+        require(FighterCraftSprites.operationalRole(
+                diplomacy.sim.FighterModel.Hull.INTERCEPTOR,
+                diplomacy.sim.ShipTacticalDirectives.FighterMission.SCREEN,false)
+                .equals("recon_fighter"),"Screening interceptor must use recon artwork");
+        require(FighterCraftSprites.operationalRole(
+                diplomacy.sim.FighterModel.Hull.TORPEDO_BOMBER,
+                diplomacy.sim.ShipTacticalDirectives.FighterMission.STRIKE,true)
+                .equals("heavy_bomber"),"Dreadnought torpedo flight must use heavy-bomber artwork");
+        require(FighterCraftSprites.operationalRole(
+                diplomacy.sim.FighterModel.Hull.TORPEDO_BOMBER,
+                diplomacy.sim.ShipTacticalDirectives.FighterMission.STRIKE,false)
+                .equals("torpedo_bomber"),"Normal torpedo flight must retain its own artwork");
         require(paletteUses.size()==5,"Expected five original fighter visual families");
         require(byFaction.size()==Battle.Faction.values().length,"Missing playable faction art");
         for(String family:paletteUses.keySet())
