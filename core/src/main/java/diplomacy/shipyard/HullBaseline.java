@@ -26,9 +26,36 @@ public final class HullBaseline {
                     ||!Double.isFinite(powerRegen)||powerRegen<0
                     ||!Double.isFinite(sensorRange)||sensorRange<=0
                     ||!Double.isFinite(radarCrossSection)||radarCrossSection<=0
-                    ||fighterBay<0||fighterBay>12||slots<1)
+                    ||fighterBay<0||fighterBay>32||slots<1)
                 throw new IllegalArgumentException("Invalid physical hull baseline");
         }
+    }
+    /**
+     * Inherent flight decks are physical hull structures, not installed modules.
+     * Ordinary combatants can gain aviation with SUPPORT-slot FTR modules, but
+     * a purpose-built carrier keeps a much larger organic complement.
+     * No new enum ordinals or blueprint records are introduced.
+     */
+    public static int builtInFighterCapacity(Shipyard.Hull hull){
+        return switch(hull){
+            case CARRIER -> 12;
+            case CARRIER_COMMAND -> 14;
+            case CARRIER_LOGISTICS -> 16;
+            case DREADNOUGHT, DREADNOUGHT_SIEGE -> 2;
+            case BATTLECRUISER_TENDER -> 2;
+            case HEAVY_CRUISER_COMMAND, CRUISER_CONTROLLER -> 1;
+            default -> 0;
+        };
+    }
+    /** Independent launch catapults per synchronized sortie cycle. */
+    public static int builtInLaunchBays(Shipyard.Hull hull){
+        return switch(hull){
+            case CARRIER, CARRIER_COMMAND -> 3;
+            case CARRIER_LOGISTICS -> 4;
+            case DREADNOUGHT, DREADNOUGHT_SIEGE, BATTLECRUISER_TENDER,
+                 HEAVY_CRUISER_COMMAND, CRUISER_CONTROLLER -> 1;
+            default -> 0;
+        };
     }
     /** Class core, before civilization-specific structural engineering. */
     public static Stats forHull(Battle.Faction race,Shipyard.Hull hull){
@@ -41,11 +68,11 @@ public final class HullBaseline {
         double regeneration=1.5+hull.massCapacity*0.002;
         double sensors=520+90*hull.mobility;
         double signature=0.2+StrictMath.sqrt(hull.massCapacity/120.0);
-        int builtInFighters=0;
+        int builtInFighters=builtInFighterCapacity(hull);
         switch(hull.spriteHull()){
             case LIGHT_CRUISER,CRUISER,HEAVY_CRUISER -> {shields=8;recharge=0.22;}
             case BATTLECRUISER,DREADNOUGHT -> {shields=15;recharge=0.35;}
-            case CARRIER -> {shields=12;recharge=0.30;builtInFighters=2;}
+            case CARRIER -> {shields=12;recharge=0.30;}
             default -> { }
         }
         // Dedicated torpedo raiders sacrifice even inherited capital-grade shields.
