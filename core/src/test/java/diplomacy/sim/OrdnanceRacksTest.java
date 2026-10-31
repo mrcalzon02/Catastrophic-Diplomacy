@@ -76,7 +76,7 @@ public final class OrdnanceRacksTest {
         Battle world=new Battle(122934L);
         world.spawnWing(0,fitted(catalog),catalog,1,200,300);
         world.spawnWing(1,Shipyard.starter(Battle.Faction.CARNELIAN,
-                Shipyard.Hull.DREADNOUGHT),catalog,1,680,300);
+                Shipyard.Hull.DREADNOUGHT),catalog,1,540,300);
         return world;
     }
     private static void firing(TechnologyCatalog catalog){
