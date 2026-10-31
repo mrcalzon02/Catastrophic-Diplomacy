@@ -36,6 +36,8 @@ final class ModularWeaponFxRenderer implements Disposable {
     private boolean rejectedMissileAtlas;
     private TextureRegion[] curatedKineticBodies;
     private boolean rejectedKineticAtlas;
+    private TextureRegion[] authoredFiringImpacts;
+    private boolean rejectedFiringImpacts;
 
     private Texture texture(String path) {
         Texture cached=textures.get(path);
@@ -53,6 +55,36 @@ final class ModularWeaponFxRenderer implements Disposable {
             return null;
         }
     }
+    /** Authored 64-frame muzzle and impact atlas: four weapon families,
+     * two phases, eight frames each. All cells are source-art cuts. */
+    private TextureRegion[] authoredFiringImpacts(){
+        if(authoredFiringImpacts!=null)return authoredFiringImpacts;
+        if(rejectedFiringImpacts)return null;
+        Texture atlas=texture(WeaponStageArt.CURATED);
+        if(atlas==null)return null;
+        if(atlas.getWidth()!=WeaponStageArt.SIZE||atlas.getHeight()!=WeaponStageArt.SIZE){
+            rejectedFiringImpacts=true;
+            Gdx.app.error("WEAPON-FX","Original firing and impact atlas dimensions invalid");
+            return null;
+        }
+        TextureRegion[] sprites=new TextureRegion[WeaponStageArt.ROWS*WeaponStageArt.COLS];
+        for(int i=0;i<sprites.length;i++)
+            sprites[i]=new TextureRegion(atlas,
+                    (i%WeaponStageArt.COLS)*WeaponStageArt.CELL,
+                    (i/WeaponStageArt.COLS)*WeaponStageArt.CELL,
+                    WeaponStageArt.CELL,WeaponStageArt.CELL);
+        return authoredFiringImpacts=sprites;
+    }
+
+    /** Stage clip indices stay bound to real weapon type and actual hit events. */
+    private TextureRegion authoredStage(Clip clip,long elapsed){
+        int row=WeaponStageArt.row(clip);
+        int frame=clip.frame(elapsed);
+        if(row<0||frame<0||frame>=WeaponStageArt.COLS)return null;
+        TextureRegion[] cells=authoredFiringImpacts();
+        return cells==null?null:cells[row*WeaponStageArt.COLS+frame];
+    }
+
     /** Build six atlas regions once, never once per active projectile. */
     private TextureRegion[] missileBodies(){
         if(curatedMissileBodies!=null)return curatedMissileBodies;
@@ -172,8 +204,10 @@ final class ModularWeaponFxRenderer implements Disposable {
             Battle.VisualEvent event=shot.event();
             if(view!=null&&!view.circle(event.x(),event.y(),
                     Math.max(shot.clip().width(),shot.clip().height())*.5f))continue;
-            Texture image=frame(shot.clip(),battle.tick-event.tick());
-            if(image==null)continue;
+            long elapsed=battle.tick-event.tick();
+            TextureRegion authored=authoredStage(shot.clip(),elapsed);
+            Texture image=authored==null?frame(shot.clip(),elapsed):null;
+            if(authored==null&&image==null)continue;
             float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
                     event.targetY()-event.y(),event.targetX()-event.x()));
             diplomacy.sim.LaserFamilies.Type laser=
@@ -189,7 +223,10 @@ final class ModularWeaponFxRenderer implements Disposable {
                 var tint=CombatLightingRenderer.laserColor(laser);
                 batch.setColor(tint.r,tint.g,tint.b,1);
             }
-            drawCentered(batch,image,(float)event.x(),(float)event.y(),
+            if(authored!=null)
+                drawCentered(batch,authored,(float)event.x(),(float)event.y(),
+                        shot.clip().width()*size,shot.clip().height()*size,angle);
+            else drawCentered(batch,image,(float)event.x(),(float)event.y(),
                     shot.clip().width()*size,shot.clip().height()*size,angle);
             if(laser!=null)batch.setColor(1,1,1,1);
         }
@@ -258,5 +295,6 @@ final class ModularWeaponFxRenderer implements Disposable {
         textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
         curatedMissileBodies=null;rejectedMissileAtlas=false;
         curatedKineticBodies=null;rejectedKineticAtlas=false;
+        authoredFiringImpacts=null;rejectedFiringImpacts=false;
     }
 }
