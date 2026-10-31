@@ -30,6 +30,12 @@ public final class LevelEconomyTest {
         check(LevelEconomy.victoryCredits(10000,20,1,1,true)==29000,"one-ship win 2.9x");
         check(LevelEconomy.victoryCredits(10000,20,1,0,true)==0,"lost one ship means no survivors");
         check(LevelEconomy.victoryCredits(10000,20,10,10,false)==0,"defeat cannot farm credits");
+        check(LevelEconomy.victoryCredits(Long.MAX_VALUE,1,1,1,true)==Long.MAX_VALUE,
+                "max signed 64-bit reward must remain exact");
+        boolean rewardOverflow=false;
+        try{LevelEconomy.victoryCredits(Long.MAX_VALUE,2,1,1,true);}
+        catch(ArithmeticException expected){rewardOverflow=true;}
+        check(rewardOverflow,"reward overflow must not silently wrap credits");
         check(LevelEconomy.victoryCredits(10000,20,16,16,true)==14000,
                 "Raw first-clear formula is unchanged; replay reduction is applied by CampaignProgress");
         for(int stage=1;stage<=9;stage++)
