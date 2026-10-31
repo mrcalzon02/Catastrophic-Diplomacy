@@ -4,8 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
-import diplomacy.shipyard.FactionArt;
-import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
 import java.util.EnumMap;
@@ -15,12 +13,9 @@ import java.util.Map;
 /**
  * Original faction-specific fighter and drone sprite renderer. Never paints
  * colored squares/triangles over a successfully loaded craft sprite.
- * Every alien sprite belongs ONLY to its named civilization. Gameplay
- * archetypes do not imply permission to borrow another faction's graphics.
- * The six founding civilizations use selected silhouettes from their OWN
- * approved ten-hull sprite sheets until individual craft sheets exist.
- * Their craft roles no longer all draw as the same interceptor.
- * No faction substitutes a generic triangle or another civilization's art.
+ * All 11 playable factions use the original 50 purpose-built fighter images.
+ * Founder fleets share their corresponding fighter-art family; no resized
+ * cruiser, destroyer or improvised triangle is ever used for craft.
  */
 public final class FighterCraftSprites implements Disposable {
     private static final String[] ROLES={
@@ -37,48 +32,31 @@ public final class FighterCraftSprites implements Disposable {
             new EnumMap<>(Battle.Faction.class);
 
     /**
-     * Role-appropriate family-owned art for founding civilizations without
-     * purpose-built fighter atlases. These are small-ship silhouettes from
-     * their genuine approved fleets, NOT mislabelled alien fighter assets.
+     * The 50 dedicated, role-specific fighter sprites are the aircraft source
+     * for ALL playable fleets. Founder factions are paired with their established
+     * visual/mechanical counterpart. Terran selects the modular industrial
+     * aircraft family. Never replace a fighter with a cruiser/destroyer hull.
      *
-     * Keep drones/interceptors on actual light silhouettes. Large capital
-     * silhouettes (carrier, dreadnought) must never masquerade as drones.
+     * This is a graphics selection only; it does not alter faction mechanics,
+     * fitted hangars, or the aircraft's weapons and movement.
      */
-    static Shipyard.Hull originalHullForCraftRole(String role) {
-        return switch(role) {
-            case "interceptor", "recon_fighter", "support_drone" -> Shipyard.Hull.INTERCEPTOR;
-            case "superiority_fighter", "point_defense_fighter" -> Shipyard.Hull.CORVETTE;
-            case "assault_gunship" -> Shipyard.Hull.FRIGATE;
-            case "missile_fighter" -> Shipyard.Hull.MISSILE_CORVETTE;
-            case "torpedo_bomber" -> Shipyard.Hull.DESTROYER;
-            case "heavy_bomber" -> Shipyard.Hull.HEAVY_CRUISER;
-            case "electronic_warfare" -> Shipyard.Hull.LIGHT_CRUISER;
-            default -> throw new IllegalArgumentException("Unknown fighter/drone role: "+role);
+    static String fighterArtFamily(Battle.Faction faction) {
+        if(faction==null)throw new IllegalArgumentException("Fighter faction required");
+        return switch(faction) {
+            case DRAXIAN, VAERITH_PRISM -> "vaerith_prism";
+            case UZIPT, ZELTHAR_LUMINARI -> "zelthar_luminari";
+            case MANDRALLY, AUREATE_SYNOD -> "aureate_synod";
+            case CARNELIAN, NYX_BIOLITH -> "nyx_biolith";
+            case ZIPPLEDROW, UMBRA_FOUNDRY, TERRAN -> "umbra_foundry";
         };
     }
-    /** Stable original-art path used in both APK assets and desktop JAR. */
+    /** Authored craft image, not a generic mesh or downsized capital ship. */
     public static String spritePath(Battle.Faction faction,String role) {
         if(faction==null||role==null)throw new IllegalArgumentException("Craft identity required");
-        String chosen=null;
-        for(String candidate:ROLES)if(candidate.equals(role)){chosen=role;break;}
-        if(chosen==null)throw new IllegalArgumentException("Unapproved fighter role: "+role);
-        Shipyard.Hull sibling=originalHullForCraftRole(role);
-        if(faction==Battle.Faction.TERRAN)
-            return "ships/terran/"+switch(sibling) {
-                case INTERCEPTOR -> "interceptor";
-                case CORVETTE -> "corvette";
-                case MISSILE_CORVETTE -> "missile_corvette";
-                case FRIGATE -> "frigate";
-                case DESTROYER -> "destroyer";
-                case LIGHT_CRUISER -> "light_cruiser";
-                case HEAVY_CRUISER -> "heavy_cruiser";
-                default -> throw new IllegalStateException("No approved small craft silhouette: "+sibling);
-            }+".png";
-        if(FactionArt.hasLegacyArt(faction))
-            return FactionArt.runtimePath(faction,sibling);
-        FactionArt.Entry art=FactionArt.visualArt(faction);
-        if(art==null)throw new IllegalStateException("No approved fighter art family: "+faction);
-        return "ships/fighters/"+art.id()+"/"+chosen+".png";
+        boolean supported=false;
+        for(String candidate:ROLES)if(candidate.equals(role)){supported=true;break;}
+        if(!supported)throw new IllegalArgumentException("Unapproved fighter role: "+role);
+        return "ships/fighters/"+fighterArtFamily(faction)+"/"+role+".png";
     }
     /** Distinguish six real fighter fittings and independently launched support drones. */
     public static String role(Battle.Craft craft) {
@@ -111,13 +89,11 @@ public final class FighterCraftSprites implements Disposable {
             }
             palettes.put(faction,palette);
         }
-        // Seven distinct original-hull silhouettes for each of six founding
-        // factions, plus 50 specialized fighters for the five newer factions.
-        // Sprite sharing between multiple roles is intentional and verified.
-        if(originals.size()!=92)
+        // Ten dedicated craft per palette; some factions use the same source
+        // palette. All fifty are shared once in GPU memory, not reloaded.
+        if(originals.size()!=50)
             throw new IllegalStateException(
-                    "Expected 42 faction-owned founding sprites plus 50 specialist fighters: "+
-                    originals.size());
+                    "All 50 authored fighter/drone sprites must load: "+originals.size());
     }
     public int loaded() { return originals.size(); }
     public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
