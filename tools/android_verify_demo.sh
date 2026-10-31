@@ -88,7 +88,7 @@ if len(success) != 1:
 receipt = success[0]
 values = {}
 for key in ("tick", "frames", "renderCpuAvgMs", "renderCpuWorstMs", "avgDraws", "avgMatBinds", "spriteShips"):
-    matches = re.findall(r"(?:^|\\s)" + key + r"=([0-9]+(?:\\.[0-9]+)?)", receipt)
+    matches = re.findall(r"(?:^|[ ])" + key + r"=([0-9]+(?:[.][0-9]+)?)", receipt)
     if len(matches) != 1:
         raise SystemExit(f"FAIL: missing or ambiguous real telemetry field {key}")
     values[key] = float(matches[0])
@@ -103,7 +103,7 @@ values["interpretation"] = "render-thread CPU time only; excludes GPU, frame sch
 values["target_frame_budget_ms"] = 1000 / 30
 values["performance_status"] = ("ABOVE_30_FPS_CPU_BUDGET" if avg > 1000 / 30
                                 else "WITHIN_30_FPS_CPU_BUDGET_NOT_FPS_CERTIFIED")
-pathlib.Path(sys.argv[2]).write_text(json.dumps(values, indent=2, sort_keys=True) + "\\n")
+pathlib.Path(sys.argv[2]).write_text(json.dumps(values, indent=2, sort_keys=True) + chr(10))
 print(f"PERFORMANCE DIAGNOSTIC: CPU render avg={avg:.1f} ms, worst={values['renderCpuWorstMs']:.1f} ms; "
       f"{values['frames']:.0f} rendered frames, {values['tick']:.0f} simulation ticks.")
 if avg > 1000 / 30:
