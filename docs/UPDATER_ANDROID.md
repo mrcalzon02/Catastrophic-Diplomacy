@@ -26,7 +26,7 @@ The `main` channel uses GitHub-signed-infrastructure HTTPS releases and **Androi
 }
 ```
 
-A manifest, when supplied, must describe the **already signed** APK. The updater pages through all visible published releases (up to 2,000 entries; exceeding the scan limit is an explicit error, never a false 'no update'). It lists every safe Android APK candidate, including prerelease and nonstandard tags, for selection. When metadata is missing, it checks the APK's real code and signature after download, *before* requesting installation. Source version `0.1.1`/code 2 is not a published update; the next installable APK must have a higher versionCode than the installed copy.
+A manifest, when supplied, must describe the **already signed** APK. The updater pages through all visible published releases (up to 2,000 entries; exceeding the scan limit is an explicit error, never a false 'no update'). It selects the most recently **published** release that contains a valid APK asset, including prerelease and nonstandard tags. Following the established ReverieVR interaction, manual checks show one **Update / Later / View release** dialog, not a long list of every historic APK. Only the selected release's optional manifest is downloaded during discovery. If a valid manifest reports a build code not higher than the installed code, the result is **Already up to date**. When metadata is absent or inconsistent, the actual APK code and signer are inspected after an approved download, *before* requesting installation. Source version `0.1.1`/code 2 is not a published update; the next installable APK must have a higher versionCode than the installed copy.
 
 ## Network and security guarantees
 
