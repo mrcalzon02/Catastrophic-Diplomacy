@@ -7,7 +7,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.HexFormat;
 
 /** Portable fleet blueprint collection, independent of the challenge's tech
  * cap. A Tech II fleet may enter Tech II, III, IV, V or VI matches. The host
@@ -25,7 +24,7 @@ public final class SkirmishFleetCodec {
     }
     private static String hash(String value){
         try{
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            return HexCodec.hex(MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(StandardCharsets.UTF_8)));
         }catch(NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
     }

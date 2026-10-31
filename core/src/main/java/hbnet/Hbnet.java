@@ -25,9 +25,18 @@ public final class Hbnet {
     private static final Base64.Encoder B64=Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder UN64=Base64.getUrlDecoder();
     public static IOException failure(){return new IOException("Connection unavailable (NET-04)");}
-    public static String hash(byte[] data){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));}catch(GeneralSecurityException e){throw new IllegalStateException(e);}}
+    /** Preserve the exact lowercase hex wire format on Android 10/26+. */
+    private static String hex(byte[] raw){
+        StringBuilder out=new StringBuilder(raw.length*2);
+        for(byte v:raw){
+            out.append(Character.forDigit((v>>>4)&15,16));
+            out.append(Character.forDigit(v&15,16));
+        }
+        return out.toString();
+    }
+    public static String hash(byte[] data){try{return hex(MessageDigest.getInstance("SHA-256").digest(data));}catch(GeneralSecurityException e){throw new IllegalStateException(e);}}
     public static byte[] random(int size){byte[] b=new byte[size];RANDOM.nextBytes(b);return b;}
-    public static String roomKey(){return HexFormat.of().formatHex(random(20));}
+    public static String roomKey(){return hex(random(20));}
     public static void password(char[] value){
         if(value==null||value.length<12||value.length>128)throw new IllegalArgumentException("Password must contain 12 to 128 printable ASCII characters");
         for(char c:value)if(c<32||c>126)throw new IllegalArgumentException("Password must contain printable ASCII only");

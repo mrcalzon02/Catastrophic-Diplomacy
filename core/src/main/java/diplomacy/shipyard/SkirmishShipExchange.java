@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
-import java.util.HexFormat;
 
 /** Portable, integrity-checked skirmish ship plus its challenge restrictions.
  * Not a signature or proof of trusted server authorization. */
@@ -15,7 +14,7 @@ public final class SkirmishShipExchange {
     public record Package(Shipyard.Design design,SkirmishTechnologyRules rules){}
     private static String digest(String text){
         try{
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            return HexCodec.hex(MessageDigest.getInstance("SHA-256")
                     .digest(text.getBytes(StandardCharsets.UTF_8)));
         }catch(NoSuchAlgorithmException impossible){
             throw new IllegalStateException("SHA-256 required",impossible);
