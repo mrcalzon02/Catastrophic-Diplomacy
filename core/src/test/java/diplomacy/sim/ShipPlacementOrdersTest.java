@@ -68,7 +68,7 @@ public final class ShipPlacementOrdersTest {
                 .appendOrder(0,ShipCommandQueue.Command.move(315,250))
                 .appendOrder(0,ShipCommandQueue.Command.engage(5))
                 .appendOrder(1,ShipCommandQueue.Command.hold(900));
-        CampaignEncounter encounter=CampaignEncounter.start(1,configured,ally,enemy,catalog);
+        CampaignEncounter encounter=CampaignEncounter.start(25,configured,ally,enemy,catalog);
         Battle battle=encounter.battle();
         Battle.Ship lead=battle.ships().get(0),wing=battle.ships().get(1);
         ok(lead.x==250&&lead.y==250&&lead.commandQueue.total()==4,

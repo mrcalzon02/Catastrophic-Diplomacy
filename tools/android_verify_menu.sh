@@ -209,23 +209,23 @@ assert_step 'CAMPAIGN_MAP 1'
 touch_ui campaign-map 1080 60
 sleep 2
 capture campaign-dock
-assert_step 'CAMPAIGN_DOCK owned=4 active=4 reserve=0'
-# A new campaign starts with four real owned, active corvettes and zero credits.
+assert_step 'CAMPAIGN_DOCK owned=1 active=1 reserve=0'
+# A new campaign starts with one real owned, active corvette and zero credits.
 # Enter deployment through the dock's real DEPLOY ACTIVE FLEET control.
 touch_ui campaign-dock 1100 60
 sleep 2
 capture campaign-deployment
 assert_step 'DEPLOYMENT 1'
-# Switch the genuine four-ship roster from battle line to attack wedge.
-# A fifth ship costs credits and cannot be silently spawned in a new campaign.
+# Switch the genuine one-ship deployment from battle line to attack wedge.
+# A second ship costs credits and cannot be silently spawned in a new campaign.
 touch_ui campaign-deployment 1145 345
 sleep 1
 capture campaign-deployment-configured
 touch_ui campaign-deployment-configured 1050 62
 sleep 5
 capture campaign-battle
-assert_step 'CAMPAIGN_BATTLE 1 4 WEDGE'
-echo "PASS: signed APK real skirmish hull drag + five persistent standing-order policies, and campaign four-owned-ship wedge -> multiwave combat."
+assert_step 'CAMPAIGN_BATTLE 1 1 WEDGE'
+echo "PASS: signed APK real skirmish hull drag + five persistent standing-order policies, and campaign single-owned-ship wedge -> multiwave combat."
 
 # Independent signed-APK screensaver acceptance: single taps and drags must
 # never eject the spectator, but double-tapping must reveal actual usable HUD.

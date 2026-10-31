@@ -85,9 +85,9 @@ public final class ShipStandingOrdersTest {
                 "Per-vessel standing order independence failed");
         check(deployment.withFormation(1).standingFor(1).equals(attack),
                 "Changing layout erased the standing orders");
-        check(deployment.withShips(-1,LevelEconomy.level(1)).standings().containsKey(1),
+        check(deployment.withShips(-1,LevelEconomy.level(25)).standings().containsKey(1),
                 "Ship count reduction erased a commissioned hull doctrine");
-        check(!deployment.withShips(-2,LevelEconomy.level(1)).standings().containsKey(1),
+        check(!deployment.withShips(-2,LevelEconomy.level(25)).standings().containsKey(1),
                 "Doctrine for a removed hull remained active");
         var restored=deployment.withStandingProfiles(
                 decoded.policies().entrySet().stream().collect(
@@ -101,7 +101,7 @@ public final class ShipStandingOrdersTest {
                 ScenarioCatalog.Preset.DUEL,Battle.Faction.TERRAN,true,tech);
         Shipyard.Design hostile=ScenarioCatalog.defaultDesign(
                 ScenarioCatalog.Preset.DUEL,Battle.Faction.DRAXIAN,false,tech);
-        CampaignEncounter encounter=CampaignEncounter.start(1,deployment,friendly,hostile,tech);
+        CampaignEncounter encounter=CampaignEncounter.start(25,deployment,friendly,hostile,tech);
         Battle battle=encounter.battle();
         var a=battle.ships().get(0);
         var b=battle.ships().get(1);
@@ -138,7 +138,7 @@ public final class ShipStandingOrdersTest {
         check(battle.tick==1,"Standing doctrines prevented live combat tick");
         var connected=new CampaignDeployment.Loadout(6,CampaignDeployment.Formation.LINE)
                 .withStanding(0,advanced);
-        CampaignEncounter linked=CampaignEncounter.start(1,connected,friendly,hostile,tech);
+        CampaignEncounter linked=CampaignEncounter.start(50,connected,friendly,hostile,tech);
         Battle.Ship captain=linked.battle().ships().get(0);
         check(captain.escortShipId==linked.battle().ships().get(1).id,
                 "Escort deployment slot did not resolve to physical ship ID");

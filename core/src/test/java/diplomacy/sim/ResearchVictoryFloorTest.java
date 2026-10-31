@@ -30,7 +30,7 @@ public final class ResearchVictoryFloorTest {
                     require(started.researchRank()==rank&&started.researchActive(),
                             "Timed technology finished without a successful mission");
                     for(int turn=1;turn<=expected;turn++){
-                        started=started.complete(1,20,20);
+                        started=started.complete(1,1,1);
                         require(started.researchRank()==(turn==expected?rank+1:rank),
                                 "Technology unlocked on wrong mission turn");
                     }
@@ -49,7 +49,7 @@ public final class ResearchVictoryFloorTest {
             require(started.missionsUntilResearchComplete()==expected,
                     "Paid lab quote and project differ");
             for(int turn=0;turn<expected;turn++)
-                started=started.complete(1,20,20);
+                started=started.complete(1,1,1);
             require(started.speedUpgrades()==bonus+1&&!started.researchActive(),
                     "Laboratory accelerator not completed after purchased mission time");
         }

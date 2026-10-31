@@ -32,7 +32,7 @@ public final class ShipTacticalDirectivesTest {
         var active=new CampaignDeployment.Loadout(6,CampaignDeployment.Formation.LINE)
                 .withStanding(0,policy.adjust(13,-4).adjust(17,1,0,6)
                         .adjust(21,1,0,6));
-        var encounter=CampaignEncounter.start(1,active,ally,foe,tech);
+        var encounter=CampaignEncounter.start(50,active,ally,foe,tech);
         var battle=encounter.battle();
         var ship=battle.ships().get(0);
         ok(ship.defendedShipIds.equals(List.of(battle.ships().get(1).id)),

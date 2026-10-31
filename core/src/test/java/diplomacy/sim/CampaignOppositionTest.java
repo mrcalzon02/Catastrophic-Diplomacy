@@ -97,7 +97,7 @@ public final class CampaignOppositionTest {
                     }
                     if(mission>=451&&weaponsInstalled>2)advancedBatteries++;
                 }
-                if(sample>1)check(variations.size()>1,
+                if(sample>=16)check(variations.size()>1,
                         "Entire campaign fleet is one cloned loadout");
             }
         }

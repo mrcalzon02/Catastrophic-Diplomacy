@@ -69,7 +69,7 @@ public final class BattleRetreatTest {
                 Battle.Faction.TERRAN,true,catalog);
         Shipyard.Design enemy=ScenarioCatalog.defaultDesign(ScenarioCatalog.Preset.DUEL,
                 Battle.Faction.DRAXIAN,false,catalog);
-        CampaignEncounter encounter=CampaignEncounter.start(1,
+        CampaignEncounter encounter=CampaignEncounter.start(10,
                 new CampaignDeployment.Loadout(2,CampaignDeployment.Formation.LINE)
                         .withPlacement(0,80,320).withStanding(0,hullPolicy(.8)),
                 ally,enemy,catalog);
@@ -86,8 +86,8 @@ public final class BattleRetreatTest {
                     CampaignEncounter.Advance.VICTORY:CampaignEncounter.Advance.NEXT_WAVE),
                     "An escaped ally broke sequential campaign wave victory rules");
         }
-        ok(LevelEconomy.victoryCredits(LevelEconomy.level(1),2,combat.alive(0),true)
-                <LevelEconomy.victoryCredits(LevelEconomy.level(1),2,2,true),
+        ok(LevelEconomy.victoryCredits(LevelEconomy.level(10),2,combat.alive(0),true)
+                <LevelEconomy.victoryCredits(LevelEconomy.level(10),2,2,true),
                 "Evacuated hull incorrectly received survivor credit");
 
         // If the last active captain is only still INSIDE the field while
