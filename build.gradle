@@ -199,6 +199,87 @@ tasks.register('prepareModularWeaponFx') {
  * Cosmetic art is never a release blocker: if the optional VFX pack is absent
  * or invalid, leave staging empty and retain the 35 original beam-strip fallback.
  */
+/**
+ * User-created original missile art, separated into 40 thrusterless bodies and
+ * 240 six-frame plume cells. Exact transfer ZIP is committed in seven slices.
+ * Cosmetic corruption never blocks launching the game: the existing source
+ * missile atlas remains the fallback when this optional pack fails verification.
+ */
+def missileFxParts=(0..<7).collect {
+    file('asset_packs/missile-engine/part-'+String.format('%02d',it)+'.b64')
+}
+def missileFxOutput=layout.buildDirectory.dir('generated/cd-missile-engine')
+tasks.register('prepareMissileEngineArt') {
+    group='assets'
+    description='Restore original body-only guided projectile sprites and animated exhaust atlases.'
+    inputs.files missileFxParts
+    outputs.dir missileFxOutput
+    doLast {
+        def target=missileFxOutput.get().asFile
+        project.delete(target)
+        target.mkdirs()
+        try {
+            def encoded=new StringBuilder(3047256)
+            missileFxParts.eachWithIndex { part,i ->
+                if(!part.isFile())throw new IllegalArgumentException('Missing missile FX archive part')
+                String txt=part.getText('US-ASCII').trim()
+                if(txt.length()!=(i==6?347256:450000) ||
+                        !(txt ==~ /[A-Za-z0-9+\/=]+/))
+                    throw new IllegalArgumentException('Invalid missile FX part '+part.name)
+                encoded.append(txt)
+            }
+            byte[] zipBytes=java.util.Base64.decoder.decode(encoded.toString())
+            def sha={ byte[] data -> java.security.MessageDigest.getInstance('SHA-256')
+                    .digest(data).encodeHex().toString() }
+            if(zipBytes.length!=2285440 || sha(zipBytes)!=
+                    'f6fe6e49a0a3cf5adc94d20cc3bf58f43f856484d1b0d0192db96c180327b959')
+                throw new IllegalArgumentException('Missile FX ZIP differs from source-verified art')
+            def expected=[
+                'effects/ordnance/library/missile_bodies.png',
+                'effects/ordnance/library/missile_plumes.png',
+                'effects/ordnance/library/missile_manifest.json'
+            ] as Set
+            def found=[:] 
+            new java.util.zip.ZipInputStream(
+                    new java.io.ByteArrayInputStream(zipBytes)).withCloseable { stream ->
+                java.util.zip.ZipEntry entry
+                while((entry=stream.getNextEntry())!=null){
+                    if(!expected.contains(entry.name) || found.containsKey(entry.name))
+                        throw new IllegalArgumentException('Unknown/duplicate missile FX entry')
+                    found[entry.name]=stream.readAllBytes()
+                    stream.closeEntry()
+                }
+            }
+            if((found.keySet() as Set)!=expected)
+                throw new IllegalArgumentException('Incomplete missile FX atlas inventory')
+            def manifest=new groovy.json.JsonSlurper().parseText(
+                    new String(found['effects/ordnance/library/missile_manifest.json'],
+                            java.nio.charset.StandardCharsets.UTF_8))
+            if(manifest.schema!='cd-ordnance-separated-v1' || manifest.count!=40 ||
+                    manifest.plume_frames!=6 || manifest.variants.size()!=40)
+                throw new IllegalArgumentException('Unexpected missile FX source manifest')
+            def bodies=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(
+                    found['effects/ordnance/library/missile_bodies.png']))
+            def exhaust=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(
+                    found['effects/ordnance/library/missile_plumes.png']))
+            if(bodies==null||bodies.width!=2048||bodies.height!=640||
+                    exhaust==null||exhaust.width!=1536||exhaust.height!=1920)
+                throw new IllegalArgumentException('Unexpected missile FX atlas dimensions')
+            found.each { name,bytes ->
+                def dest=new File(target,name)
+                dest.parentFile.mkdirs()
+                dest.bytes=bytes
+            }
+            println('PASS: 40 source-derived missile bodies + 240 plume animation cells staged.')
+        }catch(Exception unavailable){
+            project.delete(target)
+            target.mkdirs()
+            logger.warn('MISSILE-FX DIAGNOSTIC: '+unavailable.message+
+                    ' — using existing authored projectile atlas.')
+        }
+    }
+}
+
 def laserRun01Parts=(0..<17).collect {
     file('asset_packs/laser-run01/part-' + String.format('%02d',it) + '.b64')
 }
