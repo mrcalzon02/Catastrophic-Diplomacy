@@ -25,14 +25,20 @@ final class ShipArmorStamps {
         // Multi-lobed, stable metal tearing, not a uniform grey disc.
         int hash=shipId*0x9e3779b9+row*0x7f4a7c15+col*0x6c8e9cf5;
         hash^=hash>>>16;
-        float phase=(hash&0xffff)*(float)(2*StrictMath.PI/65536.0);
-        float angle=(float)StrictMath.atan2(dy,dx);
-        float teeth=(float)(.13*StrictMath.sin(5*angle+phase)
-                        +.065*StrictMath.sin(9*angle-phase*.73)
-                        +.05*StrictMath.cos(3*angle+phase*.43));
+        // A bounded asymmetric combination of second/third radial harmonics.
+        // No trig per pixel: damage-mask uploads must stay cheap in 400-ship
+        // battles even as multiple plates change at once.
+        float distance=(float)StrictMath.sqrt(dx*dx+dy*dy);
+        float nx=dx/Math.max(.0001f,distance);
+        float ny=dy/Math.max(.0001f,distance);
+        float a=((hash&255)/255f-.5f)*.28f;
+        float b=(((hash>>>8)&255)/255f-.5f)*.22f;
+        float c=(((hash>>>16)&255)/255f-.5f)*.16f;
+        float d=(((hash>>>24)&255)/255f-.5f)*.16f;
+        float teeth=a*(nx*nx-ny*ny)+b*(2*nx*ny)
+                +c*nx*(nx*nx-3*ny*ny)+d*ny*(3*nx*nx-ny*ny);
         float radius=(.12f+.50f*peeled+.20f*puncture)
-                *Math.max(.72f,Math.min(1.23f,1f+teeth));
-        float distance=(float)StrictMath.hypot(dx,dy);
+                *Math.max(.76f,Math.min(1.24f,1f+teeth));
         float edge=clamp((radius-distance)/.095f);
         // Deeply eroded/stripped cells have a truly transparent center.
         // Bypass damage can expose some structure before armor reaches zero.

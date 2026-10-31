@@ -292,16 +292,15 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         return result;
     }
-    private static float cellDamage(Battle.Ship ship,int row,int col,boolean internal) {
+    private static float cellDamage(float[][] values,int row,int col) {
         if(row<0||col<0||row>=GRID||col>=GRID)return 0;
-        var tile=ship.defense.tile(row,col);
-        return !tile.occupied?0:(float)(internal?tile.internalDamage():tile.exposure());
+        return values[row][col];
     }
-    private static float surfaceDamage(Battle.Ship ship,double row,double col,boolean internal) {
+    private static float surfaceDamage(float[][] values,double row,double col) {
         int r=(int)StrictMath.floor(row),c=(int)StrictMath.floor(col);
         float dy=(float)(row-r),dx=(float)(col-c);
-        float first=cellDamage(ship,r,c,internal)*(1-dx)+cellDamage(ship,r,c+1,internal)*dx;
-        float second=cellDamage(ship,r+1,c,internal)*(1-dx)+cellDamage(ship,r+1,c+1,internal)*dx;
+        float first=cellDamage(values,r,c)*(1-dx)+cellDamage(values,r,c+1)*dx;
+        float second=cellDamage(values,r+1,c)*(1-dx)+cellDamage(values,r+1,c+1)*dx;
         return first*(1-dy)+second*dy;
     }
     private static float noise(int x,int y,int salt) {
@@ -321,6 +320,16 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(item.original==original && item.overlay!=null && item.signature==signature)
             return item.overlay;
         Pixmap source=sourcePixels(original);
+        // Snapshot only 256 actual protection cells once per changed vessel.
+        // Avoid dereferencing defenses and recomputing integrity for every
+        // mask pixel (and all 9 neighboring tiles) in mass engagements.
+        float[][] wear=new float[GRID][GRID],internal=new float[GRID][GRID];
+        for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++){
+            var tile=ship.defense.tile(r,c);
+            if(!tile.occupied)continue;
+            wear[r][c]=(float)tile.exposure();
+            internal[r][c]=(float)tile.internalDamage();
+        }
         Pixmap output=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
         output.setBlending(Pixmap.Blending.None);
         try {
@@ -333,17 +342,16 @@ public final class TerranPlaceholderSprites implements Disposable {
                 double tileCol=(x+0.5)*GRID/MASK_W-0.5;
                 // Wear darkens source plating; only localized physically
                 // damaged cells cut alpha. Neighbor lookups catch crater lips.
-                float damage=surfaceDamage(ship,tileRow,tileCol,false);
+                float damage=surfaceDamage(wear,tileRow,tileCol);
                 float crater=0f;
                 int centerR=(int)StrictMath.floor(tileRow+.5);
                 int centerC=(int)StrictMath.floor(tileCol+.5);
                 for(int r=Math.max(0,centerR-1);r<=Math.min(GRID-1,centerR+1);r++)
                     for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
-                        var tile=ship.defense.tile(r,c);
-                        if(!tile.occupied)continue;
+                        if(wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
                         crater=Math.max(crater,ShipArmorStamps.openingAt(
                                 (float)tileRow,(float)tileCol,r,c,
-                                (float)tile.exposure(),(float)tile.internalDamage(),ship.id));
+                                wear[r][c],internal[r][c],ship.id));
                     }
                 float rough=noise(x/4,y/4,ship.id)*0.70f+
                         noise(x,y,ship.id*31)*0.30f;
