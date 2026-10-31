@@ -58,7 +58,7 @@ public final class CampaignFleet {
     }
     public record Vessel(long id,String name,Shipyard.Design fitting,boolean deployed,Stores stores) {
         public Vessel {
-            if(!VesselIdentifiers.valid(id)||name==null||name.isBlank()||
+            if(!VesselIdentifiers.valid(id)||name==null||name.trim().isEmpty()||
                     name.length()>70||fitting==null||stores==null)
                 throw new IllegalArgumentException("Invalid commissioned ship");
         }
@@ -74,7 +74,7 @@ public final class CampaignFleet {
         public Readiness {
             if(vessel==null||deficits==null||deficits.isEmpty())
                 throw new IllegalArgumentException("Readiness requires a damaged or depleted vessel");
-            deficits=List.copyOf(deficits);
+            deficits=java.util.Collections.unmodifiableList(new java.util.ArrayList<>(deficits));
         }
     }
     public record SquadronProfile(FleetNames.Style naming,CrewChatter.Tone radio){
@@ -103,7 +103,7 @@ public final class CampaignFleet {
                     nextSerial>VesselIdentifiers.MAX_SERIAL+1||ships==null||ships.size()>200||
                     squadronAssignments==null||squadronProfiles==null)
                 throw new IllegalArgumentException("Invalid fleet roster");
-            ships=List.copyOf(ships);
+            ships=java.util.Collections.unmodifiableList(new java.util.ArrayList<>(ships));
             HashSet<Long> ids=new HashSet<>();
             HashSet<String> names=new HashSet<>();
             for(Vessel v:ships)
@@ -123,8 +123,8 @@ public final class CampaignFleet {
                 if(entry.getKey()==null||entry.getKey()<1||
                         entry.getKey()>=SQUADRON_COUNT||entry.getValue()==null)
                     throw new IllegalArgumentException("Invalid squadron profile");
-            squadronAssignments=Map.copyOf(squadronAssignments);
-            squadronProfiles=Map.copyOf(squadronProfiles);
+            squadronAssignments=java.util.Collections.unmodifiableMap(new java.util.HashMap<>(squadronAssignments));
+            squadronProfiles=java.util.Collections.unmodifiableMap(new java.util.HashMap<>(squadronProfiles));
         }
         public int squadronOf(long id){
             get(id);
@@ -456,7 +456,7 @@ public final class CampaignFleet {
             ArrayList<Service> needed=new ArrayList<>();
             for(Service service:Service.values())
                 if(cost(id,service,technology)>0)needed.add(service);
-            return List.copyOf(needed);
+            return java.util.Collections.unmodifiableList(new java.util.ArrayList<>(needed));
         }
         /** An advisory, not a blocking gate: captains may risk damaged ships. */
         public List<Readiness> activeServiceWarnings(TechnologyCatalog technology){
@@ -465,7 +465,7 @@ public final class CampaignFleet {
                 List<Service> deficits=requiredServices(vessel.id(),technology);
                 if(!deficits.isEmpty())warnings.add(new Readiness(vessel,deficits));
             }
-            return List.copyOf(warnings);
+            return java.util.Collections.unmodifiableList(new java.util.ArrayList<>(warnings));
         }
         /** Quote the complete dock job before debiting credits. All five services
          * are calculated from this vessel's actual fitted capacity and stores. */
