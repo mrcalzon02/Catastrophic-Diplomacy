@@ -272,6 +272,10 @@ public final class Battle {
         /** Read by the effects renderer: true, simulation-owned engine state. */
         public OrdnancePropulsion.Phase thrustPhase=OrdnancePropulsion.Phase.CRUISE;
         public int flightTicks;
+        /** The seeker tracks only its original assigned hull. Lost locks retain
+         * the last actually observed position; scans never grant perfect telemetry. */
+        public boolean seekerLocked=true;
+        public double lastKnownX,lastKnownY,lastKnownVX,lastKnownVY;
         void setPropulsion(OrdnancePropulsion.Mode mode){
             if(mode==null)throw new IllegalArgumentException("No propulsion mode");
             propulsionMode=mode;
@@ -322,6 +326,7 @@ public final class Battle {
             ignitionDelayTicks=ignitionTicks;
             if(ignitionTicks>0)thrustPhase=OrdnancePropulsion.Phase.COLD_EJECT;
             spec=profile;guidanceQuality=launchGuidance;
+            lastKnownX=sx+dx;lastKnownY=sy+dy;
             // Legacy direct construction starts at rated speed; queued launch
             // schemes then set the appropriate ejection/boost impulse.
             vx*=spec.speed();vy*=spec.speed();
@@ -2289,6 +2294,19 @@ public final class Battle {
             m.thrustPhase=OrdnancePropulsion.phase(m.propulsionMode,m.flightTicks,
                     m.ignitionDelayTicks,range,m.torpedo);
             if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
+            // Maintain lock with actual target RCS and ECM; a broken lock
+            // only reacquires on a bounded scan with stricter geometry.
+            boolean visible=OrdnanceSeeker.canTrack(range,target.radarCrossSection,
+                    target.ecmStrength*target.ecmCondition,m.guidanceQuality,
+                    m.torpedo,!m.seekerLocked);
+            if(m.seekerLocked&&!visible)m.seekerLocked=false;
+            else if(!m.seekerLocked&&visible
+                    &&OrdnanceSeeker.scanDue(m.flightTicks,m.visualId))
+                m.seekerLocked=true;
+            if(m.seekerLocked){
+                m.lastKnownX=target.x;m.lastKnownY=target.y;
+                m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
+            }
             if (range < 13) {
                 if(m.decoy){
                     // A decoy has NO warhead and may never apply hull damage.
@@ -2304,13 +2322,15 @@ public final class Battle {
                         m.torpedo?DamageType.TORPEDO:DamageType.MISSILE).guidancePerTick()
                         *m.guidanceQuality
                         *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition)
-                        *OrdnancePropulsion.guidanceMultiplier(m.thrustPhase));
+                        *OrdnancePropulsion.guidanceMultiplier(m.thrustPhase)
+                        *(m.seekerLocked?1:0));
                 // Apply bounded thrust/steering to persistent world-space
                 // velocity. Coast and cold eject preserve inertial motion.
                 if(m.propellant<=1e-9&&OrdnancePropulsion.burning(m.thrustPhase))
                     m.thrustPhase=OrdnancePropulsion.Phase.COAST;
                 var steering=OrdnanceGuidance.aim(m.guidanceMode,m.x,m.y,m.vx,m.vy,
-                        target.x,target.y,target.vx,target.vy,m.flightTicks,m.approachSide);
+                        m.lastKnownX,m.lastKnownY,m.lastKnownVX,m.lastKnownVY,
+                        m.flightTicks,m.approachSide);
                 var nextVelocity=OrdnancePropulsion.advanceVelocity(
                         m.vx,m.vy,steering.dx(),steering.dy(),
                         m.spec.speed(),guidance,m.thrustPhase,
@@ -2589,6 +2609,11 @@ public final class Battle {
             hash=mix(hash,m.guidanceMode.ordinal());
             hash=mix(hash,m.approachSide);
             hash=mix(hash,m.thrustPhase.ordinal());
+            hash=mix(hash,m.seekerLocked?1:0);
+            hash=mix(hash,Double.doubleToLongBits(m.lastKnownX));
+            hash=mix(hash,Double.doubleToLongBits(m.lastKnownY));
+            hash=mix(hash,Double.doubleToLongBits(m.lastKnownVX));
+            hash=mix(hash,Double.doubleToLongBits(m.lastKnownVY));
             hash=mix(hash,m.visualId);
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));
             hash=mix(hash,Double.doubleToLongBits(m.x));

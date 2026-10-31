@@ -345,6 +345,14 @@ tasks.register('ordnanceRacksSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('ordnanceBlueprintSmoke') { finalizedBy(tasks.named('ordnanceRacksSmoke')) }
+tasks.register('ordnanceSeekerSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Seeded live seeker ECM loss/reacquisition and physical point-defense counterplay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceSeekerTest'
+    dependsOn testClasses
+}
+tasks.named('ordnanceRacksSmoke') { finalizedBy(tasks.named('ordnanceSeekerSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
 // The functional release's gameFlowSmoke task is registered later in this file.
 
