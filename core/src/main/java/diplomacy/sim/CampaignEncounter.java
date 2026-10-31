@@ -72,6 +72,12 @@ public final class CampaignEncounter {
         for(int i=first;i<battle.ships().size();i++){
             Battle.Ship hostile=battle.ships().get(i);
             hostile.name=FleetNames.generate(naming,level.seed(),++hostileSerial);
+            // Only the final reinforcement of Chapter 1's sector capital is the
+            // Warrant Spire; ordinary faction dreadnought art stays untouched.
+            if(level.index()==50 && wave==level.waves() && i==first){
+                hostile.campaignBossArt="warrant_spire";
+                hostile.name="Warrant Spire";
+            }
         }
     }
 
