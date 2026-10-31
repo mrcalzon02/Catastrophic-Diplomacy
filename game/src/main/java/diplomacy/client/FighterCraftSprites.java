@@ -71,6 +71,41 @@ public final class FighterCraftSprites implements Disposable {
             case TORPEDO_BOMBER -> "torpedo_bomber";
         };
     }
+    /**
+     * The original fighter atlas also has recon and heavy-bomber artwork.
+     * Select it when the actual parent flight doctrine/launch hull matches:
+     * screening interceptors are the scout variant; a dreadnought's torpedo
+     * flight is the heavy-bomber variant. This is visual; weapon profiles
+     * stay entirely authoritative in FighterModel.
+     */
+    static String operationalRole(FighterModel.Hull hull,
+                                  diplomacy.sim.ShipTacticalDirectives.FighterMission mission,
+                                  boolean dreadnoughtCarrier) {
+        if(hull==null)throw new IllegalArgumentException("Fighter profile required");
+        if(hull==FighterModel.Hull.INTERCEPTOR
+                &&mission==diplomacy.sim.ShipTacticalDirectives.FighterMission.SCREEN)
+            return "recon_fighter";
+        if(hull==FighterModel.Hull.TORPEDO_BOMBER &&dreadnoughtCarrier)
+            return "heavy_bomber";
+        return switch(hull) {
+            case INTERCEPTOR -> "interceptor";
+            case ASSAULT_GUNSHIP -> "assault_gunship";
+            case LASER_FIGHTER -> "superiority_fighter";
+            case PARTICLE_FIGHTER -> "electronic_warfare";
+            case MISSILE_FIGHTER -> "missile_fighter";
+            case TORPEDO_BOMBER -> "torpedo_bomber";
+        };
+    }
+    private static String role(Battle.Craft craft,Battle.Ship source) {
+        if(!craft.fighter)return role(craft);
+        diplomacy.sim.ShipTacticalDirectives.FighterMission mission=
+                source.standingOrders==null?null:
+                source.standingOrders.directives().fighterMission();
+        boolean large=source.hullClass!=null &&
+                source.hullClass.spriteHull()==diplomacy.shipyard.Shipyard.Hull.DREADNOUGHT;
+        return operationalRole(craft.profile.hull(),mission,large);
+    }
+
     public FighterCraftSprites() {
         for(Battle.Faction faction:Battle.Faction.values()) {
             Map<String,Texture> palette=new HashMap<>();
@@ -113,9 +148,10 @@ public final class FighterCraftSprites implements Disposable {
             Map<String,Texture> family=palettes.get(source.faction);
             if(family==null)
                 throw new IllegalStateException("Approved craft art missing for faction: "+source.faction);
-            Texture picture=family.get(role(craft));
+            String artRole=role(craft,source);
+            Texture picture=family.get(artRole);
             if(picture==null)
-                throw new IllegalStateException("Approved craft sprite not loaded: "+source.faction+"/"+role(craft));
+                throw new IllegalStateException("Approved craft sprite not loaded: "+source.faction+"/"+artRole);
             float height=craft.fighter?switch(craft.profile.hull()) {
                 case INTERCEPTOR -> 13f;
                 case ASSAULT_GUNSHIP -> 17f;
