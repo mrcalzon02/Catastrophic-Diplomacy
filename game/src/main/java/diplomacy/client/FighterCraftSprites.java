@@ -6,9 +6,12 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
-import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Original faction-specific fighter and drone sprite renderer. Never paints
@@ -23,13 +26,15 @@ public final class FighterCraftSprites implements Disposable {
         "torpedo_bomber","recon_fighter","heavy_bomber","point_defense_fighter",
         "electronic_warfare","support_drone"
     };
-    private final Map<String,Texture> originals=new HashMap<>();
+    // Keep only textures actually used by recent battles, not 50 RGB + 100
+    // material textures permanently resident on Android GL at game startup.
+    private static final int MAX_RESIDENT_CRAFT_ART=24;
+    private final Map<String,Texture> originals=new LinkedHashMap<>(32,.75f,true);
+    private final Set<String> missingPaths=new HashSet<>();
     private final Map<Integer,Battle.Ship> vesselById=new HashMap<>();
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
     public int litCraftMaterials(){return surfaces.materialCount();}
     public int materialTextureBindings(){return surfaces.textureBindings();}
-    private final EnumMap<Battle.Faction,Map<String,Texture>> palettes=
-            new EnumMap<>(Battle.Faction.class);
 
     /**
      * The 50 dedicated, role-specific fighter sprites are the aircraft source
@@ -107,28 +112,42 @@ public final class FighterCraftSprites implements Disposable {
     }
 
     public FighterCraftSprites() {
-        for(Battle.Faction faction:Battle.Faction.values()) {
-            Map<String,Texture> palette=new HashMap<>();
-            for(String role:ROLES) {
-                String path=spritePath(faction,role);
-                Texture picture=originals.get(path);
-                if(picture==null) {
-                    if(!Gdx.files.internal(path).exists())
-                        throw new IllegalStateException("Original fighter art missing from game build: "+path);
-                    picture=new Texture(Gdx.files.internal(path));
-                    picture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-                    surfaces.prepare(picture,path);
-                    originals.put(path,picture);
-                }
-                palette.put(role,picture);
-            }
-            palettes.put(faction,palette);
+        // Shader only. Sprite and material textures are loaded when actual
+        // fighters appear, not for all civilizations on every main-menu boot.
+    }
+    private Texture art(String path){
+        Texture existing=originals.get(path);
+        if(existing!=null)return existing;
+        if(missingPaths.contains(path))return null;
+        if(!Gdx.files.internal(path).exists()){
+            missingPaths.add(path);
+            Gdx.app.error("CRAFT-ART","Original fighter image missing: "+path);
+            return null;
         }
-        // Ten dedicated craft per palette; some factions use the same source
-        // palette. All fifty are shared once in GPU memory, not reloaded.
-        if(originals.size()!=50)
-            throw new IllegalStateException(
-                    "All 50 authored fighter/drone sprites must load: "+originals.size());
+        Texture picture=null;
+        try{
+            picture=new Texture(Gdx.files.internal(path));
+            picture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+            surfaces.prepare(picture,path);
+            originals.put(path,picture);
+            return picture;
+        }catch(RuntimeException failed){
+            if(picture!=null)picture.dispose();
+            missingPaths.add(path);
+            Gdx.app.error("CRAFT-ART","Unable to load fighter materials: "+path,failed);
+            return null;
+        }
+    }
+    private void trimAfterFrame(Set<String> used){
+        if(originals.size()<=MAX_RESIDENT_CRAFT_ART)return;
+        Iterator<Map.Entry<String,Texture>> entries=originals.entrySet().iterator();
+        while(originals.size()>MAX_RESIDENT_CRAFT_ART&&entries.hasNext()){
+            Map.Entry<String,Texture> entry=entries.next();
+            if(used.contains(entry.getKey()))continue;
+            surfaces.forget(entry.getValue());
+            entry.getValue().dispose();
+            entries.remove();
+        }
     }
     public int loaded() { return originals.size(); }
     public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
@@ -139,19 +158,20 @@ public final class FighterCraftSprites implements Disposable {
                        CombatViewBounds view) {
         vesselById.clear();
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
+        if(battle.crafts().isEmpty())return;
+        Set<String> used=new HashSet<>();
         surfaces.begin(batch,battle,view);
+        try{
         batch.setColor(1,1,1,1);
         for(Battle.Craft craft:battle.crafts()) {
             Battle.Ship source=vesselById.get(craft.sourceId);
             if(source==null)
                 throw new IllegalStateException("Autonomous craft has no parent faction: "+craft.sourceId);
-            Map<String,Texture> family=palettes.get(source.faction);
-            if(family==null)
-                throw new IllegalStateException("Approved craft art missing for faction: "+source.faction);
             String artRole=role(craft,source);
-            Texture picture=family.get(artRole);
-            if(picture==null)
-                throw new IllegalStateException("Approved craft sprite not loaded: "+source.faction+"/"+artRole);
+            String path=spritePath(source.faction,artRole);
+            Texture picture=art(path);
+            if(picture==null)continue;
+            used.add(path);
             float height=craft.fighter?switch(craft.profile.hull()) {
                 case INTERCEPTOR -> 13f;
                 case ASSAULT_GUNSHIP -> 17f;
@@ -177,11 +197,17 @@ public final class FighterCraftSprites implements Disposable {
                     width/2,height/2,width,height,1,1,rotation,
                     0,0,picture.getWidth(),picture.getHeight(),false,false);
         }
-        surfaces.end(batch);
+        }finally{
+            // Finish the GL draw before evicting any material still referenced
+            // by pending SpriteBatch vertices.
+            surfaces.end(batch);
+            trimAfterFrame(used);
+        }
     }
     @Override public void dispose(){
         surfaces.dispose();
         for(Texture texture:originals.values())texture.dispose();
-        originals.clear();palettes.clear();
+        originals.clear();
+        missingPaths.clear();
     }
 }
