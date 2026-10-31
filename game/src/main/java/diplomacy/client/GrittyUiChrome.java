@@ -75,7 +75,7 @@ final class GrittyUiChrome {
 
     void drawState(SpriteBatch batch,int base,boolean hover,boolean down,
                    float x,float y,float width,float height){
-        if(texture==null||width<65||height<25)return;
+        if(texture==null||width<32||height<22)return;
         int variant=stateVariant(base,hover,down);
         float color=batch.getPackedColor();
         // Button body, not a painted border, shows each state. The pressed
@@ -91,7 +91,7 @@ final class GrittyUiChrome {
     }
 
     void draw(SpriteBatch batch,int type,float x,float y,float width,float height){
-        if(texture==null||type<0||type>=TILES||width<65||height<25)return;
+        if(texture==null||type<0||type>=TILES||width<32||height<22)return;
         tiles[type].draw(batch,x,y,width,height);
     }
 
