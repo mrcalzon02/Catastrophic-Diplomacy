@@ -47,6 +47,19 @@ public final class ShieldSurfaceModelTest {
                 "Real recharge creates a visible material pulse");
         check(ShieldSurfaceModel.energizedOpacity(.9f,1,1)<=.92f,
                 "Full-charge effects remain capped to avoid overdraw blooms");
+        // The original authored blue-hex texture must become an off-hull
+        // field shell rather than only a hull-alpha tint.
+        int brightHex=0x2A8AFFFF;
+        int inner=ShieldSurfaceModel.shellMaterial(brightHex,.15);
+        int rim=ShieldSurfaceModel.shellMaterial(brightHex,.91);
+        check((inner&255)>0,"Shield PNG pattern must remain visible inside field");
+        check((rim&255)>(inner&255),"Shield shell perimeter must be brighter than center");
+        check(ShieldSurfaceModel.shellMaterial(brightHex,1.01)==0,
+                "Shield shell must not draw a square PNG border");
+        check(ShieldSurfaceModel.shellMaterial(0x2A8AFF00,.91)==0,
+                "Transparent shield sprite pixel must remain transparent");
+        check(ShieldSurfaceModel.shellMaterial(brightHex,Double.NaN)==0,
+                "Bad source coordinates must not render");
         System.out.println("PASS silhouette shields, pulse, depletion, max alpha and strategic LOD");
     }
 }

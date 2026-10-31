@@ -32,6 +32,8 @@ public final class TerranPlaceholderSprites implements Disposable {
     // textures are created per hull, not per vessel or recharge tick.
     private final java.util.Map<Texture,Texture[]> shieldSections =
             new java.util.IdentityHashMap<>();
+    /** One shared hex-texture field shell, split into the same four mechanical facings. */
+    private Texture[] shieldShell;
     // A compact per-vessel overlay keeps irregular hull peeling inexpensive
     // even when several hundred damaged vessels share the same original PNG.
     private static final int MASK_W=96, MASK_H=144;
@@ -217,6 +219,43 @@ public final class TerranPlaceholderSprites implements Disposable {
         shieldSections.put(original,layers);
     }
 
+    /**
+     * Cache the actual authored energy-field sprite on an elliptical shell.
+     * Texture preparation happens once per renderer, never once per ship/frame.
+     * Each transparent quarter corresponds to an independently powered facing.
+     */
+    private void prepareShieldShell(){
+        if(shieldShell!=null)return;
+        final int size=192;
+        Texture[] built=new Texture[DirectionalDefense.Facing.values().length];
+        try {
+            for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+                Pixmap pixels=new Pixmap(size,size,Pixmap.Format.RGBA8888);
+                pixels.setBlending(Pixmap.Blending.None);
+                try {
+                    for(int y=0;y<size;y++)for(int x=0;x<size;x++){
+                        double nx=(x+.5)*2.0/size-1.0;
+                        double ny=(y+.5)*2.0/size-1.0;
+                        double distance=StrictMath.hypot(nx,ny);
+                        if(distance>=1)continue;
+                        if(DirectionalDefense.facingFor(-ny,-nx)!=face)continue;
+                        int material=shieldMaterial.getPixel(
+                                x*shieldMaterial.getWidth()/size,
+                                y*shieldMaterial.getHeight()/size);
+                        int rgba=ShieldSurfaceModel.shellMaterial(material,distance);
+                        if((rgba&255)!=0)pixels.drawPixel(x,y,rgba);
+                    }
+                    Texture sector=new Texture(pixels);
+                    sector.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                    built[face.ordinal()]=sector;
+                }finally{pixels.dispose();}
+            }
+            shieldShell=built;
+        }catch(RuntimeException error){
+            for(Texture part:built)if(part!=null)part.dispose();
+            throw error;
+        }
+    }
     private Pixmap sourcePixels(Texture texture){
         Pixmap source=sourcePixels.get(texture);
         if(source!=null)return source;
@@ -359,7 +398,10 @@ public final class TerranPlaceholderSprites implements Disposable {
             Texture tex=texture(ship.faction,ship.hullClass);
             if(!ShipSurfaceLighting.flatAt(view))
                 surfaces.prepare(tex,originals.get(tex));
-            if(ship.shields>0)prepareShields(tex);
+            if(ship.shields>0){
+                prepareShields(tex);
+                prepareShieldShell();
+            }
             if(breached(ship)){
                 exposedInterior(tex,ship.hull<ship.maxHull*0.30);
                 erodedExterior(ship,tex);
@@ -425,6 +467,15 @@ public final class TerranPlaceholderSprites implements Disposable {
             float opacity=ShieldSurfaceModel.opacity(strength,tick,ship.id,face.ordinal());
             if(shieldFx!=null)opacity=shieldFx.opacity(ship,face,opacity);
             if(opacity<=0f)continue;
+            // The outer field is the actual blue hex-energy sprite, NOT a
+            // procedural ellipse. Geometry only masks its outside pixels and
+            // chooses the live powered face; the original texture is preserved.
+            if(shieldShell!=null){
+                batch.setColor(1,1,1,Math.min(.85f,opacity*1.35f));
+                drawWhole(batch,shieldShell[face.ordinal()],pose,
+                        width*1.31f,height*1.27f,rotation);
+            }
+            // Keep the existing on-hull material for shield contact feedback.
             batch.setColor(1,1,1,opacity);
             drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
         }
@@ -446,6 +497,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture[] sections:shieldSections.values())
             for(Texture sector:sections)if(sector!=null)sector.dispose();
         shieldSections.clear();
+        if(shieldShell!=null){
+            for(Texture sector:shieldShell)if(sector!=null)sector.dispose();
+            shieldShell=null;
+        }
         for(Pixmap pixels:sourcePixels.values())pixels.dispose();
         sourcePixels.clear();
         for(Texture image:damagedLayers.values())image.dispose();

@@ -51,6 +51,26 @@ final class ShieldSurfaceModel {
         float regen=Float.isFinite(charge)?Math.max(0,Math.min(1,charge)):0f;
         return Math.min(.92f,base+hit*.32f+regen*.13f);
     }
+    /**
+     * Real hex-field PNG applied to an elliptical, off-hull energy shell.
+     * The original source pixel supplies its pattern and hue; only the
+     * perimeter strength is shaped here. No generated hexagon substitute.
+     */
+    static int shellMaterial(int rgba,double radius) {
+        if(!Double.isFinite(radius)||radius>=1.0||radius<0)return 0;
+        int sourceAlpha=rgba&255;
+        if(sourceAlpha==0)return 0;
+        // Luminous, soft energy rim; the center retains the source hex texture.
+        float rim=(float)Math.max(0,1-Math.abs(radius-.91)/.12);
+        float envelope=(float)Math.min(1,(1-radius)/.025);
+        int a=clamp(Math.round((sourceAlpha*(.56f+rim*1.25f)+rim*42f)*envelope));
+        if(a==0)return 0;
+        int r=(rgba>>>24)&255,g=(rgba>>>16)&255,b=(rgba>>>8)&255;
+        int rr=clamp(Math.round(r*(1-rim*.40f)+125f*rim*.40f));
+        int gg=clamp(Math.round(g*(1-rim*.27f)+234f*rim*.27f));
+        int bb=clamp(Math.round(b*(1-rim*.18f)+255f*rim*.18f));
+        return (rr<<24)|(gg<<16)|(bb<<8)|a;
+    }
     /** Never spend overdraw on shield shells smaller than a handful of pixels. */
     static boolean drawable(float spriteHeight,double viewWidth) {
         if(!(spriteHeight>0)||!(viewWidth>0))return false;
