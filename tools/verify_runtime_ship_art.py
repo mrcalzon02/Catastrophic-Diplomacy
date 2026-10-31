@@ -81,7 +81,7 @@ def expected():
             if not original.is_file():
                 raise ValueError("Founding-faction sprite crop not generated: "+str(original))
             raw=original.read_bytes()
-            if not raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            if not raw.startswith(b"\x89PNG\r\n\x1a\n"):
                 raise ValueError("Invalid original founding-faction image: "+relative)
             if relative in result:
                 raise ValueError("Duplicate founding-faction image path: "+relative)
