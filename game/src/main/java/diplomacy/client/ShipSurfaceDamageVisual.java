@@ -19,6 +19,18 @@ final class ShipSurfaceDamageVisual {
         return Math.max(uneven,puncture);
     }
 
+    /**
+     * Diffuse armor wear colors the original plating without a global alpha
+     * fade. Only a localized impact crater can expose the structural layer.
+     */
+    static int stampedPixel(int original,float diffuseWear,float craterOpening,float grit){
+        int originalAlpha=original&255;
+        if(originalAlpha==0)return 0;
+        int tinted=ShipDamageScorch.darken(original,diffuseWear,grit);
+        int alpha=Math.round(originalAlpha*(1f-clamp(craterOpening)));
+        return (tinted&0xffffff00)|Math.max(0,Math.min(originalAlpha,alpha));
+    }
+
     /** Pixmap RGBA8888; nothing may extend beyond the original PNG alpha. */
     static int pixel(int original,float armorExposure,float internalDamage,float grit) {
         int originalAlpha=original&255;

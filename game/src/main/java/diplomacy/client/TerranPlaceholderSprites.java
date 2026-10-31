@@ -331,12 +331,24 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(originalAlpha==0){output.drawPixel(x,y,0);continue;}
                 double tileRow=(y+0.5)*GRID/MASK_H-0.5;
                 double tileCol=(x+0.5)*GRID/MASK_W-0.5;
+                // Wear darkens source plating; only localized physically
+                // damaged cells cut alpha. Neighbor lookups catch crater lips.
                 float damage=surfaceDamage(ship,tileRow,tileCol,false);
-                float internal=surfaceDamage(ship,tileRow,tileCol,true);
+                float crater=0f;
+                int centerR=(int)StrictMath.floor(tileRow+.5);
+                int centerC=(int)StrictMath.floor(tileCol+.5);
+                for(int r=Math.max(0,centerR-1);r<=Math.min(GRID-1,centerR+1);r++)
+                    for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
+                        var tile=ship.defense.tile(r,c);
+                        if(!tile.occupied)continue;
+                        crater=Math.max(crater,ShipArmorStamps.openingAt(
+                                (float)tileRow,(float)tileCol,r,c,
+                                (float)tile.exposure(),(float)tile.internalDamage(),ship.id));
+                    }
                 float rough=noise(x/4,y/4,ship.id)*0.70f+
                         noise(x,y,ship.id*31)*0.30f;
-                output.drawPixel(x,y,ShipSurfaceDamageVisual.pixel(
-                        originalPixel,damage,internal,rough));
+                output.drawPixel(x,y,ShipSurfaceDamageVisual.stampedPixel(
+                        originalPixel,damage,crater,rough));
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);

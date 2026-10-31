@@ -24,6 +24,34 @@ public final class ShipSurfaceDamageVisualTest {
             int semi=ShipSurfaceDamageVisual.pixel(0xb0a09080,fraction,0,.3f);
             check(alpha(semi)<=128,"Output alpha may never exceed original alpha");
         }
+        // Actual spatial damage stamps are localized, irregular and physically
+        // gated by the armor/structure state of the corresponding plate.
+        for(int shipId:new int[]{11,482,1931}){
+            for(int row=4;row<10;row++)for(int col=5;col<11;col++){
+                float untouched=ShipArmorStamps.openingAt(row,col,row,col,0,0,shipId);
+                float scuffed=ShipArmorStamps.openingAt(row,col,row,col,.38f,0,shipId);
+                float deep=ShipArmorStamps.openingAt(row,col,row,col,.90f,0,shipId);
+                float stripped=ShipArmorStamps.openingAt(row,col,row,col,1,0,shipId);
+                float adjacent=ShipArmorStamps.openingAt(row,col+1.2f,row,col,1,0,shipId);
+                check(untouched==0&&scuffed==0,
+                        "Superficial wear must not invent armor holes");
+                check(deep>.95f&&stripped==1f,
+                        "Deep erosion must form a transparent crater center");
+                check(adjacent==0,"Distant armor must remain fully opaque");
+                int shallow=ShipSurfaceDamageVisual.stampedPixel(source,.38f,scuffed,0);
+                int punctured=ShipSurfaceDamageVisual.stampedPixel(source,.90f,deep,0);
+                check(alpha(shallow)==255&&alpha(punctured)<=13,
+                        "The stamped image must show the underlying interior only after deep wear");
+                check(ShipSurfaceDamageVisual.stampedPixel(0xaabbcc00,1,1,0)==0,
+                        "Original transparent silhouette must stay transparent");
+            }
+        }
+        float bypassStamp=ShipArmorStamps.openingAt(6,7,6,7,.2f,.25f,23);
+        check(bypassStamp>0&&bypassStamp<1,
+                "Actual armor-bypassing structure damage may make a smaller puncture");
+        float tearA=ShipArmorStamps.openingAt(6.58f,7.08f,6,7,1f,0,32);
+        float tearB=ShipArmorStamps.openingAt(6.58f,7.08f,6,7,1f,0,33);
+        check(tearA!=tearB,"Different impact locations need varied jagged outlines");
         // A transparent exterior and opaque silhouette-clipped sublayer are
         // separate physical render passes, not a cutout into empty space.
         check(alpha(hole)==0 && alpha(0x424c55ff)==255,
