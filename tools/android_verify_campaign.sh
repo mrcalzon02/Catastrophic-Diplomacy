@@ -11,6 +11,8 @@ on_failure(){
   local rc="$1"
   echo "FAIL: API29 campaign playability at $current (exit $rc)" >&2
   adb logcat -d -v time > "$report/failure-$current-logcat.txt" || true
+  echo "--- APP TRANSITIONS / ACTUAL ANDROID ERRORS ---" >&2
+  grep -E 'CD-GAME-FLOW|CD-CAMPAIGN-RUNTIME|AndroidRuntime|FATAL EXCEPTION|NoSuchMethodError|NoClassDefFoundError|[Cc]rash|[Ee]xception' "$report/failure-$current-logcat.txt" | tail -n 75 >&2 || true
   adb shell dumpsys activity activities > "$report/failure-activity.txt" || true
 }
 trap 'on_failure "$?"' ERR
@@ -86,6 +88,9 @@ start_game(){
   adb shell am start -W -n "$activity" > "$report/$current-start.txt"
   wait_log 'CD-GAME-FLOW.*MAIN_MENU' 20
   dismiss_updater
+  # 400-ship test emulators may draw fewer than 2 UI frames per second.
+  # Log MAIN_MENU is not proof that the first interactive frame is ready.
+  sleep 3
   capture "$current-home"
 }
 adb shell pm clear "$package" > "$report/clear-package.txt"
@@ -96,7 +101,15 @@ for idx in $(seq 0 10); do
   current="$idx-$faction"
   start_game
   touch "$current-home" 930 512
-  wait_log 'CD-GAME-FLOW.*CAMPAIGN_FACTION_SETUP' 15
+  if ! wait_log 'CD-GAME-FLOW.*CAMPAIGN_FACTION_SETUP' 12; then
+    # The optional native update dialog may surface after the startup probe.
+    # Retry the exact visible NEW CAMPAIGN tile once, never jump to a test menu.
+    assert_no_crash
+    dismiss_updater
+    capture "$current-home-retry"
+    touch "$current-home-retry" 930 512
+    wait_log 'CD-GAME-FLOW.*CAMPAIGN_FACTION_SETUP' 20
+  fi
   capture "$current-faction"
   if (( idx<6 )); then x=180; y=$((518-idx*62));
   else x=740; y=$((518-(idx-6)*62)); fi
