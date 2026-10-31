@@ -16,8 +16,11 @@ import diplomacy.sim.OrdnancePropulsion;
 final class GuidedPayloadVisual {
     static final String GUIDED="effects/weapon_fx/missile/payload_01.png";
     static final String HEAVY="effects/weapon_fx/torpedo/payload_01.png";
+    static final String CURATED="effects/projectile_fx/curated/missile_bodies_6.png";
+    static final int COLS=3,CELL_WIDTH=64,CELL_HEIGHT=40,CELLS=6;
     record Appearance(String image,float width,float height,
-                      float red,float green,float blue,float alpha) { }
+                      float red,float green,float blue,float alpha,
+                      int cell,String fallback) { }
     private GuidedPayloadVisual(){}
 
     static Appearance forMissile(Battle.Missile missile){
@@ -33,7 +36,17 @@ final class GuidedPayloadVisual {
                 !Double.isFinite(crossSection)||crossSection<=0)
             throw new IllegalArgumentException("Invalid physical guided-body appearance");
         boolean heavy=torpedo||payload==OrdnanceDoctrine.Payload.HEAVY;
-        String image=heavy?HEAVY:GUIDED;
+        // Six independent silhouettes cut from the archived ballistic arsenal.
+        int cell=torpedo?4:payload==OrdnanceDoctrine.Payload.HEAVY?1:
+                payload==OrdnanceDoctrine.Payload.MICRO||
+                payload==OrdnanceDoctrine.Payload.DECOY?3:
+                switch(warhead){
+                    case ARMOR_PIERCING -> 2;
+                    case EMP,SHIELD_BREAKER -> 3;
+                    case FRAGMENTATION,HIGH_EXPLOSIVE -> 5;
+                    default -> 0;
+                };
+        String fallback=heavy?HEAVY:GUIDED;
         // The source texture's proportions and provenance are retained.
         // Values below are BEFORE the common one-third combat-FX draw scale.
         float size=heavy?1.25f:1f;
@@ -59,6 +72,6 @@ final class GuidedPayloadVisual {
                 phase==OrdnancePropulsion.Phase.COAST){
             r*=.82f;g*=.82f;b*=.82f;
         }
-        return new Appearance(image,36f*size,28f*size,r,g,b,a);
+        return new Appearance(CURATED,36f*size,28f*size,r,g,b,a,cell,fallback);
     }
 }

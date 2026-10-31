@@ -3,6 +3,7 @@ package diplomacy.client;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.fx.WeaponFxProfile;
 import diplomacy.fx.WeaponFxProfile.Clip;
@@ -31,6 +32,8 @@ final class ModularWeaponFxRenderer implements Disposable {
     private Battle trackedBattle;
     private long lastSequence;
     private static final int ACTIVE_LIMIT=4096;
+    private TextureRegion[] curatedMissileBodies;
+    private boolean rejectedMissileAtlas;
 
     private Texture texture(String path) {
         Texture cached=textures.get(path);
@@ -48,6 +51,27 @@ final class ModularWeaponFxRenderer implements Disposable {
             return null;
         }
     }
+    /** Build six atlas regions once, never once per active projectile. */
+    private TextureRegion[] missileBodies(){
+        if(curatedMissileBodies!=null)return curatedMissileBodies;
+        if(rejectedMissileAtlas)return null;
+        Texture atlas=texture(GuidedPayloadVisual.CURATED);
+        if(atlas==null)return null;
+        if(atlas.getWidth()!=GuidedPayloadVisual.COLS*GuidedPayloadVisual.CELL_WIDTH ||
+                atlas.getHeight()!=2*GuidedPayloadVisual.CELL_HEIGHT){
+            rejectedMissileAtlas=true;
+            Gdx.app.error("WEAPON-FX","Curated missile sprite atlas cell dimensions invalid");
+            return null;
+        }
+        TextureRegion[] regions=new TextureRegion[GuidedPayloadVisual.CELLS];
+        for(int i=0;i<regions.length;i++)
+            regions[i]=new TextureRegion(atlas,
+                    (i%GuidedPayloadVisual.COLS)*GuidedPayloadVisual.CELL_WIDTH,
+                    (i/GuidedPayloadVisual.COLS)*GuidedPayloadVisual.CELL_HEIGHT,
+                    GuidedPayloadVisual.CELL_WIDTH,GuidedPayloadVisual.CELL_HEIGHT);
+        return curatedMissileBodies=regions;
+    }
+
     private Texture frame(Clip clip,long elapsedTicks) {
         int n=clip.frame(elapsedTicks);
         return n<0?null:texture(clip.path(n));
@@ -92,6 +116,13 @@ final class ModularWeaponFxRenderer implements Disposable {
         batch.draw(image,x-width/2,y-height/2,
                 width/2,height/2,width,height,1,1,angle,
                 0,0,image.getWidth(),image.getHeight(),false,false);
+    }
+
+    private static void drawCentered(SpriteBatch batch,TextureRegion image,
+                                     float x,float y,float width,float height,float angle){
+        width=CombatEffectScale.of(width);height=CombatEffectScale.of(height);
+        batch.draw(image,x-width/2,y-height/2,width/2,height/2,
+                width,height,1f,1f,angle);
     }
 
     /**
@@ -150,11 +181,15 @@ final class ModularWeaponFxRenderer implements Disposable {
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
             float radius=CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f;
             if(view!=null&&!view.circle(pose.x(),pose.y(),radius))continue;
-            Texture image=texture(style.image());
-            if(image==null)continue; // Real projectile geometry remains the fallback.
+            TextureRegion[] authored=missileBodies();
+            Texture fallback=authored==null?texture(style.fallback()):null;
+            if(authored==null&&fallback==null)continue; // Existing physical geometry.
             float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(style.red(),style.green(),style.blue(),style.alpha());
-            drawCentered(batch,image,pose.x(),pose.y(),
+            if(authored!=null)
+                drawCentered(batch,authored[style.cell()],pose.x(),pose.y(),
+                        style.width(),style.height(),angle);
+            else drawCentered(batch,fallback,pose.x(),pose.y(),
                     style.width(),style.height(),angle);
             batch.setColor(1,1,1,1);
         }
@@ -187,12 +222,14 @@ final class ModularWeaponFxRenderer implements Disposable {
 
     /** A missing payload sprite keeps existing ordnance geometry visible. */
     public boolean hasMissilePayload(Battle.Missile missile,long tick){
-        return texture(GuidedPayloadVisual.forMissile(missile).image())!=null;
+        return missileBodies()!=null||
+                texture(GuidedPayloadVisual.forMissile(missile).fallback())!=null;
     }
     int activeAnimations(){return oneShots.size();}
     int loadedTextures(){return textures.size();}
     @Override public void dispose(){
         for(Texture value:textures.values())value.dispose();
         textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
+        curatedMissileBodies=null;rejectedMissileAtlas=false;
     }
 }
