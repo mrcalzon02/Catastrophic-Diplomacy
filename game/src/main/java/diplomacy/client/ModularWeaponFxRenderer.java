@@ -34,6 +34,8 @@ final class ModularWeaponFxRenderer implements Disposable {
     private static final int ACTIVE_LIMIT=4096;
     private TextureRegion[] curatedMissileBodies;
     private boolean rejectedMissileAtlas;
+    private TextureRegion[] curatedKineticBodies;
+    private boolean rejectedKineticAtlas;
 
     private Texture texture(String path) {
         Texture cached=textures.get(path);
@@ -70,6 +72,25 @@ final class ModularWeaponFxRenderer implements Disposable {
                     (i/GuidedPayloadVisual.COLS)*GuidedPayloadVisual.CELL_HEIGHT,
                     GuidedPayloadVisual.CELL_WIDTH,GuidedPayloadVisual.CELL_HEIGHT);
         return curatedMissileBodies=regions;
+    }
+
+    /** Five source-art shell cells shared across every physical ballistic round. */
+    private TextureRegion[] kineticBodies(){
+        if(curatedKineticBodies!=null)return curatedKineticBodies;
+        if(rejectedKineticAtlas)return null;
+        Texture atlas=texture(KineticPayloadVisual.CURATED);
+        if(atlas==null)return null;
+        if(atlas.getWidth()!=KineticPayloadVisual.CELLS*KineticPayloadVisual.WIDTH ||
+                atlas.getHeight()!=KineticPayloadVisual.HEIGHT){
+            rejectedKineticAtlas=true;
+            Gdx.app.error("WEAPON-FX","Kinetic sprite atlas dimensions invalid");
+            return null;
+        }
+        TextureRegion[] regions=new TextureRegion[KineticPayloadVisual.CELLS];
+        for(int i=0;i<regions.length;i++)
+            regions[i]=new TextureRegion(atlas,i*KineticPayloadVisual.WIDTH,0,
+                    KineticPayloadVisual.WIDTH,KineticPayloadVisual.HEIGHT);
+        return curatedKineticBodies=regions;
     }
 
     private Texture frame(Clip clip,long elapsedTicks) {
@@ -197,17 +218,22 @@ final class ModularWeaponFxRenderer implements Disposable {
         // The atlas frame is oriented by immutable launch velocity, not a fake
         // interpolation between origin and target that would conceal PD hits.
         Profile kinetic=WeaponFxProfile.forType(Battle.DamageType.KINETIC);
+        TextureRegion[] shells=kineticBodies();
         for(Battle.Ballistic shell:battle.ballistics()){
             Clip clip=kinetic.payload();
+            KineticPayloadVisual.Appearance spec=KineticPayloadVisual.forType(shell.ammunition);
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
             if(view!=null&&!view.circle(pose.x(),pose.y(),
-                    Math.max(clip.width(),clip.height())*.5f))continue;
-            Texture image=frame(clip,battle.tick-shell.spawnTick);
-            if(image==null)continue;
+                    CombatEffectScale.of(Math.max(spec.width(),spec.height()))*.5f))continue;
+            Texture fallback=shells==null?frame(clip,battle.tick-shell.spawnTick):null;
+            if(shells==null&&fallback==null)continue;
             float angle=(float)StrictMath.toDegrees(pose.angle());
-            drawCentered(batch,image,pose.x(),pose.y(),
+            if(shells!=null)
+                drawCentered(batch,shells[spec.cell()],pose.x(),pose.y(),
+                        spec.width(),spec.height(),angle);
+            else drawCentered(batch,fallback,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
         }
         batch.setColor(1,1,1,1);
@@ -217,7 +243,7 @@ final class ModularWeaponFxRenderer implements Disposable {
     /** A missing ballistic payload also keeps live, positioned fallback geometry. */
     public boolean hasBallisticPayload(Battle.Ballistic shell,long tick){
         Profile kinetic=WeaponFxProfile.forType(Battle.DamageType.KINETIC);
-        return frame(kinetic.payload(),tick-shell.spawnTick)!=null;
+        return kineticBodies()!=null || frame(kinetic.payload(),tick-shell.spawnTick)!=null;
     }
 
     /** A missing payload sprite keeps existing ordnance geometry visible. */
@@ -231,5 +257,6 @@ final class ModularWeaponFxRenderer implements Disposable {
         for(Texture value:textures.values())value.dispose();
         textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
         curatedMissileBodies=null;rejectedMissileAtlas=false;
+        curatedKineticBodies=null;rejectedKineticAtlas=false;
     }
 }
