@@ -18,6 +18,9 @@ public final class BattleOrdersTest {
         launcher.missileDamage=fighters?0:52;
         launcher.missileAmmo=fighters?0:1;
         launcher.fighterReserve=fighters?1:0;
+        // Manually constructed test ships do not receive fitted hangars.
+        // A fighter reserve by itself is not physical launch hardware.
+        launcher.fighterLaunchBays=fighters?1:0;
         defender.laserDamage=defender.missileDamage=0;
         defender.kineticDamage=defender.plasmaDamage=defender.particleDamage=defender.torpedoDamage=0;
         defender.missileAmmo=0;
