@@ -109,10 +109,17 @@ public final class WeaponBeamSprites implements Disposable {
     public void render(Battle battle,SpriteBatch batch,
                        java.util.function.Predicate<Battle.Ballistic> showTracer,
                        BattleRenderPoses poses,CombatViewBounds view) {
+        render(battle,batch,showTracer,poses,view,beam -> true);
+    }
+    public void render(Battle battle,SpriteBatch batch,
+                       java.util.function.Predicate<Battle.Ballistic> showTracer,
+                       BattleRenderPoses poses,CombatViewBounds view,
+                       java.util.function.Predicate<Battle.Beam> showBeam) {
         if(loaded==0)return;
         batch.begin();
         batch.setColor(1,1,1,1);
         for(Battle.Beam beam:battle.beams()){
+            if(!showBeam.test(beam))continue;
             if(view!=null&&!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,6.3))continue;
             Texture image=texture(beam,battle.tick);
             if(image==null)continue;
