@@ -82,6 +82,7 @@ jobs:
         run: |
           python3 tools/verify_faction_ship_assets.py
           python3 tools/verify_runtime_ship_art.py --desktop-dir desktop/build/libs
+          gradle --no-daemon :game:fighterArtBridgeDiagnostic
       - uses: actions/upload-artifact@v4
         with:
           name: cd-linux-${{ github.run_id }}
