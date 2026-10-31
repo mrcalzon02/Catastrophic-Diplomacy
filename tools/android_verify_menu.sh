@@ -316,24 +316,34 @@ adb logcat -d -v time > "$report/screensaver-controls-logcat.txt"
 for round in $(seq 1 8); do
   adb logcat -c
   touch_ui screensaver-controls-awake 875 32
-  sleep 3
-  adb logcat -d -v time > "$report/screensaver-round-$round-logcat.txt"
-  if ! adb shell pidof "$package" >/dev/null 2>&1; then
-    echo "FAIL: signed APK crashed on randomized screensaver round $round" >&2
-    grep -E 'CD-SCREENSAVER|FATAL EXCEPTION|AndroidRuntime|OutOfMemoryError' \
-      "$report/screensaver-round-$round-logcat.txt" | tail -n 45 >&2 || true
-    exit 1
-  fi
-  if grep -qE 'FATAL EXCEPTION|OutOfMemoryError' "$report/screensaver-round-$round-logcat.txt"; then
-    echo "FAIL: Android reported fatal error on screensaver round $round" >&2
+  # A large randomized exhibition may take several emulator frames to spawn.
+  # Poll for a new ROUND receipt rather than mistaking slow initialization
+  # for an app crash; exit immediately on an actual process death.
+  round_started=0
+  for attempt in $(seq 1 12); do
+    sleep 2
+    adb logcat -d -v time > "$report/screensaver-round-$round-logcat.txt"
+    if ! adb shell pidof "$package" >/dev/null 2>&1; then
+      echo "FAIL: signed APK crashed on randomized screensaver round $round" >&2
+      grep -E 'CD-SCREENSAVER|FATAL EXCEPTION|AndroidRuntime|OutOfMemoryError' \
+        "$report/screensaver-round-$round-logcat.txt" | tail -n 45 >&2 || true
+      exit 1
+    fi
+    if grep -qE 'FATAL EXCEPTION|OutOfMemoryError' "$report/screensaver-round-$round-logcat.txt"; then
+      echo "FAIL: Android reported fatal error on screensaver round $round" >&2
+      exit 1
+    fi
+    if grep -q 'CD-SCREENSAVER.*ROUND seed=' "$report/screensaver-round-$round-logcat.txt"; then
+      round_started=1
+      break
+    fi
+  done
+  if (( !round_started )); then
+    echo "FAIL: no new randomized screensaver round after NEXT $round" >&2
     exit 1
   fi
   grep 'CD-SCREENSAVER.*ROUND seed=' "$report/screensaver-round-$round-logcat.txt" \
-    | tail -n 1 >> "$report/screensaver-round-stress.txt" || true
-  if ! grep -q 'CD-SCREENSAVER.*ROUND seed=' "$report/screensaver-round-$round-logcat.txt"; then
-    echo "FAIL: screensaver next-round command produced no new seeded battle at round $round" >&2
-    exit 1
-  fi
+    | tail -n 1 >> "$report/screensaver-round-stress.txt"
 done
 capture screensaver-stress-last-round
 grep -q 'CD-SCREENSAVER.*CONTROL ZOOM IN' "$report/screensaver-controls-logcat.txt" || {
