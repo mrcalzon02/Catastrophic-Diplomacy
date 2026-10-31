@@ -322,9 +322,7 @@ tasks.register('ordnancePropulsionSmoke', JavaExec) {
 }
 tasks.named('ordnanceDoctrineSmoke') { finalizedBy(tasks.named('ordnancePropulsionSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
-// Existing release workflows run gameFlowSmoke. Gate on real ordnance physics
-// and 7-mode launch functionality, not on cosmetic FX acceptance.
-tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
+// The functional release's gameFlowSmoke task is registered later in this file.
 
 
 tasks.register('ammunitionTypesSmoke', JavaExec) {
@@ -385,6 +383,8 @@ tasks.register('gameFlowSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
+// Verify the real seven-mode salvos and physical flight during functional releases.
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
 
 tasks.register('screensaverSmoke', JavaExec) {
     group = 'verification'
