@@ -77,6 +77,10 @@ public final class OrdnanceRacksTest {
         world.spawnWing(0,fitted(catalog),catalog,1,200,300);
         world.spawnWing(1,Shipyard.starter(Battle.Faction.CARNELIAN,
                 Shipyard.Hull.DREADNOUGHT),catalog,1,380,300);
+        // Opposing vessel is a physical target, not an extra salvo emitter
+        // when asserting this source's two independent mounted launchers.
+        var target=world.ships().get(1);
+        target.missileDamage=target.torpedoDamage=0;
         return world;
     }
     private static void firing(TechnologyCatalog catalog){
