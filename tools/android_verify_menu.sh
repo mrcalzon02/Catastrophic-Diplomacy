@@ -42,7 +42,7 @@ capture(){
   adb exec-out screencap -p > "$report/$1.png"
   test "$(wc -c < "$report/$1.png")" -gt 2000
 }
-# FitViewport(1280x720) maps our virtual UI into the actual landscape surface.
+# FitViewport(1280x720) maps both platform-specific virtual UI layouts into the landscape surface.
 # Decode only the 24-byte PNG header; no OCR or image matching heuristics.
 map_ui(){
   local frame="$1" uix="$2" uiy="$3"
@@ -89,7 +89,7 @@ sleep 5
 dismiss_optional_updater first-launch
 capture main-menu
 assert_step MAIN_MENU
-touch_ui main-menu 640 384
+touch_ui main-menu 350 392
 sleep 3
 capture skirmish-menu
 assert_step SKIRMISH_SETUP
@@ -159,7 +159,7 @@ sleep 5
 dismiss_optional_updater hull-relaunch
 capture hull-home
 assert_step MAIN_MENU
-touch_ui hull-home 640 384
+touch_ui hull-home 350 392
 sleep 2
 capture hull-scenarios
 assert_step SKIRMISH_SETUP
@@ -194,8 +194,8 @@ sleep 5
 dismiss_optional_updater campaign-relaunch
 capture campaign-main-menu
 assert_step MAIN_MENU
-# HOME's second item: NEW CAMPAIGN.
-touch_ui campaign-main-menu 640 448
+# Mobile HOME top-right tile: NEW CAMPAIGN.
+touch_ui campaign-main-menu 930 512
 sleep 2
 capture campaign-faction
 assert_step CAMPAIGN_FACTION_SETUP
@@ -236,7 +236,7 @@ sleep 5
 dismiss_optional_updater screensaver-relaunch
 capture screensaver-home
 assert_step MAIN_MENU
-touch_ui screensaver-home 640 60
+touch_ui screensaver-home 350 152
 sleep 4
 capture screensaver-exhibition
 adb logcat -d -v time > "$report/screensaver-logcat.txt"
