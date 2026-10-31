@@ -329,3 +329,11 @@ tasks.register('audioPitchVariationSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.AudioPitchVariantsTest'
 }
+
+tasks.register('ordnanceLibraryDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Nonblocking source-art test of 40 distinct missile bodies and animated motor states.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.OrdnanceLibrarySpritesTest'
+}
