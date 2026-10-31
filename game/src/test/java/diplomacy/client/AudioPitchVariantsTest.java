@@ -39,9 +39,37 @@ public final class AudioPitchVariantsTest {
             require(a.next("kinetic",AudioPitchVariants.Profile.COMBAT)==
                     b.next("kinetic",AudioPitchVariants.Profile.COMBAT),
                     "Seeded pitch sequence should be reproducible in diagnostics");
+        // Actual sound instance identity is more precise than logical cue text.
+        // Both PLASMA and TORPEDO can be routed to the same heavy_fire Sound.
+        AudioPitchVariants played=new AudioPitchVariants(549L);
+        Object sharedHeavyFire=new Object();
+        float previous=Float.NaN,twoBack=Float.NaN;
+        Set<Float> sameSampleVariants=new HashSet<>();
+        for(int i=0;i<700;i++){
+            float rate=played.nextSample(sharedHeavyFire,AudioPitchVariants.Profile.COMBAT);
+            require(rate!=previous&&rate!=twoBack,
+                    "One decoded sample shared by plasma and torpedoes must never repeat last two pitches");
+            sameSampleVariants.add(rate);
+            twoBack=previous;previous=rate;
+        }
+        require(sameSampleVariants.size()>=6,"Shared physical sample must vary in pitch");
+        // Even equal() objects can represent different decoded Sound allocations.
+        Object sampleA=new String("shared");
+        Object sampleB=new String("shared");
+        require(sampleA!=sampleB&&sampleA.equals(sampleB),"Test setup requires distinct identities");
+        float aFirst=played.nextSample(sampleA,AudioPitchVariants.Profile.UI);
+        float bFirst=played.nextSample(sampleB,AudioPitchVariants.Profile.UI);
+        require(aFirst>=.95f&&bFirst>=.95f,"Distinct loaded samples receive independent histories");
+        played.reset();
+        require(played.nextSample(sharedHeavyFire,AudioPitchVariants.Profile.COMBAT)>=.86f,
+                "Reset clears sample history without invalidating the decoded source");
         boolean rejected=false;
         try{a.next("",AudioPitchVariants.Profile.UI);}catch(IllegalArgumentException expected){rejected=true;}
         require(rejected,"Cannot vary an unnamed cue");
+        rejected=false;
+        try{played.nextSample(null,AudioPitchVariants.Profile.COMBAT);}
+        catch(IllegalArgumentException expected){rejected=true;}
+        require(rejected,"Null loaded sound must not consume pitch variants");
         System.out.println("PASS pitch variety, no last-two repeats, seeded replay, independent cues, profile bounds");
     }
 }

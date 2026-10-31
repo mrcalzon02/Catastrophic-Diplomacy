@@ -238,7 +238,7 @@ public final class CombatAudio implements AutoCloseable {
         if (tone != null) {
             try {
                 tone.play(effectsVolume*0.28f,
-                        pitchVariants.next(radioFlip?"radio_open":"radio_close",
+                        pitchVariants.nextSample(tone,
                                 AudioPitchVariants.Profile.RADIO),0f);
             }
             catch (RuntimeException error) { Gdx.app.error("AUDIO", "Radio cue failed",error); }
@@ -252,17 +252,17 @@ public final class CombatAudio implements AutoCloseable {
         if (click != null) {
             try {
                 click.play(effectsVolume * 0.42f,
-                        pitchVariants.next("ui_confirm",AudioPitchVariants.Profile.UI),0f);
+                        pitchVariants.nextSample(click,AudioPitchVariants.Profile.UI),0f);
             }
             catch (RuntimeException error) { Gdx.app.error("AUDIO", "UI cue failed", error); }
         }
     }
 
-    private void uiSound(Sound sound,float level,String cue){
+    private void uiSound(Sound sound,float level){
         if(!effectsOn||suspended||sound==null)return;
         try{
             sound.play(effectsVolume*level,
-                    pitchVariants.next(cue,AudioPitchVariants.Profile.UI),0f);
+                    pitchVariants.nextSample(sound,AudioPitchVariants.Profile.UI),0f);
         }catch(RuntimeException err){
             if(Gdx.app!=null)Gdx.app.error("AUDIO","UI feedback failed",err);
         }
@@ -270,15 +270,15 @@ public final class CombatAudio implements AutoCloseable {
     public void uiHover(){
         long now=System.nanoTime();
         if(now-lastHoverSoundNs<90_000_000L)return;
-        lastHoverSoundNs=now;uiSound(uiHoverSound,.16f,"ui_hover");
+        lastHoverSoundNs=now;uiSound(uiHoverSound,.16f);
     }
-    public void uiPress(){uiSound(uiPressSound,.35f,"ui_press");}
-    public void uiBack(){uiSound(uiBackSound,.34f,"ui_back");}
-    public void uiBlocked(){uiSound(uiBlockedSound,.29f,"ui_blocked");}
+    public void uiPress(){uiSound(uiPressSound,.35f);}
+    public void uiBack(){uiSound(uiBackSound,.34f);}
+    public void uiBlocked(){uiSound(uiBlockedSound,.29f);}
     public void uiAdjust(){
         long now=System.nanoTime();
         if(now-lastAdjustSoundNs<65_000_000L)return;
-        lastAdjustSoundNs=now;uiSound(uiAdjustSound,.28f,"ui_adjust");
+        lastAdjustSoundNs=now;uiSound(uiAdjustSound,.28f);
     }
     public void pause() {
         suspended = true;

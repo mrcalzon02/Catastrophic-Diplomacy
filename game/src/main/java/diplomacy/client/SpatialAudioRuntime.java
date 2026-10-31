@@ -201,7 +201,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
             long previous=lastCueTick.getOrDefault(p.key,Long.MIN_VALUE/2);
             if(p.tick-previous<p.cooldown)continue;
             try{
-                float pitch=pitchVariants.next(p.key,AudioPitchVariants.Profile.COMBAT);
+                float pitch=pitchVariants.nextSample(p.sound,AudioPitchVariants.Profile.COMBAT);
                 long voice=p.sound.play(clip(master*p.gain),pitch,p.pan);
                 if(voice<0)continue;
                 lastCueTick.put(p.key,p.tick);total++;
@@ -259,7 +259,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
                         &&battle.tick-voice.lastThrusterTick>=14) {
                     Sound burst=synth.get("thruster");
                     if(burst!=null)burst.play(clip(volume*0.35f*m.gain()),
-                            pitchVariants.next("thruster",AudioPitchVariants.Profile.THRUSTER),
+                            pitchVariants.nextSample(burst,AudioPitchVariants.Profile.THRUSTER),
                             m.pan());
                     voice.lastThrusterTick=battle.tick;
                 }

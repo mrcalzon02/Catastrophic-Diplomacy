@@ -1,6 +1,7 @@
 package diplomacy.client;
 
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 /**
@@ -25,6 +26,9 @@ final class AudioPitchVariants {
         int previous=-1,last=-1;
     }
     private final Map<String,History> recent = new HashMap<>();
+    // All logical combat/UI cues playing the SAME loaded Sound share one
+    // anti-repeat bag, even if the game labels them different weapon families.
+    private final IdentityHashMap<Object,History[]> samples = new IdentityHashMap<>();
     private long state;
 
     AudioPitchVariants(){this(System.nanoTime() ^ 0x5DEECE66DL);}
@@ -49,8 +53,27 @@ final class AudioPitchVariants {
     float next(String key,Profile profile){
         if(key==null||key.isEmpty()||profile==null)
             throw new IllegalArgumentException("Sound identity and profile required");
-        float[] values=notes(profile);
         History history=recent.computeIfAbsent(profile.name()+":"+key,k->new History());
+        return choose(history,profile);
+    }
+
+    /**
+     * Render-side anti-repeat keyed by the actual decoded Sound object.
+     * Two different weapon labels using the same heavy-fire sample therefore
+     * cannot accidentally repeat the same pitch. Identity comparison is
+     * intentional (sound instances are shared, strings and hash IDs are not).
+     */
+    float nextSample(Object sample,Profile profile){
+        if(sample==null||profile==null)
+            throw new IllegalArgumentException("Loaded sound and profile required");
+        History[] history=samples.computeIfAbsent(sample,k->new History[Profile.values().length]);
+        int index=profile.ordinal();
+        if(history[index]==null)history[index]=new History();
+        return choose(history[index],profile);
+    }
+
+    private float choose(History history,Profile profile){
+        float[] values=notes(profile);
         int available=0;
         for(int i=0;i<values.length;i++)
             if(i!=history.last&&i!=history.previous)available++;
@@ -67,5 +90,5 @@ final class AudioPitchVariants {
     }
 
     /** A new battle clears cue history but does not repeat the PRNG sequence. */
-    void reset(){recent.clear();}
+    void reset(){recent.clear();samples.clear();}
 }

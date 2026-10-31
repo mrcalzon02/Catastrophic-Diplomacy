@@ -81,3 +81,12 @@ Muting, pause/resume, battle reset and polyphony controls still apply.
 Test with `gradle :game:audioPitchVariationSmoke` (standalone diagnostic, not
 a release-blocking aesthetic check); then audition rapidly repeated close-up
 volleys, UI controls and radio bleeps on an actual Android handset and desktop.
+
+
+### Physical sample identity anti-repeat correction
+The playback-rate history is attached to the **loaded Sound instance** rather
+than just its event category. Shared samples (e.g. the heavy-fire recording
+selected by both plasma and torpedo fire) now have one shared history. The same
+rule applies to a loaded UI tone, radio bleep or thruster burst. Different sound
+assets have independent bags; logical event cooldown, event prioritization,
+attenuation, stereo pan and the recorded speech/music pitch are unchanged.
