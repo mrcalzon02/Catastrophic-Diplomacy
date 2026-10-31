@@ -329,6 +329,14 @@ tasks.register('ordnanceConfigurationSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('ordnancePropulsionSmoke') { finalizedBy(tasks.named('ordnanceConfigurationSmoke')) }
+tasks.register('ordnanceBlueprintSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate CD-SHIP-4 launcher blueprint migration, module tech gating and physical missile combat.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceBlueprintTest'
+    dependsOn testClasses
+}
+tasks.named('ordnanceConfigurationSmoke') { finalizedBy(tasks.named('ordnanceBlueprintSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
 // The functional release's gameFlowSmoke task is registered later in this file.
 

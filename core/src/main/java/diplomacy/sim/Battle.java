@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.OrdnanceFitting;
 import diplomacy.shipyard.SupportDoctrine;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.tech.TechnologyCatalog;
@@ -107,6 +108,19 @@ public final class Battle {
         /** Null only on legacy addShip(faction) test fixtures; real fitted ships
          * are governed by the per-socket research intersection. */
         public AmmunitionResearch.Access ammoAccess;
+        /** Weakest installed licensed socket: no higher-tech configurations
+         * on real fitted fleets. Unfitted legacy simulation fixtures are exempt. */
+        public int missileOrdnanceTier=-1,torpedoOrdnanceTier=-1;
+        public int ordnanceTier(DamageType family){
+            if(family==DamageType.MISSILE)return missileOrdnanceTier;
+            if(family==DamageType.TORPEDO)return torpedoOrdnanceTier;
+            throw new IllegalArgumentException("Not a guided launcher");
+        }
+        private void requireOrdnanceTier(DamageType family,int required){
+            if(ammoAccess!=null&&ordnanceTier(family)<required)
+                throw new IllegalArgumentException("Fitted "+family+
+                        " lacks guided technology tier "+required);
+        }
         public final EnumMap<DamageType,AmmunitionTable.Warhead> warheads=
                 new EnumMap<>(DamageType.class);
         public AmmunitionTable.Warhead warhead(DamageType family){
@@ -137,7 +151,9 @@ public final class Battle {
             return launchModes.getOrDefault(family,OrdnanceDoctrine.Mode.SINGLE);
         }
         public void setLaunchMode(DamageType family,OrdnanceDoctrine.Mode mode){
-            OrdnanceDoctrine.forWeapon(family,mode);launchModes.put(family,mode);
+            OrdnanceDoctrine.forWeapon(family,mode);
+            requireOrdnanceTier(family,OrdnanceFitting.requiredTier(mode));
+            launchModes.put(family,mode);
         }
         /** Motor and guidance are independent of salvo pattern. The old
          * doctrine-to-motor mapping remains the default for old designs. */
@@ -157,11 +173,13 @@ public final class Battle {
         public void setPropulsionMode(DamageType family,OrdnancePropulsion.Mode mode){
             OrdnanceDoctrine.patterns(family);
             if(mode==null)throw new IllegalArgumentException("Missing propulsion plan");
+            requireOrdnanceTier(family,OrdnanceFitting.requiredTier(mode));
             propulsionModes.put(family,mode);
         }
         public void setGuidanceMode(DamageType family,OrdnanceGuidance.Mode mode){
             OrdnanceDoctrine.patterns(family);
             if(mode==null)throw new IllegalArgumentException("Missing seeker doctrine");
+            requireOrdnanceTier(family,OrdnanceFitting.requiredTier(mode));
             guidanceModes.put(family,mode);
         }
         /** Null clears an override and restores the legacy salvo default. */
@@ -713,6 +731,14 @@ public final class Battle {
         s.pdCycle=machinery.pdCycle();
         s.weapons=machinery.weapons();
         s.ammoAccess=machinery.ammunition();
+        s.missileOrdnanceTier=OrdnanceFitting.fittedTier(design,DamageType.MISSILE);
+        s.torpedoOrdnanceTier=OrdnanceFitting.fittedTier(design,DamageType.TORPEDO);
+        for(DamageType family:new DamageType[]{DamageType.MISSILE,DamageType.TORPEDO}){
+            OrdnanceFitting.Guided guided=design.ordnance(family);
+            s.setLaunchMode(family,guided.salvo());
+            s.setPropulsionMode(family,guided.motor());
+            s.setGuidanceMode(family,guided.guidance());
+        }
         // A fleet blueprint owns the chosen, research-licensed physical loads.
         // Stock ammo remains the exact default for legacy CD-SHIP-1/2 fleets.
         s.setKineticType(design.ammoSelection.kinetic());

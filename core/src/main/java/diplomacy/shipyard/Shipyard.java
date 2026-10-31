@@ -5,6 +5,9 @@ import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionResearch;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
+import diplomacy.sim.OrdnanceDoctrine;
+import diplomacy.sim.OrdnancePropulsion;
+import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 import diplomacy.tech.TechnologyCatalog.Upgrade;
@@ -210,6 +213,12 @@ public final class Shipyard {
         /** Hangar payload is a separately chosen launch loadout, not a cosmetic sprite. */
         public final FighterModel.Hull fighterHull;
         public final AmmoSelection ammoSelection;
+        public final OrdnanceFitting.Guided missileOrdnance,torpedoOrdnance;
+        public OrdnanceFitting.Guided ordnance(Battle.DamageType family){
+            if(family==Battle.DamageType.MISSILE)return missileOrdnance;
+            if(family==Battle.DamageType.TORPEDO)return torpedoOrdnance;
+            throw new IllegalArgumentException("Not guided ordnance");
+        }
         private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted){
             this(group,frame,callSign,mounted,FighterModel.Hull.ASSAULT_GUNSHIP,
                     AmmoSelection.STANDARD);
@@ -220,14 +229,20 @@ public final class Shipyard {
         }
         private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
                        FighterModel.Hull craftType,AmmoSelection loadout){
+            this(group,frame,callSign,mounted,craftType,loadout,
+                    OrdnanceFitting.Guided.STANDARD,OrdnanceFitting.Guided.STANDARD);
+        }
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
+                       FighterModel.Hull craftType,AmmoSelection loadout,
+                       OrdnanceFitting.Guided missile,OrdnanceFitting.Guided torpedo){
             if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70)
                 throw new IllegalArgumentException("Invalid vessel identity");
             if(mounted.size()!=frame.slots.size())
                 throw new IllegalArgumentException("Incorrect hardpoint count");
-            if(craftType==null||loadout==null)
+            if(craftType==null||loadout==null||missile==null||torpedo==null)
                 throw new IllegalArgumentException("Ship equipment selections required");
             faction=group;hull=frame;name=callSign;fighterHull=craftType;
-            ammoSelection=loadout;
+            ammoSelection=loadout;missileOrdnance=missile;torpedoOrdnance=torpedo;
             parts=Collections.unmodifiableList(new ArrayList<>(mounted));
         }
         private Design verifyAmmo(){
@@ -237,10 +252,21 @@ public final class Shipyard {
                     ||!available.allows(Battle.DamageType.TORPEDO,ammoSelection.torpedo()))
                 throw new IllegalArgumentException(
                         "Selected ammunition locked: change it to STANDARD before changing its weapon research");
+            OrdnanceFitting.requireAllowed(this,Battle.DamageType.MISSILE,missileOrdnance);
+            OrdnanceFitting.requireAllowed(this,Battle.DamageType.TORPEDO,torpedoOrdnance);
             return this;
         }
+        public Design withGuidedOrdnance(Battle.DamageType family,
+                                         OrdnanceFitting.Guided choice){
+            if(choice==null)throw new IllegalArgumentException("Missing guided fit");
+            OrdnanceFitting.suffix(family);
+            return new Design(faction,hull,name,parts,fighterHull,ammoSelection,
+                    family==Battle.DamageType.MISSILE?choice:missileOrdnance,
+                    family==Battle.DamageType.TORPEDO?choice:torpedoOrdnance).verifyAmmo();
+        }
         public Design withAmmoSelection(AmmoSelection selected){
-            return new Design(faction,hull,name,parts,fighterHull,selected).verifyAmmo();
+            return new Design(faction,hull,name,parts,fighterHull,selected,
+                    missileOrdnance,torpedoOrdnance).verifyAmmo();
         }
         public Design withKineticAmmunition(AmmunitionTable.Kinetic selected){
             return withAmmoSelection(new AmmoSelection(selected,
@@ -262,10 +288,12 @@ public final class Shipyard {
             if(existing==null)throw new IllegalArgumentException("Empty socket cannot be versioned");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(existing.component,existing.stages,pattern,mark));
-            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
+                    missileOrdnance,torpedoOrdnance).verifyAmmo();
         }
         public Design withFighterHull(FighterModel.Hull type) {
-            return new Design(faction,hull,name,parts,type,ammoSelection).verifyAmmo();
+            return new Design(faction,hull,name,parts,type,ammoSelection,
+                    missileOrdnance,torpedoOrdnance).verifyAmmo();
         }
         public Installed at(int slot) { return parts.get(slot); }
         public int slots() { return parts.size(); }
@@ -276,7 +304,8 @@ public final class Shipyard {
                 throw new IllegalArgumentException("Invalid base component ID");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,baseId==null?null:new Installed(baseId, Map.of()));
-            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
+                    missileOrdnance,torpedoOrdnance).verifyAmmo();
         }
         public Design stage(int slot, Track track, int level) {
             if(level<0||level>9||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..9");
@@ -291,7 +320,8 @@ public final class Shipyard {
             if(level==0) updated.remove(track); else updated.put(track,level);
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(current.component,updated,current.pattern,current.mark));
-            return new Design(faction,hull,name,changed,fighterHull,ammoSelection).verifyAmmo();
+            return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
+                    missileOrdnance,torpedoOrdnance).verifyAmmo();
         }
     }
     public static String factionId(Battle.Faction faction) {
@@ -434,6 +464,11 @@ public final class Shipyard {
         if(draw>generation+1e-8)errors.add("Insufficient reactor output");
         if(heat>cooling+1e-8)errors.add("Thermal rejection insufficient");
         if(!Double.isFinite(mass+volume+draw+generation+heat+cooling))errors.add("Nonfinite engineering values");
+        for(Battle.DamageType family:new Battle.DamageType[]{
+                Battle.DamageType.MISSILE,Battle.DamageType.TORPEDO}){
+            try{OrdnanceFitting.requireAllowed(design,family,design.ordnance(family));}
+            catch(IllegalArgumentException invalid){errors.add(invalid.getMessage());}
+        }
         return new Report(List.copyOf(errors),mass,volume,draw,generation,heat,cooling,industry,research);
     }
 
@@ -775,18 +810,29 @@ public final class Shipyard {
                 newer=true;
         }
         boolean specializedAmmo=!design.ammoSelection.equals(AmmoSelection.STANDARD);
-        StringBuilder out=new StringBuilder(specializedAmmo?"CD-SHIP-3|"
+        boolean customGuided=!design.missileOrdnance.equals(OrdnanceFitting.Guided.STANDARD)
+                ||!design.torpedoOrdnance.equals(OrdnanceFitting.Guided.STANDARD);
+        StringBuilder out=new StringBuilder(customGuided?"CD-SHIP-4|":
+                specializedAmmo?"CD-SHIP-3|"
                 :newer?"CD-SHIP-2|":"CD-SHIP-1|")
                 .append(design.faction.name()).append('|')
                 .append(design.hull.name()).append('|')
                 .append(Base64.getUrlEncoder().withoutPadding()
                         .encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
         // Preserve exact legacy CD-SHIP-1/2 when no purpose-loaded ammo.
-        if(specializedAmmo)
+        if(specializedAmmo||customGuided){
             out.append('|').append(design.fighterHull.name())
                     .append('|').append(design.ammoSelection.kinetic().name())
                     .append('|').append(design.ammoSelection.missile().name())
                     .append('|').append(design.ammoSelection.torpedo().name());
+            if(customGuided){
+                for(OrdnanceFitting.Guided fit:new OrdnanceFitting.Guided[]{
+                        design.missileOrdnance,design.torpedoOrdnance})
+                    out.append('|').append(fit.salvo().name())
+                            .append('|').append(fit.motor().name())
+                            .append('|').append(fit.guidance().name());
+            }
+        }
         else if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
             out.append('|').append(design.fighterHull.name());
         out.append('\n');
@@ -795,7 +841,7 @@ public final class Shipyard {
             if(installed==null)continue;
             out.append(i).append('|').append(installed.component);
             for(Track track:Track.values())out.append('|').append(installed.stage(track));
-            if(newer||specializedAmmo)out.append('|').append(installed.pattern.name())
+            if(newer||specializedAmmo||customGuided)out.append('|').append(installed.pattern.name())
                     .append('|').append(installed.mark);
             out.append('\n');
         }
@@ -806,9 +852,11 @@ public final class Shipyard {
         String[] lines=encoded.split("\\n",-1);
         if(lines.length<2||lines.length>70)throw new IllegalArgumentException("Invalid blueprint lines");
         String[] header=lines[0].split("\\|",-1);
-        boolean hasAmmo=header.length>=1&&"CD-SHIP-3".equals(header[0]);
+        boolean hasGuided=header.length>=1&&"CD-SHIP-4".equals(header[0]);
+        boolean hasAmmo=hasGuided||header.length>=1&&"CD-SHIP-3".equals(header[0]);
         boolean hasVersions=hasAmmo||header.length>=1&&"CD-SHIP-2".equals(header[0]);
-        if((hasAmmo?header.length!=8:(header.length!=4&&header.length!=5))
+        if((hasGuided?header.length!=14:hasAmmo?header.length!=8:
+                (header.length!=4&&header.length!=5))
                 ||(!hasVersions&&!"CD-SHIP-1".equals(header[0])))
             throw new IllegalArgumentException("Wrong ship file version");
         final Design base;
@@ -882,6 +930,22 @@ public final class Shipyard {
             }catch(IllegalArgumentException invalid){
                 throw new IllegalArgumentException(
                         "Blueprint ammo is not licensed by the fitted module research",invalid);
+            }
+        }
+        if(hasGuided){
+            try{
+                design=design.withGuidedOrdnance(Battle.DamageType.MISSILE,
+                        new OrdnanceFitting.Guided(
+                                OrdnanceDoctrine.Mode.valueOf(header[8]),
+                                OrdnancePropulsion.Mode.valueOf(header[9]),
+                                OrdnanceGuidance.Mode.valueOf(header[10])));
+                design=design.withGuidedOrdnance(Battle.DamageType.TORPEDO,
+                        new OrdnanceFitting.Guided(
+                                OrdnanceDoctrine.Mode.valueOf(header[11]),
+                                OrdnancePropulsion.Mode.valueOf(header[12]),
+                                OrdnanceGuidance.Mode.valueOf(header[13])));
+            }catch(RuntimeException bad){
+                throw new IllegalArgumentException("Invalid or unauthorized guided weapon blueprint",bad);
             }
         }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
