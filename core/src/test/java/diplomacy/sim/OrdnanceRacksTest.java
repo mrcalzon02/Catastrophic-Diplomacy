@@ -76,7 +76,7 @@ public final class OrdnanceRacksTest {
         Battle world=new Battle(122934L);
         world.spawnWing(0,fitted(catalog),catalog,1,200,300);
         world.spawnWing(1,Shipyard.starter(Battle.Faction.CARNELIAN,
-                Shipyard.Hull.DREADNOUGHT),catalog,1,540,300);
+                Shipyard.Hull.DREADNOUGHT),catalog,1,380,300);
         return world;
     }
     private static void firing(TechnologyCatalog catalog){
@@ -90,7 +90,12 @@ public final class OrdnanceRacksTest {
                 "Each rack must retain its original fitted socket");
         one.step();two.step();
         check(src.launched==2&&one.salvosStarted==2,
-                "Two independent rack controllers must fire simultaneously");
+                "Two independent rack controllers must fire simultaneously"
+                +" launched="+src.launched+" salvos="+one.salvosStarted
+                +" pending="+one.pendingSalvoCount()
+                +" ammo="+src.missileAmmo+" damage="+src.missileDamage
+                +" sensor="+src.sensorRange+" reach="+src.weapons.missileRange()
+                +" power="+src.power+" racks="+src.launchers.size());
         check(src.missileAmmo==initial-2,
                 "Each physical launch pays exact shared ammunition");
         check(src.launchers.stream().mapToInt(x->x.magazine).sum()==initial-2,
