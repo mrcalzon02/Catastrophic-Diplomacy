@@ -187,6 +187,8 @@ public final class FighterCraftTest {
                 fleetCarrier,tech,917101L);
         long id=original.ships().get(0).id();
         var inReserve=original.setActive(id,false,200);
+        check(inReserve.cost(id,CampaignFleet.Service.REPAIR,tech)==0,
+                "Pristine native armor must not incur phantom one-credit repairs");
         int purchased=inReserve.get(id).stores().fighters();
         check(purchased==Shipyard.fit(fleetCarrier,tech).fighterCapacity(),
                 "Existing carrier's purchased complement must be preserved");
