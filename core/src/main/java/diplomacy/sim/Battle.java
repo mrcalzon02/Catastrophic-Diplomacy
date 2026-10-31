@@ -1772,7 +1772,10 @@ public final class Battle {
                 fighterTarget!=null&&ship.fighterReserve>0 &&
                 ship.fighterReload<=0 && crafts.size()<2000) {
             crafts.add(new Craft(nextCraftId++,ship,true,fighterTarget.id));
-            visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,enemy.id,
+            // SCREEN/PROTECT can acquire a defensive threat even when the
+            // ordinary offensive selector found no enemy. Attribute the sortie
+            // to its actual target rather than dereferencing a null enemy.
+            visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,fighterTarget.id,
                     ship.x,ship.y,fighterTarget.x,fighterTarget.y);
             ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
             radio(ship,CrewChatter.Event.LAUNCH);
