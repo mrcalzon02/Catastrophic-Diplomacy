@@ -231,21 +231,23 @@ public final class TerranPlaceholderSprites implements Disposable {
         long result=0xcbf29ce484222325L;
         for(int row=0;row<GRID;row++)for(int col=0;col<GRID;col++){
             var tile=ship.defense.tile(row,col);
-            long quantized=tile.occupied?StrictMath.round(tile.exposure()*128.0):0;
-            result=(result^quantized)*0x100000001b3L;
+            long armor=tile.occupied?StrictMath.round(tile.exposure()*128.0):0;
+            long internal=tile.occupied?StrictMath.round(tile.internalDamage()*128.0):0;
+            result=(result^armor)*0x100000001b3L;
+            result=(result^internal)*0x100000001b3L;
         }
         return result;
     }
-    private static float exposure(Battle.Ship ship,int row,int col) {
+    private static float cellDamage(Battle.Ship ship,int row,int col,boolean internal) {
         if(row<0||col<0||row>=GRID||col>=GRID)return 0;
         var tile=ship.defense.tile(row,col);
-        return tile.occupied?(float)tile.exposure():0;
+        return !tile.occupied?0:(float)(internal?tile.internalDamage():tile.exposure());
     }
-    private static float surfaceExposure(Battle.Ship ship,double row,double col) {
+    private static float surfaceDamage(Battle.Ship ship,double row,double col,boolean internal) {
         int r=(int)StrictMath.floor(row),c=(int)StrictMath.floor(col);
         float dy=(float)(row-r),dx=(float)(col-c);
-        float first=exposure(ship,r,c)*(1-dx)+exposure(ship,r,c+1)*dx;
-        float second=exposure(ship,r+1,c)*(1-dx)+exposure(ship,r+1,c+1)*dx;
+        float first=cellDamage(ship,r,c,internal)*(1-dx)+cellDamage(ship,r,c+1,internal)*dx;
+        float second=cellDamage(ship,r+1,c,internal)*(1-dx)+cellDamage(ship,r+1,c+1,internal)*dx;
         return first*(1-dy)+second*dy;
     }
     private static float noise(int x,int y,int salt) {
@@ -254,9 +256,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         return ((hash^(hash>>>16))&0xffff)/65535f-0.5f;
     }
     /**
-     * Per-pixel original hull opacity is eroded by the actual tile armor loss.
-     * Neighbor bilinear sampling removes grid edges; stable fine/coarse noise
-     * makes irregular crater lips instead of square checkerboard transparency.
+     * Shallow armor wear darkens plating without opening a hole. Severe armor
+     * loss or actual internal damage erodes hull alpha to reveal structural
+     * material; bilinear cells and stable noise shape the crater lips.
      * The pixel's existing RGBA alpha is never increased or extended off-hull.
      */
     private Texture erodedExterior(Battle.Ship ship,Texture original){
@@ -275,15 +277,12 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(originalAlpha==0){output.drawPixel(x,y,0);continue;}
                 double tileRow=(y+0.5)*GRID/MASK_H-0.5;
                 double tileCol=(x+0.5)*GRID/MASK_W-0.5;
-                float damage=surfaceExposure(ship,tileRow,tileCol);
+                float damage=surfaceDamage(ship,tileRow,tileCol,false);
+                float internal=surfaceDamage(ship,tileRow,tileCol,true);
                 float rough=noise(x/4,y/4,ship.id)*0.70f+
                         noise(x,y,ship.id*31)*0.30f;
-                float erosion=Math.max(0,Math.min(1,
-                        damage*1.16f+rough*Math.min(0.45f,damage*0.70f)));
-                int alpha=Math.max(0,Math.min(255,
-                        (int)(originalAlpha*(1f-erosion)+0.5f)));
-                int darkened=ShipDamageScorch.darken(originalPixel,damage,rough);
-                output.drawPixel(x,y,(darkened&0xffffff00)|alpha);
+                output.drawPixel(x,y,ShipSurfaceDamageVisual.pixel(
+                        originalPixel,damage,internal,rough));
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);

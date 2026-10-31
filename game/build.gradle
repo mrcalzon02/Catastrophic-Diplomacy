@@ -260,3 +260,12 @@ tasks.register('capitalTurretSmoke', JavaExec) {
     mainClass = 'diplomacy.client.CapitalTurretSpritesTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('capitalTurretSmoke') }
+
+// Nonblocking artwork diagnostic: never a dependency of menuFlowSmoke.
+tasks.register('shipDamageVisualSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check scorch/penetration alpha separation and original pixel silhouette.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipSurfaceDamageVisualTest'
+}
