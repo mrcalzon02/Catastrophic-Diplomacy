@@ -8,6 +8,7 @@ import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnancePropulsion;
+import diplomacy.sim.OrdnanceSubmunitions;
 import diplomacy.sim.FighterModel;
 import diplomacy.sim.ShipStandingOrders;
 import diplomacy.sim.BattleOrders;
@@ -184,13 +185,19 @@ final class GameWikiCatalog {
                 OrdnanceDoctrine.Pattern p=OrdnanceDoctrine.forWeapon(family,mode);
                 a.add(new Article("salvo."+family+"."+mode,"ORDNANCE",
                     nice(family.name())+" / "+nice(mode.name())+" salvo",
-                    "Physical launch doctrine: "+p.real()+" armed projectiles and "+p.decoys()+" decoys in a salvo; total "+p.ammoNeeded()+" units of stored ammunition.",
+                    "Physical launch doctrine: "+p.real()+" guided launch bodies and "+p.decoys()+" decoys in a salvo; total "+p.ammoNeeded()+" units of stored ammunition.",
                     "Spacing "+p.intervalTicks()+" simulation ticks; cold ignition delay "+p.ignitionDelayTicks()+" ticks; reload x"+number(p.reloadMultiplier())+".",
                     "Per-projectile damage x"+number(p.damageMultiplier())+
                         ", velocity x"+number(p.velocityMultiplier())+", durability x"+
                         number(p.durabilityMultiplier())+", radar cross-section x"+
                         number(p.crossSectionMultiplier())+", emissions x"+number(p.signatureMultiplier())+".",
-                    "Payload pattern "+nice(p.payload().name())+". Decoys are real projectiles, not free visual flares. Launcher mounts and missile guidance remain independently fitted."));
+                    "Payload pattern "+nice(p.payload().name())+". "+
+                    (OrdnanceSubmunitions.carrier(p.payload())
+                        ?"Each surviving carrier releases "+OrdnanceSubmunitions.children(p.payload())+
+                            " independently guided and interceptable "+(OrdnanceSubmunitions.ultra(p.payload())
+                            ?"ultra-micro":"micro")+" missiles in flight. The carrier has no impact damage when it opens; its original warhead budget is divided among the children. "
+                        :"")+
+                    "Decoys are real projectiles, not free visual flares. Launcher mounts and missile guidance remain independently fitted."));
             }
         for(OrdnancePropulsion.Mode mode:OrdnancePropulsion.Mode.values())
             a.add(new Article("propulsion."+mode,"ORDNANCE",nice(mode.name())+" motor",

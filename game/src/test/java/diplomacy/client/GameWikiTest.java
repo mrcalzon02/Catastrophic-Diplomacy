@@ -42,7 +42,8 @@ public final class GameWikiTest {
                     .anyMatch(e->e.id.equals("fighter."+type.name())),"Missing fighter "+type);
         for(var mode:OrdnanceDoctrine.Mode.values())
             check(catalog.search("ORDNANCE",mode.name()).stream()
-                    .filter(e->e.id.startsWith("salvo.")).count()==2,
+                    .filter(e->e.id.equals("salvo.MISSILE."+mode)
+                            ||e.id.equals("salvo.TORPEDO."+mode)).count()==2,
                     "Missile and torpedo salvo entries must both exist for "+mode);
         GameWikiPanel ui=new GameWikiPanel(catalog,true);
         check(ui.resultCount()>8&&ui.categoryIndex()==1,"Mobile guide landing page absent");
