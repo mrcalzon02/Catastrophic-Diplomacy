@@ -305,3 +305,11 @@ tasks.register('weaponStageArtSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.WeaponStageArtTest'
 }
+
+tasks.register('laserFxDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Nonblocking visual-art diagnostic: ten original laser event-to-atlas routes.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.LaserRun01FxTest'
+}
