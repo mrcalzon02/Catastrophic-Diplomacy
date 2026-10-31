@@ -93,6 +93,10 @@ start_game(){
   sleep 3
   capture "$current-home"
 }
+# Android 10's immersive-mode confirmation is a system overlay reading
+# "Viewing full screen / GOT IT". It intercepts campaign button taps.
+# This same OS test setup is already used by android_verify_menu.sh.
+adb shell settings put secure immersive_mode_confirmations confirmed
 adb shell pm clear "$package" > "$report/clear-package.txt"
 factions=(TERRAN DRAXIAN CARNELIAN ZIPPLEDROW UZIPT MANDRALLY
           VAERITH_PRISM ZELTHAR_LUMINARI AUREATE_SYNOD NYX_BIOLITH UMBRA_FOUNDRY)
