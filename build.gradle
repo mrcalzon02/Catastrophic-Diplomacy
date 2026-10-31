@@ -190,6 +190,118 @@ tasks.register('prepareModularWeaponFx') {
     }
 }
 
+
+/**
+ * Ten fully timed original laser FX animations retained byte-for-byte as
+ * Library ZIP source. Full resolution is staged for desktop; Android receives
+ * half-resolution runtime derivatives, not modified source artwork.
+ *
+ * Cosmetic art is never a release blocker: if the optional VFX pack is absent
+ * or invalid, leave staging empty and retain the 35 original beam-strip fallback.
+ */
+def laserRun01Parts=(0..<17).collect {
+    file('asset_packs/laser-run01/part-' + String.format('%02d',it) + '.b64')
+}
+def laserFullOutput=layout.buildDirectory.dir('generated/cd-laser-full')
+def laserMobileOutput=layout.buildDirectory.dir('generated/cd-laser-mobile')
+tasks.register('prepareLaserRun01') {
+    group = 'assets'
+    description = 'Stage 10 original 30fps laser animations, including mobile-optimized atlas derivatives.'
+    inputs.files laserRun01Parts
+    outputs.dir laserFullOutput
+    outputs.dir laserMobileOutput
+    doLast {
+        def full=laserFullOutput.get().asFile
+        def mobile=laserMobileOutput.get().asFile
+        project.delete(full,mobile)
+        full.mkdirs()
+        mobile.mkdirs()
+        try {
+            if(laserRun01Parts.any { !it.isFile() })
+                throw new IllegalArgumentException('Missing original laser ZIP segments')
+            def encoded=new StringBuilder(7628648)
+            laserRun01Parts.eachWithIndex { p,i ->
+                String segment=p.getText('US-ASCII').trim()
+                if(segment.length()!=(i==16?428648:450000) ||
+                        !(segment ==~ /[A-Za-z0-9+\/=]+/))
+                    throw new IllegalArgumentException('Bad original laser segment '+p.name)
+                encoded.append(segment)
+            }
+            byte[] zipped=java.util.Base64.decoder.decode(encoded.toString())
+            def digest={ byte[] data ->
+                java.security.MessageDigest.getInstance('SHA-256').digest(data).encodeHex().toString()
+            }
+            if(zipped.length!=5721485 || digest(zipped)!=
+                    'd5411c2cfaade00952a1d1d415282f077b0c2c7f0826bf493844d1fc2bc3d916')
+                throw new IllegalArgumentException('Original laser ZIP SHA-256 mismatch')
+            def archive=new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zipped))
+            def records=[:]
+            archive.withCloseable { stream ->
+                for(java.util.zip.ZipEntry entry;(entry=stream.nextEntry)!=null;){
+                    if(entry.name=='manifest.json'||entry.name.startsWith('atlases/'))
+                        records[entry.name]=stream.readAllBytes()
+                    stream.closeEntry()
+                }
+            }
+            def manifestBytes=records['manifest.json']
+            if(manifestBytes==null)throw new IllegalArgumentException('Laser manifest absent')
+            def manifest=new groovy.json.JsonSlurper().parseText(
+                    new String(manifestBytes,java.nio.charset.StandardCharsets.UTF_8))
+            if(manifest.schema!='catastrophic-diplomacy.weapon-vfx.v2'
+                    || manifest.weapon_count!=10 || manifest.weapon_animations.size()!=10
+                    || manifest.fps!=30)
+                throw new IllegalArgumentException('Unexpected original laser inventory')
+            def expected=['01_pulse_laser','02_rapid_repeater','03_heavy_cannon',
+                '04_cutting_beam','05_stuttering_burst','06_sniper_laser',
+                '07_tri_beam','08_sweeping_laser','09_prism_split','10_overcharged_flash']
+            int staged=0
+            manifest.weapon_animations.eachWithIndex { fx,i ->
+                if(fx.id!=expected[i] || fx.sheet_columns!=8 ||
+                        fx.frame_size_px!=[512,160] || fx.frame_count<1 ||
+                        fx.frame_count>96 || fx.sheet_rows!=Math.ceil(fx.frame_count/8.0) as int)
+                    throw new IllegalArgumentException('Invalid laser animation '+fx.id)
+                String entry='atlases/'+fx.id+'.png'
+                byte[] original=records[entry]
+                if(original==null || digest(original)!=fx.atlas_sha256)
+                    throw new IllegalArgumentException('Missing/corrupt laser original '+entry)
+                def image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(original))
+                if(image==null || image.width!=4096 ||
+                        image.height!=160*(fx.sheet_rows as int))
+                    throw new IllegalArgumentException('Invalid laser atlas geometry '+entry)
+                String target='effects/lasers/run01/'+entry
+                def originalOut=new File(full,target)
+                originalOut.parentFile.mkdirs()
+                originalOut.bytes=original // never rewrite original desktop pixels
+                def reduced=new java.awt.image.BufferedImage(image.width/2,image.height/2,
+                        java.awt.image.BufferedImage.TYPE_INT_ARGB)
+                def g=reduced.createGraphics()
+                try {
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                            java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+                    g.drawImage(image,0,0,reduced.width,reduced.height,null)
+                } finally {g.dispose()}
+                def mobileOut=new File(mobile,target)
+                mobileOut.parentFile.mkdirs()
+                if(!javax.imageio.ImageIO.write(reduced,'png',mobileOut))
+                    throw new IllegalArgumentException('Mobile atlas encoder failed '+entry)
+                staged++
+            }
+            for(def dest:[full,mobile]){
+                def output=new File(dest,'effects/lasers/run01/manifest.json')
+                output.parentFile.mkdirs()
+                output.bytes=manifestBytes
+            }
+            println('PASS: 10 original desktop laser atlases and 10 mobile derivatives staged.')
+        }catch(Exception problem){
+            project.delete(full,mobile)
+            full.mkdirs()
+            mobile.mkdirs()
+            logger.warn('LASER-VFX OPTIONAL: '+problem.message+
+                    '; using original beam strips instead. This is diagnostic, not a release gate.')
+        }
+    }
+}
+
 /**
  * The user's original five-faction, ten-roles-per-faction fighter art.
  * Binary chunks reconstruct the original ZIP byte-for-byte. Do not substitute
