@@ -68,6 +68,7 @@ public final class FleetLobbyTest {
         }
         try(BattleServer host=BattleServer.openLanLobby("127.0.0.1",0,303L,low);
             Socket raw=new Socket("127.0.0.1",host.port())){
+            raw.setSoTimeout(5000);
             Hbnet.write(raw.getOutputStream(),"PLAYER|1");
             check(Hbnet.read(raw.getInputStream()).startsWith("WELCOME|1|"),"Raw seat handshake");
             Hbnet.write(raw.getOutputStream(),"FLEET_BEGIN|160001|58|"+

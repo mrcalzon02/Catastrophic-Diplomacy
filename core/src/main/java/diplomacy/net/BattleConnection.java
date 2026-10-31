@@ -47,6 +47,15 @@ public final class BattleConnection implements AutoCloseable {
             socket.setSoTimeout(30000);
         }catch(IOException|RuntimeException e){socket.close();throw Hbnet.failure();}
         Thread reader=new Thread(this::read,"diplomacy-authoritative-events");reader.setDaemon(true);reader.start();
+        // A passive lobby player must remain connected beyond the socket's 30-second
+        // input deadline. Heartbeats also prevent an idle spectator's server timeout.
+        Thread heartbeat=new Thread(()->{
+            while(connected){
+                try{Thread.sleep(10_000);if(connected)synchronized(this){
+                    Hbnet.write(socket.getOutputStream(),"SNAPSHOT");
+                }}catch(IOException|InterruptedException stopped){close();return;}
+            }
+        },"diplomacy-connection-heartbeat");heartbeat.setDaemon(true);heartbeat.start();
     }
     public Snapshot snapshot(){return snapshot;}
     public boolean connected(){return connected;}
