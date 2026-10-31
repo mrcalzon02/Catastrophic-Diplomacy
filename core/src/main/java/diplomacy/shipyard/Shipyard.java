@@ -582,6 +582,21 @@ public final class Shipyard {
     }
 
     /** Bounded combat parameters directly consumed by the authoritative Battle simulation. */
+    /**
+     * Physical flight-deck throughput. Each installed FTR support module brings
+     * an auxiliary launch bay even to hulls that originally had none. Carrier
+     * hulls have several innate bays and always retain their launch advantage.
+     * Fighter STORAGE remains independently calculated by fit().
+     */
+    public static int fighterLaunchBays(Design design){
+        if(design==null)throw new IllegalArgumentException("Missing fighter ship design");
+        int bays=HullBaseline.builtInLaunchBays(design.hull);
+        for(int i=0;i<design.slots();i++){
+            Installed installed=design.at(i);
+            if(installed!=null&&installed.component.endsWith("-FTR"))bays++;
+        }
+        return bays;
+    }
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
                          double speed, double accuracy, double laserDamage, double missileDamage,
