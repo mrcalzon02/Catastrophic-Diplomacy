@@ -106,19 +106,48 @@ final class GameMenuPanel {
         "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT","MULTIPLAYER"
     };
 
+    /** Android landscape command tiles, independent of the desktop mouse layout. */
+    private static final int[] MOBILE_HOME_ORDER={0,1,2,3,4,6,7,5};
+    private static final float MOBILE_COLUMN_WIDTH=552f;
+    private static final float MOBILE_VOICE_LEFT=225f,MOBILE_VOICE_WIDTH=832f;
+    private static float mobileColumnX(int slot){return 72+(slot%2)*584;}
+    private static float mobileHomeY(int slot){return 464-(slot/2)*120;}
+    private static float mobileOptionY(int slot){return 350-(slot/2)*115;}
+    private final boolean mobileLayout;
+    GameMenuPanel(){this(false);}
+    GameMenuPanel(boolean mobileLayout){this.mobileLayout=mobileLayout;}
+    boolean mobileLayout(){return mobileLayout;}
+    static boolean voiceHit(float x,float y,boolean mobile){
+        return mobile?hit(x,y,120,462,1040,108):VoiceVolumeControl.hit(x,y);
+    }
+    static float voiceAt(float x,boolean mobile){
+        return mobile?VoiceVolumeControl.clamp((x-MOBILE_VOICE_LEFT)/MOBILE_VOICE_WIDTH):
+                VoiceVolumeControl.valueAt(x);
+    }
     static boolean hit(float x,float y,float bx,float by,float w,float h){
         return x>=bx&&x<=bx+w&&y>=by&&y<=by+h;
     }
     /** Shared options hit contract, including a real disabled updater state. */
     static int optionsAction(float x,float y,boolean updaterAvailable){
-        if(VoiceVolumeControl.hit(x,y))return 0;
+        return optionsAction(x,y,updaterAvailable,false);
+    }
+    static int optionsAction(float x,float y,boolean updaterAvailable,boolean mobile){
+        if(voiceHit(x,y,mobile))return 0;
         for(int i=0;i<5;i++){
-            if(hit(x,y,405,472-i*78,470,59))
-                return i==3&&!updaterAvailable?-2:i+1;
+            boolean inside=mobile?hit(x,y,mobileColumnX(i),mobileOptionY(i),
+                    MOBILE_COLUMN_WIDTH,94):hit(x,y,405,472-i*78,470,59);
+            if(inside)return i==3&&!updaterAvailable?-2:i+1;
         }
         return -1;
     }
-    static int homeHit(float x,float y){
+    static int homeHit(float x,float y){return homeHit(x,y,false);}
+    static int homeHit(float x,float y,boolean mobile){
+        if(mobile){
+            for(int slot=0;slot<MOBILE_HOME_ORDER.length;slot++)
+                if(hit(x,y,mobileColumnX(slot),mobileHomeY(slot),
+                        MOBILE_COLUMN_WIDTH,96))return MOBILE_HOME_ORDER[slot];
+            return -1;
+        }
         for(int i=0;i<HOME_ACTIONS.length;i++)
             if(hit(x,y,438,487-i*64,404,50))return i;
         if(hit(x,y,438,35,404,50))return 7; // Unattended battle screensaver
@@ -376,8 +405,22 @@ final class GameMenuPanel {
         rectangle(shapes,37,622,132,2,MilitaryUiTheme.AMBER);
         switch(screen){
             case HOME -> {
-                for(int i=0;i<HOME_ACTIONS.length;i++)button(shapes,438,487-i*64,404,50,false);
-                button(shapes,438,35,404,50,false);
+                if(mobileLayout){
+                    rectangle(shapes,62,578,1156,3,MilitaryUiTheme.FRAME_BRIGHT);
+                    rectangle(shapes,62,578,215,3,MilitaryUiTheme.AMBER);
+                    for(int slot=0;slot<MOBILE_HOME_ORDER.length;slot++){
+                        int action=MOBILE_HOME_ORDER[slot];
+                        float x=mobileColumnX(slot),y=mobileHomeY(slot);
+                        if(action==0||action==1||action==7)
+                            actionButton(shapes,x,y,MOBILE_COLUMN_WIDTH,96,
+                                    MilitaryUiTheme.Intent.PRIMARY);
+                        else button(shapes,x,y,MOBILE_COLUMN_WIDTH,96,false);
+                    }
+                }else{
+                    for(int i=0;i<HOME_ACTIONS.length;i++)
+                        button(shapes,438,487-i*64,404,50,false);
+                    button(shapes,438,35,404,50,false);
+                }
             }
             case CAMPAIGN_SETUP -> {
                 Battle.Faction[] factions=Battle.Faction.values();
@@ -585,6 +628,23 @@ final class GameMenuPanel {
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
+                if(mobileLayout){
+                    rectangle(shapes,120,462,1040,108,PANEL);
+                    rectangle(shapes,MOBILE_VOICE_LEFT,485,MOBILE_VOICE_WIDTH,13,
+                            MilitaryUiTheme.FRAME);
+                    rectangle(shapes,MOBILE_VOICE_LEFT,485,
+                            MOBILE_VOICE_WIDTH*VoiceVolumeControl.clamp(voiceVolume),13,
+                            MilitaryUiTheme.TELEMETRY);
+                    rectangle(shapes,MOBILE_VOICE_LEFT+
+                            MOBILE_VOICE_WIDTH*VoiceVolumeControl.clamp(voiceVolume)-11,
+                            474,22,35,MilitaryUiTheme.AMBER);
+                    for(int i=0;i<5;i++){
+                        float x=mobileColumnX(i),y=mobileOptionY(i);
+                        if(i==3&&!updaterAvailable)
+                            disabledButton(shapes,x,y,MOBILE_COLUMN_WIDTH,94);
+                        else button(shapes,x,y,MOBILE_COLUMN_WIDTH,94,false);
+                    }
+                }else{
                 for(int i=0;i<5;i++){
                     if(i==3&&!updaterAvailable)disabledButton(shapes,405,472-i*78,470,59);
                     else button(shapes,405,472-i*78,470,59,false);
@@ -597,6 +657,8 @@ final class GameMenuPanel {
                         MilitaryUiTheme.TELEMETRY);
                 rectangle(shapes,VoiceVolumeControl.thumbX(voiceVolume)-7,552,14,24,
                         MilitaryUiTheme.AMBER);
+
+                }
             }
             case RESULTS -> {
                 if(report!=null){
@@ -625,11 +687,28 @@ final class GameMenuPanel {
         batch.begin();
         switch(screen){
             case HOME -> {
+                if(mobileLayout){
+                    float original=font.getData().scaleX;
+                    font.getData().setScale(2.05f);
+                    label(batch,font,"CATASTROPHIC DIPLOMACY",73,667,Color.WHITE);
+                    font.getData().setScale(1.52f);
+                    label(batch,font,"TACTICAL FLEET COMMAND",74,613,MUTED);
+                    font.getData().setScale(2.05f);
+                    for(int slot=0;slot<MOBILE_HOME_ORDER.length;slot++){
+                        int action=MOBILE_HOME_ORDER[slot];
+                        String name=action==7?"BATTLE SCREENSAVER":HOME_ACTIONS[action];
+                        label(batch,font,name,mobileColumnX(slot)+32,
+                                mobileHomeY(slot)+60,Color.WHITE);
+                    }
+                    font.getData().setScale(original);
+                }else{
                 title(batch,font,"CATASTROPHIC DIPLOMACY","TACTICAL FLEET COMMAND");
                 for(int i=0;i<HOME_ACTIONS.length;i++)
                     label(batch,font,HOME_ACTIONS[i],474,520-i*64,Color.WHITE);
                 label(batch,font,"BATTLE SCREENSAVER",474,68,Color.WHITE);
                 label(batch,font,"CAMPAIGN  /  SKIRMISH  /  SHIP ENGINEERING",438,15,MUTED);
+
+                }
             }
             case CAMPAIGN_SETUP -> {
                 title(batch,font,"NEW CAMPAIGN","SELECT THE FACTION YOU WILL COMMAND");
@@ -1012,6 +1091,26 @@ final class GameMenuPanel {
                 label(batch,font,editNotice,48,86,Color.GOLD);
             }
             case OPTIONS -> {
+                if(mobileLayout){
+                    float original=font.getData().scaleX;
+                    font.getData().setScale(2.10f);
+                    label(batch,font,"OPTIONS",73,662,Color.WHITE);
+                    font.getData().setScale(1.52f);
+                    label(batch,font,"AUDIO AND APPLICATION",74,613,MUTED);
+                    font.getData().setScale(1.85f);
+                    label(batch,font,"VOICE VOLUME",153,532,Color.WHITE);
+                    label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
+                            1057,532,Color.WHITE);
+                    String[] names={"MUSIC: "+(music?"ON":"OFF"),
+                            "SOUND EFFECTS: "+(effects?"ON":"OFF"),
+                            "SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),
+                            updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
+                            "BACK"};
+                    for(int i=0;i<names.length;i++)
+                        label(batch,font,names[i],mobileColumnX(i)+30,mobileOptionY(i)+58,
+                                i==3&&!updaterAvailable?MUTED:Color.WHITE);
+                    font.getData().setScale(original);
+                }else{
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
                 label(batch,font,"VOICE VOLUME",427,598,Color.WHITE);
                 label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",817,598,Color.WHITE);
@@ -1021,6 +1120,8 @@ final class GameMenuPanel {
                 label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",445,276,
                         updaterAvailable?Color.WHITE:MUTED);
                 label(batch,font,"BACK",445,198,Color.WHITE);
+
+                }
             }
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");
