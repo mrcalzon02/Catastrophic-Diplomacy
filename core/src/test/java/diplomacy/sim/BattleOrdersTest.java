@@ -18,9 +18,19 @@ public final class BattleOrdersTest {
         launcher.missileDamage=fighters?0:52;
         launcher.missileAmmo=fighters?0:1;
         launcher.fighterReserve=fighters?1:0;
-        // Manually constructed test ships do not receive fitted hangars.
-        // A fighter reserve by itself is not physical launch hardware.
-        launcher.fighterLaunchBays=fighters?1:0;
+        // This manually constructed PD fixture needs a real fitted FTR socket
+        // to launch its hostile craft. Reserve alone is not flight hardware.
+        if(fighters){
+            Shipyard.Design deck=Shipyard.starter(Battle.Faction.TERRAN,
+                    Shipyard.Hull.CRUISER);
+            int socket=-1;
+            for(Shipyard.Slot slot:deck.hull.slots)
+                if(slot.mount()==Shipyard.Mount.SUPPORT){socket=slot.index();break;}
+            if(socket<0)throw new AssertionError("Cruiser missing FTR support socket");
+            launcher.fighterBays=Battle.Ship.baysFor(
+                    deck.install(socket,"BASE-TER-FTR"));
+        }
+        launcher.fighterLaunchBays=launcher.fighterBays.size();
         defender.laserDamage=defender.missileDamage=0;
         defender.kineticDamage=defender.plasmaDamage=defender.particleDamage=defender.torpedoDamage=0;
         defender.missileAmmo=0;
