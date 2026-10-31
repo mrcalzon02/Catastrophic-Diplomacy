@@ -117,7 +117,9 @@ public final class Battle {
             throw new IllegalArgumentException("Not a guided launcher");
         }
         private void requireOrdnanceTier(DamageType family,int required){
-            if(ammoAccess!=null&&ordnanceTier(family)<required)
+            // Ships with no launcher must still accept the harmless stock
+            // profile during fleet spawn. Non-stock profiles need hardware.
+            if(ammoAccess!=null&&required>0&&ordnanceTier(family)<required)
                 throw new IllegalArgumentException("Fitted "+family+
                         " lacks guided technology tier "+required);
         }
