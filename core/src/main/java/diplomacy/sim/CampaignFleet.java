@@ -159,13 +159,13 @@ public final class CampaignFleet {
         }
         public List<Vessel> squadronShips(int group){
             profile(group);
-            return ships.stream().filter(s->squadronOf(s.id())==group).toList();
+            return ships.stream().filter(s->squadronOf(s.id())==group).collect(java.util.stream.Collectors.toList());
         }
         public List<Vessel> active(){
-            return ships.stream().filter(Vessel::deployed).toList();
+            return ships.stream().filter(Vessel::deployed).collect(java.util.stream.Collectors.toList());
         }
         public List<Vessel> reserves(){
-            return ships.stream().filter(v->!v.deployed()).toList();
+            return ships.stream().filter(v->!v.deployed()).collect(java.util.stream.Collectors.toList());
         }
         /** Saved captain targets use immutable owned IDs; battle references
          * use ordinal slots in the currently selected active fleet. */
@@ -271,7 +271,7 @@ public final class CampaignFleet {
             Vessel selected=get(id);
             long rerollSeed=namingSeed^((long)selected.name().hashCode()*0xd1b54a32d192ed03L);
             String generated=FleetNames.unique(namingFor(id),rerollSeed,
-                    VesselIdentifiers.serial(id),ships.stream().map(Vessel::name).toList());
+                    VesselIdentifiers.serial(id),ships.stream().map(Vessel::name).collect(java.util.stream.Collectors.toList()));
             return rename(id,generated);
         }
 
@@ -372,7 +372,7 @@ public final class CampaignFleet {
             newShip.fighterReserve=0;newShip.droneReserve=0;newShip.repairDroneReserve=0;
             ArrayList<Vessel> result=new ArrayList<>(ships);
             String uniqueName=FleetNames.unique(style,namingSeed,nextSerial,
-                    ships.stream().map(Vessel::name).toList());
+                    ships.stream().map(Vessel::name).collect(java.util.stream.Collectors.toList()));
             result.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,nextSerial),uniqueName,
                     design,false,Stores.capture(newShip)));
             return new Roster(faction,style,nextSerial+1,result,namingSeed,radioTone,squadronAssignments,squadronProfiles);
@@ -381,7 +381,7 @@ public final class CampaignFleet {
             if(battle==null||deployedIds==null||active().size()!=deployedIds.size())
                 throw new IllegalArgumentException("Incomplete campaign sortie");
             List<Battle.Ship> participants=battle.ships().stream()
-                    .filter(s->s.team==0).toList();
+                    .filter(s->s.team==0).collect(java.util.stream.Collectors.toList());
             if(participants.size()!=deployedIds.size())
                 throw new IllegalArgumentException("Battle's actual fleet size differs");
             for(int i=0;i<deployedIds.size();i++)
@@ -551,7 +551,7 @@ public final class CampaignFleet {
         for(int i=1;i<=count;i++)
             vessels.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,i),
                     FleetNames.unique(FleetNames.Style.NAVAL,namingSeed,i,
-                            vessels.stream().map(Vessel::name).toList()),
+                            vessels.stream().map(Vessel::name).collect(java.util.stream.Collectors.toList())),
                     starter,true,Stores.capture(fresh(starter,technology))));
         return new Roster(faction,FleetNames.Style.NAVAL,count+1,vessels,namingSeed,
                 CrewChatter.Tone.MIXED);

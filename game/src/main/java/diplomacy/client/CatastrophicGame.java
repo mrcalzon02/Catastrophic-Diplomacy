@@ -150,6 +150,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private CampaignAfterAction.Report campaignAfterAction;
     private int afterActionPage;
     private boolean playedCampaign,lastWon;
+    private String lastCampaignDrawn="";
+    private long lastCampaignFrameBucket=-1;
     private static final String CAMPAIGN_FILE="campaign/progress-v1.dat";
     private TechnologyCatalog technology;
     private Shipyard.Design leftDesign, rightDesign;
@@ -1048,7 +1050,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(!commitCampaign(proposed,vessels,new CampaignTechnology.State(pendingFaction)))return;
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
         saveCampaignBlueprint(campaignDesign);
-        campaignPage=0;selectedMission=1;
+        campaignPage=0;selectedMission=1;lastCampaignDrawn="";
         screen=GameMenuPanel.Screen.CAMPAIGN;
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_MAP 1");
     }
@@ -1660,6 +1662,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for(var vessel:campaignFleet.active())campaignSortie.add(vessel.id());
         battlefieldLevel=activeMission;
         playedCampaign=true;screen=GameMenuPanel.Screen.BATTLE;
+        lastCampaignFrameBucket=-1;
         reset();
         if(audio!=null)audio.announcePriority(AnnouncerAudio.Cue.BATTLE_START);
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_BATTLE "+activeMission+" "+deployment.ships()+" "+deployment.formation());
@@ -2361,7 +2364,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verifyDemo)battle=DemonstrationBattle.create(technology);
         else if(screen==GameMenuPanel.Screen.BATTLE && playedCampaign) {
             campaignEncounter=CampaignEncounter.start(activeMission,deployment,
-                    campaignFleet.active().stream().map(CampaignFleet.Vessel::fitting).toList(),
+                    campaignFleet.active().stream().map(CampaignFleet.Vessel::fitting).collect(java.util.stream.Collectors.toList()),
                     rightDesign,technology);
             battle=campaignEncounter.battle();
         }
@@ -2466,6 +2469,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     technology,discoveries,technologyPage,technologyModule,technologyTrack,
                     technologyStage,technologyNotice,armedTechnology);
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
+                // An actual completed framebuffer menu draw, not merely a
+                // click-handler state transition. Android campaign CI requires it.
+                if(campaign!=null&&(screen==GameMenuPanel.Screen.CAMPAIGN||
+                        screen==GameMenuPanel.Screen.DOCK||
+                        screen==GameMenuPanel.Screen.DEPLOYMENT)){
+                    String checkpoint=screen.name()+":"+campaign.faction()+":"+
+                            (screen==GameMenuPanel.Screen.DEPLOYMENT?
+                                    activeMission:selectedMission);
+                    if(!checkpoint.equals(lastCampaignDrawn)){
+                        lastCampaignDrawn=checkpoint;
+                        Gdx.app.log("CD-CAMPAIGN-RUNTIME","MENU_RENDER "+checkpoint);
+                    }
+                }
             }
             return;
         }
@@ -2890,6 +2906,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     " fps="+Gdx.graphics.getFramesPerSecond());
             renderProfile.reset();
         }
+        if(playedCampaign&&screen==GameMenuPanel.Screen.BATTLE&&battle!=null&&
+                battle.tick>=15){
+            // Emit only AFTER the actual gameplay framebuffer is drawn.
+            // A bare CAMPAIGN_BATTLE transition no longer suffices for CI.
+            long bucket=battle.tick/60;
+            if(lastCampaignFrameBucket!=bucket){
+                lastCampaignFrameBucket=bucket;
+                Gdx.app.log("CD-CAMPAIGN-RUNTIME","BATTLE_FRAME mission="+activeMission+
+                        " tick="+battle.tick+" alive="+battle.alive(0)+"/"+
+                        battle.alive(1)+" ships="+battle.ships().size());
+            }
+        }
         if(verifyDemo)verifyRenderedDemoFrame();
     }
 
@@ -3071,7 +3099,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     /** Presentation mirror only: no local step(), commands, campaign settlement or second rules engine. */
     private void drawRemoteBattle(diplomacy.net.BattleConnection.Snapshot snapshot){
-        java.util.List<String> rows=snapshot.entities().stream().filter(s->s.startsWith("SHIP|")).toList();
+        java.util.List<String> rows=snapshot.entities().stream().filter(s->s.startsWith("SHIP|")).collect(java.util.stream.Collectors.toList());
         if(remotePresentation==null||remotePresentation.ships().size()!=rows.size()){
             remotePresentation=new Battle(0);
             for(String row:rows){String[] p=row.split("\\|");remotePresentation.addShip(Integer.parseInt(p[2]),Battle.Faction.valueOf(p[3]),0,0);}

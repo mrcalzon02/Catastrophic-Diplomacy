@@ -644,3 +644,12 @@ tasks.named('gameFlowSmoke') {
         tasks.named('hullVoiceSmoke')
     )
 }
+
+tasks.register('campaignLaunchRuntimeSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Block release unless all factions create, persist, restore and launch real playable missions.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignLaunchRuntimeTest'
+}
+tasks.named('gameFlowSmoke') { dependsOn tasks.named('campaignLaunchRuntimeSmoke') }

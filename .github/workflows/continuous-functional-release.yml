@@ -163,6 +163,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 tools/check_android_api26_compat.py
           python3 tools/test_prepare_android_update_manifest.py
           test -n "$CD_ANDROID_KEYSTORE_BASE64" && test -n "$CD_ANDROID_KEYSTORE_PASSWORD"
           test -n "$CD_ANDROID_KEY_PASSWORD" && test "$CD_ANDROID_KEY_ALIAS" = 'catastrophic-diplomacy'
@@ -252,8 +253,46 @@ jobs:
           path: test-output/android/
           if-no-files-found: warn
 
+  # User-visible campaign launch is functional, not an optional screenshot
+  # diagnostic. Android 14/API34 alone cannot detect Java 16 Stream.toList
+  # crashes on Galaxy S9/Android 10 and other supported older devices.
+  android-campaign-runtime:
+    needs: android-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: actions/download-artifact@v4
+        with: {name: 'cd-android-${{ github.run_id }}', path: package}
+      - name: Require accelerated Android 10 emulator
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 1200
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
+          script: |
+            adb install package/Catastrophic-Diplomacy-Android.apk
+            bash tools/android_verify_campaign.sh test-output/campaign-api29
+      - name: Preserve campaign crash logs and real map/dock/deployment/combat screens
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-android-campaign-api29-${{ github.run_id }}
+          path: test-output/campaign-api29/
+          if-no-files-found: warn
+
   publish:
-    needs: [linux, windows, android-runtime]
+    needs: [linux, windows, android-runtime, android-campaign-runtime]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:

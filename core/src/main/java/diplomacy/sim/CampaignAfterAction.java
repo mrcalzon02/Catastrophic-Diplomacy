@@ -44,7 +44,7 @@ public final class CampaignAfterAction {
             throw new IllegalArgumentException("Incomplete after-action sources");
         List<CampaignFleet.Vessel> active=owned.active();
         List<Battle.Ship> participants=battle.ships().stream()
-                .filter(s->s.team==0).toList();
+                .filter(s->s.team==0).collect(java.util.stream.Collectors.toList());
         if(active.size()!=deployedIds.size()||participants.size()!=deployedIds.size())
             throw new IllegalArgumentException("Fleet deployment mismatch");
         ArrayList<Entry> entries=new ArrayList<>();

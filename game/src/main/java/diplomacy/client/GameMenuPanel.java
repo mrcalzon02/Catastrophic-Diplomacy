@@ -309,7 +309,7 @@ final class GameMenuPanel {
         return catalog.baseComponents().values().stream()
                 .filter(c->c.faction.equals(code))
                 .sorted(Comparator.comparing((Component c)->c.category)
-                        .thenComparing(c->c.name)).toList();
+                        .thenComparing(c->c.name)).collect(java.util.stream.Collectors.toList());
     }
     static String technologyId(Battle.Faction faction,String subsystem,int track,int stage){
         if(track<0||track>=4||stage<1||stage>9)
