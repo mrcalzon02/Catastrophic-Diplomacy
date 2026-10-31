@@ -31,7 +31,7 @@ public final class ArmorBreachTelemetry {
         return count;
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws java.io.IOException {
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
         int all=0,aliveBreach=0,diedBeforeBreach=0,diedAfterBreach=0;
         System.out.println("ARMOR-READABILITY: real-fitted seeded duels, "+LIMIT+
