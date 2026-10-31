@@ -42,7 +42,9 @@ wait_log(){
       echo "FAIL: campaign app process exited before $marker" >&2
       return 1
     fi
-    if adb logcat -d -v brief | grep -qE "$marker"; then return 0; fi
+    # Avoid grep -q closing an adb pipe early under pipefail.
+    adb logcat -d -v brief > "$report/$current-poll-logcat.txt"
+    if grep -qE "$marker" "$report/$current-poll-logcat.txt"; then return 0; fi
     sleep 1
   done
   echo "FAIL: no actual campaign telemetry: $marker" >&2
