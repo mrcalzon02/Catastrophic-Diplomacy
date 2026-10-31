@@ -173,6 +173,22 @@ public final class FighterCraftTest {
         for(int tick=0;tick<240;tick++)battle.step();
         check(parent.fightersLaunched+parent.fighterReserve==initial,
                 "Hangar launches must not create or delete purchased inventory");
+        // Refitting other components cannot confiscate paid aircraft stored in
+        // an organic carrier deck. Removing the added module is safe too.
+        var original=CampaignFleet.startSolo(Battle.Faction.TERRAN,
+                fleetCarrier,tech,917101L);
+        long id=original.ships().get(0).id();
+        var inReserve=original.setActive(id,false,200);
+        int purchased=inReserve.get(id).stores().fighters();
+        check(purchased==Shipyard.fit(fleetCarrier,tech).fighterCapacity(),
+                "Existing carrier's purchased complement must be preserved");
+        var refitted=inReserve.refit(id,fleetCarrier.install(
+                support(Shipyard.Hull.CARRIER),"BASE-TER-FTR"),tech);
+        check(refitted.get(id).stores().fighters()==purchased,
+                "Adding FTR to organic carrier must preserve paid fighters");
+        var removed=refitted.refit(id,fleetCarrier,tech);
+        check(removed.get(id).stores().fighters()==purchased,
+                "Removing auxiliary FTR must not erase organic carrier stock");
     }
 
     public static void main(String[] args)throws IOException {
