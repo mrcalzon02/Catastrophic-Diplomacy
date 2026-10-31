@@ -66,7 +66,9 @@ final class ShieldSurfaceModel {
         float energy=Math.min(1f,energyFraction);
         double phase=tick*.055+shipId*.117+facing*.73;
         float modulation=(float)(.925+.075*Math.sin(phase));
-        return .40f*(float)Math.sqrt(energy)*modulation;
+        // A critically weakened red-facing sector must remain legible until
+        // actual depletion; do not fade the red warning out prematurely.
+        return (.12f+.28f*(float)Math.sqrt(energy))*modulation;
     }
     /** Brief material response on the real silhouette, with no unpowered glow. */
     static float energizedOpacity(float base,float contact,float charge){

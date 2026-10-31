@@ -34,7 +34,8 @@ public final class TerranPlaceholderSprites implements Disposable {
             new java.util.IdentityHashMap<>();
     /** One shared hex-texture field shell, split into the same four mechanical facings. */
     private Texture[] shieldShell;
-    private final ShieldMaterialShader shieldInk=new ShieldMaterialShader();
+    /** Optional cosmetic shader; failure must never prevent the game launching. */
+    private final ShieldMaterialShader shieldInk;
     // A compact per-vessel overlay keeps irregular hull peeling inexpensive
     // even when several hundred damaged vessels share the same original PNG.
     private static final int MASK_W=96, MASK_H=144;
@@ -66,6 +67,13 @@ public final class TerranPlaceholderSprites implements Disposable {
         };
     }
     public TerranPlaceholderSprites() {
+        ShieldMaterialShader candidate=null;
+        try{candidate=new ShieldMaterialShader();}
+        catch(RuntimeException shaderFailure){
+            if(Gdx.app!=null)Gdx.app.error("SHIELD-FX",
+                    "Source-art shield tint unavailable; using original texture fallback",shaderFailure);
+        }
+        shieldInk=candidate;
         damagedMaterial=loadMaterial("materials/structure_damaged.png");
         destroyedMaterial=loadMaterial("materials/structure_destroyed.png");
         shieldMaterial=loadMaterial("materials/shield_energy_blue.png");
@@ -437,9 +445,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         surfaces.end(batch);
         // Cached source-art hex textures are recolored using per-vertex RGB:
         // one shader for all factions, generators and independent facings.
-        batch.setShader(shieldInk.program());
+        batch.setShader(shieldInk==null?null:shieldInk.program());
         batch.begin();
-        shieldInk.configure(false,battle.tick);
+        if(shieldInk!=null)shieldInk.configure(false,battle.tick);
         for(Battle.Ship ship:battle.ships()){
             if(!hasSprite(ship)||ship.shields<=0)continue;
             Texture tex=texture(ship.faction,ship.hullClass);
@@ -484,7 +492,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             batch.setBlendFunction(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA,
                     com.badlogic.gdx.graphics.GL20.GL_ONE);
             batch.begin();
-            shieldInk.configure(true,battle.tick);
+            if(shieldInk!=null)shieldInk.configure(true,battle.tick);
             for(Battle.Ship ship:battle.ships()){
                 if(!hasSprite(ship)||ship.shields<=0)continue;
                 BattleRenderPoses.Pose pose=poses==null
@@ -579,7 +587,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture image:severeLayers.values())image.dispose();
         damagedLayers.clear();severeLayers.clear();originals.clear();
         surfaces.dispose();
-        shieldInk.dispose();
+        if(shieldInk!=null)shieldInk.dispose();
         damagedMaterial.dispose();
         destroyedMaterial.dispose();
         shieldMaterial.dispose();
