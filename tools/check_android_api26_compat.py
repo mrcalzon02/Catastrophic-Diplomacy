@@ -16,7 +16,7 @@ for root in roots:
         # become reachable through campaign management or an updater path.
         for line_number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
             if (re.search(r"(?<!Collectors)\.toList\s*\(\s*\)", line) or
-                re.search(r"\b(?:java\.util\.)?HexFormat\b", line)) and not line.lstrip().startswith(("//", "*")):
+                re.search(r"\b(?:java\.util\.)?HexFormat\b", line)) and not line.lstrip().startswith(("//", "*", "/*")):
                 bad.append(f"{source}:{line_number}: {line.strip()}")
 if bad:
     print("FAIL Android minSdk26 forbidden Java runtime APIs (Stream.toList / HexFormat):", file=sys.stderr)
