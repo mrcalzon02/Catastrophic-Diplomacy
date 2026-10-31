@@ -1048,7 +1048,7 @@ final class ShipyardPanel {
         for(int i=0;i<SLOT_ROWS;i++){
             int index=i+scroll;
             if(index>=draft.slots())break;
-            if(index==selectedSlot)rectangle(shapes,30,561-i*26,286,25,
+            if(index==selectedSlot)rectangle(shapes,30,535-i*26,286,25,
                     new Color(.13f,.23f,.33f,1));
         }
         rectangle(shapes,342,170,453,54,new Color(.15f,.25f,.34f,1));
@@ -1089,7 +1089,7 @@ final class ShipyardPanel {
             font.setColor(index==selectedSlot?Color.GOLD:mountColor(slot.mount()));
             font.draw(batch,String.format(Locale.ROOT,"%02d  %-7s %s",index+1,
                     slot.mount().name(),module==null?"EMPTY":module.component.substring(5)),
-                    36,580-i*26);
+                    36,551-i*26);
         }
         font.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
         font.draw(batch,draft.faction.displayName,345,553);
