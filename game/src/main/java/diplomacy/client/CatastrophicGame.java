@@ -174,6 +174,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int focusedShipId = -1;
     private float battlePanX,battlePanY;
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
+    private final ShipInspectionPanel shipInspector=new ShipInspectionPanel();
     private final BattleRenderPoses renderPoses=new BattleRenderPoses();
     private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
     private final CombatHitFeedback hitFeedback=new CombatHitFeedback();
@@ -584,6 +585,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(screensaverMode){
                     com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
                             new com.badlogic.gdx.math.Vector2(x,y));
+                    if(shipInspector.tap(ui.x,ui.y))return true;
                     if(screensaverControlsVisible&&ui.y>=0&&ui.y<=66){
                         screensaverControlPointer=pointer;
                         screensaverControlDownX=ui.x;
@@ -599,6 +601,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return true;
                 }
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
+                if(screen==GameMenuPanel.Screen.BATTLE&&!shipyard.open()
+                        &&shipInspector.tap(world.x,world.y))return true;
                 if(!verifyDemo&&!shipyard.open()&&screen==GameMenuPanel.Screen.BATTLE
                         && GameMenuPanel.hit(world.x,world.y,1060,126,185,44)){
                     openWiki();wikiTouchPointer=pointer;return true;
@@ -780,7 +784,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             tapScreensaverControl(ui.x);
                         return true;
                     }
-                    if(battleTouch.owns(pointer))battleTouch.end(pointer,ui.x,ui.y);
+                    if(battleTouch.owns(pointer)&&battleTouch.end(pointer,ui.x,ui.y))
+                        inspectNearest(ui.x,ui.y,false);
                     // Use the event's own timestamp: processing two 100ms taps on
                     // consecutive slow frames must still count as a double tap.
                     long touchTime=Gdx.input.getCurrentEventTime();
@@ -837,7 +842,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         manualZoom=(float)Math.max(0.18,Math.min(4.0,manualZoom*Math.pow(1.18,steps)));
     }
     private void resetBattleView(){
-        manualZoom=1f;focusedShipId=-1;
+        manualZoom=1f;focusedShipId=-1;shipInspector.close();
         battlePanX=battlePanY=0f;battleTouch.cancel();
         if(battle!=null)updateBattleCamera();
     }
@@ -851,19 +856,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         battlePanX+=x;battlePanY+=y;updateBattleCamera();
     }
-    /** Tap a vessel to follow it while zoomed in. Empty space clears focus. */
-    private void focusNearest(float uiX,float uiY) {
+    /** Tap-to-inspect is independent of battle simulation and drawing scale.
+     * The player view keeps its existing tap-to-follow behavior; exhibition
+     * taps inspect without overriding the cinematic director. */
+    private void inspectNearest(float uiX,float uiY,boolean follow){
         if(battle==null)return;
-        double x=battleCamera.position.x+(uiX-W*0.5)*battleCamera.zoom;
-        double y=battleCamera.position.y+(uiY-H*0.5)*battleCamera.zoom;
-        double nearest=Math.max(24,34*battleCamera.zoom);
-        int chosen=-1;
-        for(Battle.Ship ship:battle.ships())if(ship.alive()){
-            double d=Math.hypot(ship.x-x,ship.y-y);
-            if(d<nearest){nearest=d;chosen=ship.id;}
+        int chosen=ShipInspectionPanel.pick(battle,renderPoses,uiX,uiY,
+                battleCamera.position.x,battleCamera.position.y,battleCamera.zoom);
+        shipInspector.select(chosen);
+        if(follow){
+            focusedShipId=chosen;
+            battlePanX=battlePanY=0f;
         }
-        focusedShipId=chosen;
-        battlePanX=battlePanY=0f;
+    }
+    private void focusNearest(float uiX,float uiY){
+        inspectNearest(uiX,uiY,true);
     }
 
     private void selectScenario(ScenarioCatalog.Preset choice){
@@ -2278,6 +2285,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     private void startScreensaver(){
+        shipInspector.close();
         screensaverWake.reset();
         screensaverControlsVisible=false;
         screensaverControlPointer=-1;
@@ -2291,6 +2299,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.app.log("CD-SCREENSAVER","START seed="+screensaverRound.seed());
     }
     private void nextScreensaverRound(){
+        shipInspector.close();
         screensaverRound=ScreensaverBattle.create(screensaverRandom.nextLong(),technology);
         battle=screensaverRound.battle();
         // Each battle is a new shot sequence. Never follow stale/dead previous-round IDs.
@@ -2308,6 +2317,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 +") backdrop="+battlefieldLevel);
     }
     private void stopScreensaver(){
+        shipInspector.close();
         screensaverWake.reset();
         screensaverControlsVisible=false;
         screensaverControlPointer=-1;
@@ -2321,6 +2331,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void reset() {
         if(screensaverMode){nextScreensaverRound();return;}
+        shipInspector.close();
         // Menus and the shipyard must not instantiate a combat sandbox on startup.
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE)return;
         LevelEnvironment.Stage environment = LevelEnvironment.forLevel(battlefieldLevel);
@@ -2506,6 +2517,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
             for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
         }
+        // Only the selected vessel's actual fitted weapon reach is highlighted;
+        // range lines are rendering diagnostics and do not change fire control.
+        shipInspector.ranges(shapes,battle,renderPoses,view);
         // A tracked hull receives a restrained in-world locator, not a giant
         // selection halo that would obscure the weapon and shield effects.
         if(!screensaverMode&&focusedShipId>=0)for(Battle.Ship followed:battle.ships()){
@@ -2703,6 +2717,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 font.draw(batch,"EXIT",1125,39);
                 batch.end();
             }
+            if(shipInspector.selected(battle)!=null){
+                shapes.setProjectionMatrix(camera.combined);
+                batch.setProjectionMatrix(camera.combined);
+                shipInspector.draw(battle,shapes,batch,font);
+            }
             return;
         }
         // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
@@ -2811,6 +2830,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     + " HOLDS THE FIELD", 330, 617);
         }
         batch.end();
+        if(shipInspector.selected(battle)!=null&&!shipyard.open()&&!tacticalMenuOpen){
+            shapes.setProjectionMatrix(camera.combined);
+            batch.setProjectionMatrix(camera.combined);
+            shipInspector.draw(battle,shapes,batch,font);
+        }
         if (tacticalMenuOpen) drawTacticalMenu();
         renderProfile.sample(System.nanoTime()-renderStartNs,
                 simulationEndNs-renderStartNs,lightingOverlayNs,

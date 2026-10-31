@@ -269,3 +269,12 @@ tasks.register('shipDamageVisualSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.ShipSurfaceDamageVisualTest'
 }
+
+tasks.register('shipInspectionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate real-ship tap selection, range overlays, ammunition and live vessel status.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipInspectionPanelTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipInspectionSmoke') }
