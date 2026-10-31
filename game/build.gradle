@@ -259,7 +259,7 @@ tasks.register('capitalTurretSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.CapitalTurretSpritesTest'
 }
-tasks.named('menuFlowSmoke') { dependsOn tasks.named('capitalTurretSmoke') }
+// Art-scale and texture-cell aesthetics are diagnostics, not release blockers.
 
 // Nonblocking artwork diagnostic: never a dependency of menuFlowSmoke.
 tasks.register('shipDamageVisualSmoke', JavaExec) {
@@ -286,4 +286,13 @@ tasks.register('guidedOrdnanceArtSmoke', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.GuidedPayloadVisualTest'
+}
+
+// Standalone original artillery-sprite diagnostic; NOT a release dependency.
+tasks.register('kineticOrdnanceArtSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify all five fitted kinetic ammunition types select real original-sprite cuts.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.KineticPayloadVisualTest'
 }

@@ -1,0 +1,51 @@
+name: Authored turret and projectile art diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/weapon-art-diagnostics.yml'
+      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
+      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
+      - 'game/src/main/java/diplomacy/client/GuidedPayloadVisual.java'
+      - 'game/src/main/java/diplomacy/client/KineticPayloadVisual.java'
+      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
+      - 'game/src/test/java/diplomacy/client/CapitalTurretSpritesTest.java'
+      - 'game/src/test/java/diplomacy/client/GuidedPayloadVisualTest.java'
+      - 'game/src/test/java/diplomacy/client/KineticPayloadVisualTest.java'
+      - 'assets/modules/turrets/**'
+      - 'assets/effects/projectile_fx/curated/**'
+      - 'game/build.gradle'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Visual diagnostics only. NEVER used as a dependency of release/publish.
+jobs:
+  source-art-mapping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Verify real source atlas files and type assignments
+        shell: bash
+        run: |
+          set -o pipefail
+          test -s assets/effects/projectile_fx/curated/missile_bodies_6.png
+          test -s assets/effects/projectile_fx/curated/kinetic_bodies_5.png
+          mkdir -p test-output/projectile-art
+          gradle --no-daemon :game:capitalTurretSmoke :game:guidedOrdnanceArtSmoke :game:kineticOrdnanceArtSmoke :game:classes |
+            tee test-output/projectile-art/mapping.log
+      - name: Store independent diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-projectile-art-${{ github.sha }}
+          path: test-output/projectile-art/
+          if-no-files-found: warn
+          retention-days: 30
