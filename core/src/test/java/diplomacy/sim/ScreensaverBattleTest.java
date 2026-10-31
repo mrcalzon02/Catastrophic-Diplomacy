@@ -92,6 +92,24 @@ public final class ScreensaverBattleTest {
                 round.battle().step();
             check(round.battle().tick>0,"Screensaver simulation did not advance");
         }
+        // Intermittent failures occur on random new rounds, not on the six
+        // traditional smoke seeds. Exercise additional deterministic starts
+        // and the first live combat frames, and print the failing seed.
+        // Deliberately create each round independently as on the Android HUD.
+        for(long seed=0;seed<48;seed++){
+            long replaySeed=0x53435245454E4C00L+seed*7919L;
+            try{
+                ScreensaverBattle.Round round=ScreensaverBattle.create(replaySeed,catalog);
+                check(round.battle().alive(0)>0&&round.battle().alive(1)>0,
+                        "Empty random exhibition fleet");
+                for(int tick=0;tick<24&&!round.battle().finished();tick++)
+                    round.battle().step();
+                check(round.battle().tick>0,"Random exhibition failed before first frame");
+            }catch(RuntimeException|AssertionError failure){
+                throw new AssertionError("SCREENSAVER CRASH REPRO seed="+
+                        Long.toUnsignedString(replaySeed)+" tick=first24",failure);
+            }
+        }
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
