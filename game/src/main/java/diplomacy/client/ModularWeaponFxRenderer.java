@@ -29,6 +29,7 @@ final class ModularWeaponFxRenderer implements Disposable {
     private final Map<String,Texture> textures=new HashMap<>();
     private final Set<String> absent=new HashSet<>();
     private final List<OneShot> oneShots=new ArrayList<>();
+    private final LaserRun01Fx lasers=new LaserRun01Fx();
     private Battle trackedBattle;
     private long lastSequence;
     private static final int ACTIVE_LIMIT=4096;
@@ -192,16 +193,19 @@ final class ModularWeaponFxRenderer implements Disposable {
     public void render(Battle battle,SpriteBatch batch,WeaponBeamSprites existingBeamPayload,
                        BattleRenderPoses poses,CombatViewBounds view) {
         sync(battle);
+        lasers.sync(battle);
         // The already integrated real atlas-derived strip is the BEAM PAYLOAD part.
         // Its animation is started per shot using Beam.spawnTick, not global tick.
         if(existingBeamPayload!=null && existingBeamPayload.loaded()>0)
             existingBeamPayload.render(battle,batch,
-                    shell -> !hasBallisticPayload(shell,battle.tick),poses,view);
+                    shell -> !hasBallisticPayload(shell,battle.tick),poses,view,
+                    beam -> !lasers.handles(beam,battle.tick));
         batch.begin();
         batch.setColor(1,1,1,1);
         // Local FIRING and terminal IMPACT/INTERCEPT are separate, independent clips.
         for(OneShot shot:oneShots){
             Battle.VisualEvent event=shot.event();
+            if(lasers.handlesFire(event))continue; // Full authored shot replaces old muzzle cutout.
             if(view!=null&&!view.circle(event.x(),event.y(),
                     Math.max(shot.clip().width(),shot.clip().height())*.5f))continue;
             long elapsed=battle.tick-event.tick();
@@ -273,9 +277,12 @@ final class ModularWeaponFxRenderer implements Disposable {
             else drawCentered(batch,fallback,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
         }
+        lasers.draw(batch,battle,view);
         batch.setColor(1,1,1,1);
         batch.end();
     }
+
+    boolean hasLaserBeam(Battle.Beam beam,long tick){return lasers.handles(beam,tick);}
 
     /** A missing ballistic payload also keeps live, positioned fallback geometry. */
     public boolean hasBallisticPayload(Battle.Ballistic shell,long tick){
@@ -294,6 +301,7 @@ final class ModularWeaponFxRenderer implements Disposable {
         for(Texture value:textures.values())value.dispose();
         textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
         curatedMissileBodies=null;rejectedMissileAtlas=false;
+        lasers.dispose();
         curatedKineticBodies=null;rejectedKineticAtlas=false;
         authoredFiringImpacts=null;rejectedFiringImpacts=false;
     }
