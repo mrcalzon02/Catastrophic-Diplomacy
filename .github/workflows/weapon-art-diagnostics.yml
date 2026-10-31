@@ -8,6 +8,8 @@ on:
       - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
       - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
       - 'game/src/main/java/diplomacy/client/GuidedPayloadVisual.java'
+      - 'game/src/main/java/diplomacy/client/OrdnanceLibrarySprites.java'
+      - 'game/src/test/java/diplomacy/client/OrdnanceLibrarySpritesTest.java'
       - 'game/src/main/java/diplomacy/client/KineticPayloadVisual.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
       - 'game/src/main/java/diplomacy/client/WeaponStageArt.java'
@@ -17,6 +19,8 @@ on:
       - 'game/src/test/java/diplomacy/client/KineticPayloadVisualTest.java'
       - 'assets/modules/turrets/**'
       - 'assets/effects/projectile_fx/curated/**'
+      - 'asset_packs/missile-engine/**'
+      - 'tools/generate_missile_engine_art.py'
       - 'game/build.gradle'
   workflow_dispatch:
 
@@ -42,8 +46,24 @@ jobs:
           test -s assets/effects/projectile_fx/curated/kinetic_bodies_5.png
           test -s assets/effects/projectile_fx/curated/weapon_fire_impact_64.png
           mkdir -p test-output/projectile-art
-          gradle --no-daemon :game:capitalTurretSmoke :game:guidedOrdnanceArtSmoke :game:kineticOrdnanceArtSmoke :game:weaponStageArtSmoke :game:classes |
+          gradle --no-daemon :game:capitalTurretSmoke :game:guidedOrdnanceArtSmoke :game:kineticOrdnanceArtSmoke :game:weaponStageArtSmoke :game:ordnanceLibraryDiagnostic :prepareMissileEngineArt :game:classes |
             tee test-output/projectile-art/mapping.log
+      - name: Verify separated missile assets reached the runtime staging directory
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('build/generated/cd-missile-engine/effects/ordnance/library')
+          assert (root/'missile_bodies.png').stat().st_size > 10000
+          assert (root/'missile_plumes.png').stat().st_size > 10000
+          data=json.loads((root/'missile_manifest.json').read_text())
+          assert data['count']==40 and data['plume_frames']==6
+          assert len(data['variants'])==40
+          assert len({v['source_id'] for v in data['variants']})==40
+          assert sorted(v['index'] for v in data['variants'])==list(range(40))
+          print('PASS: 40 unique real-source missile bodies + 240 engine frames staged')
+          PY
       - name: Store independent diagnostic log
         if: always()
         uses: actions/upload-artifact@v4
