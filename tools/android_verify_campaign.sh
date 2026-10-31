@@ -2,8 +2,16 @@
 # Release blocker: real signed APK campaign creation and gameplay on Android 10.
 # Tests every faction and two important transitions: new and saved campaign.
 set -Eeuo pipefail
-report="$1"
+report="${1:?Report directory required}"
+first="${2:-0}"
+last="${3:-10}"
+if ! [[ "$first" =~ ^(0|[1-9][0-9]*)$ && "$last" =~ ^(0|[1-9][0-9]*)$ ]] ||
+     (( first>last || last>10 )); then
+  echo "Invalid campaign shard ${first}..${last}; expected 0..10" >&2
+  exit 2
+fi
 mkdir -p "$report"
+echo "CAMPAIGN SHARD: factions ${first} through ${last} (inclusive)"
 package="games.catastrophicdiplomacy"
 activity="$package/diplomacy.android.AndroidLauncher"
 current="startup"
@@ -14,6 +22,11 @@ on_failure(){
   echo "--- APP TRANSITIONS / ACTUAL ANDROID ERRORS ---" >&2
   grep -E 'CD-GAME-FLOW|CD-CAMPAIGN-RUNTIME|AndroidRuntime|FATAL EXCEPTION|NoSuchMethodError|NoClassDefFoundError|[Cc]rash|[Ee]xception' "$report/failure-$current-logcat.txt" | tail -n 75 >&2 || true
   adb shell dumpsys activity activities > "$report/failure-activity.txt" || true
+  # Preserve process/heap state to distinguish a slow emulator start from an
+  # actual game-thread hang; do not mislabel a timeout as a Java exception.
+  timeout 12s adb shell pidof "$package" > "$report/failure-pid.txt" 2>&1 || true
+  timeout 12s adb shell dumpsys meminfo "$package" > "$report/failure-meminfo.txt" 2>&1 || true
+  timeout 12s adb exec-out screencap -p > "$report/failure-$current.png" 2>/dev/null || true
 }
 trap 'on_failure "$?"' ERR
 capture(){ adb exec-out screencap -p > "$report/$1.png"; }
@@ -86,7 +99,9 @@ start_game(){
   adb shell am force-stop "$package"
   adb logcat -c
   adb shell am start -W -n "$activity" > "$report/$current-start.txt"
-  wait_log 'CD-GAME-FLOW.*MAIN_MENU' 20
+  # Swiftshader startup after multiple campaign scenes varies widely. A live
+  # process must actually emit the main-menu marker; no timestamp-only pass.
+  wait_log 'CD-GAME-FLOW.*MAIN_MENU' 45
   dismiss_updater
   # 400-ship test emulators may draw fewer than 2 UI frames per second.
   # Log MAIN_MENU is not proof that the first interactive frame is ready.
@@ -98,9 +113,11 @@ start_game(){
 # This same OS test setup is already used by android_verify_menu.sh.
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb shell pm clear "$package" > "$report/clear-package.txt"
+# Keep startup transitions in the buffer throughout each shard.
+adb logcat -G 8M > "$report/logcat-buffer.txt" 2>&1 || true
 factions=(TERRAN DRAXIAN CARNELIAN ZIPPLEDROW UZIPT MANDRALLY
           VAERITH_PRISM ZELTHAR_LUMINARI AUREATE_SYNOD NYX_BIOLITH UMBRA_FOUNDRY)
-for idx in $(seq 0 10); do
+for idx in $(seq "$first" "$last"); do
   faction="$(printf '%s' "${factions[$idx]}")"
   current="$idx-$faction"
   start_game
@@ -147,4 +164,4 @@ for idx in $(seq 0 10); do
     echo "PASS: Android 10 persisted campaign loads into management interface"
   fi
 done
-echo "PASS: Android 10 campaign + live mission rendering for all 11 factions"
+echo "PASS: Android 10 campaign + live mission rendering for shard ${first}..${last}; release requires every matrix shard"

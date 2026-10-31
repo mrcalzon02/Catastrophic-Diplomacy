@@ -258,7 +258,16 @@ jobs:
   android-campaign-runtime:
     needs: android-build
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 45
+    # Every faction remains release-blocking, but no single emulator runs
+    # through eleven unrelated cold starts while accumulating driver state.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {first: 0, last: 3}
+          - {first: 4, last: 7}
+          - {first: 8, last: 10}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -281,12 +290,12 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
           script: |
             adb install package/Catastrophic-Diplomacy-Android.apk
-            bash tools/android_verify_campaign.sh test-output/campaign-api29
+            bash tools/android_verify_campaign.sh test-output/campaign-api29 ${{ matrix.first }} ${{ matrix.last }}
       - name: Preserve campaign crash logs and real map/dock/deployment/combat screens
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cd-android-campaign-api29-${{ github.run_id }}
+          name: cd-android-campaign-api29-${{ github.run_id }}-${{ matrix.first }}-${{ matrix.last }}
           path: test-output/campaign-api29/
           if-no-files-found: warn
 
