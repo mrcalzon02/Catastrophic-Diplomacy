@@ -64,7 +64,7 @@ These are **narrative proposals**, not newly implemented engineering bonuses, ha
 
 Nobody speaks for an entire civilization. Every faction contains peaceful negotiators, uncompromising admirals, conflicted dockworkers and officers forced to choose between command authority and the people under their protection. Avoid a one-civilization-villain narrative.
 
-### Principal characters: one performer, six roles
+### Principal characters: one recognizable narrator, recurring officials and selected PRO alien voices
 
 | ID | Role | Performance and Voicemod treatment | Dramatic purpose |
 |---|---|---|---|
@@ -75,7 +75,7 @@ Nobody speaks for an entire civilization. Every faction contains peaceful negoti
 | **KADE** | Chief Quartermaster Oren Kade | Light rasp, slower phrasing | Ships are paid for, crew can be lost, and fuel is never free |
 | **CONCORDANCE** | Central arbitration authority | Calm harmonics, close and clean; no cartoon robot buzz | Its conclusion is monstrous precisely because it sounds reasonable |
 
-Other occasional voices — emergency witness, official proclamation, broken archival playback — should be filters on one of these characters, not a requirement to record a thousand soldiers. **Ship combat chatter stays TEXT ONLY** with short communication bleeps. The previously recorded 30-cue main-menu and battle announcer remains separate from these narrative roles.
+**Casting rule:** the owner's natural voice is deliberately the primary Archivist. Ordinary Voicemod presets often do **not** convincingly conceal it; some strong PRO alien voices can. Six dramatic writing roles therefore do **not** imply six distinctive performed voices. Voss and Kade may be read naturally; Thale and Halde can appear as written dispatches or quoted testimony. The strongest verified PRO voices should be reserved for a small recurring cast of **alien** envoys, admirals and witnesses, with a separate optional uncanny treatment for the Concordance. The owner's existing Voicemod hull-class performances must not be overwritten or misidentified as narrative presets.\n\n**Important:** Catastrophic Diplomacy already has **260 recorded lines across ten hull-specific radio voice roles** and a separate 30-cue announcer. Those exact hull lines remain voiced, while unmatched routine combat chatter is text and calm bleeps. Alien dialogue is a *new* layer, not a replacement for ship-radio identities. See [the updated voice production guide](scripts/RECORDING_GUIDE.md).
 
 ### Character change across the campaign
 

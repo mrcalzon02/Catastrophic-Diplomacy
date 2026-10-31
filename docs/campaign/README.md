@@ -25,7 +25,7 @@ The `opponent`, `operation`, `enemy_tier`, `fleet_cap` and `waves` in the JSON a
 
 ## Narrative release and voice policy
 
-Voice acting is provided by the project's owner using their own natural voice and optional Voicemod character processing. The existing 30-cue announcer audio is still the *game announcer*, independent of story characters. Combat crew messages remain text-only with their calm bleeps. All 231 story cues are **not recorded** in this package; a cue manifest is not sound.
+Campaign acting is designed for the owner's recognizable natural narrator plus selective **tested Voicemod PRO alien voices**. The owner previously used particular Voicemod presets to perform the **260 already recorded hull radio cues**; those ten established hull voice roles must be preserved rather than replaced or confused with the new campaign cast. The existing 30-cue announcer audio is still the *game announcer*, independent of story characters. The exact ten hull banks' prerecorded combat lines remain voiced; unrecorded messages use text and calm bleeps. All 231 story cues are **not recorded** in this package; a cue manifest is not sound.
 
 A scripted mission opening is skippable; completing a mission is what authorizes its conclusion. Never play a success discovery after defeat or retreat. A future mid-battle line must have a genuine event trigger and must never be faked by a random timer. Ending-choice lines remain optional prose until an actual saved ending choice exists.
 
