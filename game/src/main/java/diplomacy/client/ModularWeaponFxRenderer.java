@@ -30,6 +30,7 @@ final class ModularWeaponFxRenderer implements Disposable {
     private final Set<String> absent=new HashSet<>();
     private final List<OneShot> oneShots=new ArrayList<>();
     private final LaserRun01Fx lasers=new LaserRun01Fx();
+    private final OrdnanceLibrarySprites missileLibrary=new OrdnanceLibrarySprites();
     private Battle trackedBattle;
     private long lastSequence;
     private static final int ACTIVE_LIMIT=4096;
@@ -243,6 +244,7 @@ final class ModularWeaponFxRenderer implements Disposable {
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
             float radius=CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f;
             if(view!=null&&!view.circle(pose.x(),pose.y(),radius))continue;
+            if(missileLibrary.draw(batch,missile,pose,style,battle.tick))continue;
             TextureRegion[] authored=missileBodies();
             Texture fallback=authored==null?texture(style.fallback()):null;
             if(authored==null&&fallback==null)continue; // Existing physical geometry.
@@ -292,7 +294,7 @@ final class ModularWeaponFxRenderer implements Disposable {
 
     /** A missing payload sprite keeps existing ordnance geometry visible. */
     public boolean hasMissilePayload(Battle.Missile missile,long tick){
-        return missileBodies()!=null||
+        return missileLibrary.available()||missileBodies()!=null||
                 texture(GuidedPayloadVisual.forMissile(missile).fallback())!=null;
     }
     int activeAnimations(){return oneShots.size();}
@@ -302,6 +304,7 @@ final class ModularWeaponFxRenderer implements Disposable {
         textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
         curatedMissileBodies=null;rejectedMissileAtlas=false;
         lasers.dispose();
+        missileLibrary.dispose();
         curatedKineticBodies=null;rejectedKineticAtlas=false;
         authoredFiringImpacts=null;rejectedFiringImpacts=false;
     }
