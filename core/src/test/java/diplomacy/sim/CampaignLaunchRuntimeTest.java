@@ -60,7 +60,7 @@ public final class CampaignLaunchRuntimeTest {
         }finally{
             try(var paths=Files.walk(temp)){
                 paths.sorted(java.util.Comparator.reverseOrder()).forEach(p->{
-                    try{Files.deleteIfExists(p);}catch(java.io.IOException ignored){}
+                    try{Files.deleteIfExists(p);}catch(java.io.IOException cleanupFailure){}
                 });
             }
         }
