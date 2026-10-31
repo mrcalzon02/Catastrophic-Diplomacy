@@ -194,7 +194,11 @@ public final class FighterCraftTest {
                 support(Shipyard.Hull.CARRIER),"BASE-TER-FTR"),tech);
         check(refitted.get(id).stores().fighters()==purchased,
                 "Adding FTR to organic carrier must preserve paid fighters");
-        var removed=refitted.refit(id,fleetCarrier,tech);
+        // Newly installed machinery raises max structural integrity. The
+        // existing paid-service rule requires hull overhaul before another
+        // refit; test the actual lawful campaign sequence.
+        var overhauled=refitted.service(id,CampaignFleet.Service.REPAIR,tech);
+        var removed=overhauled.refit(id,fleetCarrier,tech);
         check(removed.get(id).stores().fighters()==purchased,
                 "Removing auxiliary FTR must not erase organic carrier stock");
     }
