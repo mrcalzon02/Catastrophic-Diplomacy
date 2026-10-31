@@ -57,7 +57,7 @@ public final class ShipSurfaceDamageVisualTest {
         // physically adjacent opaque armor. Never project across empty space.
         int w=96,h=144;
         int[] thinHull=new int[w*h];
-        for(int y=4;y<h-4;y++)for(int x=38;x<=58;x++)thinHull[y*w+x]=255;
+        for(int y=4;y<h-4;y++)for(int x=36;x<=58;x++)thinHull[y*w+x]=255;
         var aligned=ShipArmorStampAnchors.fromAlpha(thinHull,w,h);
         check(aligned.row(8,8)==8f&&aligned.col(8,8)==8f,
                 "Already opaque armor plate must keep its exact physical anchor");

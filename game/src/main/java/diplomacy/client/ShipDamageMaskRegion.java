@@ -28,13 +28,14 @@ final class ShipDamageMaskRegion {
             minCol=Math.min(minCol,col);maxCol=Math.max(maxCol,col);
         }
         if(maxRow<0)return null;
-        // Both bilinear scorch and stamp lips are confined within one
-        // defense cell of a changed cell's center; 1.5 tile padding is safe
-        // at mask-pixel boundaries and under linear texture filtering.
-        int x=Math.max(0,(int)Math.floor((minCol-1.5)*width/GRID));
-        int y=Math.max(0,(int)Math.floor((minRow-1.5)*height/GRID));
-        int right=Math.min(width,(int)Math.ceil((maxCol+2.5)*width/GRID));
-        int bottom=Math.min(height,(int)Math.ceil((maxRow+2.5)*height/GRID));
+        // Physical damage registration may move a visual stamp up to one
+        // tile to meet an irregular original hull silhouette. Include that
+        // one-tile displacement, maximum crater radius and scorch spill
+        // before issuing a subrectangle GPU upload.
+        int x=Math.max(0,(int)Math.floor((minCol-2.5)*width/GRID));
+        int y=Math.max(0,(int)Math.floor((minRow-2.5)*height/GRID));
+        int right=Math.min(width,(int)Math.ceil((maxCol+3.5)*width/GRID));
+        int bottom=Math.min(height,(int)Math.ceil((maxRow+3.5)*height/GRID));
         return new Rect(x,y,right-x,bottom-y);
     }
 }
