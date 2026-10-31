@@ -28,8 +28,13 @@ public final class AndroidLauncher extends AndroidApplication {
                 getIntent().getBooleanExtra("cd.verify_200v200",false);
         boolean review=debug && getIntent()!=null &&
                 getIntent().getBooleanExtra("cd.verify_surface_damage",false);
+        // Emulator-only functional UI test; this flag cannot activate in
+        // a signed production APK even if passed through an external Intent.
+        boolean updateDialogReview=debug && getIntent()!=null &&
+                getIntent().getBooleanExtra("cd.verify_update_dialog",false);
         initialize(new CatastrophicGame(updater::checkForUpdates,verify,review), config);
-        if(!verify && !review)updater.checkForUpdates(false); // prereleases eligible
+        if(updateDialogReview)updater.showVerificationDialog();
+        else if(!verify && !review)updater.checkForUpdates(false); // prereleases eligible
     }
     @Override protected void onDestroy(){
         if(updater!=null)updater.close();
