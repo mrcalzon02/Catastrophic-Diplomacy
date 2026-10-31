@@ -62,7 +62,12 @@ public final class LevelEconomy {
                 .multiply(BigInteger.valueOf(survivors))
                 .multiply(BigInteger.valueOf(10L+maximumFleet-deployed));
         BigInteger denominator=BigInteger.valueOf(deployed).multiply(BigInteger.TEN);
-        return numerator.divide(denominator).longValueExact();
+        // Android 10's BigInteger has no longValueExact(). Preserve its
+        // overflow contract without using an API absent from supported devices.
+        BigInteger reward=numerator.divide(denominator);
+        if(reward.compareTo(BigInteger.valueOf(Long.MAX_VALUE))>0)
+            throw new ArithmeticException("Campaign reward exceeds signed 64-bit credits");
+        return reward.longValue();
     }
     public static long victoryCredits(Level level,int deployed,int survivors,boolean completed) {
         if(level==null)throw new IllegalArgumentException("Level required");
