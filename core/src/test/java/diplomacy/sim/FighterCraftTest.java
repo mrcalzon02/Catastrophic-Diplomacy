@@ -126,7 +126,14 @@ public final class FighterCraftTest {
         Shipyard.Design logisticsCarrier=Shipyard.starter(Battle.Faction.TERRAN,
                 Shipyard.Hull.CARRIER_LOGISTICS);
         Shipyard.Design cruiser=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        // A noncarrier conversion sacrifices its main batteries and shields
+        // to fit extra aviation hardware; this is not free capacity.
         Shipyard.Design converted=cruiser;
+        for(Shipyard.Slot slot:converted.hull.slots)
+            if((slot.mount()==Shipyard.Mount.WEAPON
+                    ||slot.mount()==Shipyard.Mount.DEFENSE)
+                    &&converted.at(slot.index())!=null)
+                converted=converted.install(slot.index(),null);
         int modules=0;
         for(Shipyard.Slot slot:converted.hull.slots)
             if(slot.mount()==Shipyard.Mount.SUPPORT){
@@ -134,7 +141,8 @@ public final class FighterCraftTest {
                 modules++;
             }
         check(modules>=2,"Cruiser must offer multiple sacrificeable hangar slots");
-        check(Shipyard.inspect(converted,tech).valid(),"Modular cruiser carrier must fit");
+        check(Shipyard.inspect(converted,tech).valid(),
+                "Modular cruiser carrier must fit: "+Shipyard.inspect(converted,tech).explanation());
         check(Shipyard.fit(cruiser,tech).fighterCapacity()==0,
                 "Standard non-carrier must not spawn complimentary fighters");
         check(Shipyard.fighterLaunchBays(cruiser)==0,
