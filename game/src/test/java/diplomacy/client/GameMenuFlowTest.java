@@ -15,6 +15,26 @@ public final class GameMenuFlowTest {
         if(!pass)throw new AssertionError(detail);
     }
     public static void main(String[] args) throws Exception {
+        // The real eight-tile UI atlas now provides visible interaction
+        // states. A glowing ShapeRenderer outline is not an input state.
+        check(GrittyUiChrome.stateVariant(GrittyUiChrome.NORMAL,false,false)
+                        ==GrittyUiChrome.NORMAL,
+                "Idle menu button must use authored NORMAL button art");
+        check(GrittyUiChrome.stateVariant(GrittyUiChrome.NORMAL,true,false)
+                        ==GrittyUiChrome.SELECTED,
+                "Hover must swap the original sprite, not draw an outside glow");
+        check(GrittyUiChrome.stateVariant(GrittyUiChrome.NORMAL,true,true)
+                        ==GrittyUiChrome.PRIMARY,
+                "Pressed must use a distinct authored button state");
+        check(GrittyUiChrome.stateVariant(GrittyUiChrome.SELECTED,true,false)
+                        ==GrittyUiChrome.TELEMETRY,
+                "Selected button needs a distinct hovered body");
+        check(GrittyUiChrome.stateVariant(GrittyUiChrome.CONFIRM,false,true)
+                        ==GrittyUiChrome.CONFIRM,
+                "Confirmation buttons must retain their semantic art on press");
+        check(GrittyUiChrome.stateVariant(-1,true,true)
+                        ==GrittyUiChrome.SECONDARY,
+                "Disabled buttons use subdued authored chrome, never hover/press");
         check(Math.abs(CombatPace.DEFAULT-0.20f)<0.0001f,
                 "Normal battle must start five times slower than legacy full speed");
         check(Math.abs(CombatPace.faster(CombatPace.DEFAULT)-0.40f)<0.0001f,
