@@ -1,11 +1,35 @@
 package diplomacy.client;
 
+import diplomacy.shipyard.Shipyard;
+
 /**
  * Pure presentation-only shield material rules. Never modifies shield energy,
  * combat state, or source ship silhouette. No Pixmap/GL access: headless-testable.
  */
 final class ShieldSurfaceModel {
     private ShieldSurfaceModel(){}
+    enum Style {
+        STANDARD(.23f,.69f,1f), OUTPUT(1f,.82f,.28f),
+        EFFICIENCY(.22f,.95f,.72f), RESILIENCE(.69f,.55f,1f),
+        SPECIALIST(.35f,.91f,1f);
+        final float r,g,b;
+        Style(float r,float g,float b){this.r=r;this.g=g;this.b=b;}
+    }
+    static Style style(Shipyard.Track research){
+        return research==null?Style.STANDARD:Style.valueOf(research.name());
+    }
+    /** At full energy the fitted generator's original hue; gradually amber
+     * halfway through the face's capacity, critical red just before failure. */
+    static float channel(Style style,double energy,int component){
+        if(style==null||component<0||component>2)
+            throw new IllegalArgumentException("Shield material channel");
+        float f=Double.isFinite(energy)?(float)Math.max(0,Math.min(1,energy)):0;
+        float healthy=component==0?style.r:component==1?style.g:style.b;
+        float amber=component==0?1f:component==1?.51f:.09f;
+        float critical=component==0?1f:component==1?.065f:.04f;
+        if(f>.5f)return amber+(healthy-amber)*(f-.5f)*2f;
+        return critical+(amber-critical)*f*2f;
+    }
     static int clamp(int value){return Math.min(255,Math.max(0,value));}
     /**
      * Detect the *outer silhouette*, not the join between real shield sectors.

@@ -60,6 +60,28 @@ public final class ShieldSurfaceModelTest {
                 "Transparent shield sprite pixel must remain transparent");
         check(ShieldSurfaceModel.shellMaterial(brightHex,Double.NaN)==0,
                 "Bad source coordinates must not render");
-        System.out.println("PASS silhouette shields, pulse, depletion, max alpha and strategic LOD");
+        for(var track:diplomacy.shipyard.Shipyard.Track.values()){
+            var type=ShieldSurfaceModel.style(track);
+            check(type!=ShieldSurfaceModel.Style.STANDARD,"Research shield uses own look");
+            for(int i=0;i<3;i++){
+                float healthy=ShieldSurfaceModel.channel(type,1,i);
+                float middle=ShieldSurfaceModel.channel(type,.5,i);
+                float critical=ShieldSurfaceModel.channel(type,0,i);
+                check(healthy>=0&&healthy<=1&&middle>=0&&middle<=1
+                        &&critical>=0&&critical<=1,"Shield gamut clamped");
+                check(Math.abs(ShieldSurfaceModel.channel(type,.1,i)-critical)
+                        <=Math.abs(middle-critical)+.0001f,
+                        "Every specialized shield graduates toward red");
+            }
+        }
+        check(ShieldSurfaceModel.style(null)==ShieldSurfaceModel.Style.STANDARD,
+                "Unresearched and old save shields stay standard");
+        check(ShieldSurfaceModel.channel(ShieldSurfaceModel.Style.STANDARD,0,0)>.95f
+                &&ShieldSurfaceModel.channel(ShieldSurfaceModel.Style.STANDARD,0,1)<.1f,
+                "Critical red precedes sector collapse");
+        check(ShieldMaterialShader.FRAGMENT.contains("source.a*v_color.a")
+                &&ShieldMaterialShader.FRAGMENT.contains("u_scan"),
+                "Material scan retains actual original art and transparent alpha");
+        System.out.println("PASS source-art shields, branch palettes, depleted red, transparency and strategic LOD");
     }
 }

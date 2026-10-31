@@ -78,6 +78,9 @@ public final class Battle {
         public Map<Integer,Subsystem> installedSubsystems=Map.of();
         /** Directional powered shields, localized armor plates and exposed structure. */
         public DirectionalDefense defense;
+        /** Research-family presentation of the strongest installed SHD module.
+         * The existing four-facing physical shield mechanics remain unchanged. */
+        public Shipyard.Track shieldFieldBranch;
         public double x, y, vx, vy, facing;
         public double hull, maxHull, shields, maxShields, armor, maxArmor, sif, power, maxPower, heat, maxHeat;
         /** Persistent capital-ship reaction mass; unlike transient fighter flight fuel. */
@@ -737,6 +740,16 @@ public final class Battle {
         s.weaponEmitters=WeaponMuzzles.equipped(design,HullLayouts.slots(design.faction,design.hull));
         s.laserFittings=LaserFamilies.fitted(design);
         s.installedSubsystems=Map.copyOf(located);
+        int strongestShieldRank=0;
+        for(int i=0;i<design.slots();i++){
+            Shipyard.Installed part=design.at(i);
+            if(part==null||!part.component.endsWith("-SHD")||part.branch()==null)continue;
+            int rank=part.stage(part.branch());
+            if(rank>strongestShieldRank){
+                strongestShieldRank=rank;
+                s.shieldFieldBranch=part.branch();
+            }
+        }
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
         s.fittedCrewSystems=true;
         s.crewRequired=machinery.crew().minimum();

@@ -34,6 +34,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             new java.util.IdentityHashMap<>();
     /** One shared hex-texture field shell, split into the same four mechanical facings. */
     private Texture[] shieldShell;
+    private final ShieldMaterialShader shieldInk=new ShieldMaterialShader();
     // A compact per-vessel overlay keeps irregular hull peeling inexpensive
     // even when several hundred damaged vessels share the same original PNG.
     private static final int MASK_W=96, MASK_H=144;
@@ -434,9 +435,11 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         batch.setColor(1,1,1,1);
         surfaces.end(batch);
-        // Shields use original alpha-masked materials, not fabricated normal
-        // directions or emissive pixels. Separate translucent overlay pass.
+        // Cached source-art hex textures are recolored using per-vertex RGB:
+        // one shader for all factions, generators and independent facings.
+        batch.setShader(shieldInk.program());
         batch.begin();
+        shieldInk.configure(false,battle.tick);
         for(Battle.Ship ship:battle.ships()){
             if(!hasSprite(ship)||ship.shields<=0)continue;
             Texture tex=texture(ship.faction,ship.hullClass);
@@ -451,8 +454,73 @@ public final class TerranPlaceholderSprites implements Disposable {
             drawShield(batch,ship,tex,pose,width,height,
                     (float)(StrictMath.toDegrees(pose.angle())-90),battle.tick,shieldFx);
         }
+        // A collapsed mechanical sector dissipates a last, red, ALPHA-MASKED
+        // copy of the original art rather than a fabricated solid ring.
+        if(shieldFx!=null && shieldShell!=null)
+            for(ShieldFxTimeline.Effect fx:shieldFx.events()){
+                if(fx.kind!=ShieldFxTimeline.Kind.COLLAPSE||!hasSprite(fx.ship)
+                        ||fx.ship.defense.shields(fx.facing)>.015)continue;
+                BattleRenderPoses.Pose pose=poses==null
+                        ?new BattleRenderPoses.Pose((float)fx.ship.x,(float)fx.ship.y,(float)fx.ship.facing)
+                        :poses.ship(fx.ship);
+                if(view!=null&&!view.ship(pose,fx.ship.visualScale()))continue;
+                float height=(float)(34*fx.ship.visualScale());
+                if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
+                    continue;
+                Texture tex=texture(fx.ship.faction,fx.ship.hullClass);
+                if(tex==null)continue;
+                float width=height*tex.getWidth()/(float)tex.getHeight();
+                float fade=1f-fx.progress();
+                batch.setColor(1f,.065f,.04f,.55f*fade*fade);
+                drawWhole(batch,shieldShell[fx.facing.ordinal()],pose,
+                        width*1.31f,height*1.27f,
+                        (float)(StrictMath.toDegrees(pose.angle())-90));
+            }
         batch.setColor(1,1,1,1);
         batch.end();
+        // Recharge/restart scan over exactly the same source-art sector textures
+        // in a separate, additive, grouped pass. No per-ship textures or uniforms.
+        if(shieldFx!=null && shieldShell!=null){
+            batch.setBlendFunction(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA,
+                    com.badlogic.gdx.graphics.GL20.GL_ONE);
+            batch.begin();
+            shieldInk.configure(true,battle.tick);
+            for(Battle.Ship ship:battle.ships()){
+                if(!hasSprite(ship)||ship.shields<=0)continue;
+                BattleRenderPoses.Pose pose=poses==null
+                        ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
+                        :poses.ship(ship);
+                if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
+                Texture tex=texture(ship.faction,ship.hullClass);
+                float height=(float)(34*ship.visualScale());
+                if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
+                    continue;
+                float width=height*tex.getWidth()/(float)tex.getHeight();
+                Texture[] sectors=shieldSections.get(tex);
+                if(sectors==null)continue;
+                float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
+                for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+                    float recharge=shieldFx.recharge(ship.id,face);
+                    double max=ship.defense.maxShields(face);
+                    if(recharge<=.001f||max<=0)continue;
+                    float fraction=(float)(ship.defense.shields(face)/max);
+                    if(fraction<=.003f)continue;
+                    ShieldSurfaceModel.Style type=ShieldSurfaceModel.style(ship.shieldFieldBranch);
+                    batch.setColor(ShieldSurfaceModel.channel(type,fraction,0),
+                            ShieldSurfaceModel.channel(type,fraction,1),
+                            ShieldSurfaceModel.channel(type,fraction,2),
+                            Math.min(.48f,.34f*recharge));
+                    drawWhole(batch,shieldShell[face.ordinal()],pose,
+                            width*1.31f,height*1.27f,rotation);
+                    drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
+                }
+            }
+            batch.setColor(1,1,1,1);
+            batch.end();
+            batch.setBlendFunction(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA,
+                    com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);
+        }
+        batch.setShader(null);
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
                             BattleRenderPoses.Pose pose,float width,float height,
@@ -467,16 +535,20 @@ public final class TerranPlaceholderSprites implements Disposable {
             float opacity=ShieldSurfaceModel.opacity(strength,tick,ship.id,face.ordinal());
             if(shieldFx!=null)opacity=shieldFx.opacity(ship,face,opacity);
             if(opacity<=0f)continue;
+            ShieldSurfaceModel.Style type=ShieldSurfaceModel.style(ship.shieldFieldBranch);
+            float red=ShieldSurfaceModel.channel(type,strength,0);
+            float green=ShieldSurfaceModel.channel(type,strength,1);
+            float blue=ShieldSurfaceModel.channel(type,strength,2);
             // The outer field is the actual blue hex-energy sprite, NOT a
             // procedural ellipse. Geometry only masks its outside pixels and
             // chooses the live powered face; the original texture is preserved.
             if(shieldShell!=null){
-                batch.setColor(1,1,1,Math.min(.85f,opacity*1.35f));
+                batch.setColor(red,green,blue,Math.min(.85f,opacity*1.35f));
                 drawWhole(batch,shieldShell[face.ordinal()],pose,
                         width*1.31f,height*1.27f,rotation);
             }
             // Keep the existing on-hull material for shield contact feedback.
-            batch.setColor(1,1,1,opacity);
+            batch.setColor(red,green,blue,opacity);
             drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
@@ -507,6 +579,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture image:severeLayers.values())image.dispose();
         damagedLayers.clear();severeLayers.clear();originals.clear();
         surfaces.dispose();
+        shieldInk.dispose();
         damagedMaterial.dispose();
         destroyedMaterial.dispose();
         shieldMaterial.dispose();

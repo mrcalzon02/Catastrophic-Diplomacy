@@ -82,7 +82,7 @@ final class GameWikiCatalog {
             "Blueprints can be exported/imported for permitted skirmishes. Campaign refits must modify an actually owned vessel and preserve roster/resource transactions.");
         guide(a,"COMBAT","Directional protection and hull damage",
             "Damage resolves against shields, armor, structure and installed systems. Directional facings track independent energy; hits and recovery use actual simulation state.",
-            "Armor can erode locally; physically damaged hulls receive localized scorch and destruction effects. Shield flashes and beam corona are render-only feedback, not extra gameplay damage.",
+            "Armor can erode locally; physically damaged hulls receive localized scorch and destruction effects. Shield generators use translucent source-art field sectors: unresearched blue, output gold, efficiency green, resilience violet and specialist cyan. Each facing blends toward red as charge falls; recharge and restart scan the actual hex-field artwork.",
             "Repair, shield transfer and drone service require purpose-built fitted support modules and finite charge, power, range and heat resources.");
         guide(a,"WEAPONS","Primary weapon families",
             "Laser fire uses one of five installed laser families with different beam profile, effective behavior and emission. Kinetic guns launch finite physical rounds with chosen ammunition.",

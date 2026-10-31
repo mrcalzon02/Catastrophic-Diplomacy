@@ -30,3 +30,26 @@ gradle :game:menuFlowSmoke :android:assembleDebug :desktop:installDist
 ```
 
 **Outstanding validation:** A real Android and desktop screenshot of shields at close zoom (fully charged, one collapsed face, impact/recharge) is still needed before calling this visually approved. Source-code and unit-test success alone do not prove that the field texture is visually compelling on a GPU.
+
+## Material-driven generator color and recovery
+
+A standard unresearched SHD uses the original transparent blue hex art.
+Fitted SHD research branches have distinct healthy palettes: OUTPUT gold,
+EFFICIENCY green, RESILIENCE violet and SPECIALIST cyan. The most advanced
+installed SHD chooses the ship-wide visual family. These branches already
+change real fitted technology stats; no new damage or shield bonuses are
+introduced by this *render-only* appearance mapping.
+
+Each of the four mechanical shield faces independently grades its healthy
+color through amber at half energy to critical red just before collapse.
+A shared source-art shader uses the original PNG's pattern luminance and
+alpha; no manufactured replacement PNG, colored ring or per-ship texture
+is allocated. Contact response uses actual per-facing energy.
+
+Regeneration and restart now brighten a scrolling, transparent *copy of the
+same shield-source sector textures* in a grouped additive pass, rather than
+being represented chiefly by generic geometry arcs. Collapse leaves a short
+red fading hex-material discharge tied to the real drained sector. Existing
+impact/strain/collapse crack accents remain. Source sprites stay unchanged.
+`shieldSurfaceSmoke` is a visual diagnostic, not a release gate.
+Actual Android and desktop screenshots remain required for visual acceptance.

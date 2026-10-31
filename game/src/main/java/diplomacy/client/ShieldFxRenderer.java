@@ -29,6 +29,10 @@ final class ShieldFxRenderer {
                 // Never fill a crowded far-field battle with subpixel overdraw.
                 if(radius*1280.0/(visible.right-visible.left)<3.2)continue;
             }
+            // Recharge/restart now illuminate cached source-art translucent
+            // fields; geometry is retained for impacts and cracking only.
+            if(fx.kind==ShieldFxTimeline.Kind.RECHARGE
+                    ||fx.kind==ShieldFxTimeline.Kind.RESTART)continue;
             float progress=fx.progress();
             float decay=(1-progress)*(1-progress);
             float center=fx.localAngle+(float)StrictMath.toDegrees(pose.angle());
