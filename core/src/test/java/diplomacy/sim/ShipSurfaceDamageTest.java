@@ -86,6 +86,38 @@ public final class ShipSurfaceDamageTest {
             b.impactSplash(1,.3,point.x(),point.y(),12,Battle.DamageType.PLASMA,0.1,2.15);
         }
         check(a.fingerprint()==b.fingerprint(),"Repeated module impacts must replay exactly");
-        System.out.println("PASS ship surface damage: shields-first, module aim, scatter, localized multi-tile peel, saved state and deterministic replay");
+        // Repeated kinetic strikes must strip ONE local plate before ordinary
+        // shots reach structure. No global armor depletion prerequisite.
+        var plate=new DirectionalDefense(0,1000,1500);
+        var cell=plate.tileAt(.4,0);
+        var untouched=plate.tileAt(-.5,.2);
+        double neighborArmor=untouched.armor();
+        double step=cell.maxArmor()/plate.damageFactor(
+                DirectionalDefense.Layer.ARMOR,cell.facing,Battle.DamageType.KINETIC)/4;
+        for(int i=0;i<3;i++){
+            var dent=plate.impact(1,0,.4,0,step,Battle.DamageType.KINETIC);
+            equal(dent.hullDamage(),0,"Unpenetrated kinetic hit cannot remove hull health");
+            check(dent.armorConsumed()>0,"Local kinetic impact must consume contacted armor");
+        }
+        check(cell.exposure()>.7&&cell.exposure()<.8,
+                "Consecutive strikes must wear the impacted armor section");
+        equal(untouched.armor(),neighborArmor,"Unstruck plate is unaffected");
+        var breach=plate.impact(1,0,.4,0,step*3,Battle.DamageType.KINETIC);
+        check(breach.hullDamage()>0&&breach.structuralTileDamage()>0,
+                "Armor exhaustion must permit structural and hull penetration");
+        var reload=new DirectionalDefense(0,1000,1500);
+        reload.restoreIntegrity(plate.saveIntegrity());
+        equal(reload.tileAt(.4,0).exposure(),cell.exposure(),
+                "Localized exterior breach survives saved battle integrity");
+        equal(reload.tileAt(.4,0).internalDamage(),cell.internalDamage(),
+                "Internal breach survives saved battle integrity");
+        plate.overhaul();
+        equal(cell.exposure(),0,"Paid overhaul restores armor opacity");
+        equal(cell.internalDamage(),0,"Paid overhaul restores structural condition");
+        var bypassPlate=new DirectionalDefense(0,1000,1500);
+        var pierced=bypassPlate.impact(1,0,.4,0,.6,Battle.DamageType.KINETIC,.5);
+        check(pierced.hullDamage()>0&&bypassPlate.tileAt(.4,0).armor()>0,
+                "Armor bypass can injure structure before plating is exhausted");
+        System.out.println("PASS surface damage: shield first, localized abrasion, staged penetration, bypass, overhaul, save/replay");
     }
 }

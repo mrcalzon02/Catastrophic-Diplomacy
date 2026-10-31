@@ -86,3 +86,28 @@ desktop or Android runtime screenshot plus log/telemetry, not a concept render.
 **Release policy:** Only failed executable function, launch, essential gameplay,
 or required network correctness can block publication. Art and aesthetic
 diagnostics must not independently block a working build.
+
+## Superficial armor wear versus structural breach
+
+The simulation retains four shield facings, 16x16 occupied armor cells, saved
+localized structure and global hull health. The client now distinguishes:
+
+- Shield-only impacts: shield contact feedback, no permanent hull mark.
+- Unpenetrated armor wear: original plate pixels become scorched while remaining
+  fully opaque; low-level wear is not incorrectly portrayed as an open hole.
+- Near-exhausted armor: irregular exterior alpha reduction exposes the shared
+  structural-material layer below; fully exhausted armor is transparent locally.
+- Actual structural penetration via ammunition bypass can reveal a smaller
+  internal patch even if some exterior armor remains.
+- Hull HP loss: a bounded heated edge and short gray smoke puff; penetration
+  takes priority when armor, hull and shield drop during the same tick.
+- Repairs and saves: alpha masks derive from authoritative armor and structural
+  integrity; the cache signature includes both. Paid overhaul restores both.
+
+`ShipSurfaceDamageTest` now tests repeated kinetic hits until penetration,
+armor bypass, untouched neighboring cells, persistence and overhaul.
+`ShipSurfaceDamageVisualTest` is a headless pixel diagnostic covering original
+source alpha, scorch-only damage, gradual openings, structural bypass and full
+exposure. It is invoked by the separate hull diagnostics workflow, not added to
+release gates. Visual quality still requires actual desktop/Android screenshots,
+which these headless checks do not replace.

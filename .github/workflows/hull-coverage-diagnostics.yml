@@ -7,6 +7,14 @@ on:
       - '.github/workflows/hull-coverage-diagnostics.yml'
       - 'core/src/main/java/diplomacy/sim/HullCoverageBattle.java'
       - 'core/src/test/java/diplomacy/sim/HullCoverageBattleTest.java'
+      - 'core/src/test/java/diplomacy/sim/ShipSurfaceDamageTest.java'
+      - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
+      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageVisual.java'
+      - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
+      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
+      - 'game/src/main/java/diplomacy/client/CombatLightingRenderer.java'
+      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageVisualTest.java'
+      - 'game/build.gradle'
   workflow_dispatch:
 
 permissions:
@@ -33,7 +41,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p test-output/hull-coverage
-          gradle --no-daemon :core:hullCoverageSmoke :core:shipSurfaceDamageSmoke :game:classes |
+          gradle --no-daemon :core:hullCoverageSmoke :core:shipSurfaceDamageSmoke :game:shipDamageVisualSmoke :game:classes |
             tee test-output/hull-coverage/functional-test.log
       - name: Save independent diagnostic evidence
         if: always()
