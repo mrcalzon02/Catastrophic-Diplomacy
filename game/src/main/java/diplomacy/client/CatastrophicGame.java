@@ -546,7 +546,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         screensaverControlDownY=ui.y;
                         return true;
                     }
-                    screensaverWake.down(pointer,x,y,System.nanoTime());
+                    // The Android render thread can stall under large fleet effects.
+                    // Time the physical touch event, not its delayed dispatch.
+                    long touchTime=Gdx.input.getCurrentEventTime();
+                    screensaverWake.down(pointer,x,y,
+                            touchTime>0?touchTime:System.nanoTime());
                     battleTouch.start(pointer,ui.x,ui.y);
                     return true;
                 }
@@ -726,7 +730,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(battleTouch.owns(pointer))battleTouch.end(pointer,ui.x,ui.y);
-                    if(screensaverWake.up(pointer,x,y,System.nanoTime())){
+                    // Use the event's own timestamp: processing two 100ms taps on
+                    // consecutive slow frames must still count as a double tap.
+                    long touchTime=Gdx.input.getCurrentEventTime();
+                    if(screensaverWake.up(pointer,x,y,
+                            touchTime>0?touchTime:System.nanoTime())){
                         screensaverControlsVisible=!screensaverControlsVisible;
                         if(audio!=null)audio.ui();
                         Gdx.app.log("CD-SCREENSAVER","CONTROLS "+(screensaverControlsVisible?"WAKE":"HIDE"));
