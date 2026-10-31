@@ -5,7 +5,6 @@ import diplomacy.tech.TechnologyCatalog;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 
 /** Versioned, checksum-protected purchase blueprint, not a commissioned vessel.
  * A saved blueprint NEVER contains crew, ammunition, fuel, stored craft or ship IDs.
@@ -47,8 +46,14 @@ public final class CampaignBlueprintCodec {
     }
     private static String digest(String text){
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(text.getBytes(StandardCharsets.UTF_8)));
+            byte[] digest=MessageDigest.getInstance("SHA-256")
+                    .digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder output=new StringBuilder(digest.length*2);
+            for(byte value:digest){
+                output.append(Character.forDigit((value>>>4)&15,16));
+                output.append(Character.forDigit(value&15,16));
+            }
+            return output.toString();
         } catch(NoSuchAlgorithmException impossible){
             throw new IllegalStateException("SHA-256 required by Java 17",impossible);
         }
