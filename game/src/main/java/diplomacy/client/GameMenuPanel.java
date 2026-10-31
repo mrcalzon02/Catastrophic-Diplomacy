@@ -77,32 +77,6 @@ final class GameMenuPanel {
         lastHover=next;hoverScreen=screen;
         return entered;
     }
-    private void feedback(ShapeRenderer shapes,Screen screen){
-        int hovering=pointerActive?controlAt(pointerX,pointerY):-1;
-        int pressed=lastPressScreen==screen&&System.nanoTime()<pressUntilNs?recentPress:-1;
-        for(int i=0;i<chromeCount;i++){
-            int k=i*5;
-            float x=chromeCommands[k],y=chromeCommands[k+1],
-                    w=chromeCommands[k+2],h=chromeCommands[k+3];
-            if(chromeCommands[k+4]<0){
-                shapes.setColor(.035f,.044f,.048f,1f);
-                shapes.rect(x+3,y+3,w-6,h-6);
-                shapes.setColor(.18f,.20f,.20f,1f);
-                shapes.rect(x+4,y+h-7,w-8,2);
-                continue;
-            }
-            boolean down=i==pressed||(pointerDown&&i==hovering);
-            if(i!=hovering&&!down)continue;
-            shapes.setColor(down?MilitaryUiTheme.AMBER:MilitaryUiTheme.TELEMETRY);
-            float thick=down?4:2;
-            shapes.rect(x+2,y+2,w-4,thick);
-            shapes.rect(x+2,y+h-2-thick,w-4,thick);
-            shapes.rect(x+2,y+2,thick,h-4);
-            shapes.rect(x+w-2-thick,y+2,thick,h-4);
-            if(down)shapes.rect(x+10,y+8,w-20,3);
-        }
-    }
-
     private static final String[] HOME_ACTIONS={
         "CONTINUE CAMPAIGN","NEW CAMPAIGN","SKIRMISH","SHIPYARD","OPTIONS","EXIT","MULTIPLAYER"
     };
@@ -677,17 +651,22 @@ final class GameMenuPanel {
             default -> {}
         }
         shapes.end();
+        // The actual button atlas owns all visual interaction states.
+        // No second ShapeRenderer pass painting a fake glow over the art.
+        int hovered=pointerActive?controlAt(pointerX,pointerY):-1;
+        int pressed=lastPressScreen==screen&&System.nanoTime()<pressUntilNs
+                ?recentPress:-1;
         batch.begin();
         for(int i=0;i<chromeCount;i++){
             int at=i*5;
-            grittyChrome.draw(batch,(int)chromeCommands[at+4],
+            boolean down=i==pressed||(pointerDown&&i==hovered);
+            boolean hover=i==hovered&&!down;
+            grittyChrome.drawState(batch,(int)chromeCommands[at+4],
+                    hover,down,
                     chromeCommands[at],chromeCommands[at+1],
                     chromeCommands[at+2],chromeCommands[at+3]);
         }
         batch.end();
-        shapes.begin(ShapeRenderer.ShapeType.Filled);
-        feedback(shapes,screen);
-        shapes.end();
         batch.begin();
         switch(screen){
             case HOME -> {
