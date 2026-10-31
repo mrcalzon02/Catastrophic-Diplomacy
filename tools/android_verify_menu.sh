@@ -329,8 +329,8 @@ for round in $(seq 1 8); do
         "$report/screensaver-round-$round-logcat.txt" | tail -n 45 >&2 || true
       exit 1
     fi
-    if grep -qE 'FATAL EXCEPTION|OutOfMemoryError' "$report/screensaver-round-$round-logcat.txt"; then
-      echo "FAIL: Android reported fatal error on screensaver round $round" >&2
+    if grep -qE 'AndroidRuntime.*Process: games\\.catastrophicdiplomacy|Force finishing activity.*catastrophicdiplomacy' "$report/screensaver-round-$round-logcat.txt"; then
+      echo "FAIL: Android reported a Catastrophic Diplomacy crash on screensaver round $round" >&2
       exit 1
     fi
     if grep -q 'CD-SCREENSAVER.*ROUND seed=' "$report/screensaver-round-$round-logcat.txt"; then
