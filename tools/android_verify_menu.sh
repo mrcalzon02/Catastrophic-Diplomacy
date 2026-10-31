@@ -226,3 +226,64 @@ sleep 5
 capture campaign-battle
 assert_step 'CAMPAIGN_BATTLE 1 4 WEDGE'
 echo "PASS: signed APK real skirmish hull drag + five persistent standing-order policies, and campaign four-owned-ship wedge -> multiwave combat."
+
+# Independent signed-APK screensaver acceptance: single taps and drags must
+# never eject the spectator, but double-tapping must reveal actual usable HUD.
+adb shell am force-stop "$package"
+adb logcat -c
+adb shell am start -W -n "$package/diplomacy.android.AndroidLauncher"
+sleep 5
+dismiss_optional_updater screensaver-relaunch
+capture screensaver-home
+assert_step MAIN_MENU
+touch_ui screensaver-home 640 60
+sleep 4
+capture screensaver-exhibition
+adb logcat -d -v time > "$report/screensaver-logcat.txt"
+grep -q 'CD-SCREENSAVER.*START seed=' "$report/screensaver-logcat.txt" || {
+  echo "FAIL: signed APK did not start a real screensaver round" >&2
+  exit 1
+}
+touch_ui screensaver-exhibition 640 390
+sleep 1
+adb logcat -d -v time > "$report/screensaver-single-tap-logcat.txt"
+if grep -q 'CD-SCREENSAVER.*EXIT HOME' "$report/screensaver-single-tap-logcat.txt"; then
+  echo "FAIL: a single tap incorrectly dismissed the exhibition" >&2
+  exit 1
+fi
+# Send both platform taps within one ADB shell invocation so emulator command
+# startup latency cannot accidentally turn a double tap into two slow taps.
+read -r wake_x wake_y <<< "$(map_ui screensaver-exhibition 640 390)"
+adb shell "input tap $wake_x $wake_y; sleep 0.10; input tap $wake_x $wake_y"
+sleep 1
+capture screensaver-controls-awake
+adb logcat -d -v time > "$report/screensaver-wake-logcat.txt"
+grep -q 'CD-SCREENSAVER.*CONTROLS WAKE' "$report/screensaver-wake-logcat.txt" || {
+  echo "FAIL: double-tap failed to reveal screensaver controls" >&2
+  exit 1
+}
+touch_ui screensaver-controls-awake 200 32
+sleep 1
+capture screensaver-zoomed
+touch_ui screensaver-controls-awake 875 32
+sleep 2
+capture screensaver-next-round
+adb logcat -d -v time > "$report/screensaver-controls-logcat.txt"
+grep -q 'CD-SCREENSAVER.*CONTROL ZOOM IN' "$report/screensaver-controls-logcat.txt" || {
+  echo "FAIL: woken screensaver zoom control was inert" >&2
+  exit 1
+}
+grep -q 'CD-SCREENSAVER.*CONTROL NEXT' "$report/screensaver-controls-logcat.txt" || {
+  echo "FAIL: woken screensaver next-battle control was inert" >&2
+  exit 1
+}
+touch_ui screensaver-controls-awake 1180 32
+sleep 1
+adb logcat -d -v time > "$report/screensaver-exit-logcat.txt"
+grep -q 'CD-SCREENSAVER.*EXIT HOME' "$report/screensaver-exit-logcat.txt" || {
+  echo "FAIL: explicit screensaver EXIT control did not return to menu" >&2
+  exit 1
+}
+capture screensaver-exited
+echo "PASS: signed APK single tap ignored, double-tap wakes controls, zoom/next work and EXIT returns home."
+

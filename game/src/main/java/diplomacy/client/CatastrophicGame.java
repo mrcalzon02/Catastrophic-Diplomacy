@@ -2182,16 +2182,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
         return values[(f.ordinal() + 1) % values.length];
     }
     private void tapScreensaverControl(float x){
-        if(x<135)screensaverCamera.manualScale(1.4f);
-        else if(x<270)screensaverCamera.manualScale(1f/1.4f);
-        else if(x<405)running=!running;
-        else if(x<535)speed=CombatPace.slower(speed);
-        else if(x<665)speed=CombatPace.faster(speed);
-        else if(x<805)screensaverCamera.resumeAuto();
-        else if(x<955)nextScreensaverRound();
-        else if(x<1095)screensaverControlsVisible=false;
+        String action;
+        if(x<135){screensaverCamera.manualScale(1.4f);action="ZOOM OUT";}
+        else if(x<270){screensaverCamera.manualScale(1f/1.4f);action="ZOOM IN";}
+        else if(x<405){running=!running;action=running?"RESUME":"PAUSE";}
+        else if(x<535){speed=CombatPace.slower(speed);action="SLOW";}
+        else if(x<665){speed=CombatPace.faster(speed);action="FAST";}
+        else if(x<805){screensaverCamera.resumeAuto();action="AUTO CAM";}
+        else if(x<955){nextScreensaverRound();action="NEXT";}
+        else if(x<1095){screensaverControlsVisible=false;action="HIDE";}
         else {stopScreensaver();return;}
         if(audio!=null)audio.ui();
+        Gdx.app.log("CD-SCREENSAVER","CONTROL "+action+" speed="+speed
+                +" zoom="+screensaverCamera.currentZoom());
     }
 
     private void startScreensaver(){
