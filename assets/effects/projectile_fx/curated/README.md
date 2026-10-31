@@ -41,3 +41,35 @@ research or save data were altered.
 This visual mapping has independent diagnostics only. Art approval requires
 REAL desktop/Android game screenshot inspection and does not block a
 functionally working release.
+
+
+## Original 64-frame weapon muzzle and impact atlas
+
+`weapon_fire_impact_64.png`: 1024×1024 RGBA, eight columns by eight rows,
+128×128 original source-art frame cuts. This is sourced from the existing
+`Catastrophic_Diplomacy_Modular_FX_Existing_Art.zip` Library archive
+(6,503,142 bytes) which already contained independently sliced transparent
+frames for laser, kinetic, plasma and particle effects. No new weapon artwork
+was synthesized and no source frames were overwritten. The source archive
+still remains unchanged in the Library.
+
+Row 0: laser FIRING, row 1: laser IMPACT.
+Row 2: kinetic FIRING, row 3: kinetic IMPACT.
+Row 4: plasma FIRING (7 original frames, eighth cell empty),
+row 5: plasma IMPACT.
+Row 6: particle FIRING, row 7: particle IMPACT.
+
+Each row has eight ticks/frames (plasma fire seven) matching the existing
+`WeaponFxProfile` clip timing and actual FIRE/IMPACT visual events. The
+renderer only creates the atlas's 64 `TextureRegion` objects once, shares
+them among active effects and falls back to independently packaged source
+frames when necessary.
+
+SHA-256 curated atlas:
+`0b05f708d61f2c04488139fb3f2ab87806c3155b789b447cda8d462c98d5a61a`
+Drive staging copy:
+https://drive.google.com/file/d/182Ap_Ebifq8yS9IOs4WdR80yL5OXxKgE/view?usp=drivesdk
+
+This change also leaves guided projectile launch/explosion arts for further
+specific curation; it does not misrepresent a laser or kinetic impact as
+a missile impact. Cosmetic checks are isolated from release gates.

@@ -10,6 +10,8 @@ on:
       - 'game/src/main/java/diplomacy/client/GuidedPayloadVisual.java'
       - 'game/src/main/java/diplomacy/client/KineticPayloadVisual.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
+      - 'game/src/main/java/diplomacy/client/WeaponStageArt.java'
+      - 'game/src/test/java/diplomacy/client/WeaponStageArtTest.java'
       - 'game/src/test/java/diplomacy/client/CapitalTurretSpritesTest.java'
       - 'game/src/test/java/diplomacy/client/GuidedPayloadVisualTest.java'
       - 'game/src/test/java/diplomacy/client/KineticPayloadVisualTest.java'
@@ -38,8 +40,9 @@ jobs:
           set -o pipefail
           test -s assets/effects/projectile_fx/curated/missile_bodies_6.png
           test -s assets/effects/projectile_fx/curated/kinetic_bodies_5.png
+          test -s assets/effects/projectile_fx/curated/weapon_fire_impact_64.png
           mkdir -p test-output/projectile-art
-          gradle --no-daemon :game:capitalTurretSmoke :game:guidedOrdnanceArtSmoke :game:kineticOrdnanceArtSmoke :game:classes |
+          gradle --no-daemon :game:capitalTurretSmoke :game:guidedOrdnanceArtSmoke :game:kineticOrdnanceArtSmoke :game:weaponStageArtSmoke :game:classes |
             tee test-output/projectile-art/mapping.log
       - name: Store independent diagnostic log
         if: always()

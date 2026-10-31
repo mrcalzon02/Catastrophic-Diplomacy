@@ -296,3 +296,12 @@ tasks.register('kineticOrdnanceArtSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.KineticPayloadVisualTest'
 }
+
+// Existing authored 64-frame weapon firing/impact art: standalone visual diagnostic.
+tasks.register('weaponStageArtSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Check original laser/kinetic/plasma/particle firing and impact atlas cell routing.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.WeaponStageArtTest'
+}
