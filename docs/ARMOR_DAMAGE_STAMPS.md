@@ -49,3 +49,18 @@ Already-opaque centers remain unchanged; source alpha clipping is still
 absolute. This does not move the physical projectile strike, damage tile,
 armor loss, module hit or saved battle state. Low-alpha labels/thruster fringes
 are excluded from anchor candidates.
+
+
+## Combat observability diagnostic
+
+Run `gradle :core:armorBreachTelemetry` for **all 11 actual, legally
+fitted same-size hull duels**, 450 real simulation ticks each.
+The diagnostic reports each vessel's maximum hull, armor, first tick with
+90%+ armor exposure **while still alive**, first death tick, and maximum
+breached armor-cell count. It prints the number of ships that perish before
+ever showing an armor hole. An optional CI artifact saves those measurements.
+
+This measures the original concern ("ships die before their armor holes can be
+seen") rather than falsely assuming that a perfect cutout algorithm guarantees
+visibility. It is completely independent of gameplay balancing and is never a
+release gate; device screenshots remain necessary.

@@ -661,3 +661,14 @@ tasks.register('campaignLaunchRuntimeSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.CampaignLaunchRuntimeTest'
 }
 tasks.named('gameFlowSmoke') { dependsOn tasks.named('campaignLaunchRuntimeSmoke') }
+
+
+// Standalone NONBLOCKING diagnostic: measure real battle lifetime before a
+// physical armor cell can expose its underlying metal. Never changes balance.
+tasks.register('armorBreachTelemetry', JavaExec) {
+    group = 'verification'
+    description = 'Report actual hull survival and 90% armor exposure in every fitted 1v1 duel.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ArmorBreachTelemetry'
+}

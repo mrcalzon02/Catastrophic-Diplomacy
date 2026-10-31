@@ -21,5 +21,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1'}
       # Independent workflow: failures are visible here, NEVER a release dependency.
-      - name: Inspect functional armor-alpha stamp invariants (visual diagnostic only)
+      - name: Inspect physical armor masks and cropped GPU updates
         run: gradle --no-daemon :game:shipDamageVisualSmoke
+      - name: Measure actual time to armor exposure in fitted duels (diagnostic only)
+        run: |
+          mkdir -p test-output/armor-observation
+          gradle --no-daemon :core:armorBreachTelemetry | tee test-output/armor-observation/lifetime.csv
+      - name: Preserve optional armor-readability measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-readability-${{ github.sha }}
+          path: test-output/armor-observation/
+          if-no-files-found: warn
+          retention-days: 30
