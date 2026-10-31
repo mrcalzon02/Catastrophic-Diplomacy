@@ -76,9 +76,23 @@ final class CombatLightingRenderer implements Disposable {
                 && y - radius <= camera.position.y + halfH;
     }
 
+    private static boolean visibleSegment(OrthographicCamera camera,
+                                          double x1,double y1,double x2,double y2,
+                                          double pad) {
+        double hw=camera.viewportWidth*camera.zoom*.5;
+        double hh=camera.viewportHeight*camera.zoom*.5;
+        return Math.max(x1,x2)+pad>=camera.position.x-hw &&
+                Math.min(x1,x2)-pad<=camera.position.x+hw &&
+                Math.max(y1,y2)+pad>=camera.position.y-hh &&
+                Math.min(y1,y2)-pad<=camera.position.y+hh;
+    }
+
     private void spot(SpriteBatch batch, OrthographicCamera camera,
                       double x, double y, float radius, Color color, float alpha) {
-        if (radius <= 0 || alpha <= 0 || !visible(camera, x, y, radius)) return;
+        // Fully subpixel halos cannot illuminate a visible receiver or contribute
+        // a legible source glow. Keep larger emitters and true beam cores.
+        if (radius <= 0 || alpha <= 0 || radius*2f/camera.zoom < 1f
+                || !visible(camera, x, y, radius)) return;
         batch.setColor(color.r, color.g, color.b, Math.min(1, alpha));
         batch.draw(glow, (float) x - radius, (float) y - radius,
                 radius * 2, radius * 2);
@@ -151,7 +165,8 @@ final class CombatLightingRenderer implements Disposable {
                     / CombatLightingModel.SMOKE_LIFETIME_TICKS;
             if (age < 0 || age >= 1) continue;
             float radius = CombatEffectScale.of((smoke.heavy() ? 7.5f : 4.8f) * (1 + age * 1.65f));
-            if (!visible(camera, smoke.x(), smoke.y(), radius)) continue;
+            if (radius*2f/camera.zoom < 1f
+                    || !visible(camera, smoke.x(), smoke.y(), radius)) continue;
             float fade=1-age;
             if(smoke.decoy())batch.setColor(.36f,.53f,.69f,.25f*fade*fade);
             else if(smoke.heavy())batch.setColor(.47f,.42f,.40f,.50f*fade*fade);
@@ -187,12 +202,15 @@ final class CombatLightingRenderer implements Disposable {
         for (Battle.Ship ship : battle.ships()) {
             if (!ship.alive()) continue;
             float scale = (float) Math.min(3.5, ship.visualScale());
-            float ratio = (float) Math.min(1, StrictMath.hypot(ship.vx, ship.vy)
-                    / Math.max(1, ship.speed));
-            float intensity = .14f + ratio * .7f;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
+            // Reject the entire engine emitter before trigonometry, speed
+            // normalization or submitting up to three glowing quads.
+            if(!visible(camera,pose.x(),pose.y(),105*scale))continue;
+            float ratio = (float) Math.min(1, StrictMath.hypot(ship.vx, ship.vy)
+                    / Math.max(1, ship.speed));
+            float intensity = .14f + ratio * .7f;
             double dx=StrictMath.cos(pose.angle()),dy=StrictMath.sin(pose.angle());
             double x=pose.x()-dx*12*scale,y=pose.y()-dy*12*scale;
             Color tint = ship.team == 0 ? Color.SKY : Color.ORANGE;
@@ -210,6 +228,8 @@ final class CombatLightingRenderer implements Disposable {
         int beams = 0;
         for (Battle.Beam beam : battle.beams()) {
             if (++beams > MAX_BEAM_LIGHTS) break;
+            // No beam corona work when the complete lit segment is offscreen.
+            if(!visibleSegment(camera,beam.x1,beam.y1,beam.x2,beam.y2,45))continue;
             Color tint=beam.pointDefense?Color.GREEN:
                     beam.type==Battle.DamageType.LASER?
                     laserColor(beam.laserType):weaponColor(beam.type);
@@ -259,7 +279,8 @@ final class CombatLightingRenderer implements Disposable {
         for (Battle.Missile missile : battle.missiles()) {
             if (++missiles > MAX_MISSILE_LIGHTS) break;
             if (!OrdnancePropulsion.burning(missile.thrustPhase)
-                    || missile.fuel<=0)continue;
+                    || missile.fuel<=0
+                    || !visible(camera,missile.x,missile.y,55))continue;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);

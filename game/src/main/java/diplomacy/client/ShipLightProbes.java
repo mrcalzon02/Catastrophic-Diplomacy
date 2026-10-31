@@ -4,6 +4,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.LaserFamilies;
 import com.badlogic.gdx.graphics.Color;
 import java.util.List;
+import java.util.Arrays;
 
 /**
  * Bounded render-only weapon-light candidates, shared by hull and fighter passes.
@@ -18,13 +19,59 @@ final class ShipLightProbes {
             score=new float[COUNT];
     private CombatViewBounds bounds;
     private static final int MAX_EVENTS=96,MAX_BEAMS=128,MAX_MISSILES=128;
+    private static final int CELLS_X=32,CELLS_Y=20;
+    private final boolean[] receiverCells=new boolean[CELLS_X*CELLS_Y];
+    private boolean requireReceivers;
+    private Battle cachedBattle;
+    private long cachedTick=Long.MIN_VALUE;
+    private CombatViewBounds cachedView;
+    private int sourceOffers,sourceRejected;
     void reset(CombatViewBounds camera) {
         bounds=camera;
+        requireReceivers=false;
+        cachedBattle=null;cachedView=null;
+        sourceOffers=sourceRejected=0;
         for(int i=0;i<COUNT;i++) {
             score[i]=-1f; power[i]=0f;radius[i]=1f;x[i]=y[i]=0f;
             red[i]=green[i]=blue[i]=0f;
         }
     }
+    private int cellX(double px){
+        return Math.max(0,Math.min(CELLS_X-1,
+                (int)Math.floor((px-bounds.left)*CELLS_X/(bounds.right-bounds.left))));
+    }
+    private int cellY(double py){
+        return Math.max(0,Math.min(CELLS_Y-1,
+                (int)Math.floor((py-bounds.bottom)*CELLS_Y/(bounds.top-bounds.bottom))));
+    }
+    private void markReceiver(double px,double py,double radius){
+        if(!bounds.circle(px,py,radius))return;
+        int left=cellX(px-radius),right=cellX(px+radius);
+        int bottom=cellY(py-radius),top=cellY(py+radius);
+        for(int y=bottom;y<=top;y++)
+            Arrays.fill(receiverCells,y*CELLS_X+left,y*CELLS_X+right+1,true);
+    }
+    /** Broad-phase physical receiver occupancy; conservatively includes every
+     * ship/craft footprint. Glow emission itself remains visible in open space. */
+    void limitToReceivers(Battle battle){
+        Arrays.fill(receiverCells,false);
+        requireReceivers=true;
+        if(battle==null)return;
+        for(Battle.Ship ship:battle.ships())
+            if(ship.alive())markReceiver(ship.x,ship.y,
+                    80*Math.max(1,ship.visualScale()));
+        for(Battle.Craft craft:battle.crafts())
+            markReceiver(craft.x,craft.y,24);
+    }
+    private boolean reachesReceiver(double px,double py,double radius){
+        int left=cellX(px-radius),right=cellX(px+radius);
+        int bottom=cellY(py-radius),top=cellY(py+radius);
+        for(int y=bottom;y<=top;y++)for(int x=left;x<=right;x++)
+            if(receiverCells[y*CELLS_X+x])return true;
+        return false;
+    }
+    int sourceOffers(){return sourceOffers;}
+    int sourceRejected(){return sourceRejected;}
     private void copy(int from,int to) {
         x[to]=x[from];y[to]=y[from];radius[to]=radius[from];
         power[to]=power[from];score[to]=score[from];
@@ -35,8 +82,13 @@ final class ShipLightProbes {
      * camera-center lights); strong and nearby lights outrank distant flashes.
      */
     void offer(double px,double py,float reach,float strength,float r,float g,float b) {
+        sourceOffers++;
         if(bounds==null||!Double.isFinite(px)||!Double.isFinite(py)||
                 !(reach>0)||!(strength>0)||!bounds.circle(px,py,reach))return;
+        if(requireReceivers&&!reachesReceiver(px,py,reach)){
+            sourceRejected++;
+            return;
+        }
         double cx=(bounds.left+bounds.right)*.5,cy=(bounds.bottom+bounds.top)*.5;
         double dx=px-cx,dy=py-cy;
         double scale=Math.max(1,Math.min(bounds.right-bounds.left,bounds.top-bounds.bottom));
@@ -51,8 +103,13 @@ final class ShipLightProbes {
         red[slot]=r;green[slot]=g;blue[slot]=b;
     }
     void select(Battle battle,CombatViewBounds view) {
+        if(battle!=null&&view!=null&&battle==cachedBattle&&battle.tick==cachedTick
+                &&cachedView!=null&&cachedView.left==view.left&&cachedView.right==view.right
+                &&cachedView.top==view.top&&cachedView.bottom==view.bottom)return;
         reset(view);
         if(battle==null||view==null)return;
+        limitToReceivers(battle);
+        cachedBattle=battle;cachedTick=battle.tick;cachedView=view;
         // Events are the authoritative FIRE, IMPACT and INTERCEPT records.
         // TIMEOUT is deliberately excluded: it must not create phantom impact light.
         List<Battle.VisualEvent> events=battle.visualEvents();

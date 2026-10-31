@@ -2378,6 +2378,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
+        // Keep simulation catch-up separate from graphics CPU submission time.
+        long simulationEndNs=System.nanoTime();
+        long lightingOverlayNs=0;
         // Simulation death detection is tick-exact; fragments evolve only while
         // combat runs (and through the four-second post-battle victory pause).
         deathTimeline.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
@@ -2521,7 +2524,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view,shieldFx);
         if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses,view);
-        if(lighting!=null)lighting.renderSmoke(battle,batch,battleCamera);
+        if(lighting!=null){
+            long beforeLight=System.nanoTime();
+            lighting.renderSmoke(battle,batch,battleCamera);
+            lightingOverlayNs+=System.nanoTime()-beforeLight;
+        }
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses,view);
         // No second hull is rendered after a kill: real source-art pieces fly
         // apart across irregular cuts, surrounded by smoke, for a bounded time.
@@ -2565,7 +2572,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.end();
         // Final additive world-space pass illuminates actual ship and projectile
         // pixels as well as space around real weapon and engine light sources.
-        if(lighting!=null)lighting.renderGlow(battle,batch,battleCamera,renderPoses,shieldFx);
+        if(lighting!=null){
+            long beforeLight=System.nanoTime();
+            lighting.renderGlow(battle,batch,battleCamera,renderPoses,shieldFx);
+            lightingOverlayNs+=System.nanoTime()-beforeLight;
+        }
         if(screensaverMode){
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
@@ -2714,6 +2725,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.end();
         if (tacticalMenuOpen) drawTacticalMenu();
         renderProfile.sample(System.nanoTime()-renderStartNs,
+                simulationEndNs-renderStartNs,lightingOverlayNs,
                 Math.max(0,batch.totalRenderCalls-drawCallsBefore),
                 (terranSprites==null?0:terranSprites.materialTextureBindings())+
                 (craftSprites==null?0:craftSprites.materialTextureBindings()));
@@ -2722,6 +2734,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(Gdx.app!=null)Gdx.app.log("CD-RENDER-PERF",
                     "samples="+frame.samples()+" avgCpuMs="+frame.meanCpuMs()+
                     " worstCpuMs="+frame.worstCpuMs()+
+                    " simCpuAvgMs="+frame.meanSimulationMs()+
+                    " nonSimCpuAvgMs="+frame.meanNonSimulationMs()+
+                    " lightOverlayCpuAvgMs="+frame.meanLightingOverlayMs()+
                     " avgDraws="+frame.meanDrawCalls()+
                     " maxDraws="+frame.maximumDrawCalls()+
                     " avgMaterialBinds="+frame.meanMaterialBinds()+
@@ -2822,6 +2837,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
             " renderCpuAvgMs="+perf.meanCpuMs()+
             " renderCpuWorstMs="+perf.worstCpuMs()+
+            " simCpuAvgMs="+perf.meanSimulationMs()+
+            " nonSimCpuAvgMs="+perf.meanNonSimulationMs()+
+            " lightOverlayCpuAvgMs="+perf.meanLightingOverlayMs()+
             " avgDraws="+perf.meanDrawCalls()+
             " avgMatBinds="+perf.meanMaterialBinds()+
             " shots="+verifiedShots+" hits="+battle.hitCount+

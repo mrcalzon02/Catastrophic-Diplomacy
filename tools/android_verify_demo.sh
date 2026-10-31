@@ -87,7 +87,9 @@ if len(success) != 1:
     raise SystemExit("FAIL: expected exactly one in-game verifier PASS receipt")
 receipt = success[0]
 values = {}
-for key in ("tick", "frames", "renderCpuAvgMs", "renderCpuWorstMs", "avgDraws", "avgMatBinds", "spriteShips"):
+for key in ("tick", "frames", "renderCpuAvgMs", "renderCpuWorstMs", "simCpuAvgMs",
+            "nonSimCpuAvgMs", "lightOverlayCpuAvgMs",
+            "avgDraws", "avgMatBinds", "spriteShips"):
     matches = re.findall(r"(?:^|[ ])" + key + r"=([0-9]+(?:[.][0-9]+)?)", receipt)
     if len(matches) != 1:
         raise SystemExit(f"FAIL: missing or ambiguous real telemetry field {key}")
@@ -97,6 +99,10 @@ if not all(math.isfinite(v) and v >= 0 for v in values.values()):
 if values["frames"] < 2 or values["tick"] <= 0 or values["spriteShips"] < 400:
     raise SystemExit("FAIL: demo did not report live 400-ship rendered progression")
 avg = values["renderCpuAvgMs"]
+if abs(values["simCpuAvgMs"]+values["nonSimCpuAvgMs"]-avg)>max(0.5,avg*.01):
+    raise SystemExit("FAIL: per-frame CPU phases do not reconcile")
+if values["lightOverlayCpuAvgMs"]>values["nonSimCpuAvgMs"]+0.01:
+    raise SystemExit("FAIL: lighting overlay time exceeds non-simulation time")
 values["cpu_limited_fps_upper_bound"] = round(1000 / avg, 3) if avg > 0 else None
 values["emulator"] = "pixel_2 Android 34 software graphics (not physical-device certification)"
 values["interpretation"] = "render-thread CPU time only; excludes GPU, frame scheduling, and physical-device FPS"
@@ -104,7 +110,10 @@ values["target_frame_budget_ms"] = 1000 / 30
 values["performance_status"] = ("ABOVE_30_FPS_CPU_BUDGET" if avg > 1000 / 30
                                 else "WITHIN_30_FPS_CPU_BUDGET_NOT_FPS_CERTIFIED")
 pathlib.Path(sys.argv[2]).write_text(json.dumps(values, indent=2, sort_keys=True) + chr(10))
-print(f"PERFORMANCE DIAGNOSTIC: CPU render avg={avg:.1f} ms, worst={values['renderCpuWorstMs']:.1f} ms; "
+print(f"PERFORMANCE DIAGNOSTIC: CPU total={avg:.1f} ms, simulation={values['simCpuAvgMs']:.1f} ms, "
+      f"non-simulation={values['nonSimCpuAvgMs']:.1f} ms, "
+      f"additive smoke/glow={values['lightOverlayCpuAvgMs']:.1f} ms; "
+      f"worst total={values['renderCpuWorstMs']:.1f} ms; "
       f"{values['frames']:.0f} rendered frames, {values['tick']:.0f} simulation ticks.")
 if avg > 1000 / 30:
     print(f"WARNING: 30 FPS target NOT DEMONSTRATED on emulator; "
