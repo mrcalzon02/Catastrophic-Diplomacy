@@ -47,6 +47,21 @@ public final class GuidedShipyardPanelTest {
                 "Clicking outside the controls must not change a weapon");
         var catalog=TechnologyCatalog.loadDefault();
         var stock=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
+        // The real approved PNG is the primary view. These interaction tests
+        // remain headless: the fallback schematic still accepts the same sockets.
+        var editor=new ShipyardPanel(catalog,(side,fit)->{},stock,stock,null);
+        editor.show();
+        check(editor.prefersHullArt(),"Shipyard must prefer real vessel artwork on open");
+        var chosen=stock.placements().get(2);
+        check(editor.tap(562f+chosen.x()*2.65f,343f+chosen.y()*2.65f)
+                &&editor.selectedHardpoint()==chosen.index(),
+                "Hardpoints must remain selectable in the schematic fallback");
+        editor.tap(43,560-4*26-8);
+        check(editor.selectedHardpoint()==4,
+                "Shipyard list rows and touch hitboxes must agree after heading spacing fix");
+        editor.tap(715,597);
+        check(!editor.prefersHullArt(),"Schematic toggle must remain available");
+        editor.close();
         int socket=missileSocket(stock);
         var locked=ShipyardPanel.chooseGuided(stock,socket,1,1);
         check(locked==stock,"Stock launchers cannot acquire advanced motors");
