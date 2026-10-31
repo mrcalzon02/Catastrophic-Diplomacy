@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FactionArt;
+import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
 import diplomacy.sim.DirectionalDefense;
 import java.util.EnumMap;
@@ -19,6 +20,11 @@ public final class TerranPlaceholderSprites implements Disposable {
     private static final int GRID=DirectionalDefense.GRID;
     private final EnumMap<Battle.Faction,EnumMap<Shipyard.Hull,Texture>> textures=
             new EnumMap<>(Battle.Faction.class);
+    // Shipyard hardpoints are aligned once to each approved transparent PNG.
+    // Cached normalized anchors are shared by mouse, touch and rendering.
+    record ArtAnchor(float u,float v) {}
+    private final java.util.Map<String,ArtAnchor[]> shipyardAnchors=new java.util.HashMap<>();
+
     // Every exposed interior pixel is masked by the ORIGINAL hull PNG alpha.
     // Never put an oval generic material under a rectangular sprite region.
     private final java.util.Map<Texture,String> originals =
@@ -365,7 +371,95 @@ public final class TerranPlaceholderSprites implements Disposable {
     Texture sourceTexture(Battle.Faction faction,Shipyard.Hull hull){
         return hull==null?null:texture(faction,hull);
     }
-    /** Preview is an art reference, not yet a source of fitted module UV anchors. */
+    /**
+     * Physical-looking fitting anchors for the original faction sprite, not a
+     * replacement drawing. Map the stable HullLayouts socket positions into
+     * the source PNG and snap each to the nearest opaque hull-interior sample.
+     * Source image coordinates run downward; shipyard coordinates run upward.
+     * The PNG is decoded only on first use for a particular faction/class.
+     */
+    private ArtAnchor[] buildShipyardAnchors(Battle.Faction faction,Shipyard.Hull hull) {
+        Texture tex=texture(faction,hull);
+        if(tex==null)return new ArtAnchor[0];
+        var outline=HullLayouts.outline(faction,hull);
+        int minX=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE;
+        int minY=Integer.MAX_VALUE,maxY=Integer.MIN_VALUE;
+        for(var point:outline){
+            minX=Math.min(minX,point.x());maxX=Math.max(maxX,point.x());
+            minY=Math.min(minY,point.y());maxY=Math.max(maxY,point.y());
+        }
+        int width=tex.getWidth(),height=tex.getHeight();
+        var sockets=HullLayouts.slots(faction,hull);
+        ArtAnchor[] result=new ArtAnchor[sockets.size()];
+        // Precompute opaque core samples once, rather than reading every pixel
+        // of a source PNG for every socket, or creating a GPU texture per socket.
+        int[] candidates=new int[((width+3)/4)*((height+3)/4)];
+        int count=0;
+        Pixmap image=null;
+        try {
+            image=new Pixmap(Gdx.files.internal(originals.get(tex)));
+            for(int y=8;y<height-8;y+=4)for(int x=8;x<width-8;x+=4){
+                if((image.getPixel(x,y)&255)<180)continue;
+                // Avoid anti-aliased transparent edges and detached exhaust.
+                if((image.getPixel(x-6,y)&255)<70 ||
+                   (image.getPixel(x+6,y)&255)<70 ||
+                   (image.getPixel(x,y-6)&255)<70 ||
+                   (image.getPixel(x,y+6)&255)<70)continue;
+                candidates[count++]=y*width+x;
+            }
+        } catch(RuntimeException ex) {
+            if(Gdx.app!=null)Gdx.app.error("SHIPYARD",
+                    "Could not scan sprite mount anchors: "+faction+"/"+hull,ex);
+        } finally {
+            if(image!=null)image.dispose();
+        }
+        for(var socket:sockets){
+            float u=(socket.x()-minX)/(float)Math.max(1,maxX-minX);
+            float v=(socket.y()-minY)/(float)Math.max(1,maxY-minY);
+            // Reserve 8% edge clearance inside the approved PNG crop.
+            int idealX=Math.round((.08f+.84f*u)*(width-1));
+            int idealY=Math.round((.08f+.84f*(1-v))*(height-1));
+            int pickedX=idealX,pickedY=idealY;
+            long best=Long.MAX_VALUE;
+            for(int n=0;n<count;n++){
+                int x=candidates[n]%width,y=candidates[n]/width;
+                long dx=x-idealX,dy=y-idealY,d2=dx*dx+dy*dy;
+                if(d2<best){best=d2;pickedX=x;pickedY=y;}
+            }
+            result[socket.index()]=new ArtAnchor(
+                    (pickedX+.5f)/width,1f-(pickedY+.5f)/height);
+        }
+        return result;
+    }
+
+    private ArtAnchor shipyardAnchor(Battle.Faction faction,Shipyard.Hull hull,int socket) {
+        if(!hasHull(faction,hull))return null;
+        ArtAnchor[] anchors=shipyardAnchors.computeIfAbsent(
+                faction.name()+"/"+hull.name(),key->buildShipyardAnchors(faction,hull));
+        return socket<0||socket>=anchors.length?null:anchors[socket];
+    }
+
+    private static float previewScale(Texture tex,float maxWidth,float maxHeight){
+        return Math.min(maxWidth/tex.getWidth(),maxHeight/tex.getHeight());
+    }
+
+    /** Same exact sprite-space mapping for drawn dots and Android/desktop taps. */
+    float previewMountX(Battle.Faction faction,Shipyard.Hull hull,int socket,
+                        float centerX,float maxWidth,float maxHeight) {
+        ArtAnchor anchor=shipyardAnchor(faction,hull,socket);
+        if(anchor==null)return centerX;
+        Texture tex=texture(faction,hull);
+        return centerX+(anchor.u()-.5f)*tex.getWidth()*previewScale(tex,maxWidth,maxHeight);
+    }
+    float previewMountY(Battle.Faction faction,Shipyard.Hull hull,int socket,
+                        float centerY,float maxWidth,float maxHeight) {
+        ArtAnchor anchor=shipyardAnchor(faction,hull,socket);
+        if(anchor==null)return centerY;
+        Texture tex=texture(faction,hull);
+        return centerY+(anchor.v()-.5f)*tex.getHeight()*previewScale(tex,maxWidth,maxHeight);
+    }
+
+    /** Approved source artwork is the primary fitting canvas. */
     public boolean hasHull(Battle.Faction faction, Shipyard.Hull hull) {
         return texture(faction,hull)!=null;
     }
@@ -373,7 +467,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                                float centerX,float centerY,float maxWidth,float maxHeight) {
         if(!hasHull(faction,hull))return false;
         Texture texture=texture(faction,hull);
-        float factor=Math.min(maxWidth/texture.getWidth(),maxHeight/texture.getHeight());
+        float factor=previewScale(texture,maxWidth,maxHeight);
         float w=texture.getWidth()*factor,h=texture.getHeight()*factor;
         batch.setColor(1,1,1,0.94f);
         batch.draw(texture,centerX-w/2,centerY-h/2,w,h);
