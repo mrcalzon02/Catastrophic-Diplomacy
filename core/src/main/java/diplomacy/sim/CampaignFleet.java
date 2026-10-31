@@ -304,7 +304,7 @@ public final class CampaignFleet {
                     Math.min(stores.torpedoes(),fitted.torpedoAmmo):0;
             // Matching hangar and craft type can keep already-purchased fighters
             // through upgrades; changing craft family cannot transmute aircraft.
-            fitted.fighterReserve=compatibleMagazine(former,replacement,"FTR")&&
+            fitted.fighterReserve=compatibleFighterBays(former,replacement)&&
                     former.fighterHull==replacement.fighterHull?
                     Math.min(stores.fighters(),fitted.fighterReserve):0;
             fitted.droneReserve=Math.min(stores.drones(),fitted.droneReserve);
@@ -317,6 +317,18 @@ public final class CampaignFleet {
                     new Vessel(id,ship.name(),replacement,false,Stores.capture(fitted)):ship);
             return new Roster(faction,style,nextSerial,updated,namingSeed,radioTone,
                     squadronAssignments,squadronProfiles);
+        }
+        /**
+         * Organic carrier decks are physical bays too. Refitting unrelated
+         * equipment must not confiscate purchased aircraft merely because a
+         * carrier has no FTR module installed. Fighter types must still match.
+         */
+        private static boolean compatibleFighterBays(Shipyard.Design old,Shipyard.Design next){
+            boolean oldBay=diplomacy.shipyard.HullBaseline.builtInFighterCapacity(old.hull)>0
+                    ||hasInstalledFamily(old,"FTR");
+            boolean nextBay=diplomacy.shipyard.HullBaseline.builtInFighterCapacity(next.hull)>0
+                    ||hasInstalledFamily(next,"FTR");
+            return oldBay&&nextBay;
         }
         private static boolean compatibleMagazine(Shipyard.Design old,
                                                   Shipyard.Design next,String family){
