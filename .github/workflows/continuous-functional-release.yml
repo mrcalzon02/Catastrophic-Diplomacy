@@ -282,15 +282,25 @@ jobs:
     needs: android-build
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    # Every faction remains release-blocking, but no single emulator runs
-    # through eleven unrelated cold starts while accumulating driver state.
+    # Independent API29 emulator per faction. Repeated force-stops across
+    # unrelated factions caused SwiftShader stalls that obscured real
+    # launch failures. Each shard still checks fresh campaign, sustained combat
+    # and a genuine saved-campaign process restart. Every shard is required.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {first: 0, last: 3}
-          - {first: 4, last: 7}
-          - {first: 8, last: 10}
+          - {first: 0, last: 0}
+          - {first: 1, last: 1}
+          - {first: 2, last: 2}
+          - {first: 3, last: 3}
+          - {first: 4, last: 4}
+          - {first: 5, last: 5}
+          - {first: 6, last: 6}
+          - {first: 7, last: 7}
+          - {first: 8, last: 8}
+          - {first: 9, last: 9}
+          - {first: 10, last: 10}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
