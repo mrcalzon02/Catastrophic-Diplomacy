@@ -39,7 +39,7 @@ android {
             if (signingAvailable) signingConfig signingConfigs.release
         }
     }
-    sourceSets { main { assets.srcDirs = ['../assets', rootProject.layout.buildDirectory.dir('generated/cd-ui').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-music').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-stage1').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-weapon-fx').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-fighters').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-legacy-factions').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-ship-surfaces').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-announcer').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-fighter-voice').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-hull-voices').get().asFile] } }
+    sourceSets { main { assets.srcDirs = ['../assets', rootProject.layout.buildDirectory.dir('generated/cd-ui').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-music').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-stage1').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-weapon-fx').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-laser-mobile').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-fighters').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-legacy-factions').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-ship-surfaces').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-announcer').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-fighter-voice').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-hull-voices').get().asFile] } }
     packaging { resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] } }
 }
 
@@ -78,6 +78,7 @@ tasks.configureEach { task ->
         task.dependsOn rootProject.tasks.named('prepareMusicAssets')
         task.dependsOn rootProject.tasks.named('prepareStage1Art')
         task.dependsOn rootProject.tasks.named('prepareModularWeaponFx')
+        task.dependsOn rootProject.tasks.named('prepareLaserRun01')
         task.dependsOn rootProject.tasks.named('verifyGuidedOrdnanceSprites')
         task.dependsOn rootProject.tasks.named('prepareFighterArt')
         task.dependsOn rootProject.tasks.named('prepareAnnouncerVoiceAssets')
