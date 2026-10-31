@@ -321,6 +321,14 @@ tasks.register('ordnancePropulsionSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('ordnanceDoctrineSmoke') { finalizedBy(tasks.named('ordnancePropulsionSmoke')) }
+tasks.register('ordnanceConfigurationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate independent salvo, motor, seeker, opposite-lane guidance, ammunition and deterministic replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceConfigurationTest'
+    dependsOn testClasses
+}
+tasks.named('ordnancePropulsionSmoke') { finalizedBy(tasks.named('ordnanceConfigurationSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
 // The functional release's gameFlowSmoke task is registered later in this file.
 

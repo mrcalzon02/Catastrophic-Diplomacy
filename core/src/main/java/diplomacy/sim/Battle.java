@@ -139,6 +139,35 @@ public final class Battle {
         public void setLaunchMode(DamageType family,OrdnanceDoctrine.Mode mode){
             OrdnanceDoctrine.forWeapon(family,mode);launchModes.put(family,mode);
         }
+        /** Motor and guidance are independent of salvo pattern. The old
+         * doctrine-to-motor mapping remains the default for old designs. */
+        public final EnumMap<DamageType,OrdnancePropulsion.Mode> propulsionModes=
+                new EnumMap<>(DamageType.class);
+        public final EnumMap<DamageType,OrdnanceGuidance.Mode> guidanceModes=
+                new EnumMap<>(DamageType.class);
+        public OrdnancePropulsion.Mode propulsionMode(DamageType family){
+            OrdnanceDoctrine.patterns(family);
+            return propulsionModes.getOrDefault(family,
+                    OrdnancePropulsion.forDoctrine(launchMode(family)));
+        }
+        public OrdnanceGuidance.Mode guidanceMode(DamageType family){
+            OrdnanceDoctrine.patterns(family);
+            return guidanceModes.getOrDefault(family,OrdnanceGuidance.Mode.PURSUIT);
+        }
+        public void setPropulsionMode(DamageType family,OrdnancePropulsion.Mode mode){
+            OrdnanceDoctrine.patterns(family);
+            if(mode==null)throw new IllegalArgumentException("Missing propulsion plan");
+            propulsionModes.put(family,mode);
+        }
+        public void setGuidanceMode(DamageType family,OrdnanceGuidance.Mode mode){
+            OrdnanceDoctrine.patterns(family);
+            if(mode==null)throw new IllegalArgumentException("Missing seeker doctrine");
+            guidanceModes.put(family,mode);
+        }
+        /** Null clears an override and restores the legacy salvo default. */
+        public void resetPropulsionMode(DamageType family){
+            OrdnanceDoctrine.patterns(family);propulsionModes.remove(family);
+        }
         /** Permanent sixteen-digit campaign identity; zero for uncommissioned
          * skirmish ships. Tactical combat target IDs remain short-lived ints. */
         public long commissionedId;
@@ -201,6 +230,9 @@ public final class Battle {
         /** Cold launches wait before ignition and can be killed by PD while coasting. */
         public int ignitionDelayTicks;
         public OrdnancePropulsion.Mode propulsionMode=OrdnancePropulsion.Mode.CONSTANT_BURN;
+        public OrdnanceGuidance.Mode guidanceMode=OrdnanceGuidance.Mode.PURSUIT;
+        /** Opposite lanes belong to physical missiles, not visual duplicates. */
+        public int approachSide=1;
         /** Read by the effects renderer: true, simulation-owned engine state. */
         public OrdnancePropulsion.Phase thrustPhase=OrdnancePropulsion.Phase.CRUISE;
         public int flightTicks;
@@ -209,12 +241,14 @@ public final class Battle {
             propulsionMode=mode;
             thrustPhase=ignitionDelayTicks>0?OrdnancePropulsion.Phase.COLD_EJECT:
                     mode==OrdnancePropulsion.Mode.BOOST_COAST_TERMINAL
+                    ||mode==OrdnancePropulsion.Mode.SILENT_GHOST
                     ||mode==OrdnancePropulsion.Mode.PULSE_BURN?
                     OrdnancePropulsion.Phase.BOOST:OrdnancePropulsion.Phase.CRUISE;
             double priorSpeed=StrictMath.hypot(vx,vy);
             double ejectSpeed=spec.speed()*OrdnancePropulsion.initialSpeedMultiplier(thrustPhase);
             if(priorSpeed>0){vx*=ejectSpeed/priorSpeed;vy*=ejectSpeed/priorSpeed;}
             propellant=spec.speed()*(mode==OrdnancePropulsion.Mode.BOOST_COAST_TERMINAL?1.85:
+                    mode==OrdnancePropulsion.Mode.SILENT_GHOST?1.75:
                     mode==OrdnancePropulsion.Mode.PULSE_BURN?3.2:2.6);
         }
         Missile(long visualId,long spawnTick, int source, int owner, int target,
@@ -397,14 +431,19 @@ public final class Battle {
         final int sourceId,targetId;
         final DamageType family;
         final OrdnanceDoctrine.Pattern pattern;
+        final OrdnancePropulsion.Mode propulsion;
+        final OrdnanceGuidance.Mode guidance;
         final AmmunitionTable.Warhead loadedWarhead;
         int nextIndex;
         long nextTick;
         PendingLaunch(int source,int target,DamageType type,
                       OrdnanceDoctrine.Pattern doctrine,long start,
-                      AmmunitionTable.Warhead loaded){
+                      AmmunitionTable.Warhead loaded,
+                      OrdnancePropulsion.Mode motor,OrdnanceGuidance.Mode seeker){
             sourceId=source;targetId=target;family=type;pattern=doctrine;
-            loadedWarhead=loaded;nextTick=start;
+            if(loaded==null||motor==null||seeker==null)
+                throw new IllegalArgumentException("Incomplete guided salvo configuration");
+            loadedWarhead=loaded;propulsion=motor;guidance=seeker;nextTick=start;
         }
     }
     private final List<PendingLaunch> launchQueue=new ArrayList<>();
@@ -459,6 +498,18 @@ public final class Battle {
         Ship ship=findShip(shipId);
         if(ship==null)throw new IllegalArgumentException("Ship does not exist");
         ship.setLaunchMode(family,mode);
+    }
+    public void setShipPropulsionMode(int shipId,DamageType family,
+                                      OrdnancePropulsion.Mode mode){
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setPropulsionMode(family,mode);
+    }
+    public void setShipGuidanceMode(int shipId,DamageType family,
+                                    OrdnanceGuidance.Mode mode){
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        ship.setGuidanceMode(family,mode);
     }
     public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
@@ -1200,7 +1251,9 @@ public final class Battle {
                 s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
                 launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,
-                        doctrine,tick,s.warhead(DamageType.MISSILE)));
+                        doctrine,tick,s.warhead(DamageType.MISSILE),
+                        s.propulsionMode(DamageType.MISSILE),
+                        s.guidanceMode(DamageType.MISSILE)));
                 salvosStarted++;
             }
         }
@@ -1286,7 +1339,9 @@ public final class Battle {
                 s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
                 launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,
-                        doctrine,tick,s.warhead(DamageType.TORPEDO)));
+                        doctrine,tick,s.warhead(DamageType.TORPEDO),
+                        s.propulsionMode(DamageType.TORPEDO),
+                        s.guidanceMode(DamageType.TORPEDO)));
                 salvosStarted++;
             }
         }
@@ -1351,8 +1406,11 @@ public final class Battle {
             Missile body=new Missile(shot,tick,source.id,source.team,target.id,
                     muzzle.x(),muzzle.y(),velocityX,velocityY,damage,heavy,actual,
                     heavy?source.weapons.torpedoTracking():source.weapons.missileTracking(),
-                    subtype,order.pattern.ignitionDelayTicks(),warhead);
-            body.setPropulsion(OrdnancePropulsion.forDoctrine(order.pattern.mode()));
+                    subtype,order.propulsion==OrdnancePropulsion.Mode.COLD_START
+                            ?StrictMath.max(15,order.pattern.ignitionDelayTicks()):0,warhead);
+            body.guidanceMode=order.guidance;
+            body.approachSide=index%2==0?1:-1;
+            body.setPropulsion(order.propulsion);
             missiles.add(body);
             visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
                     source.team,source.id,target.id,muzzle.x(),muzzle.y(),target.x,target.y);
@@ -2138,8 +2196,11 @@ public final class Battle {
                 // velocity. Coast and cold eject preserve inertial motion.
                 if(m.propellant<=1e-9&&OrdnancePropulsion.burning(m.thrustPhase))
                     m.thrustPhase=OrdnancePropulsion.Phase.COAST;
+                var steering=OrdnanceGuidance.aim(m.guidanceMode,m.x,m.y,m.vx,m.vy,
+                        target.x,target.y,target.vx,target.vy,m.flightTicks,m.approachSide);
                 var nextVelocity=OrdnancePropulsion.advanceVelocity(
-                        m.vx,m.vy,dx,dy,m.spec.speed(),guidance,m.thrustPhase,
+                        m.vx,m.vy,steering.dx(),steering.dy(),
+                        m.spec.speed(),guidance,m.thrustPhase,
                         DT,m.propellant);
                 double spent=StrictMath.hypot(nextVelocity.vx()-m.vx,
                         nextVelocity.vy()-m.vy);
@@ -2364,6 +2425,10 @@ public final class Battle {
                 }
             hash=mix(hash,s.launchMode(DamageType.MISSILE).ordinal());
             hash=mix(hash,s.launchMode(DamageType.TORPEDO).ordinal());
+            hash=mix(hash,s.propulsionMode(DamageType.MISSILE).ordinal());
+            hash=mix(hash,s.propulsionMode(DamageType.TORPEDO).ordinal());
+            hash=mix(hash,s.guidanceMode(DamageType.MISSILE).ordinal());
+            hash=mix(hash,s.guidanceMode(DamageType.TORPEDO).ordinal());
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
             hash=mix(hash,s.repairDroneReserve);
             hash=mix(hash,Double.doubleToLongBits(s.repairDroneReload));
@@ -2378,6 +2443,8 @@ public final class Battle {
             hash=mix(hash,pending.targetId);
             hash=mix(hash,pending.family.ordinal());
             hash=mix(hash,pending.pattern.mode().ordinal());
+            hash=mix(hash,pending.propulsion.ordinal());
+            hash=mix(hash,pending.guidance.ordinal());
             hash=mix(hash,pending.loadedWarhead.ordinal());
             hash=mix(hash,pending.nextIndex);
             hash=mix(hash,pending.nextTick);
@@ -2395,6 +2462,8 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(m.vy));
             hash=mix(hash,Double.doubleToLongBits(m.propellant));
             hash=mix(hash,m.propulsionMode.ordinal());
+            hash=mix(hash,m.guidanceMode.ordinal());
+            hash=mix(hash,m.approachSide);
             hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.visualId);
             hash=mix(hash,m.sourceId);hash=mix(hash,Double.doubleToLongBits(m.y));

@@ -7,7 +7,8 @@ package diplomacy.sim;
  */
 public final class OrdnancePropulsion {
     private OrdnancePropulsion(){}
-    public enum Mode { CONSTANT_BURN, COLD_START, BOOST_COAST_TERMINAL, PULSE_BURN }
+    public enum Mode { CONSTANT_BURN, COLD_START, BOOST_COAST_TERMINAL, PULSE_BURN,
+                       SILENT_GHOST, TERMINAL_SPRINT }
     public enum Phase { COLD_EJECT, BOOST, COAST, TERMINAL, CRUISE }
     public static Mode forDoctrine(OrdnanceDoctrine.Mode doctrine){
         if(doctrine==null)throw new IllegalArgumentException("Launch doctrine required");
@@ -30,6 +31,11 @@ public final class OrdnancePropulsion {
                 targetDistance<=(torpedo?190:135)?Phase.TERMINAL:
                     flightTicks<=(torpedo?25:18)?Phase.BOOST:Phase.COAST;
             case PULSE_BURN -> flightTicks%18<9?Phase.BOOST:Phase.COAST;
+            case SILENT_GHOST ->
+                targetDistance<=(torpedo?190:150)?Phase.TERMINAL:
+                flightTicks<=(torpedo?20:14)?Phase.BOOST:Phase.COAST;
+            case TERMINAL_SPRINT -> targetDistance<=(torpedo?240:185)
+                    ?Phase.TERMINAL:Phase.CRUISE;
         };
     }
     public static boolean burning(Phase phase){

@@ -42,6 +42,16 @@ public final class OrdnancePropulsionTest {
                 OrdnancePropulsion.Phase.COAST,"pulse off");
         check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.PULSE_BURN,20,0,700,false)==
                 OrdnancePropulsion.Phase.BOOST,"pulse restart");
+        check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.SILENT_GHOST,10,0,600,false)==
+                OrdnancePropulsion.Phase.BOOST,"ghost booster");
+        check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.SILENT_GHOST,32,0,600,false)==
+                OrdnancePropulsion.Phase.COAST,"ghost persists without exhaust");
+        check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.SILENT_GHOST,60,0,130,false)==
+                OrdnancePropulsion.Phase.TERMINAL,"ghost terminal motor relights");
+        check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.TERMINAL_SPRINT,10,0,600,false)==
+                OrdnancePropulsion.Phase.CRUISE,"sprinter cruises initially");
+        check(OrdnancePropulsion.phase(OrdnancePropulsion.Mode.TERMINAL_SPRINT,40,0,150,false)==
+                OrdnancePropulsion.Phase.TERMINAL,"sprinter accelerates terminally");
         // Physics contract: no velocity or heading change without propellant/thrust.
         var coast=OrdnancePropulsion.advanceVelocity(180,40,-900,0,220,1,
                 OrdnancePropulsion.Phase.COAST,Battle.DT,1000);
