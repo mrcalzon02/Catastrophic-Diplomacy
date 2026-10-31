@@ -2,7 +2,6 @@ package diplomacy.client;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.shipyard.FactionArt;
@@ -17,9 +16,9 @@ import java.util.Map;
  * colored squares/triangles over a successfully loaded craft sprite.
  * Every alien sprite belongs ONLY to its named civilization. Gameplay
  * archetypes do not imply permission to borrow another faction's graphics.
- * Older civilizations awaiting approved imports show an explicit neutral
- * wireframe diagnostic silhouette, never an unrelated civilization's fighter.
- * Terran uses its own interceptor art until class-specific art is authored.
+ * The six founding civilizations use their OWN approved interceptor artwork
+ * for fighter and drone roles until role-specific sheets are approved.
+ * No faction ever substitutes a generic triangle or another faction's art.
  */
 public final class FighterCraftSprites implements Disposable {
     private static final String[] ROLES={
@@ -32,7 +31,6 @@ public final class FighterCraftSprites implements Disposable {
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
     public int litCraftMaterials(){return surfaces.materialCount();}
     public int materialTextureBindings(){return surfaces.textureBindings();}
-    private final Texture unassignedWireframe;
     private final EnumMap<Battle.Faction,Map<String,Texture>> palettes=
             new EnumMap<>(Battle.Faction.class);
 
@@ -43,7 +41,12 @@ public final class FighterCraftSprites implements Disposable {
         for(String candidate:ROLES)if(candidate.equals(role)){chosen=role;break;}
         if(chosen==null)throw new IllegalArgumentException("Unapproved fighter role: "+role);
         if(faction==Battle.Faction.TERRAN)
-            return "ships/terran/interceptor.png"; // actual Terran artwork, not an alien impostor
+            return "ships/terran/interceptor.png";
+        // These five original factions already have genuine, distinct hull
+        // sprites. Until their class-specific fighter atlases are approved,
+        // their own interceptor is the correct stand-in, just like Terran.
+        if(FactionArt.hasLegacyArt(faction))
+            return FactionArt.runtimePath(faction,diplomacy.shipyard.Shipyard.Hull.INTERCEPTOR);
         FactionArt.Entry art=FactionArt.visualArt(faction);
         if(art==null)throw new IllegalStateException("No approved fighter art family: "+faction);
         return "ships/fighters/"+art.id()+"/"+chosen+".png";
@@ -63,10 +66,6 @@ public final class FighterCraftSprites implements Disposable {
     }
     public FighterCraftSprites() {
         for(Battle.Faction faction:Battle.Faction.values()) {
-            // No approved fighter sheet for the five original non-Terran
-            // civilizations yet. Do NOT import a derivative faction's sheet.
-            if(faction!=Battle.Faction.TERRAN && !FactionArt.supports(faction))
-                continue;
             Map<String,Texture> palette=new HashMap<>();
             for(String role:ROLES) {
                 String path=spritePath(faction,role);
@@ -83,19 +82,10 @@ public final class FighterCraftSprites implements Disposable {
             }
             palettes.put(faction,palette);
         }
-        if(originals.size()!=51)
-            throw new IllegalStateException("Expected 50 approved alien fighters plus original Terran interceptor: "+originals.size());
-        // Explicitly neutral debug symbol for the five unillustrated legacy
-        // factions; preserving playability without misrepresenting their art.
-        Pixmap wire=new Pixmap(24,32,Pixmap.Format.RGBA8888);
-        wire.setColor(1f,1f,1f,0.8f);
-        wire.drawLine(12,1,2,27);
-        wire.drawLine(12,1,22,27);
-        wire.drawLine(2,27,12,21);
-        wire.drawLine(12,21,22,27);
-        unassignedWireframe=new Texture(wire);
-        unassignedWireframe.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-        wire.dispose();
+        // One true interceptor each for Terran and the five legacy factions,
+        // plus fifty specialized sprites for the five newer civilizations.
+        if(originals.size()!=56)
+            throw new IllegalStateException("Expected all 56 original faction fighter/interceptor sprites: "+originals.size());
     }
     public int loaded() { return originals.size(); }
     public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
@@ -113,7 +103,9 @@ public final class FighterCraftSprites implements Disposable {
             if(source==null)
                 throw new IllegalStateException("Autonomous craft has no parent faction: "+craft.sourceId);
             Map<String,Texture> family=palettes.get(source.faction);
-            Texture picture=family==null?unassignedWireframe:family.get(role(craft));
+            if(family==null)
+                throw new IllegalStateException("Approved craft art missing for faction: "+source.faction);
+            Texture picture=family.get(role(craft));
             if(picture==null)
                 throw new IllegalStateException("Approved craft sprite not loaded: "+source.faction+"/"+role(craft));
             float height=craft.fighter?switch(craft.profile.hull()) {
@@ -135,13 +127,8 @@ public final class FighterCraftSprites implements Disposable {
             float rotation=(float)StrictMath.toDegrees(bearing)-90f;
             if(view!=null&&!view.circle(position.x(),position.y(),
                     Math.max(width,height)*.72))continue;
-            if(picture==unassignedWireframe){
-                surfaces.unlit(batch);
-                batch.setColor(1,1,1,1);
-            }else{
-                surfaces.bind(batch,picture);
-                surfaces.color(batch,rotation);
-            }
+            surfaces.bind(batch,picture);
+            surfaces.color(batch,rotation);
             batch.draw(picture,position.x()-width/2,position.y()-height/2,
                     width/2,height/2,width,height,1,1,rotation,
                     0,0,picture.getWidth(),picture.getHeight(),false,false);
@@ -152,6 +139,5 @@ public final class FighterCraftSprites implements Disposable {
         surfaces.dispose();
         for(Texture texture:originals.values())texture.dispose();
         originals.clear();palettes.clear();
-        unassignedWireframe.dispose();
     }
 }
