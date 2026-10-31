@@ -769,12 +769,14 @@ def additionalHullVoicePacks = [
     [hull: 'CRUISER', batch: '010', file: file('asset_packs/audio/cruiser-voice-batch-010.zip'),
      checksum: '0d8e996fc8544b34796d575716f84ea25f6e38c993d9bdccf92be7c9a7523dc1'],
     [hull: 'LIGHT_CRUISER', batch: '011', file: file('asset_packs/audio/light-cruiser-voice-batch-011.zip'),
-     checksum: '11437b903d0fae6e1eb68705ed402ce5d68c9e511459b2f0dce7fa0388be7d20']
+     checksum: '11437b903d0fae6e1eb68705ed402ce5d68c9e511459b2f0dce7fa0388be7d20'],
+    [hull: 'HEAVY_CRUISER', batch: '012', file: file('asset_packs/audio/heavy-cruiser-voice-batch-012.zip'),
+     checksum: '4f44e9465b1ab7823966e39e8f94f3ba9f43a64461a04a03a13fe2979e20a3d8']
 ]
 def additionalHullVoicesOutput = layout.buildDirectory.dir('generated/cd-hull-voices')
 tasks.register('prepareAdditionalHullVoiceAssets') {
     group = 'assets'
-    description = 'Verify eight Drive-transferred hull voice archives and stage 208 original OGG clips.'
+    description = 'Verify nine Drive-transferred hull voice archives and stage 234 original OGG clips.'
     inputs.files additionalHullVoicePacks.collect { it.file }
     outputs.dir additionalHullVoicesOutput
     doLast {
@@ -800,7 +802,7 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
                 def seen = [] as Set
                 manifest.clips.each { cue ->
                     String id = cue.id as String
-                    if (!(id ==~ /(?:CORVETTE|DESTROYER|CARRIER|DREADNOUGHT|BATTLECRUISER|MISSILE_FRIGATE|CRUISER|LIGHT_CRUISER)_[A-Z_]+_0[12]/)
+                    if (!(id ==~ /(?:CORVETTE|DESTROYER|CARRIER|DREADNOUGHT|BATTLECRUISER|MISSILE_FRIGATE|CRUISER|LIGHT_CRUISER|HEAVY_CRUISER)_[A-Z_]+_0[12]/)
                             || !id.startsWith(pack.hull+'_') || !seen.add(id))
                         throw new GradleException('Invalid/duplicate hull voice ID: '+id)
                     String filename = id.toLowerCase(java.util.Locale.ROOT)+'.ogg'
@@ -829,7 +831,7 @@ tasks.register('prepareAdditionalHullVoiceAssets') {
                 new File(target,pack.hull.toLowerCase(java.util.Locale.ROOT)+'-manifest.json').bytes = record
             }
         }
-        println('PASS: 208 original hull voice clips verified across eight Drive-first archives')
+        println('PASS: 234 original hull voice clips verified across nine Drive-first archives')
     }
 }
 tasks.named('verifyBattleAudioResources') {

@@ -6,18 +6,19 @@ import diplomacy.shipyard.Shipyard;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Headless test: nine recorded hull roles with explicit missile-frigate distinction. */
+/** Headless test: ten recorded hull roles with explicit missile-frigate distinction. */
 public final class FighterVoiceAudioTest {
     public static void main(String[] args) {
-        if (RecordedHullVoiceAudio.registeredCues() != 234)
-            throw new AssertionError("Expected 234 recorded hull voice cues");
+        if (RecordedHullVoiceAudio.registeredCues() != 260)
+            throw new AssertionError("Expected 260 recorded hull voice cues");
         Set<String> paths = new HashSet<>();
         int n = 0;
         for (Shipyard.Hull hull : new Shipyard.Hull[]{
                 Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER,
                 Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT,
                 Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE,
-                Shipyard.Hull.CRUISER, Shipyard.Hull.LIGHT_CRUISER}) {
+                Shipyard.Hull.CRUISER, Shipyard.Hull.LIGHT_CRUISER,
+                Shipyard.Hull.HEAVY_CRUISER}) {
             for (CrewChatter.Event event : CrewChatter.Event.values()) {
                 for (CrewChatter.Tone tone : new CrewChatter.Tone[]{
                         CrewChatter.Tone.PROFESSIONAL, CrewChatter.Tone.VETERAN}) {
@@ -45,8 +46,8 @@ public final class FighterVoiceAudioTest {
                 CrewChatter.Event.ATTACK,0,0,CrewChatter.Tone.PROFESSIONAL);
         if (RecordedHullVoiceAudio.assetPathForRadio("RADIO Ordinary Frigate: "+sameLine) != null)
             throw new AssertionError("Missile frigate voice leaked onto ordinary frigate");
-        if(n != 234 || paths.size() != 234)
-            throw new AssertionError("Incomplete nine-hull voice bank");
-        System.out.println("PASS: 234 unique original recorded cues across 9 fixed hull voices");
+        if(n != 260 || paths.size() != 260)
+            throw new AssertionError("Incomplete ten-hull voice bank");
+        System.out.println("PASS: 260 unique original recorded cues across 10 fixed hull voices");
     }
 }

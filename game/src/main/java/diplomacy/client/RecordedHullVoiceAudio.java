@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * User-recorded hull voices across nine hull roles, including the missile frigate; 234 cues.
+ * User-recorded hull voices across ten hull roles, including the missile frigate; 260 cues.
  * One clip at a time, with a global cooldown suitable for 200v200 engagements.
  * All routing is cosmetic; no simulation RNG, no synthetic pilot impersonation.
  */
@@ -22,6 +22,7 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
     private boolean suspended;
     private boolean resumeVoice;
     private float gain=1f;
+    private float proximityEnvelope;
 
     private static Map<String,String> buildIndex() {
         Map<String,String> result = new HashMap<>();
@@ -29,7 +30,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
                 Shipyard.Hull.INTERCEPTOR, Shipyard.Hull.CORVETTE, Shipyard.Hull.DESTROYER,
                 Shipyard.Hull.CARRIER, Shipyard.Hull.DREADNOUGHT,
                 Shipyard.Hull.BATTLECRUISER, Shipyard.Hull.FRIGATE_MISSILE,
-                Shipyard.Hull.CRUISER, Shipyard.Hull.LIGHT_CRUISER
+                Shipyard.Hull.CRUISER, Shipyard.Hull.LIGHT_CRUISER,
+                Shipyard.Hull.HEAVY_CRUISER
         };
         for (Shipyard.Hull hull : recorded) {
             for (CrewChatter.Event event : CrewChatter.Event.values()) {
@@ -54,8 +56,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
                 }
             }
         }
-        if (result.size() != 234)
-            throw new IllegalStateException("Incomplete 9-hull voice bank");
+        if (result.size() != 260)
+            throw new IllegalStateException("Incomplete 10-hull voice bank");
         return Collections.unmodifiableMap(result);
     }
 
@@ -84,7 +86,8 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
             if (!file.exists()) throw new IllegalStateException("Missing recorded hull voice: " + path);
             active = Gdx.audio.newMusic(file);
             active.setLooping(false);
-            active.setVolume(0.44f*gain);
+            proximityEnvelope=0f;
+            active.setVolume(0f);
             active.play();
             nextTick = tick + MIN_SPACING_TICKS;
             return true;
@@ -97,10 +100,13 @@ public final class RecordedHullVoiceAudio implements AutoCloseable {
     }
     public void setVolume(float value){
         gain=VoiceVolumeControl.clamp(value);
-        if(active!=null)active.setVolume(.44f*gain);
+        if(active!=null)active.setVolume(.44f*gain*proximityEnvelope);
     }
-    public void advance() {
-        if (!suspended && active != null && !active.isPlaying()) closeActive();
+    public void advance(float desired,float seconds) {
+        if(suspended||active==null)return;
+        if(!active.isPlaying()){closeActive();return;}
+        proximityEnvelope=RadioVoiceProximity.step(proximityEnvelope,desired,seconds);
+        active.setVolume(.44f*gain*proximityEnvelope);
     }
     public void stop() { closeActive(); resumeVoice = false; }
     public void reset() { stop(); nextTick = Long.MIN_VALUE; }

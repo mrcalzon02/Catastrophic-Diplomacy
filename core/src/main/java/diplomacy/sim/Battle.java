@@ -414,6 +414,7 @@ public final class Battle {
     private final List<Beam> beams = new ArrayList<>();
     private final List<SupportLink> supportLinks=new ArrayList<>();
     private final List<String> events = new ArrayList<>();
+    private final List<Integer> eventSourceIds = new ArrayList<>();
     private final List<VisualEvent> visualEvents=new ArrayList<>();
     private long nextVisualShotId=1, nextVisualSequence=1;
     private int nextId = 1;
@@ -464,6 +465,11 @@ public final class Battle {
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
     public List<SupportLink> supportLinks(){return Collections.unmodifiableList(supportLinks);}
     public List<String> events() { return Collections.unmodifiableList(events); }
+    public Ship radioSourceAt(int index) {
+        if(index<0||index>=eventSourceIds.size())return null;
+        int id=eventSourceIds.get(index);
+        return id==0?null:findShip(id);
+    }
     /** History allows renderers to catch up when more than one tick elapses per frame. */
     public List<VisualEvent> visualEvents() { return Collections.unmodifiableList(visualEvents); }
     public BattleOrders.Orders teamOrders(int team) {
@@ -2308,14 +2314,19 @@ public final class Battle {
         if(source==null||tick-source.lastChatterTick<90||
                 source.hull<=0)return;
         source.lastChatterTick=tick;
-        log(radioMessage(source,event,false));
+        log(radioMessage(source,event,false),source);
     }
     private void radioFighter(Battle.Ship carrier,CrewChatter.Event event){
         if(tick-carrier.lastChatterTick<90)return;
         carrier.lastChatterTick=tick;
-        log(radioMessage(carrier,event,true));
+        log(radioMessage(carrier,event,true),carrier);
     }
-    private void log(String message) { events.add(message); if (events.size() > 90) events.remove(0); }
+    private void log(String message) { log(message,null); }
+    private void log(String message,Ship origin) {
+        events.add(message);
+        eventSourceIds.add(origin==null?0:origin.id);
+        if(events.size()>90) {events.remove(0);eventSourceIds.remove(0);}
+    }
 
     /** Stable across machines using Java's specified Double.doubleToLongBits. */
     public long fingerprint() {

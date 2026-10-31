@@ -64,7 +64,7 @@ tasks.named('audioSmoke') { finalizedBy(tasks.named('announcerSmoke')) }
 
 tasks.register('fighterVoiceSmoke', JavaExec) {
     group = 'verification'
-    description = 'Headless validation of all 234 original subtitle-to-OGG mappings across 9 hull voice roles.'
+    description = 'Headless validation of all 260 original subtitle-to-OGG mappings across 10 hull voice roles.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.FighterVoiceAudioTest'
@@ -216,3 +216,12 @@ tasks.register('renderPerformanceSmoke', JavaExec) {
     mainClass = 'diplomacy.client.RenderPerformanceCountersTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('renderPerformanceSmoke') }
+
+tasks.register('radioVoiceProximitySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless camera-pan proximity and smooth radio-voice envelope checks.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.RadioVoiceProximityTest'
+}
+tasks.named('fighterVoiceSmoke') { dependsOn tasks.named('radioVoiceProximitySmoke') }

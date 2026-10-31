@@ -26,6 +26,7 @@ public final class CombatAudio implements AutoCloseable {
     private String lastLogEntry;
     private long lastRadioTick = -1000000L;
     private boolean radioFlip;
+    private int radioVoiceSourceId;
     private Preferences prefs;
     private Music battleMusic, ambientMusic, activeMusic;
     private long seenSequence;
@@ -169,6 +170,7 @@ public final class CombatAudio implements AutoCloseable {
         lastLogEntry = null;
         lastRadioTick = -1000000L;
         radioFlip = false;
+        radioVoiceSourceId=0;
         hullVoice.reset();
     }
 
@@ -179,13 +181,20 @@ public final class CombatAudio implements AutoCloseable {
     public void advance(Battle battle,double cameraX,double cameraY,float zoom,
                         boolean battleVisible) {
         announcer.advance();
-        hullVoice.advance();
+        hullVoice.advance(nearbyVoice(battle,cameraX,cameraY,zoom,battleVisible),
+                Gdx.graphics==null?1f/60f:Gdx.graphics.getDeltaTime());
         spatial.advance(battle,cameraX,cameraY,zoom,battleVisible&&!suspended,
                 effectsOn,effectsVolume);
-        radioBleep(battle, battleVisible);
+        radioBleep(battle,battleVisible,cameraX,cameraY,zoom);
     }
 
-    private void radioBleep(Battle battle, boolean visible) {
+    private float nearbyVoice(Battle battle,double cx,double cy,float zoom,boolean visible){
+        if(!visible||suspended||battle==null||radioVoiceSourceId==0)return 0;
+        for(var ship:battle.ships())if(ship.id==radioVoiceSourceId)
+            return ship.alive()?RadioVoiceProximity.target(cx,cy,zoom,ship.x,ship.y):0;
+        return 0;
+    }
+    private void radioBleep(Battle battle, boolean visible,double cx,double cy,float zoom) {
         if (battle == null) return;
         java.util.List<String> log = battle.events();
         if (log.isEmpty()) return;
@@ -200,17 +209,26 @@ public final class CombatAudio implements AutoCloseable {
         if (!visible || suspended) return;
         boolean received = false;
         String hullCue = null;
+        int closestSourceId=0;
+        float closestGain=.09f;
         for (int i=start;i<log.size();i++) {
             String line = log.get(i);
             if (line.startsWith("RADIO ")) {
                 received = true;
-                if (hullCue == null && RecordedHullVoiceAudio.assetPathForRadio(line) != null)
-                    hullCue = line;
+                var origin=battle.radioSourceAt(i);
+                if(origin!=null&&origin.alive()&&
+                        RecordedHullVoiceAudio.assetPathForRadio(line)!=null){
+                    float proximity=RadioVoiceProximity.target(cx,cy,zoom,origin.x,origin.y);
+                    if(proximity>closestGain){
+                        hullCue=line;closestSourceId=origin.id;closestGain=proximity;
+                    }
+                }
             }
         }
         // The original recording is rare cockpit speech, not 400 simultaneous pilots.
         // Ordinary ship messages continue to receive quiet radio bleeps.
-        if (voiceVolume>0f && hullCue!=null && !announcer.playing()) hullVoice.play(hullCue,battle.tick);
+        if(voiceVolume>0f&&hullCue!=null&&!announcer.playing()&&hullVoice.play(hullCue,battle.tick))
+            radioVoiceSourceId=closestSourceId;
         if (!effectsOn || !received || battle.tick-lastRadioTick<45) return;
         Sound tone = radioFlip ? radioClose : radioOpen;
         radioFlip = !radioFlip;
