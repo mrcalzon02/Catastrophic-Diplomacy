@@ -16,6 +16,7 @@ public final class CampaignOppositionTest {
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Set<CampaignOpposition.Operation> operations=new HashSet<>();
+        Set<String> namedLocations=new HashSet<>();
         for(int mission=1;mission<=500;mission++){
             LevelEconomy.Level level=LevelEconomy.level(mission);
             var map=CampaignMap.page(CampaignMap.pageOf(mission));
@@ -30,10 +31,23 @@ public final class CampaignOppositionTest {
                     "Missing or misplaced sector capital "+mission);
             check(node.name().contains(node.operation().title),
                     "Map does not identify its battle type "+mission);
+            check(node.name().contains(CampaignStoryAtlas.nodeName(mission)),
+                    "Map did not display authored location "+mission);
+            check(!CampaignStoryAtlas.regionName(mission).isBlank(),
+                    "Region is missing for mission "+mission);
+            check(!CampaignStoryAtlas.frontObjective(mission).isBlank(),
+                    "Front objective is missing for mission "+mission);
+            check(namedLocations.add(CampaignStoryAtlas.nodeName(mission)),
+                    "Authored location name duplicated "+mission);
             if((mission-1)%10!=9)check(node.opponent()==map.get(9).opponent(),
                     "Opponent changes halfway through a contiguous map page");
             operations.add(node.operation());
         }
+        check(namedLocations.size()==500,"Not all 500 locations have individual names");
+        check("Glasswake Threshold".equals(CampaignStoryAtlas.nodeName(1)),
+                "First mission lost its canonical story location");
+        check("Article Zero".equals(CampaignStoryAtlas.nodeName(500)),
+                "Final mission lost its canonical story location");
         check(operations.size()==CampaignOpposition.Operation.values().length,
                 "Mission categories never appear across the map");
         check(CampaignOpposition.operation(1)==CampaignOpposition.Operation.PATROL,

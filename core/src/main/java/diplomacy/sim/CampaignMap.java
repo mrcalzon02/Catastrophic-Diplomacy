@@ -23,8 +23,10 @@ public final class CampaignMap {
             float x=112+index*77;
             float y=235+((index*43)%180)+((variation>>>4)&31);
             CampaignOpposition.Operation operation=CampaignOpposition.operation(level);
-            String name=(level%50==0?"SECTOR CAPITAL ":"SYSTEM ")+
-                    String.format(Locale.ROOT,"%03d",level)+" / "+operation.title;
+            // Geographic name is authored independently from battle operation.
+            // Preserve the operation suffix for readability and existing UI.
+            String name=String.format(Locale.ROOT,"%03d %s / %s",
+                    level,CampaignStoryAtlas.nodeName(level),operation.title);
             // A contiguous ten-system campaign front has one opposing power.
             // Separate map pages can change allegiance without a random
             // opponent switch in the middle of a tactical operation.

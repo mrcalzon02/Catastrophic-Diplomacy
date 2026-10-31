@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.sim.Battle;
 import diplomacy.sim.CampaignMap;
+import diplomacy.sim.CampaignStoryAtlas;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignTechnology;
 import diplomacy.tech.TechnologyCatalog;
@@ -1184,8 +1185,12 @@ final class GameMenuPanel {
         label(batch,font,"CREDITS: "+progress.credits()+"   COMPLETED: "+progress.victories(),39,590,Color.GOLD);
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             label(batch,font,""+node.level(),node.x()-12,node.y()+38,MUTED);
-        label(batch,font,"MISSION "+selected,946,568,Color.WHITE);
-        label(batch,font,"SECTOR "+level.sector(),946,524,MUTED);
+        label(batch,font,"MISSION "+selected+": "+
+                shortLabel(CampaignStoryAtlas.nodeName(selected),19),
+                946,568,Color.WHITE);
+        label(batch,font,"SECTOR "+level.sector()+": "+
+                shortLabel(CampaignStoryAtlas.regionName(selected),21),
+                946,524,MUTED);
         var node=CampaignMap.page(CampaignMap.pageOf(selected))
                 .get((selected-1)%CampaignMap.PAGE_SIZE);
         label(batch,font,"ENEMY: "+node.opponent().name(),946,482,MUTED);
@@ -1203,7 +1208,8 @@ final class GameMenuPanel {
         var briefing=CampaignNarrative.forLevel(selected);
         label(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title(),946,262,Color.CYAN);
         label(batch,font,briefing.intelligence(),946,231,MUTED);
-        label(batch,font,briefing.beat(),946,202,Color.WHITE);
+        label(batch,font,shortLabel(CampaignStoryAtlas.frontObjective(selected),42),
+                946,202,Color.WHITE);
         label(batch,font,"BASE HULLS: "+HullProgression.baseFamiliesAtTier(progress.researchRank())+
                 "/11 | TECH "+progress.researchRank(),946,167,Color.GOLD);
         label(batch,font,"BACK",62,67,Color.WHITE);
