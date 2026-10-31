@@ -155,6 +155,11 @@ final class CombatLightingRenderer implements Disposable {
 
     /** Dusty decorative smoke in space: alpha blended, persistent and tick-aged. */
     void renderSmoke(Battle battle, SpriteBatch batch, OrthographicCamera camera) {
+        renderSmoke(battle,batch,camera,null);
+    }
+    /** Small smoke puffs are reserved for actual hull penetration. */
+    void renderSmoke(Battle battle, SpriteBatch batch, OrthographicCamera camera,
+                     CombatHitFeedback impacts) {
         timeline.update(battle);
         lastSmokeQuads = 0;
         batch.setProjectionMatrix(camera.combined);
@@ -173,6 +178,19 @@ final class CombatLightingRenderer implements Disposable {
             else batch.setColor(.55f,.59f,.65f,.39f*fade*fade);
             batch.draw(smokeMask,smoke.x()-radius,smoke.y()-radius,
                     radius * 2, radius * 2);
+            lastSmokeQuads++;
+        }
+        if(impacts!=null)for(CombatHitFeedback.Pulse impact:impacts.pulses()){
+            if(impact.layer!=CombatHitFeedback.Layer.HULL)continue;
+            float age=impact.age/CombatHitFeedback.LIFETIME;
+            if(age<0 || age>=1)continue;
+            float radius=CombatEffectScale.of(4.0f+age*5.0f)*impact.scale;
+            float x=impact.x-impact.normalX*radius*.2f;
+            float y=impact.y-impact.normalY*radius*.2f;
+            if(radius*2f/camera.zoom<1f || !visible(camera,x,y,radius))continue;
+            float fade=1f-age;
+            batch.setColor(.51f,.48f,.44f,.31f*fade*fade);
+            batch.draw(smokeMask,x-radius,y-radius,radius*2,radius*2);
             lastSmokeQuads++;
         }
         batch.setColor(Color.WHITE);

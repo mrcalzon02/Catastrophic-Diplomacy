@@ -49,6 +49,15 @@ public final class CombatHitFeedbackTest {
         for(int i=0;i<8;i++)feedback.advance(battle,.08f,true);
         check(feedback.count()==0,"feedback expires in bounded time");
         check(ship.hull==originalHull,"presentation does not modify damage");
+        var mixed=new CombatHitFeedback.Defense(100,100,100,0,0,0,1);
+        check(CombatHitFeedback.changedLayer(mixed,90,95,97)==CombatHitFeedback.Layer.HULL,
+                "Simultaneous shield/armor/hull loss must show actual penetration");
+        check(CombatHitFeedback.changedLayer(mixed,90,95,100)==CombatHitFeedback.Layer.ARMOR,
+                "Shield and armor loss must prefer the damaged armor layer");
+        check(CombatHitFeedback.changedLayer(mixed,90,100,100)==CombatHitFeedback.Layer.SHIELD,
+                "Shield-only loss must remain shield-only");
+        check(CombatHitFeedback.changedLayer(mixed,100,100,100)==null,
+                "Non-damaging impact must not invent hull smoke or breach glow");
         Battle mass=new Battle(17L);
         for(int i=0;i<400;i++)mass.addShip(i%2,Battle.Faction.TERRAN,
                 20*i,10);

@@ -39,6 +39,12 @@ final class CombatHitRenderer {
                 if(armor)shapes.setColor(1f,.72f,.31f,.95f*fade);
                 else shapes.setColor(1f,.38f,.31f,.72f*fade);
                 float centerX=hit.x,centerY=hit.y;
+                if(!armor){
+                    // Only real hull injury earns a short heated breach outline.
+                    shapes.setColor(1f,.51f,.19f,.70f*fade);
+                    shapes.circle(centerX,centerY,(2.0f+2.2f*t)*hit.scale,12);
+                    shapes.setColor(1f,.38f,.31f,.72f*fade);
+                }
                 // Four coherent sparks emanate from the real impact position;
                 // directional normal prevents the visual from bursting across
                 // the opposite, unstruck side of the hull.

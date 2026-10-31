@@ -82,9 +82,11 @@ final class CombatHitFeedback {
     }
     static Layer changedLayer(Defense prior,double shields,double armor,double hull){
         // Each layer only lights when that resource genuinely dropped.
-        if(prior.shields()-shields>.01)return Layer.SHIELD;
-        if(prior.armor()-armor>.01)return Layer.ARMOR;
+        // One simulation step may cross multiple protection layers. Visual
+        // feedback should represent the deepest layer actually damaged.
         if(prior.hull()-hull>.01)return Layer.HULL;
+        if(prior.armor()-armor>.01)return Layer.ARMOR;
+        if(prior.shields()-shields>.01)return Layer.SHIELD;
         return null;
     }
     void advance(Battle battle,float delta,boolean running){

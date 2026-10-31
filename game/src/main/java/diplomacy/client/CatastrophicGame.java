@@ -2609,7 +2609,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             capitalTurrets.render(battle,batch,renderPoses,view,battleCamera.zoom);
         if(lighting!=null){
             long beforeLight=System.nanoTime();
-            lighting.renderSmoke(battle,batch,battleCamera);
+            lighting.renderSmoke(battle,batch,battleCamera,hitFeedback);
             lightingOverlayNs+=System.nanoTime()-beforeLight;
         }
         if(weaponFx!=null)weaponFx.render(battle,batch,weaponBeams,renderPoses,view);
