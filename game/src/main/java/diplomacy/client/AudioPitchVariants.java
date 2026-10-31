@@ -89,6 +89,24 @@ final class AudioPitchVariants {
         return values[selected];
     }
 
+    /**
+     * Fixed, per-ship engine detuning. Three nearby vessels running the same
+     * generated loop otherwise phase-lock and sound like one repeated sample.
+     * No per-frame randomization, envelope wobble or gameplay RNG is involved.
+     * Fleet bed, recorded speech and soundtrack remain at their native pitch.
+     */
+    static float engineLoopPitch(int shipId,double hullVisualScale){
+        if(!Double.isFinite(hullVisualScale)||hullVisualScale<=0)
+            throw new IllegalArgumentException("Invalid vessel engine scale");
+        float byClass=.8f+(float)Math.min(.38,hullVisualScale*.12);
+        int x=shipId;
+        x^=x>>>16;x*=0x7feb352d;
+        x^=x>>>15;x*=0x846ca68b;
+        x^=x>>>16;
+        float detune=(Math.floorMod(x,17)-8)*.0035f; // no more than +/- 2.8%
+        return Math.max(.5f,Math.min(1.5f,byClass+detune));
+    }
+
     /** A new battle clears cue history but does not repeat the PRNG sequence. */
     void reset(){recent.clear();samples.clear();}
 }

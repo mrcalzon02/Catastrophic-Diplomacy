@@ -63,6 +63,19 @@ public final class AudioPitchVariantsTest {
         played.reset();
         require(played.nextSample(sharedHeavyFire,AudioPitchVariants.Profile.COMBAT)>=.86f,
                 "Reset clears sample history without invalidating the decoded source");
+        // Engine loops are continuously audible. Give each hull a fixed,
+        // subtle detune instead of picking a new pitch every rendered frame.
+        Set<Float> loopPitches=new HashSet<>();
+        float base=.8f+.12f;
+        for(int id=1;id<=400;id++){
+            float pitch=AudioPitchVariants.engineLoopPitch(id,1.0);
+            require(Math.abs(pitch-base)<=.02801f,
+                    "Steady vessel loop must stay within +/-2.8% of its class pitch");
+            require(pitch==AudioPitchVariants.engineLoopPitch(id,1.0),
+                    "Existing engines must never wobble each frame");
+            loopPitches.add(pitch);
+        }
+        require(loopPitches.size()>=12,"Nearby ships must not all phase-lock at one engine pitch");
         boolean rejected=false;
         try{a.next("",AudioPitchVariants.Profile.UI);}catch(IllegalArgumentException expected){rejected=true;}
         require(rejected,"Cannot vary an unnamed cue");

@@ -90,3 +90,12 @@ selected by both plasma and torpedo fire) now have one shared history. The same
 rule applies to a loaded UI tone, radio bleep or thruster burst. Different sound
 assets have independent bags; logical event cooldown, event prioritization,
 attenuation, stereo pan and the recorded speech/music pitch are unchanged.
+
+
+### Continuously running engine-loop chorus
+The **three** existing proximity-limited engine channels retain their
+class-based base pitch, but each ship receives a stable, ID-derived ±2.8%
+detuning *when its loop starts*. Ships of one class no longer all produce the
+identical phase-locked hum at close range. This never changes frame by frame,
+never touches the sound engine during simulation, and does not affect the one
+distant fleet machinery loop, music or speech.

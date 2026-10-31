@@ -252,7 +252,9 @@ final class SpatialAudioRuntime implements AutoCloseable {
             EngineVoice voice=localEngines.get(ship.id);
             try {
                 if(voice==null){
-                    long id=hum.loop(gain,0.8f+(float)Math.min(0.38,ship.visualScale()*0.12),m.pan());
+                    long id=hum.loop(gain,
+                            AudioPitchVariants.engineLoopPitch(ship.id,ship.visualScale()),
+                            m.pan());
                     if(id!=-1){voice=new EngineVoice(id,ship.facing);localEngines.put(ship.id,voice);}
                 }else hum.setPan(voice.voice,m.pan(),gain);
                 if(voice!=null&&wrappedAngle(ship.facing,voice.facing)>0.11
