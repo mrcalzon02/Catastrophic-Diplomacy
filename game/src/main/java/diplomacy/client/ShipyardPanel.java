@@ -675,6 +675,7 @@ final class ShipyardPanel {
         return artPreview&&fleetArt!=null&&fleetArt.hasHull(draft.faction,draft.hull);
     }
     boolean prefersHullArt(){return artPreview;}
+    int selectedHardpoint(){return selectedSlot;}
     private float hardpointX(Shipyard.Slot slot) {
         return showingHullArt()?fleetArt.previewMountX(draft.faction,draft.hull,
                 slot.index(),MAP_CX,PREVIEW_WIDTH,PREVIEW_HEIGHT):
