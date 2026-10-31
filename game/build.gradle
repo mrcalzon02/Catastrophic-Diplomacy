@@ -38,6 +38,15 @@ tasks.register('menuFlowSmoke', JavaExec) {
     mainClass = 'diplomacy.client.GameMenuFlowTest'
 }
 
+tasks.register('guidedShipyardSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify touch/mouse guided-ordnance tabs, researched options and persisted shipyard selections.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.GuidedShipyardPanelTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('guidedShipyardSmoke') }
+
 // Tested without an OpenGL context: ignition-only exhaust, pause fidelity,
 // real event bursts and bounded smoke/light timelines.
 tasks.register('lightingSmoke', JavaExec) {

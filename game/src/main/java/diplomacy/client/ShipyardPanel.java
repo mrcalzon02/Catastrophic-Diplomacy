@@ -6,6 +6,10 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.OrdnanceFitting;
+import diplomacy.sim.OrdnanceDoctrine;
+import diplomacy.sim.OrdnancePropulsion;
+import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.LaserFamilies;
@@ -72,6 +76,7 @@ final class ShipyardPanel {
     Usage usage(){return usage;}
     private boolean artPreview;
     private boolean technologyView;
+    private boolean guidedView;
     private Shipyard.Track technologyTrack=Shipyard.Track.OUTPUT;
     private int technologyStage=1;
     private Supplier<SkirmishTechnologyRules> skirmishRules=SkirmishTechnologyRules::unrestricted;
@@ -147,7 +152,7 @@ final class ShipyardPanel {
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
-        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;
+        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;guidedView=false;
         purchaseArmedDesign=null;refitShipId=0;
         notice="DESIGN SANDBOX: configure fitted modules; campaign technology is researched separately.";
     }
@@ -180,7 +185,7 @@ final class ShipyardPanel {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
     }
-    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;}
+    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;guidedView=false;}
     private void hull(int step){
         Shipyard.Hull[] options=Shipyard.Hull.shipyardOrder();
         int current=0;
@@ -291,6 +296,88 @@ final class ShipyardPanel {
             }
         }catch(IllegalArgumentException problem){notice=problem.getMessage();}
     }
+
+    /** Four independently selectable physical guided-weapon dimensions.
+     * This same immutable blueprint powers desktop, Android and fleet export. */
+    static Shipyard.Design chooseGuided(Shipyard.Design source,int socket,int axis,int step){
+        if(source==null||socket<0||socket>=source.slots()||axis<0||axis>3||
+                (step!=1&&step!=-1))
+            throw new IllegalArgumentException("Invalid guided-ordnance control");
+        Shipyard.Installed module=source.at(socket);
+        if(module==null)throw new IllegalArgumentException("Select a fitted launcher");
+        Battle.DamageType family=module.component.endsWith("-MSL")?Battle.DamageType.MISSILE:
+                module.component.endsWith("-TOR")?Battle.DamageType.TORPEDO:null;
+        if(family==null)throw new IllegalArgumentException("Select a missile or torpedo hardpoint");
+        OrdnanceFitting.Guided old=source.ordnance(family);
+        int count=switch(axis){
+            case 0 -> OrdnanceDoctrine.Mode.values().length;
+            case 1 -> OrdnancePropulsion.Mode.values().length;
+            case 2 -> OrdnanceGuidance.Mode.values().length;
+            default -> AmmunitionTable.Warhead.values().length;
+        };
+        for(int n=1;n<count;n++){
+            int index=switch(axis){
+                case 0 -> Math.floorMod(old.salvo().ordinal()+n*step,count);
+                case 1 -> Math.floorMod(old.motor().ordinal()+n*step,count);
+                case 2 -> Math.floorMod(old.guidance().ordinal()+n*step,count);
+                default -> Math.floorMod(source.ammoSelection.missile().ordinal()+n*step,count);
+            };
+            try{
+                if(axis==3){
+                    var current=family==Battle.DamageType.MISSILE?
+                            source.ammoSelection.missile():source.ammoSelection.torpedo();
+                    var kind=AmmunitionTable.Warhead.values()[
+                            Math.floorMod(current.ordinal()+n*step,count)];
+                    return source.withGuidedWarhead(family,kind);
+                }
+                var trial=new OrdnanceFitting.Guided(
+                        axis==0?OrdnanceDoctrine.Mode.values()[index]:old.salvo(),
+                        axis==1?OrdnancePropulsion.Mode.values()[index]:old.motor(),
+                        axis==2?OrdnanceGuidance.Mode.values()[index]:old.guidance());
+                return source.withGuidedOrdnance(family,trial);
+            }catch(IllegalArgumentException locked){
+                // Skip unresearched options, never install them tentatively.
+            }
+        }
+        return source;
+    }
+    private Battle.DamageType selectedGuidedFamily(){
+        var installed=draft.at(selectedSlot);
+        if(installed==null)return null;
+        if(installed.component.endsWith("-MSL"))return Battle.DamageType.MISSILE;
+        if(installed.component.endsWith("-TOR"))return Battle.DamageType.TORPEDO;
+        return null;
+    }
+    private void cycleGuided(int axis,int step){
+        Battle.DamageType family=selectedGuidedFamily();
+        if(family==null){
+            notice="Select an equipped missile or torpedo hardpoint first";return;
+        }
+        try{
+            Shipyard.Design next=chooseGuided(draft,selectedSlot,axis,step);
+            if(next==draft){notice="No additional researched "+family+" options";return;}
+            if(!campaignTechnology())challenge().requireAllowed(next,catalog);
+            draft=next;purchaseArmedDesign=null;cachedQuote=null;
+            notice=family+" "+new String[]{"SALVO","MOTOR","GUIDANCE","WARHEAD"}[axis]
+                    +" updated; SAVE or APPLY to retain this blueprint";
+        }catch(IllegalArgumentException locked){
+            notice="GUIDED FIT DENIED: "+locked.getMessage();
+        }
+    }
+    /** Stable 1280x720 mouse/touch coordinates shared by Android and desktop. */
+    static int guidedTabHit(float x,float y){
+        if(x<807||x>1255||y<578||y>607)return -1;
+        return x<941?0:x<1100?2:1; // MODULES, GUIDED, TECH
+    }
+    static int guidedOptionHit(float x,float y){
+        if(x<809||x>1255)return -1;
+        for(int row=0;row<4;row++){
+            int bottom=455-row*100;
+            if(y>=bottom&&y<=bottom+72)return row;
+        }
+        return -1;
+    }
+
     private void cyclePattern(){
         Shipyard.Installed p=draft.at(selectedSlot);
         if(p==null){notice="Install a module first";return;}
@@ -358,6 +445,13 @@ final class ShipyardPanel {
         if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
         if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
         if(code==com.badlogic.gdx.Input.Keys.A){cycleAmmunition();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.G){
+            guidedView=!guidedView;technologyView=false;return true;
+        }
+        if(guidedView&&code>=com.badlogic.gdx.Input.Keys.NUM_1&&
+                code<=com.badlogic.gdx.Input.Keys.NUM_4){
+            cycleGuided(code-com.badlogic.gdx.Input.Keys.NUM_1,1);return true;
+        }
         if(code==com.badlogic.gdx.Input.Keys.PAGE_UP){hullGroup(-1);return true;}
         if(code==com.badlogic.gdx.Input.Keys.PAGE_DOWN){hullGroup(1);return true;}
         if(code==com.badlogic.gdx.Input.Keys.UP){selectedSlot=Math.max(0,selectedSlot-1);scroll=Math.min(scroll,selectedSlot);return true;}
@@ -540,8 +634,19 @@ final class ShipyardPanel {
     }
     boolean tap(float x,float y){
         if(!open)return false;
-        if(y>=578&&y<=607&&x>=807&&x<=1255){
-            technologyInput(technologyHit(x,y));return true;
+        int tab=guidedTabHit(x,y);
+        if(tab>=0){
+            guidedView=tab==2;technologyView=tab==1;return true;
+        }
+        if(guidedView&&y<638){
+            if(x<320&&y>=105&&y<=590){
+                int index=scroll+(int)((590-y)/26);
+                if(index>=0&&index<draft.slots())select(index);
+            }else{
+                int option=guidedOptionHit(x,y);
+                if(option>=0)cycleGuided(option,x<881?-1:1);
+            }
+            return true;
         }
         if(technologyView&&y<638){
             if(x<320&&y>=105&&y<=590){
@@ -762,8 +867,9 @@ final class ShipyardPanel {
         font.setColor(Color.CYAN);
         font.draw(batch,"SELECTED HARDPOINT",36,587);
         font.draw(batch,"VESSEL TECHNOLOGY PLAN",346,587);
-        font.draw(batch,"< MODULES",812,587);
-        font.draw(batch,"TECH LOADOUT",1004,587);
+        font.draw(batch,"MODULES",812,587);
+        font.draw(batch,"GUIDED",956,587);
+        font.draw(batch,"TECH LOADOUT",1104,587);
         for(int n=0;n<SLOT_ROWS;n++){
             int index=scroll+n;
             if(index>=draft.slots())break;
@@ -839,8 +945,115 @@ final class ShipyardPanel {
         batch.end();
     }
 
+    /** Touch-sized 74px per-option selection instead of tiny desktop-only
+     * shortcuts. Left hardpoint list stays visible for module selection. */
+    private void drawGuided(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font){
+        var report=Shipyard.inspect(draft,catalog);
+        Battle.DamageType family=selectedGuidedFamily();
+        OrdnanceFitting.Guided choice=family==null?null:draft.ordnance(family);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        rectangle(shapes,0,0,1280,720,MilitaryUiTheme.BACKGROUND);
+        rectangle(shapes,0,630,1280,90,new Color(.06f,.09f,.15f,1));
+        rectangle(shapes,24,83,300,524,new Color(.045f,.075f,.11f,1));
+        rectangle(shapes,332,83,463,524,new Color(.03f,.052f,.081f,1));
+        rectangle(shapes,803,83,452,524,new Color(.045f,.075f,.11f,1));
+        for(int i=0;i<SLOT_ROWS;i++){
+            int index=i+scroll;
+            if(index>=draft.slots())break;
+            if(index==selectedSlot)rectangle(shapes,30,561-i*26,286,25,
+                    new Color(.13f,.23f,.33f,1));
+        }
+        for(int row=0;row<4;row++){
+            int bottom=455-row*100;
+            rectangle(shapes,809,bottom,446,72,
+                    choice==null?new Color(.12f,.12f,.15f,1):
+                    new Color(.12f,.21f,.30f,1));
+            if(choice!=null){
+                rectangle(shapes,812,bottom+3,65,66,new Color(.16f,.29f,.38f,1));
+                rectangle(shapes,1184,bottom+3,67,66,new Color(.16f,.29f,.38f,1));
+            }
+        }
+        shapes.end();
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch,"GUIDED ORDNANCE / SHIPYARD",22,704);
+        font.draw(batch,"LEFT FLEET",34,660);
+        if(!playerOnly)font.draw(batch,"RIGHT FLEET",175,660);
+        font.draw(batch,"<",345,660);
+        font.draw(batch,shortText(draft.hull.name().replace('_',' '),21),392,660);
+        font.draw(batch,">",652,660);
+        font.draw(batch,playerOnly?"BLUEPRINT":"APPLY",717,660);
+        font.draw(batch,"SAVE",831,660);font.draw(batch,"LOAD",938,660);
+        font.draw(batch,playerOnly?"PURCHASE":"FACTION >",1022,660);
+        font.draw(batch,"CLOSE",1171,660);
+        font.setColor(Color.CYAN);
+        font.draw(batch,"HARDPOINTS",36,587);
+        font.draw(batch,"SELECTED WEAPON",344,587);
+        font.setColor(Color.LIGHT_GRAY);font.draw(batch,"MODULES",813,587);
+        font.setColor(Color.GOLD);font.draw(batch,"GUIDED",956,587);
+        font.setColor(Color.CYAN);font.draw(batch,"TECH >",1104,587);
+        for(int i=0;i<SLOT_ROWS;i++){
+            int index=i+scroll;
+            if(index>=draft.slots())break;
+            Shipyard.Slot slot=draft.placements().get(index);
+            Shipyard.Installed module=draft.at(index);
+            font.setColor(index==selectedSlot?Color.GOLD:mountColor(slot.mount()));
+            font.draw(batch,String.format(Locale.ROOT,"%02d  %-7s %s",index+1,
+                    slot.mount().name(),module==null?"EMPTY":module.component.substring(5)),
+                    36,580-i*26);
+        }
+        font.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
+        font.draw(batch,draft.faction.displayName,345,553);
+        font.setColor(Color.WHITE);
+        font.draw(batch,"HULL "+draft.hull.name().replace('_',' '),345,513);
+        var installed=draft.at(selectedSlot);
+        font.draw(batch,"SOCKET "+(selectedSlot+1)+" / "+draft.slots(),345,467);
+        font.draw(batch,installed==null?"EMPTY":installed.component,345,430);
+        if(choice==null){
+            font.setColor(Color.GOLD);
+            font.draw(batch,"SELECT A MISSILE OR TORPEDO",346,355);
+            font.draw(batch,"HARDPOINT FROM THE LEFT LIST",346,323);
+            font.draw(batch,"GUIDED LOADOUT IS FAMILY-WIDE",346,268);
+            font.draw(batch,"UNTIL PER-MOUNT FIRE CONTROL",346,240);
+        }else{
+            font.setColor(Color.CYAN);
+            font.draw(batch,family+" / RESEARCH TIER "+
+                    OrdnanceFitting.fittedTier(draft,family)+"/9",345,372);
+            font.setColor(Color.WHITE);
+            font.draw(batch,"REQUIRED TIER "+OrdnanceFitting.requiredTier(choice)+"/9",345,334);
+            font.draw(batch,"REAL PHYSICAL MISSILES",345,282);
+            font.draw(batch,"PROPULSION + SEEKER + SALVO",345,252);
+            font.draw(batch,"SHARED FAMILY CONTROLLER",345,212);
+            font.draw(batch,"LEFT / RIGHT ARROWS TO SELECT",345,173);
+            font.draw(batch,"KEYS G / 1-4 ALSO AVAILABLE",345,139);
+        }
+        String[] labels={"LAUNCH PATTERN","MOTOR / FLIGHT","GUIDANCE","WARHEAD"};
+        String[] values=choice==null?new String[]{"NO LAUNCHER","NO LAUNCHER",
+                "NO LAUNCHER","NO LAUNCHER"}:
+                new String[]{choice.salvo().name(),choice.motor().name(),
+                        choice.guidance().name(),(family==Battle.DamageType.MISSILE?
+                        draft.ammoSelection.missile():draft.ammoSelection.torpedo()).name()};
+        for(int row=0;row<4;row++){
+            int bottom=455-row*100;
+            font.setColor(Color.CYAN);
+            font.draw(batch,labels[row],814,bottom+90);
+            font.setColor(choice==null?Color.GRAY:Color.WHITE);
+            if(choice!=null){
+                font.draw(batch,"<",831,bottom+46);
+                font.draw(batch,">",1212,bottom+46);
+            }
+            font.draw(batch,shortText(values[row].replace('_',' '),23),892,bottom+45);
+        }
+        font.setColor(report.valid()?Color.GREEN:Color.SCARLET);
+        font.draw(batch,shortText(report.explanation(),72),343,62);
+        font.setColor(Color.LIGHT_GRAY);
+        font.draw(batch,shortText(notice,125),28,36);
+        batch.end();
+    }
+
     void draw(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font) {
         if(technologyView){drawTechnology(shapes,batch,font);return;}
+        if(guidedView){drawGuided(shapes,batch,font);return;}
         Shipyard.Report report=Shipyard.inspect(draft,catalog);
         List<Shipyard.Slot> layout=draft.placements();
         Shipyard.Slot selected=layout.get(selectedSlot);
@@ -953,8 +1166,10 @@ final class ShipyardPanel {
         font.setColor(Color.GOLD);
         font.draw(batch,artPreview?"SHOW MAP":"SHOW ART",705,590);
         font.draw(batch,"MODULES",813,590);
+        font.setColor(Color.GOLD);
+        font.draw(batch,"GUIDED >",956,590);
         font.setColor(Color.CYAN);
-        font.draw(batch,"TECH LOADOUT >",1004,590);
+        font.draw(batch,"TECH >",1104,590);
         for(int n=0;n<SLOT_ROWS;n++) {
             int index=scroll+n;
             if(index>=draft.slots())break;
