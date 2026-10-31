@@ -231,6 +231,10 @@ jobs:
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
           script: |
             bash tools/android_verify_demo.sh package/verify-debug.apk test-output/android
+            # Save genuine in-engine approved hull sprites at four seeded physics
+            # integrity states. Cosmetic evidence must NOT block a functional release.
+            bash tools/android_capture_surface_damage.sh test-output/android || \
+              echo "WARNING: optional real hull-damage screenshot diagnostic unavailable"
             adb uninstall games.catastrophicdiplomacy
             adb install package/Catastrophic-Diplomacy-Android.apk
             adb shell am start -W -n games.catastrophicdiplomacy/diplomacy.android.AndroidLauncher
