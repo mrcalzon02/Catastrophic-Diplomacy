@@ -6,6 +6,7 @@ public final class ShipSurfaceDamageVisualTest {
     private static void check(boolean yes,String why){if(!yes)throw new AssertionError(why);}
     private static int alpha(int rgba){return rgba&255;}
     public static void main(String[] args) throws Exception {
+        ShipDamageMaskRegionTest.verify();
         int source=0xb0a090ff;
         check(ShipSurfaceDamageVisual.pixel(source,0,0,0)==source,"Intact hull pixels changed");
         check(ShipSurfaceDamageVisual.pixel(0x11223300,1,1,0)==0,"Original transparent silhouette expanded");

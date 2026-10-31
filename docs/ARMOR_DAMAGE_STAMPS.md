@@ -20,3 +20,18 @@ sprite. Sprite rotations and sizes reuse the existing renderer.
 Run `gradle :game:shipDamageVisualSmoke` as a standalone **nonblocking**
 visual diagnostic. Review real Android game-frame screenshots before
 claiming display-level acceptance.
+
+
+## Incremental rendering refinement
+
+- The `96×144` per-vessel exterior mask now uploads only the dirty
+  rectangle around changed protection tiles, including edge/scorch padding.
+  Dispersed hits still use a full update if their bounding region spans it.
+- Real armor integrity is quantized consistently with the existing change
+  fingerprint. No per-frame or per-ship texture regeneration is needed when
+  integrity is unchanged; independent shield regeneration does not dirty armor.
+- Repaired ships, destroyed ships and ships removed from a battle release
+  obsolete GPU overlay masks. Off-camera damaged ships keep theirs, avoiding
+  pan-induced allocations and image upload spikes.
+- The incremental rectangular update is covered by headless visual diagnostics
+  for single-point hits, structural bypass, repair, edge and distant impacts.
