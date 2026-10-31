@@ -319,13 +319,10 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 1200
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
+          # android-emulator-runner invokes each script line in a separate sh -c.
+          # An if/then/fi block split across lines exits before the APK installs.
           script: |
-            if [[ "${{ matrix.first }}" == '0' ]]; then
-              adb install package/reference/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
-              adb install -r package/Catastrophic-Diplomacy-Android.apk
-            else
-              adb install package/Catastrophic-Diplomacy-Android.apk
-            fi
+            if [ "${{ matrix.first }}" = "0" ]; then adb install package/reference/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk && adb install -r package/Catastrophic-Diplomacy-Android.apk; else adb install package/Catastrophic-Diplomacy-Android.apk; fi
             bash tools/android_verify_campaign.sh test-output/campaign-api29 ${{ matrix.first }} ${{ matrix.last }}
       - name: Preserve campaign crash logs and real map/dock/deployment/combat screens
         if: always()
