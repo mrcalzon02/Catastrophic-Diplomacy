@@ -237,7 +237,8 @@ tasks.register('prepareLaserRun01') {
             def archive=new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zipped))
             def records=[:]
             archive.withCloseable { stream ->
-                for(java.util.zip.ZipEntry entry;(entry=stream.nextEntry)!=null;){
+                java.util.zip.ZipEntry entry
+                while ((entry=stream.getNextEntry())!=null) {
                     if(entry.name=='manifest.json'||entry.name.startsWith('atlases/'))
                         records[entry.name]=stream.readAllBytes()
                     stream.closeEntry()
@@ -258,7 +259,7 @@ tasks.register('prepareLaserRun01') {
             manifest.weapon_animations.eachWithIndex { fx,i ->
                 if(fx.id!=expected[i] || fx.sheet_columns!=8 ||
                         fx.frame_size_px!=[512,160] || fx.frame_count<1 ||
-                        fx.frame_count>96 || fx.sheet_rows!=Math.ceil(fx.frame_count/8.0) as int)
+                        fx.frame_count>96 || fx.sheet_rows!=(Math.ceil((fx.frame_count as int)/8.0) as int))
                     throw new IllegalArgumentException('Invalid laser animation '+fx.id)
                 String entry='atlases/'+fx.id+'.png'
                 byte[] original=records[entry]
@@ -272,7 +273,7 @@ tasks.register('prepareLaserRun01') {
                 def originalOut=new File(full,target)
                 originalOut.parentFile.mkdirs()
                 originalOut.bytes=original // never rewrite original desktop pixels
-                def reduced=new java.awt.image.BufferedImage(image.width/2,image.height/2,
+                def reduced=new java.awt.image.BufferedImage(image.width.intdiv(2),image.height.intdiv(2),
                         java.awt.image.BufferedImage.TYPE_INT_ARGB)
                 def g=reduced.createGraphics()
                 try {
