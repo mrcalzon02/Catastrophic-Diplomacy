@@ -278,3 +278,12 @@ tasks.register('shipInspectionSmoke', JavaExec) {
     mainClass = 'diplomacy.client.ShipInspectionPanelTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipInspectionSmoke') }
+
+// Visual diagnostics only. Sprite assignments and aesthetics never gate release.
+tasks.register('guidedOrdnanceArtSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Audit authored missile/torpedo art routing and micro/heavy/decoy variants.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.GuidedPayloadVisualTest'
+}

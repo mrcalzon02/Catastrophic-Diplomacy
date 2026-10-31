@@ -141,22 +141,22 @@ final class ModularWeaponFxRenderer implements Disposable {
                     shot.clip().width()*size,shot.clip().height()*size,angle);
             if(laser!=null)batch.setColor(1,1,1,1);
         }
-        // Guided PAYLOAD uses the projectile's *current* simulation position,
-        // rotation and own spawn tick. A missile does not teleport to its target.
+        // Guided PAYLOAD uses the real physical body's type, fitted payload,
+        // warhead, and LIVE motor phase—not one universal missile image.
         for(Battle.Missile missile:battle.missiles()){
-            Profile profile=WeaponFxProfile.forType(
-                    missile.torpedo?Battle.DamageType.TORPEDO:Battle.DamageType.MISSILE);
-            Clip clip=profile.payload();
+            GuidedPayloadVisual.Appearance style=GuidedPayloadVisual.forMissile(missile);
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
-            if(view!=null&&!view.circle(pose.x(),pose.y(),
-                    Math.max(clip.width(),clip.height())*.5f))continue;
-            Texture image=frame(clip,battle.tick-missile.spawnTick);
-            if(image==null)continue;
+            float radius=CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f;
+            if(view!=null&&!view.circle(pose.x(),pose.y(),radius))continue;
+            Texture image=texture(style.image());
+            if(image==null)continue; // Real projectile geometry remains the fallback.
             float angle=(float)StrictMath.toDegrees(pose.angle());
+            batch.setColor(style.red(),style.green(),style.blue(),style.alpha());
             drawCentered(batch,image,pose.x(),pose.y(),
-                    clip.width(),clip.height(),angle);
+                    style.width(),style.height(),angle);
+            batch.setColor(1,1,1,1);
         }
         // Slow ballistic PAYLOADs use their real collision-tested world positions.
         // The atlas frame is oriented by immutable launch velocity, not a fake
@@ -187,9 +187,7 @@ final class ModularWeaponFxRenderer implements Disposable {
 
     /** A missing payload sprite keeps existing ordnance geometry visible. */
     public boolean hasMissilePayload(Battle.Missile missile,long tick){
-        Profile profile=WeaponFxProfile.forType(
-                missile.torpedo?Battle.DamageType.TORPEDO:Battle.DamageType.MISSILE);
-        return frame(profile.payload(),tick-missile.spawnTick)!=null;
+        return texture(GuidedPayloadVisual.forMissile(missile).image())!=null;
     }
     int activeAnimations(){return oneShots.size();}
     int loadedTextures(){return textures.size();}
