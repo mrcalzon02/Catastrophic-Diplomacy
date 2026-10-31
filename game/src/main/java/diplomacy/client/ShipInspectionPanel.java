@@ -33,8 +33,12 @@ final class ShipInspectionPanel {
     };
     private int shipId=-1;
     private int rangeMask=ALL_RANGES;
+    private boolean mobile;
+    private int mobilePage;
+    void setMobile(boolean enabled){mobile=enabled;}
     int selectedId(){return shipId;}
     void select(int id){
+        if(id!=shipId)mobilePage=0;
         shipId=id;
         rangeMask=ALL_RANGES;
     }
@@ -58,10 +62,26 @@ final class ShipInspectionPanel {
         if(y<104&&x>1090)return 2; // All ranges on/off
         return 0; // Prevent tap-through into battle/menu HUD.
     }
+    static int mobileAction(float x,float y,int page){
+        if(x<615||x>1268||y<60||y>609)return -1;
+        if(x>=1210&&y>=565)return 1;
+        if(y>=514&&y<=564)return x<941?20:21; // STATUS / WEAPONS
+        if(page==1){
+            for(int i=0;i<7;i++){
+                int baseline=482-i*48;
+                if(y>=baseline-24&&y<=baseline+18)return 10+i;
+            }
+            if(y>=60&&y<=118&&x>=1020)return 2;
+        }
+        return 0;
+    }
     boolean tap(float x,float y){
-        if(shipId<0||!contains(x,y))return false;
-        int click=action(x,y);
+        if(shipId<0)return false;
+        int click=mobile?mobileAction(x,y,mobilePage):action(x,y);
+        if(click<0)return false;
         if(click==1)close();
+        else if(click==20)mobilePage=0;
+        else if(click==21)mobilePage=1;
         else if(click==2)rangeMask=rangeMask==0?ALL_RANGES:0;
         else if(click>=10&&click<17)rangeMask^=1<<(click-10);
         return true;
@@ -171,6 +191,7 @@ final class ShipInspectionPanel {
         return label+" "+percent(ratio,1)+"%";
     }
     void draw(Battle battle,ShapeRenderer shapes,SpriteBatch batch,BitmapFont font){
+        if(mobile){drawMobile(battle,shapes,batch,font);return;}
         Battle.Ship s=selected(battle);
         if(s==null)return;
         shapes.begin(ShapeRenderer.ShapeType.Filled);
@@ -263,5 +284,120 @@ final class ShipInspectionPanel {
         font.setColor(Color.CYAN);
         font.draw(batch,rangeMask==0?"SHOW RANGES":"HIDE RANGES",1110,96);
         batch.end();
+    }
+    private void drawMobile(Battle battle,ShapeRenderer shapes,
+                            SpriteBatch batch,BitmapFont font){
+        Battle.Ship s=selected(battle);
+        if(s==null)return;
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(.025f,.045f,.075f,.975f);
+        shapes.rect(615,60,653,549);
+        shapes.setColor(.12f,.23f,.32f,1f);
+        shapes.rect(615,557,653,52);
+        shapes.setColor(mobilePage==0?Color.CYAN:Color.DARK_GRAY);
+        shapes.rect(630,514,298,44);
+        shapes.setColor(mobilePage==1?Color.CYAN:Color.DARK_GRAY);
+        shapes.rect(937,514,252,44);
+        shapes.setColor(.19f,.30f,.4f,1f);
+        shapes.rect(1210,565,50,38);
+        if(mobilePage==0){
+            bar(shapes,642,485,290,s.hull,s.maxHull,Color.ORANGE);
+            bar(shapes,642,446,290,s.shields,s.maxShields,Color.CYAN);
+            bar(shapes,642,407,290,s.armor,s.maxArmor,Color.GOLD);
+        }else{
+            for(int i=0;i<7;i++){
+                int y=482-i*48;
+                shapes.setColor((i&1)==0?.09f:.065f,.14f,.20f,.95f);
+                shapes.rect(633,y-26,626,45);
+                if(enabled(i)){
+                    Color c=COLORS[i];
+                    shapes.setColor(c.r,c.g,c.b,1);
+                    shapes.rect(636,y-22,7,37);
+                }
+            }
+            shapes.setColor(.14f,.25f,.32f,1f);
+            shapes.rect(1021,64,238,49);
+        }
+        shapes.end();
+        float oldX=font.getData().scaleX,oldY=font.getData().scaleY;
+        font.getData().setScale(oldX*1.28f,oldY*1.28f);
+        try{
+            batch.begin();
+            font.setColor(Color.WHITE);
+            font.draw(batch,shortName(s.name,31),634,588);
+            font.setColor(Color.LIGHT_GRAY);
+            font.draw(batch,(s.hullClass==null?"SHIP":s.hullClass.name().replace('_',' '))+
+                    "  #"+s.id+"  "+(s.alive()?"ACTIVE":"DESTROYED"),635,565);
+            font.setColor(Color.WHITE);
+            font.draw(batch,"X",1227,592);
+            font.setColor(mobilePage==0?Color.BLACK:Color.WHITE);
+            font.draw(batch,"STATUS",680,540);
+            font.setColor(mobilePage==1?Color.BLACK:Color.WHITE);
+            font.draw(batch,"WEAPONS / RANGES",950,540);
+            if(mobilePage==0){
+                font.setColor(Color.WHITE);
+                font.draw(batch,stat("HULL",s.hull,s.maxHull),643,507);
+                font.draw(batch,stat("SHIELD",s.shields,s.maxShields),643,468);
+                font.draw(batch,stat("ARMOR",s.armor,s.maxArmor),643,429);
+                font.draw(batch,stat("POWER",s.power,s.maxPower),961,505);
+                font.draw(batch,stat("HEAT",s.heat,s.maxHeat),961,464);
+                font.draw(batch,stat("FUEL",s.fuel,s.maxFuel),961,425);
+                font.setColor(Color.CYAN);
+                font.draw(batch,"CREW / SHIELD FACINGS",642,377);
+                font.setColor(Color.WHITE);
+                font.draw(batch,Math.round(s.crewCount)+" CREW  /  "+s.crewBerths+
+                        " BERTHS  /  "+s.crewRequired+" REQUIRED",642,344);
+                if(s.defense!=null){
+                    var facing=DirectionalDefense.Facing.values();
+                    StringBuilder protection=new StringBuilder("F/P/A/S: ");
+                    for(int i=0;i<4;i++){
+                        if(i>0)protection.append(" / ");
+                        protection.append(percent(s.defense.shields(facing[i]),
+                                s.defense.maxShields(facing[i]))).append('%');
+                    }
+                    font.draw(batch,protection.toString(),642,316);
+                }
+                font.setColor(Color.CYAN);
+                font.draw(batch,"SUBSYSTEM CONDITION",642,271);
+                font.setColor(Color.WHITE);
+                String[][] rows={
+                    {condition("ENGINE",s.engineCondition),condition("WEAPONS",s.weaponsCondition)},
+                    {condition("REACTOR",s.reactorCondition),condition("SENSORS",s.sensorsCondition)},
+                    {condition("COOLING",s.coolingCondition),condition("POINT DEF",s.pointDefenseCondition)},
+                    {condition("COMMAND",s.commandCondition),condition("MAGAZINE",s.magazineCondition)},
+                    {condition("HANGAR",s.hangarCondition),condition("ECM",s.ecmCondition)}
+                };
+                for(int i=0;i<rows.length;i++){
+                    font.draw(batch,rows[i][0],644,238-i*35);
+                    font.draw(batch,rows[i][1],967,238-i*35);
+                }
+            }else{
+                font.setColor(Color.CYAN);
+                font.draw(batch,"TYPE",647,506);
+                font.draw(batch,"RANGE",840,506);
+                font.draw(batch,"RELOAD",958,506);
+                font.draw(batch,"AMMO",1082,506);
+                for(int i=0;i<7;i++){
+                    int y=482-i*48;
+                    double reach=range(s,i);
+                    font.setColor(reach>0?COLORS[i]:Color.GRAY);
+                    font.draw(batch,LABELS[i],647,y);
+                    font.setColor(Color.WHITE);
+                    font.draw(batch,reach>0?Math.round(reach)+"u":"--",837,y);
+                    font.draw(batch,reach>0?String.format(Locale.ROOT,"%.1fs",reload(s,i)):"--",960,y);
+                    int count=ammo(s,i);
+                    font.draw(batch,count>=0?Integer.toString(count):"--",1090,y);
+                    font.setColor(enabled(i)&&reach>0?Color.GREEN:Color.GRAY);
+                    font.draw(batch,enabled(i)&&reach>0?"ON":"OFF",1196,y);
+                }
+                font.setColor(Color.LIGHT_GRAY);
+                font.draw(batch,"Tap a weapon row to toggle its range ring.",640,141);
+                font.setColor(Color.CYAN);
+                font.draw(batch,rangeMask==0?"SHOW ALL RANGES":"HIDE ALL RANGES",1035,91);
+            }
+            batch.end();
+        }finally{
+            font.getData().setScale(oldX,oldY);
+        }
     }
 }

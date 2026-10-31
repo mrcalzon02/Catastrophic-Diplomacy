@@ -212,6 +212,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         viewport = new FitViewport(W, H, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
         shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
+        shipInspector.setMobile(Gdx.app.getType()==
+                com.badlogic.gdx.Application.ApplicationType.Android);
         audio = new CombatAudio();
         terranSprites = new TerranPlaceholderSprites();
         craftSprites = new FighterCraftSprites();

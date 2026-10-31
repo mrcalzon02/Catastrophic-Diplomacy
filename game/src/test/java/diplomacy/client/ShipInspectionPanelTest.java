@@ -63,6 +63,20 @@ public final class ShipInspectionPanelTest {
         check(panel.selected(b)==null,"Close hides the sheet without modifying the ship");
         panel.select(second.id);
         check(panel.selected(b)==second,"Selecting enemy must replace inspected vessel");
+        panel.setMobile(true);
+        check(ShipInspectionPanel.mobileAction(635,530,0)==20
+                &&ShipInspectionPanel.mobileAction(1050,530,0)==21,
+                "Android must have separate large touch targets for STATUS and WEAPONS tabs");
+        check(ShipInspectionPanel.mobileAction(900,482,1)==10
+                &&ShipInspectionPanel.mobileAction(900,194,1)==16,
+                "Android weapon toggles must span >= 42 logical touch pixels per row");
+        check(panel.tap(1020,533),"Android WEAPONS page must be selectable by tap");
+        check(panel.tap(800,482)&&!panel.enabled(0),
+                "Android taps must toggle actual weapon range instead of a cosmetic checkbox");
+        check(panel.tap(1120,89)&&!panel.enabled(4),
+                "Android show/hide ranges control must affect all real range circles");
+        check(panel.tap(1235,580)&&panel.selected(b)==null,
+                "Android panel close must be finger-sized and clear selection");
         System.out.println("PASS ship tap, pan-safe picking, right-side sheet hitboxes, live range/ammo/reload, zoom and overlays");
     }
 }
