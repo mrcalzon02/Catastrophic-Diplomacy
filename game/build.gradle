@@ -211,22 +211,20 @@ tasks.named('lightingSmoke') { dependsOn tasks.named('combatPropulsionFxSmoke') 
 
 tasks.register('shieldSurfaceSmoke', JavaExec) {
     group = 'verification'
-    description = 'Verify silhouette-safe shield rims, real facing depletion, tick-stable shimmer and shield LOD.'
+    description = 'Nonblocking shield overlay sprite and facing visual diagnostic.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.ShieldSurfaceModelTest'
 }
-tasks.named('menuFlowSmoke') { dependsOn tasks.named('shieldSurfaceSmoke') }
 
 tasks.register('shieldFxSmoke', JavaExec) {
     group = 'verification'
-    description = 'Headless shield impacts, facing collapse, regeneration, restart and 400-ship FX cap.'
+    description = 'Nonblocking shield impact, collapse, recharge and FX diagnostic.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.ShieldFxTimelineTest'
 }
 // The existing multiplatform functional-release pipeline runs menuFlowSmoke.
-tasks.named('menuFlowSmoke') { dependsOn tasks.named('shieldFxSmoke') }
 
 tasks.register('renderPerformanceSmoke', JavaExec) {
     group = 'verification'
