@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove all 148 approved hull, fighter, beam and material PNGs are inside the actual desktop JAR / APK.
+"""Prove all approved hull, fighter, beam and material PNGs are inside the actual desktop JAR / APK.
 
 This checks runtime deliverables rather than merely testing whether the PNGs
 exist in the source checkout. Desktop libGDX assets live at the JAR root;
@@ -66,6 +66,28 @@ def expected():
             result[short]=hashlib.sha256(source.read(name)).hexdigest()
     if len(result)!=148:
         raise ValueError("Expected 50 alien hulls, 10 Terran hulls, 35 beams, 3 materials, 50 fighters")
+    # The five founding civilizations have their OWN ten-hull source sheets.
+    # Their runtime crops are generated during asset preparation, and the
+    # fighter bridge selects seven of these per civilization. Validate that
+    # the exact generated pixels (not some other faction's art) ship in the
+    # final archive as well.
+    manifest=json.loads((ART/"legacy-sheets.json").read_text(encoding="utf-8"))
+    if len(manifest["factions"])!=5 or len(manifest["roles"])!=10:
+        raise ValueError("Unexpected founding-faction sprite sheet inventory")
+    for faction in manifest["factions"]:
+        for role in manifest["roles"]:
+            relative=f"ships/legacy_factions/{faction['id']}/{role}.png"
+            original=ROOT/"build/generated/cd-legacy-factions"/relative
+            if not original.is_file():
+                raise ValueError("Founding-faction sprite crop not generated: "+str(original))
+            raw=original.read_bytes()
+            if not raw.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+                raise ValueError("Invalid original founding-faction image: "+relative)
+            if relative in result:
+                raise ValueError("Duplicate founding-faction image path: "+relative)
+            result[relative]=hashlib.sha256(raw).hexdigest()
+    if len(result)!=198:
+        raise ValueError("Expected 148 existing approved assets + 50 founding-faction hulls")
     return result
 
 def verify(path,kind,approved):
@@ -82,7 +104,7 @@ def verify(path,kind,approved):
                 raise ValueError("invalid packaged PNG "+archive_name)
             if hashlib.sha256(image).hexdigest()!=source_digest:
                 raise ValueError(f"{kind} package corrupted or replaced {archive_name}")
-    print(f"PASS {kind}: all 148 original approved hull/fighter/FX images embedded in {path}")
+    print(f"PASS {kind}: all {len(approved)} original approved hull/fighter/FX images embedded in {path}")
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
