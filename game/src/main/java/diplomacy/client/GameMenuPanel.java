@@ -143,6 +143,7 @@ final class GameMenuPanel {
     }
     static int homeHit(float x,float y){return homeHit(x,y,false);}
     static int homeHit(float x,float y,boolean mobile){
+        if(hit(x,y,880,633,205,55))return 8; // searchable encyclopedia
         if(mobile){
             for(int slot=0;slot<MOBILE_HOME_ORDER.length;slot++)
                 if(hit(x,y,mobileColumnX(slot),mobileHomeY(slot),
@@ -404,6 +405,8 @@ final class GameMenuPanel {
         // Paint-only change: original hit regions and native text remain authoritative.
         rectangle(shapes,0,622,W,2,MilitaryUiTheme.FRAME_BRIGHT);
         rectangle(shapes,37,622,132,2,MilitaryUiTheme.AMBER);
+        // Same visible, touch-sized wiki launcher on every native menu.
+        button(shapes,880,633,205,55,false);
         switch(screen){
             case HOME -> {
                 if(mobileLayout){
@@ -1173,6 +1176,7 @@ final class GameMenuPanel {
             }
             default -> {}
         }
+        label(batch,font,"FIELD WIKI (F1)",897,670,Color.CYAN);
         batch.end();
     }
     private static String shortLabel(String value,int max){

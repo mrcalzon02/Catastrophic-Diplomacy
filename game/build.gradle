@@ -38,6 +38,17 @@ tasks.register('menuFlowSmoke', JavaExec) {
     mainClass = 'diplomacy.client.GameMenuFlowTest'
 }
 
+// Read-only native encyclopedia is a functional screen, not a cosmetic gate.
+// Ensure the entire live module/research/hull index is available and searchable.
+tasks.register('wikiSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate every actual hull, variant, module, research stage and wiki touch/search behavior.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.GameWikiTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('wikiSmoke') }
+
 tasks.register('guidedShipyardSmoke', JavaExec) {
     group = 'verification'
     description = 'Verify touch/mouse guided-ordnance tabs, researched options and persisted shipyard selections.'

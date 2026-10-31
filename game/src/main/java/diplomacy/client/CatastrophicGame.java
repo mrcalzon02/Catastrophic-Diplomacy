@@ -95,6 +95,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private MultiplayerPanel multiplayer;
     private Battle remotePresentation;
     private GameMenuPanel menuPanel;
+    private GameWikiPanel wiki;
+    private boolean wikiVisible,wikiRestoreRunning;
+    private int wikiTouchPointer=-1;
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private SkirmishTechnologyRules skirmishRules=ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM);
@@ -303,12 +306,28 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel(Gdx.app.getType()==
                 com.badlogic.gdx.Application.ApplicationType.Android);
+        wiki=new GameWikiPanel(GameWikiCatalog.build(technology),menuPanel.mobileLayout());
         if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
         else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
             audio.announce(AnnouncerAudio.Cue.WELCOME);}
         Gdx.input.setCatchKey(Input.Keys.BACK,true);
         Gdx.input.setInputProcessor(new InputAdapter() {
             @Override public boolean keyDown(int key) {
+                if(!verifyDemo && key==Input.Keys.F1){
+                    if(wikiVisible)closeWiki();else openWiki();
+                    return true;
+                }
+                if(wikiVisible){
+                    if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK)closeWiki();
+                    else if(key==Input.Keys.BACKSPACE)wiki.erase();
+                    else if(key==Input.Keys.UP)wiki.pageText(-3);
+                    else if(key==Input.Keys.DOWN)wiki.pageText(3);
+                    else if(key==Input.Keys.PAGE_UP)wiki.pageText(-14);
+                    else if(key==Input.Keys.PAGE_DOWN)wiki.pageText(14);
+                    else if(key==Input.Keys.LEFT)wiki.pageList(-1);
+                    else if(key==Input.Keys.RIGHT)wiki.pageList(1);
+                    return true;
+                }
                 if(screensaverMode){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         stopScreensaver();
@@ -536,7 +555,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.E) { changeFaction(1); return true; }
                 return false;
             }
+            @Override public boolean keyTyped(char character){
+                if(wikiVisible){wiki.type(character);return true;}
+                return false;
+            }
             @Override public boolean touchDown(int x, int y, int pointer, int button) {
+                if(wikiVisible){
+                    wikiTouchPointer=pointer;
+                    com.badlogic.gdx.math.Vector2 pos=viewport.unproject(
+                            new com.badlogic.gdx.math.Vector2(x,y));
+                    int action=wiki.tap(pos.x,pos.y);
+                    if(action==2)closeWiki();
+                    else if(action==1){
+                        Gdx.input.getTextInput(new Input.TextInputListener(){
+                            @Override public void input(String text){wiki.setQuery(text);}
+                            @Override public void canceled(){}
+                        },"Search field encyclopedia",wiki.query(),"");
+                    }
+                    return true;
+                }
                 if(screensaverMode){
                     com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
                             new com.badlogic.gdx.math.Vector2(x,y));
@@ -555,6 +592,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return true;
                 }
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
+                if(!verifyDemo&&!shipyard.open()&&screen==GameMenuPanel.Screen.BATTLE
+                        && GameMenuPanel.hit(world.x,world.y,1060,126,185,44)){
+                    openWiki();wikiTouchPointer=pointer;return true;
+                }
                 if(screen==GameMenuPanel.Screen.BATTLE && battle!=null &&
                         !shipyard.open() && !tacticalMenuOpen &&
                         (fleetOrdersPanel==null || !fleetOrdersPanel.open()) &&
@@ -653,6 +694,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return false;
             }
             @Override public boolean touchDragged(int x,int y,int pointer) {
+                if(wikiVisible||pointer==wikiTouchPointer)return true;
                 if(screensaverMode){
                     if(pointer==screensaverControlPointer)return true;
                     screensaverWake.move(pointer,x,y);
@@ -719,6 +761,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return shipyard.drag(world.x,world.y,pointer);
             }
             @Override public boolean touchUp(int x,int y,int pointer,int button) {
+                if(pointer==wikiTouchPointer){wikiTouchPointer=-1;return true;}
+                if(wikiVisible)return true;
                 if(screensaverMode){
                     com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
                             new com.badlogic.gdx.math.Vector2(x,y));
@@ -768,6 +812,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 return activated;
             }
             @Override public boolean scrolled(float amountX,float amountY) {
+                if(wikiVisible){wiki.pageText((int)Math.signum(amountY)*3);return true;}
                 if(screensaverMode){
                     screensaverCamera.manualScale((float)Math.pow(1.18,amountY));
                     return true;
@@ -1638,7 +1683,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         else screen=GameMenuPanel.Screen.SKIRMISH;
     }
+    private void openWiki(){
+        if(verifyDemo||screensaverMode||multiplayer!=null||wikiVisible)return;
+        wikiRestoreRunning=running;running=false;wikiVisible=true;
+        if(audio!=null)audio.uiPress();
+        Gdx.app.log("CD-WIKI","OPEN articles="+wiki.resultCount());
+    }
+    private void closeWiki(){
+        if(!wikiVisible)return;
+        wikiVisible=false;running=wikiRestoreRunning;
+        if(audio!=null)audio.uiBack();
+        Gdx.app.log("CD-WIKI","CLOSE");
+    }
     private void tapFrontEnd(float x,float y){
+        if(GameMenuPanel.hit(x,y,880,633,205,55)){openWiki();return;}
         if(screen==GameMenuPanel.Screen.HOME){
             switch(GameMenuPanel.homeHit(x,y,menuPanel.mobileLayout())){
                 case 0 -> showCampaign();
@@ -1655,6 +1713,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     catch(Exception unavailable){Gdx.app.error("NETWORK","Local network profile unavailable (NET-20)");}
                 }
                 case 7 -> startScreensaver();
+                case 8 -> openWiki();
             }
             return;
         }
@@ -2303,6 +2362,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     @Override public void render() {
         if(multiplayer!=null){multiplayer.draw();return;}
+        if(wikiVisible){
+            Gdx.gl.glClearColor(.018f,.027f,.046f,1f);
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
+            viewport.apply();camera.update();
+            shapes.setProjectionMatrix(camera.combined);
+            batch.setProjectionMatrix(camera.combined);
+            wiki.draw(shapes,batch,font);
+            return;
+        }
         if(screensaverMode&&battle.finished()){
             screensaverResultPause+=Math.min(0.08f,Gdx.graphics.getDeltaTime());
             if(screensaverResultPause>=ScreensaverBattle.RESULT_PAUSE_SECONDS)
@@ -2663,6 +2731,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         font.draw(batch,"SHIPYARD",1195,693);
         font.setColor(Color.WHITE);
         font.draw(batch,"MENU (M)",1174,107);
+        if(!screensaverMode){
+            font.setColor(Color.CYAN);
+            font.draw(batch,"FIELD WIKI (F1)",1091,150);
+            font.setColor(Color.WHITE);
+        }
         if(updateCheck!=null){
             font.setColor(Color.CYAN);
             font.draw(batch,"UPDATES (K)",1015,107);
