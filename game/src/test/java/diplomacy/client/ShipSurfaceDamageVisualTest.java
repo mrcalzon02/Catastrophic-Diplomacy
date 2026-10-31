@@ -5,7 +5,7 @@ public final class ShipSurfaceDamageVisualTest {
     private ShipSurfaceDamageVisualTest(){}
     private static void check(boolean yes,String why){if(!yes)throw new AssertionError(why);}
     private static int alpha(int rgba){return rgba&255;}
-    public static void main(String[] args){
+    public static void main(String[] args) throws Exception {
         int source=0xb0a090ff;
         check(ShipSurfaceDamageVisual.pixel(source,0,0,0)==source,"Intact hull pixels changed");
         check(ShipSurfaceDamageVisual.pixel(0x11223300,1,1,0)==0,"Original transparent silhouette expanded");
@@ -32,6 +32,27 @@ public final class ShipSurfaceDamageVisualTest {
               "Armor wear alone must not be a penetrating crater");
         check(ShipSurfaceDamageVisual.opening(1f,0,-.5f)==1,
               "Full armor depletion must remain visible despite pixel noise");
-        System.out.println("PASS superficial scorch, penetrating alpha mask, bypass, source silhouette");
+        // The debug Android comparison must represent four legal fitted ships
+        // using actual cell integrity, never invented material-state screenshots.
+        var technology=diplomacy.tech.TechnologyCatalog.loadDefault();
+        var scene=ShipSurfaceDamageFixture.create(technology);
+        check(scene.ships().size()==4,"Review scene must contain exactly four real ships");
+        float[] expectedArmor={0f,.38f,.90f,1f};
+        for(int i=0;i<4;i++){
+            var ship=scene.ships().get(i);
+            check(ship.hullClass==diplomacy.shipyard.Shipyard.Hull.DREADNOUGHT,
+                    "Stage fixture must render actual fitted approved dreadnought art");
+            check(ship.defense.totalShields()==0,
+                    "Shield overlay must not obscure any of the comparison stages");
+            var cell=ship.defense.tile(6,7);
+            check(cell.occupied,"Review damage cell must belong to the real hull");
+            check(Math.abs(cell.exposure()-expectedArmor[i])<.001f,
+                    "Review stage does not match physical armor depletion "+i);
+            if(i<3)check(ship.hull==ship.maxHull && cell.internalDamage()==0,
+                    "Nonpenetrating review stage cannot damage structural integrity");
+            else check(ship.hull<ship.maxHull && cell.internalDamage()>0,
+                    "Penetration stage must actually deplete structure and hull");
+        }
+        System.out.println("PASS superficial scorch, staged fitted-hull damage, alpha preservation and bypass");
     }
 }
