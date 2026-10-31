@@ -124,8 +124,51 @@ public final class Battle {
         public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload,repairDroneReload;
         public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
         public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
-        /** Independent physical fighter launch bays, distinct from craft storage. */
+        /** Stable physical launch lanes: native catapults and individually fitted FTR sockets.
+         * Damage disables only the affected lane, never its paid fighter inventory. */
+        public static final class HangarBay {
+            public final String id;
+            public final int socketIndex;
+            public final boolean organic;
+            public double condition=1.0;
+            HangarBay(String identity,int socket,boolean builtIn){
+                id=identity;socketIndex=socket;organic=builtIn;
+            }
+            public boolean operational(){return condition>=0.20;}
+        }
+        public List<HangarBay> fighterBays=List.of();
+        /** Legacy total launch-lane count remains available to existing UI/telemetry. */
         public int fighterLaunchBays;
+        public HangarBay fighterBay(String identity){
+            for(HangarBay bay:fighterBays)if(bay.id.equals(identity))return bay;
+            return null;
+        }
+        /** A module hit targets its actual FTR socket; unlocated native-deck damage
+         * targets one organic catapult. Other hangar subsystem hits retain the
+         * shared legacy hangar-condition behavior. */
+        public void damageFighterBay(int socket,double loss){
+            if(!Double.isFinite(loss)||loss<0)throw new IllegalArgumentException("Invalid bay damage");
+            for(HangarBay bay:fighterBays){
+                if(socket>=0?bay.socketIndex==socket:bay.organic){
+                    bay.condition=Math.max(0,bay.condition-loss);
+                    return;
+                }
+            }
+            hangarCondition=Math.max(0,hangarCondition-loss);
+        }
+        static List<HangarBay> baysFor(Shipyard.Design design){
+            List<HangarBay> bays=new ArrayList<>();
+            int nativeCount=diplomacy.shipyard.HullBaseline.builtInLaunchBays(design.hull);
+            for(int n=0;n<nativeCount;n++)
+                bays.add(new HangarBay("ORG:"+n,-1,true));
+            for(Shipyard.Slot slot:design.hull.slots){
+                Shipyard.Installed part=design.at(slot.index());
+                if(slot.mount()==Shipyard.Mount.SUPPORT && part!=null
+                        &&part.component.endsWith("-FTR"))
+                    bays.add(new HangarBay("FTR:"+slot.index(),slot.index(),false));
+            }
+            return List.copyOf(bays);
+        }
         public int kineticAmmo=100;
         public AmmunitionTable.Kinetic kineticType=AmmunitionTable.Kinetic.STANDARD;
         /** Null only on legacy addShip(faction) test fixtures; real fitted ships
@@ -386,6 +429,8 @@ public final class Battle {
     public static final class Craft {
         public final int id, sourceId, team;
         public final boolean fighter,repair;
+        /** Physical bay that launched this craft; empty for non-fighter drones. */
+        public String launchBayId="";
         public double x, y, integrity, maxIntegrity,armor,fuel,reload,repairReserve;
         public SupportDoctrine.Channel serviceChannel;
         public boolean reusable,returning;
@@ -813,7 +858,8 @@ public final class Battle {
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
         s.fighterReserve=machinery.fighterCapacity();
-        s.fighterLaunchBays=Shipyard.fighterLaunchBays(design);
+        s.fighterBays=Ship.baysFor(design);
+        s.fighterLaunchBays=s.fighterBays.size();
         s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
         s.kineticAmmo=s.kineticDamage>0?64+machinery.magazineCapacity()*4:0;
@@ -1809,12 +1855,15 @@ public final class Battle {
             // cycle. An auxiliary hangar contributes one; true carriers have
             // multiple built-in decks. All launches pay their own power and
             // heat cost, and never exceed the available inventory or craft cap.
-            int slots=Math.min(ship.fighterLaunchBays,
-                    Math.min(ship.fighterReserve,2000-crafts.size()));
+            int slots=Math.min(ship.fighterReserve,2000-crafts.size());
             int launched=0;
-            for(int i=0;i<slots;i++){
+            for(Ship.HangarBay bay:ship.fighterBays){
+                if(launched>=slots)break;
+                if(!bay.operational())continue;
                 if(ship.power<7||ship.heat+3>ship.maxHeat*0.9)break;
-                crafts.add(new Craft(nextCraftId++,ship,true,fighterTarget.id));
+                Craft launchedCraft=new Craft(nextCraftId++,ship,true,fighterTarget.id);
+                launchedCraft.launchBayId=bay.id;
+                crafts.add(launchedCraft);
                 visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",
                         ship.team,ship.id,fighterTarget.id,
                         ship.x,ship.y,fighterTarget.x,fighterTarget.y);
@@ -2593,7 +2642,7 @@ public final class Battle {
                 case SENSORS: defender.sensorsCondition = Math.max(0, defender.sensorsCondition - loss); break;
                 case COOLING: defender.coolingCondition = Math.max(0, defender.coolingCondition - loss); break;
                 case COMMAND: defender.commandCondition = Math.max(0, defender.commandCondition - loss); break;
-                case HANGAR: defender.hangarCondition = Math.max(0,defender.hangarCondition-loss); break;
+                case HANGAR: defender.damageFighterBay(socket,loss); break;
                 case MAGAZINE: defender.magazineCondition=Math.max(0,defender.magazineCondition-loss); break;
                 case ELECTRONIC_WARFARE: defender.ecmCondition=Math.max(0,defender.ecmCondition-loss); break;
                 default: break;
@@ -2674,6 +2723,10 @@ public final class Battle {
                 hash=mix(hash,Double.doubleToLongBits(rack.reload));
             }
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
+            for(Ship.HangarBay bay:s.fighterBays){
+                hash=mix(hash,bay.id.hashCode());
+                hash=mix(hash,Double.doubleToLongBits(bay.condition));
+            }
             hash=mix(hash,s.repairDroneReserve);
             hash=mix(hash,Double.doubleToLongBits(s.repairDroneReload));
             hash=mix(hash,Double.doubleToLongBits(s.remoteHullRepaired));
@@ -2737,6 +2790,7 @@ public final class Battle {
             hash=mix(hash,craft.id);hash=mix(hash,Double.doubleToLongBits(craft.x));
             hash=mix(hash,Double.doubleToLongBits(craft.y));
             hash=mix(hash,craft.repair?1:0);
+            hash=mix(hash,craft.launchBayId.hashCode());
             hash=mix(hash,Double.doubleToLongBits(craft.repairReserve));
             hash=mix(hash,craft.targetId);
             hash=mix(hash,craft.targetCraftId);hash=mix(hash,craft.ammunition);

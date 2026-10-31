@@ -118,6 +118,18 @@ public final class FighterCraftTest {
         check(Shipyard.decode(Shipyard.encode(legacy),tech).fighterHull
                         ==FighterModel.Hull.ASSAULT_GUNSHIP,
                 "Legacy saves default safely to the original gunship");
+        Shipyard.Design nativeCarrier=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CARRIER);
+        String oldCarrierSave=Shipyard.encode(nativeCarrier);
+        check(oldCarrierSave.split("\\n")[0].split("\\|",-1).length==4,
+                "Organic carrier must retain legacy four-field save header");
+        Shipyard.Design restoredCarrier=Shipyard.decode(oldCarrierSave,tech);
+        Battle savedBattle=new Battle(91918);
+        savedBattle.spawnWing(0,restoredCarrier,tech,1,290,350);
+        check(savedBattle.ships().get(0).fighterBays.stream()
+                        .map(bay->bay.id).toList().equals(
+                                java.util.List.of("ORG:0","ORG:1","ORG:2")),
+                "Legacy carrier save must reconstruct stable native bay identities");
     }
     /** Physical aviation is hull capacity plus fitted modular hangars. */
     private static void hangarCapacityAndSorties(TechnologyCatalog tech){
@@ -149,6 +161,35 @@ public final class FighterCraftTest {
                 "Non-carrier must require physical flight deck");
         check(Shipyard.fighterLaunchBays(converted)==modules,
                 "Each physical auxiliary hangar adds a flight launch bay");
+        Battle moduleBattle=new Battle(91917);
+        moduleBattle.spawnWing(0,converted,tech,1,290,350);
+        moduleBattle.spawnWing(1,Shipyard.starter(Battle.Faction.DRAXIAN,
+                Shipyard.Hull.CRUISER),tech,1,550,350);
+        for(Battle.Ship ship:moduleBattle.ships())disarm(ship);
+        Battle.Ship modular=moduleBattle.ships().get(0);
+        check(modular.fighterBays.size()==modules,
+                "Every FTR support socket must create its own physical launch lane");
+        int firstSocket=-1;
+        java.util.Set<String> identities=new java.util.HashSet<>();
+        for(Battle.Ship.HangarBay bay:modular.fighterBays){
+            check(!bay.organic&&bay.socketIndex>=0&&identities.add(bay.id)
+                            &&bay.id.equals("FTR:"+bay.socketIndex),
+                    "Distinct installed FTR sockets must retain stable bay identities");
+            if(firstSocket<0)firstSocket=bay.socketIndex;
+        }
+        int paid=modular.fighterReserve;
+        String damagedId="FTR:"+firstSocket;
+        modular.damageFighterBay(firstSocket,1.0);
+        check(!modular.fighterBay(damagedId).operational()
+                        &&modular.fighterReserve==paid,
+                "Disabling one bay must not erase purchased fighter stock");
+        moduleBattle.step();
+        check(modular.fightersLaunched==modules-1
+                        &&modular.fighterReserve==paid-(modules-1),
+                "Damaged FTR bay must block only its own launch lane");
+        check(moduleBattle.crafts().stream().filter(c->c.fighter
+                &&c.sourceId==modular.id).allMatch(c->!c.launchBayId.equals(damagedId)),
+                "No fighter may originate from a disabled physical socket");
         check(Shipyard.fit(converted,tech).fighterCapacity()>0,
                 "Auxiliary modules must convert a cruiser into a fighter carrier");
         check(Shipyard.fit(fleetCarrier,tech).fighterCapacity()>
@@ -170,9 +211,17 @@ public final class FighterCraftTest {
         Battle.Ship parent=battle.ships().get(0);
         int initial=parent.fighterReserve;
         check(parent.fighterLaunchBays==3,"Carrier must spawn with three launch bays");
+        check(parent.fighterBays.size()==3
+                        &&parent.fighterBay("ORG:0")!=null
+                        &&parent.fighterBay("ORG:1")!=null
+                        &&parent.fighterBay("ORG:2")!=null,
+                "Carrier must expose three independent native catapult identities");
         battle.step();
         check(parent.fightersLaunched==3&&parent.fighterReserve==initial-3,
                 "Carrier initial launch must deploy exactly one craft per bay");
+        check(battle.crafts().stream().filter(c->c.fighter
+                &&c.sourceId==parent.id).map(c->c.launchBayId).distinct().count()==3,
+                "Each native deck must launch from its own stable bay identity");
         check(battle.crafts().stream().filter(c->c.fighter
                 &&c.sourceId==parent.id).count()==3,
                 "All three launched fighters are independently simulated");
