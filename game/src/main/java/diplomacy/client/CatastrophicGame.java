@@ -218,7 +218,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 com.badlogic.gdx.Application.ApplicationType.Android);
         audio = new CombatAudio();
         terranSprites = new TerranPlaceholderSprites();
-        craftSprites = new FighterCraftSprites();
+        try {
+            craftSprites = new FighterCraftSprites();
+        } catch (RuntimeException unavailable) {
+            // Missing or unsupported optional fighter materials must not kill
+            // Android startup. The real fighter simulation remains active;
+            // surface asset errors are recorded for diagnostic repair.
+            Gdx.app.error("CRAFT-ART","Fighter render resources unavailable",unavailable);
+            craftSprites = null;
+        }
         try {
             capitalTurrets = new CapitalTurretSprites();
         } catch (RuntimeException unavailable) {
@@ -2656,7 +2664,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view,shieldFx);
-        if(craftSprites!=null)craftSprites.render(battle,batch,renderPoses,view);
+        if(craftSprites!=null)try {
+            craftSprites.render(battle,batch,renderPoses,view);
+        }catch(RuntimeException failed){
+            // A single optional craft material/shader failure is not a valid
+            // reason to terminate live combat. Leave the SpriteBatch usable
+            // for hardpoints, projectiles, shields and the rest of the frame.
+            Gdx.app.error("CRAFT-ART","Disabling failed fighter render pass",failed);
+            try {
+                if(batch.isDrawing())batch.end();
+                batch.setShader(null);
+            }catch(RuntimeException cleanup){
+                Gdx.app.error("CRAFT-ART","SpriteBatch cleanup after craft error",cleanup);
+            }
+            try{craftSprites.dispose();}
+            catch(RuntimeException cleanup){
+                Gdx.app.error("CRAFT-ART","Craft material cleanup failed",cleanup);
+            }
+            craftSprites=null;
+        }
         // Hulls and physical hardpoint hardware share the interpolated combat
         // camera. Weapon discharge is still emitted by authoritative Battle.
         if(capitalTurrets!=null)
