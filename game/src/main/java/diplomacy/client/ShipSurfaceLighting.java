@@ -197,6 +197,12 @@ final class ShipSurfaceLighting implements Disposable {
         batch.setShader(null);
         active=null;started=false;flat=false;
     }
+    /** Release an inactive original and its GPU materials after a completed frame. */
+    void forget(Texture original){
+        Pair pair=pairs.remove(original);
+        if(pair!=null)pair.dispose();
+        if(active==original)active=null;
+    }
     int materialCount(){return pairs.size();}
     int textureBindings(){return binds;}
     @Override public void dispose(){
