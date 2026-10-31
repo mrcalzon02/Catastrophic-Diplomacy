@@ -15,10 +15,11 @@ for root in roots:
         # This is deliberately broad: even a currently unreachable method may
         # become reachable through campaign management or an updater path.
         for line_number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
-            if re.search(r"(?<!Collectors)\.toList\s*\(\s*\)", line) and not line.lstrip().startswith(("//", "*")):
+            if (re.search(r"(?<!Collectors)\.toList\s*\(\s*\)", line) or
+                re.search(r"\b(?:java\.util\.)?HexFormat\b", line)) and not line.lstrip().startswith(("//", "*")):
                 bad.append(f"{source}:{line_number}: {line.strip()}")
 if bad:
-    print("FAIL Android 26-33 incompatible Stream.toList invocations:", file=sys.stderr)
+    print("FAIL Android minSdk26 forbidden Java runtime APIs (Stream.toList / HexFormat):", file=sys.stderr)
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
-print("PASS production Android sources contain no API34-only Stream.toList() invocations")
+print("PASS runtime sources avoid Android-incompatible Stream.toList and java.util.HexFormat")
