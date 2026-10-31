@@ -322,6 +322,9 @@ tasks.register('ordnancePropulsionSmoke', JavaExec) {
 }
 tasks.named('ordnanceDoctrineSmoke') { finalizedBy(tasks.named('ordnancePropulsionSmoke')) }
 tasks.named('massBattleCampaign') { dependsOn tasks.named('ordnancePropulsionSmoke') }
+// Existing release workflows run gameFlowSmoke. Gate on real ordnance physics
+// and 7-mode launch functionality, not on cosmetic FX acceptance.
+tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
 
 
 tasks.register('ammunitionTypesSmoke', JavaExec) {
