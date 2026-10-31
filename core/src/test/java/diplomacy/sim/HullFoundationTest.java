@@ -36,8 +36,10 @@ public final class HullFoundationTest {
                         &&intrinsic.power()>0&&intrinsic.sensorRange()>0
                         &&intrinsic.radarCrossSection()>0,"Physical hull has real intrinsic stats");
                 check(intrinsic.slots()==hull.slots.size(),"Class slot capacity is physical");
-                check(intrinsic.fighterBay()==(hull.spriteHull()==Shipyard.Hull.CARRIER?2:0),
-                        "Only special carrier classes have a native fighter bay");
+                check(intrinsic.fighterBay()==HullBaseline.builtInFighterCapacity(hull),
+                        "Every chassis must have its actual built-in aviation capacity");
+                check(HullBaseline.builtInLaunchBays(hull)<=intrinsic.fighterBay(),
+                        "Organic launch catapults cannot exceed the native craft complement");
                 check(intrinsic.shields()==0 || intrinsic.shieldRecharge()>0,
                         "Intrinsic shields have an intrinsic refresh rate");
                 Shipyard.Design starter=Shipyard.starter(faction,hull);
