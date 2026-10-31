@@ -102,6 +102,10 @@ public final class ScreensaverBattleTest {
                 ScreensaverBattle.Round round=ScreensaverBattle.create(replaySeed,catalog);
                 check(round.battle().alive(0)>0&&round.battle().alive(1)>0,
                         "Empty random exhibition fleet");
+                // Match CatastrophicGame.nextScreensaverRound, including the
+                // seeded environment before the first simulation step.
+                round.battle().configureWeather(
+                        LevelEnvironment.forLevel(round.environmentLevel()).weather());
                 for(int tick=0;tick<24&&!round.battle().finished();tick++)
                     round.battle().step();
                 check(round.battle().tick>0,"Random exhibition failed before first frame");
