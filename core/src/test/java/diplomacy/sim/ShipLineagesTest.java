@@ -122,7 +122,7 @@ public final class ShipLineagesTest {
         check(licensed.researchRank()==0&&licensed.activeProject()==CampaignProgress.Project.LICENSE
                 &&licensed.missionsUntilResearchComplete()==1&&licensed.credits()==0,
                 "Research must charge once and require one victory tick");
-        var finished=licensed.complete(1,20,20);
+        var finished=licensed.complete(1,1,1);
         check(finished.researchRank()==1&&finished.activeProject()==CampaignProgress.Project.NONE,
                 "Paid early research did not unlock upon mission completion");
         check(CampaignProgress.decode(CampaignProgress.encode(licensed)).equals(licensed),
