@@ -3065,6 +3065,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             " hullMaterials="+(terranSprites==null?0:terranSprites.litMaterialCount())+
             " fighterMaterials="+(craftSprites==null?0:craftSprites.litCraftMaterials())+
             " maskedDamageLayers="+(terranSprites==null?0:terranSprites.damageLayersBuilt())+
+            " damageMaskUploads="+(terranSprites==null?0:terranSprites.maskTextureUploads())+
+            " damageMaskPixels="+(terranSprites==null?0:terranSprites.maskPixelsUploaded())+
+            " sourceCpuBytes="+(terranSprites==null?0:terranSprites.cpuSourceCacheBytes())+
             " textureFrames="+
             (weaponFx==null?0:weaponFx.loadedTextures())+
             " beamFrames="+(weaponBeams==null?0:weaponBeams.loaded());

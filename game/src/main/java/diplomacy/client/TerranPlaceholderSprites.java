@@ -61,6 +61,15 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final java.util.Map<Texture,ShipArmorStampAnchors> armorAnchors =
             new java.util.IdentityHashMap<>();
     private Battle activeBattle;
+    // Session counters are read only at diagnostics time, never inside GPU
+    // callbacks. They expose upload area and retained CPU cache pressure.
+    private long maskPixelsUploaded;
+    private int maskTextureUploads;
+    public long maskPixelsUploaded(){return maskPixelsUploaded;}
+    public int maskTextureUploads(){return maskTextureUploads;}
+    public long cpuSourceCacheBytes(){
+        return (long)sourcePixels.size()*MASK_W*MASK_H*4;
+    }
     // One shader + cached textures for all faction/hull instances; no per-frame Pixmaps.
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
     public int litMaterialCount(){return surfaces.materialCount();}
@@ -435,6 +444,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                 item.overlay.setFilter(Texture.TextureFilter.Linear,
                         Texture.TextureFilter.Linear);
             }else item.overlay.draw(output,region.x(),region.y());
+            maskPixelsUploaded+=region.pixels();
+            maskTextureUploads++;
             item.original=original;
             item.levels=levels;
             item.signature=signature;

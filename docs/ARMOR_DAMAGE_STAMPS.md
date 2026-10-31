@@ -77,3 +77,13 @@ shield sector stencil, and armor anchor registration. The full-resolution
 approved original texture remains uploaded on the GPU and is never modified.
 Temporary full-resolution decoding is disposed immediately. This bounds the
 persistent source-pixel cache independently of the original fleet art size.
+
+
+### Runtime evidence for 200-vs-200
+
+The existing in-game `CD-DEMO-VERIFY` log now includes
+`damageMaskUploads` (actual full/subrect texture updates),
+`damageMaskPixels` (total pixels uploaded, rather than an assumed gain),
+and `sourceCpuBytes` (the retained sampled CPU art cache). They are
+observations only, never release pass/fail thresholds. A real Android or
+desktop battle should be used to validate these values under load.
