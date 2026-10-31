@@ -193,6 +193,18 @@ jobs:
           grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' package/signature-verification.txt
           python3 tools/prepare_android_update_manifest.py package/Catastrophic-Diplomacy-Android.apk --output package/release-manifest.json
           (cd package && sha256sum Catastrophic-Diplomacy-Android.apk > SHA256SUMS.txt)
+      - name: Require continuity with the first publicly released Android signing certificate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package/reference
+          gh release download cd-v0.1.4-rc.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern signature-verification.txt --dir package/reference
+          python3 tools/verify_android_signer_continuity.py \
+            --reference package/reference/signature-verification.txt \
+            --candidate package/signature-verification.txt
       - name: Optional Fire tablet sideload compatibility diagnostic
         continue-on-error: true
         run: |
@@ -217,6 +229,13 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: actions/download-artifact@v4
         with: {name: 'cd-android-${{ github.run_id }}', path: package}
+      - name: Fetch original published APK for real Android upgrade test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p package/reference
+          gh release download cd-v0.1.4-rc.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk --dir package/reference
       - name: Require accelerated Android emulator
         run: |
           test -c /dev/kvm
@@ -240,7 +259,10 @@ jobs:
             # button, not a hidden list masked by an explanatory message.
             bash tools/android_verify_update_dialog.sh test-output/android
             adb uninstall games.catastrophicdiplomacy
-            adb install package/Catastrophic-Diplomacy-Android.apk
+            # Android PackageManager must accept a real upgrade from our first
+            # public release without wiping its app data or changing the signer.
+            adb install package/reference/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
+            adb install -r package/Catastrophic-Diplomacy-Android.apk
             adb shell am start -W -n games.catastrophicdiplomacy/diplomacy.android.AndroidLauncher
             sleep 5
             adb shell pidof games.catastrophicdiplomacy
@@ -275,6 +297,14 @@ jobs:
         with: {distribution: temurin, java-version: '17'}
       - uses: actions/download-artifact@v4
         with: {name: 'cd-android-${{ github.run_id }}', path: package}
+      - name: Fetch old published APK for Android 10 upgrade regression
+        if: matrix.first == 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p package/reference
+          gh release download cd-v0.1.4-rc.1 --repo "$GITHUB_REPOSITORY" \
+            --pattern Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk --dir package/reference
       - name: Require accelerated Android 10 emulator
         run: |
           test -c /dev/kvm
@@ -290,7 +320,12 @@ jobs:
           emulator-boot-timeout: 1200
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
           script: |
-            adb install package/Catastrophic-Diplomacy-Android.apk
+            if [[ "${{ matrix.first }}" == '0' ]]; then
+              adb install package/reference/Catastrophic-Diplomacy-0.1.4-rc.1-Android.apk
+              adb install -r package/Catastrophic-Diplomacy-Android.apk
+            else
+              adb install package/Catastrophic-Diplomacy-Android.apk
+            fi
             bash tools/android_verify_campaign.sh test-output/campaign-api29 ${{ matrix.first }} ${{ matrix.last }}
       - name: Preserve campaign crash logs and real map/dock/deployment/combat screens
         if: always()
