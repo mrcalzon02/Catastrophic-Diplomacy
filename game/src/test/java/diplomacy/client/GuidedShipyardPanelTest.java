@@ -70,6 +70,17 @@ public final class GuidedShipyardPanelTest {
         check(stock.missileOrdnance.equals(OrdnanceFitting.Guided.STANDARD)
                 &&stock.ammoSelection.missile()==AmmunitionTable.Warhead.STANDARD,
                 "Editor must not mutate the original saved blueprint");
+        var mount=ShipyardPanel.chooseRack(advanced,socket,1,-1);
+        check(mount.launcher(socket).guided().motor()==OrdnancePropulsion.Mode.SILENT_GHOST,
+                "Per-hardpoint selector must install a physical motor on the socket");
+        check(mount.missileOrdnance.equals(OrdnanceFitting.Guided.STANDARD),
+                "Rack editing must not change the family-wide legacy profile");
+        check(Shipyard.encode(mount).startsWith("CD-SHIP-5|"),
+                "Editing an individual launcher must use the socket-specific format");
+        check(Shipyard.decode(Shipyard.encode(mount),catalog).launcher(socket).equals(
+                mount.launcher(socket)),"Real rack edits must persist and reload");
+        check(ShipyardPanel.chooseRack(stock,socket,1,1)==stock,
+                "Stock socket must skip unavailable specialized rack engines");
         String encoded=Shipyard.encode(payload);
         var restored=Shipyard.decode(encoded,catalog);
         check(restored.missileOrdnance.equals(seeker.missileOrdnance)

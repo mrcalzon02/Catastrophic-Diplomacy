@@ -46,6 +46,24 @@ public final class WeaponMuzzles {
         }
         return List.copyOf(found);
     }
+    /** Exact fitted socket, never a family-level round-robin proxy. */
+    public static Origin atSlot(Battle.Ship ship,Family family,int slotId){
+        if(ship==null||family==null||slotId<0)
+            throw new IllegalArgumentException("Invalid fitted muzzle");
+        for(Emitter emitter:ship.weaponEmitters){
+            if(emitter.family()!=family||emitter.slotId()!=slotId)continue;
+            return transformed(ship,emitter);
+        }
+        throw new IllegalArgumentException("Fitted launcher socket not found "+slotId);
+    }
+    private static Origin transformed(Battle.Ship ship,Emitter emitter){
+        double unit=34.0/154.0*ship.visualScale();
+        double c=StrictMath.cos(ship.facing),s=StrictMath.sin(ship.facing);
+        double forward=emitter.localY()*unit;
+        double starboard=emitter.localX()*unit;
+        return new Origin(ship.x+forward*c+starboard*s,
+                ship.y+forward*s-starboard*c,emitter.slotId());
+    }
     public static Origin at(Battle.Ship ship,Family family,long shotId){
         if(ship==null||family==null)throw new IllegalArgumentException("Ship and weapon family required");
         int matching=0;
@@ -56,14 +74,7 @@ public final class WeaponMuzzles {
         for(Emitter emitter:ship.weaponEmitters){
             if(emitter.family()!=family)continue;
             if(index-->0)continue;
-            // 154 local longitudinal units correspond to a 34-unit displayed
-            // hull at scale 1. This matches the canonical hull-art draw height.
-            double unit=34.0/154.0*ship.visualScale();
-            double c=StrictMath.cos(ship.facing),s=StrictMath.sin(ship.facing);
-            double forward=emitter.localY()*unit;
-            double starboard=emitter.localX()*unit;
-            return new Origin(ship.x+forward*c+starboard*s,
-                    ship.y+forward*s-starboard*c,emitter.slotId());
+            return transformed(ship,emitter);
         }
         throw new IllegalStateException("Weapon emitter selection failed");
     }

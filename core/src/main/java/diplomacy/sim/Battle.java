@@ -58,6 +58,22 @@ public final class Battle {
         public List<Shipyard.Slot> impactHardpoints=List.of();
         /** Installed weapon-family emitters in the original faction hull layout. */
         public List<WeaponMuzzles.Emitter> weaponEmitters=List.of();
+        /** Opt-in physically distinct rack controllers; legacy remains family-wide. */
+        public List<Launcher> launchers=List.of();
+        public Launcher launcher(int slot){
+            for(Launcher rack:launchers)if(rack.slot==slot)return rack;
+            return null;
+        }
+        public static final class Launcher {
+            public final int slot;
+            public final DamageType family;
+            public final OrdnanceFitting.Mounted fitting;
+            public int magazine;
+            public double reload;
+            Launcher(int socket,DamageType type,OrdnanceFitting.Mounted load,int rounds){
+                slot=socket;family=type;fitting=load;magazine=rounds;
+            }
+        }
         public Map<Integer,LaserFamilies.Type> laserFittings=Map.of();
         public Map<Integer,Subsystem> installedSubsystems=Map.of();
         /** Directional powered shields, localized armor plates and exposed structure. */
@@ -446,9 +462,9 @@ public final class Battle {
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
-    /** A single family-level launch sequencer, until true per-hardpoint guns exist. */
+    /** Queued physical salvo is owned by one socket, or -1 for legacy fleets. */
     private static final class PendingLaunch {
-        final int sourceId,targetId;
+        final int sourceId,targetId,slotId;
         final DamageType family;
         final OrdnanceDoctrine.Pattern pattern;
         final OrdnancePropulsion.Mode propulsion;
@@ -460,7 +476,13 @@ public final class Battle {
                       OrdnanceDoctrine.Pattern doctrine,long start,
                       AmmunitionTable.Warhead loaded,
                       OrdnancePropulsion.Mode motor,OrdnanceGuidance.Mode seeker){
-            sourceId=source;targetId=target;family=type;pattern=doctrine;
+            this(source,target,type,doctrine,start,loaded,motor,seeker,-1);
+        }
+        PendingLaunch(int source,int target,DamageType type,
+                      OrdnanceDoctrine.Pattern doctrine,long start,
+                      AmmunitionTable.Warhead loaded,
+                      OrdnancePropulsion.Mode motor,OrdnanceGuidance.Mode seeker,int socket){
+            sourceId=source;targetId=target;family=type;pattern=doctrine;slotId=socket;
             if(loaded==null||motor==null||seeker==null)
                 throw new IllegalArgumentException("Incomplete guided salvo configuration");
             loadedWarhead=loaded;propulsion=motor;guidance=seeker;nextTick=start;
@@ -758,6 +780,24 @@ public final class Battle {
         s.kineticAmmo=s.kineticDamage>0?64+machinery.magazineCapacity()*4:0;
         s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
         s.torpedoAmmo=s.torpedoDamage>0?3+machinery.magazineCapacity()/3:0;
+        if(!design.launcherFittings.isEmpty()){
+            List<Ship.Launcher> mounted=new ArrayList<>();
+            for(DamageType family:new DamageType[]{DamageType.MISSILE,DamageType.TORPEDO}){
+                List<Integer> slots=new ArrayList<>();
+                for(int i=0;i<design.slots();i++){
+                    Shipyard.Installed part=design.at(i);
+                    if(part!=null&&part.component.endsWith(OrdnanceFitting.suffix(family)))
+                        slots.add(i);
+                }
+                int rounds=family==DamageType.MISSILE?s.missileAmmo:s.torpedoAmmo;
+                for(int i=0;i<slots.size();i++){
+                    int slot=slots.get(i);
+                    mounted.add(new Ship.Launcher(slot,family,design.launcher(slot),
+                            rounds/slots.size()+(i<rounds%slots.size()?1:0)));
+                }
+            }
+            s.launchers=List.copyOf(mounted);
+        }
         return s;
     }
     public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
@@ -973,6 +1013,8 @@ public final class Battle {
         s.plasmaReload=Math.max(0,s.plasmaReload-DT);
         s.particleReload=Math.max(0,s.particleReload-DT);
         s.torpedoReload=Math.max(0,s.torpedoReload-DT);
+        for(Ship.Launcher launcher:s.launchers)
+            launcher.reload=Math.max(0,launcher.reload-DT);
         s.fighterReload=Math.max(0,s.fighterReload-DT);
         s.droneReload=Math.max(0,s.droneReload-DT);
         s.repairDroneReload=Math.max(0,s.repairDroneReload-DT);
@@ -1269,7 +1311,9 @@ public final class Battle {
             if(landed)hitLaser(target,s.laserDamage*laserType.damage,
                     s,shotId,aim.x(),aim.y(),label);
         }
-        if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
+        if(!s.launchers.isEmpty()){
+            queueRackSalvos(s,target,DamageType.MISSILE,distance,missile);
+        }else if(missile.available(s.missileDamage,s.missileAmmo,distance,s.weapons.missileRange(),
                 s.missileReload,s.power,s.heat,s.maxHeat,
                 s.weaponsCondition,s.magazineCondition)
                 &&!hasPendingGuided(s.id,DamageType.MISSILE)){
@@ -1357,7 +1401,9 @@ public final class Battle {
                     muzzle.x(),muzzle.y(),endX,endY);
             if(landed)hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId,aim.x(),aim.y());
         }
-        if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
+        if(!s.launchers.isEmpty()){
+            queueRackSalvos(s,target,DamageType.TORPEDO,distance,torpedo);
+        }else if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
                 s.torpedoReload,s.power,s.heat,s.maxHeat,
                 s.weaponsCondition,s.magazineCondition)
                 &&!hasPendingGuided(s.id,DamageType.TORPEDO)){
@@ -1375,6 +1421,37 @@ public final class Battle {
         }
     }
 
+    private void queueRackSalvos(Ship source,Ship target,DamageType family,
+                                 double distance,WeaponBehaviorTable.Gun gun){
+        int ammo=family==DamageType.MISSILE?source.missileAmmo:source.torpedoAmmo;
+        double damage=family==DamageType.MISSILE?source.missileDamage:source.torpedoDamage;
+        double reach=family==DamageType.MISSILE?source.weapons.missileRange():
+                source.weapons.torpedoRange();
+        double cycle=family==DamageType.MISSILE?source.weapons.missileCycle():
+                source.weapons.torpedoCycle();
+        for(Ship.Launcher rack:source.launchers){
+            if(rack.family!=family||rack.magazine<=0||rack.reload>0)continue;
+            if(hasPendingGuided(source.id,family,rack.slot))continue;
+            if(!gun.available(damage,ammo,distance,reach,rack.reload,
+                    source.power,source.heat,source.maxHeat,
+                    source.weaponsCondition,source.magazineCondition))continue;
+            OrdnanceFitting.Mounted loaded=rack.fitting;
+            OrdnanceDoctrine.Pattern pattern=OrdnanceDoctrine.forWeapon(
+                    family,loaded.guided().salvo());
+            if(ammo<pattern.ammoNeeded()||rack.magazine<pattern.ammoNeeded())continue;
+            rack.reload=gun.reload(cycle,source.weaponsCondition)*pattern.reloadMultiplier();
+            launchQueue.add(new PendingLaunch(source.id,target.id,family,pattern,tick,
+                    loaded.warhead(),loaded.guided().motor(),loaded.guided().guidance(),
+                    rack.slot));
+            salvosStarted++;
+        }
+    }
+    private boolean hasPendingGuided(int sourceId,DamageType family,int slot){
+        for(PendingLaunch pending:launchQueue)
+            if(pending.sourceId==sourceId&&pending.family==family
+                    &&pending.slotId==slot)return true;
+        return false;
+    }
     private boolean hasPendingGuided(int sourceId,DamageType family){
         for(PendingLaunch pending:launchQueue)
             if(pending.sourceId==sourceId && pending.family==family)return true;
@@ -1390,6 +1467,11 @@ public final class Battle {
             Ship target=findShip(order.targetId);
             var gun=WeaponBehaviorTable.gun(order.family);
             boolean heavy=order.family==DamageType.TORPEDO;
+            Ship.Launcher rack=source==null||order.slotId<0?null:source.launcher(order.slotId);
+            if(order.slotId>=0&&(rack==null||rack.family!=order.family||
+                    rack.magazine<=0)){
+                launchQueue.remove(i);continue;
+            }
             if(source==null||!source.alive()||source.withdrawing||source.crewReadiness()<0.05
                     ||target==null||!target.alive()
                     ||source.weaponsCondition<=gun.requiredWeaponCondition()
@@ -1414,7 +1496,9 @@ public final class Battle {
                     :order.pattern.payload();
             double spread=(index-(order.pattern.count()-1)*0.5)*0.045;
             WeaponMuzzles.Family family=heavy?WeaponMuzzles.Family.TORPEDO:WeaponMuzzles.Family.MISSILE;
-            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(source,family,nextVisualShotId);
+            WeaponMuzzles.Origin muzzle=order.slotId>=0?
+                    WeaponMuzzles.atSlot(source,family,order.slotId):
+                    WeaponMuzzles.at(source,family,nextVisualShotId);
             double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x())+spread;
             double distance=StrictMath.hypot(target.y-muzzle.y(),target.x-muzzle.x());
             double velocityX=StrictMath.cos(angle)*Math.max(1,distance);
@@ -1428,6 +1512,7 @@ public final class Battle {
             source.power-=gun.powerPerShot()*payload.powerCost();
             source.heat+=gun.heatPerShot()*payload.heatCost();
             if(heavy)source.torpedoAmmo--;else source.missileAmmo--;
+            if(rack!=null)rack.magazine--;
             source.launched++;roundsFiredBySalvos++;
             if(decoy)decoysLaunched++;
             long shot=nextVisualShotId++;
@@ -2457,6 +2542,16 @@ public final class Battle {
             hash=mix(hash,s.propulsionMode(DamageType.TORPEDO).ordinal());
             hash=mix(hash,s.guidanceMode(DamageType.MISSILE).ordinal());
             hash=mix(hash,s.guidanceMode(DamageType.TORPEDO).ordinal());
+            for(Ship.Launcher rack:s.launchers){
+                hash=mix(hash,rack.slot);
+                hash=mix(hash,rack.family.ordinal());
+                hash=mix(hash,rack.fitting.guided().salvo().ordinal());
+                hash=mix(hash,rack.fitting.guided().motor().ordinal());
+                hash=mix(hash,rack.fitting.guided().guidance().ordinal());
+                hash=mix(hash,rack.fitting.warhead().ordinal());
+                hash=mix(hash,rack.magazine);
+                hash=mix(hash,Double.doubleToLongBits(rack.reload));
+            }
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
             hash=mix(hash,s.repairDroneReserve);
             hash=mix(hash,Double.doubleToLongBits(s.repairDroneReload));
@@ -2470,6 +2565,7 @@ public final class Battle {
             hash=mix(hash,pending.sourceId);
             hash=mix(hash,pending.targetId);
             hash=mix(hash,pending.family.ordinal());
+            hash=mix(hash,pending.slotId);
             hash=mix(hash,pending.pattern.mode().ordinal());
             hash=mix(hash,pending.propulsion.ordinal());
             hash=mix(hash,pending.guidance.ordinal());

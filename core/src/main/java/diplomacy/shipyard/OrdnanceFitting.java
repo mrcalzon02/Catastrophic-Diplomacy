@@ -5,8 +5,8 @@ import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.sim.OrdnancePropulsion;
 
-/** One family-level launcher profile until independent hardpoint fire control.
- * The weakest fitted weapon module limits the shared launcher configuration.
+/** Guided profiles can be shared by legacy family controllers or owned by one rack.
+ * The weakest fitted weapon module limits a shared family configuration.
  * Fitted research itself is authorized by the existing game-mode gate.
  */
 public final class OrdnanceFitting {
@@ -20,6 +20,32 @@ public final class OrdnanceFitting {
             if(salvo==null||motor==null||guidance==null)
                 throw new IllegalArgumentException("Incomplete guided launcher profile");
         }
+    }
+    /** Physical magazine payload and guidance belong to one launcher socket. */
+    public record Mounted(Guided guided,diplomacy.sim.AmmunitionTable.Warhead warhead){
+        public Mounted {
+            if(guided==null)throw new IllegalArgumentException("No guided rack");
+            diplomacy.sim.AmmunitionTable.warhead(warhead);
+        }
+    }
+    /** Never let another launcher lend its research to this socket. */
+    public static void requireAt(Shipyard.Design design,int slot,Mounted mounted){
+        if(design==null||mounted==null||slot<0||slot>=design.slots())
+            throw new IllegalArgumentException("Invalid mounted launcher");
+        Shipyard.Installed installed=design.at(slot);
+        if(installed==null)throw new IllegalArgumentException("Missing mounted launcher");
+        Battle.DamageType family=installed.component.endsWith("-MSL")?
+                Battle.DamageType.MISSILE:installed.component.endsWith("-TOR")?
+                Battle.DamageType.TORPEDO:null;
+        if(family==null)throw new IllegalArgumentException("Socket is not guided weaponry");
+        Shipyard.Track branch=installed.branch();
+        int rank=branch==null?0:installed.stage(branch);
+        if(rank<requiredTier(mounted.guided()))
+            throw new IllegalArgumentException("Socket "+slot+" needs guided research "
+                    +requiredTier(mounted.guided())+" but has "+rank);
+        if(!Shipyard.ammunitionAt(design,slot).allows(family,mounted.warhead()))
+            throw new IllegalArgumentException("Socket "+slot+" has no warhead research for "
+                    +mounted.warhead());
     }
     public static int requiredTier(OrdnanceDoctrine.Mode mode){
         if(mode==null)throw new IllegalArgumentException("No salvo choice");

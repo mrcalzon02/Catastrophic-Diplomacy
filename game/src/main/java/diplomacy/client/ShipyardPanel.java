@@ -77,6 +77,7 @@ final class ShipyardPanel {
     private boolean artPreview;
     private boolean technologyView;
     private boolean guidedView;
+    private boolean perRackView;
     private Shipyard.Track technologyTrack=Shipyard.Track.OUTPUT;
     private int technologyStage=1;
     private Supplier<SkirmishTechnologyRules> skirmishRules=SkirmishTechnologyRules::unrestricted;
@@ -152,7 +153,7 @@ final class ShipyardPanel {
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
-        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;guidedView=false;
+        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;guidedView=false;perRackView=false;
         purchaseArmedDesign=null;refitShipId=0;
         notice="DESIGN SANDBOX: configure fitted modules; campaign technology is researched separately.";
     }
@@ -341,6 +342,40 @@ final class ShipyardPanel {
         }
         return source;
     }
+    /** Select per-socket guidance and payload without borrowing another rack's research. */
+    static Shipyard.Design chooseRack(Shipyard.Design source,int socket,int axis,int step){
+        if(source==null||socket<0||socket>=source.slots()||
+                axis<0||axis>3||(step!=1&&step!=-1))
+            throw new IllegalArgumentException("Invalid rack selector");
+        OrdnanceFitting.Mounted original=source.launcher(socket);
+        int count=switch(axis){
+            case 0 -> OrdnanceDoctrine.Mode.values().length;
+            case 1 -> OrdnancePropulsion.Mode.values().length;
+            case 2 -> OrdnanceGuidance.Mode.values().length;
+            default -> AmmunitionTable.Warhead.values().length;
+        };
+        for(int n=1;n<count;n++){
+            OrdnanceFitting.Guided old=original.guided();
+            int current=switch(axis){
+                case 0 -> old.salvo().ordinal();
+                case 1 -> old.motor().ordinal();
+                case 2 -> old.guidance().ordinal();
+                default -> original.warhead().ordinal();
+            };
+            int index=Math.floorMod(current+n*step,count);
+            try{
+                OrdnanceFitting.Guided next=new OrdnanceFitting.Guided(
+                        axis==0?OrdnanceDoctrine.Mode.values()[index]:old.salvo(),
+                        axis==1?OrdnancePropulsion.Mode.values()[index]:old.motor(),
+                        axis==2?OrdnanceGuidance.Mode.values()[index]:old.guidance());
+                return source.withLauncher(socket,new OrdnanceFitting.Mounted(next,
+                        axis==3?AmmunitionTable.Warhead.values()[index]:original.warhead()));
+            }catch(IllegalArgumentException locked){
+                // The mounted socket's own exclusive research path is authoritative.
+            }
+        }
+        return source;
+    }
     private Battle.DamageType selectedGuidedFamily(){
         var installed=draft.at(selectedSlot);
         if(installed==null)return null;
@@ -354,12 +389,14 @@ final class ShipyardPanel {
             notice="Select an equipped missile or torpedo hardpoint first";return;
         }
         try{
-            Shipyard.Design next=chooseGuided(draft,selectedSlot,axis,step);
+            Shipyard.Design next=perRackView?chooseRack(draft,selectedSlot,axis,step):
+                    chooseGuided(draft,selectedSlot,axis,step);
             if(next==draft){notice="No additional researched "+family+" options";return;}
             if(!campaignTechnology())challenge().requireAllowed(next,catalog);
             draft=next;purchaseArmedDesign=null;cachedQuote=null;
-            notice=family+" "+new String[]{"SALVO","MOTOR","GUIDANCE","WARHEAD"}[axis]
-                    +" updated; SAVE or APPLY to retain this blueprint";
+            notice=(perRackView?"SOCKET "+(selectedSlot+1):family.toString())+" "+
+                    new String[]{"SALVO","MOTOR","GUIDANCE","WARHEAD"}[axis]+
+                    " updated; SAVE or APPLY to retain this blueprint";
         }catch(IllegalArgumentException locked){
             notice="GUIDED FIT DENIED: "+locked.getMessage();
         }
@@ -447,6 +484,12 @@ final class ShipyardPanel {
         if(code==com.badlogic.gdx.Input.Keys.A){cycleAmmunition();return true;}
         if(code==com.badlogic.gdx.Input.Keys.G){
             guidedView=!guidedView;technologyView=false;return true;
+        }
+        if(code==com.badlogic.gdx.Input.Keys.M&&guidedView){
+            perRackView=!perRackView;
+            notice=perRackView?"EDIT PER HARDPOINT: rack owns magazine and cooldown":
+                    "EDIT SHARED FAMILY: legacy missile configuration";
+            return true;
         }
         if(guidedView&&code>=com.badlogic.gdx.Input.Keys.NUM_1&&
                 code<=com.badlogic.gdx.Input.Keys.NUM_4){
@@ -639,6 +682,12 @@ final class ShipyardPanel {
             guidedView=tab==2;technologyView=tab==1;return true;
         }
         if(guidedView&&y<638){
+            if(x>=342&&x<=795&&y>=170&&y<=224){
+                perRackView=!perRackView;
+                notice=perRackView?"EDIT PER HARDPOINT: own rounds and cooldown":
+                        "EDIT SHARED FAMILY: legacy profile";
+                return true;
+            }
             if(x<320&&y>=105&&y<=590){
                 int index=scroll+(int)((590-y)/26);
                 if(index>=0&&index<draft.slots())select(index);
@@ -950,7 +999,11 @@ final class ShipyardPanel {
     private void drawGuided(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font){
         var report=Shipyard.inspect(draft,catalog);
         Battle.DamageType family=selectedGuidedFamily();
-        OrdnanceFitting.Guided choice=family==null?null:draft.ordnance(family);
+        OrdnanceFitting.Mounted loaded=family==null?null:perRackView?
+                draft.launcher(selectedSlot):new OrdnanceFitting.Mounted(
+                        draft.ordnance(family),family==Battle.DamageType.MISSILE?
+                        draft.ammoSelection.missile():draft.ammoSelection.torpedo());
+        OrdnanceFitting.Guided choice=loaded==null?null:loaded.guided();
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         rectangle(shapes,0,0,1280,720,MilitaryUiTheme.BACKGROUND);
         rectangle(shapes,0,630,1280,90,new Color(.06f,.09f,.15f,1));
@@ -963,6 +1016,7 @@ final class ShipyardPanel {
             if(index==selectedSlot)rectangle(shapes,30,561-i*26,286,25,
                     new Color(.13f,.23f,.33f,1));
         }
+        rectangle(shapes,342,170,453,54,new Color(.15f,.25f,.34f,1));
         for(int row=0;row<4;row++){
             int bottom=455-row*100;
             rectangle(shapes,809,bottom,446,72,
@@ -1023,16 +1077,19 @@ final class ShipyardPanel {
             font.draw(batch,"REQUIRED TIER "+OrdnanceFitting.requiredTier(choice)+"/9",345,334);
             font.draw(batch,"REAL PHYSICAL MISSILES",345,282);
             font.draw(batch,"PROPULSION + SEEKER + SALVO",345,252);
-            font.draw(batch,"SHARED FAMILY CONTROLLER",345,212);
-            font.draw(batch,"LEFT / RIGHT ARROWS TO SELECT",345,173);
+            font.draw(batch,perRackView?"PER HARDPOINT / OWN MAGAZINE":
+                    "SHARED FAMILY CONTROLLER",345,269);
+            font.draw(batch,"TOGGLE SCOPE BELOW OR PRESS M",345,244);
             font.draw(batch,"KEYS G / 1-4 ALSO AVAILABLE",345,139);
         }
+        font.setColor(Color.GOLD);
+        font.draw(batch,perRackView?"PER HARDPOINT   /   SWITCH TO FAMILY":
+                "SHARED FAMILY   /   SWITCH TO RACK",354,203);
         String[] labels={"LAUNCH PATTERN","MOTOR / FLIGHT","GUIDANCE","WARHEAD"};
         String[] values=choice==null?new String[]{"NO LAUNCHER","NO LAUNCHER",
                 "NO LAUNCHER","NO LAUNCHER"}:
                 new String[]{choice.salvo().name(),choice.motor().name(),
-                        choice.guidance().name(),(family==Battle.DamageType.MISSILE?
-                        draft.ammoSelection.missile():draft.ammoSelection.torpedo()).name()};
+                        choice.guidance().name(),loaded.warhead().name()};
         for(int row=0;row<4;row++){
             int bottom=455-row*100;
             font.setColor(Color.CYAN);
