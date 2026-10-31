@@ -70,9 +70,13 @@ public final class GuidedShipyardPanelTest {
         check(stock.missileOrdnance.equals(OrdnanceFitting.Guided.STANDARD)
                 &&stock.ammoSelection.missile()==AmmunitionTable.Warhead.STANDARD,
                 "Editor must not mutate the original saved blueprint");
-        var mount=ShipyardPanel.chooseRack(advanced,socket,1,-1);
+        var terminal=ShipyardPanel.chooseRack(advanced,socket,1,-1);
+        check(terminal.launcher(socket).guided().motor()==
+                OrdnancePropulsion.Mode.TERMINAL_SPRINT,
+                "First backward tap must select the actual last motor enum");
+        var mount=ShipyardPanel.chooseRack(terminal,socket,1,-1);
         check(mount.launcher(socket).guided().motor()==OrdnancePropulsion.Mode.SILENT_GHOST,
-                "Per-hardpoint selector must install a physical motor on the socket");
+                "Second backward tap must install Silent Ghost on this socket");
         check(mount.missileOrdnance.equals(OrdnanceFitting.Guided.STANDARD),
                 "Rack editing must not change the family-wide legacy profile");
         check(Shipyard.encode(mount).startsWith("CD-SHIP-5|"),
