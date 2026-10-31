@@ -119,10 +119,67 @@ public final class FighterCraftTest {
                         ==FighterModel.Hull.ASSAULT_GUNSHIP,
                 "Legacy saves default safely to the original gunship");
     }
+    /** Physical aviation is hull capacity plus fitted modular hangars. */
+    private static void hangarCapacityAndSorties(TechnologyCatalog tech){
+        Shipyard.Design fleetCarrier=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CARRIER).withFighterHull(FighterModel.Hull.INTERCEPTOR);
+        Shipyard.Design logisticsCarrier=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CARRIER_LOGISTICS);
+        Shipyard.Design cruiser=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        Shipyard.Design converted=cruiser;
+        int modules=0;
+        for(Shipyard.Slot slot:converted.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){
+                converted=converted.install(slot.index(),"BASE-TER-FTR");
+                modules++;
+            }
+        check(modules>=2,"Cruiser must offer multiple sacrificeable hangar slots");
+        check(Shipyard.inspect(converted,tech).valid(),"Modular cruiser carrier must fit");
+        check(Shipyard.fit(cruiser,tech).fighterCapacity()==0,
+                "Standard non-carrier must not spawn complimentary fighters");
+        check(Shipyard.fighterLaunchBays(cruiser)==0,
+                "Non-carrier must require physical flight deck");
+        check(Shipyard.fighterLaunchBays(converted)==modules,
+                "Each physical auxiliary hangar adds a flight launch bay");
+        check(Shipyard.fit(converted,tech).fighterCapacity()>0,
+                "Auxiliary modules must convert a cruiser into a fighter carrier");
+        check(Shipyard.fit(fleetCarrier,tech).fighterCapacity()>
+                        Shipyard.fit(converted,tech).fighterCapacity(),
+                "Dedicated carrier must outclass improvised cruiser capacity");
+        check(Shipyard.fighterLaunchBays(fleetCarrier)>Shipyard.fighterLaunchBays(converted),
+                "Dedicated carrier must launch more aircraft per cycle");
+        check(Shipyard.fit(logisticsCarrier,tech).fighterCapacity()>
+                        Shipyard.fit(fleetCarrier,tech).fighterCapacity(),
+                "Logistics carrier must have specialized built-in storage");
+        check(Shipyard.fit(Shipyard.starter(Battle.Faction.TERRAN,
+                        Shipyard.Hull.DREADNOUGHT),tech).fighterCapacity()>0,
+                "Capital with organic auxiliary bays must not need FTR module");
+        Battle battle=new Battle(91916);
+        battle.spawnWing(0,fleetCarrier,tech,1,290,350);
+        battle.spawnWing(1,Shipyard.starter(Battle.Faction.DRAXIAN,
+                Shipyard.Hull.CRUISER),tech,1,550,350);
+        for(Battle.Ship ship:battle.ships())disarm(ship);
+        Battle.Ship parent=battle.ships().get(0);
+        int initial=parent.fighterReserve;
+        check(parent.fighterLaunchBays==3,"Carrier must spawn with three launch bays");
+        battle.step();
+        check(parent.fightersLaunched==3&&parent.fighterReserve==initial-3,
+                "Carrier initial launch must deploy exactly one craft per bay");
+        check(battle.crafts().stream().filter(c->c.fighter
+                &&c.sourceId==parent.id).count()==3,
+                "All three launched fighters are independently simulated");
+        check(parent.power>=0&&parent.heat<=parent.maxHeat,
+                "Fighter launch must respect power and thermal limits");
+        for(int tick=0;tick<240;tick++)battle.step();
+        check(parent.fightersLaunched+parent.fighterReserve==initial,
+                "Hangar launches must not create or delete purchased inventory");
+    }
+
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         sensorAndArmor();
         saves(tech);
+        hangarCapacityAndSorties(tech);
         for(FighterModel.Hull hull:FighterModel.Hull.values()){
             check(Shipyard.inspect(carrier(hull),tech).valid(),"Carrier fitting "+hull);
             long a=run(tech,hull,2000+hull.ordinal());
