@@ -54,7 +54,9 @@ final class GameWikiPanel {
         if(!query.equals(next)){query=next;refresh();}
     }
     void type(char character){
-        if(character==8){erase();return;}
+        // BACKSPACE is handled by keyDown; keyTyped can also deliver ASCII 8.
+        // Never erase twice for the same key press.
+        if(character==8)return;
         if(character>=32&&character!=127&&query.length()<72)setQuery(query+character);
     }
     void erase(){

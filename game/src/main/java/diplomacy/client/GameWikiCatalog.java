@@ -135,6 +135,7 @@ final class GameWikiCatalog {
                     " defense, "+support+" support, "+habitat+" habitat.",
                 "Variant identity and capacity change real available builds. It shares an approved artwork family where noted, not a copied damage profile.",
                 "Actual weapons, shields, electronics, repairs and deployed fighters come from installed fitted modules; this chassis is not free equipment."));
+        }
         for(TechnologyCatalog.Component m:catalog.baseComponents().values())
             a.add(new Article("module."+m.id,"MODULES",m.name,
                 "Exact component ID: "+m.id+" | faction "+m.faction+" | subsystem "+m.subsystem+

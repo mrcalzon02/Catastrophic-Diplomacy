@@ -89,6 +89,30 @@ sleep 5
 dismiss_optional_updater first-launch
 capture main-menu
 assert_step MAIN_MENU
+# Exercise the ACTUAL native field encyclopedia from the signed APK.
+# The tap must be on the same visible header tile as the gameplay UI.
+touch_ui main-menu 965 662
+sleep 2
+capture wiki-open
+adb logcat -d -v time > "$report/wiki-logcat.txt"
+grep -q 'CD-WIKI.*OPEN articles=' "$report/wiki-logcat.txt" || {
+  echo "FAIL: signed APK wiki launcher did not open the live encyclopedia" >&2
+  exit 1
+}
+# Touch a real category, and return through the rendered CLOSE control.
+touch_ui wiki-open 54 575
+sleep 1
+capture wiki-category
+touch_ui wiki-category 1150 674
+sleep 1
+capture wiki-returned
+adb logcat -d -v time > "$report/wiki-return-logcat.txt"
+grep -q 'CD-WIKI.*CLOSE' "$report/wiki-return-logcat.txt" || {
+  echo "FAIL: signed APK encyclopedia failed to close back to its prior menu" >&2
+  exit 1
+}
+assert_step MAIN_MENU
+echo "PASS: signed APK native searchable field encyclopedia opens, changes category and returns."
 touch_ui main-menu 350 392
 sleep 3
 capture skirmish-menu
