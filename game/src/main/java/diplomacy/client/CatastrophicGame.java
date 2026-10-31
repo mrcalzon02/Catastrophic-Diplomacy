@@ -961,7 +961,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // A new campaign receives its own name seed; existing campaigns keep
         // their original seed in the atomic roster save.
         long namingSeed=java.util.concurrent.ThreadLocalRandom.current().nextLong();
-        CampaignFleet.Roster vessels=CampaignFleet.start(pendingFaction,
+        CampaignFleet.Roster vessels=CampaignFleet.startSolo(pendingFaction,
                 Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology,namingSeed);
         if(!commitCampaign(proposed,vessels,new CampaignTechnology.State(pendingFaction)))return;
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);

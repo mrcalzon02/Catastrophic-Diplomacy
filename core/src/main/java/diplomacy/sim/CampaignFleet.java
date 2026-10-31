@@ -532,19 +532,28 @@ public final class CampaignFleet {
                                TechnologyCatalog technology){
         return start(faction,starter,technology,faction==null?0:faction.ordinal());
     }
-    /** A truly new campaign chooses this seed once, then persists it in the
-     * owned roster. Deterministic fixtures continue using the legacy overload. */
+    /** New-game production path: one commissioned ship, with no free escorts. */
+    public static Roster startSolo(Battle.Faction faction,Shipyard.Design starter,
+                                   TechnologyCatalog technology,long namingSeed){
+        return startWithCount(faction,starter,technology,namingSeed,1);
+    }
+    /** Legacy fixture/migration path retains its four-ship creation semantics.
+     * Existing saved fleets keep all vessels and their permanent identifiers. */
     public static Roster start(Battle.Faction faction,Shipyard.Design starter,
                                TechnologyCatalog technology,long namingSeed){
+        return startWithCount(faction,starter,technology,namingSeed,4);
+    }
+    private static Roster startWithCount(Battle.Faction faction,Shipyard.Design starter,
+                                        TechnologyCatalog technology,long namingSeed,int count){
         if(faction==null||starter==null||starter.faction!=faction)
             throw new IllegalArgumentException("Starter faction mismatch");
         ArrayList<Vessel> vessels=new ArrayList<>();
-        for(int i=1;i<=4;i++)
+        for(int i=1;i<=count;i++)
             vessels.add(new Vessel(VesselIdentifiers.commissioned(namingSeed,i),
                     FleetNames.unique(FleetNames.Style.NAVAL,namingSeed,i,
                             vessels.stream().map(Vessel::name).toList()),
                     starter,true,Stores.capture(fresh(starter,technology))));
-        return new Roster(faction,FleetNames.Style.NAVAL,5,vessels,namingSeed,
+        return new Roster(faction,FleetNames.Style.NAVAL,count+1,vessels,namingSeed,
                 CrewChatter.Tone.MIXED);
     }
 }

@@ -35,9 +35,21 @@ public final class CampaignNarrative {
     private static final String[] BEATS={
         "First contact","Reconnaissance","Escalation","Counterstroke","Sector confrontation"
     };
+    private static final String[] LAST_SEVEN={
+        "The Needle Gate",
+        "The Broken Crown",
+        "Graveyard of Delegates",
+        "The Furnace Ring",
+        "The Silent Chancery",
+        "The Last Armada",
+        "Article Zero"
+    };
     public static Brief forLevel(int level){
         LevelEconomy.Level mission=LevelEconomy.level(level);
         int chapter=mission.sector()-1;
+        if(level>=LevelEconomy.FINALE_START)
+            return new Brief(chapter+1,CHAPTERS[chapter],INTEL[chapter],
+                    "Final offensive: "+LAST_SEVEN[level-LevelEconomy.FINALE_START]);
         int phase=(mission.inSector()-1)/10;
         return new Brief(chapter+1,CHAPTERS[chapter],INTEL[chapter],BEATS[phase]);
     }

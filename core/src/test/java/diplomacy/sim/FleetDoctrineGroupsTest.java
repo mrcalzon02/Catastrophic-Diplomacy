@@ -76,7 +76,7 @@ public final class FleetDoctrineGroupsTest {
                 ScenarioCatalog.Preset.DUEL,Battle.Faction.TERRAN,true,technology);
         Shipyard.Design hostile=ScenarioCatalog.defaultDesign(
                 ScenarioCatalog.Preset.DUEL,Battle.Faction.DRAXIAN,false,technology);
-        CampaignEncounter battle=CampaignEncounter.start(1,result,friendly,hostile,technology);
+        CampaignEncounter battle=CampaignEncounter.start(150,result,friendly,hostile,technology);
         ok(battle.battle().ships().get(1).escortShipId==battle.battle().ships().get(5).id,
                 "Group doctrine broke actual escort relationship");
         ok(battle.battle().ships().get(1).defendedShipIds.size()==2,

@@ -25,11 +25,11 @@ public final class GameFlowTest {
         var start=CampaignProgress.start(Battle.Faction.TERRAN);
         verify(start.available(1)&&!start.available(2),"Invalid starting mission access");
         verify(start.equals(CampaignProgress.decode(CampaignProgress.encode(start))),"Save round-trip");
-        var won=start.complete(1,4,4);
+        var won=start.complete(1,1,1);
         verify(won.available(2)&&won.credits()>0&&won.victories()==1,"Progress rewards");
         verify(won.equals(CampaignProgress.decode(CampaignProgress.encode(won))),"Won save round-trip");
-        long rawReplay=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,3,true);
-        verify(won.complete(1,4,3).credits()-won.credits()==rawReplay/4,
+        long rawReplay=LevelEconomy.victoryCredits(LevelEconomy.level(1),1,1,true);
+        verify(won.complete(1,1,1).credits()-won.credits()==rawReplay/4,
                 "Replay of completed mission must pay floor(full reward / 4)");
         var top=new CampaignProgress.State(Battle.Faction.TERRAN,500,0,499,
                 0,499,0,CampaignProgress.Project.NONE,0);
@@ -63,9 +63,9 @@ public final class GameFlowTest {
                 ScenarioCatalog.Preset.DUEL,Battle.Faction.TERRAN,true,tech);
         Shipyard.Design enemy=ScenarioCatalog.defaultDesign(
                 ScenarioCatalog.Preset.DUEL,Battle.Faction.DRAXIAN,false,tech);
-        CampaignEncounter encounter=CampaignEncounter.start(1,4,player,enemy,tech);
+        CampaignEncounter encounter=CampaignEncounter.start(1,1,player,enemy,tech);
         Battle live=encounter.battle();
-        verify(live.alive(0)==4&&live.alive(1)==4,"Campaign initial deployment");
+        verify(live.alive(0)==1&&live.alive(1)==1,"Campaign initial deployment");
         Battle.Ship surviving=live.ships().get(0);
         surviving.hull=surviving.maxHull/2;
         surviving.missileAmmo=2;
@@ -77,7 +77,7 @@ public final class GameFlowTest {
             if(wave<encounter.waves()){
                 verify(result==CampaignEncounter.Advance.NEXT_WAVE,
                         "Campaign ended before all mandatory waves");
-                verify(live.alive(1)==CampaignEncounter.enemyCount(LevelEconomy.level(1),4,wave+1),
+                verify(live.alive(1)==CampaignEncounter.enemyCount(LevelEconomy.level(1),1,wave+1),
                         "Campaign reinforcements did not spawn");
                 verify(live.ships().get(0)==surviving
                         && surviving.hull==surviving.maxHull/2
@@ -86,7 +86,7 @@ public final class GameFlowTest {
             }else verify(result==CampaignEncounter.Advance.VICTORY,
                     "Campaign final wave not credited");
         }
-        CampaignEncounter lost=CampaignEncounter.start(1,4,player,enemy,tech);
+        CampaignEncounter lost=CampaignEncounter.start(1,1,player,enemy,tech);
         for(Battle.Ship ship:lost.battle().ships())if(ship.team==0)ship.hull=0;
         verify(lost.advance()==CampaignEncounter.Advance.DEFEAT,"Dead fleet earned victory");
         System.out.println("PASS game flow: real skirmishes, sequential campaign waves, map, saves and rewards");

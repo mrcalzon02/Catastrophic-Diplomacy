@@ -9,15 +9,39 @@ import java.math.BigInteger;
 public final class LevelEconomy {
     public static final int LEVEL_COUNT=500;
     public static final int SECTOR_SIZE=50;
+    public static final int FINALE_START=494;
+    // Inclusive fleet-cap milestones. The final seven sorties are true
+    // 200-on-200 deployments, not hundreds of waves against a token escort.
+    private static final int[][] FLEET_CURVE={
+            {1,1},{10,2},{25,4},{50,8},{75,12},{100,18},
+            {125,26},{150,36},{175,47},{200,60},{225,74},
+            {250,88},{275,102},{300,116},{325,129},
+            {350,142},{375,153},{400,164},{425,175},
+            {450,184},{475,193},{490,198},{493,199},
+            {494,200},{500,200}
+    };
     private LevelEconomy() { }
+    /** Monotonic mission-specific cap, independent of the selected deployment. */
+    public static int fleetCap(int mission){
+        if(mission<1||mission>LEVEL_COUNT)
+            throw new IllegalArgumentException("Level out of range");
+        for(int i=1;i<FLEET_CURVE.length;i++){
+            int[] previous=FLEET_CURVE[i-1],next=FLEET_CURVE[i];
+            if(mission>next[0])continue;
+            int span=next[0]-previous[0],offset=mission-previous[0];
+            return previous[1]+(int)(((long)offset*(next[1]-previous[1])+span/2)/span);
+        }
+        return 200;
+    }
     public record Level(int index,int sector,int inSector,int maximumFleet,
                         int waves,long baseCredits,long seed) { }
     public static Level level(int index) {
         if(index<1 || index>LEVEL_COUNT)throw new IllegalArgumentException("Level out of range");
         int sector=(index-1)/SECTOR_SIZE+1;
-        int count=20+(index-1)/3;
-        int fleetCap=StrictMath.min(200,count);
-        int waves=3+(index-1)/50;
+        int fleetCap=fleetCap(index);
+        // The last seven missions commit both navies at full strength at once.
+        // Keep earlier sector reinforcement waves unchanged.
+        int waves=index>=FINALE_START?1:3+(index-1)/50;
         long n=index-1;
         long base=10000L+1200L*n+6L*n*n;
         long seed=0x43442d4c4556454cL ^ (index*0x9e3779b97f4a7c15L);

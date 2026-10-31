@@ -59,12 +59,13 @@ public final class CampaignOppositionTest {
         int upgraded=0,advancedBatteries=0;
         for(int mission:new int[]{1,10,50,51,91,101,151,201,250,251,301,351,401,451,499,500}){
             int ceiling=CampaignOpposition.maximumTier(mission);
+            int sample=Math.min(16,LevelEconomy.level(mission).maximumFleet());
             for(Battle.Faction faction:new Battle.Faction[]{
                     Battle.Faction.TERRAN,Battle.Faction.VAERITH_PRISM}){
                 List<Shipyard.Design> ships=CampaignOpposition.fleet(
-                        mission,1,16,faction,catalog);
+                        mission,1,sample,faction,catalog);
                 List<Shipyard.Design> replay=CampaignOpposition.fleet(
-                        mission,1,16,faction,catalog);
+                        mission,1,sample,faction,catalog);
                 check(ships.size()==replay.size(),"Enemy fleet count changed on seed replay");
                 Set<String> variations=new HashSet<>();
                 for(int i=0;i<ships.size();i++){
@@ -96,7 +97,8 @@ public final class CampaignOppositionTest {
                     }
                     if(mission>=451&&weaponsInstalled>2)advancedBatteries++;
                 }
-                check(variations.size()>1,"Entire campaign fleet is one cloned loadout");
+                if(sample>1)check(variations.size()>1,
+                        "Entire campaign fleet is one cloned loadout");
             }
         }
         check(advancedBatteries>0,

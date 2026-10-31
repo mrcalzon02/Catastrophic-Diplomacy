@@ -27,25 +27,25 @@ public final class CampaignResearchTest {
                 &&first.missionsUntilResearchComplete()==1,"First technology needs one mission");
         reject(()->first.beginResearch(CampaignProgress.Project.ACCELERATOR),
                 "No simultaneous projects");
-        var winner=first.complete(1,20,20);
+        var winner=first.complete(1,1,1);
         check(winner.researchRank()==1&&winner.activeProject()==CampaignProgress.Project.NONE,
                 "One successful mission did not complete early research");
         var second=winner.purchaseNextResearch();
         check(second.missionsUntilResearchComplete()==2,"Second technology should take two missions");
-        var one=second.complete(1,20,20);
-        long full=LevelEconomy.victoryCredits(LevelEconomy.level(1),20,20,true);
+        var one=second.complete(1,1,1);
+        long full=LevelEconomy.victoryCredits(LevelEconomy.level(1),1,1,true);
         check(one.credits()-second.credits()==full/4,
                 "Repeated mission must pay exactly one quarter");
         check(one.projectProgress()==1&&one.missionsUntilResearchComplete()==1,
                 "Replay must advance research by one mission tick only");
-        var two=one.complete(1,20,20);
+        var two=one.complete(1,1,1);
         check(two.researchRank()==2,"Second research project failed after two wins");
         var fifth=funded(399,4,0,80000000).purchaseNextResearch();
         check(fifth.missionsUntilResearchComplete()==5,"Late projects must need five missions");
-        for(int i=0;i<4;i++)fifth=fifth.complete(1,20,20);
+        for(int i=0;i<4;i++)fifth=fifth.complete(1,1,1);
         check(fifth.researchRank()==4&&fifth.projectProgress()==4,
                 "Five-turn project prematurely completed");
-        fifth=fifth.complete(1,20,20);
+        fifth=fifth.complete(1,1,1);
         check(fifth.researchRank()==5,"Five-turn project did not complete");
         reject(()->funded(24,0,0,90000000).purchaseResearchSpeed(),
                 "Lab milestone 25 bypassed");
@@ -60,7 +60,7 @@ public final class CampaignResearchTest {
             check(queued.missionsUntilResearchComplete()>=0,
                     "A laboratory has negative work duration");
             while(queued.activeProject()!=CampaignProgress.Project.NONE)
-                queued=queued.complete(1,20,20);
+                queued=queued.complete(1,1,1);
             fleet=queued;
             check(fleet.speedUpgrades()==tier,"Research accelerator not earned");
         }

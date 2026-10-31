@@ -40,8 +40,9 @@ public final class CampaignDeploymentTest {
         int formationIndex=0;
         for(CampaignDeployment.Formation formation:CampaignDeployment.Formation.values()){
             CampaignDeployment.Loadout selected=new CampaignDeployment.Loadout(9,formation);
-            CampaignEncounter encounter=CampaignEncounter.start(1,selected,friendly,hostile,technology);
-            require(encounter.battle().alive(0)==9&&encounter.battle().alive(1)==9,
+            CampaignEncounter encounter=CampaignEncounter.start(150,selected,friendly,hostile,technology);
+            require(encounter.battle().alive(0)==9&&encounter.battle().alive(1)==
+                    CampaignEncounter.enemyCount(LevelEconomy.level(150),9,1),
                     "Selected fleet size not reflected in actual battle");
             require(encounter.deployment().equals(selected),"Encounter lost deployment selection");
             for(int i=0;i<9;i++){
@@ -57,8 +58,11 @@ public final class CampaignDeploymentTest {
         require(CampaignDeployment.defaultFor(LevelEconomy.level(1))
                 .withFormation(3).formation()==CampaignDeployment.Formation.LINE,
                 "Formation cycle failed");
-        long compact=LevelEconomy.victoryCredits(LevelEconomy.level(1),4,4,true);
-        long full=LevelEconomy.victoryCredits(LevelEconomy.level(1),20,20,true);
+        require(CampaignDeployment.defaultFor(LevelEconomy.level(1)).ships()==1,
+                "New campaign should deploy one ship on the first mission");
+        LevelEconomy.Level mid=LevelEconomy.level(150);
+        long compact=LevelEconomy.victoryCredits(mid,4,4,true);
+        long full=LevelEconomy.victoryCredits(mid,mid.maximumFleet(),mid.maximumFleet(),true);
         require(compact>full,"Deployment size does not affect the underdog reward preview");
         System.out.println("PASS campaign deployment: 4 stages, all formations, real coordinates, "
                 +"fleet caps, reward balance");

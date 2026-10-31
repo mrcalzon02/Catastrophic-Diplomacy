@@ -91,7 +91,11 @@ public final class CampaignEncounter {
             case FLEET_BATTLE -> 115;
             case SECTOR_CAPITAL -> 125;
         };
-        int initial=Math.max(1,(deployed*percent+99)/100);
+        // Hostile deployment represents the mission's strategic garrison,
+        // not the number of allied ships selected to game the underdog reward.
+        // In the final seven missions the full 200-ship enemy line is deployed.
+        if(level.index()>=LevelEconomy.FINALE_START)return 200;
+        int initial=Math.max(1,(level.maximumFleet()*percent+99)/100);
         return Math.min(level.maximumFleet(),initial+wave-1);
     }
 

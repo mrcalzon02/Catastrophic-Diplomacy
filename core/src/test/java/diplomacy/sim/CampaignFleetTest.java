@@ -16,6 +16,12 @@ public final class CampaignFleetTest {
         Battle.Faction faction=Battle.Faction.TERRAN;
         Shipyard.Design baseline=Shipyard.starter(faction,Shipyard.Hull.CORVETTE);
         var original=CampaignFleet.start(faction,baseline,tech);
+        var solo=CampaignFleet.startSolo(faction,baseline,tech,0x1a2b3c4dL);
+        check(solo.ships().size()==1&&solo.active().size()==1&&solo.reserves().isEmpty()
+                &&solo.nextSerial()==2,
+                "New story campaign must commission exactly one persistent ship");
+        check(solo.get(solo.ships().get(0).id()).id()==solo.ships().get(0).id(),
+                "Solo flagship must have a valid immutable commissioned identity");
         long ship1=original.ships().get(0).id();
         long ship2=original.ships().get(1).id();
         long ship3=original.ships().get(2).id();
