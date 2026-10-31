@@ -42,6 +42,8 @@ import java.util.function.Consumer;
 /** Compact, touch-and-mouse compatible single-screen ship fitting interface. */
 final class ShipyardPanel {
     private static final int SLOT_ROWS=18;
+    private static final float SLOT_ROW_TOP=560f;
+    private static final float PREVIEW_WIDTH=330f,PREVIEW_HEIGHT=402f;
     private static final float MAP_CX=563f, MAP_CY=343f, MAP_SCALE=2.65f;
     private final TechnologyCatalog catalog;
     private final TerranPlaceholderSprites fleetArt;
@@ -74,7 +76,8 @@ final class ShipyardPanel {
     private int campaignRank=9,unlockedMission=1;
     private boolean playerOnly;
     Usage usage(){return usage;}
-    private boolean artPreview;
+    // Show the actual approved faction vessel first, not the debug wireframe.
+    private boolean artPreview=true;
     private boolean technologyView;
     private boolean guidedView;
     private boolean perRackView;
@@ -153,7 +156,7 @@ final class ShipyardPanel {
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
-        draft=active[team];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;guidedView=false;perRackView=false;
+        draft=active[team];selectedSlot=0;scroll=0;artPreview=true;technologyView=false;guidedView=false;perRackView=false;
         purchaseArmedDesign=null;refitShipId=0;
         notice="DESIGN SANDBOX: configure fitted modules; campaign technology is researched separately.";
     }
@@ -186,7 +189,7 @@ final class ShipyardPanel {
         active[side]=design;
         if(side==team){draft=design;selectedSlot=0;scroll=0;}
     }
-    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=false;technologyView=false;guidedView=false;}
+    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;artPreview=true;technologyView=false;guidedView=false;}
     private void hull(int step){
         Shipyard.Hull[] options=Shipyard.Hull.shipyardOrder();
         int current=0;
@@ -201,7 +204,7 @@ final class ShipyardPanel {
         }
         if(next==null){notice="No hull licensed at Tech "+campaignRank;return;}
         draft=Shipyard.starter(draft.faction,next);
-        selectedSlot=0;scroll=0;artPreview=false;
+        selectedSlot=0;scroll=0;artPreview=true;
         var line=ShipLineages.of(next);
         notice="SIZE "+line.generation()+"/10 | TECH "+HullProgression.requiredTier(next)+
                 " | "+line.role().description;
@@ -215,7 +218,7 @@ final class ShipyardPanel {
             if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&
                     !HullProgression.available(next,campaignRank))continue;
             draft=Shipyard.starter(draft.faction,next);
-            selectedSlot=0;scroll=0;artPreview=false;
+            selectedSlot=0;scroll=0;artPreview=true;
             notice="SIZE "+target+"/10 | BASE TECH "+HullProgression.requiredTier(next)+
                     " | choose chassis with hull arrows";
             return;
@@ -225,7 +228,7 @@ final class ShipyardPanel {
         Battle.Faction[] options=Battle.Faction.values();
         Battle.Faction next=options[Math.floorMod(draft.faction.ordinal()+step,options.length)];
         draft=Shipyard.starter(next,draft.hull);
-        selectedSlot=0;scroll=0;artPreview=false;
+        selectedSlot=0;scroll=0;artPreview=true;
         notice="New "+next.displayName+" "+draft.hull+" frame; stock equipment installed";
     }
     private String legacyFileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)+".ship";}
@@ -252,7 +255,7 @@ final class ShipyardPanel {
             if(usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)
                 CampaignShipyardRules.requireAllowed(loaded,campaignWallet.get(),
                         campaignDiscoveries.get(),catalog);
-            draft=loaded;selectedSlot=0;scroll=0;artPreview=false;notice="Loaded "+file.path()+"; APPLY to deploy";
+            draft=loaded;selectedSlot=0;scroll=0;artPreview=true;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
     private void cycleFighter(){
@@ -509,7 +512,7 @@ final class ShipyardPanel {
         return true;
     }
     void startTouch(float x,float y,int pointer) {
-        if(gesture.start(pointer,x,y))scrollGesture=x<321&&y>105&&y<590;
+        if(gesture.start(pointer,x,y))scrollGesture=x<321&&y>90&&y<SLOT_ROW_TOP;
     }
     boolean drag(float x,float y,int pointer){
         if(!open)return false;
@@ -668,8 +671,32 @@ final class ShipyardPanel {
     }
 
     /** Shared pointer/touch hit test is intentionally independent of the renderer. */
+    private boolean showingHullArt() {
+        return artPreview&&fleetArt!=null&&fleetArt.hasHull(draft.faction,draft.hull);
+    }
+    boolean prefersHullArt(){return artPreview;}
+    private float hardpointX(Shipyard.Slot slot) {
+        return showingHullArt()?fleetArt.previewMountX(draft.faction,draft.hull,
+                slot.index(),MAP_CX,PREVIEW_WIDTH,PREVIEW_HEIGHT):
+                MAP_CX+slot.x()*MAP_SCALE;
+    }
+    private float hardpointY(Shipyard.Slot slot) {
+        return showingHullArt()?fleetArt.previewMountY(draft.faction,draft.hull,
+                slot.index(),MAP_CY,PREVIEW_WIDTH,PREVIEW_HEIGHT):
+                MAP_CY+slot.y()*MAP_SCALE;
+    }
+    /** Pixel-identical hardpoint positions for mouse and Android tap selection. */
     private int hitHardpoint(float x,float y) {
-        return HullLayouts.pick(draft.placements(),x,y,MAP_CX,MAP_CY,MAP_SCALE,14);
+        if(!showingHullArt())
+            return HullLayouts.pick(draft.placements(),x,y,MAP_CX,MAP_CY,MAP_SCALE,14);
+        float nearest=14f*14f;
+        int selected=-1;
+        for(Shipyard.Slot slot:draft.placements()){
+            float dx=x-hardpointX(slot),dy=y-hardpointY(slot);
+            float distance=dx*dx+dy*dy;
+            if(distance<nearest){nearest=distance;selected=slot.index();}
+        }
+        return selected;
     }
     private void select(int index) {
         selectedSlot=index;
@@ -690,8 +717,8 @@ final class ShipyardPanel {
                         "EDIT SHARED FAMILY: legacy profile";
                 return true;
             }
-            if(x<320&&y>=105&&y<=590){
-                int index=scroll+(int)((590-y)/26);
+            if(x<320&&y>=90&&y<SLOT_ROW_TOP){
+                int index=scroll+(int)((SLOT_ROW_TOP-y)/26);
                 if(index>=0&&index<draft.slots())select(index);
             }else{
                 int option=guidedOptionHit(x,y);
@@ -700,8 +727,8 @@ final class ShipyardPanel {
             return true;
         }
         if(technologyView&&y<638){
-            if(x<320&&y>=105&&y<=590){
-                int index=scroll+(int)((590-y)/26);
+            if(x<320&&y>=90&&y<SLOT_ROW_TOP){
+                int index=scroll+(int)((SLOT_ROW_TOP-y)/26);
                 if(index>=0&&index<draft.slots())select(index);
             }else technologyInput(technologyHit(x,y));
             return true;
@@ -727,13 +754,14 @@ final class ShipyardPanel {
             return true;
         }
         if(x>=690&&x<=795&&y>=580&&y<=635) {
-            if(artPreview)artPreview=false;
-            else if(fleetArt!=null && fleetArt.hasHull(draft.faction,draft.hull))artPreview=true;
-            else notice="No approved individual hull artwork for "+draft.faction+" "+draft.hull;
+            if(artPreview){artPreview=false;notice="Engineering schematic view";}
+            else if(fleetArt!=null&&fleetArt.hasHull(draft.faction,draft.hull)){
+                artPreview=true;notice="Approved faction hull artwork";
+            }else notice="No approved individual hull artwork for "+draft.faction+" "+draft.hull;
             return true;
         }
-        if(x<320 && y>=105&&y<=590){
-            int index=scroll+(int)((590-y)/26);
+        if(x<320 && y>=90&&y<SLOT_ROW_TOP){
+            int index=scroll+(int)((SLOT_ROW_TOP-y)/26);
             if(index>=0&&index<draft.slots())select(index);
             return true;
         }
@@ -752,7 +780,6 @@ final class ShipyardPanel {
             cycleAmmunition();return true;
         }
         if(x>=335&&x<=796&&y>=110&&y<=580){
-            if(artPreview){notice="Switch to SHOW MAP to select physical module hardpoints";return true;}
             int hit=hitHardpoint(x,y);
             if(hit>=0)select(hit);
             return true;
@@ -874,7 +901,7 @@ final class ShipyardPanel {
         for(int n=0;n<SLOT_ROWS;n++){
             int index=scroll+n;
             if(index>=draft.slots())break;
-            if(index==selectedSlot)rectangle(shapes,30,561-n*26,286,25,
+            if(index==selectedSlot)rectangle(shapes,30,535-n*26,286,25,
                     new Color(.13f,.23f,.33f,1));
         }
         for(int branch=0;branch<4;branch++){
@@ -934,7 +961,7 @@ final class ShipyardPanel {
             font.setColor(index==selectedSlot?Color.GOLD:mountColor(place.mount()));
             font.draw(batch,String.format(Locale.ROOT,"%02d  %-7s %s",
                     index+1,place.mount().name(),
-                    part==null?"EMPTY":part.component.substring(5)),36,581-n*26);
+                    part==null?"EMPTY":part.component.substring(5)),36,551-n*26);
         }
         font.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
         font.draw(batch,draft.faction.displayName,345,553);
@@ -1133,33 +1160,41 @@ final class ShipyardPanel {
         for(int n=0;n<SLOT_ROWS;n++){
             int index=scroll+n;
             if(index>=draft.slots())break;
-            if(index==selectedSlot)rectangle(shapes,30,561-n*26,286,25,new Color(0.13f,0.23f,0.33f,1));
+            if(index==selectedSlot)rectangle(shapes,30,535-n*26,286,25,new Color(0.13f,0.23f,0.33f,1));
         }
-        // Hardpoints are positioned in faction-specific normalized ship coordinates.
-        if(!artPreview)for(Shipyard.Slot slot:layout){
-            float px=MAP_CX+slot.x()*MAP_SCALE, py=MAP_CY+slot.y()*MAP_SCALE;
+        shapes.end();
+        // Artwork is the fitting canvas, never a separate noninteractive gallery.
+        boolean artwork=showingHullArt();
+        if(artwork){
+            batch.begin();
+            fleetArt.drawPreview(batch,draft.faction,draft.hull,
+                    MAP_CX,MAP_CY,PREVIEW_WIDTH,PREVIEW_HEIGHT);
+            batch.end();
+        }
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for(Shipyard.Slot slot:layout){
+            float px=hardpointX(slot),py=hardpointY(slot);
             shapes.setColor(slot.index()==selectedSlot?Color.WHITE:
                     draft.at(slot.index())==null?Color.GRAY:mountColor(slot.mount()));
-            shapes.circle(px,py,slot.index()==selectedSlot?11:7,16);
+            shapes.circle(px,py,slot.index()==selectedSlot?9:6,16);
             shapes.setColor(slot.index()==selectedSlot?Color.GOLD:new Color(0.035f,0.061f,0.09f,1));
-            shapes.circle(px,py,slot.index()==selectedSlot?5:3,12);
+            shapes.circle(px,py,slot.index()==selectedSlot?4:2.5f,12);
         }
         shapes.end();
-        shapes.begin(ShapeRenderer.ShapeType.Line);
-        shapes.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
-        List<HullLayouts.Point> border=HullLayouts.outline(draft.faction,draft.hull);
-        float[] vertices=new float[border.size()*2];
-        for(int n=0;n<border.size();n++){
-            vertices[n*2]=MAP_CX+border.get(n).x()*MAP_SCALE;
-            vertices[n*2+1]=MAP_CY+border.get(n).y()*MAP_SCALE;
-        }
-        if(!artPreview){
+        if(!artwork){
+            shapes.begin(ShapeRenderer.ShapeType.Line);
+            shapes.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
+            List<HullLayouts.Point> border=HullLayouts.outline(draft.faction,draft.hull);
+            float[] vertices=new float[border.size()*2];
+            for(int n=0;n<border.size();n++){
+                vertices[n*2]=MAP_CX+border.get(n).x()*MAP_SCALE;
+                vertices[n*2+1]=MAP_CY+border.get(n).y()*MAP_SCALE;
+            }
             shapes.polygon(vertices);
-            // Prow indicator, never an imaginary weapon barrel.
             shapes.line(MAP_CX-6,562,MAP_CX,574);
             shapes.line(MAP_CX,574,MAP_CX+6,562);
+            shapes.end();
         }
-        shapes.end();
         batch.begin();
         if (uiIcons != null) {
             uiIcons.drawButton(batch,team==0?"primary":"secondary",24,642,137,42);
@@ -1173,8 +1208,6 @@ final class ShipyardPanel {
             uiIcons.drawButton(batch,"cancel",1135,642,116,42);
             uiIcons.drawButton(batch,"info",697,579,102,41);
         }
-        if(artPreview&&fleetArt!=null)
-            fleetArt.drawPreview(batch,draft.faction,draft.hull,MAP_CX,MAP_CY,330,402);
         if (uiIcons != null) {
             uiIcons.draw(batch, "back", 344, 649, 25);
             uiIcons.draw(batch, "next", 650, 649, 25);
@@ -1226,9 +1259,9 @@ final class ShipyardPanel {
         font.draw(batch,"CLOSE",1174,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);
-        font.draw(batch,artPreview?"HULL ART PREVIEW":"FACTION HULL SCHEMATIC",345,590);
+        font.draw(batch,artwork?"FITTED HULL":"ENGINEERING SCHEMATIC",345,590);
         font.setColor(Color.GOLD);
-        font.draw(batch,artPreview?"SHOW MAP":"SHOW ART",705,590);
+        font.draw(batch,artwork?"SCHEMATIC":"SHIP ART",705,590);
         font.draw(batch,"MODULES",813,590);
         font.setColor(Color.GOLD);
         font.draw(batch,"GUIDED >",956,590);
@@ -1241,7 +1274,7 @@ final class ShipyardPanel {
             Shipyard.Installed part=draft.at(index);
             font.setColor(index==selectedSlot?Color.GOLD:mountColor(slot.mount()));
             String name=part==null?"EMPTY":part.component.substring("BASE-".length());
-            font.draw(batch,String.format(Locale.ROOT,"%02d  %-7s %s",index+1,slot.mount().name(),name),36,580-n*26);
+            font.draw(batch,String.format(Locale.ROOT,"%02d  %-7s %s",index+1,slot.mount().name(),name),36,551-n*26);
         }
         font.setColor(draft.faction.r,draft.faction.g,draft.faction.b,1);
         font.draw(batch,draft.faction.displayName,346,555);
@@ -1328,16 +1361,15 @@ final class ShipyardPanel {
                         tuning.cycle(),tuning.tracking(),tuning.supportEfficiency()),342,137);
             }
         }
-        if(!artPreview && draft.slots()<=18){
+        if(draft.slots()<=18){
             font.setColor(Color.LIGHT_GRAY);
-            for(Shipyard.Slot slot:layout){
-                font.draw(batch,""+(slot.index()+1),MAP_CX+slot.x()*MAP_SCALE+10,
-                                        MAP_CY+slot.y()*MAP_SCALE+6);
-            }
-        }else if(!artPreview){
+            for(Shipyard.Slot slot:layout)
+                font.draw(batch,""+(slot.index()+1),
+                        hardpointX(slot)+9,hardpointY(slot)+5);
+        }else{
             font.setColor(Color.GOLD);
-            font.draw(batch,"#"+(selectedSlot+1),MAP_CX+selected.x()*MAP_SCALE+13,
-                                            MAP_CY+selected.y()*MAP_SCALE+5);
+            font.draw(batch,"#"+(selectedSlot+1),
+                    hardpointX(selected)+12,hardpointY(selected)+5);
         }
         List<Component> options=Shipyard.choices(catalog,draft.faction,selected.mount());
         font.setColor(Color.LIGHT_GRAY);font.draw(batch,"CLEAR MOUNT",813,564);
