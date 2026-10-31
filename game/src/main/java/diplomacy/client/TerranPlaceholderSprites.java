@@ -20,6 +20,8 @@ public final class TerranPlaceholderSprites implements Disposable {
     private static final int GRID=DirectionalDefense.GRID;
     private final EnumMap<Battle.Faction,EnumMap<Shipyard.Hull,Texture>> textures=
             new EnumMap<>(Battle.Faction.class);
+    /** Campaign flagships use separate art, never overwrite faction hulls. */
+    private final java.util.Map<String,Texture> bossTextures=new java.util.HashMap<>();
     // Shipyard hardpoints are aligned once to each approved transparent PNG.
     // Cached normalized anchors are shared by mouse, touch and rendering.
     record ArtAnchor(float u,float v) {}
@@ -114,6 +116,19 @@ public final class TerranPlaceholderSprites implements Disposable {
                 }
             }
             if(!fleet.isEmpty())textures.put(faction,fleet);
+        }
+        // Optional dedicated flagship art: load once; all weapons remain the
+        // actual fitted modules and are rendered separately by the game.
+        String bossPath="ships/bosses/warrant_spire.png";
+        if(Gdx.files.internal(bossPath).exists()){
+            try{
+                Texture boss=new Texture(Gdx.files.internal(bossPath));
+                boss.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+                bossTextures.put("warrant_spire",boss);
+                originals.put(boss,bossPath);
+            }catch(RuntimeException error){
+                Gdx.app.error("SPRITES","Unable to load Warrant Spire sprite: "+bossPath,error);
+            }
         }
         // A full artwork release may NOT silently substitute colored geometric
         // hulls for a missing PNG. The 200v200 verification previously accepted
@@ -494,10 +509,14 @@ public final class TerranPlaceholderSprites implements Disposable {
         batch.setColor(1,1,1,1);
         return true;
     }
+    private Texture texture(Battle.Ship ship){
+        if(ship==null)return null;
+        Texture override=ship.campaignBossArt==null?null:bossTextures.get(ship.campaignBossArt);
+        return override!=null?override:ship.hullClass==null?null:texture(ship.faction,ship.hullClass);
+    }
     /** True only when this living vessel has an actual image, never for unapproved alien sheets. */
     public boolean hasSprite(Battle.Ship ship) {
-        return ship != null && ship.alive() && ship.hullClass != null
-                && texture(ship.faction,ship.hullClass)!=null;
+        return ship != null && ship.alive() && texture(ship)!=null;
     }
     public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses) {
@@ -518,7 +537,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
             if(view!=null&&!view.ship(position,ship.visualScale()))continue;
-            Texture tex=texture(ship.faction,ship.hullClass);
+            Texture tex=texture(ship);
             if(!ShipSurfaceLighting.flatAt(view))
                 surfaces.prepare(tex,originals.get(tex));
             if(ship.shields>0){
@@ -533,7 +552,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         surfaces.begin(batch,battle,view);
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship))continue;
-            Texture tex=texture(ship.faction,ship.hullClass);
+            Texture tex=texture(ship);
             if(tex==null)continue;
             float height=(float)(34*ship.visualScale());
             float width=height*tex.getWidth()/(float)tex.getHeight();
@@ -564,7 +583,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(shieldInk!=null)shieldInk.configure(false,battle.tick);
         for(Battle.Ship ship:battle.ships()){
             if(!hasSprite(ship)||ship.shields<=0)continue;
-            Texture tex=texture(ship.faction,ship.hullClass);
+            Texture tex=texture(ship);
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
@@ -589,7 +608,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float height=(float)(34*fx.ship.visualScale());
                 if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
                     continue;
-                Texture tex=texture(fx.ship.faction,fx.ship.hullClass);
+                Texture tex=texture(fx.ship);
                 if(tex==null)continue;
                 float width=height*tex.getWidth()/(float)tex.getHeight();
                 float fade=1f-fx.progress();
@@ -613,7 +632,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                         ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
                         :poses.ship(ship);
                 if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
-                Texture tex=texture(ship.faction,ship.hullClass);
+                Texture tex=texture(ship);
                 float height=(float)(34*ship.visualScale());
                 if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
                     continue;
@@ -687,6 +706,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(var fleet:textures.values())
             for(Texture image:fleet.values())if(disposed.add(image))image.dispose();
         textures.clear();
+        for(Texture image:bossTextures.values())if(disposed.add(image))image.dispose();
+        bossTextures.clear();
         resetPeelCache();activeBattle=null;
         for(Texture[] sections:shieldSections.values())
             for(Texture sector:sections)if(sector!=null)sector.dispose();
