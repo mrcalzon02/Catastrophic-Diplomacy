@@ -44,6 +44,37 @@ public final class GameMenuFlowTest {
             check(GameMenuPanel.homeHit(600,512-i*64)==i,"Home action "+i);
         check(GameMenuPanel.homeHit(15,650)==-1,"Off-menu tap activated an action");
         check(GameMenuPanel.homeHit(600,60)==7,"Battle screensaver must be clickable");
+        // Android has an independent large-target 2x4 home menu.
+        int[] mobileActions={0,1,2,3,4,6,7,5};
+        for(int slot=0;slot<mobileActions.length;slot++){
+            float x=72+(slot%2)*584+276,y=464-(slot/2)*120+48;
+            check(GameMenuPanel.homeHit(x,y,true)==mobileActions[slot],
+                    "Android home tile "+slot+" does not dispatch its visible action");
+        }
+        check(GameMenuPanel.homeHit(640,510,true)==-1,
+                "Android home gutter must not activate a tile");
+        check(GameMenuPanel.homeHit(600,60,true)==-1,
+                "Android must not retain an invisible desktop screensaver hitbox");
+        check(GameMenuPanel.homeHit(600,510,false)==0,
+                "Desktop campaign hitbox changed");
+        check(GameMenuPanel.optionsAction(640,510,true,true)==0,
+                "Android voice slider must be tappable");
+        check(GameMenuPanel.optionsAction(300,395,true,true)==1 &&
+                GameMenuPanel.optionsAction(800,395,true,true)==2 &&
+                GameMenuPanel.optionsAction(300,275,true,true)==3 &&
+                GameMenuPanel.optionsAction(800,275,true,true)==4 &&
+                GameMenuPanel.optionsAction(300,160,true,true)==5,
+                "Android options labels and controls have different actions");
+        check(GameMenuPanel.optionsAction(800,275,false,true)==-2,
+                "Unavailable updater must be disabled on Android");
+        check(GameMenuPanel.optionsAction(640,395,true,true)==-1,
+                "Android options gutter must not trigger anything");
+        check(GameMenuPanel.voiceHit(640,500,true) &&
+                !GameMenuPanel.voiceHit(640,500,false),
+                "Android voice panel must have distinct touch bounds");
+        check(GameMenuPanel.voiceAt(225,true)==0f &&
+                GameMenuPanel.voiceAt(1057,true)==1f,
+                "Android voice slider endpoints fail");
         check(GameMenuPanel.Screen.valueOf("CAMPAIGN_SETUP")!=null,
                 "New-campaign confirmation view is missing");
         ScenarioCatalog.Preset[] presets=ScenarioCatalog.Preset.values();
