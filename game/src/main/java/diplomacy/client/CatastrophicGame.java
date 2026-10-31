@@ -585,7 +585,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(screensaverMode){
                     com.badlogic.gdx.math.Vector2 ui=viewport.unproject(
                             new com.badlogic.gdx.math.Vector2(x,y));
-                    if(shipInspector.tap(ui.x,ui.y))return true;
+                    if(shipInspector.tap(ui.x,ui.y)){
+                        // Even when the inspection sheet consumes this tap,
+                        // double-tap wake must still receive real event time.
+                        long eventTime=Gdx.input.getCurrentEventTime();
+                        screensaverWake.down(pointer,x,y,
+                                eventTime>0?eventTime:System.nanoTime());
+                        return true;
+                    }
                     if(screensaverControlsVisible&&ui.y>=0&&ui.y<=66){
                         screensaverControlPointer=pointer;
                         screensaverControlDownX=ui.x;
