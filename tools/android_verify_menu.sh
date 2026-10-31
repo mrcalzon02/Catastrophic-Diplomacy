@@ -307,11 +307,14 @@ capture screensaver-zoomed
 touch_ui screensaver-controls-awake 875 32
 sleep 2
 capture screensaver-next-round
+# Preserve first zoom/next controls before clearing per-round logcat.
+adb logcat -d -v time > "$report/screensaver-controls-logcat.txt"
 # Real signed-APK randomized round stress: a one-off successful NEXT is
 # insufficient for sporadic crashes during battle creation or initial rendering.
 # Verify each freshly generated fight stays alive while combat begins.
 : > "$report/screensaver-round-stress.txt"
 for round in $(seq 1 8); do
+  adb logcat -c
   touch_ui screensaver-controls-awake 875 32
   sleep 3
   adb logcat -d -v time > "$report/screensaver-round-$round-logcat.txt"
@@ -327,13 +330,12 @@ for round in $(seq 1 8); do
   fi
   grep 'CD-SCREENSAVER.*ROUND seed=' "$report/screensaver-round-$round-logcat.txt" \
     | tail -n 1 >> "$report/screensaver-round-stress.txt" || true
-  if [[ ! -s "$report/screensaver-round-stress.txt" ]]; then
-    echo "FAIL: no screensaver seed telemetry after randomized round $round" >&2
+  if ! grep -q 'CD-SCREENSAVER.*ROUND seed=' "$report/screensaver-round-$round-logcat.txt"; then
+    echo "FAIL: screensaver next-round command produced no new seeded battle at round $round" >&2
     exit 1
   fi
 done
 capture screensaver-stress-last-round
-adb logcat -d -v time > "$report/screensaver-controls-logcat.txt"
 grep -q 'CD-SCREENSAVER.*CONTROL ZOOM IN' "$report/screensaver-controls-logcat.txt" || {
   echo "FAIL: woken screensaver zoom control was inert" >&2
   exit 1
