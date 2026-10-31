@@ -311,3 +311,11 @@ tasks.register('laserFxDiagnostic', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.LaserRun01FxTest'
 }
+
+tasks.register('fighterArtBridgeDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Nonblocking review of 11 faction-owned craft palettes and real sprite routing.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.FighterCraftArtBridgeDiagnostic'
+}
