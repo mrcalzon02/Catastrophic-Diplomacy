@@ -35,3 +35,17 @@ claiming display-level acceptance.
   pan-induced allocations and image upload spikes.
 - The incremental rectangular update is covered by headless visual diagnostics
   for single-point hits, structural bypass, repair, edge and distant impacts.
+
+
+## Source-art damage registration
+
+An impact near a thin or irregular hull edge may be inside the physical
+16×16 armor grid but over original PNG transparency. On first damage use
+per unique approved sprite, we sample its **actual alpha** into 96×144
+coordinates and cache 256 nearest-opaque visual crater anchors.
+Only an off-hull crater whose center is **within one original armor cell** of
+solid authored artwork can shift its visual center, by at most that distance.
+Already-opaque centers remain unchanged; source alpha clipping is still
+absolute. This does not move the physical projectile strike, damage tile,
+armor loss, module hit or saved battle state. Low-alpha labels/thruster fringes
+are excluded from anchor candidates.

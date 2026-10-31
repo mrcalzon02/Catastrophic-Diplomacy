@@ -53,6 +53,25 @@ public final class ShipSurfaceDamageVisualTest {
         float tearA=ShipArmorStamps.openingAt(6.58f,7.08f,6,7,1f,0,32);
         float tearB=ShipArmorStamps.openingAt(6.58f,7.08f,6,7,1f,0,33);
         check(tearA!=tearB,"Different impact locations need varied jagged outlines");
+        // Source-alpha alignment: only move a visually hidden crater to
+        // physically adjacent opaque armor. Never project across empty space.
+        int w=96,h=144;
+        int[] thinHull=new int[w*h];
+        for(int y=4;y<h-4;y++)for(int x=38;x<=58;x++)thinHull[y*w+x]=255;
+        var aligned=ShipArmorStampAnchors.fromAlpha(thinHull,w,h);
+        check(aligned.row(8,8)==8f&&aligned.col(8,8)==8f,
+                "Already opaque armor plate must keep its exact physical anchor");
+        check(aligned.col(8,5)>5f&&aligned.col(8,5)<=6f,
+                "Nearby narrow hull armor should receive the crater, not transparent padding");
+        check(aligned.col(8,0)==0f,
+                "A remote disconnected impact cannot teleport its crater across transparent space");
+        float shifted=ShipArmorStamps.openingAt(aligned.row(8,5),aligned.col(8,5),
+                8,5,aligned.row(8,5),aligned.col(8,5),1,0,77);
+        check(shifted==1f,"Aligned physical armor breach must expose the interior");
+        int[] transparent=new int[w*h];
+        var empty=ShipArmorStampAnchors.fromAlpha(transparent,w,h);
+        check(empty.row(8,5)==8&&empty.col(8,5)==5,
+                "Missing source artwork must not invent a new hull surface");
         // A transparent exterior and opaque silhouette-clipped sublayer are
         // separate physical render passes, not a cutout into empty space.
         check(alpha(hole)==0 && alpha(0x424c55ff)==255,

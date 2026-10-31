@@ -15,13 +15,18 @@ final class ShipArmorStamps {
      */
     static float openingAt(float localRow,float localCol,int row,int col,
                            float exposure,float structural,int shipId){
+        return openingAt(localRow,localCol,row,col,row,col,exposure,structural,shipId);
+    }
+    static float openingAt(float localRow,float localCol,int row,int col,
+                           float stampedRow,float stampedCol,
+                           float exposure,float structural,int shipId){
         float wear=clamp(exposure),inside=clamp(structural);
         if(wear<=.70f&&inside<=.00001f)return 0f;
         float peeled=clamp((wear-.70f)/.20f);
         float puncture=(float)StrictMath.sqrt(inside);
         if(peeled<=0f&&puncture<=0f)return 0f;
 
-        float dx=localCol-col,dy=localRow-row;
+        float dx=localCol-stampedCol,dy=localRow-stampedRow;
         // Multi-lobed, stable metal tearing, not a uniform grey disc.
         int hash=shipId*0x9e3779b9+row*0x7f4a7c15+col*0x6c8e9cf5;
         hash^=hash>>>16;

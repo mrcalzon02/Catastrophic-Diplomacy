@@ -56,6 +56,10 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final java.util.Set<Integer> retainedDamageIds=new java.util.HashSet<>();
     private final java.util.Map<Texture,Pixmap> sourcePixels =
             new java.util.IdentityHashMap<>();
+    // One source-alpha registration per artwork texture, shared by every ship
+    // of that hull/faction; only the visual stamps shift, never impact physics.
+    private final java.util.Map<Texture,ShipArmorStampAnchors> armorAnchors =
+            new java.util.IdentityHashMap<>();
     private Battle activeBattle;
     // One shader + cached textures for all faction/hull instances; no per-frame Pixmaps.
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
@@ -297,6 +301,19 @@ public final class TerranPlaceholderSprites implements Disposable {
         sourcePixels.put(texture,source);
         return source;
     }
+    private ShipArmorStampAnchors armorAnchors(Texture original){
+        ShipArmorStampAnchors registered=armorAnchors.get(original);
+        if(registered!=null)return registered;
+        Pixmap source=sourcePixels(original);
+        int[] alpha=new int[MASK_W*MASK_H];
+        for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++)
+            alpha[y*MASK_W+x]=source.getPixel(
+                    x*source.getWidth()/MASK_W,
+                    y*source.getHeight()/MASK_H)&255;
+        registered=ShipArmorStampAnchors.fromAlpha(alpha,MASK_W,MASK_H);
+        armorAnchors.put(original,registered);
+        return registered;
+    }
     /** Only armor changes invalidate the overlay; regenerating shields do not. */
     private static long armorSignature(Battle.Ship ship) {
         long result=0xcbf29ce484222325L;
@@ -342,6 +359,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             item.levels=null;
         }
         Pixmap source=sourcePixels(original);
+        ShipArmorStampAnchors aligned=armorAnchors(original);
         // Snapshot only 256 actual protection cells once per changed vessel.
         // Avoid dereferencing defenses and recomputing integrity for every
         // mask pixel (and all 9 neighboring tiles) in mass engagements.
@@ -385,6 +403,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                         if(wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
                         crater=Math.max(crater,ShipArmorStamps.openingAt(
                                 (float)tileRow,(float)tileCol,r,c,
+                                aligned.row(r,c),aligned.col(r,c),
                                 wear[r][c],internal[r][c],ship.id));
                     }
                 float rough=noise(x/4,y/4,ship.id)*0.70f+
@@ -754,6 +773,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         for(Pixmap pixels:sourcePixels.values())pixels.dispose();
         sourcePixels.clear();
+        armorAnchors.clear();
         for(Texture image:damagedLayers.values())image.dispose();
         for(Texture image:severeLayers.values())image.dispose();
         damagedLayers.clear();severeLayers.clear();originals.clear();
