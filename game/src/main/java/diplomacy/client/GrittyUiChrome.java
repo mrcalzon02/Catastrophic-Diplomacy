@@ -48,6 +48,47 @@ final class GrittyUiChrome {
 
     boolean loaded(){return texture!=null;}
 
+    /**
+     * Resolve interactive body art from the *existing* authored atlas.
+     * No procedural glow frames. Normal/selected states are sprite-based,
+     * as are hover/press variants. The semantic intent remains visible at
+     * rest; a pressed button is also physically inset like a real switch.
+     */
+    static int stateVariant(int base,boolean hover,boolean down){
+        if(base<0)return SECONDARY; // disabled, visibly dimmed by drawState
+        if(base>=TILES)throw new IllegalArgumentException("Unknown button variant");
+        if(down)return switch(base){
+            case NORMAL,SELECTED,TELEMETRY,SECONDARY -> PRIMARY;
+            case WARNING -> DANGER;
+            default -> base; // preserve confirm/primary/danger semantic coloring
+        };
+        if(hover)return switch(base){
+            case NORMAL -> SELECTED;
+            case SELECTED -> TELEMETRY;
+            case WARNING -> PRIMARY;
+            case DANGER -> WARNING;
+            case SECONDARY -> SELECTED;
+            default -> base; // retain the warning/confirmation intent artwork
+        };
+        return base;
+    }
+
+    void drawState(SpriteBatch batch,int base,boolean hover,boolean down,
+                   float x,float y,float width,float height){
+        if(texture==null||width<65||height<25)return;
+        int variant=stateVariant(base,hover,down);
+        float color=batch.getPackedColor();
+        // Button body, not a painted border, shows each state. The pressed
+        // surface moves inward and darkens; the active touch rectangle does not.
+        if(base<0)batch.setColor(.46f,.46f,.46f,.68f);
+        else if(down)batch.setColor(.78f,.78f,.78f,1f);
+        else if(hover&&variant==base)batch.setColor(1f,1f,.88f,1f);
+        else batch.setColor(1f,1f,1f,1f);
+        float inset=down?2f:0f;
+        tiles[variant].draw(batch,x+inset,y-inset,width-2f*inset,height);
+        batch.setPackedColor(color);
+    }
+
     void draw(SpriteBatch batch,int type,float x,float y,float width,float height){
         if(texture==null||type<0||type>=TILES||width<65||height<25)return;
         tiles[type].draw(batch,x,y,width,height);
