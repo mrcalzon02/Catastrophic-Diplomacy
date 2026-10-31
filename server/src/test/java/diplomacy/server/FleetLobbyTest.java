@@ -66,6 +66,26 @@ public final class FleetLobbyTest {
                     "Tech 6 must preserve mixed lower-tier ships");
             check(t6.at(0)!=null&&basic.slots()>0,"Source designs preserved");
         }
+        // A disconnected owner must lose its accepted fleet; an incoming trusted-LAN
+        // seat cannot inherit that fleet or trigger an early battle.
+        try(BattleServer host=BattleServer.openLanLobby("127.0.0.1",0,252L,low);
+            BattleConnection a=BattleConnection.openLan("127.0.0.1",host.port(),false);
+            BattleConnection b=BattleConnection.openLan("127.0.0.1",host.port(),false)){
+            a.submitFleet(SkirmishFleetCodec.encode(new SkirmishFleet(List.of(basic,t3)),tech));
+            until(()->b.lobbyStatus().equals("Accepted seats 1/0"));
+            a.close();
+            until(()->b.lobbyStatus().equals("Accepted seats 0/0"));
+            check(host.lobbyWaiting()&&host.tick()==0&&b.snapshot()==null,
+                    "Disconnect must invalidate its accepted fleet");
+            try(BattleConnection replacement=BattleConnection.openLan("127.0.0.1",host.port(),false)){
+                check(replacement.team==0,"LAN disconnect must free the original seat");
+                replacement.submitFleet(SkirmishFleetCodec.encode(new SkirmishFleet(List.of(basic,t3)),tech));
+                b.submitFleet(SkirmishFleetCodec.encode(SkirmishFleet.repeat(other,2),tech));
+                until(()->replacement.snapshot()!=null&&b.snapshot()!=null);
+                check(replacement.snapshot().entities().stream().filter(s->s.startsWith("SHIP|")).count()==4,
+                        "Replacement must submit a fresh legal fleet");
+            }
+        }
         try(BattleServer host=BattleServer.openLanLobby("127.0.0.1",0,303L,low);
             Socket raw=new Socket("127.0.0.1",host.port())){
             raw.setSoTimeout(5000);
