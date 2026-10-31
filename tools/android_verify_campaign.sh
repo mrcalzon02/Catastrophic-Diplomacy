@@ -51,11 +51,20 @@ touch(){
 }
 live(){ adb shell pidof "$package" >/dev/null 2>&1; }
 wait_log(){
-  local marker="$1" timeout_seconds="$2" second
+  local marker="$1" timeout_seconds="$2" second saw_process=0
   for second in $(seq 1 "$timeout_seconds"); do
-    if ! live; then
-      echo "FAIL: campaign app process exited before $marker" >&2
-      return 1
+    if live; then
+      saw_process=1
+    else
+      # am start -W returns before the Linux process is visible through
+      # pidof on some SwiftShader boots. Do not mistake that narrow startup
+      # race for a crashing application. Once seen, process death is fatal.
+      if (( saw_process || second>10 )); then
+        echo "FAIL: campaign app process exited before $marker" >&2
+        return 1
+      fi
+      sleep 1
+      continue
     fi
     # Avoid grep -q closing an adb pipe early under pipefail.
     adb logcat -d -v brief > "$report/$current-poll-logcat.txt"
@@ -101,7 +110,7 @@ start_game(){
   adb shell am start -W -n "$activity" > "$report/$current-start.txt"
   # Swiftshader startup after multiple campaign scenes varies widely. A live
   # process must actually emit the main-menu marker; no timestamp-only pass.
-  wait_log 'CD-GAME-FLOW.*MAIN_MENU' 45
+  wait_log 'CD-GAME-FLOW.*MAIN_MENU' 90
   dismiss_updater
   # 400-ship test emulators may draw fewer than 2 UI frames per second.
   # Log MAIN_MENU is not proof that the first interactive frame is ready.
