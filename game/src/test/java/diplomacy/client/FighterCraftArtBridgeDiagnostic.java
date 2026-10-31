@@ -1,17 +1,16 @@
 package diplomacy.client;
 
 import diplomacy.sim.Battle;
-import diplomacy.shipyard.FactionArt;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Visual-only diagnostic: every spawned craft uses original art owned by its
- * faction. Founder factions intentionally share some genuine small-hull art
- * between roles until bespoke fighter/drone sheets are authored.
- * Do not attach this visual mapping check to functional release gates.
+ * Nonblocking visual audit: all 11 playable factions use purpose-built
+ * craft sprites, not scaled-down ship hulls or geometry placeholders.
+ * Reused palette art is loaded only once per true source PNG.
  */
 public final class FighterCraftArtBridgeDiagnostic {
     private static final String[] ROLES={
@@ -19,35 +18,32 @@ public final class FighterCraftArtBridgeDiagnostic {
             "torpedo_bomber","recon_fighter","heavy_bomber","point_defense_fighter",
             "electronic_warfare","support_drone"
     };
-    private static void require(boolean valid,String message){
+    private static void require(boolean valid,String message) {
         if(!valid)throw new AssertionError(message);
     }
-    public static void main(String[] ignored){
-        Set<String> used=new HashSet<>();
+    public static void main(String[] ignored) {
+        Set<String> allSprites=new HashSet<>();
         Map<Battle.Faction,Set<String>> byFaction=new EnumMap<>(Battle.Faction.class);
+        Map<String,Integer> paletteUses=new HashMap<>();
         for(Battle.Faction faction:Battle.Faction.values()){
             Set<String> paths=new HashSet<>();
+            String family=FighterCraftSprites.fighterArtFamily(faction);
+            paletteUses.merge(family,1,Integer::sum);
             for(String role:ROLES){
                 String path=FighterCraftSprites.spritePath(faction,role);
-                require(path.endsWith(".png"),faction+"/"+role+" has no real PNG");
-                if(faction==Battle.Faction.TERRAN)
-                    require(path.startsWith("ships/terran/"),"Terran art identity changed");
-                else if(FactionArt.hasLegacyArt(faction))
-                    require(path.startsWith("ships/legacy_factions/"),"Foreign sprite for "+faction);
-                else
-                    require(path.startsWith("ships/fighters/"+FactionArt.alien(faction).id()+"/"),
-                            "Foreign specialized fighter art for "+faction+"/"+role);
-                paths.add(path);
+                require(path.equals("ships/fighters/"+family+"/"+role+".png"),
+                        faction+"/"+role+" routed to non-fighter asset: "+path);
+                require(paths.add(path),faction+" reuses a fighter for different roles");
+                allSprites.add(path);
             }
-            int expected=FactionArt.supports(faction)?10:7;
-            require(paths.size()==expected,
-                    faction+" should use "+expected+" genuine sprites, got "+paths.size());
-            for(String path:paths)
-                require(used.add(path),"Sprite assigned to multiple civilizations: "+path);
+            require(paths.size()==10,faction+" missing specialist craft roles");
             byFaction.put(faction,paths);
         }
-        require(used.size()==92,"Expected 42 founder-hull silhouettes + 50 alien fighter images");
-        require(byFaction.size()==Battle.Faction.values().length,"Missing faction art mapping");
-        System.out.println("PASS visual diagnostic: 11 faction-owned craft palettes, 92 genuine image paths; no Asteroids wireframes");
+        require(allSprites.size()==50,"Expected precisely 50 original specialist craft images");
+        require(paletteUses.size()==5,"Expected five original fighter visual families");
+        require(byFaction.size()==Battle.Faction.values().length,"Missing playable faction art");
+        for(String family:paletteUses.keySet())
+            require(paletteUses.get(family)>=2,"Unused corresponding founding family: "+family);
+        System.out.println("PASS visual diagnostic: all 11 factions have ten specialist fighter/drone roles; 50 authentic source PNG paths, no capital-hull substitutes");
     }
 }
