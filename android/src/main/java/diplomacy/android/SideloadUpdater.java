@@ -339,7 +339,11 @@ final class SideloadUpdater {
 
     private void validateArchive(File apk, UpdatePolicy.Candidate candidate) throws Exception {
         PackageManager pm = activity.getPackageManager();
-        int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+        // Ask for both representations: some Android package parsers omit
+        // signingInfo for archive files even when the legacy signatures are present.
+        int flags = Build.VERSION.SDK_INT >= 28
+                ? PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.GET_SIGNATURES
+                : PackageManager.GET_SIGNATURES;
         PackageInfo archive = pm.getPackageArchiveInfo(apk.getAbsolutePath(), flags);
         PackageInfo installed = pm.getPackageInfo(activity.getPackageName(), flags);
         if (archive == null || !candidate.applicationId().equals(archive.packageName) ||
@@ -351,12 +355,22 @@ final class SideloadUpdater {
                 (code(archive) != candidate.versionCode() || !candidate.version().equals(archive.versionName)))
             throw new IOException("APK version metadata disagrees with its release manifest");
         Signature[] from = signers(installed), to = signers(archive);
-        if (from == null || to == null || from.length == 0 || !Arrays.equals(from, to))
+        if (from == null || to == null || from.length == 0 || to.length == 0)
+            throw new IOException("Android could not read the installed or downloaded APK signer; refusing an unverified upgrade");
+        // APK signing identity is an unordered set, not a guaranteed ordered array.
+        if (from.length != to.length ||
+                !new java.util.HashSet<>(Arrays.asList(from)).equals(
+                        new java.util.HashSet<>(Arrays.asList(to))))
             throw new IOException("APK signer differs from the installed app; refusing unsafe upgrade");
     }
 
     private static Signature[] signers(PackageInfo info) {
-        if (Build.VERSION.SDK_INT >= 28) return info.signingInfo == null ? null : info.signingInfo.getApkContentsSigners();
+        if (Build.VERSION.SDK_INT >= 28 && info.signingInfo != null) {
+            Signature[] current = info.signingInfo.getApkContentsSigners();
+            if (current != null && current.length > 0) return current;
+        }
+        // GET_SIGNATURES was also requested so a readable archive certificate
+        // is not accidentally reported as a different signer on older devices.
         return info.signatures;
     }
     private static long code(PackageInfo info) {
