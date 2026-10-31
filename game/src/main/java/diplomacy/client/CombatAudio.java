@@ -20,6 +20,7 @@ public final class CombatAudio implements AutoCloseable {
     private final Map<CombatAudioCue.Cue, Sound> cues = new EnumMap<>(CombatAudioCue.Cue.class);
     private final long[] lastPlayedTick = new long[CombatAudioCue.Cue.values().length];
     private final SpatialAudioRuntime spatial;
+    private final AudioPitchVariants pitchVariants = new AudioPitchVariants();
     private final AnnouncerAudio announcer;
     private final RecordedHullVoiceAudio hullVoice;
     private Sound radioOpen, radioClose, uiHoverSound, uiPressSound, uiBackSound, uiBlockedSound, uiAdjustSound;
@@ -167,6 +168,7 @@ public final class CombatAudio implements AutoCloseable {
         seenSequence=0;seenDestructions=0;
         Arrays.fill(lastPlayedTick,-1000000L);
         spatial.reset();
+        pitchVariants.reset();
         lastLogEntry = null;
         lastRadioTick = -1000000L;
         radioFlip = false;
@@ -234,7 +236,11 @@ public final class CombatAudio implements AutoCloseable {
         radioFlip = !radioFlip;
         lastRadioTick = battle.tick;
         if (tone != null) {
-            try { tone.play(effectsVolume*0.28f); }
+            try {
+                tone.play(effectsVolume*0.28f,
+                        pitchVariants.next(radioFlip?"radio_open":"radio_close",
+                                AudioPitchVariants.Profile.RADIO),0f);
+            }
             catch (RuntimeException error) { Gdx.app.error("AUDIO", "Radio cue failed",error); }
         }
     }
@@ -244,28 +250,35 @@ public final class CombatAudio implements AutoCloseable {
         if (!effectsOn || suspended) return;
         Sound click = cues.get(CombatAudioCue.Cue.UI);
         if (click != null) {
-            try { click.play(effectsVolume * 0.42f); }
+            try {
+                click.play(effectsVolume * 0.42f,
+                        pitchVariants.next("ui_confirm",AudioPitchVariants.Profile.UI),0f);
+            }
             catch (RuntimeException error) { Gdx.app.error("AUDIO", "UI cue failed", error); }
         }
     }
 
-    private void uiSound(Sound sound,float level){
+    private void uiSound(Sound sound,float level,String cue){
         if(!effectsOn||suspended||sound==null)return;
-        try{sound.play(effectsVolume*level);}
-        catch(RuntimeException err){if(Gdx.app!=null)Gdx.app.error("AUDIO","UI feedback failed",err);}
+        try{
+            sound.play(effectsVolume*level,
+                    pitchVariants.next(cue,AudioPitchVariants.Profile.UI),0f);
+        }catch(RuntimeException err){
+            if(Gdx.app!=null)Gdx.app.error("AUDIO","UI feedback failed",err);
+        }
     }
     public void uiHover(){
         long now=System.nanoTime();
         if(now-lastHoverSoundNs<90_000_000L)return;
-        lastHoverSoundNs=now;uiSound(uiHoverSound,.16f);
+        lastHoverSoundNs=now;uiSound(uiHoverSound,.16f,"ui_hover");
     }
-    public void uiPress(){uiSound(uiPressSound,.35f);}
-    public void uiBack(){uiSound(uiBackSound,.34f);}
-    public void uiBlocked(){uiSound(uiBlockedSound,.29f);}
+    public void uiPress(){uiSound(uiPressSound,.35f,"ui_press");}
+    public void uiBack(){uiSound(uiBackSound,.34f,"ui_back");}
+    public void uiBlocked(){uiSound(uiBlockedSound,.29f,"ui_blocked");}
     public void uiAdjust(){
         long now=System.nanoTime();
         if(now-lastAdjustSoundNs<65_000_000L)return;
-        lastAdjustSoundNs=now;uiSound(uiAdjustSound,.28f);
+        lastAdjustSoundNs=now;uiSound(uiAdjustSound,.28f,"ui_adjust");
     }
     public void pause() {
         suspended = true;

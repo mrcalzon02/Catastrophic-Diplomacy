@@ -1,0 +1,25 @@
+name: Optional audio repetition diagnostics
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'game/src/main/java/diplomacy/client/AudioPitchVariants.java'
+      - 'game/src/main/java/diplomacy/client/CombatAudio.java'
+      - 'game/src/main/java/diplomacy/client/SpatialAudioRuntime.java'
+      - 'game/src/test/java/diplomacy/client/AudioPitchVariantsTest.java'
+      - 'game/build.gradle'
+      - '.github/workflows/audio-pitch-diagnostics.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audio-pitch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Verify bounded varied sound playback without device sound hardware
+        run: gradle --no-daemon :game:audioPitchVariationSmoke

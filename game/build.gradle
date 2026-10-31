@@ -319,3 +319,13 @@ tasks.register('fighterArtBridgeDiagnostic', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.FighterCraftArtBridgeDiagnostic'
 }
+
+
+// Cosmetic/audio-timbre diagnostic; NOT a gameplay or release-blocking dependency.
+tasks.register('audioPitchVariationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate bounded playback-rate variants and anti-repeat pitch bags.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.AudioPitchVariantsTest'
+}

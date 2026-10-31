@@ -22,6 +22,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
     private final Map<CombatAudioCue.Cue,Sound> library;
     private final Map<String,Sound> synth = new HashMap<>();
     private final Map<String,Long> lastCueTick = new HashMap<>();
+    private final AudioPitchVariants pitchVariants = new AudioPitchVariants();
     private final Map<Integer,EngineVoice> localEngines = new HashMap<>();
     private final Map<Integer,double[]> shieldStates = new HashMap<>();
     private final Set<Integer> seenDead = new HashSet<>();
@@ -34,7 +35,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
         EngineVoice(long voice,double facing){this.voice=voice;this.facing=facing;}
     }
     private record Pending(Sound sound,String key,long tick,int cooldown,
-                           float gain,float pan,float pitch,double priority) { }
+                           float gain,float pan,double priority) { }
 
     SpatialAudioRuntime(Map<CombatAudioCue.Cue,Sound> library) {
         this.library=library;
@@ -52,6 +53,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
     }
     void reset() {
         lastSequence=0;lastDestructions=0;lastCueTick.clear();
+        pitchVariants.reset();
         shieldStates.clear();seenDead.clear();stopEngines();
     }
     private void stopEngines() {
@@ -107,9 +109,9 @@ final class SpatialAudioRuntime implements AutoCloseable {
         return priority*(phase==Battle.VisualPhase.IMPACT?1.7:1.0);
     }
     private void add(List<Pending> list,Sound sound,String key,long tick,int cooldown,
-                     float gain,float pan,float pitch,double priority){
+                     float gain,float pan,double priority){
         if(sound==null || gain<0.012f)return;
-        Pending pending=new Pending(sound,key,tick,cooldown,gain,pan,pitch,priority*gain);
+        Pending pending=new Pending(sound,key,tick,cooldown,gain,pan,priority*gain);
         if(list.size()<CANDIDATE_LIMIT){list.add(pending);return;}
         int smallest=0;
         for(int i=1;i<list.size();i++)
@@ -130,10 +132,11 @@ final class SpatialAudioRuntime implements AutoCloseable {
         float strength=(event.phase()==Battle.VisualPhase.IMPACT?0.91f:0.68f);
         if(layer==SpatialAudioModel.Layer.CAPITAL)strength*=1.18f;
         String key=event.phase()+":"+event.weapon();
-        float pitch=0.91f+(float)Math.floorMod(event.shotId(),7)*0.027f;
+        // Select pitch only after the channel passes budget/cooldown gates.
+        // The old shotId%7 sequence repeated its exact timbre on every volley.
         add(list,selectSound(event,cue),key,event.tick(),
                 CombatAudioCue.cooldownTicks(cue),mix.gain()*strength,mix.pan(),
-                pitch,weight(layer,event.phase()));
+                weight(layer,event.phase()));
     }
     private double[] cachedShieldFacings(Battle.Ship ship){
         return shieldStates.computeIfAbsent(ship.id,id->{
@@ -170,7 +173,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
                         ? SpatialAudioModel.Layer.CAPITAL : SpatialAudioModel.Layer.TACTICAL;
                 SpatialAudioModel.Mix mix=SpatialAudioModel.at(layer,cx,cy,zoom,ship.x,ship.y);
                 add(list,synth.get(cue),cue,battle.tick,20,mix.gain()*.85f,
-                        mix.pan(),1f,3.6);
+                        mix.pan(),3.6);
             }
         }
     }
@@ -183,7 +186,7 @@ final class SpatialAudioRuntime implements AutoCloseable {
                 float gain=clip(0.4f+0.7f*mix.gain());
                 add(list,synth.getOrDefault("reactor_hit",
                         library.get(CombatAudioCue.Cue.EXPLOSION)),
-                        "explosion",battle.tick,13,gain,mix.pan(),0.88f,5.6);
+                        "explosion",battle.tick,13,gain,mix.pan(),5.6);
             }
         }
         lastDestructions=battle.destructions;
@@ -198,7 +201,8 @@ final class SpatialAudioRuntime implements AutoCloseable {
             long previous=lastCueTick.getOrDefault(p.key,Long.MIN_VALUE/2);
             if(p.tick-previous<p.cooldown)continue;
             try{
-                long voice=p.sound.play(clip(master*p.gain),p.pitch,p.pan);
+                float pitch=pitchVariants.next(p.key,AudioPitchVariants.Profile.COMBAT);
+                long voice=p.sound.play(clip(master*p.gain),pitch,p.pan);
                 if(voice<0)continue;
                 lastCueTick.put(p.key,p.tick);total++;
                 if(p.key.startsWith("FIRE:POINT_DEFENSE")||p.key.startsWith("FIRE:FIGHTER"))detail++;
@@ -254,7 +258,9 @@ final class SpatialAudioRuntime implements AutoCloseable {
                 if(voice!=null&&wrappedAngle(ship.facing,voice.facing)>0.11
                         &&battle.tick-voice.lastThrusterTick>=14) {
                     Sound burst=synth.get("thruster");
-                    if(burst!=null)burst.play(clip(volume*0.35f*m.gain()),1f,m.pan());
+                    if(burst!=null)burst.play(clip(volume*0.35f*m.gain()),
+                            pitchVariants.next("thruster",AudioPitchVariants.Profile.THRUSTER),
+                            m.pan());
                     voice.lastThrusterTick=battle.tick;
                 }
                 // Retain the last firing heading; accumulate small steering corrections.

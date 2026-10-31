@@ -54,3 +54,30 @@ background/resume, stereo panning and final destruction audibility.
 Drive audio distribution rights remain subject to the original
 [Audio System](AUDIO_SYSTEM.md) release-rights gate; these synthesized cues are
 original programmatic source.
+
+
+## Automatic anti-repetition pitch variants (October 2026)
+
+Every accepted one-shot combat sound now selects a fresh playback-rate variant
+from the authored source WAV. This includes weapons, shield hits and facing
+transitions, hull impacts, ship explosions, and the dedicated point-defense
+synth. The same cue cannot repeat either of its previous TWO pitches.
+It retains spatial volume, stereo pan, event priority, actual hit timing,
+cooldown and the existing 6-shots-per-frame cap.
+
+- Combat one-shots: **0.86×–1.14×** pitch (nine notes), matching the Nut Buster
+  percussion variation approach.
+- UI buttons, menu confirms and adjustments: **0.95×–1.05×** (seven notes).
+- Communication bleeps: **0.96×–1.04×** (seven notes).
+- Steering thruster bursts: **0.91×–1.09×** (seven notes).
+
+Voiceover, spoken radio, background music, continuous engine loops and fleet
+beds are **not** randomly pitch shifted. Ship-class engine pitch remains
+as-designed for each looping engine. The pitch selector uses its own render-side
+PRNG and per-cue anti-repeat history, not the simulation RNG. Each variant reuses
+the exact original file without creating another decoded sample per variant.
+Muting, pause/resume, battle reset and polyphony controls still apply.
+
+Test with `gradle :game:audioPitchVariationSmoke` (standalone diagnostic, not
+a release-blocking aesthetic check); then audition rapidly repeated close-up
+volleys, UI controls and radio bleeps on an actual Android handset and desktop.
