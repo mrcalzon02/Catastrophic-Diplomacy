@@ -234,8 +234,7 @@ jobs:
             bash tools/android_verify_demo.sh package/verify-debug.apk test-output/android
             # Save genuine in-engine approved hull sprites at four seeded physics
             # integrity states. Cosmetic evidence must NOT block a functional release.
-            bash tools/android_capture_surface_damage.sh test-output/android || \
-              echo "WARNING: optional real hull-damage screenshot diagnostic unavailable"
+            bash tools/android_capture_surface_damage.sh test-output/android || echo "WARNING: optional real hull-damage screenshot diagnostic unavailable"
             # Gate the real Android release dialog: UPDATE must be an actionable
             # button, not a hidden list masked by an explanatory message.
             bash tools/android_verify_update_dialog.sh test-output/android
