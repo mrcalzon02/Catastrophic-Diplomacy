@@ -472,6 +472,12 @@ public final class Battle {
 
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
+    /** Stable entity-ID index: fighter, missile and support loops frequently
+     * resolve parent/target IDs; avoid 400-ship linear scans per craft/tick.
+     * Ships remain in the battle registry after destruction, so historical
+     * projectile owners and replay telemetry remain addressable.
+     */
+    private final Map<Integer,Ship> shipById = new HashMap<>();
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
     private static final int MAX_GUIDED_BODIES=12000;
     private final List<Missile> missiles = new ArrayList<>();
@@ -719,7 +725,7 @@ public final class Battle {
         Ship ship = new Ship(nextId++, team, faction, faction.name().substring(0, 3) + "-" + nextId);
         ship.x = x; ship.y = y; ship.facing = team == 0 ? 0 : Math.PI;
         ship.orders=teamOrders[team];
-        ships.add(ship); return ship;
+        ships.add(ship); shipById.put(ship.id,ship); return ship;
     }
     /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
     private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery,
@@ -2449,7 +2455,7 @@ public final class Battle {
             }
         }
     }
-    private Ship findShip(int id) { for (Ship ship : ships) if (ship.id == id) return ship; return null; }
+    private Ship findShip(int id) { return shipById.get(id); }
 
     private void hit(Ship defender, double raw, Ship attacker, DamageType kind) {
         hit(defender,raw,attacker,kind,0);
