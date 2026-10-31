@@ -110,16 +110,22 @@ final class SideloadUpdater {
         return null; // Sideloaded APKs retain the existing signed GitHub updater.
     }
 
+
     private void findUpdate(boolean manual) {
         try {
             PackageInfo installed = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
             long installedCode = code(installed);
-            List<Release> available = new ArrayList<>();
+            JSONObject newest = null;
+            JSONObject newestApk = null;
+            String newestPublished = "";
             int rejected = 0;
             boolean complete = false;
 
-            // GitHub's /releases/latest endpoint excludes prereleases. Never use it here.
-            // Iterate all pages, including prereleases and test-build tags, until exhausted.
+            // Same user flow as ReverieVR: offer ONE newest published APK.
+            // GitHub's /releases/latest excludes prereleases, so inspect the full
+            // published feed and compare published_at rather than relying on
+            // GitHub's creation-date ordering or on a stable-only endpoint.
+            // Inspect release metadata here; download only the winner's manifest.
             for (int page = 1; page <= MAX_PAGES; page++) {
                 JSONArray releases = new JSONArray(new String(
                         downloadBytes(RELEASE_API + page, MAX_RELEASE_JSON),
@@ -128,28 +134,12 @@ final class SideloadUpdater {
                     JSONObject release = releases.optJSONObject(i);
                     if (release == null || !UpdatePolicy.eligibleRelease(
                             release.optBoolean("draft"), release.optBoolean("prerelease"))) continue;
-                    // Public GitHub does not reveal unpublished drafts; prereleases ARE included.
+                    String publishedAt = release.optString("published_at", "");
                     String tag = release.optString("tag_name", "");
                     JSONArray assets = release.optJSONArray("assets");
-                    if (assets == null) continue;
+                    if (publishedAt.isEmpty() || assets == null) continue;
 
-                    JSONObject manifest = null;
-                    JSONObject manifestAsset;
-                    try { manifestAsset = findAsset(assets, MANIFEST_NAME); }
-                    catch (JSONException malformed) { manifestAsset = null; rejected++; }
-                    if (manifestAsset != null && manifestAsset.optLong("size", 0) > 0
-                            && manifestAsset.optLong("size") <= MAX_MANIFEST_JSON) {
-                        try {
-                            String manifestUrl = manifestAsset.getString("browser_download_url");
-                            UpdatePolicy.requireDownloadUrl(manifestUrl, tag, MANIFEST_NAME);
-                            manifest = new JSONObject(new String(downloadBytes(manifestUrl, MAX_MANIFEST_JSON),
-                                    java.nio.charset.StandardCharsets.UTF_8));
-                        } catch (Exception ignored) {
-                            // The manifest is optional: the downloaded signed APK remains authoritative.
-                            rejected++;
-                        }
-                    }
-
+                    JSONObject selectedApk = null;
                     for (int j = 0; j < assets.length(); j++) {
                         JSONObject asset = assets.optJSONObject(j);
                         if (asset == null) continue;
@@ -159,74 +149,102 @@ final class SideloadUpdater {
                             long bytes = asset.getLong("size");
                             String apkUrl = asset.getString("browser_download_url");
                             UpdatePolicy.requireDownloadUrl(apkUrl, tag, name);
-                            String githubDigest = asset.optString("digest", "");
-                            // Unknown checksum algorithms are ignored; Android signing is still mandatory.
-                            String sha = githubDigest.startsWith("sha256:") ? githubDigest.substring(7) : "";
-                            UpdatePolicy.Candidate candidate = UpdatePolicy.provisional(tag, name, bytes, sha);
-                            if (manifest != null && manifest.optInt("schema") == 1) {
-                                JSONObject item = manifest.optJSONObject("apk");
-                                if (item != null && name.equals(item.optString("name"))) {
-                                    // Stale manifests cannot hide valid test APKs. Archive
-                                    // identity, versionCode and signature are verified after download.
-                                    try {
-                                        UpdatePolicy.Candidate described = new UpdatePolicy.Candidate(tag,
-                                                manifest.getString("version"), manifest.getLong("versionCode"),
-                                                manifest.getString("applicationId"), manifest.getInt("minDataSchema"),
-                                                name, item.getLong("bytes"), item.getString("sha256"));
-                                        UpdatePolicy.requireCandidate(described, installed.versionName, installedCode);
-                                        if (described.bytes() != bytes)
-                                            throw new IOException("Manifest size differs from GitHub asset");
-                                        if (!sha.isEmpty() && !sha.equalsIgnoreCase(described.sha256()))
-                                            throw new IOException("Manifest checksum differs from GitHub digest");
-                                        candidate = described;
-                                    } catch (Exception invalidManifest) {
-                                        rejected++; // Keep provisional candidate for APK inspection.
-                                    }
-                                }
-                            }
-                            available.add(new Release(candidate, apkUrl, release.optBoolean("prerelease")));
+                            String digest = asset.optString("digest", "");
+                            String sha = digest.startsWith("sha256:") ? digest.substring(7) : "";
+                            UpdatePolicy.provisional(tag, name, bytes, sha);
+                            // Prefer the ordinary Android package when a release
+                            // also contains a distinct Fire OS package.
+                            if (selectedApk == null || name.equalsIgnoreCase("Catastrophic-Diplomacy-Android.apk"))
+                                selectedApk = asset;
                         } catch (Exception invalid) {
-                            // One malformed asset must not hide other published releases.
                             rejected++;
                         }
+                    }
+                    if (selectedApk != null && (newest == null ||
+                            publishedAt.compareTo(newestPublished) > 0)) {
+                        newest = release;
+                        newestApk = selectedApk;
+                        newestPublished = publishedAt;
                     }
                 }
                 if (releases.length() < PER_PAGE) { complete = true; break; }
             }
             if (!complete) throw new IOException("Release history exceeds supported scan; cannot report no updates");
+
+            Release selected = null;
+            boolean alreadyCurrent = false;
+            if (newest != null) {
+                String tag = newest.getString("tag_name");
+                String name = newestApk.getString("name");
+                long bytes = newestApk.getLong("size");
+                String apkUrl = newestApk.getString("browser_download_url");
+                String githubDigest = newestApk.optString("digest", "");
+                String sha = githubDigest.startsWith("sha256:") ? githubDigest.substring(7) : "";
+                UpdatePolicy.Candidate candidate = UpdatePolicy.provisional(tag, name, bytes, sha);
+
+                JSONArray assets = newest.getJSONArray("assets");
+                JSONObject manifestAsset;
+                try { manifestAsset = findAsset(assets, MANIFEST_NAME); }
+                catch (JSONException malformed) { manifestAsset = null; rejected++; }
+                if (manifestAsset != null && manifestAsset.optLong("size", 0) > 0 &&
+                        manifestAsset.optLong("size") <= MAX_MANIFEST_JSON) {
+                    try {
+                        String manifestUrl = manifestAsset.getString("browser_download_url");
+                        UpdatePolicy.requireDownloadUrl(manifestUrl, tag, MANIFEST_NAME);
+                        JSONObject manifest = new JSONObject(new String(
+                                downloadBytes(manifestUrl, MAX_MANIFEST_JSON),
+                                java.nio.charset.StandardCharsets.UTF_8));
+                        JSONObject item = manifest.optJSONObject("apk");
+                        if (manifest.optInt("schema") == 1 && item != null &&
+                                name.equals(item.optString("name"))) {
+                            UpdatePolicy.Candidate described = new UpdatePolicy.Candidate(tag,
+                                    manifest.getString("version"), manifest.getLong("versionCode"),
+                                    manifest.getString("applicationId"), manifest.getInt("minDataSchema"),
+                                    name, item.getLong("bytes"), item.getString("sha256"));
+                            if (described.bytes() != bytes ||
+                                    !UpdatePolicy.PACKAGE_ID.equals(described.applicationId()) ||
+                                    !described.version().matches("[A-Za-z0-9][A-Za-z0-9._+\\-]{0,99}") ||
+                                    described.versionCode() < 1 ||
+                                    (!sha.isEmpty() && !sha.equalsIgnoreCase(described.sha256())))
+                                throw new IOException("Release manifest disagrees with the published APK");
+                            UpdatePolicy.requireAsset(tag, name, described.bytes(), described.sha256());
+                            if (!UpdatePolicy.newerAndroidBuild(described.versionCode(), installedCode)) {
+                                alreadyCurrent = true;
+                            } else {
+                                UpdatePolicy.requireCandidate(described, installed.versionName, installedCode);
+                                candidate = described;
+                            }
+                        }
+                    } catch (Exception badManifest) {
+                        // Missing/stale metadata cannot hide a real APK. The
+                        // downloaded archive is still checked before installation.
+                        rejected++;
+                        android.util.Log.w("CD-Updater", "Release manifest unavailable or inconsistent", badManifest);
+                    }
+                }
+                selected = new Release(candidate, apkUrl, newest.optBoolean("prerelease"));
+            }
+
+            Release latest = selected;
+            boolean current = alreadyCurrent;
             int skipped = rejected;
             activity.runOnUiThread(() -> {
-                busy.set(false);
                 if (closed || activity.isFinishing()) return;
-                if (available.isEmpty()) {
-                    if (manual) new AlertDialog.Builder(activity).setTitle("No downloadable update")
-                            .setMessage("Scanned all published stable and prerelease entries. No eligible Android APK was found."
-                                    + (skipped > 0 ? " " + skipped + " malformed assets were skipped." : ""))
-                            .setPositiveButton("OK", null).show();
+                if (latest == null) {
+                    if (manual) dialog("No Android releases",
+                            "No downloadable APK exists in the published GitHub releases." +
+                            (skipped > 0 ? " Rejected malformed assets: " + skipped : ""), null);
                     return;
                 }
-                // Automatic startup checks must never hijack gameplay with a
-                // modal, even when release candidates exist. Only the player's
-                // explicit UPDATES button opens the selection dialog.
-                if (!manual) {
-                    android.util.Log.i("CD-Updater", "Background update scan found "
-                            + available.size() + " candidate APK releases (no modal)");
+                if (current) {
+                    if (manual) dialog("Already up to date",
+                            "Installed: " + installed.versionName + " (build " + installedCode +
+                            "). Latest published: " + latest.candidate().tag() + ".", null);
                     return;
                 }
-                // Every possible published APK is selectable. Without a manifest, actual
-                // versionCode is verified from the downloaded APK *before* installation.
-                String[] descriptions = new String[available.size()];
-                for (int i = 0; i < available.size(); i++) {
-                    Release entry = available.get(i);
-                    UpdatePolicy.Candidate c = entry.candidate;
-                    descriptions[i] = (entry.prerelease ? "[TEST] " : "") + c.tag() + " • " +
-                            c.fileName() + (c.versionCode() > 0
-                                    ? " (code " + c.versionCode() + ")"
-                                    : " (verify build code after download)");
-                }
-                new AlertDialog.Builder(activity).setTitle("Available GitHub APK releases")
-                        .setItems(descriptions, (d, which) -> offerDownload(available.get(which)))
-                        .setNegativeButton("Later", null).show();
+                // A background check never steals focus from the game.
+                if (manual) showAvailableUpdate(latest, installed.versionName, installedCode);
+                else android.util.Log.i("CD-Updater", "Newest published APK: " + latest.candidate().tag());
             });
         } catch (Exception failure) {
             if (manual) dialog("Update check failed", safeError(failure), null);
@@ -236,14 +254,37 @@ final class SideloadUpdater {
         }
     }
 
-    private void offerDownload(Release release) {
+    /** Port of ReverieVR's working single-update decision dialog. */
+    private void showAvailableUpdate(Release release, String installedVersion, long installedCode) {
         UpdatePolicy.Candidate c = release.candidate();
+        String newVersion = c.versionCode() > 0 ? c.version() + " (build " + c.versionCode() + ")"
+                : c.tag() + " (APK build number verified after download)";
         new AlertDialog.Builder(activity)
-                .setTitle("Get " + c.tag())
-                .setMessage("Download " + c.fileName() + " (" + (c.bytes() / 1048576) +
-                        " MiB)? Android will verify that it is a newer signed build before offering installation. Your existing saves remain untouched.")
-                .setNegativeButton("Not now", null)
-                .setPositiveButton("Download", (d, w) -> downloadUpdate(release)).show();
+                .setTitle("Update available")
+                .setMessage("Installed: " + installedVersion + " (build " + installedCode + ")" +
+                        "\nAvailable: " + newVersion +
+                        "\n\n" + (release.prerelease() ? "Published test/prerelease. " : "") +
+                        "Download " + c.fileName() + " (" + (c.bytes() / 1048576) +
+                        " MiB)? Android checks the package ID, build number and signer before installing. Saves are preserved on a compatible upgrade.")
+                .setPositiveButton("Update", (d, w) -> downloadUpdate(release))
+                .setNegativeButton("Later", null)
+                .setNeutralButton("View release", (d, w) -> {
+                    Uri page = Uri.parse("https://github.com/" + UpdatePolicy.REPOSITORY +
+                            "/releases/tag/" + Uri.encode(c.tag()));
+                    try { activity.startActivity(new Intent(Intent.ACTION_VIEW, page)); }
+                    catch (RuntimeException failure) { show("Cannot open release page"); }
+                })
+                .show();
+    }
+
+    /** Debug-only emulator acceptance: exercise the production dialog without a live download. */
+    void showVerificationDialog() {
+        UpdatePolicy.Candidate sample = new UpdatePolicy.Candidate("cd-v0.1.5-dev.9000",
+                "0.1.5-dev.9000", 10000, UpdatePolicy.PACKAGE_ID, 1,
+                "Catastrophic-Diplomacy-Android.apk", 1048576, "");
+        showAvailableUpdate(new Release(sample, "https://github.com/" + UpdatePolicy.REPOSITORY +
+                "/releases/download/cd-v0.1.5-dev.9000/Catastrophic-Diplomacy-Android.apk", true),
+                "0.1.5-dev.8999", 9999);
     }
 
     private void downloadUpdate(Release release) {
