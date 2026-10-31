@@ -495,6 +495,11 @@ public final class CampaignFleet {
                 updated=updated.service(id,type,technology);
             return updated;
         }
+        /** Only sub-nanounit floating-point residue is free; real damage still pays. */
+        private static long repairUnits(double missing,int creditsPerUnit){
+            if(!Double.isFinite(missing))throw new IllegalArgumentException("Nonfinite repair condition");
+            return missing<=1e-9?0:(long)Math.ceil(missing*creditsPerUnit);
+        }
         public long cost(long id,Service service,TechnologyCatalog technology){
             Vessel vessel=get(id);
             Battle.Ship full=fresh(vessel.fitting(),technology);
@@ -502,10 +507,14 @@ public final class CampaignFleet {
             return switch(service){
                 case REPAIR -> {
                     full.defense.restoreIntegrity(current.integrity());
-                    long structure=(long)Math.ceil(Math.max(0,full.maxHull-current.hull())*18);
-                    long armor=(long)Math.ceil(Math.max(0,full.maxArmor-full.defense.totalArmor())*6);
-                    long shields=(long)Math.ceil(Math.max(0,full.maxShields-
-                            full.defense.totalShields())*2);
+                    // Directional armor serialization can reconstruct a full
+                    // facing to within ~3e-13 of its original value. ceil()
+                    // would otherwise charge one credit FOREVER, preventing
+                    // even a fully repaired vessel from purchasing a refit.
+                    long structure=repairUnits(full.maxHull-current.hull(),18);
+                    long armor=repairUnits(full.maxArmor-full.defense.totalArmor(),6);
+                    long shields=repairUnits(full.maxShields-
+                            full.defense.totalShields(),2);
                     yield Math.addExact(Math.addExact(Math.addExact(structure,armor),
                             shields),ShipSubsystems.repairCost(current.machinery()));
                 }
