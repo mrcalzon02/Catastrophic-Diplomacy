@@ -210,7 +210,7 @@ public final class BattleServer implements AutoCloseable {
     }
     /** The seat, never a client-declared team, owns each upload. Fragments stay below
      * hbnet's 4096-byte frame cap and are strictly ordered and memory bounded. */
-    private void receiveFleet(Peer peer,String[] p){
+    private void receiveFleet(Peer peer,String[] p)throws IOException{
         if(hostRules==null||battle!=null||peer.seat.team<0){peer.send(List.of("FLEET_REJECT|UNAVAILABLE"));return;}
         int team=peer.seat.team;
         try{
