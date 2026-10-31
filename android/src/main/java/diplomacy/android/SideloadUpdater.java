@@ -225,7 +225,6 @@ final class SideloadUpdater {
                                     : " (verify build code after download)");
                 }
                 new AlertDialog.Builder(activity).setTitle("Available GitHub APK releases")
-                        .setMessage("Includes test, beta, nightly and stable releases. Only an APK with a higher Android build code and matching app signature can install.")
                         .setItems(descriptions, (d, which) -> offerDownload(available.get(which)))
                         .setNegativeButton("Later", null).show();
             });
