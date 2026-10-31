@@ -625,3 +625,22 @@ tasks.register('laserFamiliesSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.LaserFamiliesTest'
 }
+
+// Run existing FUNCTIONAL engineering checks on every Linux/Windows release.
+// These checks previously lived only in the opt-in massBattleCampaign suite,
+// which the continuous release workflow does not invoke. Do not attach the
+// Java2D raster/art, pixel/style, or soundtrack taste diagnostics here.
+tasks.named('gameFlowSmoke') {
+    dependsOn(
+        tasks.named('hullFoundationSmoke'),
+        tasks.named('moduleVersionsSmoke'),
+        tasks.named('crewAccommodationSmoke'),
+        tasks.named('weaponBehaviorSmoke'),
+        tasks.named('ammunitionTypesSmoke'),
+        tasks.named('ammunitionResearchSmoke'),
+        tasks.named('ammunitionSelectionSmoke'),
+        tasks.named('hullCoverageSmoke'),
+        tasks.named('demoWeaponSmoke'),
+        tasks.named('hullVoiceSmoke')
+    )
+}

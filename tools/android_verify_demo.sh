@@ -73,6 +73,46 @@ if cmp -s "$report/early.png" "$report/late.png"; then
 fi
 sha256sum "$apk" "$report/early.png" "$report/late.png" > "$report/sha256.txt"
 cat "$report/demo-telemetry.txt"
+# Interpret live simulator telemetry as a separately reported PERFORMANCE
+# DIAGNOSTIC. The software-emulated GPU is not comparable to actual Android
+# hardware, so bad measured timings must not masquerade as 30-FPS certification
+# or become an arbitrary release blocker. Invalid/missing 400-ship progression
+# is already rejected above by the objective runtime assertions.
+python3 - "$report/demo-telemetry.txt" "$report/performance-diagnostic.json" <<'PY'
+import json, math, pathlib, re, sys
+source = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+success = [line for line in source.splitlines()
+           if "PASS 200v200 mechanics+render-loop" in line]
+if len(success) != 1:
+    raise SystemExit("FAIL: expected exactly one in-game verifier PASS receipt")
+receipt = success[0]
+values = {}
+for key in ("tick", "frames", "renderCpuAvgMs", "renderCpuWorstMs", "avgDraws", "avgMatBinds", "spriteShips"):
+    matches = re.findall(r"(?:^|\\s)" + key + r"=([0-9]+(?:\\.[0-9]+)?)", receipt)
+    if len(matches) != 1:
+        raise SystemExit(f"FAIL: missing or ambiguous real telemetry field {key}")
+    values[key] = float(matches[0])
+if not all(math.isfinite(v) and v >= 0 for v in values.values()):
+    raise SystemExit("FAIL: invalid performance telemetry")
+if values["frames"] < 2 or values["tick"] <= 0 or values["spriteShips"] < 400:
+    raise SystemExit("FAIL: demo did not report live 400-ship rendered progression")
+avg = values["renderCpuAvgMs"]
+values["cpu_limited_fps_upper_bound"] = round(1000 / avg, 3) if avg > 0 else None
+values["emulator"] = "pixel_2 Android 34 software graphics (not physical-device certification)"
+values["interpretation"] = "render-thread CPU time only; excludes GPU, frame scheduling, and physical-device FPS"
+values["target_frame_budget_ms"] = 1000 / 30
+values["performance_status"] = ("ABOVE_30_FPS_CPU_BUDGET" if avg > 1000 / 30
+                                else "WITHIN_30_FPS_CPU_BUDGET_NOT_FPS_CERTIFIED")
+pathlib.Path(sys.argv[2]).write_text(json.dumps(values, indent=2, sort_keys=True) + "\\n")
+print(f"PERFORMANCE DIAGNOSTIC: CPU render avg={avg:.1f} ms, worst={values['renderCpuWorstMs']:.1f} ms; "
+      f"{values['frames']:.0f} rendered frames, {values['tick']:.0f} simulation ticks.")
+if avg > 1000 / 30:
+    print(f"WARNING: 30 FPS target NOT DEMONSTRATED on emulator; "
+          f"render-thread CPU upper-bound rate only {values['cpu_limited_fps_upper_bound']:.2f} FPS. "
+          "This is a diagnostic, not a cosmetic release blocker.")
+else:
+    print("NOTE: CPU budget is necessary, not sufficient, for 30 FPS on real devices.")
+PY
 if grep -q 'ART_PENDING' "$report/demo-telemetry.txt"; then
     echo "WARNING: mechanics and GL loop passed; curated PNG stages are NOT certified in this APK."
 else

@@ -234,3 +234,9 @@ tasks.register('radioVoiceProximitySmoke', JavaExec) {
     mainClass = 'diplomacy.client.RadioVoiceProximityTest'
 }
 tasks.named('fighterVoiceSmoke') { dependsOn tasks.named('radioVoiceProximitySmoke') }
+
+// The release invokes menuFlowSmoke, but the original game-announcer/audio
+// checks used to be reachable only through the uninvoked audioSmoke chain.
+// Keep narration cue mappings and actual audio event routing under real
+// functional regression coverage on Linux and Windows.
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('audioSmoke') }
