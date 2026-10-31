@@ -2599,6 +2599,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         for (Battle.Beam beam : battle.beams()) {
             if(!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,7))continue;
             if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
+            if(weaponFx!=null && weaponFx.hasLaserBeam(beam,battle.tick))continue;
             shapes.setColor(beam.pointDefense?Color.GREEN:
                     beam.type==Battle.DamageType.LASER?
                     CombatLightingRenderer.laserColor(beam.laserType):
