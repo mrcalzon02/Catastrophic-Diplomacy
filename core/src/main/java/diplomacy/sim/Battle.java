@@ -119,6 +119,8 @@ public final class Battle {
         public double kineticReload, plasmaReload, particleReload, torpedoReload, fighterReload, droneReload,repairDroneReload;
         public double hangarCondition=1, magazineCondition=1, ecmCondition=1;
         public int missileAmmo=60, torpedoAmmo, fighterReserve, droneReserve,repairDroneReserve;
+        /** Independent physical fighter launch bays, distinct from craft storage. */
+        public int fighterLaunchBays;
         public int kineticAmmo=100;
         public AmmunitionTable.Kinetic kineticType=AmmunitionTable.Kinetic.STANDARD;
         /** Null only on legacy addShip(faction) test fixtures; real fitted ships
@@ -786,7 +788,9 @@ public final class Battle {
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
-        s.fighterReserve=machinery.fighterCapacity();s.droneReserve=machinery.droneCapacity();
+        s.fighterReserve=machinery.fighterCapacity();
+        s.fighterLaunchBays=Shipyard.fighterLaunchBays(design);
+        s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
         s.kineticAmmo=s.kineticDamage>0?64+machinery.magazineCapacity()*4:0;
         s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
@@ -1776,16 +1780,27 @@ public final class Battle {
                     ShipTacticalDirectives.FighterMission.SCREEN);
         if(!withdrawing&&fighterPlan!=ShipTacticalDirectives.FighterMission.RESERVE&&
                 fighterTarget!=null&&ship.fighterReserve>0 &&
-                ship.fighterReload<=0 && crafts.size()<2000) {
-            crafts.add(new Craft(nextCraftId++,ship,true,fighterTarget.id));
-            // SCREEN/PROTECT can acquire a defensive threat even when the
-            // ordinary offensive selector found no enemy. Attribute the sortie
-            // to its actual target rather than dereferencing a null enemy.
-            visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",ship.team,ship.id,fighterTarget.id,
-                    ship.x,ship.y,fighterTarget.x,fighterTarget.y);
-            ship.fighterReserve--;ship.fightersLaunched++;ship.fighterReload=4.5/ship.hangarCondition;
-            radio(ship,CrewChatter.Event.LAUNCH);
-            ship.power-=7;ship.heat+=3;
+                ship.fighterLaunchBays>0&&ship.fighterReload<=0&&crafts.size()<2000) {
+            // Each physical flight deck can launch one aircraft per sortie
+            // cycle. An auxiliary hangar contributes one; true carriers have
+            // multiple built-in decks. All launches pay their own power and
+            // heat cost, and never exceed the available inventory or craft cap.
+            int slots=Math.min(ship.fighterLaunchBays,
+                    Math.min(ship.fighterReserve,2000-crafts.size()));
+            int launched=0;
+            for(int i=0;i<slots;i++){
+                if(ship.power<7||ship.heat+3>ship.maxHeat*0.9)break;
+                crafts.add(new Craft(nextCraftId++,ship,true,fighterTarget.id));
+                visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",
+                        ship.team,ship.id,fighterTarget.id,
+                        ship.x,ship.y,fighterTarget.x,fighterTarget.y);
+                ship.fighterReserve--;ship.fightersLaunched++;launched++;
+                ship.power-=7;ship.heat+=3;
+            }
+            if(launched>0){
+                ship.fighterReload=4.5/ship.hangarCondition;
+                radio(ship,CrewChatter.Event.LAUNCH);
+            }
         }
         if(!withdrawing&&ship.droneReserve>0 && ship.droneReload<=0 && crafts.size()<2000){
             crafts.add(new Craft(nextCraftId++,ship,false,enemy==null?0:enemy.id));
