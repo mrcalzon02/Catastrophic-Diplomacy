@@ -143,6 +143,7 @@ final class GameWikiCatalog {
                 "Base mass "+number(m.mass)+", power demand "+number(m.power)+
                     ", heat "+number(m.heat)+", integrity "+number(m.integrity)+".",
                 "Base effect output "+number(m.effect)+"; industry cost "+m.industryCost+".",
+                "Functional purpose: "+subsystemExplanation(m.subsystem),
                 "This is a physical installable base component. A hull alone does not supply the effect; select a compatible socket and check capacity, power and heat.",
                 "Research tracks: OUTPUT for stronger effect, EFFICIENCY for lower operating burdens, RESILIENCE for survivability, SPECIALIST for role-specific specialization. Choose only one per installed socket.",
                 "Find its exact upgrade pages by searching "+m.faction+" "+m.subsystem+" or "+m.id+"."));
@@ -158,6 +159,7 @@ final class GameWikiCatalog {
                 "Additional multipliers: integrity x"+number(u.integrity)+", shields x"+
                     number(u.shield)+", thrust x"+number(u.thrust)+", cooling x"+
                     number(u.cooling)+", maintenance x"+number(u.maintenance)+".",
+                "Research branch purpose: "+branchExplanation(u.track),
                 "Authoritative design tradeoff: "+u.tradeoff,
                 "The fitted module must own the appropriate branch and stage. This is not a whole-ship automatic buff."));
         for(ModuleVersions.Pattern pattern:ModuleVersions.Pattern.values())
@@ -233,6 +235,54 @@ final class GameWikiCatalog {
     }
     private static void guide(List<Article> a,String id,String title,String... body){
         a.add(new Article("guide."+id,"GUIDES",title,body));
+    }
+    private static String branchExplanation(String branch){
+        return switch(branch){
+            case "OUTPUT" -> "Increases the installed module's primary physical effect, subject to its own power, heat, mass and cost consequences.";
+            case "EFFICIENCY" -> "Optimizes energy use, heat and operating burden rather than granting free extra hardware.";
+            case "RESILIENCE" -> "Reinforces the installed subsystem's ability to withstand damage and continue contributing.";
+            case "SPECIALIST" -> "Emphasizes the individual module family role; inspect the stage's exact tradeoff and numeric multipliers.";
+            default -> "Use the real research multiplier and prerequisite shown for this stage.";
+        };
+    }
+    private static String subsystemExplanation(String code){
+        return switch(code){
+            case "KIN" -> "Kinetic battery. Fires physical ballistic rounds; the chosen ammunition alters damage, velocity, penetration, splash and detection. Requires firing power, heat budget and stored rounds.";
+            case "MSL" -> "Missile launcher. Spawns physical guided missiles with finite ammunition. Each rack selects its own warhead, salvo pattern, seeker and propulsion options under its technology license.";
+            case "TOR" -> "Torpedo launcher. Heavy guided payloads trade salvo size and reload for capital-target damage. Torpedoes have physical signatures, fuel, interception health and launch modes.";
+            case "LAS" -> "Laser emitter. Generates actual beam attacks with selectable researched laser family. Continuous or pulsed output is gated by reactor power, cooling, range and hardpoint location.";
+            case "PLA" -> "Plasma projector. A dedicated thermal-energy weapon family with its own damage and defense interactions. A plasma module is not a free upgrade to every laser.";
+            case "PAR" -> "Particle lance. Directed high-energy particle weapon fitted to a physical weapon socket, with its own range, damage and heat constraints.";
+            case "PD" -> "Point-defense battery. Tracks eligible threatening missiles, torpedoes, ballistic rounds or small craft according to persistent interception and protection policies.";
+            case "FLK" -> "Flak projector. Physical area-defense module used to counter crowded inbound threats; availability still depends on sensor acquisition, valid target and installed ammunition/energy.";
+            case "SHD" -> "Shield generator. Supplies local shield protection and regeneration to its own fitted vessel; does NOT automatically project shield power to other ships.";
+            case "SIF" -> "Structural integrity field. Reinforces the vessel's survivability through an installed defense socket; it is not a remote repair beam.";
+            case "ARM" -> "Ablative armor. Provides physical damage absorption which can erode locally and expose structure and installed systems to subsequent hits.";
+            case "REA" -> "Power plant/reactor. Supplies onboard electrical power for thrust, shields, weapons and service subsystems, while generating heat and mass costs.";
+            case "RAD" -> "Radiator/cooling system. Dissipates physical heat accumulated by reactors, engines, weapon volleys and specialist support machinery.";
+            case "ENG" -> "Engine and thrusters. Determines ship mobility and maneuvering capability, subject to actual propulsion stats and captain speed-limit orders.";
+            case "SEN" -> "Sensor array. Detects targets and ordnance by range, signature and radar cross section. Sensor performance gates real target acquisition.";
+            case "ECM" -> "Electronic warfare. Interferes with hostile acquisition and guided seeker locks; countermeasures never erase a ship's physical presence.";
+            case "FTR" -> "Fighter hangar. Stores and launches actual autonomous craft with finite fuel, ammunition, weapons, radar signatures and pilot orders.";
+            case "DRN" -> "Drone controller. Carries and launches actual drones; their capabilities and reserves derive from installed equipment and finite magazines.";
+            case "REP" -> "Damage-control equipment. Restores the owning vessel through installed repair machinery; not the long-range projector or area aura used on allies.";
+            case "MAG" -> "Ordnance magazine. Expands physical ammunition logistics and replenishment capacity; an empty launcher is not armed by its cosmetic model.";
+            case "XFR" -> "Shield transfer projector. An explicitly fitted, ranged support channel for helping allied shields using actual power, range and heat constraints.";
+            case "HPR" -> "Long-range hull restoration projector. Applies measured remote hull repair to a real allied target, subject to distance, reactor power and line-of-service rules.";
+            case "APR" -> "Armor restoration projector. Repairs allied armor rather than freely repairing hull, shield and all resource channels at once.";
+            case "PWR" -> "Power transfer projector. Sends bounded electrical power to allied vessels, a separate service channel from shield, armor and hull restoration.";
+            case "DHL" -> "Hull service drone bay. Launches finite repair drones that physically assist allied hulls. Drone capacity and deployed reserves are not infinite.";
+            case "DSH" -> "Shield service drone bay. Launches dedicated shield service drones with a separate finite charge stock and corresponding defense target priorities.";
+            case "DAR" -> "Armor service drone bay. Provides specialized drone-based armor restoration with real equipment, ammunition and target constraints.";
+            case "DPW" -> "Power service drone bay. Dispatches finite electrical support drones to allied vessels; not a global passive reactor aura.";
+            case "AHL" -> "Hull restoration aura. Emits a restrained spherical local support field; its radius and low gain follow installed machinery rather than free fleetwide healing.";
+            case "ASH" -> "Shield restoration aura. Offers weak local shield replenishment to vessels in physical range, separately from dedicated active shield projectors.";
+            case "AAR" -> "Armor restoration aura. Provides bounded armor support to nearby friendly ships only within its actual radius.";
+            case "APW" -> "Power restoration aura. Offers modest local electrical assistance, separate from direct transfer projectors.";
+            case "CRW" -> "Crew accommodation. Physical habitat module provides berths; a warship cannot legally commission crew solely from hull art or nominal tonnage.";
+            case "LFS" -> "Life-support system. Supports onboard crew through an installed habitat socket. Both accommodation and actual life support matter.";
+            default -> "Purpose-built physical subsystem. Read its exact installed category, mass, heat, energy, effect and research tradeoffs; no free hull bonuses.";
+        };
     }
     private static void ammo(List<Article> a,String kind,String name,AmmunitionTable.Profile p){
         a.add(new Article("ammo."+kind+"."+name,"AMMUNITION",kind+" / "+name,

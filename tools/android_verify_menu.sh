@@ -92,13 +92,28 @@ assert_step MAIN_MENU
 # Exercise the ACTUAL native field encyclopedia from the signed APK.
 # The tap must be on the same visible header tile as the gameplay UI.
 touch_ui main-menu 965 662
-sleep 2
-capture wiki-open
-adb logcat -d -v time > "$report/wiki-logcat.txt"
-grep -q 'CD-WIKI.*OPEN articles=' "$report/wiki-logcat.txt" || {
+# The large technology index is loaded lazily on first use, not at app startup.
+# Wait for the actual UI OPEN receipt instead of guessing how fast an emulator
+# will build the 13k-plus article catalogue.
+wiki_opened=0
+for attempt in $(seq 1 20); do
+  adb logcat -d -v time > "$report/wiki-logcat.txt"
+  if grep -q 'CD-WIKI.*OPEN articles=' "$report/wiki-logcat.txt"; then
+    wiki_opened=1
+    break
+  fi
+  if ! adb shell pidof "$package" >/dev/null 2>&1; then
+    echo "FAIL: signed APK exited while opening its encyclopedia" >&2
+    exit 1
+  fi
+  sleep 1
+done
+if (( !wiki_opened )); then
   echo "FAIL: signed APK wiki launcher did not open the live encyclopedia" >&2
   exit 1
-}
+fi
+sleep 1
+capture wiki-open
 # Touch a real category, and return through the rendered CLOSE control.
 touch_ui wiki-open 54 575
 sleep 1

@@ -306,7 +306,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
         fleetOrdersPanel.setIcons(uiIcons);
         menuPanel=new GameMenuPanel(Gdx.app.getType()==
                 com.badlogic.gdx.Application.ApplicationType.Android);
-        wiki=new GameWikiPanel(GameWikiCatalog.build(technology),menuPanel.mobileLayout());
         if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
         else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
             audio.announce(AnnouncerAudio.Cue.WELCOME);}
@@ -1685,6 +1684,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void openWiki(){
         if(verifyDemo||screensaverMode||multiplayer!=null||wikiVisible)return;
+        // The catalogue is sizeable (all nine-stage upgrades across 11 factions).
+        // Build it once on demand; never charge every combat launch for it.
+        if(wiki==null)wiki=new GameWikiPanel(
+                GameWikiCatalog.build(technology),menuPanel.mobileLayout());
         wikiRestoreRunning=running;running=false;wikiVisible=true;
         if(audio!=null)audio.uiPress();
         Gdx.app.log("CD-WIKI","OPEN articles="+wiki.resultCount());
