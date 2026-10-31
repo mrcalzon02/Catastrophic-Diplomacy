@@ -301,7 +301,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         });
         fleetOrdersPanel=new FleetOrdersPanel(side->fleetOrders[side],this::applyFleetOrders);
         fleetOrdersPanel.setIcons(uiIcons);
-        menuPanel=new GameMenuPanel();
+        menuPanel=new GameMenuPanel(Gdx.app.getType()==
+                com.badlogic.gdx.Application.ApplicationType.Android);
         if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
         else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
             audio.announce(AnnouncerAudio.Cue.WELCOME);}
@@ -556,9 +557,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         world.y>125 && world.y<610 &&
                         battleTouch.start(pointer,world.x,world.y))return true;
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
-                    if(screen==GameMenuPanel.Screen.OPTIONS&&VoiceVolumeControl.hit(world.x,world.y)){
+                    if(screen==GameMenuPanel.Screen.OPTIONS&&
+                            GameMenuPanel.voiceHit(world.x,world.y,menuPanel.mobileLayout())){
                         voiceSliderPointer=pointer;
-                        audio.setVoiceVolume(VoiceVolumeControl.valueAt(world.x),false);
+                        audio.setVoiceVolume(GameMenuPanel.voiceAt(world.x,menuPanel.mobileLayout()),false);
                         audio.uiAdjust();
                         return true;
                     }
@@ -672,7 +674,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
                 if(pointer==voiceSliderPointer){
-                    float next=VoiceVolumeControl.valueAt(world.x);
+                    float next=GameMenuPanel.voiceAt(world.x,menuPanel.mobileLayout());
                     if(Math.abs(next-audio.voiceVolume())>.004f){
                         audio.setVoiceVolume(next,false);
                         audio.uiAdjust();
@@ -1630,7 +1632,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void tapFrontEnd(float x,float y){
         if(screen==GameMenuPanel.Screen.HOME){
-            switch(GameMenuPanel.homeHit(x,y)){
+            switch(GameMenuPanel.homeHit(x,y,menuPanel.mobileLayout())){
                 case 0 -> showCampaign();
                 case 1 -> openCampaignSetup();
                 case 2 -> {screen=GameMenuPanel.Screen.SKIRMISH;Gdx.app.log("CD-GAME-FLOW","SKIRMISH_SETUP");}
@@ -1768,8 +1770,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
-            switch(GameMenuPanel.optionsAction(x,y,updateCheck!=null)){
-                case 0 -> audio.setVoiceVolume(VoiceVolumeControl.valueAt(x),true);
+            switch(GameMenuPanel.optionsAction(x,y,updateCheck!=null,menuPanel.mobileLayout())){
+                case 0 -> audio.setVoiceVolume(GameMenuPanel.voiceAt(x,menuPanel.mobileLayout()),true);
                 case 1 -> audio.toggleMusic();
                 case 2 -> audio.toggleEffects();
                 case 3 -> audio.toggleTrack();
