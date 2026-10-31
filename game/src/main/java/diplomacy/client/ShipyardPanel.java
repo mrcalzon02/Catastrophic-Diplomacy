@@ -257,8 +257,10 @@ final class ShipyardPanel {
     }
     private void cycleFighter(){
         Shipyard.Installed installed=draft.at(selectedSlot);
-        if(installed==null||!installed.component.endsWith("-FTR")){
-            notice="Select an installed fighter hangar before choosing its craft type";return;
+        boolean fittedHangar=installed!=null&&installed.component.endsWith("-FTR");
+        boolean organicHangar=diplomacy.shipyard.HullBaseline.builtInFighterCapacity(draft.hull)>0;
+        if(!fittedHangar&&!organicHangar){
+            notice="Install an FTR support hangar to carry fighters on this hull";return;
         }
         FighterModel.Hull[] options=FighterModel.Hull.values();
         draft=draft.withFighterHull(options[(draft.fighterHull.ordinal()+1)%options.length]);
@@ -738,6 +740,11 @@ final class ShipyardPanel {
         if(x>=335&&x<=796&&y>=180&&y<=215
                 &&draft.at(selectedSlot)!=null
                 &&draft.at(selectedSlot).component.endsWith("-FTR")){
+            cycleFighter();return true;
+        }
+        // Organic carrier flight decks work without taking a support socket.
+        if(x>=335&&x<=796&&y>=65&&y<=91
+                &&diplomacy.shipyard.HullBaseline.builtInFighterCapacity(draft.hull)>0){
             cycleFighter();return true;
         }
         if(x>=335&&x<=796&&y>=107&&y<=131
@@ -1244,6 +1251,12 @@ final class ShipyardPanel {
                 "  DEF "+count(layout,Shipyard.Mount.DEFENSE)+
                 "  SUP "+count(layout,Shipyard.Mount.SUPPORT)+
                 "  HAB "+count(layout,Shipyard.Mount.HABITAT),343,100);
+        int organicCraft=diplomacy.shipyard.HullBaseline.builtInFighterCapacity(draft.hull);
+        if(organicCraft>0){
+            font.setColor(Color.CYAN);
+            font.draw(batch,"FLIGHT "+organicCraft+" ORGANIC + FTR  |  "
+                    +draft.fighterHull.name().replace('_',' ')+"  [TAP TO CYCLE]",343,76);
+        }
         if(installed!=null){
             ProjectileModel.Spec projectile=Shipyard.projectileAt(draft,catalog,selectedSlot);
             ProjectileModel.Defense defense=Shipyard.defenseAt(draft,catalog,selectedSlot);
