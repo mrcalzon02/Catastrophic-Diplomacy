@@ -17,6 +17,22 @@ public final class CapitalTurretSpritesTest {
                 "Real missile racks must use the missile-pod artwork");
         check(CapitalTurretSprites.tile(WeaponMuzzles.Family.TORPEDO,7)==8,
                 "Real torpedo racks must use the torpedo tube artwork");
+        check(CapitalTurretSprites.tile(WeaponMuzzles.Family.LASER,1)==2
+                && CapitalTurretSprites.tile(WeaponMuzzles.Family.LASER,2)==2,
+                "Laser sockets must never receive the railgun image");
+        check(CapitalTurretSprites.tile(new WeaponMuzzles.Emitter(5,
+                WeaponMuzzles.Family.POINT_DEFENSE,0,0,"BASE-VP-FLK"),
+                Shipyard.Hull.DESTROYER)==5,"Flak modules use flak hardware");
+        check(CapitalTurretSprites.tile(new WeaponMuzzles.Emitter(5,
+                WeaponMuzzles.Family.POINT_DEFENSE,0,0,"BASE-VP-PD"),
+                Shipyard.Hull.DESTROYER)==6,"Rotary point defense uses gatling");
+        check(CapitalTurretSprites.tile(new WeaponMuzzles.Emitter(8,
+                WeaponMuzzles.Family.KINETIC,0,0,"BASE-VP-KIN"),
+                Shipyard.Hull.DREADNOUGHT)==11,"Dreadnought kinetics use siege hardware");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.LASER,1f)
+                *3f-6.4f)<.0001f,"Mounted turret diameter must be 1/3 former size");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.TORPEDO,1f)
+                *3f-6.4f*1.14f)<.0001f,"Torpedo fittings retain relative sizing");
         check(CapitalTurretSprites.tile(WeaponMuzzles.Family.PLASMA,1)==4,
                 "Plasma modules must show plasma cannon artwork");
         check(CapitalTurretSprites.tile(WeaponMuzzles.Family.POINT_DEFENSE,2)==6,

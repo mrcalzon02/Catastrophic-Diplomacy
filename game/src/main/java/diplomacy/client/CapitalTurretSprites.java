@@ -35,7 +35,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
     static int tile(WeaponMuzzles.Family family,int slot){
         if(family==null)throw new IllegalArgumentException("Weapon family required");
         return switch(family){
-            case LASER -> (slot&1)==0?2:9;
+            case LASER -> 2; // Never show the railgun atlas cell on a laser.
             case KINETIC -> switch(Math.floorMod(slot,4)){
                 case 0 -> 0; case 1 -> 1; case 2 -> 10; default -> 11;
             };
@@ -46,6 +46,34 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case POINT_DEFENSE -> (slot&1)==0?6:5;
         };
     }
+    /** Actual fitted component suffix distinguishes flak from rotary PD.
+     * Kinetic bore hardware is sized by ship class; no laser is a railgun. */
+    static int tile(WeaponMuzzles.Emitter emitter,Shipyard.Hull hull){
+        if(emitter==null)throw new IllegalArgumentException("Missing fitted turret");
+        String id=emitter.component();
+        if(id.endsWith("-FLK"))return 5;
+        if(id.endsWith("-PD"))return 6;
+        if(emitter.family()==WeaponMuzzles.Family.KINETIC && hull!=null)
+            return switch(hull.spriteHull()){
+                case DREADNOUGHT -> 11;
+                case BATTLECRUISER,HEAVY_CRUISER -> 0;
+                case CRUISER -> 1;
+                default -> 10;
+            };
+        return tile(emitter.family(),emitter.slotId());
+    }
+
+    /** Divide the previous mounted-art footprint by THREE in each dimension.
+     * Weapons and damage values stay untouched; sockets remain the pivot. */
+    static float diameter(WeaponMuzzles.Family family,float shipScale){
+        if(family==null||!Float.isFinite(shipScale)||shipScale<=0)
+            throw new IllegalArgumentException("Invalid turret scale");
+        float value=(6.4f/3f)*shipScale;
+        if(family==WeaponMuzzles.Family.POINT_DEFENSE)value*=.75f;
+        if(family==WeaponMuzzles.Family.TORPEDO)value*=1.14f;
+        return value;
+    }
+
     /** Turret overlay only for destroyer and larger hulls: tiny craft remain readable. */
     static boolean capital(Shipyard.Hull hull){
         if(hull==null)return false;
@@ -88,14 +116,10 @@ public final class CapitalTurretSprites implements AutoCloseable {
                 float right=(float)mount.localX()*unit;
                 float x=pose.x()+forward*c+right*s;
                 float y=pose.y()+forward*s-right*c;
-                float diameter=6.4f*scale;
-                if(mount.family()==WeaponMuzzles.Family.POINT_DEFENSE)
-                    diameter*=0.75f;
-                if(mount.family()==WeaponMuzzles.Family.TORPEDO)
-                    diameter*=1.14f;
+                float diameter=diameter(mount.family(),scale);
                 // Only mounted physical emitters; rotation pivots at the base
                 // centre of the 256-pixel sprite, not at the muzzle tip.
-                batch.draw(tiles[tile(mount.family(),mount.slotId())],
+                batch.draw(tiles[tile(mount,ship.hullClass)],
                         x-diameter*0.5f,y-diameter*0.5f,
                         diameter*0.5f,diameter*0.5f,
                         diameter,diameter,1f,1f,angle);

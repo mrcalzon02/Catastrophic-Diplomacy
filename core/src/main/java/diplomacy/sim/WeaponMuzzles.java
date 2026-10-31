@@ -15,7 +15,13 @@ public final class WeaponMuzzles {
     public enum Family {
         LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, POINT_DEFENSE
     }
-    public record Emitter(int slotId,Family family,double localX,double localY) {}
+    public record Emitter(int slotId,Family family,double localX,double localY,
+                          String component) {
+        /** Legacy fixtures can still describe a family-only emitter. */
+        public Emitter(int slotId,Family family,double localX,double localY){
+            this(slotId,family,localX,localY,"");
+        }
+    }
     public record Origin(double x,double y,int slotId) {}
     public static Family family(String component){
         if(component==null)return null;
@@ -42,7 +48,7 @@ public final class WeaponMuzzles {
             Family family=family(part.component);
             if(family==null)continue;
             // The canonical HullLayouts positions already respect faction artwork.
-            found.add(new Emitter(slot.index(),family,slot.x(),slot.y()));
+            found.add(new Emitter(slot.index(),family,slot.x(),slot.y(),part.component));
         }
         return List.copyOf(found);
     }
