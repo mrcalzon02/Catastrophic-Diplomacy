@@ -401,15 +401,17 @@ public final class Shipyard {
         Mount required=requiredMount(component);
         if(required==mount)return true;
         String subsystem=component.subsystem;
+        boolean utility=required==Mount.SYSTEM &&
+                (subsystem.equals("REA")||subsystem.equals("RAD")||subsystem.equals("ENG"));
+        boolean protection=required==Mount.DEFENSE &&
+                (subsystem.equals("ARM")||subsystem.equals("SHD")||subsystem.equals("SIF"));
         return switch(mount){
-            case WEAPON -> (required==Mount.SYSTEM &&
-                    (subsystem.equals("REA")||subsystem.equals("RAD")||subsystem.equals("ENG")))
-                    ||(required==Mount.DEFENSE &&
-                    (subsystem.equals("ARM")||subsystem.equals("SHD")||subsystem.equals("SIF")));
-            case DEFENSE, SUPPORT -> required==Mount.SYSTEM &&
-                    (subsystem.equals("REA")||subsystem.equals("RAD")||subsystem.equals("ENG"));
-            case SYSTEM -> required==Mount.DEFENSE &&
-                    (subsystem.equals("SHD")||subsystem.equals("SIF"));
+            case WEAPON -> utility||protection;
+            case DEFENSE -> utility;
+            case SUPPORT -> utility||protection||
+                    (required==Mount.HABITAT &&
+                    (subsystem.equals("CRW")||subsystem.equals("LFS")));
+            case SYSTEM -> protection;
             case HABITAT -> false;
         };
     }
