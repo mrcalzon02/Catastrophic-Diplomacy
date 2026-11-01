@@ -26,6 +26,12 @@ public final class TerranPlaceholderSprites implements Disposable {
     // Cached normalized anchors are shared by mouse, touch and rendering.
     record ArtAnchor(float u,float v) {}
     private final java.util.Map<String,ArtAnchor[]> shipyardAnchors=new java.util.HashMap<>();
+    // Small, immutable alpha point clouds, one for each unique authored PNG.
+    // Sharing across specialist variants avoids decoding the same picture
+    // forty-six times per faction. No GPU readback or per-frame allocations.
+    private record AlphaCloud(int width,int height,int[] opaque) {}
+    private final java.util.Map<Texture,AlphaCloud> alphaClouds=
+            new java.util.IdentityHashMap<>();
 
     // Every exposed interior pixel is masked by the ORIGINAL hull PNG alpha.
     // Never put an oval generic material under a rectangular sprite region.
@@ -158,6 +164,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         // All original civilizations now load their own source-sheet sprites.
         // Missing generated art is a genuine packaging failure, not permission
         // to display blue geometric hulls for those factions.
+        // Installed before any campaign/skirmish ship spawns. The same exact
+        // projected slots drive FIRE origins, visible turret art, and editor taps.
+        HullLayouts.useSpriteProjector(this::projectOriginalArt);
     }
     private static Pixmap loadMaterial(String path) {
         if(!Gdx.files.internal(path).exists())
@@ -510,15 +519,57 @@ public final class TerranPlaceholderSprites implements Disposable {
         return hull==null?null:texture(faction,hull);
     }
     /**
-     * Physical-looking fitting anchors for the original faction sprite, not a
-     * replacement drawing. Map the stable HullLayouts socket positions into
-     * the source PNG and snap each to the nearest opaque hull-interior sample.
-     * Source image coordinates run downward; shipyard coordinates run upward.
-     * The PNG is decoded only on first use for a particular faction/class.
+     * Only deep, connected-looking opaque source-art pixels may carry hardware.
+     * Avoid the top/bottom caption/thruster bands and antialiased outer edge.
+     * The alpha sampling is deterministic on every supported libGDX backend.
      */
-    private ArtAnchor[] buildShipyardAnchors(Battle.Faction faction,Shipyard.Hull hull) {
+    private AlphaCloud alphaCloud(Texture tex){
+        AlphaCloud cached=alphaClouds.get(tex);
+        if(cached!=null)return cached;
+        int width=tex.getWidth(),height=tex.getHeight();
+        int[] candidates=new int[((width+3)/4)*((height+3)/4)];
+        int count=0;
+        String path=originals.get(tex);
+        Pixmap image=null;
+        try {
+            image=new Pixmap(Gdx.files.internal(path));
+            int clear=Math.max(7,Math.round(height*.028f));
+            int firstY=Math.max(clear,Math.round(height*.09f));
+            int lastY=Math.min(height-clear,Math.round(height*.87f));
+            for(int y=firstY;y<lastY;y+=4)
+                for(int x=clear;x<width-clear;x+=4){
+                    if((image.getPixel(x,y)&255)<210)continue;
+                    // Keep the physical turret footprint on solid hull metal.
+                    if((image.getPixel(x-clear,y)&255)<150
+                            ||(image.getPixel(x+clear,y)&255)<150
+                            ||(image.getPixel(x,y-clear)&255)<150
+                            ||(image.getPixel(x,y+clear)&255)<150)continue;
+                    double localX=154.0*(x+.5-width*.5)/height;
+                    if(Math.abs(localX)>72)continue;
+                    candidates[count++]=y*width+x;
+                }
+        }catch(RuntimeException error){
+            if(Gdx.app!=null)Gdx.app.error("HARDPOINTS",
+                    "Original ship alpha unavailable for "+path,error);
+        }finally{if(image!=null)image.dispose();}
+        AlphaCloud cloud=new AlphaCloud(width,height,java.util.Arrays.copyOf(candidates,count));
+        alphaClouds.put(tex,cloud);
+        return cloud;
+    }
+
+    /** Deterministic variant-specific offsets, not per-frame visual jitter. */
+    private static int hashSlot(Battle.Faction faction,Shipyard.Hull hull,int socket){
+        int key=0x6b8b4567 ^ (faction.ordinal()*0x9e3779b9)
+                ^ (hull.ordinal()*0x85ebca6b) ^ (socket*0xc2b2ae35);
+        key^=key>>>16;key*=0x7feb352d;key^=key>>>15;
+        key*=0x846ca68b;return key^(key>>>16);
+    }
+    private List<Shipyard.Slot> projectOriginalArt(Battle.Faction faction,
+              Shipyard.Hull hull,List<Shipyard.Slot> schematic){
         Texture tex=texture(faction,hull);
-        if(tex==null)return new ArtAnchor[0];
+        if(tex==null)return schematic;
+        AlphaCloud cloud=alphaCloud(tex);
+        if(cloud.opaque().length<schematic.size())return schematic;
         var outline=HullLayouts.outline(faction,hull);
         int minX=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE;
         int minY=Integer.MAX_VALUE,maxY=Integer.MIN_VALUE;
@@ -526,46 +577,66 @@ public final class TerranPlaceholderSprites implements Disposable {
             minX=Math.min(minX,point.x());maxX=Math.max(maxX,point.x());
             minY=Math.min(minY,point.y());maxY=Math.max(maxY,point.y());
         }
-        int width=tex.getWidth(),height=tex.getHeight();
-        var sockets=HullLayouts.slots(faction,hull);
-        ArtAnchor[] result=new ArtAnchor[sockets.size()];
-        // Precompute opaque core samples once, rather than reading every pixel
-        // of a source PNG for every socket, or creating a GPU texture per socket.
-        int[] candidates=new int[((width+3)/4)*((height+3)/4)];
-        int count=0;
-        Pixmap image=null;
-        try {
-            image=new Pixmap(Gdx.files.internal(originals.get(tex)));
-            for(int y=8;y<height-8;y+=4)for(int x=8;x<width-8;x+=4){
-                if((image.getPixel(x,y)&255)<180)continue;
-                // Avoid anti-aliased transparent edges and detached exhaust.
-                if((image.getPixel(x-6,y)&255)<70 ||
-                   (image.getPixel(x+6,y)&255)<70 ||
-                   (image.getPixel(x,y-6)&255)<70 ||
-                   (image.getPixel(x,y+6)&255)<70)continue;
-                candidates[count++]=y*width+x;
+        int width=cloud.width(),height=cloud.height();
+        int minimum=Math.max(9,Math.min(16,(int)Math.sqrt(
+                width*(double)height/Math.max(1,schematic.size()*21))));
+        int minSq=minimum*minimum;
+        List<Shipyard.Slot> answer=new java.util.ArrayList<>(schematic.size());
+        java.util.List<Integer> usedPixels=new java.util.ArrayList<>();
+        for(Shipyard.Slot slot:schematic){
+            double nx=(slot.x()-minX)/(double)Math.max(1,maxX-minX);
+            double ny=(slot.y()-minY)/(double)Math.max(1,maxY-minY);
+            int random=hashSlot(faction,hull,slot.index());
+            int idealX=(int)Math.round((.10+.80*nx)*(width-1))
+                    +Math.floorMod(random,19)-9;
+            int idealY=(int)Math.round((.10+.80*(1-ny))*(height-1))
+                    +Math.floorMod(random>>>12,19)-9;
+            int selected=-1;
+            long nearest=Long.MAX_VALUE;
+            for(int candidate:cloud.opaque()){
+                int cx=candidate%width,cy=candidate/width;
+                long dx=cx-idealX,dy=cy-idealY,dist=dx*dx+dy*dy;
+                if(dist>=nearest)continue;
+                boolean separated=true;
+                for(int previous:usedPixels){
+                    int px=cx-previous%width,py=cy-previous/width;
+                    if(px*px+py*py<minSq){separated=false;break;}
+                }
+                if(separated){selected=candidate;nearest=dist;}
             }
-        } catch(RuntimeException ex) {
-            if(Gdx.app!=null)Gdx.app.error("SHIPYARD",
-                    "Could not scan sprite mount anchors: "+faction+"/"+hull,ex);
-        } finally {
-            if(image!=null)image.dispose();
+            // If unusually dense, reduce separation before giving up a socket.
+            if(selected<0){
+                for(int candidate:cloud.opaque()){
+                    if(usedPixels.contains(candidate))continue;
+                    int cx=candidate%width,cy=candidate/width;
+                    long dx=cx-idealX,dy=cy-idealY,d=dx*dx+dy*dy;
+                    if(d<nearest){nearest=d;selected=candidate;}
+                }
+            }
+            if(selected<0)return schematic;
+            usedPixels.add(selected);
+            int px=selected%width,py=selected/width;
+            int localX=(int)Math.round(154.0*(px+.5-width*.5)/height);
+            int localY=(int)Math.round(154.0*(height*.5-py-.5)/height);
+            answer.add(new Shipyard.Slot(slot.index(),slot.mount(),localX,localY));
         }
-        for(var socket:sockets){
-            float u=(socket.x()-minX)/(float)Math.max(1,maxX-minX);
-            float v=(socket.y()-minY)/(float)Math.max(1,maxY-minY);
-            // Reserve 8% edge clearance inside the approved PNG crop.
-            int idealX=Math.round((.08f+.84f*u)*(width-1));
-            int idealY=Math.round((.08f+.84f*(1-v))*(height-1));
-            int pickedX=idealX,pickedY=idealY;
-            long best=Long.MAX_VALUE;
-            for(int n=0;n<count;n++){
-                int x=candidates[n]%width,y=candidates[n]/width;
-                long dx=x-idealX,dy=y-idealY,d2=dx*dx+dy*dy;
-                if(d2<best){best=d2;pickedX=x;pickedY=y;}
-            }
-            result[socket.index()]=new ArtAnchor(
-                    (pickedX+.5f)/width,1f-(pickedY+.5f)/height);
+        return java.util.List.copyOf(answer);
+    }
+
+    /**
+     * The preview and combat both read precisely the same snapped sockets.
+     * Their local coordinates are derived from the *actual* PNG aspect ratio:
+     * battle height = 34*scale and width = height*pngWidth/pngHeight.
+     */
+    private ArtAnchor[] buildShipyardAnchors(Battle.Faction faction,Shipyard.Hull hull) {
+        Texture tex=texture(faction,hull);
+        if(tex==null)return new ArtAnchor[0];
+        var slots=HullLayouts.slots(faction,hull);
+        ArtAnchor[] result=new ArtAnchor[slots.size()];
+        for(var socket:slots){
+            float u=.5f+socket.x()*tex.getHeight()/(154f*tex.getWidth());
+            float v=.5f+socket.y()/154f;
+            result[socket.index()]=new ArtAnchor(u,v);
         }
         return result;
     }
@@ -810,6 +881,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                 0,0,tex.getWidth(),tex.getHeight(),false,false);
     }
     @Override public void dispose() {
+        HullLayouts.useSpriteProjector(null);
+        shipyardAnchors.clear();alphaClouds.clear();
         java.util.Set<Texture> disposed=java.util.Collections.newSetFromMap(
                 new java.util.IdentityHashMap<Texture,Boolean>());
         for(var fleet:textures.values())
