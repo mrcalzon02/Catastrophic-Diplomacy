@@ -204,6 +204,17 @@ public final class ShipyardTest {
                 "Shield spire must exchange armored fists for fast shield recovery");
         require(shielded.maxPower()>0&&shielded.coolingRate()>0,
                 "Specialization cannot bypass real thermal and power budget");
+        Battle comparison=new Battle(448710);
+        comparison.spawnWing(0,armorFist,catalog,1,170,390);
+        comparison.spawnWing(0,shieldSpire,catalog,1,270,390);
+        Battle.Ship armoredShip=comparison.ships().get(0);
+        Battle.Ship shieldShip=comparison.ships().get(1);
+        armoredShip.defense.disruptShields(10000);
+        shieldShip.defense.disruptShields(10000);
+        double armorRecovery=armoredShip.defense.recharge(3,armoredShip.power-3,true);
+        double spireRecovery=shieldShip.defense.recharge(3,shieldShip.power-3,true);
+        require(spireRecovery>armorRecovery*3,
+                "Actually deployed shield spire must restore shield energy much faster");
         String encoded=Shipyard.encode(improved);
         Shipyard.Design loaded=Shipyard.decode(encoded,catalog);
         require(loaded.at(weapon).stage(Shipyard.Track.OUTPUT)==3,"upgrade stage serialization");
