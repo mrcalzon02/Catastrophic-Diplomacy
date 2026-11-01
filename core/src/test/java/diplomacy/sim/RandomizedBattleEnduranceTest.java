@@ -77,6 +77,51 @@ public final class RandomizedBattleEnduranceTest {
                     &&Double.isFinite(p.damage),"Invalid tracked ballistic "+p.visualId);
     }
 
+    /** Capture the reason live fleets stopped meeting, without fabricating a victory. */
+    private static String contactDiagnostic(Battle b){
+        StringBuilder result=new StringBuilder("CONTACT-DIAGNOSTIC tick="+b.tick);
+        for(int team=0;team<2;team++){
+            int alive=0,fueled=0,armed=0,retreating=0,nearSensor=0,nearLaser=0;
+            double minimum=Double.POSITIVE_INFINITY,maximum=0,average=0;
+            for(Battle.Ship ship:b.ships()){
+                if(!ship.alive()||ship.team!=team)continue;
+                alive++;
+                if(ship.fuel>1&&ship.engineCondition>.1)fueled++;
+                if(ship.withdrawing)retreating++;
+                if(ship.laserDamage+ship.kineticDamage+ship.plasmaDamage+
+                        ship.particleDamage>0 ||
+                        (ship.missileDamage>0&&ship.missileAmmo>0) ||
+                        (ship.torpedoDamage>0&&ship.torpedoAmmo>0) ||
+                        ship.fighterReserve>0)armed++;
+                double closest=Double.POSITIVE_INFINITY;
+                for(Battle.Ship enemy:b.ships()){
+                    if(!enemy.alive()||enemy.team==team)continue;
+                    closest=Math.min(closest,StrictMath.hypot(
+                            ship.x-enemy.x,ship.y-enemy.y));
+                }
+                if(Double.isFinite(closest)){
+                    minimum=Math.min(minimum,closest);
+                    maximum=Math.max(maximum,closest);
+                    average+=closest;
+                    if(closest<ship.sensorRange)nearSensor++;
+                    if(closest<530)nearLaser++;
+                }
+            }
+            result.append(" side").append(team).append("={alive=").append(alive)
+                    .append(",fueled=").append(fueled).append(",armed=").append(armed)
+                    .append(",withdrawing=").append(retreating)
+                    .append(",sensorContact=").append(nearSensor)
+                    .append(",laserDistance=").append(nearLaser)
+                    .append(",nearestMin=").append(String.format(Locale.ROOT,"%.1f",
+                            Double.isFinite(minimum)?minimum:-1))
+                    .append(",nearestMean=").append(String.format(Locale.ROOT,"%.1f",
+                            alive>0?average/alive:-1))
+                    .append(",nearestMax=").append(String.format(Locale.ROOT,"%.1f",maximum))
+                    .append("}");
+        }
+        return result.toString();
+    }
+
     private static void run(long seed,Path dir)throws Exception{
         Files.createDirectories(dir);
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
@@ -144,6 +189,8 @@ public final class RandomizedBattleEnduranceTest {
                     " flightDecks="+flightDecks+" fittedAircraft="+stockedTypes,progress);
             shipCheck(b);
             while(!b.finished()){
+                if(b.tick>=MAX_TICKS)
+                    diagnostic(contactDiagnostic(b),progress);
                 require(b.tick<MAX_TICKS,"TIMEOUT: no terminal victory after "+
                         MAX_TICKS+" real 30Hz combat ticks");
                 require(System.nanoTime()-started<MAX_WALL_NS,
@@ -181,6 +228,8 @@ public final class RandomizedBattleEnduranceTest {
                             " peakCraft="+peakCraft+" fingerprint="+
                             Long.toHexString(b.fingerprint()),progress);
                 }
+                if(b.tick-lastProgressTick>=NO_COMBAT_PROGRESS_TICKS)
+                    diagnostic(contactDiagnostic(b),progress);
                 require(b.tick-lastProgressTick<NO_COMBAT_PROGRESS_TICKS,
                         "STALL: neither combat hits/losses nor fighter fire advanced for "+
                                 NO_COMBAT_PROGRESS_TICKS+" ticks; alive="+b.alive(0)+"/"+b.alive(1));
