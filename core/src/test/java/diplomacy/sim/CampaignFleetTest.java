@@ -281,19 +281,26 @@ public final class CampaignFleetTest {
         check(installed.get(ship1).stores().missiles()==
                         Math.min(warehouse.get(ship1).stores().missiles(),
                                 CampaignFleet.fresh(weaponRefit,tech).missileAmmo)&&
-                        installed.get(ship1).stores().kinetic()==0&&
-                        installed.get(ship1).stores().torpedoes()==0&&
+                        installed.get(ship1).stores().kinetic()==
+                                Math.min(warehouse.get(ship1).stores().kinetic(),
+                                        CampaignFleet.fresh(weaponRefit,tech).kineticAmmo)&&
+                        installed.get(ship1).stores().torpedoes()==
+                                Math.min(warehouse.get(ship1).stores().torpedoes(),
+                                        CampaignFleet.fresh(weaponRefit,tech).torpedoAmmo)&&
                         installed.get(ship1).stores().crew()<=warehouse.get(ship1).stores().crew()&&
                         installed.get(ship1).stores().fuel()<=warehouse.get(ship1).stores().fuel(),
                 "Upgrading unrelated laser hardware destroyed missile stock or added supplies");
-        // Removing the only missile launcher must not convert its ammunition
-        // into a new laser magazine. There is no fleet depot implemented yet.
+        // The hull has a permanently sealed magazine independent of launchers.
+        // Uninstalling the missile rack must not destroy paid missile rounds,
+        // and without a launcher it still cannot fire them.
         var withoutMissile=baseline.install(missileSlot,"BASE-TER-LAS");
         check(Shipyard.inspect(withoutMissile,tech).valid(),
                 "Missile removal regression requires a buildable alternate fitting");
         var converted=warehouse.refit(ship1,withoutMissile,tech);
-        check(converted.get(ship1).stores().missiles()==0,
-                "Removed missile launcher retained inaccessible combat ammunition");
+        check(converted.get(ship1).stores().missiles()==
+                        Math.min(warehouse.get(ship1).stores().missiles(),
+                                CampaignFleet.fresh(withoutMissile,tech).missileAmmo),
+                "Removing the missile rack destroyed paid hull magazine stock");
         var afterRefitSave=CampaignFleetCodec.decode(
                 CampaignFleetCodec.encode(refitted),tech);
         check(afterRefitSave.get(latest.id()).fitting().at(systemSlot).mark==2&&
