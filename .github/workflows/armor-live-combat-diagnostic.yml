@@ -1,0 +1,43 @@
+name: Optional armor live-fire and engineering diagnostic
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/test/java/diplomacy/sim/ArmorLiveFireTrial.java'
+      - 'core/src/test/java/diplomacy/sim/ArmorEngineeringTest.java'
+      - 'core/src/test/java/diplomacy/sim/CampaignAfterActionTest.java'
+      - 'core/src/main/java/diplomacy/shipyard/ArmorMaterials.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/build.gradle'
+      - '.github/workflows/armor-live-combat-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-fire:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      # Test real simulation and infrastructure. Any durability preference
+      # remains a separate balance observation, never a release blocker.
+      - name: Run bare-target combat and fitted nine-rank armor engineering tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-output/armor-live-fire
+          gradle --no-daemon :core:armorEngineeringSmoke :core:armorCombatTrial \
+            :core:campaignAfterActionSmoke | tee test-output/armor-live-fire/results.log
+      - name: Preserve live-fire and fitting test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-live-fire-${{ github.sha }}
+          path: test-output/armor-live-fire/
+          if-no-files-found: warn
