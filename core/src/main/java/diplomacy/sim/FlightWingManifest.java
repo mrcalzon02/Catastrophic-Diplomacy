@@ -32,7 +32,8 @@ public final class FlightWingManifest {
                     stored<0||ready<0||launched<0||returning<0||
                     servicing<0||destroyed<0||destroyed>1_000_000)
                 throw new IllegalArgumentException("Invalid flight wing");
-            paid();
+            Math.addExact(Math.addExact(Math.addExact(stored,ready),
+                    Math.addExact(launched,returning)),servicing);
         }
         public int paid(){
             return Math.addExact(Math.addExact(Math.addExact(stored,ready),

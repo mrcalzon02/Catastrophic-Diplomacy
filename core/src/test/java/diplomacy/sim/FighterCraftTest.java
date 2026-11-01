@@ -283,6 +283,13 @@ public final class FighterCraftTest {
         check(FlightWingManifest.legacy(legacy,tech,7).wings().equals(nativeStock.wings()),
                 "Four-field legacy ship saves must migrate to real organic bays");
         Shipyard.Design converted=empty;
+        // Auxiliary conversion must sacrifice actual weapon/defense sockets,
+        // as in the existing live carrier regression, to remain serviceable.
+        for(Shipyard.Slot slot:empty.hull.slots)
+            if((slot.mount()==Shipyard.Mount.WEAPON||
+                    slot.mount()==Shipyard.Mount.DEFENSE)&&
+                    converted.at(slot.index())!=null)
+                converted=converted.install(slot.index(),null);
         int fitted=0;
         for(Shipyard.Slot slot:empty.hull.slots)
             if(slot.mount()==Shipyard.Mount.SUPPORT&&fitted<2){
