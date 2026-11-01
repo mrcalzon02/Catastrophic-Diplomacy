@@ -25,6 +25,21 @@ public final class ScreensaverBattle {
     }
 
     public static Round create(long seed,TechnologyCatalog catalog){
+        return create(seed,catalog,0);
+    }
+
+    /**
+     * Reuse the EXACT screensaver fleet and captain randomization, optionally
+     * forcing a full-size endurance battle. A zero override retains the
+     * historical screensaver fleet-size distribution.
+     */
+    public static Round createSized(long seed,TechnologyCatalog catalog,int shipsPerSide){
+        if(shipsPerSide<1||shipsPerSide>200)
+            throw new IllegalArgumentException("Screensaver fleet must contain 1..200 ships per side");
+        return create(seed,catalog,shipsPerSide);
+    }
+
+    private static Round create(long seed,TechnologyCatalog catalog,int forcedShipsPerSide){
         if(catalog==null)throw new IllegalArgumentException("Missing engineering catalog");
         Random random=new Random(seed);
         Battle.Faction[] factions=Battle.Faction.values();
@@ -32,7 +47,8 @@ public final class ScreensaverBattle {
         Battle.Faction right=factions[random.nextInt(factions.length-1)];
         if(right.ordinal()>=left.ordinal())right=factions[right.ordinal()+1];
         int tierA=1+random.nextInt(6),tierB=1+random.nextInt(6);
-        int countA=fleetSize(random),countB=fleetSize(random);
+        int countA=forcedShipsPerSide==0?fleetSize(random):forcedShipsPerSide;
+        int countB=forcedShipsPerSide==0?fleetSize(random):forcedShipsPerSide;
         int environment=1+random.nextInt(LevelEconomy.LEVEL_COUNT);
         List<Shipyard.Design> first=fleet(random,catalog,left,tierA,countA);
         List<Shipyard.Design> second=fleet(random,catalog,right,tierB,countB);
