@@ -812,6 +812,10 @@ public final class Battle {
         s.crewBerths=machinery.crew().berths();
         s.lifeSupport=machinery.crew().lifeSupport();
         s.crewCount=Math.min(s.crewBerths,s.lifeSupport);
+        // Engine fuel and physical stores belong to the chassis; an empty
+        // unarmed vessel can still maneuver and replenish at port.
+        HullBaseline.CoreSystems core=HullBaseline.core(design.hull);
+        s.maxFuel=core.fuel();s.fuel=s.maxFuel;
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
         s.sensorRange=machinery.baseline().sensorRange();
         s.radarCrossSection=machinery.baseline().radarCrossSection();
@@ -819,10 +823,11 @@ public final class Battle {
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
         s.defense = new DirectionalDefense(s.maxShields,s.maxArmor,s.maxHull);
-        if(machinery.baseline().shieldRecharge()>0)
+        if(s.maxShields>0)
             for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values())
                 s.defense.configureRecharge(face,
-                        1.25+machinery.baseline().shieldRecharge()/4,2);
+                        1.25+machinery.baseline().shieldRecharge()/4
+                                +machinery.shieldRechargeBoost()/4,2);
         s.maxPower = machinery.maxPower(); s.power = s.maxPower;
         s.maxHeat = machinery.maxHeat();
         s.powerRegen = machinery.powerRegen();
@@ -862,9 +867,9 @@ public final class Battle {
         s.fighterLaunchBays=s.fighterBays.size();
         s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
-        s.kineticAmmo=s.kineticDamage>0?64+machinery.magazineCapacity()*4:0;
-        s.missileAmmo=s.missileDamage>0?8+machinery.magazineCapacity():0;
-        s.torpedoAmmo=s.torpedoDamage>0?3+machinery.magazineCapacity()/3:0;
+        s.kineticAmmo=core.kineticStores()+machinery.magazineCapacity()*4;
+        s.missileAmmo=core.missileStores()+machinery.magazineCapacity();
+        s.torpedoAmmo=core.torpedoStores()+machinery.magazineCapacity()/3;
         if(!design.launcherFittings.isEmpty()){
             List<Ship.Launcher> mounted=new ArrayList<>();
             for(DamageType family:new DamageType[]{DamageType.MISSILE,DamageType.TORPEDO}){
