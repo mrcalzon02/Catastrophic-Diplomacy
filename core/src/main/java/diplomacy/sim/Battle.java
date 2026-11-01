@@ -1154,6 +1154,18 @@ public final class Battle {
         long phaseY=ship.id*11L+tick/360L;
         double rallyX=480+(phaseX%6)*65;
         double rallyY=145+(phaseY%7)*75;
+        if(unattendedExhibition&&tick>6000){
+            // A long, genuine loss of contact calls for a wider search,
+            // not perpetual orbiting of the initial 325-unit rally strip.
+            // Each physical captain patrols an independent, bounded lane;
+            // enemy positions are never consulted to choose destinations.
+            // Twenty/thirty-second legs give engines time to actually arrive.
+            double expansion=StrictMath.min(3.0,1+(tick-6000)/4800.0);
+            long legX=ship.id*7L+tick/600L;
+            long legY=ship.id*11L+tick/900L;
+            rallyX=640+((legX%9)-4)*92*expansion;
+            rallyY=335+((legY%7)-3)*75*expansion;
+        }
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
                 ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
         boolean thrust=!hold && ship.fuel>0 && ship.engineCondition>0.01
