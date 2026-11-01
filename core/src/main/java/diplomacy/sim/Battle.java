@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.EnumMap;
@@ -594,6 +595,9 @@ public final class Battle {
     public int fighterGunShots,fighterLaserShots,fighterParticleShots,
                fighterMissilesLaunched,fighterTorpedoesLaunched,craftLosses;
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
+    /** One actual close-contact spotting ship per enemy for each faction.
+     * Reused every tick, so 200v200 targeting has no per-ship relay allocation. */
+    private final Ship[][] sharedSpotters={new Ship[16],new Ship[16]};
     /** Opt-in screensaver policy only. Player/campaign battles never make
      * autonomous extraction decisions for the player's surviving ships. */
     private boolean unattendedExhibition;
@@ -1050,6 +1054,7 @@ public final class Battle {
             hitAt(victim, effect.damage(), null, kind, effect.fromX(), effect.fromY());
             environmentalHits++;
         }
+        refreshSharedContacts();
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             // A lone, unarmed exhibition captain with viable engines has no
@@ -1217,6 +1222,50 @@ public final class Battle {
         double optical=weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390;
         return StrictMath.max(radar,optical);
     }
+    /** Independent optical/radar acquisition precedes any fleet datalink.
+     * A relay is a detected enemy, not an omniscient target list: the spotter
+     * must be alive, powered and within local formation radio range, and the
+     * recipient must remain near the reported hostile. Simulated once per
+     * tick rather than rescanning every ally for every target candidate. */
+    private void refreshSharedContacts(){
+        if(!weather.preset().enabled())return;
+        for(int team=0;team<2;team++){
+            if(sharedSpotters[team].length<nextId)
+                sharedSpotters[team]=new Ship[nextId];
+            else Arrays.fill(sharedSpotters[team],null);
+        }
+        double[][] nearest={new double[nextId],new double[nextId]};
+        Arrays.fill(nearest[0],Double.POSITIVE_INFINITY);
+        Arrays.fill(nearest[1],Double.POSITIVE_INFINITY);
+        for(Ship scout:ships){
+            if(!scout.alive()||scout.power<=3||scout.crewReadiness()<0.05)continue;
+            Ship[] contacts=sharedSpotters[scout.team];
+            double[] closest=nearest[scout.team];
+            for(Ship hostile:ships){
+                if(!hostile.alive()||hostile.team==scout.team)continue;
+                double dx=hostile.x-scout.x,dy=hostile.y-scout.y;
+                double d2=dx*dx+dy*dy;
+                if(d2>=closest[hostile.id])continue;
+                double range=targetAcquisitionRange(scout,hostile);
+                if(d2<=range*range){
+                    closest[hostile.id]=d2;
+                    contacts[hostile.id]=scout;
+                }
+            }
+        }
+    }
+
+    private boolean hasTargetContact(Ship actor,Ship hostile,double distance){
+        if(!weather.preset().enabled()
+                ||distance<=targetAcquisitionRange(actor,hostile))return true;
+        if(actor.power<=3||actor.crewReadiness()<0.05||distance>1250)return false;
+        Ship[] contacts=sharedSpotters[actor.team];
+        if(hostile.id>=contacts.length)return false;
+        Ship scout=contacts[hostile.id];
+        return scout!=null&&scout.alive()&&scout.power>3
+                &&StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000;
+    }
+
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
         if(actor.standingOrders==null&&
@@ -1225,8 +1274,7 @@ public final class Battle {
             double best = Double.POSITIVE_INFINITY;
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
                 double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
-                if (weather.preset().enabled() &&
-                        distance > targetAcquisitionRange(actor,s))continue;
+                if(!hasTargetContact(actor,s,distance))continue;
                 double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
@@ -1260,7 +1308,7 @@ public final class Battle {
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
             double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
-            if(weather.preset().enabled() && distance>targetAcquisitionRange(actor,candidate))continue;
+            if(!hasTargetContact(actor,candidate,distance))continue;
             double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
