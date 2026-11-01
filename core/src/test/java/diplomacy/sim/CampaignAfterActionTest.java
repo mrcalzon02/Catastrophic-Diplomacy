@@ -23,6 +23,16 @@ public final class CampaignAfterActionTest {
             battle.ships().get(i).commissionedId=ids.get(i);
         }
         var v=battle.ships().get(0);
+        // Modern bare hulls carry finite intrinsic magazines and personnel;
+        // their stores may be smaller than an arbitrary requested expenditure.
+        // Snapshot actual commissioned stores, then assert the exact losses
+        // that those stores can sustain without manufacturing ammunition.
+        var provision=original.active().get(0).stores();
+        int expectedCrew=(int)Math.ceil(Math.min(3,provision.crew()));
+        int expectedMissiles=Math.min(7,provision.missiles());
+        int expectedFuel=(int)Math.ceil(Math.min(24,provision.fuel()));
+        check(expectedCrew>0&&expectedMissiles>0&&expectedFuel>0,
+                "Test must commission real consumable stores before the sortie");
         v.hull=v.maxHull*0.5;
         v.crewCount=Math.max(0,v.crewCount-3);
         v.missileAmmo=Math.max(0,v.missileAmmo-7);
@@ -40,7 +50,8 @@ public final class CampaignAfterActionTest {
         var first=report.entries().get(0);
         check(first.id()==ids.get(0)&&first.name().equals(original.get(ids.get(0)).name())&&
                 first.hullPercent()==50,"Stable ship identity/hull integrity changed");
-        check(first.crewLost()==3&&first.missileSpent()==7&&first.fuelSpent()==24,
+        check(first.crewLost()==expectedCrew&&first.missileSpent()==expectedMissiles&&
+                first.fuelSpent()==expectedFuel,
                 "Battle expenses and personnel losses were not measured");
         // Regression: an uncommissioned tactical hull (ID 0) or a swapped
         // commissioned ID must never inherit another ship's losses or stores.
