@@ -254,9 +254,94 @@ public final class FighterCraftTest {
                 "Removing auxiliary FTR must not erase organic carrier stock");
     }
 
+
+    private static void expectRejected(Runnable action,String reason){
+        boolean rejected=false;
+        try{action.run();}catch(IllegalArgumentException expected){rejected=true;}
+        check(rejected,reason);
+    }
+    /** A separate persistent manifest, not yet the campaign's live launch authority. */
+    private static void flightWingManifest(TechnologyCatalog tech){
+        Shipyard.Design empty=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        check(FlightWingManifest.bayCapacities(empty,tech).isEmpty(),
+                "Unmodified cruiser must not have phantom fighter storage");
+        expectRejected(()->FlightWingManifest.legacy(empty,tech,1),
+                "Noncarrier must not manufacture a fighter");
+        Shipyard.Design nativeCarrier=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CARRIER);
+        var nativeBays=FlightWingManifest.bayCapacities(nativeCarrier,tech);
+        check(nativeBays.size()==3&&nativeBays.values().stream()
+                        .mapToInt(Integer::intValue).sum()==12,
+                "Three native catapults must divide the actual 12 paid storage slots");
+        var nativeStock=FlightWingManifest.legacy(nativeCarrier,tech,7);
+        check(nativeStock.paid()==7&&nativeStock.wings().size()==2,
+                "Legacy carrier allocation must preserve exact purchased inventory");
+        check(FlightWingManifest.decode(nativeStock.encode(),nativeCarrier,tech,7)
+                        .wings().equals(nativeStock.wings()),
+                "Native flight complement must survive checksum-protected save/load");
+        var legacy=Shipyard.decode(Shipyard.encode(nativeCarrier),tech);
+        check(FlightWingManifest.legacy(legacy,tech,7).wings().equals(nativeStock.wings()),
+                "Four-field legacy ship saves must migrate to real organic bays");
+        Shipyard.Design converted=empty;
+        int fitted=0;
+        for(Shipyard.Slot slot:empty.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT&&fitted<2){
+                converted=converted.install(slot.index(),"BASE-TER-FTR");
+                fitted++;
+            }
+        check(fitted==2&&Shipyard.inspect(converted,tech).valid(),
+                "Two physical FTR sockets must be serviceable");
+        var bays=FlightWingManifest.bayCapacities(converted,tech);
+        check(bays.size()==2&&bays.keySet().stream().allMatch(id->id.startsWith("FTR:")),
+                "Each installed socket must retain its original FTR identity");
+        var ids=new java.util.ArrayList<>(bays.keySet());
+        var mixed=FlightWingManifest.of(converted,tech,3,java.util.List.of(
+                new FlightWingManifest.FlightWing(ids.get(0),FighterModel.Hull.INTERCEPTOR,
+                        1,1,0,0,0,0),
+                new FlightWingManifest.FlightWing(ids.get(1),FighterModel.Hull.TORPEDO_BOMBER,
+                        0,1,0,0,0,2)));
+        check(mixed.paid()==3&&mixed.wings().size()==2,
+                "Mixed interceptor/bomber bays must account for exactly three paid craft");
+        check(FlightWingManifest.decode(mixed.encode(),converted,tech,3)
+                        .wings().equals(mixed.wings()),
+                "Mixed physical bays and historical destroyed count survive save/load");
+        final Shipyard.Design twoBays=converted;
+        expectRejected(()->FlightWingManifest.decode(mixed.encode(),twoBays,tech,4),
+                "Import must not invent a fourth paid fighter");
+        expectRejected(()->FlightWingManifest.of(twoBays,tech,2,java.util.List.of(
+                new FlightWingManifest.FlightWing(ids.get(0),FighterModel.Hull.INTERCEPTOR,
+                        0,1,0,0,0,0),
+                new FlightWingManifest.FlightWing(ids.get(0),FighterModel.Hull.INTERCEPTOR,
+                        0,1,0,0,0,0))),"Repeated bay identity must be rejected");
+        expectRejected(()->FlightWingManifest.of(twoBays,tech,1,java.util.List.of(
+                new FlightWingManifest.FlightWing("FTR:999",FighterModel.Hull.INTERCEPTOR,
+                        0,1,0,0,0,0))),"Foreign physical socket must be rejected");
+        int over=bays.get(ids.get(0))+1;
+        expectRejected(()->FlightWingManifest.of(twoBays,tech,over,java.util.List.of(
+                new FlightWingManifest.FlightWing(ids.get(0),FighterModel.Hull.INTERCEPTOR,
+                        0,over,0,0,0,0))),"One bay cannot exceed its actual fitted capacity");
+        String damaged=mixed.encode().replace("INTERCEPTOR","MISSILE_FIGHTER");
+        expectRejected(()->FlightWingManifest.decode(damaged,twoBays,tech,3),
+                "Tampering with saved fighter type must fail checksum");
+        check(mixed.forRefit(twoBays,twoBays,tech,3).paid()==3,
+                "Compatible refit retains all three purchased craft");
+        Shipyard.Design removed=twoBays.install(
+                Integer.parseInt(ids.get(0).substring(4)),null);
+        expectRejected(()->mixed.forRefit(twoBays,removed,tech,3),
+                "Removing a stocked hangar must not silently confiscate its wing");
+        Battle live=new Battle(99871);
+        live.spawnWing(0,twoBays,tech,1,290,350);
+        Battle.Ship parent=live.ships().get(0);
+        int first=Integer.parseInt(ids.get(0).substring(4));
+        parent.damageFighterBay(first,1.0);
+        check(!parent.fighterBay(ids.get(0)).operational()&&mixed.paid()==3,
+                "Disabled physical lane must retain all three paid manifest aircraft");
+    }
+
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         sensorAndArmor();
+        flightWingManifest(tech);
         saves(tech);
         hangarCapacityAndSorties(tech);
         for(FighterModel.Hull hull:FighterModel.Hull.values()){
