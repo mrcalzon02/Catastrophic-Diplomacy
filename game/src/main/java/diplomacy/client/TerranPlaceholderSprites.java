@@ -579,8 +579,12 @@ public final class TerranPlaceholderSprites implements Disposable {
             minY=Math.min(minY,point.y());maxY=Math.max(maxY,point.y());
         }
         int width=cloud.width(),height=cloud.height();
-        int minimum=Math.max(9,Math.min(16,(int)Math.sqrt(
-                width*(double)height/Math.max(1,schematic.size()*21))));
+        // Hardware must not merely touch the silhouette by its centre:
+        // leave enough solid plating between sockets for drawn gun footprints.
+        // Large capital turrets require proportionally more room than icons.
+        // The second, exact-alpha pass below handles exceptionally crowded art.
+        int minimum=Math.max(17,Math.min(43,
+                (int)Math.round(height*.063)));
         int minSq=minimum*minimum;
         List<Shipyard.Slot> answer=new java.util.ArrayList<>(schematic.size());
         java.util.List<Integer> usedPixels=new java.util.ArrayList<>();
