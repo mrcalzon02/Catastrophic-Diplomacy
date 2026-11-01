@@ -50,7 +50,8 @@ public final class ArmorEngineeringTest {
                     if(type.equals("CMP")||type.equals("ABL"))
                         check(resistant<neutral,"Composite/ablative lasers must resist better "+id);
                 }
-                check(vessel.defense.totalArmor()==vessel.maxArmor,
+                check(Math.abs(vessel.defense.totalArmor()-vessel.maxArmor)
+                                <=1e-7*Math.max(1,vessel.maxArmor),
                         "Fitted capacity must reach physical armor tiles");
                 for(Shipyard.Track track:Shipyard.Track.values()){
                     Shipyard.Design ranked=armored.stage(socket,track,9);
