@@ -196,16 +196,23 @@ public final class CampaignFleetTest {
         check(replacement.ships().size()==4&&replacement.reserves().size()==2,
                 "New ship was not individually delivered to reserve");
         var latest=replacement.get(ship5);
-        check(latest.stores().crew()==0&&latest.stores().fuel()==0&&
-                latest.stores().missiles()==0,
-                "Purchased bare hull received uncharged crew, fuel or ordnance");
-        check(replacement.cost(latest.id(),CampaignFleet.Service.CREW,tech)>0,
-                "Recruitment is mysteriously free after buying a hull");
-        check(replacement.requiredServices(latest.id(),tech).containsAll(
-                        java.util.List.of(CampaignFleet.Service.CREW,CampaignFleet.Service.FUEL))&&
-                        replacement.activeServiceWarnings(tech).stream().noneMatch(
-                                warning->warning.vessel().id()==latest.id()),
-                "Unfueled and uncrewed new reserve hull should warn without inflating active count");
+        var nativeServices=diplomacy.shipyard.HullBaseline.core(baseline.hull);
+        check(CampaignFleet.purchaseCost(baseline,tech)
+                        >=CampaignFleet.purchaseCost(baseline)
+                        +CampaignFleet.initialProvisionCost(baseline.hull),
+                "Commissioning quote must charge for the installed native operating supply");
+        check(latest.stores().crew()==nativeServices.crewBerths()
+                        &&latest.stores().fuel()==nativeServices.fuel()
+                        &&latest.stores().kinetic()==nativeServices.kineticStores()
+                        &&latest.stores().missiles()==nativeServices.missileStores()
+                        &&latest.stores().torpedoes()==nativeServices.torpedoStores(),
+                "Paid commissioned hull lacks built-in crew, fuel or munitions");
+        check(replacement.cost(latest.id(),CampaignFleet.Service.FUEL,tech)==0
+                        &&replacement.cost(latest.id(),CampaignFleet.Service.AMMUNITION,tech)==0,
+                "Paid built-in fuel and magazines were charged twice");
+        check(replacement.activeServiceWarnings(tech).stream().noneMatch(
+                        warning->warning.vessel().id()==latest.id()),
+                "Reserve hull must not inflate active-readiness warnings");
 
         var nextName=FleetNames.generate(FleetNames.Style.NAVAL,
                 original.namingSeed(),5);
@@ -234,10 +241,11 @@ public final class CampaignFleetTest {
                         !refitted.get(latest.id()).deployed()&&
                         refitted.nextSerial()==refitBase.nextSerial(),
                 "Refit replaced permanent ownership, name, squadron, or serial");
-        check(refitted.get(latest.id()).stores().crew()==0&&
-                        refitted.get(latest.id()).stores().fuel()==0&&
-                        refitted.get(latest.id()).stores().missiles()==0,
-                "Refit conjured personnel, fuel, or ammunition");
+        check(refitted.get(latest.id()).stores().crew()==latest.stores().crew()&&
+                        refitted.get(latest.id()).stores().fuel()==latest.stores().fuel()&&
+                        refitted.get(latest.id()).stores().missiles()==latest.stores().missiles()&&
+                        refitted.get(latest.id()).stores().kinetic()==latest.stores().kinetic(),
+                "Refit lost or conjured prepaid native crew, fuel or ammunition");
         check(new CampaignProgress.State(faction,1,refitPrice,0)
                         .spend(refitPrice).credits()==0,
                 "Exactly funded refit must debit the real campaign wallet");
