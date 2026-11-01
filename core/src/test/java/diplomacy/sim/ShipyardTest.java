@@ -93,6 +93,17 @@ public final class ShipyardTest {
                 "Weapon emplacement must accept armor conversion");
         require(Shipyard.accepts(normal.hull,weapon,catalog.base("BASE-TER-ENG")),
                 "Weapon emplacement must accept auxiliary thrusters");
+        var dreadSlots=Shipyard.Hull.DREADNOUGHT.slots;
+        int supportSocket=dreadSlots.stream()
+                .filter(slot->slot.mount()==Shipyard.Mount.SUPPORT)
+                .findFirst().orElseThrow().index();
+        require(Shipyard.accepts(Shipyard.Hull.DREADNOUGHT,supportSocket,
+                        catalog.base("BASE-TER-CRW"))
+                        &&Shipyard.accepts(Shipyard.Hull.DREADNOUGHT,supportSocket,
+                        catalog.base("BASE-TER-LFS"))
+                        &&Shipyard.accepts(Shipyard.Hull.DREADNOUGHT,supportSocket,
+                        catalog.base("BASE-TER-ARM")),
+                "Support sockets must permit additional crew, breathing and armor");
         require(Shipyard.fit(normal.install(weapon,"BASE-TER-REA"),catalog).maxPower()
                         >Shipyard.fit(normal,catalog).maxPower(),
                 "Trading away a gun for a reactor must increase available power");
@@ -188,6 +199,11 @@ public final class ShipyardTest {
                 if(number<4)shieldSpire=shieldSpire.install(slot.index(),"BASE-TER-REA");
                 if(number>=4&&number<7)shieldSpire=shieldSpire.install(
                         slot.index(),"BASE-TER-RAD");
+            }
+            if(slot.mount()==Shipyard.Mount.SUPPORT){
+                int number=slot.index()-find(basicDread,Shipyard.Mount.SUPPORT,0);
+                shieldSpire=shieldSpire.install(slot.index(),
+                        number%2==0?"BASE-TER-CRW":"BASE-TER-LFS");
             }
         }
         require(Shipyard.inspect(shieldSpire,catalog).valid(),
