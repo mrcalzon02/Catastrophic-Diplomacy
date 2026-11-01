@@ -114,6 +114,43 @@ public final class ScreensaverBattleTest {
                         Long.toUnsignedString(replaySeed)+" tick=first24",failure);
             }
         }
+        // Regression: inverted fleets outside the playable theater cannot
+        // indefinitely flee one another when nebula obscures target acquisition.
+        // This is the real Battle.step() search, not a test-only target teleport.
+        Battle lost=new Battle(0x5EA2C4L);
+        Battle.Ship scout=lost.addShip(0,Battle.Faction.TERRAN,1580,335);
+        Battle.Ship hunter=lost.addShip(1,Battle.Faction.DRAXIAN,-300,335);
+        lost.configureWeather(new SpaceWeather.Preset(1,17,
+                SpaceWeather.Kind.NEBULA,SpaceWeather.Kind.CLEAR,1));
+        scout.speed=85;hunter.speed=85;
+        scout.sensorRange=600;hunter.sensorRange=600;
+        double initialGap=StrictMath.hypot(scout.x-hunter.x,scout.y-hunter.y);
+        boolean reacquired=false;
+        for(int tick=0;tick<1300&&!lost.finished();tick++){
+            lost.step();
+            if(scout.lastTargetId==hunter.id||hunter.lastTargetId==scout.id){
+                reacquired=true;
+                break;
+            }
+        }
+        check(reacquired,"Fog-lost ships never reacquired real sensor contact");
+        check(StrictMath.hypot(scout.x-hunter.x,scout.y-hunter.y)<initialGap,
+                "Search patrol pushed lost ships farther from combat");
+        check(scout.fuel<scout.maxFuel&&hunter.fuel<hunter.maxFuel,
+                "Active search should consume finite propulsion fuel");
+
+        Battle stationary=new Battle(0xD15AB1EDL);
+        Battle.Ship stranded=stationary.addShip(0,Battle.Faction.TERRAN,1580,335);
+        Battle.Ship foe=stationary.addShip(1,Battle.Faction.DRAXIAN,-300,335);
+        stationary.configureWeather(new SpaceWeather.Preset(1,17,
+                SpaceWeather.Kind.NEBULA,SpaceWeather.Kind.CLEAR,1));
+        stranded.sensorRange=1;foe.sensorRange=1;
+        stranded.fuel=0;
+        double strandedX=stranded.x,strandedY=stranded.y;
+        for(int tick=0;tick<30;tick++)stationary.step();
+        check(stranded.x==strandedX&&stranded.y==strandedY,
+                "Empty fuel tank produced artificial search thrust");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
