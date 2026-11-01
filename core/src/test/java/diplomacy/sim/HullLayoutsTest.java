@@ -79,6 +79,51 @@ public final class HullLayoutsTest {
         }
         check(count==display.length*Battle.Faction.values().length,
                 "missing hull/faction permutations");
-        System.out.println("PASS hull layouts: "+count+" valid faction/class fittings, distinct placements and hit tests");
+        // Distinct class variants already have different slot inventories;
+        // never silently collapse their numbers to the shared sprite class.
+        for(Shipyard.Hull base:display){
+            if(base!=base.spriteHull())continue;
+            boolean hasSibling=false,hasDifferentCount=false;
+            for(Shipyard.Hull variant:display)if(variant!=base
+                    &&variant.spriteHull()==base){
+                hasSibling=true;
+                if(variant.slots.size()!=base.slots.size())hasDifferentCount=true;
+            }
+            if(hasSibling)check(hasDifferentCount,
+                    "All "+base+" variants have been flattened to one module count");
+        }
+        // Real sprite registration is supplied by the renderer before spawning
+        // combat ships. Assert the authoritative API preserves original socket
+        // IDs and categories while changing both shipyard and combat origins.
+        Shipyard.Design sample=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        var baseline=sample.placements();
+        try{
+            HullLayouts.useSpriteProjector((faction,hull,schematic)->{
+                java.util.ArrayList<Shipyard.Slot> mapped=new java.util.ArrayList<>();
+                for(var slot:schematic)
+                    mapped.add(new Shipyard.Slot(slot.index(),slot.mount(),
+                            slot.x()+3,slot.y()-2));
+                return mapped;
+            });
+            var altered=sample.placements();
+            check(altered.size()==baseline.size(),"Sprite projection dropped module sockets");
+            for(int i=0;i<altered.size();i++){
+                check(altered.get(i).index()==baseline.get(i).index()
+                                &&altered.get(i).mount()==baseline.get(i).mount(),
+                        "Sprite mapping rewrote installed module IDs");
+                check(altered.get(i).x()==baseline.get(i).x()+3
+                                &&altered.get(i).y()==baseline.get(i).y()-2,
+                        "Shipyard did not use projected original-art hardpoints");
+            }
+            var equipped=WeaponMuzzles.equipped(sample,altered);
+            for(var gun:equipped){
+                var mount=altered.get(gun.slotId());
+                check(gun.localX()==mount.x()&&gun.localY()==mount.y(),
+                        "Live combat muzzle is disconnected from shipyard hardpoint");
+            }
+        }finally{HullLayouts.useSpriteProjector(null);}
+        check(sample.placements().equals(baseline),
+                "Removing graphics backend did not restore headless layout");
+        System.out.println("PASS hull layouts: "+count+" valid faction/class fittings, sprite projections, stable socket IDs, distinct variant counts and live muzzle bindings");
     }
 }
