@@ -77,7 +77,7 @@ public final class ShipyardTest {
                 "An unarmed hull must never shoot without a physical gun");
         double previousX=emptyShip.x;
         for(int i=0;i<90;i++)emptyBattle.step();
-        require(emptyShip.alive()&&emptyShip.power>=0&&emptyShip.x!=Double.NaN,
+        require(emptyShip.alive()&&emptyShip.power>=0&&Double.isFinite(emptyShip.x),
                 "Bare hull must survive the first ninety frames without refit");
         require(emptyShip.maxFuel>180&&emptyShip.maxFuel>=emptyShip.fuel,
                 "Hull-class fuel stores must replace fixed 180-unit legacy fuel");
@@ -110,13 +110,20 @@ public final class ShipyardTest {
                 .install(find(Shipyard.starter(Battle.Faction.CARNELIAN,Shipyard.Hull.CORVETTE),Shipyard.Mount.DEFENSE,0),"BASE-CAR-ARM");
         require(Shipyard.inspect(heavy,catalog).errors().contains("Hull displacement exceeded"),"mass budget must reject overloaded mounts");
         rejects(()->Shipyard.fit(heavy,catalog),"overweight ship may not deploy");
-        Shipyard.Design demanding=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE)
-                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.SYSTEM,3),"BASE-TER-SEN")
-                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.WEAPON,2),"BASE-TER-FLK")
-                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.DEFENSE,1),"BASE-TER-ARM")
-                .install(find(Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE),Shipyard.Mount.SUPPORT,0),"BASE-TER-REP");
-        require(Shipyard.inspect(demanding,catalog).errors().contains("Insufficient reactor output"),"power budget must reject brownout");
-        require(Shipyard.inspect(demanding,catalog).errors().contains("Thermal rejection insufficient"),"cooling budget must reject overheating");
+        Shipyard.Design demanding=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.FRIGATE);
+        for(Shipyard.Slot slot:demanding.hull.slots){
+            if(slot.mount()==Shipyard.Mount.WEAPON
+                    ||slot.mount()==Shipyard.Mount.DEFENSE)
+                demanding=demanding.install(slot.index(),"BASE-TER-SHD");
+            if(slot.mount()==Shipyard.Mount.SYSTEM)
+                demanding=demanding.install(slot.index(),"BASE-TER-ENG");
+            if(slot.mount()==Shipyard.Mount.SUPPORT)
+                demanding=demanding.install(slot.index(),"BASE-TER-REP");
+        }
+        require(Shipyard.inspect(demanding,catalog).errors().contains("Insufficient reactor output"),
+                "Bare-hull core power cannot run unlimited shield and thruster augmentations");
+        require(Shipyard.inspect(demanding,catalog).errors().contains("Thermal rejection insufficient"),
+                "Bare-hull radiator cannot reject unlimited reactor and shield heat");
         Shipyard.Design improved=normal.stage(weapon,Shipyard.Track.OUTPUT,3);
         require(Shipyard.inspect(improved,catalog).valid(),"three output stages should fit stock corvette");
         require(Shipyard.fit(improved,catalog).laserDamage()>Shipyard.fit(normal,catalog).laserDamage(),"upgrades must impact actual combat firepower");
