@@ -42,6 +42,7 @@ import java.util.function.Consumer;
 /** Compact, touch-and-mouse compatible single-screen ship fitting interface. */
 final class ShipyardPanel {
     private static final int SLOT_ROWS=18;
+    private static final int MODULE_OPTIONS_PER_PAGE=6;
     private static final float SLOT_ROW_TOP=560f;
     private static final float PREVIEW_WIDTH=330f,PREVIEW_HEIGHT=402f;
     private static final float MAP_CX=563f, MAP_CY=343f, MAP_SCALE=2.65f;
@@ -68,7 +69,7 @@ final class ShipyardPanel {
     private final BiConsumer<Integer,Shipyard.Design> deploy;
     private Shipyard.Design[] active = new Shipyard.Design[2];
     private Shipyard.Design draft;
-    private int team, selectedSlot, scroll;
+    private int team, selectedSlot, scroll, modulePage;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
     enum Usage { WORKSHOP, SKIRMISH, CAMPAIGN, CAMPAIGN_REFIT }
@@ -700,6 +701,7 @@ final class ShipyardPanel {
         return selected;
     }
     private void select(int index) {
+        if(selectedSlot!=index)modulePage=0;
         selectedSlot=index;
         if(index<scroll)scroll=index;
         if(index>=scroll+SLOT_ROWS)scroll=index-SLOT_ROWS+1;
@@ -787,15 +789,22 @@ final class ShipyardPanel {
         }
         if(x>=805&&x<=1256&&y>=365&&y<=575){
             int index=(int)((575-y)/25);
-            Shipyard.Mount mount=draft.placements().get(selectedSlot).mount();
             List<Component> options=Shipyard.choices(catalog,draft.faction,draft.hull,selectedSlot);
             if(index==0){
                 try{draft=draft.install(selectedSlot,null);notice="Mount cleared";}
                 catch(IllegalArgumentException blocked){notice=blocked.getMessage();}
                 return true;
             }
-            if(index>0&&index<=options.size()){
-                Component part=options.get(index-1);
+            if(index==7){
+                int pages=Math.max(1,(options.size()+MODULE_OPTIONS_PER_PAGE-1)
+                        /MODULE_OPTIONS_PER_PAGE);
+                modulePage=(modulePage+1)%pages;
+                notice="Module alternatives page "+(modulePage+1)+" / "+pages;
+                return true;
+            }
+            int position=modulePage*MODULE_OPTIONS_PER_PAGE+index-1;
+            if(index>0&&index<=MODULE_OPTIONS_PER_PAGE&&position<options.size()){
+                Component part=options.get(position);
                 try{draft=draft.install(selectedSlot,part.id);}
                 catch(IllegalArgumentException blocked){notice=blocked.getMessage();return true;}
                 notice="Installed "+part.name+" (upgrades reset for this mount)";
@@ -1373,14 +1382,22 @@ final class ShipyardPanel {
                     hardpointX(selected)+12,hardpointY(selected)+5);
         }
         List<Component> options=Shipyard.choices(catalog,draft.faction,draft.hull,selectedSlot);
+        int pages=Math.max(1,(options.size()+MODULE_OPTIONS_PER_PAGE-1)
+                /MODULE_OPTIONS_PER_PAGE);
+        if(modulePage>=pages)modulePage=0;
         font.setColor(Color.LIGHT_GRAY);font.draw(batch,"CLEAR MOUNT",813,564);
-        for(int n=0;n<options.size();n++){
-            Component c=options.get(n);
-            if(uiIcons!=null && n<8)
-                uiIcons.draw(batch,iconForModule(c.name,selected.mount()),1220,533-n*25,21);
+        int first=modulePage*MODULE_OPTIONS_PER_PAGE;
+        for(int n=0;n<MODULE_OPTIONS_PER_PAGE&&first+n<options.size();n++){
+            Component c=options.get(first+n);
+            if(uiIcons!=null)
+                uiIcons.draw(batch,iconForModule(c.name,Shipyard.requiredMount(c)),
+                        1220,533-n*25,21);
             font.setColor(installed!=null&&c.id.equals(installed.component)?Color.GOLD:Color.WHITE);
             font.draw(batch,shortText(c.name,34),813,564-(n+1)*25);
         }
+        font.setColor(Color.CYAN);
+        font.draw(batch,"MORE MODULES  "+(modulePage+1)+"/"+pages+"   >",813,
+                564-(MODULE_OPTIONS_PER_PAGE+1)*25);
         Shipyard.Track activeResearch=installed==null?null:installed.branch();
         font.setColor(Color.WHITE);
         font.draw(batch,"MODULE SPECIALIZATION - "+selected.mount()+" #"+(selectedSlot+1),813,372);
