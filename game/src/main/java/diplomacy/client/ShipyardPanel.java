@@ -70,6 +70,7 @@ final class ShipyardPanel {
     private Shipyard.Design[] active = new Shipyard.Design[2];
     private Shipyard.Design draft;
     private int team, selectedSlot, scroll, modulePage;
+    private boolean stripHullArmed;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
     enum Usage { WORKSHOP, SKIRMISH, CAMPAIGN, CAMPAIGN_REFIT }
@@ -701,6 +702,7 @@ final class ShipyardPanel {
         return selected;
     }
     private void select(int index) {
+        stripHullArmed=false;
         if(selectedSlot!=index)modulePage=0;
         selectedSlot=index;
         if(index<scroll)scroll=index;
@@ -754,6 +756,18 @@ final class ShipyardPanel {
         }
         if(x>=807&&x<=1256&&y>=62&&y<=103){
             if(x<1085)cyclePattern();else cycleMark();
+            return true;
+        }
+        if(x>=503&&x<=679&&y>=588&&y<=632){
+            if(!stripHullArmed){
+                stripHullArmed=true;
+                notice="CONFIRM EMPTY HULL: tap STRIP HULL again; all fitted modules are removed";
+            }else{
+                draft=Shipyard.bareHull(draft.faction,draft.hull);
+                stripHullArmed=false;modulePage=0;selectedSlot=0;scroll=0;
+                purchaseArmedDesign=null;cachedQuote=null;
+                notice="EMPTY HULL: onboard reactor, drive, cooling, crew, fuel and stores operational";
+            }
             return true;
         }
         if(x>=690&&x<=795&&y>=580&&y<=635) {
@@ -1210,6 +1224,8 @@ final class ShipyardPanel {
             uiIcons.drawButton(batch,team==0?"primary":"secondary",24,642,137,42);
             if(!playerOnly)uiIcons.drawButton(batch,team==1?"primary":"secondary",169,642,139,42);
             uiIcons.drawButton(batch,"secondary",338,642,39,42);
+            uiIcons.drawButton(batch,stripHullArmed?"warning":"secondary",
+                    503,591,174,40);
             uiIcons.drawButton(batch,"secondary",643,642,51,42);
             uiIcons.drawButton(batch,"confirm",706,642,107,42);
             uiIcons.drawButton(batch,"secondary",819,642,96,42);
@@ -1269,6 +1285,8 @@ final class ShipyardPanel {
         font.draw(batch,"CLOSE",1174,660);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"HARDPOINTS ("+draft.slots()+")",38,590);
+        font.setColor(stripHullArmed?Color.GOLD:Color.WHITE);
+        font.draw(batch,stripHullArmed?"CONFIRM EMPTY":"STRIP HULL",518,615);
         font.draw(batch,artwork?"FITTED HULL":"ENGINEERING SCHEMATIC",345,590);
         font.setColor(Color.GOLD);
         font.draw(batch,artwork?"SCHEMATIC":"SHIP ART",705,590);
