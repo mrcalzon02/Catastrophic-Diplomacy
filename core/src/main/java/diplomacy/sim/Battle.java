@@ -1090,8 +1090,13 @@ public final class Battle {
      * sensors reacquire a target. Explicit HOLD/LAST_STAND orders remain still.
      */
     private void searchForContact(Ship ship) {
-        double rallyX=ship.team==0?565:715;
-        double rallyY=140+(ship.id*73%9)*50;
+        // Advance patrol waypoints on simulation ticks, not frame time or
+        // hidden enemy coordinates. Both fleets search overlapping lanes;
+        // otherwise impaired-sensor ships can park forever in disjoint posts.
+        long phaseX=ship.id*7L+tick/240L;
+        long phaseY=ship.id*11L+tick/360L;
+        double rallyX=480+(phaseX%6)*65;
+        double rallyY=145+(phaseY%7)*75;
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
                 ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
         boolean thrust=!hold && ship.fuel>0 && ship.engineCondition>0.01
@@ -1148,11 +1153,15 @@ public final class Battle {
         s.repairDroneReload=Math.max(0,s.repairDroneReload-DT);
     }
 
-    /** Built-in radar and target cross-section matter without art-scale coupling. */
+    /** Radar can be blinded, but nearby silhouettes remain visible to optical
+     * spotters. Optical sighting is deliberately short and weather-dependent;
+     * neither it nor the search patrol reveals targets beyond real detection. */
     private double targetAcquisitionRange(Ship observer,Ship target){
         double rcs=StrictMath.max(0.15,StrictMath.min(4.0,target.radarCrossSection));
-        return observer.sensorRange*observer.sensorsCondition*weather.sensorFactor()
+        double radar=observer.sensorRange*observer.sensorsCondition*weather.sensorFactor()
                 *StrictMath.sqrt(StrictMath.sqrt(rcs));
+        double optical=weather.preset().includes(SpaceWeather.Kind.NEBULA)?120:210;
+        return StrictMath.max(radar,optical);
     }
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
