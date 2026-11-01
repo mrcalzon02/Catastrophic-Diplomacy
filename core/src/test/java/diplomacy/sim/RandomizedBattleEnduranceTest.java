@@ -43,7 +43,7 @@ public final class RandomizedBattleEnduranceTest {
         for(Object value:values){
             if(row.length()>0)row.append(',');
             String v=String.valueOf(value);
-            row.append('"').append(v.replace(""","""")).append('"');
+            row.append('"').append(v.replace("\"","\"\"")).append('"');
         }
         return row.toString();
     }
