@@ -4,8 +4,9 @@ import diplomacy.sim.Battle;
 
 /**
  * Immutable physical starting characteristics of an EMPTY ship hull.
- * No weapon, crew accommodation, repair equipment, PD battery or ammunition
- * is bundled here; those are entirely installed-module capabilities.
+ * The hull includes a permanently integrated reactor, maneuvering thrusters,
+ * heat rejection, crew accommodation, atmosphere, fuel and basic stores.
+ * Weapons, advanced emitters and specialist capacities remain fitted modules.
  *
  * All values are world/simulation values. The catalog is deterministic,
  * derived from hull class and civilization, and shared by both player and AI.
@@ -57,6 +58,39 @@ public final class HullBaseline {
             default -> 0;
         };
     }
+    /** Immovable, paid-for chassis equipment: these are NOT free editable slots. */
+    public record CoreSystems(double reactorOutput,double heatRejection,
+                              int crewBerths,int lifeSupport,
+                              double fuel,int kineticStores,int missileStores,
+                              int torpedoStores){
+        public CoreSystems {
+            if(reactorOutput<=0||heatRejection<=0||crewBerths<=0
+                    ||lifeSupport<=0||fuel<=0||kineticStores<0
+                    ||missileStores<0||torpedoStores<0)
+                throw new IllegalArgumentException("Invalid integrated hull services");
+        }
+    }
+    /**
+     * All variants are flyable with no fitted modules. More advanced hulls
+     * have stronger internal services; civilian/specialist fitting choices
+     * can reinforce those services but cannot erase their minimum capability.
+     */
+    public static CoreSystems core(Shipyard.Hull hull){
+        if(hull==null)throw new IllegalArgumentException("Hull required");
+        double mass=hull.massCapacity;
+        int generation=ShipLineages.of(hull).generation();
+        int essentialCrew=(int)StrictMath.ceil(5+mass*0.11);
+        int installedMargin=(int)StrictMath.ceil(6+mass*.035+generation*.45);
+        int capacity=essentialCrew+installedMargin;
+        return new CoreSystems(
+                28+mass*.12+generation*1.5,
+                24+mass*.12+generation*1.4,
+                capacity,capacity,
+                120+mass*.48+generation*8,
+                24+(int)(mass*.09),4+(int)(mass*.012),
+                2+(int)(mass*.004));
+    }
+
     /** Class core, before civilization-specific structural engineering. */
     public static Stats forHull(Battle.Faction race,Shipyard.Hull hull){
         if(race==null||hull==null)throw new IllegalArgumentException("Hull identity required");
