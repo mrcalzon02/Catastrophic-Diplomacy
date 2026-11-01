@@ -221,6 +221,56 @@ public final class ScreensaverBattleTest {
         check(StrictMath.hypot(firstX-patrol.x,firstY-patrol.y)>15,
                 "Search patrol stopped cycling through unobserved sectors");
 
+        // In the same mixed nebula/ion-storm conditions that deadlocked
+        // endurance seed 2026103106, ships 260 units apart still have a
+        // physical short-range thermal/optical sighting. At 450, no such
+        // contact exists: this does not make radar damage irrelevant.
+        Battle dense=new Battle(0x10ABC1L);
+        Battle.Ship near=dense.addShip(0,Battle.Faction.TERRAN,500,335);
+        Battle.Ship far=dense.addShip(1,Battle.Faction.DRAXIAN,760,335);
+        near.sensorsCondition=0;far.sensorsCondition=0;
+        dense.configureWeather(new SpaceWeather.Preset(198,17,
+                SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
+        dense.step();
+        check(near.lastTargetId==far.id,
+                "Double-interference weather hid an enemy at optical range");
+        Battle hidden=new Battle(0x10ABC2L);
+        Battle.Ship blind=hidden.addShip(0,Battle.Faction.TERRAN,200,335);
+        Battle.Ship unseen=hidden.addShip(1,Battle.Faction.DRAXIAN,650,335);
+        blind.sensorsCondition=0;unseen.sensorsCondition=0;
+        hidden.configureWeather(new SpaceWeather.Preset(198,17,
+                SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
+        hidden.step();
+        check(blind.lastTargetId==0,
+                "Optical detection leaked enemy position through 450 units of nebula");
+
+        // Automated exhibit: lone disarmed craft depart by real propulsion
+        // and are counted as escaped, never silently killed. In ordinary
+        // battles the identical unarmed ship stays available to the player.
+        Battle exhibition=new Battle(0xE7A51L);
+        Battle.Ship pacifist=exhibition.addShip(0,Battle.Faction.TERRAN,350,335);
+        exhibition.addShip(1,Battle.Faction.DRAXIAN,1100,335);
+        pacifist.laserDamage=0;pacifist.missileDamage=0;
+        pacifist.kineticDamage=0;pacifist.plasmaDamage=0;
+        pacifist.particleDamage=0;pacifist.torpedoDamage=0;
+        pacifist.fighterReserve=0;pacifist.droneReserve=0;
+        exhibition.enableUnattendedExhibition();
+        for(int tick=0;tick<900&&!exhibition.finished();tick++)exhibition.step();
+        check(pacifist.withdrawing &&pacifist.escaped&&pacifist.hull>0,
+                "Exhibition's last defenseless captain never physically withdrew");
+        check(exhibition.escaped(0)==1 && exhibition.destroyed(0)==0,
+                "Voluntary exhibition withdrawal counted as a destroyed ship");
+        Battle manual=new Battle(0xE7A52L);
+        Battle.Ship manualShip=manual.addShip(0,Battle.Faction.TERRAN,350,335);
+        manual.addShip(1,Battle.Faction.DRAXIAN,1100,335);
+        manualShip.laserDamage=0;manualShip.missileDamage=0;
+        manualShip.kineticDamage=0;manualShip.plasmaDamage=0;
+        manualShip.particleDamage=0;manualShip.torpedoDamage=0;
+        manualShip.fighterReserve=0;manualShip.droneReserve=0;
+        for(int tick=0;tick<15;tick++)manual.step();
+        check(!manualShip.withdrawing && !manualShip.escaped,
+                "Autonomous exhibition withdrawal leaked into manual battles");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
