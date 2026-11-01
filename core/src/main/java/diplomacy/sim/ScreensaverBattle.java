@@ -55,6 +55,7 @@ public final class ScreensaverBattle {
         List<Shipyard.Design> second=fleet(random,catalog,right,tierB,countB,
                 forcedShipsPerSide>0);
         Battle battle=Battle.duel(seed,first,second,catalog);
+        battle.enableUnattendedExhibition();
         FleetNames.Style[] traditions=FleetNames.Style.values();
         FleetNames.Style firstStyle=traditions[random.nextInt(traditions.length)];
         FleetNames.Style secondStyle=traditions[random.nextInt(traditions.length)];
