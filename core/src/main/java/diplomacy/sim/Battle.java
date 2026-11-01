@@ -598,6 +598,7 @@ public final class Battle {
     /** One actual close-contact spotting ship per enemy for each faction.
      * Reused every tick, so 200v200 targeting has no per-ship relay allocation. */
     private final Ship[][] sharedSpotters={new Ship[16],new Ship[16]};
+    private final double[][] sharedNearest={new double[16],new double[16]};
     /** Opt-in screensaver policy only. Player/campaign battles never make
      * autonomous extraction decisions for the player's surviving ships. */
     private boolean unattendedExhibition;
@@ -1230,17 +1231,16 @@ public final class Battle {
     private void refreshSharedContacts(){
         if(!weather.preset().enabled())return;
         for(int team=0;team<2;team++){
-            if(sharedSpotters[team].length<nextId)
+            if(sharedSpotters[team].length<nextId){
                 sharedSpotters[team]=new Ship[nextId];
-            else Arrays.fill(sharedSpotters[team],null);
+                sharedNearest[team]=new double[nextId];
+            }else Arrays.fill(sharedSpotters[team],null);
+            Arrays.fill(sharedNearest[team],Double.POSITIVE_INFINITY);
         }
-        double[][] nearest={new double[nextId],new double[nextId]};
-        Arrays.fill(nearest[0],Double.POSITIVE_INFINITY);
-        Arrays.fill(nearest[1],Double.POSITIVE_INFINITY);
         for(Ship scout:ships){
             if(!scout.alive()||scout.power<=3||scout.crewReadiness()<0.05)continue;
             Ship[] contacts=sharedSpotters[scout.team];
-            double[] closest=nearest[scout.team];
+            double[] closest=sharedNearest[scout.team];
             for(Ship hostile:ships){
                 if(!hostile.alive()||hostile.team==scout.team)continue;
                 double dx=hostile.x-scout.x,dy=hostile.y-scout.y;
