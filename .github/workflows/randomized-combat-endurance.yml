@@ -7,6 +7,8 @@ on:
       - '.github/workflows/randomized-combat-endurance.yml'
       - 'core/src/test/java/diplomacy/sim/RandomizedBattleEnduranceTest.java'
       - 'core/src/main/java/diplomacy/sim/ScreensaverBattle.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/test/java/diplomacy/sim/ScreensaverBattleTest.java'
       - 'core/build.gradle'
   workflow_dispatch:
 
