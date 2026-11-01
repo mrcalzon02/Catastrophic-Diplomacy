@@ -1327,6 +1327,12 @@ public final class Battle {
         BattleOrders.Engagement engage=orders.forSize(BattleOrders.size(target));
         double preferredRange=engage.range()*(ship.standingOrders==null?
                 1:ship.standingOrders.engagementRangeMultiplier());
+        // An autonomous captain must not indefinitely hold outside every
+        // remaining fitted weapon's physical reach. As ordnance is expended,
+        // recalculate the approach distance from surviving guns, not the
+        // historical maximum missile/torpedo range of an empty magazine.
+        double reach=activeWeaponReach(ship);
+        if(reach>0)preferredRange=StrictMath.min(preferredRange,reach*.80);
         double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
         if(orders.position()!=BattleOrders.Position.KEEP_MOVING
                 &&distance>=preferredRange*0.5&&distance<=preferredRange){
@@ -1344,6 +1350,37 @@ public final class Battle {
             steerToward(ship,ship.x-dy,ship.y+dx);
         }else steerToward(ship,target.x,target.y);
     }
+    /** Longest currently supplied main-battery range, in world units.
+     * Support-only vessels retain their specified defensive standoff rather
+     * than being driven into the enemy simply because they have no guns. */
+    private static double activeWeaponReach(Ship ship) {
+        if(ship.weaponsCondition<=0.05||ship.crewReadiness()<0.05)return 0;
+        double reach=0;
+        if(ship.laserDamage>0) {
+            WeaponMuzzles.Origin laser=WeaponMuzzles.at(
+                    ship,WeaponMuzzles.Family.LASER,0);
+            LaserFamilies.Type type=LaserFamilies.selected(ship,laser.slotId());
+            reach=StrictMath.max(reach,WeaponBehaviorTable.gun(DamageType.LASER)
+                    .range(ship.weapons.laserRange())*type.range);
+        }
+        if(ship.kineticDamage>0&&ship.kineticAmmo>0)
+            reach=StrictMath.max(reach,WeaponBehaviorTable.gun(DamageType.KINETIC)
+                    .range(ship.weapons.kineticRange()));
+        if(ship.plasmaDamage>0)
+            reach=StrictMath.max(reach,WeaponBehaviorTable.gun(DamageType.PLASMA)
+                    .range(ship.weapons.plasmaRange()));
+        if(ship.particleDamage>0)
+            reach=StrictMath.max(reach,WeaponBehaviorTable.gun(DamageType.PARTICLE)
+                    .range(ship.weapons.particleRange()));
+        if(ship.missileDamage>0&&ship.missileAmmo>0)
+            reach=StrictMath.max(reach,WeaponBehaviorTable.gun(DamageType.MISSILE)
+                    .range(ship.weapons.missileRange()));
+        if(ship.torpedoDamage>0&&ship.torpedoAmmo>0)
+            reach=StrictMath.max(reach,WeaponBehaviorTable.gun(DamageType.TORPEDO)
+                    .range(ship.weapons.torpedoRange()));
+        return reach;
+    }
+
     /** Real extraction requires physically crossing your team's own rear
      * battlefield edge at actual engine speed; enemy weapons remain dangerous. */
     private void steerRetreat(Ship ship) {
