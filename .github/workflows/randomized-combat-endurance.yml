@@ -1,0 +1,74 @@
+name: Seven randomized full-length 200v200 combat endurance runs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/randomized-combat-endurance.yml'
+      - 'core/src/test/java/diplomacy/sim/RandomizedBattleEnduranceTest.java'
+      - 'core/src/main/java/diplomacy/sim/ScreensaverBattle.java'
+      - 'core/build.gradle'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Different commits run independently; no unfinished battle is silently cancelled.
+concurrency:
+  group: randomized-combat-endurance-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  battle-to-terminal:
+    name: Full randomized 200v200 battle / seed ${{ matrix.seed }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 7
+      matrix:
+        seed: ['2026103101', '2026103102', '2026103103', '2026103104',
+               '2026103105', '2026103106', '2026103107']
+    env:
+      CD_ENDURANCE_SEED: ${{ matrix.seed }}
+      CD_ENDURANCE_REPORT: build/reports/combat-endurance/seed-${{ matrix.seed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Record replay coordinates and prepare crash report directory
+        shell: bash
+        run: |
+          mkdir -p "$CD_ENDURANCE_REPORT"
+          printf 'commit=%s\nseed=%s\nfleet=200v200\nmode=randomized-until-terminal\n' \
+            "$GITHUB_SHA" "$CD_ENDURANCE_SEED" > "$CD_ENDURANCE_REPORT/replay.txt"
+      - name: Run authentic 400-ship battle until terminal victory or explicit failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Kill a stuck JVM before the job limit so artifact upload still runs.
+          timeout --signal=INT --kill-after=20s 48m \
+            gradle --no-daemon --stacktrace :core:randomizedCombatEndurance \
+            2>&1 | tee "$CD_ENDURANCE_REPORT/console.log"
+      - name: Collect heap, JVM and runner diagnostics even after a failure
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$CD_ENDURANCE_REPORT"
+          find . -maxdepth 3 -type f \
+            \( -name 'hs_err_pid*.log' -o -name 'java_pid*.hprof' \) \
+            -exec cp -n {} "$CD_ENDURANCE_REPORT/" \; || true
+          printf '\nRun seed %s completed or failed; inspect progress.log, result.csv, failure.txt and console.log.\n' \
+            "$CD_ENDURANCE_SEED"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combat-200v200-seed-${{ matrix.seed }}-${{ github.run_id }}
+          path: ${{ env.CD_ENDURANCE_REPORT }}/
+          if-no-files-found: warn
+          retention-days: 30
