@@ -672,3 +672,22 @@ tasks.register('armorBreachTelemetry', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.ArmorBreachTelemetry'
 }
+
+/**
+ * Standalone, end-to-end headless combat stress run. This is not a dependency
+ * of normal smoke/release tests: seven independent seeds run in their own
+ * diagnostic GitHub Actions workflow with crash artifacts.
+ */
+tasks.register('randomizedCombatEndurance', JavaExec) {
+    group = 'verification'
+    description = 'Run an actual randomized 200v200 screensaver-style battle until victory or diagnostic failure.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.RandomizedBattleEnduranceTest'
+    def seed = providers.environmentVariable('CD_ENDURANCE_SEED').orElse('2026103101')
+    def output = providers.environmentVariable('CD_ENDURANCE_REPORT').orElse('build/reports/combat-endurance')
+    argumentProviders.add({ [seed.get(),output.get()] } as org.gradle.process.CommandLineArgumentProvider)
+    maxHeapSize = '3g'
+    jvmArgs '-XX:+HeapDumpOnOutOfMemoryError',
+            '-XX:HeapDumpPath=build/reports/combat-endurance'
+}
