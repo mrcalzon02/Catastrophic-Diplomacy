@@ -12,6 +12,7 @@ import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.OrdnanceFitting;
 import diplomacy.shipyard.SupportDoctrine;
 import diplomacy.shipyard.HullLayouts;
+import diplomacy.shipyard.HullBaseline;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Deterministic 30 Hz combat simulation. No graphics, files, time or Android APIs. */
