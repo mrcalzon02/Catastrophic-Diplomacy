@@ -82,23 +82,40 @@ public final class RandomizedBattleEnduranceTest {
         StringBuilder result=new StringBuilder("CONTACT-DIAGNOSTIC tick="+b.tick);
         for(int team=0;team<2;team++){
             int alive=0,fueled=0,armed=0,retreating=0,nearSensor=0,nearLaser=0;
+            int currentTargets=0,enemyClassesExcluded=0,heatLocked=0,powerStarved=0;
+            int engineDisabled=0,weaponDisabled=0,holdOrders=0,lasersNear=0;
             double minimum=Double.POSITIVE_INFINITY,maximum=0,average=0;
+            double farthestFromCenter=0;
             for(Battle.Ship ship:b.ships()){
                 if(!ship.alive()||ship.team!=team)continue;
                 alive++;
                 if(ship.fuel>1&&ship.engineCondition>.1)fueled++;
                 if(ship.withdrawing)retreating++;
+                if(ship.lastTargetId!=0)currentTargets++;
+                if(ship.heat>=ship.maxHeat*.9)heatLocked++;
+                if(ship.power<=5)powerStarved++;
+                if(ship.engineCondition<=.1||ship.fuel<=0)engineDisabled++;
+                if(ship.weaponsCondition<=.1||ship.crewReadiness()<.05)weaponDisabled++;
+                if(ship.orders.position()==BattleOrders.Position.HOLD)holdOrders++;
+                farthestFromCenter=Math.max(farthestFromCenter,
+                        StrictMath.hypot(ship.x-640,ship.y-335));
                 if(ship.laserDamage+ship.kineticDamage+ship.plasmaDamage+
                         ship.particleDamage>0 ||
                         (ship.missileDamage>0&&ship.missileAmmo>0) ||
                         (ship.torpedoDamage>0&&ship.torpedoAmmo>0) ||
                         ship.fighterReserve>0)armed++;
                 double closest=Double.POSITIVE_INFINITY;
+                boolean hasAllowedClass=false;
                 for(Battle.Ship enemy:b.ships()){
                     if(!enemy.alive()||enemy.team==team)continue;
+                    if(ship.orders.targets(BattleOrders.size(enemy)))
+                        hasAllowedClass=true;
                     closest=Math.min(closest,StrictMath.hypot(
                             ship.x-enemy.x,ship.y-enemy.y));
                 }
+                if(!hasAllowedClass)enemyClassesExcluded++;
+                if(closest<530&&ship.laserDamage>0&&ship.weaponsCondition>.1
+                        &&ship.power>5&&ship.heat<ship.maxHeat*.9)lasersNear++;
                 if(Double.isFinite(closest)){
                     minimum=Math.min(minimum,closest);
                     maximum=Math.max(maximum,closest);
@@ -112,11 +129,21 @@ public final class RandomizedBattleEnduranceTest {
                     .append(",withdrawing=").append(retreating)
                     .append(",sensorContact=").append(nearSensor)
                     .append(",laserDistance=").append(nearLaser)
+                    .append(",selectedTargets=").append(currentTargets)
+                    .append(",excludedEnemyClasses=").append(enemyClassesExcluded)
+                    .append(",laserReadyNear=").append(lasersNear)
+                    .append(",overheated=").append(heatLocked)
+                    .append(",powerStarved=").append(powerStarved)
+                    .append(",engineDisabled=").append(engineDisabled)
+                    .append(",weaponDisabled=").append(weaponDisabled)
+                    .append(",holdOrders=").append(holdOrders)
                     .append(",nearestMin=").append(String.format(Locale.ROOT,"%.1f",
                             Double.isFinite(minimum)?minimum:-1))
                     .append(",nearestMean=").append(String.format(Locale.ROOT,"%.1f",
                             alive>0?average/alive:-1))
                     .append(",nearestMax=").append(String.format(Locale.ROOT,"%.1f",maximum))
+                    .append(",maxTheaterRadius=").append(String.format(Locale.ROOT,"%.1f",
+                            farthestFromCenter))
                     .append("}");
         }
         return result.toString();
