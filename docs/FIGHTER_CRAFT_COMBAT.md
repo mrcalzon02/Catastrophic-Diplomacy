@@ -62,3 +62,24 @@ weapon families and rejects non-reproducible 480-tick battle fingerprints.
 **Not completed by core testing:** Physical GPU rendering, Android frame rate
 and audio, aircraft artwork per faction, specialist individual-hangar loadouts,
 resupply/refueling/docking cycles and full dogfight projectile guidance.
+
+## Campaign flight-wing save bridge (not yet live launch authority)
+
+`CampaignFlightWingCodec` now provides a checked `CD-ROSTER-WINGS-1`
+envelope containing the unchanged `CampaignFleetCodec` roster plus one
+`FlightWingManifest` per commissioned vessel ID. Decoding an older
+`CD-ROSTER-1..4` save migrates its **existing paid** fighter count into
+physical `ORG:n` and `FTR:<socket>` bays without adding aircraft.
+The bridge rejects missing/foreign/duplicate ship ownership, mismatched
+paid stock, overfilled or nonexistent bays and altered checksums.
+`CampaignFlightWingCodecTest` runs through the existing
+`:core:fighterCraftSmoke` functional test.
+
+**Integration boundary:** The game client still calls
+`CampaignFleetCodec.encode/decode` and `CampaignFleet.Roster` still uses
+`Stores.fighters` as the paid-stock authority. This bridge is a validated
+migration/serialization prerequisite, **not** proof that mixed wing types
+survive live campaign refit, deployment, launch, recovery or client save.
+Those operations must be wired to one authoritative manifest owner before
+switching the client save format; do not silently discard paid aircraft
+from an occupied bay during a refit.
