@@ -1160,11 +1160,11 @@ public final class Battle {
             // Each physical captain patrols an independent, bounded lane;
             // enemy positions are never consulted to choose destinations.
             // Twenty/thirty-second legs give engines time to actually arrive.
-            double expansion=StrictMath.min(3.0,1+(tick-6000)/4800.0);
+            double expansion=StrictMath.min(4.0,1+(tick-6000)/4200.0);
             long legX=ship.id*7L+tick/600L;
             long legY=ship.id*11L+tick/900L;
             rallyX=640+((legX%9)-4)*92*expansion;
-            rallyY=335+((legY%7)-3)*75*expansion;
+            rallyY=335+((legY%7)-3)*90*expansion;
         }
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
                 ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
