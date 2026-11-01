@@ -373,6 +373,56 @@ public final class Shipyard {
             default -> throw new IllegalArgumentException("Unknown mounting class " + component.category);
         };
     }
+    /**
+     * Chassis service machinery is intrinsic. No editable hardpoint is
+     * required for basic power, engine, cooling, crew or fuel. An empty
+     * vessel can maneuver and survive even with zero offensive emitters.
+     */
+    public static Design bareHull(Battle.Faction faction,Hull hull){
+        if(faction==null||hull==null)throw new IllegalArgumentException("Missing chassis");
+        String name=hull.name().replace('_',' ').toLowerCase(Locale.ROOT);
+        return new Design(faction,hull,
+                Character.toUpperCase(name.charAt(0))+name.substring(1)+" Bare Hull",
+                new ArrayList<>(Collections.nCopies(hull.slots.size(),null)));
+    }
+
+    /**
+     * The class's hardware sockets are default roles, not inflexible equipment
+     * obligations. Sacrifice a gun emplacement for generator, thruster, radiator,
+     * armor or shields; sacrifice defensive/supplementary spaces for utilities.
+     * Installed gun barrels still require an actual weapon hardpoint.
+     */
+    public static boolean accepts(Hull hull,int socket,Component component){
+        if(hull==null||component==null||socket<0||socket>=hull.slots.size())
+            return false;
+        Mount mount=hull.slots.get(socket).mount();
+        Mount required=requiredMount(component);
+        if(required==mount)return true;
+        String subsystem=component.subsystem;
+        return switch(mount){
+            case WEAPON -> (required==Mount.SYSTEM &&
+                    (subsystem.equals("REA")||subsystem.equals("RAD")||subsystem.equals("ENG")))
+                    ||(required==Mount.DEFENSE &&
+                    (subsystem.equals("ARM")||subsystem.equals("SHD")||subsystem.equals("SIF")));
+            case DEFENSE, SUPPORT -> required==Mount.SYSTEM &&
+                    (subsystem.equals("REA")||subsystem.equals("RAD")||subsystem.equals("ENG"));
+            case SYSTEM -> required==Mount.DEFENSE &&
+                    (subsystem.equals("SHD")||subsystem.equals("SIF"));
+            case HABITAT -> false;
+        };
+    }
+
+    /** Slot-specific palette includes the genuine alternative hull equipment. */
+    public static List<Component> choices(TechnologyCatalog catalog,Battle.Faction faction,
+                                           Hull hull,int socket){
+        if(catalog==null||faction==null||hull==null||socket<0||socket>=hull.slots.size())
+            throw new IllegalArgumentException("Invalid shipyard selection");
+        List<Component> choices=new ArrayList<>();
+        for(Component part:catalog.baseComponents().values())
+            if(part.faction.equals(factionId(faction))&&accepts(hull,socket,part))
+                choices.add(part);
+        return List.copyOf(choices);
+    }
     /** Factory template: genuinely buildable ship with reactor, drive, radiator, lasers and missiles. */
     public static Design starter(Battle.Faction faction, Hull hull) {
         List<Installed> parts=new ArrayList<>(Collections.nCopies(hull.slots.size(),null));
@@ -457,7 +507,7 @@ public final class Shipyard {
             if(mounted==null)continue;
             try {
                 Part p=evaluate(mounted,catalog,design.faction);
-                if(requiredMount(p.base())!=design.hull.slots.get(i).mount())errors.add("Slot "+(i+1)+" requires "+design.hull.slots.get(i).mount());
+                if(!accepts(design.hull,i,p.base()))errors.add("Slot "+(i+1)+" cannot fit "+p.base().subsystem+" on "+design.hull.slots.get(i).mount());
                 parts.add(p);
             }catch(IllegalArgumentException|ArithmeticException problem){errors.add("Slot "+(i+1)+": "+problem.getMessage());}
         }
@@ -467,25 +517,25 @@ public final class Shipyard {
         if(design==null||catalog==null)throw new IllegalArgumentException("Missing ship or catalog");
         List<String> errors=new ArrayList<>();
         List<Part> parts=fittedParts(design,catalog,errors);
-        double mass=0,volume=0,draw=0,generation=0,heat=0,cooling=0;
-        int industry=0,research=0,reactors=0,engines=0,radiators=0,weapons=0;
-        double crewBerths=0,lifeSupport=0;
+        HullBaseline.CoreSystems core=HullBaseline.core(design.hull);
+        double mass=0,volume=0,draw=0,generation=core.reactorOutput(),
+                heat=0,cooling=core.heatRejection();
+        int industry=0,research=0;
+        double crewBerths=core.crewBerths(),lifeSupport=core.lifeSupport();
         for(Part p:parts){
             mass+=p.mass;volume+=p.mass*1.5;heat+=p.heat;industry=Math.addExact(industry,p.industry);research=Math.addExact(research,p.research);
             draw+=p.power;
             switch(p.base.subsystem) {
-                case "REA" -> {generation+=p.effect*3.0;reactors++;}
-                case "RAD" -> {cooling+=p.effect*p.cooling*2.3;radiators++;}
-                case "ENG" -> engines++;
+                case "REA" -> generation+=p.effect*3.0;
+                case "RAD" -> cooling+=p.effect*p.cooling*2.3;
+                case "ENG" -> { /* existing drive is upgraded in fit() */ }
                 case "CRW" -> crewBerths+=p.effect*design.hull.massCapacity*0.12;
                 case "LFS" -> lifeSupport+=p.effect*design.hull.massCapacity*0.12;
-                case "KIN", "LAS", "MSL", "TOR", "PAR", "PLA" -> weapons++;
+                case "KIN", "LAS", "MSL", "TOR", "PAR", "PLA" -> { }
                 default -> { }
             }
         }
-        if(reactors==0)errors.add("A reactor is required");
-        if(engines==0)errors.add("An engine is required");
-        if(radiators==0)errors.add("A radiator is required");
+        // A moduleless hull already has an operating reactor, radiator and drive.
         int staff=minimumCrew(design);
         if(crewBerths+1e-8<staff)errors.add("Insufficient fitted crew accommodation");
         if(lifeSupport+1e-8<staff)errors.add("Insufficient fitted life support");
@@ -504,8 +554,8 @@ public final class Shipyard {
         return new Report(List.copyOf(errors),mass,volume,draw,generation,heat,cooling,industry,research);
     }
 
-    /** Base staffing demand is derived from equipment and displacement, never
-     * an intrinsic complement or an invisible hull accommodation allowance. */
+    /** Core staff are integral to the ship. Extra module workload adds demand,
+     * but no module is required just to provide a viable bridge crew. */
     public static int minimumCrew(Design design){
         int installed=0;
         for(int i=0;i<design.slots();i++){
@@ -610,7 +660,8 @@ public final class Shipyard {
                          ProjectileModel.Defense pointDefense,
                          Weapons weapons,Support support,double pdCycle,
                          HullBaseline.Stats baseline,Crew crew,
-                         AmmunitionResearch.Access ammunition) { }
+                         AmmunitionResearch.Access ammunition,
+                         double shieldRechargeBoost) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -621,7 +672,9 @@ public final class Shipyard {
         double thrust=0,laser=0,missile=0,pd=0,accuracy=0.56,repair=0;
         double kinetic=0,plasma=0,particle=0,torpedo=0,ecm=0;
         int fighters=baseline.fighterBay(),drones=0,magazines=0;
-        double accommodation=0,breathing=0;
+        HullBaseline.CoreSystems core=HullBaseline.core(design.hull);
+        double accommodation=core.crewBerths(),breathing=core.lifeSupport();
+        double shieldRechargeBoost=0;
         List<ProjectileModel.Spec> kineticModules=new ArrayList<>();
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
@@ -652,6 +705,7 @@ public final class Shipyard {
                     // A normal shield generator protects ONLY its owning hull.
                     // No allied transfer without a dedicated SUPPORT-slot XFR.
                     shields+=p.effect*2.6*p.shields;
+                    shieldRechargeBoost+=p.effect*.12*p.shields;
                 }
                 case "XFR" -> {
                     shieldRate+=p.effect*0.028*tuning.shieldTransfer();
@@ -753,7 +807,7 @@ public final class Shipyard {
                 pdWeight==0?1:pdCycle/pdWeight,baseline,
                 new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
                         (int)StrictMath.floor(breathing)),
-                ammunitionAccess(design));
+                ammunitionAccess(design),shieldRechargeBoost);
     }
 
     /**
