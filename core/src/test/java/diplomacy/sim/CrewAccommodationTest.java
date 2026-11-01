@@ -3,7 +3,7 @@ package diplomacy.sim;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
 
-/** Crew and atmosphere belong to fitted modules; legacy slot IDs survive. */
+/** Every hull has integral crew and atmosphere; optional upgrades and legacy slot IDs survive. */
 public final class CrewAccommodationTest {
     private CrewAccommodationTest(){}
     private static void check(boolean good,String why){if(!good)throw new AssertionError(why);}
@@ -31,7 +31,7 @@ public final class CrewAccommodationTest {
                         "Append-only habitat sockets preserve all legacy weapon indices");
                 check(design.at(crew).component.equals("BASE-"+id+"-CRW")
                         &&design.at(air).component.equals("BASE-"+id+"-LFS"),
-                        "Every operational starter requires fitted crew quarters and air");
+                        "Factory prototypes retain optional quarters and atmosphere modules");
                 check(Shipyard.inspect(design,catalog).valid(),
                         "Crewed starter invalid: "+faction+" / "+hull+" "+
                                 Shipyard.inspect(design,catalog).explanation());
@@ -39,14 +39,24 @@ public final class CrewAccommodationTest {
                 check(result.crew().berths()>=result.crew().minimum()
                         &&result.crew().lifeSupport()>=result.crew().minimum(),
                         "Crew and air have separate physical and engineering budgets");
-                var empty=design.install(crew,null);
-                check(Shipyard.inspect(empty,catalog).errors()
-                                .contains("Insufficient fitted crew accommodation"),
-                        "No bare hull has free crew capacity");
-                var vacuum=design.install(air,null);
-                check(Shipyard.inspect(vacuum,catalog).errors()
-                                .contains("Insufficient fitted life support"),
-                        "No empty hull has free breathable air");
+                var noQuarters=design.install(crew,null);
+                var noAir=design.install(air,null);
+                check(Shipyard.inspect(noQuarters,catalog).valid()
+                                &&Shipyard.inspect(noAir,catalog).valid(),
+                        "Uninstalling habitation upgrades must not disable integral hull services");
+                check(Shipyard.fit(noQuarters,catalog).crew().berths()>0
+                                &&Shipyard.fit(noQuarters,catalog).crew().berths()
+                                    <result.crew().berths(),
+                        "Crew quarters augment, rather than create, the intrinsic complement");
+                check(Shipyard.fit(noAir,catalog).crew().lifeSupport()>0
+                                &&Shipyard.fit(noAir,catalog).crew().lifeSupport()
+                                    <result.crew().lifeSupport(),
+                        "Life support augments, rather than creates, breathable atmosphere");
+                var bare=Shipyard.bareHull(faction,hull);
+                var basic=Shipyard.fit(bare,catalog);
+                check(basic.crew().berths()>=basic.crew().minimum()
+                                &&basic.crew().lifeSupport()>=basic.crew().minimum(),
+                        "Bare hull's full native crew must be supported without module slots");
                 var aired=design.stage(air,Shipyard.Track.OUTPUT,2);
                 var accommodated=design.stage(crew,Shipyard.Track.OUTPUT,2);
                 check(Shipyard.fit(aired,catalog).crew().lifeSupport()
@@ -78,7 +88,7 @@ public final class CrewAccommodationTest {
             }
         }
         check(observed==Battle.Faction.values().length*Shipyard.Hull.values().length,
-                "Every new chassis must have independently installed crew and air");
+                "Every new chassis must have independent integrated crew and atmosphere");
         var staffed=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         Battle collapse=new Battle(5028);
         collapse.spawnWing(0,staffed,catalog,1,340,335);
@@ -93,6 +103,6 @@ public final class CrewAccommodationTest {
                 "Crewless ship must not fire guns or launch combat craft");
         check(empty.vx==0&&empty.vy==0,
                 "Crewless ship cannot maneuver under power");
-        System.out.println("PASS crew habitat: "+observed+" staffed faction/chassis combinations, 22 new module families, zero free berths, no unmanned gunfire and version-1 fleet migration");
+        System.out.println("PASS crew habitat: "+observed+" staffed faction/chassis combinations, intrinsic hull berths and life support, optional upgrades, no unmanned gunfire and version-1 migration");
     }
 }
