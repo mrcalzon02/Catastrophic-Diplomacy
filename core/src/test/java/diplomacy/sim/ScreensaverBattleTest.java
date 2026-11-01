@@ -309,6 +309,10 @@ public final class ScreensaverBattleTest {
         Battle.Ship searcher=fringe.addShip(0,Battle.Faction.TERRAN,640,335);
         Battle.Ship sentry=fringe.addShip(1,Battle.Faction.DRAXIAN,1650,335);
         searcher.sensorRange=1;sentry.sensorRange=1;
+        // This fixture represents a long-range scout with enough *finite*
+        // reaction mass for 16000 actual search ticks; default legacy ships
+        // carry just 180 and exhaust themselves before the search expands.
+        searcher.maxFuel=1200;searcher.fuel=1200;
         sentry.orders=BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD)
                 .withRetreat(0);
         fringe.configureWeather(new SpaceWeather.Preset(1,17,
