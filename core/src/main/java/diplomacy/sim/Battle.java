@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.TenderDoctrine;
 import diplomacy.shipyard.OrdnanceFitting;
 import diplomacy.shipyard.SupportDoctrine;
 import diplomacy.shipyard.HullLayouts;
@@ -88,6 +89,13 @@ public final class Battle {
         public double hull, maxHull, shields, maxShields, armor, maxArmor, sif, power, maxPower, heat, maxHeat;
         /** Persistent capital-ship reaction mass; unlike transient fighter flight fuel. */
         public double fuel=180,maxFuel=180;
+        /** Actual fitted consumable limits; supplied rounds cannot exceed these. */
+        public int maxKineticAmmo,maxMissileAmmo,maxTorpedoAmmo;
+        public TenderDoctrine tenders=TenderDoctrine.NONE;
+        /** Ammo fractional pulse budget: no fractional projectiles or stock cloning. */
+        public final double[] tenderCredit=new double[TenderDoctrine.Cargo.values().length];
+        public int roundsDelivered;
+        public double fuelDelivered;
         public long lastChatterTick=-1000;
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
@@ -859,6 +867,7 @@ public final class Battle {
         s.setWarhead(DamageType.TORPEDO,design.ammoSelection.torpedo());
         s.support=machinery.support();
         s.logistics=doctrine;
+        s.tenders=Shipyard.tenderDoctrine(design,catalog);
         for(SupportDoctrine.Channel channel:SupportDoctrine.Channel.values())
             s.serviceDroneReserve[channel.ordinal()]=s.logistics.droneCapacity(channel);
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
@@ -869,9 +878,17 @@ public final class Battle {
         s.fighterLaunchBays=s.fighterBays.size();
         s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
-        s.kineticAmmo=core.kineticStores()+machinery.magazineCapacity()*4;
-        s.missileAmmo=core.missileStores()+machinery.magazineCapacity();
-        s.torpedoAmmo=core.torpedoStores()+machinery.magazineCapacity()/3;
+        s.maxKineticAmmo=core.kineticStores()+machinery.magazineCapacity()*4
+                +(int)StrictMath.floor(s.tenders.capacity(TenderDoctrine.Cargo.KINETIC));
+        s.maxMissileAmmo=core.missileStores()+machinery.magazineCapacity()
+                +(int)StrictMath.floor(s.tenders.capacity(TenderDoctrine.Cargo.MISSILE));
+        s.maxTorpedoAmmo=core.torpedoStores()+machinery.magazineCapacity()/3
+                +(int)StrictMath.floor(s.tenders.capacity(TenderDoctrine.Cargo.TORPEDO));
+        s.maxFuel+=s.tenders.capacity(TenderDoctrine.Cargo.FUEL);
+        s.fuel=s.maxFuel;
+        s.kineticAmmo=s.maxKineticAmmo;
+        s.missileAmmo=s.maxMissileAmmo;
+        s.torpedoAmmo=s.maxTorpedoAmmo;
         if(!design.launcherFittings.isEmpty()){
             List<Ship.Launcher> mounted=new ArrayList<>();
             for(DamageType family:new DamageType[]{DamageType.MISSILE,DamageType.TORPEDO}){
@@ -1065,6 +1082,7 @@ public final class Battle {
             launchAuxiliary(s,target);
         }
         updateSupport();
+        updateTenderSupport();
         updateQueuedLaunches();
         updateMissiles();
         updateBallistics();
@@ -1814,6 +1832,146 @@ public final class Battle {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Two physical hose/munition-barge transfer pulses per second. Search
+     * local allies only for purpose-fitted tender modules. Nothing is minted:
+     * donor and receiver have equal and opposite stock changes.
+     *
+     * Fuel is fractional; ammunition is counted in integer rounds. The
+     * accumulated fractional throughput is bounded and never banked without
+     * an actual compatible, deficient ally in physical range.
+     */
+    private void updateTenderSupport(){
+        if(tick%15!=0)return;
+        final double interval=15*DT;
+        for(Ship donor:ships){
+            if(!donor.alive()||donor.tenders.emitters().isEmpty()
+                    ||donor.power<=7||donor.crewReadiness()<.05
+                    ||donor.reactorCondition<.15||donor.heat>=donor.maxHeat*.93)
+                continue;
+            for(TenderDoctrine.Emitter emitter:donor.tenders.emitters()){
+                TenderDoctrine.Cargo cargo=emitter.cargo();
+                Ship recipient=tenderRecipient(donor,emitter);
+                if(recipient==null)continue;
+                double rate=emitter.rate()*interval;
+                int index=cargo.ordinal();
+                // A discrete magazine transfers only whole rounds.
+                double offered=cargo==TenderDoctrine.Cargo.FUEL?rate:
+                        StrictMath.floor(donor.tenderCredit[index]+rate);
+                if(cargo!=TenderDoctrine.Cargo.FUEL){
+                    donor.tenderCredit[index]=Math.min(1.0-1e-9,
+                            donor.tenderCredit[index]+rate-offered);
+                }
+                if(offered<=0)continue;
+                double moved=deliverTender(donor,recipient,cargo,offered,
+                        emitter.energyPerUnit());
+                if(moved>0){
+                    donor.heat+=moved*(cargo==TenderDoctrine.Cargo.FUEL?.004:.045);
+                    donor.power-=moved*emitter.energyPerUnit();
+                    // Link is visual feedback, not another supply channel:
+                    // existing support-link kinds are preserved unchanged.
+                }
+            }
+        }
+    }
+    private static double tenderDeficit(Ship recipient,TenderDoctrine.Cargo cargo){
+        return switch(cargo){
+            case KINETIC -> recipient.kineticDamage>0?
+                    Math.max(0,recipient.maxKineticAmmo-recipient.kineticAmmo):0;
+            case MISSILE -> recipient.missileDamage>0?
+                    Math.max(0,recipient.maxMissileAmmo-recipient.missileAmmo):0;
+            case TORPEDO -> recipient.torpedoDamage>0?
+                    Math.max(0,recipient.maxTorpedoAmmo-recipient.torpedoAmmo):0;
+            case FUEL -> Math.max(0,recipient.maxFuel-recipient.fuel);
+        };
+    }
+    private static boolean tenderCompatible(Ship donor,Ship recipient,
+                                             TenderDoctrine.Cargo cargo){
+        return switch(cargo){
+            case KINETIC -> donor.kineticType==recipient.kineticType;
+            case MISSILE -> donor.warhead(DamageType.MISSILE)==
+                    recipient.warhead(DamageType.MISSILE);
+            case TORPEDO -> donor.warhead(DamageType.TORPEDO)==
+                    recipient.warhead(DamageType.TORPEDO);
+            case FUEL -> true;
+        };
+    }
+    private Ship tenderRecipient(Ship donor,TenderDoctrine.Emitter emitter){
+        Ship best=null;
+        double priority=-1;
+        for(Ship other:ships){
+            if(other==donor||!other.alive()||other.team!=donor.team)continue;
+            double range=StrictMath.hypot(other.x-donor.x,other.y-donor.y);
+            if(range>emitter.range()||
+                    !tenderCompatible(donor,other,emitter.cargo()))continue;
+            double deficit=tenderDeficit(other,emitter.cargo());
+            if(deficit<=1e-8)continue;
+            double max=switch(emitter.cargo()){
+                case KINETIC -> other.maxKineticAmmo;
+                case MISSILE -> other.maxMissileAmmo;
+                case TORPEDO -> other.maxTorpedoAmmo;
+                case FUEL -> other.maxFuel;
+            };
+            double urgency=deficit/Math.max(1,max);
+            if(urgency>priority){priority=urgency;best=other;}
+        }
+        return best;
+    }
+    private static double deliverTender(Ship donor,Ship recipient,
+                                       TenderDoctrine.Cargo cargo,double offered,
+                                       double energyPerUnit){
+        if(donor==recipient||!donor.alive()||!recipient.alive()||
+                donor.team!=recipient.team||offered<=0||donor.power<=7)
+            return 0;
+        double stock=switch(cargo){
+            case KINETIC -> donor.kineticAmmo;
+            case MISSILE -> donor.missileAmmo;
+            case TORPEDO -> donor.torpedoAmmo;
+            case FUEL -> Math.max(0,donor.fuel-Math.min(10,donor.maxFuel*.08));
+        };
+        double quantity=Math.min(Math.min(offered,stock),
+                Math.min(tenderDeficit(recipient,cargo),
+                        (donor.power-7)/energyPerUnit));
+        if(cargo!=TenderDoctrine.Cargo.FUEL)quantity=StrictMath.floor(quantity);
+        if(quantity<=0)return 0;
+        switch(cargo){
+            case KINETIC -> {
+                int amount=(int)quantity;
+                donor.kineticAmmo-=amount;
+                recipient.kineticAmmo+=amount;
+                donor.roundsDelivered+=amount;
+            }
+            case MISSILE -> {
+                int amount=(int)quantity;
+                donor.missileAmmo-=amount;
+                recipient.missileAmmo+=amount;
+                replenishLauncherMagazines(recipient,DamageType.MISSILE,amount);
+                donor.roundsDelivered+=amount;
+            }
+            case TORPEDO -> {
+                int amount=(int)quantity;
+                donor.torpedoAmmo-=amount;
+                recipient.torpedoAmmo+=amount;
+                replenishLauncherMagazines(recipient,DamageType.TORPEDO,amount);
+                donor.roundsDelivered+=amount;
+            }
+            case FUEL -> {
+                donor.fuel-=quantity;recipient.fuel+=quantity;
+                donor.fuelDelivered+=quantity;
+            }
+        }
+        return quantity;
+    }
+    private static void replenishLauncherMagazines(Ship ship,DamageType type,int rounds){
+        for(int i=0;i<rounds;i++){
+            Ship.Launcher next=null;
+            for(Ship.Launcher launcher:ship.launchers)
+                if(launcher.family==type && (next==null||
+                        launcher.magazine<next.magazine))next=launcher;
+            if(next!=null)next.magazine++;
         }
     }
 

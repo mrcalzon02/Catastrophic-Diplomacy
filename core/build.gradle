@@ -25,6 +25,14 @@ tasks.register('armorEngineeringSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('technologySmoke') { finalizedBy(tasks.named('armorEngineeringSmoke')) }
+tasks.register('fleetTenderSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Physical finite kinetic, missile, torpedo and fuel tender resupply; all research ranks and persistence.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FleetTenderTest'
+    dependsOn testClasses
+}
+
 tasks.register('armorCombatTrial', JavaExec) {
     group = 'verification'
     description = 'Actual fitted LAS-only ship fires at a bare unarmed target with six armor configurations; records penetration and hull survival.'

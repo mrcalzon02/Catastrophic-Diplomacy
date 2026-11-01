@@ -11,8 +11,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 15444, "full technology count with defensive chains");
-        require(c.componentCount() == 429, "all base components including defensive families");
+        require(c.upgradeCount() == 17028, "full technology count with tender chains");
+        require(c.componentCount() == 473, "all base components including fleet tenders");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -35,6 +35,16 @@ public final class TechnologyCatalogTest {
                                 String.format(java.util.Locale.ROOT,"%02d",rank);
                         require(c.get(id)!=null,"Missing defensive research "+id);
                     }
+            }
+            for(String module:new String[]{"KTS","MTS","TTS","FTS"}){
+                require(c.base("BASE-"+faction+"-"+module)!=null &&
+                        "support".equals(c.base("BASE-"+faction+"-"+module).category),
+                        "Missing stocked fleet tender "+faction+"/"+module);
+                for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=9;rank++)
+                        require(c.get("TECH-"+faction+"-"+module+"-"+track+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
+                                "Missing fleet tender research "+faction+"/"+module+"/"+track);
             }
             require(c.base("BASE-"+faction+"-XFR")!=null &&
                     "support".equals(c.base("BASE-"+faction+"-XFR").category),

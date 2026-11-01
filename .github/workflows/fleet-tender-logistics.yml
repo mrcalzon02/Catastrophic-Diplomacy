@@ -1,0 +1,27 @@
+name: Optional fleet tender logistics diagnostic
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/main/java/diplomacy/shipyard/TenderDoctrine.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/test/java/diplomacy/sim/FleetTenderTest.java'
+      - 'core/build.gradle'
+      - '.github/workflows/fleet-tender-logistics.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  physical-stores:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Verify finite ammunition and fuel transfer, fitted upgrades and conservation
+        run: gradle --no-daemon :core:fleetTenderSmoke :core:technologySmoke

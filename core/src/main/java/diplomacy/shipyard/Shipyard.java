@@ -635,6 +635,47 @@ public final class Shipyard {
         return new SupportDoctrine(direct,drones,auras);
     }
 
+    /**
+     * Manufacture physical stockpiles and fleet replenishment connectors.
+     * Stronger researched modules carry more cargo and deliver it faster.
+     * All capacity is placed in the donor's actual ammo/fuel fields on spawn,
+     * so campaign stores and docking keep their existing immutable format.
+     */
+    public static TenderDoctrine tenderDoctrine(Design design,TechnologyCatalog catalog){
+        if(!inspect(design,catalog).valid())
+            throw new IllegalArgumentException("Invalid fleet tender fitting");
+        List<TenderDoctrine.Emitter> modules=new ArrayList<>();
+        for(Part p:fittedParts(design,catalog,new ArrayList<>())){
+            TenderDoctrine.Cargo cargo=switch(p.base.subsystem){
+                case "KTS" -> TenderDoctrine.Cargo.KINETIC;
+                case "MTS" -> TenderDoctrine.Cargo.MISSILE;
+                case "TTS" -> TenderDoctrine.Cargo.TORPEDO;
+                case "FTS" -> TenderDoctrine.Cargo.FUEL;
+                default -> null;
+            };
+            if(cargo==null)continue;
+            ModuleBranchEffects.Tuning tuning=p.tuning();
+            double output=p.effect*p.integrity/p.base.integrity;
+            double capacity=switch(cargo){
+                case KINETIC -> StrictMath.floor(output*5.5);
+                case MISSILE -> StrictMath.floor(output*1.35);
+                case TORPEDO -> StrictMath.floor(output*0.55);
+                case FUEL -> output*7.0;
+            };
+            double rate=switch(cargo){
+                case KINETIC -> Math.max(1,output*0.13);
+                case MISSILE -> Math.max(0.5,output*0.035);
+                case TORPEDO -> Math.max(0.30,output*0.021);
+                case FUEL -> Math.max(1,output*0.22);
+            };
+            modules.add(new TenderDoctrine.Emitter(cargo,Math.max(1,capacity),
+                    rate*tuning.supportEfficiency(),390*tuning.reach(),
+                    (cargo==TenderDoctrine.Cargo.FUEL?0.045:0.65)/
+                            tuning.supportEfficiency()));
+        }
+        return modules.isEmpty()?TenderDoctrine.NONE:new TenderDoctrine(modules);
+    }
+
     /** Bounded combat parameters directly consumed by the authoritative Battle simulation. */
     /**
      * Physical flight-deck throughput. Each installed FTR support module brings

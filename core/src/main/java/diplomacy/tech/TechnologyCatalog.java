@@ -102,6 +102,7 @@ public final class TechnologyCatalog {
             addHabitatFamilies(bases,rows);
             addShieldTransferProjectors(bases,rows);
             addSpecializedSupportFamilies(bases,rows);
+            addTenderFamilies(bases,rows);
             addArmorAndBulkheadFamilies(bases,rows);
             extendToNineStages(rows);
         }
@@ -460,6 +461,51 @@ public final class TechnologyCatalog {
                 row.set(12,ratio(effect,1));row.set(14,ratio(integrity,1));
                 row.set(19,kind[1]+": "+branch+
                         " upgrade; mass, heat, power and industry compete with armament");
+                upgrades.add(row);
+            }
+        }
+    }
+
+    /**
+     * Four distinct fleet-tender storerooms; inherit each faction's genuine
+     * native XFR line, and add all four paid exclusive upgrade paths. The
+     * existing nine-rank catalog extension applies to these source chains.
+     */
+    private static void addTenderFamilies(List<List<String>> bases,
+                                          List<List<String>> upgrades){
+        String[][] kinds={
+            {"KTS","Kinetic Ammunition Tender","1.17","0.84","0.94","1.13"},
+            {"MTS","Missile Magazine Tender","1.28","1.00","1.10","1.25"},
+            {"TTS","Torpedo Magazine Tender","1.32","1.06","1.14","1.34"},
+            {"FTS","Propellant Fleet Tender","1.21","0.86","0.96","1.19"}
+        };
+        List<List<String>> originalBases=List.copyOf(bases);
+        List<List<String>> originalUpgrades=List.copyOf(upgrades);
+        for(String[] kind:kinds){
+            for(int i=1;i<originalBases.size();i++){
+                List<String> source=originalBases.get(i);
+                if(!"XFR".equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-XFR","-"+kind[0]));
+                row.set(2,kind[0]);row.set(3,kind[1]);row.set(4,"support");
+                row.set(6,ratio(Double.parseDouble(row.get(6)),Double.parseDouble(kind[2])));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),Double.parseDouble(kind[3])));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),Double.parseDouble(kind[4])));
+                row.set(10,Integer.toString((int)StrictMath.ceil(
+                        Integer.parseInt(row.get(10))*Double.parseDouble(kind[5]))));
+                row.set(12,"Finite stocked cargo. Allied replenishment uses real inventory, power, range, and research.");
+                bases.add(row);
+            }
+            for(int i=1;i<originalUpgrades.size();i++){
+                List<String> source=originalUpgrades.get(i);
+                if(!"XFR".equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-XFR-","-"+kind[0]+"-"));
+                row.set(2,kind[0]);
+                row.set(5,kind[1]+" / "+row.get(3)+" stage "+row.get(4));
+                row.set(6,row.get(6).replace("-XFR-","-"+kind[0]+"-")
+                        .replace("-XFR","-"+kind[0]));
+                row.set(19,kind[1]+": "+row.get(19)+"; finite stores and support-slot tradeoffs");
                 upgrades.add(row);
             }
         }
