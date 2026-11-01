@@ -780,7 +780,7 @@ public final class Battle {
     }
     /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
     private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery,
-                         SupportDoctrine doctrine,double x, double y) {
+                         SupportDoctrine doctrine,TechnologyCatalog catalog,double x, double y) {
         if (machinery == null || design == null) throw new IllegalArgumentException("A fitted design is required");
         Ship s = addShip(team, design.faction, x, y);
         s.hullClass = design.hull;
@@ -899,7 +899,7 @@ public final class Battle {
         SupportDoctrine doctrine=Shipyard.supportDoctrine(design,catalog);
         for (int i=0;i<count;i++) {
             double[] point = formationPosition(i,count,centerX,centerY,random);
-            addShip(team,design,machinery,doctrine,point[0],point[1]);
+            addShip(team,design,machinery,doctrine,catalog,point[0],point[1]);
         }
         log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
     }
@@ -918,7 +918,7 @@ public final class Battle {
         }
         for(int i=0;i<designs.size();i++){
             double[] point=formationPosition(i,designs.size(),centerX,centerY,random);
-            addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),point[0],point[1]);
+            addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),catalog,point[0],point[1]);
         }
         log("Team "+team+" deployed "+designs.size()+" individual engineering configurations");
     }
