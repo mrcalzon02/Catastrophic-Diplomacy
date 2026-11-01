@@ -293,14 +293,14 @@ public final class CampaignFleet {
             // weapon family and the actual ammunition type remains identical.
             // This does not create ammo in a newly installed launcher.
             Shipyard.Design former=previous.fitting();
-            fitted.kineticAmmo=compatibleMagazine(former,replacement,"KIN")&&
-                    former.ammoSelection.kinetic()==replacement.ammoSelection.kinetic()?
+            // Chassis magazines exist without gun installations. Changing
+            // unrelated hardware or removing a launcher does not throw away
+            // purchased stock; changing ammo formulation still requires refill.
+            fitted.kineticAmmo=former.ammoSelection.kinetic()==replacement.ammoSelection.kinetic()?
                     Math.min(stores.kinetic(),fitted.kineticAmmo):0;
-            fitted.missileAmmo=compatibleMagazine(former,replacement,"MSL")&&
-                    former.ammoSelection.missile()==replacement.ammoSelection.missile()?
+            fitted.missileAmmo=former.ammoSelection.missile()==replacement.ammoSelection.missile()?
                     Math.min(stores.missiles(),fitted.missileAmmo):0;
-            fitted.torpedoAmmo=compatibleMagazine(former,replacement,"TOR")&&
-                    former.ammoSelection.torpedo()==replacement.ammoSelection.torpedo()?
+            fitted.torpedoAmmo=former.ammoSelection.torpedo()==replacement.ammoSelection.torpedo()?
                     Math.min(stores.torpedoes(),fitted.torpedoAmmo):0;
             // Matching hangar and craft type can keep already-purchased fighters
             // through upgrades; changing craft family cannot transmute aircraft.
@@ -368,8 +368,10 @@ public final class CampaignFleet {
             long oldTotal=CampaignFleet.purchaseCost(existing.fitting(),technology);
             long newTotal=CampaignFleet.purchaseCost(replacement,technology);
             long hullBase=CampaignFleet.purchaseCost(replacement);
-            long newMachinery=newTotal-hullBase;
-            long oldMachinery=oldTotal-hullBase;
+            long commissioning=CampaignFleet.initialProvisionCost(replacement.hull);
+            // Refit does not re-buy crew, propellant or the hull's native ammo.
+            long newMachinery=newTotal-hullBase-commissioning;
+            long oldMachinery=oldTotal-hullBase-commissioning;
             return Math.addExact(Math.max(2500L,newMachinery/6L),
                     Math.max(0L,newMachinery-oldMachinery));
         }
@@ -377,10 +379,16 @@ public final class CampaignFleet {
             if(ships.size()>=200||nextSerial>VesselIdentifiers.MAX_SERIAL||design==null||design.faction!=faction)
                 throw new IllegalArgumentException("Fleet full or wrong faction");
             Battle.Ship newShip=fresh(design,technology);
-            // A delivered hull has engines but needs paid personnel, fuel and
-            // replacement ordnance; shipyard construction does not grant stock.
-            newShip.crewCount=0;newShip.fuel=0;
-            newShip.kineticAmmo=0;newShip.missileAmmo=0;newShip.torpedoAmmo=0;
+            // Commissioning price now INCLUDES the integral core complement.
+            // Fighter wings, optional magazine expansions and drone refills
+            // remain separately paid; never create craft for free.
+            var core=diplomacy.shipyard.HullBaseline.core(design.hull);
+            newShip.crewCount=Math.min(core.crewBerths(),
+                    Math.min(newShip.crewBerths,newShip.lifeSupport));
+            newShip.fuel=core.fuel();
+            newShip.kineticAmmo=core.kineticStores();
+            newShip.missileAmmo=core.missileStores();
+            newShip.torpedoAmmo=core.torpedoStores();
             newShip.fighterReserve=0;newShip.droneReserve=0;newShip.repairDroneReserve=0;
             ArrayList<Vessel> result=new ArrayList<>(ships);
             String uniqueName=FleetNames.unique(style,namingSeed,nextSerial,
@@ -534,14 +542,26 @@ public final class CampaignFleet {
         if(design==null)throw new IllegalArgumentException("Missing design");
         return 7000L+(long)Math.ceil(design.hull.baseHull*72)+design.hull.slots.size()*1300L;
     }
-    /** New hull procurement charges for installed real machinery in addition
-     * to the raw hull. Campaign research licenses are purchased separately. */
+    /** Charge for the basic complement, propellant and sealed hull magazines
+     * exactly ONCE at new-ship commissioning; future losses remain service work. */
+    public static long initialProvisionCost(Shipyard.Hull hull){
+        var core=diplomacy.shipyard.HullBaseline.core(hull);
+        long personnel=Math.multiplyExact(core.crewBerths(),95L);
+        long propellant=(long)Math.ceil(core.fuel()*8);
+        long stores=12L*core.kineticStores()+55L*core.missileStores()
+                +180L*core.torpedoStores();
+        return Math.addExact(Math.addExact(personnel,propellant),stores);
+    }
+    /** New hull procurement includes its real machinery AND paid native
+     * personnel, fuel and magazines. No free fighter/drone payloads. */
     public static long purchaseCost(Shipyard.Design design,TechnologyCatalog tech){
         if(tech==null)throw new IllegalArgumentException("Research catalog required");
         Shipyard.Report report=Shipyard.inspect(design,tech);
         if(!report.valid())
             throw new IllegalArgumentException("Unbuildable fitted hull: "+report.explanation());
-        return Math.addExact(purchaseCost(design),Math.multiplyExact((long)report.industry(),2L));
+        return Math.addExact(
+                Math.addExact(purchaseCost(design),initialProvisionCost(design.hull)),
+                Math.multiplyExact((long)report.industry(),2L));
     }
     public static Battle.Ship fresh(Shipyard.Design fitted,TechnologyCatalog technology){
         if(fitted==null||technology==null)throw new IllegalArgumentException("Ship fitting required");
