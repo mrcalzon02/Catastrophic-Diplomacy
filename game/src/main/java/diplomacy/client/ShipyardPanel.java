@@ -788,7 +788,7 @@ final class ShipyardPanel {
         if(x>=805&&x<=1256&&y>=365&&y<=575){
             int index=(int)((575-y)/25);
             Shipyard.Mount mount=draft.placements().get(selectedSlot).mount();
-            List<Component> options=Shipyard.choices(catalog,draft.faction,mount);
+            List<Component> options=Shipyard.choices(catalog,draft.faction,draft.hull,selectedSlot);
             if(index==0){
                 try{draft=draft.install(selectedSlot,null);notice="Mount cleared";}
                 catch(IllegalArgumentException blocked){notice=blocked.getMessage();}
@@ -1372,7 +1372,7 @@ final class ShipyardPanel {
             font.draw(batch,"#"+(selectedSlot+1),
                     hardpointX(selected)+12,hardpointY(selected)+5);
         }
-        List<Component> options=Shipyard.choices(catalog,draft.faction,selected.mount());
+        List<Component> options=Shipyard.choices(catalog,draft.faction,draft.hull,selectedSlot);
         font.setColor(Color.LIGHT_GRAY);font.draw(batch,"CLEAR MOUNT",813,564);
         for(int n=0;n<options.size();n++){
             Component c=options.get(n);
