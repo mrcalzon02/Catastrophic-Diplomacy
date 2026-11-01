@@ -175,6 +175,29 @@ public final class ScreensaverBattleTest {
                 "Physical retreat did not debit the engine's fuel reserve");
         check(withdrawing.fuel>=0,"Physical retreat overdrew fuel");
 
+        // A captain ordered to stand off beyond every remaining weapon
+        // must still be able to fight with the fitted battery. The inactive
+        // missile and torpedo inventories must not create phantom reach.
+        Battle reachBattle=new Battle(0xC105EF1E1DL);
+        Battle.Ship laserOnly=reachBattle.addShip(0,Battle.Faction.TERRAN,200,335);
+        Battle.Ship immobileTarget=reachBattle.addShip(1,Battle.Faction.DRAXIAN,900,335);
+        laserOnly.missileDamage=0;laserOnly.torpedoDamage=0;
+        laserOnly.kineticDamage=0;laserOnly.plasmaDamage=0;laserOnly.particleDamage=0;
+        laserOnly.orders=BattleOrders.DEFAULT
+                .withRetreat(0)
+                .withEngagement(BattleOrders.Size.ESCORT,100,890);
+        immobileTarget.orders=BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD);
+        immobileTarget.laserDamage=0;immobileTarget.missileDamage=0;
+        immobileTarget.kineticDamage=0;immobileTarget.plasmaDamage=0;
+        immobileTarget.particleDamage=0;immobileTarget.torpedoDamage=0;
+        for(int tick=0;tick<260&&!reachBattle.finished();tick++)
+            reachBattle.step();
+        check(StrictMath.hypot(laserOnly.x-immobileTarget.x,
+                laserOnly.y-immobileTarget.y)<530,
+                "Captain held beyond its last remaining laser's physical range");
+        check(reachBattle.hitCount>0,
+                "Range correction never produced live laser combat");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
