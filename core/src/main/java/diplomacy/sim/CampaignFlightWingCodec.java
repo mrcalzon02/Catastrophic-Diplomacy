@@ -4,10 +4,8 @@ import diplomacy.tech.TechnologyCatalog;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,9 +20,11 @@ public final class CampaignFlightWingCodec {
 
     public record Saved(CampaignFleet.Roster roster,Map<Long,FlightWingManifest> wings) {
         public Saved {
-            if(roster==null||wings==null||wings.containsKey(null)||
-                    wings.containsValue(null))
+            if(roster==null||wings==null)
                 throw new IllegalArgumentException("Incomplete flight-wing roster");
+            for(var entry:wings.entrySet())
+                if(entry.getKey()==null||entry.getValue()==null)
+                    throw new IllegalArgumentException("Invalid ship flight wing");
             wings=Map.copyOf(wings);
         }
         public FlightWingManifest wing(long vesselId){
