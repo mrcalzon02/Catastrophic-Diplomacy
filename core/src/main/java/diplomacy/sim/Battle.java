@@ -1099,8 +1099,6 @@ public final class Battle {
                 StrictMath.hypot(rallyX-ship.x,rallyY-ship.y)>45;
         if(thrust) {
             steerToward(ship,rallyX,rallyY);
-            ship.fuel=StrictMath.max(0,ship.fuel-
-                    StrictMath.hypot(ship.vx,ship.vy)*DT*.018);
         } else {
             // Coast to a halt when holding, at the patrol post, or powerless.
             // Crucially, no-fuel hulls must never be propelled by search AI.
@@ -1286,6 +1284,7 @@ public final class Battle {
         s.vx += (desiredVx - s.vx) * smoothing;
         s.vy += (desiredVy - s.vy) * smoothing;
         s.x += s.vx * DT; s.y += s.vy * DT;
+        if(thrust>0)consumeEngineFuel(s);
     }
 
     private void orderedSteer(Ship ship,Ship target) {
@@ -1369,6 +1368,15 @@ public final class Battle {
         ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
         ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
         ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+        if(velocity>0)consumeEngineFuel(ship);
+    }
+
+    /** Every powered steering path (pursuit, patrol, commands and retreat)
+     * debits the same physical fuel store. Coasting and holding do not burn
+     * propulsion fuel. Called once per powered movement tick. */
+    private static void consumeEngineFuel(Ship ship){
+        ship.fuel=StrictMath.max(0,ship.fuel-
+                StrictMath.hypot(ship.vx,ship.vy)*DT*.018);
     }
 
     /** Cost transfer occurs only for real FIRE events. All costs and rates
