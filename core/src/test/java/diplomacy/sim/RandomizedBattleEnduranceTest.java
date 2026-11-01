@@ -145,6 +145,37 @@ public final class RandomizedBattleEnduranceTest {
                     .append(",maxTheaterRadius=").append(String.format(Locale.ROOT,"%.1f",
                             farthestFromCenter))
                     .append("}");
+            // Only for near-terminal deadlocks: show the *real* last
+            // captain's hardware, orders, location and ability to escape.
+            // This is diagnostic; the battle still fails unless it ends.
+            if(alive<=2)for(Battle.Ship survivor:b.ships()){
+                if(!survivor.alive()||survivor.team!=team)continue;
+                result.append(" LAST-SHIP{")
+                        .append("id=").append(survivor.id)
+                        .append(",pos=").append(survivor.orders.position())
+                        .append(",xy=").append(String.format(Locale.ROOT,"%.1f/%.1f",
+                                survivor.x,survivor.y))
+                        .append(",fuel=").append(String.format(Locale.ROOT,"%.1f",
+                                survivor.fuel))
+                        .append(",engine=").append(String.format(Locale.ROOT,"%.3f",
+                                survivor.engineCondition))
+                        .append(",crew=").append(String.format(Locale.ROOT,"%.3f",
+                                survivor.crewReadiness()))
+                        .append(",reactor=").append(String.format(Locale.ROOT,"%.3f",
+                                survivor.reactorCondition))
+                        .append(",hangar=").append(String.format(Locale.ROOT,"%.3f",
+                                survivor.hangarCondition))
+                        .append(",power=").append(String.format(Locale.ROOT,"%.2f",
+                                survivor.power))
+                        .append(",target=").append(survivor.lastTargetId)
+                        .append(",fighterReserve=").append(survivor.fighterReserve)
+                        .append(",fighterBays=").append(survivor.fighterLaunchBays)
+                        .append(",droneReserve=").append(survivor.droneReserve)
+                        .append(",kineticAmmo=").append(survivor.kineticAmmo)
+                        .append(",missileAmmo=").append(survivor.missileAmmo)
+                        .append(",torpedoAmmo=").append(survivor.torpedoAmmo)
+                        .append("}");
+            }
         }
         return result.toString();
     }
