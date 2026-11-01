@@ -17,11 +17,39 @@ public final class HullLayouts {
     public record Point(int x, int y) { }
     private static final Map<String,List<Shipyard.Slot>> CACHE = new ConcurrentHashMap<>();
 
-    /** Lazily cached; gameplay and per-frame rendering share identical immutable coordinates. */
+    /**
+     * The client may install a read-only geometry projector backed by the
+     * ORIGINAL RGBA sprite. This is installed before any ships are deployed.
+     * Headless tests/servers keep the deterministic schematic fallback.
+     * Do not modify stable socket indices, counts or categories.
+     */
+    @FunctionalInterface
+    public interface SpriteProjector {
+        List<Shipyard.Slot> project(Battle.Faction faction,Shipyard.Hull hull,
+                                   List<Shipyard.Slot> schematic);
+    }
+    private static volatile SpriteProjector spriteProjector;
+    public static synchronized void useSpriteProjector(SpriteProjector projector){
+        spriteProjector=projector;
+        CACHE.clear();
+    }
+
+    /** Lazily cached; battle muzzles, turret artwork and shipyard all agree. */
     public static List<Shipyard.Slot> slots(Battle.Faction faction, Shipyard.Hull hull) {
         if(faction==null||hull==null)throw new IllegalArgumentException("Missing faction or hull");
-        return CACHE.computeIfAbsent(faction.name()+"/"+hull.name(),
-                key -> buildSlots(faction,hull));
+        return CACHE.computeIfAbsent(faction.name()+"/"+hull.name(), key -> {
+            List<Shipyard.Slot> schematic=buildSlots(faction,hull);
+            SpriteProjector projector=spriteProjector;
+            if(projector==null)return schematic;
+            List<Shipyard.Slot> projected=projector.project(faction,hull,schematic);
+            if(projected==null||projected.size()!=schematic.size())
+                throw new IllegalStateException("Incomplete original-art hardpoint mapping for "+key);
+            for(int i=0;i<projected.size();i++)
+                if(projected.get(i).index()!=schematic.get(i).index()
+                        ||projected.get(i).mount()!=schematic.get(i).mount())
+                    throw new IllegalStateException("Sprite mapping renumbered fitted socket "+i);
+            return List.copyOf(projected);
+        });
     }
     /** A protected central plant, side/forward weapon arcs, peripheral defense, aft support. */
     private static List<Shipyard.Slot> buildSlots(Battle.Faction faction, Shipyard.Hull hull) {
