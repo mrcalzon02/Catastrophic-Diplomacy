@@ -11,6 +11,7 @@ import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
 import diplomacy.sim.DirectionalDefense;
 import java.util.EnumMap;
+import java.util.List;
 
 /**
  * First Terran concept fleet atlas, with a generic exposed internal hull beneath.
