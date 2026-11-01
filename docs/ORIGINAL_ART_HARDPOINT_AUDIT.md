@@ -25,6 +25,28 @@ All 11 playable factions and 46 append-only chassis/variants (506 combinations).
 
 Counts are chassis properties, NOT image properties. Specialist variants already have different module numbers. **Do not casually reduce the interceptor to four total sockets**: current fitting rules require a reactor, engine, radiator, two independently equipped weapons, shield, crew quarters and life support. Replacing those requirements with inherited hull machinery would require an explicit, save-compatible feature migration. Current inventory, ship IDs, slot IDs, and existing saves are unchanged.
 
+## Packaged-source alpha audit results
+
+Audited the real packaged source-art PNGs from successful release workflow
+[41248768356](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41248768356),
+not concept art or schematic polygons. The original approved PNG checksums match
+the repository's approved-faction art manifest.
+
+- **11 factions × 46 chassis = 506** combinations.
+- **110 distinct authentic PNGs** supplying those combinations.
+- **9,515 physical socket positions**, of which **2,244 are weapon sockets**.
+- **0 weapon sockets** needed an unspaced fallback.
+- **0 sockets** landed on transparent/insufficient-alpha pixels.
+- **2 dense internal sockets** required relaxed separation on exceptionally thin
+  source silhouettes; neither was a mounted weapon.
+- Every variant using the same sprite identity received distinct deterministic
+  socket placements. Art sharing does *not* force shared module counts.
+
+This is a pixel-level geometry audit against the original assets, **not**
+a claim of manually reviewed device screenshots for all 506 combinations.
+The detailed socket-level CSV was generated as a conversation artifact.
+The source art and existing campaign inventories were not modified.
+
 ## Verification and remaining limitations
 
 - `core:hullLayoutsSmoke` asserts all chassis/faction slot counts, legal base ship builds, no duplicated logical sockets, stable ordinals, distinct variant counts, and projectable world muzzle origins that exactly match shipyard socket identities.
