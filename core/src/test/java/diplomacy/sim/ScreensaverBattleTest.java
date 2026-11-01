@@ -302,6 +302,31 @@ public final class ScreensaverBattleTest {
         check(noSpotter.lastTargetId==0,
                 "Fleet network fabricated contact without a detecting ally");
 
+        // Long-running unmanned exhibitions must eventually search outside
+        // the central rally rectangle for a genuine stranded enemy.
+        // Detection still occurs at short optical range, with no teleport.
+        Battle fringe=new Battle(0xF21A6EL);
+        Battle.Ship searcher=fringe.addShip(0,Battle.Faction.TERRAN,640,335);
+        Battle.Ship sentry=fringe.addShip(1,Battle.Faction.DRAXIAN,1650,335);
+        searcher.sensorRange=1;sentry.sensorRange=1;
+        sentry.orders=BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD)
+                .withRetreat(0);
+        fringe.configureWeather(new SpaceWeather.Preset(1,17,
+                SpaceWeather.Kind.NEBULA,SpaceWeather.Kind.CLEAR,1));
+        fringe.enableUnattendedExhibition();
+        fringe.step();
+        check(searcher.lastTargetId==0,
+                "Distant stationary enemy appeared without physical observation");
+        boolean encountered=false;
+        for(int tick=0;tick<16000&&!fringe.finished();tick++){
+            fringe.step();
+            if(searcher.lastTargetId==sentry.id){encountered=true;break;}
+        }
+        check(encountered,
+                "Extended exhibition search never discovered a stationary fringe ship");
+        check(StrictMath.hypot(searcher.x-sentry.x,searcher.y-sentry.y)<340,
+                "Fringe enemy was acquired without a real close-range encounter");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
