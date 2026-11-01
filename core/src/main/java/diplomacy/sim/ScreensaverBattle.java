@@ -50,8 +50,10 @@ public final class ScreensaverBattle {
         int countA=forcedShipsPerSide==0?fleetSize(random):forcedShipsPerSide;
         int countB=forcedShipsPerSide==0?fleetSize(random):forcedShipsPerSide;
         int environment=1+random.nextInt(LevelEconomy.LEVEL_COUNT);
-        List<Shipyard.Design> first=fleet(random,catalog,left,tierA,countA);
-        List<Shipyard.Design> second=fleet(random,catalog,right,tierB,countB);
+        List<Shipyard.Design> first=fleet(random,catalog,left,tierA,countA,
+                forcedShipsPerSide>0);
+        List<Shipyard.Design> second=fleet(random,catalog,right,tierB,countB,
+                forcedShipsPerSide>0);
         Battle battle=Battle.duel(seed,first,second,catalog);
         FleetNames.Style[] traditions=FleetNames.Style.values();
         FleetNames.Style firstStyle=traditions[random.nextInt(traditions.length)];
@@ -151,7 +153,8 @@ public final class ScreensaverBattle {
     }
 
     private static List<Shipyard.Design> fleet(Random random,TechnologyCatalog catalog,
-                                               Battle.Faction faction,int tier,int size){
+                                               Battle.Faction faction,int tier,int size,
+                                               boolean endurance){
         List<Shipyard.Hull> eligible=new ArrayList<>();
         for(Shipyard.Hull hull:Shipyard.Hull.shipyardOrder()){
             try{
@@ -162,6 +165,21 @@ public final class ScreensaverBattle {
         if(eligible.isEmpty())throw new IllegalStateException("No buildable hulls for "+faction);
         List<Shipyard.Design> ships=new ArrayList<>(size);
         for(int i=0;i<size;i++){
+            // A 200v200 endurance run MUST deploy every armed fighter type.
+            // Use real shipyard-legal native flight decks, not cheated reserve
+            // counters or test-only aircraft spawned outside the simulation.
+            // The other 194 hulls remain fully randomized screensaver fits.
+            if(endurance&&i<FighterModel.Hull.values().length){
+                Shipyard.Design flightDeck=Shipyard.starter(faction,Shipyard.Hull.CARRIER)
+                        .withFighterHull(FighterModel.Hull.values()[i]);
+                if(!Shipyard.inspect(flightDeck,catalog).valid() ||
+                        Shipyard.fit(flightDeck,catalog).fighterCapacity()<=0)
+                    throw new IllegalStateException(
+                            "Endurance aircraft carrier is not a legal physical fitting: "+
+                            faction+"/"+flightDeck.fighterHull);
+                ships.add(flightDeck);
+                continue;
+            }
             Shipyard.Design design=Shipyard.starter(faction,
                     eligible.get(random.nextInt(eligible.size())));
             int vesselTier=1+random.nextInt(tier);
