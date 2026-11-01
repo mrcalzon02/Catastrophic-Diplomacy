@@ -684,6 +684,8 @@ tasks.register('randomizedCombatEndurance', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.RandomizedBattleEnduranceTest'
+    // GitHub collects /build/reports from repository root, not /core/build.
+    workingDir = rootProject.projectDir
     def seed = providers.environmentVariable('CD_ENDURANCE_SEED').orElse('2026103101')
     def output = providers.environmentVariable('CD_ENDURANCE_REPORT').orElse('build/reports/combat-endurance')
     argumentProviders.add({ [seed.get(),output.get()] } as org.gradle.process.CommandLineArgumentProvider)
