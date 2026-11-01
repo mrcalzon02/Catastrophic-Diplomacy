@@ -307,10 +307,12 @@ public final class ScreensaverBattleTest {
         // Detection still occurs at short optical range, with no teleport.
         Battle fringe=new Battle(0xF21A6EL);
         Battle.Ship searcher=fringe.addShip(0,Battle.Faction.TERRAN,640,335);
-        Battle.Ship sentry=fringe.addShip(1,Battle.Faction.DRAXIAN,1650,335);
+        // A replay of endurance seed 2026103103's isolated LAST_STAND
+        // captain, whose actual last observed position was (1257,1448).
+        Battle.Ship sentry=fringe.addShip(1,Battle.Faction.DRAXIAN,1257,1448);
         searcher.sensorRange=1;sentry.sensorRange=1;
         // This fixture represents a long-range scout with enough *finite*
-        // reaction mass for 16000 actual search ticks; default legacy ships
+        // reaction mass for 24000 actual search ticks; default legacy ships
         // carry just 180 and exhaust themselves before the search expands.
         searcher.maxFuel=1200;searcher.fuel=1200;
         sentry.orders=BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD)
@@ -322,7 +324,7 @@ public final class ScreensaverBattleTest {
         check(searcher.lastTargetId==0,
                 "Distant stationary enemy appeared without physical observation");
         boolean encountered=false;
-        for(int tick=0;tick<16000&&!fringe.finished();tick++){
+        for(int tick=0;tick<24000&&!fringe.finished();tick++){
             fringe.step();
             if(searcher.lastTargetId==sentry.id){encountered=true;break;}
         }
