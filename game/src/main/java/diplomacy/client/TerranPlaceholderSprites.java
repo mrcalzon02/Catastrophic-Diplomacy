@@ -586,9 +586,20 @@ public final class TerranPlaceholderSprites implements Disposable {
         int minimum=Math.max(17,Math.min(43,
                 (int)Math.round(height*.063)));
         int minSq=minimum*minimum;
-        List<Shipyard.Slot> answer=new java.util.ArrayList<>(schematic.size());
+        Shipyard.Slot[] placed=new Shipyard.Slot[schematic.size()];
         java.util.List<Integer> usedPixels=new java.util.ArrayList<>();
-        for(Shipyard.Slot slot:schematic){
+        // Reserve the deepest, best fitting alpha-core locations for *visible*
+        // barrels and launcher bodies first. Machinery and accommodation are
+        // internal equipment and can occupy remaining plates afterwards.
+        List<Shipyard.Slot> ordered=new java.util.ArrayList<>(schematic);
+        ordered.sort(java.util.Comparator.comparingInt(slot->switch(slot.mount()){
+            case WEAPON -> 0;
+            case DEFENSE -> 1;
+            case SUPPORT -> 2;
+            case SYSTEM -> 3;
+            case HABITAT -> 4;
+        }));
+        for(Shipyard.Slot slot:ordered){
             double nx=(slot.x()-minX)/(double)Math.max(1,maxX-minX);
             double ny=(slot.y()-minY)/(double)Math.max(1,maxY-minY);
             int random=hashSlot(faction,hull,slot.index());
@@ -623,9 +634,10 @@ public final class TerranPlaceholderSprites implements Disposable {
             int px=selected%width,py=selected/width;
             int localX=(int)Math.round(154.0*(px+.5-width*.5)/height);
             int localY=(int)Math.round(154.0*(height*.5-py-.5)/height);
-            answer.add(new Shipyard.Slot(slot.index(),slot.mount(),localX,localY));
+            placed[slot.index()]=new Shipyard.Slot(
+                    slot.index(),slot.mount(),localX,localY);
         }
-        return java.util.List.copyOf(answer);
+        return java.util.List.of(placed);
     }
 
     /**
