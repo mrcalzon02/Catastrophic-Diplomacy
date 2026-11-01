@@ -1,6 +1,8 @@
 package diplomacy.shipyard;
 
 import diplomacy.sim.Battle;
+import diplomacy.sim.DirectionalDefense;
+import diplomacy.sim.WeaponBehaviorTable;
 import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionResearch;
 import diplomacy.sim.AmmunitionTable;
@@ -700,7 +702,9 @@ public final class Shipyard {
                 weaponCounts[weaponIndex]++;
             }
             switch(p.base.subsystem) {
-                case "ARM" -> armor+=p.effect*2.0*p.integrity/p.base.integrity;
+                case "ARM", "CMP", "ABL", "DEN", "RAC" ->
+                    armor+=p.effect*2.0*p.integrity/p.base.integrity;
+                case "BLK" -> hull+=p.effect*3.2*p.integrity/p.base.integrity;
                 case "SHD" -> {
                     // A normal shield generator protects ONLY its owning hull.
                     // No allied transfer without a dedicated SUPPORT-slot XFR.
@@ -808,6 +812,46 @@ public final class Shipyard {
                 new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
                         (int)StrictMath.floor(breathing)),
                 ammunitionAccess(design),shieldRechargeBoost);
+    }
+
+    /**
+     * Equip source-physical armor to real directional plates, not a global
+     * hull resistance toggle. Installed armor contributes its actual capacity
+     * to the weighted material profile; bare hull and legacy ARM remain neutral.
+     * The multiplier is applied ONCE on spawning a fitted vessel, not per frame.
+     */
+    public static void applyArmorMaterials(Design design,TechnologyCatalog catalog,
+                                            DirectionalDefense defense) {
+        if(design==null||catalog==null||defense==null)
+            throw new IllegalArgumentException("Missing armor fitting");
+        List<Part> parts=fittedParts(design,catalog,new ArrayList<>());
+        Battle.DamageType[] types=Battle.DamageType.values();
+        double bare=HullBaseline.forHull(design.faction,design.hull).armor();
+        double total=bare;
+        double[] weighted=new double[types.length];
+        java.util.Arrays.fill(weighted,bare);
+        for(int i=0;i<design.slots();i++){
+            Installed installed=design.at(i);
+            if(installed==null)continue;
+            String subtype=installed.component.substring(installed.component.lastIndexOf('-')+1);
+            if(!ArmorMaterials.isPlating(subtype))continue;
+            Component base=catalog.base(installed.component);
+            if(base==null)throw new IllegalArgumentException("Unrecognized armor fitting");
+            // Reuse the exact evaluated module physical capacity from fit().
+            Part part=evaluate(installed,catalog,design.faction);
+            double capacity=part.effect*2.0*part.integrity/part.base.integrity;
+            total+=capacity;
+            for(Battle.DamageType type:types)
+                weighted[type.ordinal()]+=capacity*ArmorMaterials.factor(
+                        subtype,type,installed.branch(),
+                        installed.branch()==null?0:installed.stage(installed.branch()));
+        }
+        for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values())
+            for(Battle.DamageType type:types){
+                double factor=defense.damageFactor(DirectionalDefense.Layer.ARMOR,face,type);
+                defense.setDamageFactor(DirectionalDefense.Layer.ARMOR,face,type,
+                        factor*weighted[type.ordinal()]/total);
+            }
     }
 
     /**

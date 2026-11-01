@@ -17,6 +17,14 @@ tasks.register('technologySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('smoke') { finalizedBy(tasks.named('technologySmoke')) }
+tasks.register('armorEngineeringSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Validate eleven-faction defensive module research, structural reinforcement, and typed armor resistance.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ArmorEngineeringTest'
+    dependsOn testClasses
+}
+tasks.named('technologySmoke') { finalizedBy(tasks.named('armorEngineeringSmoke')) }
 
 
 tasks.register('shipyardSmoke', JavaExec) {

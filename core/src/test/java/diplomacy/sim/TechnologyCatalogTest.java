@@ -11,8 +11,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 13464, "full technology count");
-        require(c.componentCount() == 374, "all base components");
+        require(c.upgradeCount() == 15444, "full technology count with defensive chains");
+        require(c.componentCount() == 429, "all base components including defensive families");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -24,6 +24,17 @@ public final class TechnologyCatalogTest {
                         require(c.get("TECH-"+faction+"-"+role+"-"+branch+"-"+
                                 String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
                                 "Support evolution research missing "+faction+"/"+role);
+            }
+            for(String module:new String[]{"CMP","ABL","DEN","RAC","BLK"}){
+                require(c.base("BASE-"+faction+"-"+module)!=null &&
+                        "defense".equals(c.base("BASE-"+faction+"-"+module).category),
+                        "Missing defensive module "+faction+"/"+module);
+                for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=9;rank++){
+                        String id="TECH-"+faction+"-"+module+"-"+track+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank);
+                        require(c.get(id)!=null,"Missing defensive research "+id);
+                    }
             }
             require(c.base("BASE-"+faction+"-XFR")!=null &&
                     "support".equals(c.base("BASE-"+faction+"-XFR").category),

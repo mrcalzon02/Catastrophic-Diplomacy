@@ -824,6 +824,7 @@ public final class Battle {
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
         s.defense = new DirectionalDefense(s.maxShields,s.maxArmor,s.maxHull);
+        Shipyard.applyArmorMaterials(design,catalog,s.defense);
         if(s.maxShields>0)
             for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values())
                 s.defense.configureRecharge(face,

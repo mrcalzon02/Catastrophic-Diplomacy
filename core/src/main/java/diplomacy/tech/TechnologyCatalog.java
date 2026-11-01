@@ -102,6 +102,7 @@ public final class TechnologyCatalog {
             addHabitatFamilies(bases,rows);
             addShieldTransferProjectors(bases,rows);
             addSpecializedSupportFamilies(bases,rows);
+            addArmorAndBulkheadFamilies(bases,rows);
             extendToNineStages(rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
@@ -391,6 +392,75 @@ public final class TechnologyCatalog {
                         .replace("-"+parent,"-"+code));
                 entry.set(19,type[1]+": "+entry.get(19));
                 upgrades.add(entry);
+            }
+        }
+    }
+
+    /**
+     * Five new defensive module families across all 11 native engineering
+     * catalogs. Legacy IDs, saved blueprints, and the four exclusive research
+     * tracks stay intact. Extend each source six-rank chain to ranks 7-9
+     * using the existing catalog extrapolator, not new research rules.
+     */
+    private static void addArmorAndBulkheadFamilies(List<List<String>> bases,
+                                                     List<List<String>> upgrades) {
+        String[][] families={
+            // code, title, source, mass, power, heat, integrity, output, price
+            {"CMP","Composite Plating","ARM","1.04","0.90","0.94","1.12","0.90","1.06"},
+            {"ABL","Ceramic Ablative Laminate","ARM","0.86","0.92","0.98","0.90","0.79","1.04"},
+            {"DEN","Dense Kinetic Plating","ARM","1.36","1.04","1.12","1.30","1.10","1.30"},
+            {"RAC","Reactive Armor Cells","ARM","1.17","1.20","1.16","1.03","0.87","1.24"},
+            {"BLK","Reinforced Bulkheads","SIF","1.28","0.72","0.85","1.20","0.84","1.18"}
+        };
+        List<List<String>> parentBases=List.copyOf(bases);
+        List<List<String>> parentUpgrades=List.copyOf(upgrades);
+        for(String[] kind:families){
+            String code=kind[0],parent=kind[2];
+            for(int i=1;i<parentBases.size();i++){
+                List<String> original=parentBases.get(i);
+                if(!parent.equals(original.get(2)))continue;
+                List<String> row=new ArrayList<>(original);
+                row.set(0,row.get(0).replace("-"+parent,"-"+code));
+                row.set(2,code);
+                row.set(3,kind[1]);
+                row.set(4,"defense");
+                for(int column=6;column<=9;column++)
+                    row.set(column,ratio(Double.parseDouble(row.get(column)),
+                            Double.parseDouble(kind[column-3])));
+                row.set(10,Long.toString(Math.round(Long.parseLong(row.get(10))*
+                        Double.parseDouble(kind[8]))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),
+                        Double.parseDouble(kind[7])));
+                row.set(12,kind[1]+": physical defense socket and finite mass/power budget");
+                bases.add(row);
+            }
+            for(int i=1;i<parentUpgrades.size();i++){
+                List<String> original=parentUpgrades.get(i);
+                if(!parent.equals(original.get(2)))continue;
+                List<String> row=new ArrayList<>(original);
+                row.set(0,row.get(0).replace("-"+parent+"-","-"+code+"-"));
+                row.set(2,code);
+                row.set(5,kind[1]+" - "+original.get(3)+" rank "+original.get(4));
+                row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
+                        .replace("-"+parent,"-"+code));
+                int stage=Integer.parseInt(original.get(4));
+                String branch=original.get(3);
+                double mass=Double.parseDouble(row.get(9));
+                double power=Double.parseDouble(row.get(10));
+                double effect=Double.parseDouble(row.get(12));
+                double integrity=Double.parseDouble(row.get(14));
+                switch(branch){
+                    case "OUTPUT" -> {effect*=1+.045*stage;mass*=1+.015*stage;}
+                    case "EFFICIENCY" -> {mass*=1-.025*stage;power*=1-.022*stage;}
+                    case "RESILIENCE" -> integrity*=1+.035*stage;
+                    case "SPECIALIST" -> {effect*=1+.018*stage;integrity*=1+.022*stage;}
+                    default -> throw new IllegalStateException("Unknown research branch");
+                }
+                row.set(9,ratio(mass,1));row.set(10,ratio(power,1));
+                row.set(12,ratio(effect,1));row.set(14,ratio(integrity,1));
+                row.set(19,kind[1]+": "+branch+
+                        " upgrade; mass, heat, power and industry compete with armament");
+                upgrades.add(row);
             }
         }
     }
