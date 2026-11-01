@@ -198,6 +198,29 @@ public final class ScreensaverBattleTest {
         check(reachBattle.hitCount>0,
                 "Range correction never produced live laser combat");
 
+        // Even if a vessel's radar hardware is destroyed, a nearby enemy
+        // remains optically identifiable; storm visibility is short, not zero.
+        Battle opticalBattle=new Battle(0x0F71CA1L);
+        Battle.Ship watcher=opticalBattle.addShip(0,Battle.Faction.TERRAN,500,335);
+        Battle.Ship silhouette=opticalBattle.addShip(1,Battle.Faction.DRAXIAN,655,335);
+        watcher.sensorsCondition=0;silhouette.sensorsCondition=0;
+        opticalBattle.configureWeather(new SpaceWeather.Preset(2,17,
+                SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.CLEAR,1));
+        opticalBattle.step();
+        check(watcher.lastTargetId==silhouette.id,
+                "Destroyed radar concealed an enemy at direct optical range");
+
+        // Unobserved ships must sweep several patrol lanes rather than
+        // permanently waiting at a single sector beacon.
+        Battle sweeps=new Battle(0x5EEA22L);
+        Battle.Ship patrol=sweeps.addShip(0,Battle.Faction.TERRAN,700,300);
+        patrol.sensorRange=1;
+        for(int tick=0;tick<240;tick++)sweeps.step();
+        double firstX=patrol.x,firstY=patrol.y;
+        for(int tick=0;tick<300;tick++)sweeps.step();
+        check(StrictMath.hypot(firstX-patrol.x,firstY-patrol.y)>15,
+                "Search patrol stopped cycling through unobserved sectors");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
