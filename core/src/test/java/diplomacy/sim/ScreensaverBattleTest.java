@@ -151,6 +151,30 @@ public final class ScreensaverBattleTest {
         check(stranded.x==strandedX&&stranded.y==strandedY,
                 "Empty fuel tank produced artificial search thrust");
 
+        // Both pursuit navigation paths must draw from the same finite
+        // onboard reaction-mass reserve. A captain's standing-orders branch
+        // must not accidentally make fuel free.
+        Battle chase=new Battle(0xF0E1L);
+        Battle.Ship standard=chase.addShip(0,Battle.Faction.TERRAN,200,335);
+        Battle.Ship ordered=chase.addShip(1,Battle.Faction.DRAXIAN,1070,335);
+        ordered.orders=BattleOrders.DEFAULT.withPosition(BattleOrders.Position.KEEP_MOVING);
+        double originalStandardFuel=standard.fuel,originalOrderedFuel=ordered.fuel;
+        for(int tick=0;tick<60&&!chase.finished();tick++)chase.step();
+        check(standard.fuel<originalStandardFuel && ordered.fuel<originalOrderedFuel,
+                "Pursuit or ordered steering generated free engine thrust");
+        check(standard.fuel>=0 && ordered.fuel>=0,
+                "Steering spent more fuel than was physically available");
+
+        Battle extraction=new Battle(0xE5C4FEL);
+        Battle.Ship withdrawing=extraction.addShip(0,Battle.Faction.TERRAN,640,335);
+        extraction.addShip(1,Battle.Faction.DRAXIAN,1000,335);
+        withdrawing.withdrawing=true;
+        double preEscapeFuel=withdrawing.fuel;
+        for(int tick=0;tick<60;tick++)extraction.step();
+        check(withdrawing.fuel<preEscapeFuel,
+                "Physical retreat did not debit the engine's fuel reserve");
+        check(withdrawing.fuel>=0,"Physical retreat overdrew fuel");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
