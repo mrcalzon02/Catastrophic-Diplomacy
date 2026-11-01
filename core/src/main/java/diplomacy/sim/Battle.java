@@ -1070,14 +1070,7 @@ public final class Battle {
                     }
                 }
             } else if(!navigated) {
-                if (weather.preset().enabled()) {
-                    // Low sensor visibility must not cause a permanent standstill.
-                    double heading = s.team == 0 ? 1 : -1;
-                    s.vx += (heading * s.speed * s.engineCondition
-                            * s.crewReadiness() * 0.38 - s.vx) * 0.055;
-                }
-                s.x += s.vx * DT; s.y += s.vy * DT;
-        s.fuel=Math.max(0,s.fuel-StrictMath.hypot(s.vx,s.vy)*DT*.018);
+                searchForContact(s);
             }
             launchAuxiliary(s,target);
         }
@@ -1087,6 +1080,33 @@ public final class Battle {
         updateMissiles();
         updateBallistics();
         updateCraft();
+    }
+
+    /**
+     * A fog-blinded captain searches the finite combat theater instead of
+     * accelerating blindly down its team's original heading and leaving the
+     * battle by tens of thousands of units. No enemy identity or position is
+     * leaked: each ship patrols a stable, staggered sector until its own real
+     * sensors reacquire a target. Explicit HOLD/LAST_STAND orders remain still.
+     */
+    private void searchForContact(Ship ship) {
+        double rallyX=ship.team==0?565:715;
+        double rallyY=140+(ship.id*73%9)*50;
+        boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
+                ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
+        boolean thrust=!hold && ship.fuel>0 && ship.engineCondition>0.01
+                && ship.crewReadiness()>0 &&
+                StrictMath.hypot(rallyX-ship.x,rallyY-ship.y)>45;
+        if(thrust) {
+            steerToward(ship,rallyX,rallyY);
+            ship.fuel=StrictMath.max(0,ship.fuel-
+                    StrictMath.hypot(ship.vx,ship.vy)*DT*.018);
+        } else {
+            // Coast to a halt when holding, at the patrol post, or powerless.
+            // Crucially, no-fuel hulls must never be propelled by search AI.
+            ship.vx*=0.82;ship.vy*=0.82;
+            ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+        }
     }
 
     private void replenish(Ship s) {
