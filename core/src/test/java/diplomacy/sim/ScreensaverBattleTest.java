@@ -271,6 +271,37 @@ public final class ScreensaverBattleTest {
         check(!manualShip.withdrawing && !manualShip.escaped,
                 "Autonomous exhibition withdrawal leaked into manual battles");
 
+        // Fleet contact sharing requires a real active local spotter. A blind
+        // squadmate can receive that identification, but a remote vessel and
+        // an unobserved hostile remain hidden through the same dense nebula.
+        Battle net=new Battle(0x7A7A1L);
+        Battle.Ship spotter=net.addShip(0,Battle.Faction.TERRAN,500,335);
+        Battle.Ship squadmate=net.addShip(0,Battle.Faction.TERRAN,380,335);
+        Battle.Ship remote=net.addShip(0,Battle.Faction.TERRAN,-1100,335);
+        Battle.Ship contact=net.addShip(1,Battle.Faction.DRAXIAN,760,335);
+        squadmate.sensorsCondition=0;
+        remote.sensorsCondition=0;
+        contact.sensorsCondition=0;
+        net.configureWeather(new SpaceWeather.Preset(198,17,
+                SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
+        net.step();
+        check(spotter.lastTargetId==contact.id,
+                "Actual nearby spotter never detected the target");
+        check(squadmate.lastTargetId==contact.id,
+                "Local squadmate did not receive the real sensor contact");
+        check(remote.lastTargetId==0,
+                "Fleet network leaked contact beyond local radio reach");
+
+        Battle alone=new Battle(0x7A7A2L);
+        Battle.Ship noSpotter=alone.addShip(0,Battle.Faction.TERRAN,380,335);
+        Battle.Ship distant=alone.addShip(1,Battle.Faction.DRAXIAN,760,335);
+        noSpotter.sensorsCondition=0;distant.sensorsCondition=0;
+        alone.configureWeather(new SpaceWeather.Preset(198,17,
+                SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
+        alone.step();
+        check(noSpotter.lastTargetId==0,
+                "Fleet network fabricated contact without a detecting ally");
+
         check(seen.size()>=3&&hulls.size()>=6&&environments.size()>=3
                 &&tiers.size()>=3&&loads.size()>=9,
                 "Insufficient faction, hull, environment, tier or module variation");
