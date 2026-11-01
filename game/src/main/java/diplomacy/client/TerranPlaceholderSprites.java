@@ -188,12 +188,11 @@ public final class TerranPlaceholderSprites implements Disposable {
                 int metal=material.getPixel(
                         x*material.getWidth()/src.getWidth(),
                         y*material.getHeight()/src.getHeight());
-                // Keep the distinctive original vessel plating under exposed
-                // battle damage, rather than a generic grayscale oval.
-                int r=((((pixel>>>24)&255)*3)+(((metal>>>24)&255)*7))/10;
-                int g=((((pixel>>>16)&255)*3)+(((metal>>>16)&255)*7))/10;
-                int b=((((pixel>>>8)&255)*3)+(((metal>>>8)&255)*7))/10;
-                masked.drawPixel(x,y,(r<<24)|(g<<16)|(b<<8)|alpha);
+                // 4x darker exposed interior; source alpha is authoritative.
+                // If the underlay material has no pixel at this UV, fall back
+                // to a shadowed original hull pixel, NEVER invent a sprite
+                // beyond the original silhouette or assume underlying art.
+                masked.drawPixel(x,y,ShipSurfaceDamageVisual.interiorPixel(pixel,metal));
             }
             layer=new Texture(masked);
             layer.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
@@ -371,6 +370,26 @@ public final class TerranPlaceholderSprites implements Disposable {
         return ((hash^(hash>>>16))&0xffff)/65535f-0.5f;
     }
     /**
+     * Read a physical crater at a specified mask pixel. The neighboring
+     * samples for the rim use exactly the same registered armor cells as the
+     * alpha mask; they cannot invent additional geometry.
+     */
+    private static float craterAt(float[][] wear,float[][] internal,
+                                   ShipArmorStampAnchors aligned,
+                                   float tileRow,float tileCol,int shipId) {
+        int centerR=(int)StrictMath.floor(tileRow+.5);
+        int centerC=(int)StrictMath.floor(tileCol+.5);
+        float crater=0f;
+        for(int r=Math.max(0,centerR-1);r<=Math.min(GRID-1,centerR+1);r++)
+            for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
+                if(wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
+                crater=Math.max(crater,ShipArmorStamps.openingAt(
+                        tileRow,tileCol,r,c,aligned.row(r,c),aligned.col(r,c),
+                        wear[r][c],internal[r][c],shipId));
+            }
+        return crater;
+    }
+    /**
      * Shallow armor wear darkens plating without opening a hole. Severe armor
      * loss or actual internal damage erodes hull alpha to reveal structural
      * material; bilinear cells and stable noise shape the crater lips.
@@ -423,21 +442,26 @@ public final class TerranPlaceholderSprites implements Disposable {
                 // Wear darkens source plating; only localized physically
                 // damaged cells cut alpha. Neighbor lookups catch crater lips.
                 float damage=surfaceDamage(wear,tileRow,tileCol);
-                float crater=0f;
-                int centerR=(int)StrictMath.floor(tileRow+.5);
-                int centerC=(int)StrictMath.floor(tileCol+.5);
-                for(int r=Math.max(0,centerR-1);r<=Math.min(GRID-1,centerR+1);r++)
-                    for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
-                        if(wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
-                        crater=Math.max(crater,ShipArmorStamps.openingAt(
-                                (float)tileRow,(float)tileCol,r,c,
-                                aligned.row(r,c),aligned.col(r,c),
-                                wear[r][c],internal[r][c],ship.id));
-                    }
+                float row=(float)tileRow,col=(float)tileCol;
+                float crater=craterAt(wear,internal,aligned,row,col,ship.id);
+                float rim=0f;
+                // Interior render layer is clipped to original opaque pixels.
+                // No original hull pixel => the branch above already skipped.
+                // No breach => no 4-neighbor sampling or emissive overhead.
+                if(crater>.07f && crater<.98f){
+                    float sx=GRID/(float)MASK_W,sy=GRID/(float)MASK_H;
+                    float left=craterAt(wear,internal,aligned,row,col-sx,ship.id);
+                    float right=craterAt(wear,internal,aligned,row,col+sx,ship.id);
+                    float up=craterAt(wear,internal,aligned,row-sy,col,ship.id);
+                    float down=craterAt(wear,internal,aligned,row+sy,col,ship.id);
+                    // The interior layer shares the source alpha silhouette.
+                    rim=ShipSurfaceDamageVisual.breachRim(crater,left,right,up,down,
+                            originalAlpha,originalAlpha);
+                }
                 float rough=noise(x/4,y/4,ship.id)*0.70f+
                         noise(x,y,ship.id*31)*0.30f;
                 output.drawPixel(localX,localY,ShipSurfaceDamageVisual.stampedPixel(
-                        originalPixel,damage,crater,rough));
+                        originalPixel,damage,crater,rim,rough));
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);

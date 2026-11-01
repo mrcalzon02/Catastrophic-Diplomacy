@@ -39,6 +39,32 @@ public final class ShipSurfaceDamageVisualTest {
             int semi=ShipSurfaceDamageVisual.pixel(0xb0a09080,fraction,0,.3f);
             check(alpha(semi)<=128,"Output alpha may never exceed original alpha");
         }
+        // Armor underlayer and rim must respect both image masks. Never create
+        // a glowing ghost at a transparent gap or a missing underlay sample.
+        check(ShipSurfaceDamageVisual.interiorPixel(0xffffff00,0xc08040ff)==0,
+                "Underlayer must not fill transparent gaps between sprite parts");
+        check(ShipSurfaceDamageVisual.interiorPixel(0xc08040ff,0x804020ff)
+                        ==0x261a11ff,
+                "Exposed interior must be 25% of its former blended brightness");
+        check(ShipSurfaceDamageVisual.interiorPixel(0xc0804080,0x00000000)
+                        ==0x30101080,
+                "Missing metal sample falls back to a shadowed ORIGINAL sprite pixel");
+        check(ShipSurfaceDamageVisual.breachRim(.5f,0,1,0,1,0,255)==0,
+                "Transparent source PNG must never have an emissive rim");
+        check(ShipSurfaceDamageVisual.breachRim(.5f,0,1,0,1,255,0)==0,
+                "Missing interior sprite pixel must never create a rim");
+        check(ShipSurfaceDamageVisual.breachRim(0,0,0,0,0,255,255)==0,
+                "Intact plating never glows");
+        check(ShipSurfaceDamageVisual.breachRim(1,0,0,0,0,255,255)==0,
+                "Completely empty crater center must not glow");
+        float hot=ShipSurfaceDamageVisual.breachRim(.5f,.05f,.95f,.02f,.98f,255,255);
+        check(hot>.1f,"Actual alpha transition must make a hot torn-metal rim");
+        int rim=ShipSurfaceDamageVisual.stampedPixel(source,.90f,.5f,hot,0);
+        int plain=ShipSurfaceDamageVisual.stampedPixel(source,.90f,.5f,0);
+        check(alpha(rim)==alpha(plain)&&((rim>>>24)&255)>((plain>>>24)&255),
+                "Hot edge must brighten plating without changing the original alpha cut");
+        check(ShipSurfaceDamageVisual.stampedPixel(0xffaa2200,1,.5f,1f,0)==0,
+                "Rim cannot paint pixels where there is no hull artwork");
         // Actual spatial damage stamps are localized, irregular and physically
         // gated by the armor/structure state of the corresponding plate.
         for(int shipId:new int[]{11,482,1931}){

@@ -87,3 +87,23 @@ The existing in-game `CD-DEMO-VERIFY` log now includes
 and `sourceCpuBytes` (the retained sampled CPU art cache). They are
 observations only, never release pass/fail thresholds. A real Android or
 desktop battle should be used to validate these values under load.
+
+
+## Dark exposed cavities and hot transparency-edge rims
+
+The real material pass now reduces the damaged/destroyed structural underlayer
+composite RGB to **25%** of its old brightness. It retains the authored source
+alpha, not a generic geometric oval, and uses a shadowed source-pixel fallback
+if its damage material has a transparent sample. Transparent original ship
+pixels remain completely empty.
+
+The real 96×144 alpha-peeling mask samples the local directional armor-crater
+gradient only for partially opened pixels, producing a tightly bounded
+orange-hot rim in the remaining plating. Full hole centers remain transparent,
+shallow scuffs have no rim, and no glow is painted outside source alpha or
+when no underlying pixel exists. This is not a fake shield bloom. The
+gradients are calculated on dirty-region rebuilds, not every frame, and
+functional hull HP, impact locations, repair and shielding are unchanged.
+
+The existing optional Android four-ship comparison must be re-captured for
+visual inspection; headless mask tests only validate structural invariants.

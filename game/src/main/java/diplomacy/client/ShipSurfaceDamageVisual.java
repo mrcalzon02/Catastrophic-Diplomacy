@@ -31,6 +31,63 @@ final class ShipSurfaceDamageVisual {
         return (tinted&0xffffff00)|Math.max(0,Math.min(originalAlpha,alpha));
     }
 
+    /**
+     * The exposed metal is a silhouette-clipped sublayer, not another ship
+     * sprite. Darken RGB to 25% of the previous 30/70 composite; preserve
+     * the original silhouette alpha. Empty PNG pixels must remain empty.
+     * A fully transparent material sample must not turn an opaque source
+     * pixel into undefined black/transparent data: use the source palette.
+     */
+    static int interiorPixel(int source,int material) {
+        int a=source&255;
+        if(a==0)return 0;
+        boolean materialExists=(material&255)!=0;
+        int r=materialExists?(((source>>>24)&255)*3+((material>>>24)&255)*7)/10
+                            :(source>>>24)&255;
+        int g=materialExists?(((source>>>16)&255)*3+((material>>>16)&255)*7)/10
+                            :(source>>>16)&255;
+        int b=materialExists?(((source>>>8)&255)*3+((material>>>8)&255)*7)/10
+                            :(source>>>8)&255;
+        return (Math.round(r*.25f)<<24)|(Math.round(g*.25f)<<16)
+                |(Math.round(b*.25f)<<8)|a;
+    }
+
+    /**
+     * Hot torn-plating rim: local mask alpha gradient, not a glow billboard.
+     * There MUST be both a real source hull pixel and a clipped interior
+     * pixel underneath. Never draw on transparent source artwork or an empty
+     * damage underlayer.
+     */
+    static float breachRim(float opening,float left,float right,float up,
+                           float down,int sourceAlpha,int interiorAlpha) {
+        if(sourceAlpha<=0||interiorAlpha<=0||opening<=.07f||opening>=.98f)
+            return 0;
+        float gradient=Math.max(Math.max(Math.abs(opening-left),Math.abs(opening-right)),
+                        Math.max(Math.abs(opening-up),Math.abs(opening-down)));
+        float edge=clamp((gradient-.04f)*5f);
+        // A worn but still present armor lip carries the heated metal,
+        // while the center of the hole remains fully transparent.
+        return edge*clamp((1f-opening)*2.2f);
+    }
+
+    /** Controlled hot-rim tint ONLY within the remaining armor alpha. */
+    static int stampedPixel(int original,float diffuseWear,float craterOpening,
+                            float edgeGlow,float grit) {
+        int base=stampedPixel(original,diffuseWear,craterOpening,grit);
+        int a=base&255;
+        if(a==0)return 0;
+        float glow=clamp(edgeGlow);
+        if(glow==0)return base;
+        int r=(base>>>24)&255,g=(base>>>16)&255,b=(base>>>8)&255;
+        r=Math.round(r+(255-r)*glow);
+        g=Math.round(g+(178-g)*glow*.90f);
+        b=Math.round(b+(75-b)*glow*.75f);
+        r=Math.max(0,Math.min(255,r));
+        g=Math.max(0,Math.min(255,g));
+        b=Math.max(0,Math.min(255,b));
+        return (r<<24)|(g<<16)|(b<<8)|a;
+    }
+
     /** Pixmap RGBA8888; nothing may extend beyond the original PNG alpha. */
     static int pixel(int original,float armorExposure,float internalDamage,float grit) {
         int originalAlpha=original&255;
