@@ -594,10 +594,19 @@ public final class Battle {
     public int fighterGunShots,fighterLaserShots,fighterParticleShots,
                fighterMissilesLaunched,fighterTorpedoesLaunched,craftLosses;
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
+    /** Opt-in screensaver policy only. Player/campaign battles never make
+     * autonomous extraction decisions for the player's surviving ships. */
+    private boolean unattendedExhibition;
 
     public Battle(long initialSeed) { seed = initialSeed; random = new Random(initialSeed); }
     public long seed() { return seed; }
     public SpaceWeather weather() { return weather; }
+    /** Only the self-contained, unsaved exhibition simulator enables this.
+     * Must be configured before the first combat tick. */
+    public void enableUnattendedExhibition(){
+        if(tick!=0)throw new IllegalStateException("Set exhibition policy before combat");
+        unattendedExhibition=true;
+    }
     /** Select weather before step 1; default is CLEAR for backward compatibility. */
     public void configureWeather(SpaceWeather.Preset preset) {
         if (tick != 0) throw new IllegalStateException("Weather must be configured before battle starts");
@@ -1043,6 +1052,16 @@ public final class Battle {
         }
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
+            // A lone, unarmed exhibition captain with viable engines has no
+            // remaining offensive mission. Order a genuine physical extraction
+            // instead of leaving two opposing fleets alive indefinitely.
+            // No damage, simulated kills, teleport or invented terminal state.
+            if(unattendedExhibition && lastUnarmedExhibitionShip(s)){
+                s.withdrawing=true;
+                s.withdrawalTick=tick;
+                log(s.name+" disengaging: last ship has no offensive ordnance");
+                radio(s,CrewChatter.Event.RETREAT);
+            }
             // Retreat overrides waypoint queues and navigation doctrines.
             // Recharge/repair cannot reverse a committed escape under fire.
             if(s.withdrawing||(s.standingOrders!=null&&s.standingOrders.mustWithdraw(s))) {
@@ -1080,6 +1099,38 @@ public final class Battle {
         updateMissiles();
         updateBallistics();
         updateCraft();
+    }
+
+    /** Voluntary disengagement is limited to a last armed-force survivor of a
+     * screensaver fleet. All ammunition and active attack craft count. Pure
+     * support ships remain in action while escorted allies still fight. */
+    private boolean lastUnarmedExhibitionShip(Ship candidate) {
+        if(candidate.withdrawing||candidate.fuel<=0||
+                candidate.engineCondition<=0.1||candidate.crewReadiness()<0.05)
+            return false;
+        // A deliberate last stand remains an explicit order even when depleted.
+        if(candidate.orders.position()==BattleOrders.Position.LAST_STAND)
+            return false;
+        for(Ship ally:ships)
+            if(ally!=candidate && ally.team==candidate.team && ally.alive()
+                    &&!ally.withdrawing)return false;
+        if(candidate.weaponsCondition>0.05){
+            if(candidate.laserDamage>0||candidate.plasmaDamage>0||
+                    candidate.particleDamage>0||
+                    (candidate.kineticDamage>0&&candidate.kineticAmmo>0)||
+                    (candidate.missileDamage>0&&candidate.missileAmmo>0)||
+                    (candidate.torpedoDamage>0&&candidate.torpedoAmmo>0))
+                return false;
+        }
+        if(candidate.fighterReserve>0&&candidate.fighterLaunchBays>0||
+                candidate.droneReserve>0)return false;
+        for(Craft craft:crafts)
+            if(craft.sourceId==candidate.id &&!craft.repair)return false;
+        for(Missile missile:missiles)
+            if(missile.sourceId==candidate.id)return false;
+        for(Ballistic shell:ballistics)
+            if(shell.sourceId==candidate.id)return false;
+        return true;
     }
 
     /**
@@ -1160,7 +1211,10 @@ public final class Battle {
         double rcs=StrictMath.max(0.15,StrictMath.min(4.0,target.radarCrossSection));
         double radar=observer.sensorRange*observer.sensorsCondition*weather.sensorFactor()
                 *StrictMath.sqrt(StrictMath.sqrt(rcs));
-        double optical=weather.preset().includes(SpaceWeather.Kind.NEBULA)?120:210;
+        // Passive thermal/optical spotting is a physical close-contact floor,
+        // even when nebular ions blind the long-range radar. Dense nebulae
+        // remain worse than clear space, never grant remote target knowledge.
+        double optical=weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390;
         return StrictMath.max(radar,optical);
     }
     private Ship chooseTarget(Ship actor) {
