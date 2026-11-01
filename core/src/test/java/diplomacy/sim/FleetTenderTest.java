@@ -110,6 +110,8 @@ public final class FleetTenderTest {
                     "Actual live tender failed to replenish "+code);
             check(donor<beforeSource,
                     "Donor stock was not consumed "+code);
+            check(Math.abs((beforeSource-donor)-(received-original))<=1e-6,
+                    "Ammunition or fuel appeared/disappeared during transfer "+code);
             check(received<=beforeReceiver+1e-7,
                     "Tender exceeded recipient physical inventory capacity "+code);
             check(source.power<source.maxPower,
@@ -118,6 +120,62 @@ public final class FleetTenderTest {
                 check(source.fuelDelivered>0,"Propellant transfer counter missing");
             else check(source.roundsDelivered>0,"Ammunition transfer counter missing");
         }
+        // The physical fleet supply does NOT jump across the map.
+        Battle distant=new Battle(8883);
+        Shipyard.Design shells=base.install(slot(base,Shipyard.Mount.SUPPORT),"BASE-TER-KTS");
+        distant.spawnWing(0,shells,tech,1,200,300);
+        distant.spawnWing(0,target(base,"KIN"),tech,1,1020,300);
+        var farDonor=distant.ships().get(0);
+        var farTarget=distant.ships().get(1);
+        for(Battle.Ship ship:distant.ships()){ship.speed=0;ship.vx=ship.vy=0;}
+        farTarget.kineticAmmo=0;
+        for(int i=0;i<180;i++)distant.step();
+        check(farTarget.kineticAmmo==0&&farDonor.roundsDelivered==0,
+                "Tender transferred ammunition beyond fitted range");
+
+        // A physical donor cannot refuel an opponent even at close range.
+        Battle hostile=new Battle(8884);
+        Shipyard.Design tank=base.install(slot(base,Shipyard.Mount.SUPPORT),"BASE-TER-FTS");
+        hostile.spawnWing(0,tank,tech,1,300,300);
+        hostile.spawnWing(1,base,tech,1,345,300);
+        var hostileDonor=hostile.ships().get(0);
+        var enemy=hostile.ships().get(1);
+        for(Battle.Ship ship:hostile.ships()){ship.speed=0;ship.vx=ship.vy=0;}
+        enemy.fuel-=25;
+        double hostileFuel=enemy.fuel;
+        for(int i=0;i<180;i++)hostile.step();
+        check(Math.abs(enemy.fuel-hostileFuel)<=1e-7
+                        &&hostileDonor.fuelDelivered==0,
+                "Fleet tender supplied an enemy");
+
+        // Campaign purchase provisions only the paid native fuel. The tender
+        // storeroom must be refilled through the existing charged dock service.
+        var roster=CampaignFleet.startSolo(Battle.Faction.TERRAN,base,tech,914);
+        var purchased=roster.purchase(tank,tech);
+        var commissioned=purchased.ships().get(purchased.ships().size()-1);
+        double nativeFuel=diplomacy.shipyard.HullBaseline.core(tank.hull).fuel();
+        check(Math.abs(commissioned.stores().fuel()-nativeFuel)<1e-7,
+                "Purchasing a tender secretly grants its additional fuel cargo");
+        check(purchased.cost(commissioned.id(),CampaignFleet.Service.FUEL,tech)>0,
+                "Unstocked fuel tender must require paid provisioning");
+        var fueled=purchased.service(commissioned.id(),CampaignFleet.Service.FUEL,tech);
+        check(fueled.get(commissioned.id()).stores().fuel()>nativeFuel,
+                "Purchased dock fuel did not fill installed tender tanks");
+
+        // Battle stores round-trip on a serviced vessel without magically
+        // restoring spent inventory when the same physical fitting respawns.
+        var persistenceBattle=new Battle(8885);
+        persistenceBattle.spawnWing(0,shells,tech,1,300,300);
+        var persistent=persistenceBattle.ships().get(0);
+        persistent.kineticAmmo-=17;
+        persistent.fuel-=23;
+        var saved=CampaignFleet.Stores.capture(persistent);
+        var loaded=CampaignFleet.fresh(shells,tech);
+        saved.apply(loaded);
+        check(loaded.kineticAmmo==persistent.kineticAmmo
+                        &&Math.abs(loaded.fuel-persistent.fuel)<=1e-7,
+                "Fleet recovery replenished tender cargo without a purchase");
+
         // A bare unmodified hull has no logistics replenishment authority.
         Battle plain=new Battle(8882);
         plain.spawnWing(0,base,tech,1,300,300);
