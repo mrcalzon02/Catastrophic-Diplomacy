@@ -349,6 +349,7 @@ public final class FighterCraftTest {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         sensorAndArmor();
         flightWingManifest(tech);
+        CampaignFlightWingCodecTest.run(tech);
         saves(tech);
         hangarCapacityAndSorties(tech);
         for(FighterModel.Hull hull:FighterModel.Hull.values()){
