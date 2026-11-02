@@ -1,0 +1,48 @@
+name: Optional rocket versus point-defense balance ladder
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/main/java/diplomacy/sim/RocketBarrage.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/ProjectileModel.java'
+      - 'core/src/main/java/diplomacy/sim/WeaponBehaviorTable.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/test/java/diplomacy/sim/RocketPdBalanceDiagnostic.java'
+      - 'core/build.gradle'
+      - '.github/workflows/rocket-pd-balance-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  measured-rocket-pd-ladder:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.11.1' }
+      - name: Test real matched-rank weapon and defense pairs
+        id: ladder
+        continue-on-error: true
+        run: gradle --no-daemon :core:rocketPdBalanceDiagnostic
+      - name: Surface sample metrics and diagnostic outcome
+        if: always()
+        run: |
+          echo "## Rocket versus point defense" >> "$GITHUB_STEP_SUMMARY"
+          echo "Diagnostic execution: ${{ steps.ladder.outcome }} (advisory only)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/rocket-pd-balance/summary.md ]; then
+            cat core/test-output/rocket-pd-balance/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No metrics produced. Inspect the diagnostic's execution logs for the failure." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve machine-readable results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rocket-pd-matched-tier-results
+          path: core/test-output/rocket-pd-balance/
+          if-no-files-found: warn
+          retention-days: 30

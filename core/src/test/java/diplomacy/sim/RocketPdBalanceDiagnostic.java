@@ -1,0 +1,190 @@
+package diplomacy.sim;
+
+import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.TechnologyCatalog;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Non-blocking, measured 1v1 industrial balance ladder. Each side has exactly
+ * N installed weapon or PD modules, the SAME research rank and the SAME hull.
+ * The rockets still launch and collide via the real Battle code, not a Monte
+ * Carlo approximation; defender is stationary to isolate point-defense
+ * efficiency, or follows a specified 60-unit lateral evasion trajectory.
+ *
+ * The diagnostic produces CSV for future tuning and NEVER asserts a preferred
+ * win-rate, damage, interception count or relative faction advantage.
+ */
+public final class RocketPdBalanceDiagnostic {
+    private RocketPdBalanceDiagnostic() { }
+    private static final int[] TIERS={0,3,6,9};
+    private static final int[] MODULES={1,2,4};
+    private static final int REPEAT_SEEDS=3;
+    private static final int TICKS=210;
+    private static final double LAUNCH_RANGE=440;
+
+    private static void require(boolean condition,String why){
+        if(!condition)throw new IllegalStateException(why);
+    }
+    private static Shipyard.Design fitting(TechnologyCatalog catalog,
+                                           String component,int modules,int tier,
+                                           boolean defense){
+        Shipyard.Design fit=Shipyard.bareHull(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        int count=0;
+        Shipyard.Mount mount=defense?Shipyard.Mount.DEFENSE:Shipyard.Mount.WEAPON;
+        for(Shipyard.Slot slot:fit.hull.slots){
+            if(count==modules)break;
+            if(slot.mount()!=mount)continue;
+            fit=fit.install(slot.index(),"BASE-TER-"+component);
+            if(tier>0)fit=fit.stage(slot.index(),
+                    defense?Shipyard.Track.SPECIALIST:Shipyard.Track.OUTPUT,tier);
+            count++;
+        }
+        require(count==modules,"Dreadnought lacks matched real modules");
+        Shipyard.Report report=Shipyard.inspect(fit,catalog);
+        require(report.valid(),"Invalid matched rank "+tier+" fitting: "+report.explanation());
+        return fit;
+    }
+    private record Sample(String label,int tier,int modules,int barrage,
+                          RocketBarrage.Motor motor,boolean evasive,
+                          int seed,int launched,int intercepted,int collided,
+                          int pdShots,int detectionFrames,double firstDetectionSeconds,
+                          double initialPdRange,double coldDetection,double hotDetection,
+                          double damageToProtection,double targetHullLoss,
+                          double launchCostCredits,double nominalRocketSpeed,
+                          double rocketHealth,double rocketCrossSection,
+                          double rocketSignature,double pdTracking,double pdCycle,
+                          double rocketReload,double rocketSingleDamage) {
+        String csv(){
+            return String.format(Locale.ROOT,
+                    "%s,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f",
+                    label,tier,modules,barrage,motor,evasive,seed,launched,intercepted,
+                    collided,pdShots,detectionFrames,firstDetectionSeconds,initialPdRange,
+                    coldDetection,hotDetection,damageToProtection,targetHullLoss,
+                    launchCostCredits,nominalRocketSpeed,rocketHealth,rocketCrossSection,
+                    rocketSignature,pdTracking,pdCycle,rocketReload,rocketSingleDamage);
+        }
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,int seed) {
+        Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
+                size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
+                (evasive?13001:0));
+        Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
+        Shipyard.Design defensive=fitting(catalog,"PD",modules,tier,true);
+        battle.spawnWing(0,source,catalog,1,200,300);
+        battle.spawnWing(1,defensive,catalog,1,200+LAUNCH_RANGE,300);
+        Battle.Ship attacker=battle.ships().get(0),defender=battle.ships().get(1);
+        require(attacker.rocketRacks.size()==modules,
+                "Real launcher count does not match lab's mounted weapon modules");
+        require(defender.pdRange>0&&defender.pointDefenseProfile.damage()>0,
+                "Mounted point-defense modules did not create actual laser PD");
+        // Disable unrelated hull-gun/drone capabilities to isolate only the
+        // equal-numbered competing hardware. No changes to PD or rocket stats.
+        attacker.laserDamage=attacker.missileDamage=attacker.kineticDamage=0;
+        attacker.plasmaDamage=attacker.particleDamage=attacker.torpedoDamage=0;
+        attacker.pdRange=0;attacker.fighterReserve=attacker.droneReserve=0;
+        defender.laserDamage=defender.missileDamage=defender.kineticDamage=0;
+        defender.plasmaDamage=defender.particleDamage=defender.torpedoDamage=0;
+        defender.fighterReserve=defender.droneReserve=0;
+        attacker.power=attacker.maxPower=20000;
+        attacker.maxHeat=20000;attacker.heat=0;
+        defender.power=defender.maxPower=20000;
+        defender.maxHeat=20000;defender.heat=0;
+        // The laboratory explicitly PROVISIONS and BILLS kinetic stock
+        // required for simultaneous rocket launchers. A normal campaign ship
+        // still has finite, purchased ammunition and its original store limit.
+        int stockNeeded=modules*barrage*(size.ordinal()+1);
+        attacker.kineticAmmo=attacker.maxKineticAmmo=stockNeeded+16;
+        double paidFor=stockNeeded*12.0;
+        for(RocketBarrage.Rack rack:attacker.rocketRacks)
+            battle.setShipRocketBarrage(attacker.id,rack.slot,barrage,motor);
+        battle.registerDiagnosticStationaryTarget(defender.id);
+        double startHull=defender.hull,startArmor=defender.armor,
+                startShield=defender.shields;
+        int detectedFrames=0;double firstDetection=-1;
+        double coldDetection=0,hotDetection=0;
+        RocketBarrage.Rack first=attacker.rocketRacks.get(0);
+        double pdReach=defender.pdRange;
+        for(int frame=0;frame<TICKS;frame++){
+            // Test-controlled lateral evasion is fully measured and separate
+            // from captain AI. The PD ship remains physically damageable and
+            // fires ordinary point-defense hardware while its location changes.
+            if(evasive)defender.y=300+60*StrictMath.sin(frame*.055);
+            battle.step();
+            for(Battle.Rocket rocket:battle.rockets()){
+                double detection=ProjectileModel.acquisitionRange(defender.pdRange,
+                        defender.sensorsCondition,battle.weather().sensorFactor(),
+                        defender.pointDefenseProfile,rocket.spec,
+                        RocketBarrage.hotEmission(rocket.motor,rocket.burning()));
+                if(rocket.burning())hotDetection=Math.max(hotDetection,detection);
+                else coldDetection=Math.max(coldDetection,detection);
+                double dist=StrictMath.hypot(rocket.x-defender.x,rocket.y-defender.y);
+                if(dist<=detection){
+                    detectedFrames++;
+                    if(firstDetection<0)firstDetection=frame/30.0;
+                }
+            }
+        }
+        int shots=0;
+        for(Battle.VisualEvent e:battle.visualEvents())
+            if(e.phase()==Battle.VisualPhase.FIRE&&"POINT_DEFENSE".equals(e.weapon()))
+                shots++;
+        double protectionLoss=Math.max(0,startShield-defender.shields)
+                +Math.max(0,startArmor-defender.armor)
+                +Math.max(0,startHull-defender.hull);
+        return new Sample(size.name(),tier,modules,barrage,motor,evasive,seed,
+                battle.rocketRoundsFired,battle.rocketIntercepts,battle.rocketHits,
+                shots,detectedFrames,firstDetection,pdReach,coldDetection,hotDetection,
+                protectionLoss,Math.max(0,startHull-defender.hull),paidFor,
+                first.body.speed(),first.body.health(),first.body.crossSection(),
+                first.body.signature(),defender.pointDefenseProfile.tracking(),
+                defender.pdCycle,first.reloadSeconds(),first.damage);
+    }
+    public static void main(String[] args)throws IOException {
+        TechnologyCatalog tech=TechnologyCatalog.loadDefault();
+        Path output=Path.of("test-output","rocket-pd-balance");
+        Files.createDirectories(output);
+        List<String> rows=new ArrayList<>();
+        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,seed,launched,intercepted,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage");
+        int runs=0,launches=0,intercepts=0,hits=0;
+        for(RocketBarrage.Size size:RocketBarrage.Size.values())
+            for(int tier:TIERS)
+                for(int modules:MODULES){
+                    int barrage=tier==0?4:tier==3?8:tier==6?8:16;
+                    for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+                        for(boolean evasive:new boolean[]{false,true})
+                            for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                                Sample sample=run(tech,size,tier,modules,
+                                        barrage,motor,evasive,seed);
+                                rows.add(sample.csv());
+                                launches+=sample.launched;intercepts+=sample.intercepted;
+                                hits+=sample.collided;runs++;
+                            }
+                }
+        Files.write(output.resolve("ladder.csv"),rows,StandardCharsets.UTF_8);
+        String summary="# Physical rocket versus point-defense balance ladder\n\n"+
+                "- Scenarios: "+runs+" (four rocket sizes, 0/3/6/9 research ranks, "+
+                "1/2/4 equally fitted modules per side, both motors, stationary/moving, "+
+                REPEAT_SEEDS+" deterministic seeds).\n"+
+                "- Recorded launches: "+launches+", interceptions: "+intercepts+
+                ", real impacts: "+hits+".\n"+
+                "- The final late-game row includes rank-IX SIEGE batteries with "+
+                "16-round barrages against rank-IX PD of the same module count.\n"+
+                "- CSV contains the real sensor acquisition distances, interception "+
+                "shots, projectile health/speed/signature, hull and protection damage, "+
+                "and charged campaign-kinetic-equivalent ammunition credits.\n"+
+                "- Balance results are deliberately **diagnostic**. No target hit "+
+                "percentage, win rate or cosmetic change can fail a release.\n";
+        Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
+        System.out.println(summary);
+        System.out.println("ROCKET_PD_DIAGNOSTIC_CSV="+output.resolve("ladder.csv"));
+    }
+}

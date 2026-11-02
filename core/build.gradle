@@ -387,6 +387,16 @@ tasks.register('ordnanceSeekerSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.OrdnanceSeekerTest'
     dependsOn testClasses
 }
+// Non-blocking balance measurements: equal researched rocket vs PD modules.
+// No recommended ratio, tuning target, or visual threshold may block releases.
+tasks.register('rocketPdBalanceDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Measure matched-tier 1v1 rocket/laser PD results across 4 sizes, 4 tiers, 1/2/4 modules, both motors and evasion.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.RocketPdBalanceDiagnostic'
+    dependsOn testClasses
+    maxHeapSize = '512m'
+}
 tasks.register('rocketBarrageSmoke', JavaExec) {
     group = 'verification'
     description = 'Four rocket sizes, 4/8/16 physical volleys, two dumbfire motors, dodging, laser PD, finite ammo and replay.'
