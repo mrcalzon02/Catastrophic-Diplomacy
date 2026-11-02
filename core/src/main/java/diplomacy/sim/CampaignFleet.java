@@ -349,7 +349,11 @@ public final class CampaignFleet {
         private static boolean sameEquipment(Shipyard.Design old,Shipyard.Design next){
             if(old.hull!=next.hull||old.faction!=next.faction||
                     old.fighterHull!=next.fighterHull||
-                    !old.ammoSelection.equals(next.ammoSelection))return false;
+                    !old.ammoSelection.equals(next.ammoSelection)||
+                    !old.missileOrdnance.equals(next.missileOrdnance)||
+                    !old.torpedoOrdnance.equals(next.torpedoOrdnance)||
+                    !old.launcherFittings.equals(next.launcherFittings)||
+                    !old.rocketFittings.equals(next.rocketFittings))return false;
             for(int i=0;i<old.slots();i++)if(!sameModule(old.at(i),next.at(i)))return false;
             return true;
         }
