@@ -1,8 +1,9 @@
 # Dumbfire rocket barrage implementation
 
-Status: committed **source implementation**; latest Android/desktop CI acceptance and
-actual GPU screenshots remain pending. Do not call this feature fully release-
-verified until the functional suite passes on the same commit.
+Status: rocket gameplay and sensing modules have passed the shared functional suite.
+Per-hardpoint rocket blueprint persistence and shipyard controls are committed,
+with their new cross-platform functional acceptance still requiring readback on
+the implementing commit. GPU screenshots are optional diagnostics, not gates.
 
 ## Physical hardware and gameplay
 
@@ -83,9 +84,31 @@ barrage. No enemy weapon rack can be controlled.
 
 `game:rocketHudSmoke` is a functional menu test wired into
 `game:menuFlowSmoke`, with exact button hit targets and evidence that
-different physical racks retain independent settings. **Settings are currently
-per-battle and not yet persisted in the ship's blueprint.** Do not claim that
-future missions remember a custom barrage configuration.
+different physical racks retain independent settings.
+
+### Blueprint persistence and pre-battle controls (CD-SHIP-6)
+
+In the Shipyard select a physical rocket WEAPON hardpoint (RKS/RKM/RKL/RKG),
+then open **ORDNANCE** (desktop `G` or the existing touch tab). The first two
+74px-high controls select the **4/8/16** volley count and **BOOST_COAST** or
+**SUSTAINED_BURN** motor. Tracking and warhead are explicitly inertial and
+cheap kinetic stock: neither becomes an independently selectable seeker.
+Each rocket socket is always programmed independently, never through the
+guided family-wide launch settings. SAVE or APPLY carries the settings into
+future ship spawns; changes made on the *live battle HUD* remain tactical
+and do not silently rewrite a previously saved blueprint.
+
+`Shipyard.Design.withRocketBarrage(slot,count,motor)` stores only validated
+per-socket fire settings. `Shipyard.rocketRacks(...)` initializes every
+fresh per-ship physical rack from the immutable design; ammunition and reload
+remain mutable per-ship runtime state. Old `CD-SHIP-1` through `CD-SHIP-5`
+blueprints keep their original default configurations unchanged. A nondefault
+configuration uses `CD-SHIP-6` with one `R|slot|count|motor` record per
+programmed hardpoint, beside optional older `L|...` guided launcher rows.
+Invalid count, motor, duplicate socket, stale rocket hardware or crafted
+non-rocket settings are rejected. A replaced rocket hardpoint drops only its
+abandoned program. Both core rocket smoke and the existing touch-sized
+shipyard acceptance test now exercise save/reload and controls.
 
 A recently fired short-booster rocket remains thermally conspicuous while
 coasting (emission factor 1.20, compared with 2.50 under active boost); it
