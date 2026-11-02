@@ -56,7 +56,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
             double pdTracking,double pdRange) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
+                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
                 threat,pdTier,pdMounts,seed,mode,shots,primaryLaunched,
                 primaryIntercepted,terminalEntries,primaryHits,decoysLaunched,
                 decoysIntercepted,childrenLaunched,carrierSplits,
@@ -143,7 +143,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Map<Long,String> bodies=new HashMap<>();
         Set<Long> terminal=new HashSet<>();
         Set<Integer> craftTerminal=new HashSet<>();
-        int previousEventCount=0,craftLostBefore=battle.craftLosses;
+        int craftLostBefore=battle.craftLosses;
         final int observationTicks=600;
         for(int tick=0;tick<observationTicks;tick++){
             battle.step();
@@ -236,7 +236,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Path output=Path.of("test-output","pd-interception-matrix");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
-        csv.add("threat,pd_rank,pd_mounts,seed,pd_mode,pd_shots,launched,intercepted,terminal_entries,impacts,decoys,decoys_intercepted,children_launched,carriers_split,fighter_shots,fighter_ordnance_intercepted,craft_lost,fighter_shots_count,paid_units,protection_loss,power_spent_net,heat_peak,pd_tracking,pd_range");
+        csv.add("threat,pd_rank,pd_mounts,seed,pd_mode,pd_shots,launched,intercepted,terminal_entries,impacts,decoys,decoys_intercepted,children_launched,carriers_split,secondary_launched,secondary_intercepted,craft_lost,fighter_shots,paid_units,protection_loss,power_spent_net,heat_peak,pd_tracking,pd_range");
         StringBuilder summary=new StringBuilder("# Full point-defense interception matrix\n\n");
         summary.append("All results are measured in real headless 30 Hz Battle simulation. ")
                 .append("The ship-launched projectile test source is a legacy fixture; ")
