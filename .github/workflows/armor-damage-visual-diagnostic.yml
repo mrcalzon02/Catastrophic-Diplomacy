@@ -259,3 +259,35 @@ jobs:
           path: test-output/armor-observation/individual/kinetic-terran-upper-pristine/
           if-no-files-found: warn
           retention-days: 30
+      - name: Downloadable laser-terran-upper same-hull comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-laser-terran-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/laser-terran-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable laser-terran-upper-pristine same-hull comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-laser-terran-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/laser-terran-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable missile-terran-upper same-hull comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-missile-terran-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/missile-terran-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable missile-terran-upper-pristine same-hull comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-missile-terran-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/missile-terran-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
