@@ -139,7 +139,7 @@ public final class PointDefenseLoadDiagnostic {
     }
     private record Result(Load load,Threat threat,Layout layout,int pdRank,int seed,
                           boolean pdOn,int launched,int intercepted,int impacted,
-                          int timedOut,int terminal,int unresolved,int pdShots,
+                          int timedOut,int terminal,int unresolved,int naturalCraftAttrition,int pdShots,
                           int firstShots,int middleShots,int lateShots,int drainShots,
                           int firstKills,int middleKills,int lateKills,int drainKills,
                           int firstLaunched,int middleLaunched,int lateLaunched,
@@ -148,9 +148,9 @@ public final class PointDefenseLoadDiagnostic {
                           int kineticPaid,int missilePaid,int torpedoPaid) {
         String csv(){
             return String.format(Locale.ROOT,
-                    "%s,%s,%s,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.3f,%d,%d,%d,%d",
+                    "%s,%s,%s,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.3f,%d,%d,%d,%d",
                     load,threat,layout,pdRank,seed,pdOn,launched,intercepted,impacted,
-                    timedOut,terminal,unresolved,pdShots,firstShots,middleShots,
+                    timedOut,terminal,unresolved,naturalCraftAttrition,pdShots,firstShots,middleShots,
                     lateShots,drainShots,firstKills,middleKills,lateKills,drainKills,
                     firstLaunched,middleLaunched,lateLaunched,minPowerFraction,
                     peakHeatFraction,defenderHullLoss,completedTicks,kineticPaid,
@@ -204,7 +204,10 @@ public final class PointDefenseLoadDiagnostic {
         int[] firedByBand=new int[4],pdByBand=new int[4],killsByBand=new int[4];
         int pdShots=0,previousCraftKills=0;double minPower=1,peakHeat=0;
         Set<Integer> craftTerminal=new HashSet<>();
-        for(int tick=0;tick<ACTIVE+DRAIN;tick++){
+        int activeTicks=load==Load.SUSTAINED?ACTIVE:
+                load==Load.INCIDENTAL?450:36;
+        int totalTicks=activeTicks+DRAIN;
+        for(int tick=0;tick<totalTicks;tick++){
             for(int index=0;index<attackers.size();index++){
                 Source src=attackers.get(index);
                 // The source is never restocked. Gate only the installed
@@ -303,12 +306,12 @@ public final class PointDefenseLoadDiagnostic {
                 "A diagnostic source created ammunition");
         return new Result(load,threat,layout,rank,seed,pdOn,actualLaunched,
                 actualIntercepted,impactIds.size(),timeoutIds.size(),
-                actualTerminal,unresolved,pdShots,
+                actualTerminal,unresolved,naturalCraftLosses,pdShots,
                 pdByBand[0],pdByBand[1],pdByBand[2],pdByBand[3],
                 killsByBand[0],killsByBand[1],killsByBand[2],killsByBand[3],
                 firedByBand[0],firedByBand[1],firedByBand[2],
                 minPower,peakHeat,Math.max(0,originalHull-endingHull),
-                ACTIVE+DRAIN,kineticPaid,missilePaid,torpedoPaid);
+                totalTicks,kineticPaid,missilePaid,torpedoPaid);
     }
     private static boolean isPhysical(String kind){
         return "KINETIC".equals(kind)||"ROCKET".equals(kind)||
@@ -320,7 +323,7 @@ public final class PointDefenseLoadDiagnostic {
         Path out=Path.of("test-output","pd-load-profiles");
         Files.createDirectories(out);
         List<String> rows=new ArrayList<>();
-        rows.add("load,threat,pd_layout,pd_tier,seed,pd_enabled,launched,intercepted,impacted,timed_out,terminal_entries,unresolved_at_end,pd_shots,early_pd_shots,middle_pd_shots,late_pd_shots,drain_pd_shots,early_kills,middle_kills,late_kills,drain_kills,early_launched,middle_launched,late_launched,min_reactor_fraction,peak_heat_fraction,hull_damage,simulated_ticks,kinetic_units_spent,missile_units_spent,torpedo_units_spent");
+        rows.add("load,threat,pd_layout,pd_tier,seed,pd_enabled,launched,intercepted,impacted,timed_out,terminal_entries,unresolved_at_end,natural_craft_losses,pd_shots,early_pd_shots,middle_pd_shots,late_pd_shots,drain_pd_shots,early_kills,middle_kills,late_kills,drain_kills,early_launched,middle_launched,late_launched,min_reactor_fraction,peak_heat_fraction,hull_damage,simulated_ticks,kinetic_units_spent,missile_units_spent,torpedo_units_spent");
         StringBuilder summary=new StringBuilder("# Incidental, surge and sustained point-defense load\n\n");
         summary.append("One vs four independent PD controllers with the SAME four genuine installed PD modules. ")
                 .append("Baseline versus specialist IX. Two paired seeds, PD on/off; all percentages advisory. ")
@@ -366,7 +369,9 @@ public final class PointDefenseLoadDiagnostic {
                 .append(". Failures are reported, NOT release-blocking.\n")
                 .append("Incidentals are spaced by 150 ticks; surge opens four simultaneous ")
                 .append("ship launcher lanes; sustained permits real physical reloads through tick 1800 ")
-                .append("and resolves in-flight ordnance to tick 2100. Window counts are EVENT ")
+                .append("and resolves in-flight ordnance to tick 2100. Shorter incidental ")
+                .append("and surge runs each get their own 300-tick flight drain. ")
+                .append("Window counts are EVENT ")
                 .append("throughput, not cohort-matched kill rates. Projectiles not resolved by ")
                 .append("tick 960 remain explicitly counted as unresolved.\n");
         Files.write(out.resolve("profiles.csv"),rows,StandardCharsets.UTF_8);
