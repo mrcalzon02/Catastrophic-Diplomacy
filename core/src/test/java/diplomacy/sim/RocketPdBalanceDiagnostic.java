@@ -52,7 +52,7 @@ public final class RocketPdBalanceDiagnostic {
         return fit;
     }
     private record Sample(String label,int tier,int modules,int barrage,
-                          RocketBarrage.Motor motor,boolean evasive,
+                          RocketBarrage.Motor motor,boolean evasive,boolean pdOnline,
                           int seed,int launched,int intercepted,int collided,
                           int pdShots,int detectionFrames,double firstDetectionSeconds,
                           double initialPdRange,double coldDetection,double hotDetection,
@@ -63,8 +63,8 @@ public final class RocketPdBalanceDiagnostic {
                           double rocketReload,double rocketSingleDamage) {
         String csv(){
             return String.format(Locale.ROOT,
-                    "%s,%d,%d,%d,%s,%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f",
-                    label,tier,modules,barrage,motor,evasive,seed,launched,intercepted,
+                    "%s,%d,%d,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f",
+                    label,tier,modules,barrage,motor,evasive,pdOnline,seed,launched,intercepted,
                     collided,pdShots,detectionFrames,firstDetectionSeconds,initialPdRange,
                     coldDetection,hotDetection,damageToProtection,targetHullLoss,
                     launchCostCredits,nominalRocketSpeed,rocketHealth,rocketCrossSection,
@@ -73,7 +73,7 @@ public final class RocketPdBalanceDiagnostic {
     }
     private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
-                              boolean evasive,int seed) {
+                              boolean evasive,boolean pdOnline,int seed) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
@@ -94,6 +94,7 @@ public final class RocketPdBalanceDiagnostic {
         defender.laserDamage=defender.missileDamage=defender.kineticDamage=0;
         defender.plasmaDamage=defender.particleDamage=defender.torpedoDamage=0;
         defender.fighterReserve=defender.droneReserve=0;
+        if(!pdOnline)defender.pointDefenseCondition=0;
         // Preserve actual research-derived reactor power, cooling limits
         // and real fire-control condition. Artificial infinite energy would
         // hide whether the 4-vs-4 late-game siege barrage overheats its hull
@@ -145,7 +146,7 @@ public final class RocketPdBalanceDiagnostic {
         double protectionLoss=Math.max(0,startShield-defender.shields)
                 +Math.max(0,startArmor-defender.armor)
                 +Math.max(0,startHull-defender.hull);
-        return new Sample(size.name(),tier,modules,barrage,motor,evasive,seed,
+        return new Sample(size.name(),tier,modules,barrage,motor,evasive,pdOnline,seed,
                 battle.rocketRoundsFired,battle.rocketIntercepts,battle.rocketHits,
                 shots,detectedFrames,firstDetection,pdReach,coldDetection,hotDetection,
                 protectionLoss,Math.max(0,startHull-defender.hull),paidFor,
@@ -159,7 +160,7 @@ public final class RocketPdBalanceDiagnostic {
         Files.createDirectories(output);
         List<String> rows=new ArrayList<>();
         List<Sample> all=new ArrayList<>();
-        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,seed,launched,intercepted,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage");
+        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,pd_online,seed,launched,intercepted,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage");
         int runs=0,launches=0,intercepts=0,hits=0;
         for(RocketBarrage.Size size:RocketBarrage.Size.values())
             for(int tier:TIERS)
@@ -169,18 +170,28 @@ public final class RocketPdBalanceDiagnostic {
                         for(boolean evasive:new boolean[]{false,true})
                             for(int seed=0;seed<REPEAT_SEEDS;seed++){
                                 Sample sample=run(tech,size,tier,modules,
-                                        barrage,motor,evasive,seed);
+                                        barrage,motor,evasive,true,seed);
                                 rows.add(sample.csv());
                                 all.add(sample);
                                 launches+=sample.launched;intercepts+=sample.intercepted;
                                 hits+=sample.collided;runs++;
+                                // A disabled but IDENTICALLY fitted PD battery
+                                // establishes natural projectile miss and dodge
+                                // rates independently of successful interception.
+                                // One paired baseline seed per configuration
+                                // keeps the optional diagnostic quick.
+                                if(seed==0){
+                                    Sample baseline=run(tech,size,tier,modules,
+                                            barrage,motor,evasive,false,seed);
+                                    rows.add(baseline.csv());all.add(baseline);runs++;
+                                }
                             }
                 }
         Files.write(output.resolve("ladder.csv"),rows,StandardCharsets.UTF_8);
         String summary="# Physical rocket versus point-defense balance ladder\n\n"+
                 "- Scenarios: "+runs+" (four rocket sizes, 0/3/6/9 research ranks, "+
                 "1/2/4 equally fitted modules per side, both motors, stationary/moving, "+
-                REPEAT_SEEDS+" deterministic seeds).\n"+
+                REPEAT_SEEDS+" seeded live PD runs and one paired offline-PD control per configuration).\n"+
                 "- Recorded launches: "+launches+", interceptions: "+intercepts+
                 ", real impacts: "+hits+".\n"+
                 "- The final late-game row includes rank-IX SIEGE batteries with "+
@@ -202,7 +213,7 @@ public final class RocketPdBalanceDiagnostic {
                     for(Sample measure:all)
                         if(measure.label.equals("SIEGE")&&measure.tier==9&&
                                 measure.modules==modules&&measure.barrage==16&&
-                                measure.motor==motor&&measure.evasive==moving){
+                                measure.motor==motor&&measure.evasive==moving&&measure.pdOnline){
                             samples++;fired+=measure.launched;stopped+=measure.intercepted;
                             landed+=measure.collided;shots+=measure.pdShots;
                             damage+=measure.damageToProtection;
@@ -213,8 +224,10 @@ public final class RocketPdBalanceDiagnostic {
                             landed,shots,damage));
                 }
         detail.append("\nReference ratios are empirical outcomes, not pass/fail targets. "+
-                "Use the CSV to compare rocket speed, hit points and radar/thermal "+
-                "detection ranges against point-defense tracking and reload.\n");
+                "Use offline-PD control rows to separate inertial misses and "+
+                "moving-target evasions from genuine laser interception. "+
+                "Compare speed, hit points, radar/thermal acquisition envelopes "+
+                "and point-defense tracking/reload using the full CSV.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
