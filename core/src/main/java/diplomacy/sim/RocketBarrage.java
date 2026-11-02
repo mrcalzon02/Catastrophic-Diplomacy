@@ -73,6 +73,16 @@ public final class RocketBarrage {
                     StrictMath.max(.2,StrictMath.min(4,size.health*integrity)),
                     1.30+size.ordinal()*.28,size.signature);
         }
+        /** Fresh per-ship mutable magazine from a shared researched prototype.
+         * The source rack is not shared and cannot leak ammunition between
+         * 200 identical ships in a wing. */
+        public Rack(Rack from){
+            if(from==null)throw new IllegalArgumentException("Rack source missing");
+            slot=from.slot;size=from.size;body=from.body;damage=from.damage;
+            reloadSeconds=from.reloadSeconds;magazineUnitCost=from.magazineUnitCost;
+            cheapAmmoUnitsPerRocket=from.cheapAmmoUnitsPerRocket;
+            rounds=from.rounds;salvoCount=from.salvoCount;motor=from.motor;
+        }
         public void configure(int count,Motor burn){
             if(count!=4&&count!=8&&count!=16)
                 throw new IllegalArgumentException("Rocket salvo must be 4, 8 or 16 rounds");
