@@ -249,6 +249,42 @@ public final class RocketPdBalanceDiagnostic {
                 "and evasion. Offline-PD impacts represent one paired seed "+
                 "against three online seeds. The ~33% desired escape rate "+
                 "is a non-blocking balance goal, not an objective release gate.\n");
+        // Optional A/B sweep exercises real physical rockets and fitted PD.
+        // No proposed overload coefficient affects regular game battles.
+        detail.append("\n## Experimental PD track-overload sensitivity (NOT live balance)\n\n");
+        detail.append("|PD racks|Motor|Moving target|Crowd pressure|Rockets|Intercepted|Escape %|Impacts|\n");
+        detail.append("|---:|---|---|---:|---:|---:|---:|---:|\n");
+        List<String> sweep=new ArrayList<>();
+        sweep.add("modules_each,motor,evasive,pressure,launched,intercepted,escaped,escape_fraction,impacts,shots");
+        for(int modules:new int[]{1,4})
+            for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+                for(boolean moving:new boolean[]{false,true})
+                    for(double pressure:new double[]{0,0.15,0.30,0.50,0.75}){
+                        int fired=0,intercepted=0,impacted=0,shots=0;
+                        for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                            Sample sample=run(tech,RocketBarrage.Size.SIEGE,9,modules,
+                                    16,motor,moving,true,seed,pressure);
+                            fired+=sample.launched;
+                            intercepted+=sample.intercepted;
+                            impacted+=sample.collided;
+                            shots+=sample.pdShots;
+                        }
+                        double escape=fired==0?0:(fired-intercepted)/(double)fired;
+                        sweep.add(String.format(Locale.ROOT,
+                                "%d,%s,%s,%.2f,%d,%d,%d,%.6f,%d,%d",
+                                modules,motor,moving,pressure,fired,intercepted,
+                                fired-intercepted,escape,impacted,shots));
+                        if(modules==4)
+                            detail.append(String.format(Locale.ROOT,
+                                    "|%d|%s|%s|%.2f|%d|%d|%.1f%%|%d|\n",
+                                    modules,motor,moving,pressure,fired,intercepted,
+                                    escape*100,impacted));
+                    }
+        Files.write(output.resolve("saturation-sweep.csv"),sweep,StandardCharsets.UTF_8);
+        detail.append("\nThis sweep is isolated to laboratory battles and only changes "+
+                "the chance of a physical PD shot against rockets when acquired "+
+                "inbound tracks exceed four per fitted PD emitter. Its outcomes "+
+                "must be measured before enabling any pressure in actual combat.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
