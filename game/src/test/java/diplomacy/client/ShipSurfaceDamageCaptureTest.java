@@ -16,7 +16,7 @@ public final class ShipSurfaceDamageCaptureTest {
             check(scene.target()!=null,"Missing actual ship "+scene.key());
             check(scene.battle().ships().size()>=2,"No combat scene "+scene.key());
             check(scene.target().hullClass!=null,"No approved hull class "+scene.key());
-            if(i<ShipSurfaceDamageCapture.KEYS.length-1){
+            if(i!=8){
                 check(scene.battle().isDiagnosticStationaryTarget(scene.targetId()),
                         "Live-fire target was not registered as non-AI: "+scene.key());
                 check(scene.target().vx==0&&scene.target().vy==0,
@@ -27,7 +27,7 @@ public final class ShipSurfaceDamageCaptureTest {
                         scene.target().lastTargetId==0,
                         "Diagnostic target autonomously navigated or chose a target");
             }
-            if(i<ShipSurfaceDamageCapture.KEYS.length-1){
+            if(i!=8){
                 int impactMarks=0,changed=0;
                 for(int row=0;row<diplomacy.sim.DirectionalDefense.GRID;row++)
                     for(int col=0;col<diplomacy.sim.DirectionalDefense.GRID;col++){
@@ -45,10 +45,25 @@ public final class ShipSurfaceDamageCaptureTest {
             }
             if(i==0)check(scene.ticks()==0&&scene.hits()==0,
                     "Pristine reference is already battle-damaged");
-            if(i>1&&i<ShipSurfaceDamageCapture.KEYS.length-1)
+            if(i>1&&i!=8)
                 check(scene.ticks()>0,"Live-fire scenario never simulated "+scene.key());
-            if(i==ShipSurfaceDamageCapture.KEYS.length-1)
+            if(i==8)
                 check(scene.syntheticStress(),"Rectangle must be labeled as artificial stress");
+            if(i>=9){
+                diplomacy.sim.Battle.DamageType expected=switch(i){
+                    case 9 -> diplomacy.sim.Battle.DamageType.PLASMA;
+                    case 10 -> diplomacy.sim.Battle.DamageType.PARTICLE;
+                    case 11 -> diplomacy.sim.Battle.DamageType.TORPEDO;
+                    default -> diplomacy.sim.Battle.DamageType.KINETIC;
+                };
+                boolean found=false;
+                for(int row=0;row<16;row++)for(int col=0;col<16;col++){
+                    var tile=scene.target().defense.tile(row,col);
+                    if(tile.directImpact()&&tile.impactType()==expected)found=true;
+                }
+                if(scene.hits()>0&&scene.wornCells()>0)
+                    check(found,"Fitted weapon used wrong surface profile: "+scene.key());
+            }
             System.out.printf(java.util.Locale.ROOT,
                     "ARMOR-CASE %s weapon=%s seed=%d tick=%d hits=%d armor=%.4f internal=%.4f worn=%d exposed=%d milestone=%s stress=%s%n",
                     scene.key(),scene.weapon(),scene.seed(),scene.ticks(),scene.hits(),

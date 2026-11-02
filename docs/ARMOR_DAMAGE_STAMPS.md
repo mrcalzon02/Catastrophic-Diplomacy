@@ -256,3 +256,6 @@ actual impact anchor, never one cosmetic stamp per splash-eroded tile.
 The damage family is captured and persisted by DirectionalDefense; older
 untagged impacts remain on their prior generic scorch style.
 Visual inspection is a nonblocking diagnostic.
+
+### Fitted plasma/particle/torpedo/heavy-kinetic forensic captures
+Four additional deterministic no-AI firing-lane cases now fire genuine base weapon modules PLA, PAR, TOR and heavy KIN against the fixed target. Every case captures 3 true 1280x720 client frames, typed impact metadata and an individual ZIP. The old rectangle stress test remains distinct and never impersonates a real hit. An unreached milestone remains labeled as such; the artwork quality cannot block releases.

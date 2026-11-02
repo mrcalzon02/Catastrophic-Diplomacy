@@ -16,7 +16,8 @@ final class ShipSurfaceDamageCapture {
     static final String[] KEYS={
         "pristine", "shield-contact", "laser-scoring", "kinetic-impact",
         "missile-splash", "laser-repeat", "armor-breach", "structure-hit",
-        "rectangle-stress"
+        "rectangle-stress", "plasma-impact", "particle-puncture",
+        "torpedo-impact", "kinetic-heavy"
     };
     static final long SEED=202611010140L;
     record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
@@ -69,19 +70,31 @@ final class ShipSurfaceDamageCapture {
     }
     static Snapshot create(TechnologyCatalog technology,int index){
         if(index<0||index>=KEYS.length)throw new IllegalArgumentException("Unknown armor case "+index);
-        if(index==KEYS.length-1){
+        if(index==8){
             // The former 6x6-cell image is a deliberately artificial STRESS test.
             // Retain it so the workflow catches blocky-grid regressions.
             Battle stress=ShipSurfaceDamageFixture.create(technology);
             return record(KEYS[index],"KINETIC_GRID_STRESS",SEED,stress,
                     stress.ships().get(2),true,true);
         }
-        final String weapon=index==3||index==7?"KINETIC":
-                index==4?"MISSILE":"LASER";
-        final String suffix=weapon.equals("KINETIC")?"KIN":
-                weapon.equals("MISSILE")?"MSL":"LAS";
-        final Shipyard.Hull hull=index==4?Shipyard.Hull.FRIGATE:
-                index==7?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
+        final String weapon=switch(index){
+            case 3,7,12 -> "KINETIC";
+            case 4 -> "MISSILE";
+            case 9 -> "PLASMA";
+            case 10 -> "PARTICLE";
+            case 11 -> "TORPEDO";
+            default -> "LASER";
+        };
+        final String suffix=switch(weapon){
+            case "KINETIC" -> "KIN";
+            case "MISSILE" -> "MSL";
+            case "PLASMA" -> "PLA";
+            case "PARTICLE" -> "PAR";
+            case "TORPEDO" -> "TOR";
+            default -> "LAS";
+        };
+        final Shipyard.Hull hull=index==4||index==11?Shipyard.Hull.FRIGATE:
+                index==7||index==12?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
         Shipyard.Design bare=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         Shipyard.Design shooter=bare.install(firstWeaponSlot(bare),"BASE-TER-"+suffix);
         // Actual factory-fitted defenses and structural systems, but no guns:
@@ -94,12 +107,20 @@ final class ShipSurfaceDamageCapture {
         if(!Shipyard.inspect(shooter,technology).valid()||
                 !Shipyard.inspect(targetDesign,technology).valid())
             throw new IllegalStateException("Live-fire capture needs real legal fitted hulls: "+weapon+"/"+hull);
-        long seed=SEED+(weapon.equals("KINETIC")?11:weapon.equals("MISSILE")?23:0);
+        long seed=SEED+switch(weapon){
+            case "KINETIC" -> 11;
+            case "MISSILE" -> 23;
+            case "PLASMA" -> 31;
+            case "PARTICLE" -> 37;
+            case "TORPEDO" -> 41;
+            default -> 0;
+        };
         Battle battle=new Battle(seed);
         battle.spawnWing(0,shooter,technology,1,380,360);
         battle.spawnWing(1,targetDesign,technology,1,660,360);
         Battle.Ship gun=battle.ships().get(0),victim=battle.ships().get(1);
-        if(gun.laserDamage+gun.kineticDamage+gun.missileDamage<=0)
+        if(gun.laserDamage+gun.kineticDamage+gun.missileDamage+
+                gun.plasmaDamage+gun.particleDamage+gun.torpedoDamage<=0)
             throw new IllegalStateException("Live-fire shooter lacks requested fitted weapon: "+weapon);
         if(victim.laserDamage+victim.kineticDamage+victim.missileDamage+
                 victim.plasmaDamage+victim.particleDamage+victim.torpedoDamage>0)
@@ -144,6 +165,8 @@ final class ShipSurfaceDamageCapture {
                 case 5 -> battle.hitCount>=10&&armor>.10;
                 case 6 -> armor>=.72;
                 case 7 -> interior>=.01;
+                case 9,10,11 -> battle.hitCount>=1&&armor>.01;
+                case 12 -> battle.hitCount>=3&&interior>.01;
                 default -> false;
             };
             // Never fabricate a surviving ship or repair a dead target simply

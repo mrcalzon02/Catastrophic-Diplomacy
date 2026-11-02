@@ -147,3 +147,35 @@ jobs:
           path: test-output/armor-observation/individual/rectangle-stress/
           if-no-files-found: warn
           retention-days: 30
+      - name: Downloadable plasma-impact screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-plasma-impact-${{ github.run_id }}
+          path: test-output/armor-observation/individual/plasma-impact/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable particle-puncture screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-particle-puncture-${{ github.run_id }}
+          path: test-output/armor-observation/individual/particle-puncture/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable torpedo-impact screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-torpedo-impact-${{ github.run_id }}
+          path: test-output/armor-observation/individual/torpedo-impact/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-heavy screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-heavy-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-heavy/
+          if-no-files-found: warn
+          retention-days: 30
