@@ -651,6 +651,9 @@ public final class Battle {
     /** Proof counters distinguish launched fighter rounds from mere animation. */
     public int fighterGunShots,fighterLaserShots,fighterParticleShots,
                fighterMissilesLaunched,fighterTorpedoesLaunched,craftLosses;
+    /** Diagnostic counters: real PD hits and kills of hostile craft, excluding
+     * ordinary fuel expiry, voluntary docking or other combat losses. */
+    public int pointDefenseCraftHits,pointDefenseCraftKills;
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
     /** One actual close-contact spotting ship per enemy for each faction.
      * Reused every tick, so 200v200 targeting has no per-ship relay allocation. */
@@ -3381,7 +3384,10 @@ public final class Battle {
                         weather.accuracyFactor())) {
                     hitCraft(craft,defender.pointDefenseProfile.damage()*pdLaw.craftDamageMultiplier(),
                             defender,defensiveShot,"POINT_DEFENSE");
-                    if(craft.integrity<=0){crafts.remove(i);craftLosses++;}
+                    pointDefenseCraftHits++;
+                    if(craft.integrity<=0){
+                        crafts.remove(i);craftLosses++;pointDefenseCraftKills++;
+                    }
                 }
                 break;
             }
