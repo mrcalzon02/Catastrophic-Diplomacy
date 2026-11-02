@@ -93,6 +93,9 @@ public final class WeaponFxProfile {
     public static Profile forWeapon(String weapon){
         if(weapon==null)return null;
         if(LaserFamilies.fromWeapon(weapon)!=null)return forType(Battle.DamageType.LASER);
+        // Dedicated physics family, intentionally reuse authored missile
+        // muzzle flash/interception/impact sheets, never placeholder artwork.
+        if(weapon.equals("ROCKET"))return forType(Battle.DamageType.MISSILE);
         if(weapon.equals("POINT_DEFENSE"))
             return new Profile("point_defense",Motion.HITSCAN,
                     new Clip("effects/weapon_fx/laser/firing_%02d.png",8,1,false,14,14),
