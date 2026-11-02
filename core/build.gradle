@@ -52,6 +52,18 @@ tasks.register('shipyardSmoke', JavaExec) {
 }
 tasks.named('technologySmoke') { finalizedBy(tasks.named('shipyardSmoke')) }
 
+// Sensing and deception are real combat mechanics: run their physical fitting,
+// research, persistence and counter-detection checks in functional releases.
+tasks.register('sensingModulesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Nine real sensing, stealth, thermal and holo module families: fitting, save/load, and combat detection.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensingModulesTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { dependsOn(tasks.named('sensingModulesSmoke')) }
+
+
 tasks.register('hullLayoutsSmoke', JavaExec) {
     group = 'verification'
     description = 'All 11 hull classes x six factions: hardpoint positions, selection and legacy blueprint schema.'
