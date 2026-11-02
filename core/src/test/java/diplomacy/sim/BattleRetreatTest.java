@@ -19,6 +19,17 @@ public final class BattleRetreatTest {
                 "A ship escaped across the enemy's boundary");
     }
     public static void main(String[] argv)throws Exception{
+        // A commanded HOLD should arrest momentum by coasting, not
+        // continuously charge a fuel store for movement with no engine burn.
+        Battle drifting=new Battle(990L);
+        Battle.Ship inert=drifting.addShip(0,Battle.Faction.TERRAN,140,300);
+        Battle.Ship distant=drifting.addShip(1,Battle.Faction.DRAXIAN,1700,300);
+        inert.weaponsCondition=0;distant.weaponsCondition=0;
+        inert.fuel=42;inert.vx=90;
+        drifting.setShipCommandQueue(inert.id,List.of(ShipCommandQueue.Command.hold(300)));
+        for(int t=0;t<40;t++)drifting.step();
+        ok(inert.fuel==42,"A coasting HOLD command incorrectly consumes thrust fuel");
+
         Battle first=Battle.duel(991,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship ship=first.ships().get(0);
         ship.x=42;ship.y=320;ship.hull=ship.maxHull*.40;
