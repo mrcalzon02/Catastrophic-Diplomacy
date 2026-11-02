@@ -116,7 +116,57 @@ public final class BattleOrdersTest {
             throw new AssertionError("A changed orders file passed checksum validation");
         }catch(IllegalArgumentException expected){/* checksum protects source */}
     }
+    /** Real captains authorize fire in Battle, never only in menu text. */
+    private static void checkResourceOrders(){
+        var ration=ShipResourceOrders.DEFAULT
+                .withAmmunition(ShipResourceOrders.AmmoPolicy.AUTO_RATION)
+                .withReserve(0,1);
+        check(ShipFireControl.rateFraction(ration,100,100)==1.0&&
+                        ShipFireControl.rateFraction(ration,50,100)==1.0&&
+                        Math.abs(ShipFireControl.rateFraction(ration,25,100)-.5)<1e-9&&
+                        Math.abs(ShipFireControl.rateFraction(ration,10,100)-.2)<1e-9,
+                "Automatic firing ration must be continuous below 50% stock");
+        check(ShipFireControl.nextEligible(ration,25,100,2,100)==220,
+                "At 25% remaining, firing must be half the ordinary cadence");
+        check(!ShipFireControl.mayBegin(ration,true,1,100,0,1,0,0)&&
+                        !ShipFireControl.mayBegin(ration,true,9,100,5,4,0,0)&&
+                        ShipFireControl.mayBegin(ration,true,9,100,3,4,0,0),
+                "Reserved last round or pending committed salvo could be overdrawn");
+        var energyOnly=ShipResourceOrders.DEFAULT.withAmmunition(
+                ShipResourceOrders.AmmoPolicy.ENERGY_ONLY);
+        check(!ShipFireControl.mayBegin(energyOnly,true,100,100,0,1,0,0)&&
+                        ShipFireControl.mayBegin(energyOnly,false,0,0,0,0,0,0),
+                "Energy-only order must authorize energy but deny expendable ammunition");
+        var hold=energyOnly.withFireIntent(ShipResourceOrders.FireIntent.HOLD_OFFENSE);
+        check(!ShipFireControl.mayBegin(hold,false,0,0,0,0,0,0),
+                "Offensive hold cannot permit laser discharge");
+
+        Battle test=new Battle(90413L);
+        Battle.Ship attacker=test.addShip(0,Battle.Faction.TERRAN,180,340);
+        Battle.Ship victim=test.addShip(1,Battle.Faction.DRAXIAN,320,340);
+        attacker.speed=victim.speed=0;
+        attacker.kineticDamage=22;
+        attacker.kineticAmmo=8;attacker.maxKineticAmmo=8;
+        attacker.missileDamage=attacker.torpedoDamage=0;
+        victim.missileDamage=victim.kineticDamage=victim.laserDamage=0;
+        victim.plasmaDamage=victim.particleDamage=victim.torpedoDamage=0;
+        test.setTeamPointDefense(1,BattleOrders.PointDefense.HOLD_FIRE);
+        test.setShipStandingOrders(attacker.id,ShipStandingOrders.DEFAULT.withResources(energyOnly));
+        for(int i=0;i<60;i++)test.step();
+        check(attacker.kineticAmmo==8,
+                "Battle ignored energy-only captain and consumed kinetic stock");
+        check(test.visualEvents().stream().anyMatch(e->e.team()==0&&
+                        e.phase()==Battle.VisualPhase.FIRE&&e.weapon().startsWith("LASER")),
+                "Energy-only captain did not fire available real energy weapon");
+        var saveLast=ShipResourceOrders.DEFAULT.withAmmunition(
+                ShipResourceOrders.AmmoPolicy.HOLD_RESERVE).withReserve(0,1);
+        test.setShipStandingOrders(attacker.id,ShipStandingOrders.DEFAULT.withResources(saveLast));
+        for(int i=0;i<500;i++)test.step();
+        check(attacker.kineticAmmo>=1,
+                "Live salvo fire pierced the captain's protected final round");
+    }
     public static void main(String[] args){
+        checkResourceOrders();
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,
                 "PD control must cycle through all four modes");
