@@ -75,6 +75,12 @@ public final class TechnologyCatalog {
     private final Map<String, Upgrade> upgrades;
     private final Map<String, Upgrade> sixStages;
     private final boolean deferredHigherStages;
+
+    private static final List<String> VARIANT_FACTIONS=List.of(
+            "TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB");
+    private static final List<String> VARIANT_TRACKS=List.of(
+            "OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST");
+    private static final int VIRTUAL_SURVIVAL_NODES=48*11*4*9;
     private final int upgradeTotal;
     private final Set<String> components;
     private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base,
@@ -92,7 +98,8 @@ public final class TechnologyCatalog {
                     throw new IllegalArgumentException("Missing fifth-stage source "+item.id);
                 finalBranches++;
             }
-        upgradeTotal=Math.addExact(map.size(),Math.multiplyExact(finalBranches,3));
+        upgradeTotal=Math.addExact(Math.addExact(map.size(),Math.multiplyExact(finalBranches,3)),
+                generateHigherStages?VIRTUAL_SURVIVAL_NODES:0);
         upgrades=generateHigherStages?Collections.unmodifiableMap(new LazyUpgrades()):
                 sixStages;
         baseComponents=Collections.unmodifiableMap(base);
@@ -101,6 +108,8 @@ public final class TechnologyCatalog {
     public int upgradeCount() { return upgradeTotal; }
     public int componentCount() { return components.size(); }
     public Upgrade get(String id) {
+        Upgrade virtual=survivalVariantUpgrade(id);
+        if(virtual!=null)return virtual;
         Upgrade found=sixStages.get(id);
         if(found!=null||!deferredHigherStages||id==null||id.length()<4)return found;
         int end=id.length();
@@ -133,6 +142,42 @@ public final class TechnologyCatalog {
         cells.add(stageSix.tradeoff+"; higher-stage engineering and upkeep");
         return new Upgrade(cells);
     }
+
+    /** All nine ranks have their own IDs, costs and precursor chain while
+     * inheriting the original branch's balanced physical multiplier curve. */
+    private Upgrade survivalVariantUpgrade(String id){
+        if(!deferredHigherStages||id==null)return null;
+        String[] parts=id.split("-",5);
+        if(parts.length!=5||!"TECH".equals(parts[0])||
+                !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
+                !parts[4].matches("0[1-9]"))return null;
+        SurvivalHardwareCatalog.Variant v=SurvivalHardwareCatalog.findVariant(parts[2]);
+        if(v==null||!baseComponents.containsKey("BASE-"+parts[1]+"-"+v.code()))
+            return null;
+        int stage=parts[4].charAt(1)-'0';
+        Upgrade source=get("TECH-"+parts[1]+"-"+v.root()+"-"+
+                parts[3]+"-"+parts[4]);
+        if(source==null)return null;
+        String predecessor=stage==1?"BASE-"+parts[1]+"-"+v.code():
+                "TECH-"+parts[1]+"-"+v.code()+"-"+parts[3]+"-"+
+                        String.format(Locale.ROOT,"%02d",stage-1);
+        long research=Math.round(source.researchCost*v.price());
+        long industry=Math.round(source.industryCost*v.price());
+        if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
+            throw new IllegalArgumentException("Technology cost overflow "+id);
+        ArrayList<String> cells=new ArrayList<>(COLS);
+        Collections.addAll(cells,id,parts[1],v.code(),parts[3],
+                Integer.toString(stage),v.name()+" / "+parts[3]+" "+stage,
+                predecessor,Long.toString(Math.max(1,research)),
+                Long.toString(Math.max(1,industry)));
+        for(double multiplier:new double[]{source.mass,source.power,source.heat,
+                source.output,source.accuracy,source.integrity,source.shield,
+                source.thrust,source.cooling,source.maintenance})
+            cells.add(ratio(multiplier,1));
+        cells.add(v.name()+": "+source.tradeoff);
+        return new Upgrade(cells);
+    }
+
     public boolean hasBase(String id) { return components.contains(id); }
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
@@ -147,6 +192,13 @@ public final class TechnologyCatalog {
                 String stem=u.id.substring(0,u.id.length()-2);
                 ids.add(stem+"07");ids.add(stem+"08");ids.add(stem+"09");
             }
+        if(deferredHigherStages)
+            for(String faction:VARIANT_FACTIONS)
+                for(SurvivalHardwareCatalog.Variant variant:SurvivalHardwareCatalog.VARIANTS)
+                    for(String track:VARIANT_TRACKS)
+                        for(int rank=1;rank<=9;rank++)
+                            ids.add("TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
+                                    String.format(Locale.ROOT,"%02d",rank));
         if(ids.size()!=upgradeTotal)
             throw new IllegalStateException("Virtual stage count mismatch");
         return ids;
@@ -169,6 +221,7 @@ public final class TechnologyCatalog {
                                 sixStages.values().iterator();
                         private Upgrade nextBranch;
                         private int higher=7;
+                        private int virtualIndex=0;
                         @Override public boolean hasNext(){
                             if(early.hasNext())return true;
                             if(nextBranch!=null&&higher<=9)return true;
@@ -176,15 +229,29 @@ public final class TechnologyCatalog {
                                 Upgrade test=branch.next();
                                 if(test.stage==6){nextBranch=test;higher=7;return true;}
                             }
-                            return false;
+                            return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES;
                         }
                         @Override public Entry<String,Upgrade> next(){
                             if(early.hasNext())return early.next();
                             if(!hasNext())throw new NoSuchElementException();
-                            Upgrade value=TechnologyCatalog.this.get(
-                                    nextBranch.id.substring(0,nextBranch.id.length()-2)+
-                                    "0"+higher++);
-                            return new SimpleImmutableEntry<>(value.id,value);
+                            if(!hasNext())throw new NoSuchElementException();
+                            if(nextBranch!=null&&higher<=9){
+                                Upgrade value=TechnologyCatalog.this.get(
+                                        nextBranch.id.substring(0,nextBranch.id.length()-2)+
+                                        "0"+higher++);
+                                return new SimpleImmutableEntry<>(value.id,value);
+                            }
+                            int n=virtualIndex++,stage=n%9+1;
+                            n/=9;
+                            String track=VARIANT_TRACKS.get(n%4);
+                            n/=4;
+                            String code=SurvivalHardwareCatalog.VARIANTS.get(
+                                    n%SurvivalHardwareCatalog.VARIANTS.size()).code();
+                            n/=SurvivalHardwareCatalog.VARIANTS.size();
+                            String id="TECH-"+VARIANT_FACTIONS.get(n)+"-"+code+"-"+
+                                    track+"-"+String.format(Locale.ROOT,"%02d",stage);
+                            Upgrade value=TechnologyCatalog.this.get(id);
+                            return new SimpleImmutableEntry<>(id,value);
                         }
                     };
                 }
@@ -217,6 +284,7 @@ public final class TechnologyCatalog {
             addSensingFamilies(bases,rows);
             addSensingHardwareVariants(bases,rows);
             addSurvivalAndUnsafeFamilies(bases,rows);
+            addSurvivalHardwareVariants(bases);
             addDumbfireRocketFamilies(bases,rows);
             // Ranks VII-IX are synthesized on demand. No 13,200 extra
             // temporary CSV arrays/strings retained at Android startup.
@@ -765,6 +833,32 @@ public final class TechnologyCatalog {
                         .replace("-"+parent,"-"+code));
                 row.set(19,family.name()+": "+row.get(19));
                 upgrades.add(row);
+            }
+        }
+    }
+
+
+    /** Generate 528 physical bases but resolve variant research lazily on
+     * Android's constrained 16 MiB Java heap. */
+    private static void addSurvivalHardwareVariants(List<List<String>> bases){
+        List<List<String>> original=List.copyOf(bases);
+        for(SurvivalHardwareCatalog.Variant v:SurvivalHardwareCatalog.VARIANTS){
+            for(int i=1;i<original.size();i++){
+                List<String> parent=original.get(i);
+                if(!v.root().equals(parent.get(2)))continue;
+                List<String> row=new ArrayList<>(parent);
+                row.set(0,row.get(0).replace("-"+v.root(),"-"+v.code()));
+                row.set(2,v.code());row.set(3,v.name());
+                row.set(5,"Native "+v.name()+"; tier "+v.requiredTier());
+                row.set(6,ratio(Double.parseDouble(row.get(6)),v.mass()));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),v.power()));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),v.heat()));
+                row.set(9,ratio(Double.parseDouble(row.get(9)),v.integrity()));
+                row.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(row.get(10))*v.price()))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),v.performance()));
+                row.set(12,"Physical survival alternative; separate IX-rank research");
+                bases.add(row);
             }
         }
     }
