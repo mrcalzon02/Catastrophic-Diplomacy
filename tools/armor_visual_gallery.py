@@ -152,6 +152,33 @@ try:
 except StopIteration:
     warnings.append("No comparable same-hull pristine and laser surface captures")
 
+# Exact real coefficient pixels uploaded to the material shader, separate
+# from any apparent difference caused by dark plating or engine glow.
+# These are cropped GPU mask observations; not synthetic hit marks.
+channel_coverage=[]
+for key in keys:
+    path=root/(key+"-mask-coefficients.png")
+    if not path.exists():continue
+    with Image.open(path) as original:
+        pixels=original.convert("RGBA")
+        dark=hot=metal=opening=0
+        for red,green,blue,alpha in pixels.getdata():
+            dark+=(red>12)
+            hot+=(green>12)
+            metal+=(blue>12)
+            opening+=(alpha<243)
+        item={"scenario":key,"dirty_mask_width":pixels.width,
+              "dirty_mask_height":pixels.height,
+              "dark_pixels":dark,"heated_edge_pixels":hot,
+              "bright_metal_pixels":metal,"real_opening_pixels":opening}
+        channel_coverage.append(item)
+        print(f"ARMOR-MATERIAL {key} dark={dark} heat={hot} "
+              f"metal={metal} opening={opening}")
+(out/"damage-channels-report.json").write_text(
+    json.dumps({"schema":"cd-armor-channels-v1",
+                "note":"Real R/G/B/A GPU mask dirty-region coverage; cosmetic evidence only",
+                "nonblocking":True,"observations":channel_coverage},
+               indent=2)+"\n",encoding="utf8")
 report={
     "schema":"cd-armor-review-v2",
     "original_framebuffers":len(rows),
@@ -163,7 +190,8 @@ report={
     "visual_approval":"NOT_ASSESSED",
     "warnings":warnings,
     "observations":rows,
-    "contrast_pairs":contrast_metrics
+    "contrast_pairs":contrast_metrics,
+    "material_mask_channels":channel_coverage
 }
 (out/"armor-review.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf8")
 (out/"armor-review-warnings.txt").write_text(
