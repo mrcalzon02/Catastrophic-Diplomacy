@@ -322,6 +322,11 @@ public final class PointDefenseLoadDiagnostic {
         for(Battle.Ship defender:guard)endingHull+=defender.hull;
         check(actualLaunched>0,"No actual paid projectile or fitted craft launched");
         check(pdOn||pdShots==0,"PD shots while defensive system was ordered HOLD_FIRE");
+        for(long interceptedId:interceptIds)
+            check(launchIds.contains(interceptedId),
+                    "An intercepted projectile was missing its physical FIRE "+
+                    "event: shotId="+interceptedId+" load="+load+
+                    " threat="+threat);
         check(actualIntercepted<=actualLaunched,
                 "Intercept count exceeds launched physical bodies or craft: "+
                         "launchEvents="+launchIds.size()+" craftLaunched="+
