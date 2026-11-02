@@ -467,6 +467,17 @@ tasks.register('survivalModulesSmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.named('gameFlowSmoke') { dependsOn(tasks.named('survivalModulesSmoke')) }
+// Java heap budget from the actual Android emulator OOM trace (16 MiB).
+// A full catalog must load and provide all rank IDs under this cap.
+tasks.register('technologyHeapSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Require complete 39,600-upgrade technology startup within a 16 MiB JVM heap.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.TechnologyHeapSmokeTest'
+    maxHeapSize = '16m'
+}
+tasks.named('gameFlowSmoke') { dependsOn(tasks.named('technologyHeapSmoke')) }
 // Verify all guided salvos and physical flight during functional releases.
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
 
