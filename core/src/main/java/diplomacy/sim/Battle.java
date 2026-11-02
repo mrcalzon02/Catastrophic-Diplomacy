@@ -1233,6 +1233,24 @@ public final class Battle {
         if(s.hull<=0)destroyHull(s,null);
     }
 
+    /** No random stock destruction, phantom refills or global armor bypass.
+     * Real armor/shield resolution has already supplied penetratingDamage. */
+    static void breachStores(Ship ship,DamageType kind,double penetratingDamage,
+                             boolean magazineImpact){
+        if(ship==null||kind==null||penetratingDamage<=6)return;
+        double wound=StrictMath.min(.25,penetratingDamage/
+                StrictMath.max(1,ship.maxHull)*(magazineImpact?.65:.30));
+        ship.fuel=StrictMath.max(0,ship.fuel-
+                ship.maxFuel*wound*(1-ship.fuelProtection));
+        double exposed=wound*(1-ship.magazineContainment);
+        ship.kineticAmmo=StrictMath.max(0,ship.kineticAmmo-
+                (int)StrictMath.floor(ship.maxKineticAmmo*exposed*.42));
+        ship.missileAmmo=StrictMath.max(0,ship.missileAmmo-
+                (int)StrictMath.floor(ship.maxMissileAmmo*exposed*.75));
+        ship.torpedoAmmo=StrictMath.max(0,ship.torpedoAmmo-
+                (int)StrictMath.floor(ship.maxTorpedoAmmo*exposed*.90));
+    }
+
     private void destroyHull(Ship defender,Ship attacker) {
         if(defender.retired)return;
         defender.hull=0;defender.retired=true;destructions++;
@@ -3056,6 +3074,10 @@ public final class Battle {
             defender.power -= Math.min(defender.power, fieldAbsorb * 0.6);
             damage -= fieldAbsorb;
         }
+        // Interior stores are exposed only after actual plate penetration.
+        // Vault containment and armored bunkers mitigate finite stock losses.
+        breachStores(defender,kind,damage,
+                defender.installedSubsystems.get(point.slotIndex())==Subsystem.MAGAZINE);
         defender.hull -= damage;
         radio(defender,CrewChatter.Event.DAMAGE);
         if(defender.fittedCrewSystems){

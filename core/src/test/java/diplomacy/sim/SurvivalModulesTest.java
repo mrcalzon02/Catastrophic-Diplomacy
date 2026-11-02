@@ -69,6 +69,29 @@ public final class SurvivalModulesTest {
                 check(blocked,"Premature skirmish unlock "+id);
             }
         }
+        Shipyard.Design bunker=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
+                "BASE-TER-FBN");
+        Shipyard.Design vault=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
+                "BASE-TER-AMV");
+        Battle storeBattle=new Battle(942L);
+        storeBattle.spawnWing(0,empty,catalog,1,100,100);
+        storeBattle.spawnWing(0,bunker,catalog,1,100,200);
+        storeBattle.spawnWing(0,vault,catalog,1,100,300);
+        Battle.Ship ordinary=storeBattle.ships().get(0);
+        Battle.Ship armoredFuel=storeBattle.ships().get(1);
+        Battle.Ship isolatedMag=storeBattle.ships().get(2);
+        double fuelFraction=ordinary.fuel/ordinary.maxFuel;
+        Battle.breachStores(ordinary,Battle.DamageType.TORPEDO,250,true);
+        Battle.breachStores(armoredFuel,Battle.DamageType.TORPEDO,250,true);
+        Battle.breachStores(isolatedMag,Battle.DamageType.TORPEDO,250,true);
+        check(armoredFuel.fuel/armoredFuel.maxFuel>ordinary.fuel/ordinary.maxFuel,
+                "Armored bunker failed to protect finite propellant");
+        check(isolatedMag.missileAmmo/(double)isolatedMag.maxMissileAmmo>
+                ordinary.missileAmmo/(double)ordinary.maxMissileAmmo,
+                "Magazine vault failed to limit actual ammunition losses");
+        check(fuelFraction>ordinary.fuel/ordinary.maxFuel,
+                "Penetrating torpedo strike must remove some unprotected fuel");
+
         Shipyard.Design illegal=empty.install(socket(empty.hull,Shipyard.Mount.SYSTEM),
                 "BASE-TER-IBR");
         Battle a=new Battle(45998L),b=new Battle(45998L);
