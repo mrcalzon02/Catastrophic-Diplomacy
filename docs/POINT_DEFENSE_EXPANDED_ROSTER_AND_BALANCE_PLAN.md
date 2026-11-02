@@ -37,10 +37,12 @@ are separate outcomes in telemetry and gameplay.
   derived from higher-stage ancestors. Integrate any new subsystem without
   breaking original blueprint and research IDs.
 
-## Expanded roster — nine hard-kill families, three soft-kill families
+## Point-defense weapon roster — seven hard-kill families
 
-Family codes below are **proposed**; do not add purchasable components before
-their functional interception mechanism exists.
+PD and FLK already exist. The remaining five codes are proposed **point-defense
+weapons**; do not add a purchasable component before its own physical
+interception mechanism is functional. This section excludes ECM, fighter
+craft, decoys and ship armor.
 
 | Code | Type | Mechanics that must genuinely differ | Primary jobs | Vulnerabilities |
 |---|---|---|---|---|
@@ -50,15 +52,31 @@ their functional interception mechanism exists.
 | RPD | Railgun interceptor | Very fast small solid penetrator, prediction/lead and long charge cycle | Fast large shells, tough torpedoes, large missiles | Small swarms and lateral juking; low shots per second |
 | PPD | Particle-beam PD | Accurate armor-ablation beam with longer dwell and expensive continuous energy | Armored torpedoes, hardened missiles, medium craft | Micro swarms, heat/continuous power, rapid target switching |
 | PLS | Plasma burst projector | Short-range expanding, dispersing plasma cone; decaying energy volume | Dense rocket salvo, slow close clusters, near-range craft | Fast tiny shells, distant threats, heavy shielding; severe heat |
-| PRX | Reactive fragmentation curtain | Last-ditch timed proximity countercharges, very short radial burst volume | Multiple leakers at the inner ring, emergency fighter pass | Distant threats, sustained fire and finite charges; severe proximity limitations |
 | IMD | Guided interceptor missile cell | Genuine long-range counter-missile; launch/reload ammo, guidance, warhead and minimum arming distance | Heavy torpedoes, big guided missiles, distant high-value tracks | Micro missiles, decoys, short-range rockets, repeated cheap barrages |
-| DFI | Defensive interceptor drone squad | Actual finite-fuel craft patrol/engage, per-craft lifetime and service capacity | Outer screen vs fighters, larger missiles and flanking launches | High-speed kinetic, tight terminal approach, attrition/repair costs |
-| EMP | Ion/EMP disruptor | Sensor/flight-control disable or guidance degradation, no false destruction | Guided missiles, powered drones/fighters, terminal seeker disruption | Unguided kinetic, coasting rockets, hardened electronics |
-| ECM | Electronic countermeasure suite (existing) | Targeted seeker lock-break/jamming, active signature and sensor competition | Guided missiles, smart torpedoes, hostile targeting | Dumbfire rockets, unguided kinetics, inertial terminal legs |
-| DCO | Decoy/chaff/IR dispenser | Real finite expendable decoy bodies and optical/radar/IR signatures that redirect lock | Seeker-driven missiles and torpedoes; tactical withdrawal | Physical inertial ordnance, seekers with discrimination, depleted stock |
 
-A fighter carrier with a real combat air patrol is an **additional fleet-scale
-defensive layer**, not a free interchangeable point-defense weapon module.
+### Other defense systems: separate scope
+
+- **Electronic countermeasures (ECM)** already have their own planned system.
+  They are not point-defense gun modules; no redesign is authorized here.
+- **Chaff, flares and IR/radar decoy dispensers** belong in that existing
+  electronic-countermeasures section. Their implementation status needs a
+  separate audit; do not claim that they are already working.
+- **Defensive drones are fighter/craft assets**, not eligible in this PD
+  weapon roster. They belong to the hangar, fighter and drone system.
+- **Reactive armor and reactive countercharges** are protection/armor
+  mechanics, not a new point-defense weapon class. The proposed reactive
+  fragmentation curtain is removed from this PD plan.
+- **Dedicated EMP disruptors are not included.** Any EMP arising from
+  nuclear area-denial weapons belongs to the ordnance/area-effects design,
+  not to a new PD gun.
+- **Guided interceptor missile cells (IMD) remain part of this roster.**
+  Unlike ordinary offensive missile racks, they use paid, finite counter-
+  missile stocks to engage hostile physical ordnance. They must have
+  physical flight, sensors, guidance, reload, and arming limitations.
+
+This hard-kill roster contains seven weapon families: PD, FLK, RCW, RPD,
+PPD, PLS, and IMD. Other fleet defenses can still operate alongside them
+without being silently counted as point-defense weapons.
 
 ## Suggested relative effectiveness matrix
 
@@ -74,17 +92,12 @@ A defense can be H against an isolated threat yet fail under saturation.
 | RPD rail interceptor | H | L | X | M | H | L | L |
 | PPD particle beam | M | L | L | M | H | M | M |
 | PLS plasma burst | X | H | H | M | L | M | M |
-| PRX terminal curtain | L | M | H | M | L | M | M |
 | IMD interceptor missile | L | X | X | H | H | M | L |
-| DFI defense drones | X | L | L | M | M | H | H |
-| EMP ion field | X | X | M | H | M | H | H |
-| ECM jamming | X | X | M | H | H | M | M |
-| DCO decoys | X | X | L | H | H | L | L |
 
-**Caveat:** soft-kill H means **mission failure, missed target, or diversion**
-rather than physical projectile destruction. Flak and plasma may hurt grouped
-targets through one burst, but they must not be granted false instant hits.
-No automated coverage rating should average all outcomes as if identical.
+**Caveat:** H/M/L/X here describe proposed **physical interception roles**, not
+ECM guidance disruption. Flak and plasma may hit grouped physical bodies via
+real timed proximity effects, never false instant multi-target eliminations.
+Do not combine physical kills and guided-ordnance diversion into one percentage.
 
 ## Proposed base effective range envelopes, world units
 
@@ -100,12 +113,7 @@ The following are initial design envelopes, **not existing implementation**:
 | RPD | 120–335 | Charge/lead and point blank | Power, cooldown |
 | PPD | 90–275 | Dwell and optical lock | Reactor and cooling |
 | PLS | 20–115 | Short-range thermal burst | Heat, poor reach |
-| PRX | 8–70 | Explicit last line | Finite countercharge magazine |
 | IMD | 180–480 | 70-unit minimum arming radius | Ammo cost, guidance |
-| DFI | 95–420 patrol radius | Launch/service delay | Fuel, hangar/decks |
-| EMP | 60–195 | Electronics only | Charging, hardening |
-| ECM | 150–500 sensing/lock cone | No effect on inertial threats | Power, sensor/signal strength |
-| DCO | 30–230 seeker distraction | Requires lock susceptibility | Countermeasure ammo |
 
 Range falls with damaged sensors, weather, and hostile low-observable
 signatures; it does not become an artificial fixed detection circle. Shield
@@ -124,8 +132,10 @@ For each **physical weapon loadout** and **each defense family**, measure:
 Also vary **attack count** (1 incidental, 4/8/16 burst, multi-ship saturation),
 **defense composition** (1 mount, 4 homogeneous mounts, 2+2 mixed, 4
 independent ships), target maneuver and approach vector, radar/IR concealment,
-near/mid/far engagement, finite magazines, active ECM/decoys, and sustained
-real reloads. Do not equate four installed mounts with four independent ships.
+near/mid/far engagement, finite magazines and sustained real reloads.
+A separate combined-arms validation pass may include existing ECM, decoys
+and fighter wings, but their non-PD interventions must be measured separately.
+Do not equate four installed mounts with four independent ships.
 
 A representative threat set:
 - kinetic standard/AP/frag/HE/relativistic;
@@ -149,9 +159,9 @@ Use physical constraints for anti-universality:
   seeker quality, salvo composition, projectile durability and attack angles.
 - Area effects require actual radius, flight, burst timing and friendly/neutral
   safety rules; submunitions have unique IDs and may be shot individually.
-- Soft-kill has a distinct **LOCK_BROKEN / DIVERTED / DISABLED** outcome; it
-  cannot count toward physical KILLED. Decoy missiles and fake returns cost
-  actual stocks and may occupy defensive tracks.
+- **LOCK_BROKEN / DIVERTED** outcomes belong to separate electronic warfare
+  diagnostics and must never be counted as PD projectile kills. Any chaff,
+  flare, and decoy usage must be charged to its separate physical inventory.
 - Priority rules must value *expected harm*, *time to impact*, and *chance
   of completing an effective interception*; prevent defenses wasting
   premium interceptor ammo on harmless, already-missing contacts.
@@ -163,7 +173,8 @@ Use physical constraints for anti-universality:
 
 1. **Instrumentation and inventory.** Per-emitter ID, mounted family, slot,
    research tier/track; physical attack ID and per-family engagement counters.
-   Maintain the existing PD/FLK/ECM/DRN functionality.
+   Maintain existing PD/FLK behavior while separating it; ECM, craft/drone
+   and armor code stays out of scope.
 2. **De-aggregate existing PD and FLK.** Separate independent physical
    firing states, targeting, valid targets, hit/damage logic, ranges and
    proper flak burst/fragmentation. No damage model swap for unrelated
@@ -171,21 +182,20 @@ Use physical constraints for anti-universality:
 3. **Add RCW and RPD**, including real projectiles, ammunition budgets and
    multi-target selection. Add new technology components only when
    gameplay and rendering are functional.
-4. **Add PPD/PLS/PRX** with finite energy/area/thermal mechanics.
-5. **Add IMD/DFI**, real missiles or craft, magazine/hangar refit,
-   sensor fusion, and per-body engagement.
-6. **Enhance EMP/ECM/DCO** separately: guidance disruption, decoy redirection
-   and seeker hardening without false physical kill counts.
-7. **Full 12-family × weapons × tech × approach × load experiment** with
-   both actual damage prevention and physical/soft-kill accounting.
-8. **Fleet integration and cost parity**: mixed complement tests, 200-vs-200
-   performance diagnostics, save/load/backward-compatibility and mobile
-   touch-menu regression.
+4. **Add PPD and PLS** with real energy/volume interaction and thermal constraints.
+5. **Add IMD**: guided counter-missiles, physical magazine, reload and arming,
+   target acquisition, and per-projectile intercept accounting.
+6. **Full seven-family × weapons × tech × approach × load experiments**
+   measuring actual interception, damage prevented and cost-effectiveness.
+7. **Fleet integration and cost parity**: mixed guns, 200-vs-200 performance,
+   save/load/backward compatibility and responsive mobile UI regression.
+   Run separate combined-arms tests with existing ECM/craft as needed.
 
-Track physical intercept-before-terminal-entry, terminal-ring breach,
-post-entry kill, actual impact and shield/armor/hull loss, lock diversion,
-jamming, point-defense shot and ammo cost, reactor/heat load, turret busy
-fraction, and expected credits of protection per credit of defense.
+Track physical interception before terminal entry, terminal-ring breaches,
+post-entry interceptions, actual impacts and shield/armor/hull damage,
+point-defense shots, ammunition cost, power, heat, turret busy time,
+and credits of damage prevented per credit of defense. Keep lock diversion
+and jamming as **separate ECM outcomes**, not point-defense physical kills.
 
 **Release policy:** cosmetic/visual/balance/stylistic thresholds remain
 advisory diagnostics only. Objective build/install/launch/run, save
@@ -194,5 +204,5 @@ Do not convert a proposed target band into a release gate.
 
 **Immediate practical step:** implement distinct PD-versus-FLK behavior
 and verify it with matched *actual installed* PD/FLK fittings before
-declaring any of the ten new concepts operational. The catalogue entries
+declaring any of the five newly proposed weapon concepts operational. The catalogue entries
 alone do not count as a working weapon.
