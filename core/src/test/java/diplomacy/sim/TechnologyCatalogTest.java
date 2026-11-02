@@ -13,8 +13,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 41184, "full technology count with survival research");
-        require(c.componentCount() == 1144, "all base components including survival hardware");
+        require(c.upgradeCount() == 60192, "full technology count with survival research");
+        require(c.componentCount() == 1672, "all base components including survival hardware");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -61,6 +61,25 @@ public final class TechnologyCatalogTest {
                         require(c.get("TECH-"+faction+"-"+model.code()+"-"+track+"-"+
                                 String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
                                 "Missing variant research "+id+" "+track+" "+rank);
+            }
+
+            for(var variant:SurvivalHardwareCatalog.VARIANTS){
+                String id="BASE-"+faction+"-"+variant.code();
+                var parent=c.base("BASE-"+faction+"-"+variant.root());
+                require(parent!=null&&c.base(id)!=null &&
+                        parent.category.equals(c.base(id).category),
+                        "Survival variant lacks a valid native parent socket "+id);
+                for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int stage=1;stage<=9;stage++){
+                        String tech="TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",stage);
+                        var value=c.get(tech);
+                        require(value!=null&&value.stage==stage&&
+                                value.prerequisite.equals(stage==1?id:
+                                        "TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
+                                        String.format(java.util.Locale.ROOT,"%02d",stage-1)),
+                                "Broken independent survival research "+tech);
+                    }
             }
             for(var family:SurvivalHardwareCatalog.FAMILIES){
                 String baseId="BASE-"+faction+"-"+family.code();
@@ -117,7 +136,7 @@ public final class TechnologyCatalogTest {
             }
             enumerated++;
         }
-        require(enumerated==c.upgradeCount() && highestStages==13728,
+        require(enumerated==c.upgradeCount() && highestStages==20064,
                 "Lazy technology enumeration missed or duplicated a stage");
         TechnologyCatalog.Upgrade sixth=c.get("TECH-TER-KIN-OUTPUT-06");
         TechnologyCatalog.Upgrade ninth=c.get("TECH-TER-KIN-OUTPUT-09");
