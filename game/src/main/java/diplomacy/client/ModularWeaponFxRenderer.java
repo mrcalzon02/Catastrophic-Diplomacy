@@ -257,6 +257,27 @@ final class ModularWeaponFxRenderer implements Disposable {
                     style.width(),style.height(),angle);
             batch.setColor(1,1,1,1);
         }
+        // Independent no-seeker ROCKET projectile pass. One archived missile
+        // atlas, zero new texture instances, exact live burn and coast phase.
+        // Point defense deletes real bodies; no synthetic flight tween exists.
+        TextureRegion[] rocketAtlas=missileBodies();
+        for(Battle.Rocket rocket:battle.rockets()){
+            RocketPayloadVisual.Appearance style=RocketPayloadVisual.forRocket(rocket);
+            if(view!=null&&!view.circle((float)rocket.x,(float)rocket.y,
+                    CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f))
+                continue;
+            Texture fallback=rocketAtlas==null?texture(GuidedPayloadVisual.GUIDED):null;
+            if(rocketAtlas==null&&fallback==null)continue;
+            float heading=(float)StrictMath.toDegrees(rocket.heading);
+            batch.setColor(style.red(),style.green(),style.blue(),1f);
+            if(rocketAtlas!=null)
+                drawCentered(batch,rocketAtlas[style.cell()],
+                        (float)rocket.x,(float)rocket.y,
+                        style.width(),style.height(),heading);
+            else drawCentered(batch,fallback,(float)rocket.x,(float)rocket.y,
+                    style.width(),style.height(),heading);
+            batch.setColor(1,1,1,1);
+        }
         // Slow ballistic PAYLOADs use their real collision-tested world positions.
         // The atlas frame is oriented by immutable launch velocity, not a fake
         // interpolation between origin and target that would conceal PD hits.
@@ -286,6 +307,9 @@ final class ModularWeaponFxRenderer implements Disposable {
 
     boolean hasLaserBeam(Battle.Beam beam,long tick){return lasers.handles(beam,tick);}
 
+    boolean hasRocketPayload(){
+        return missileBodies()!=null||texture(GuidedPayloadVisual.GUIDED)!=null;
+    }
     /** A missing ballistic payload also keeps live, positioned fallback geometry. */
     public boolean hasBallisticPayload(Battle.Ballistic shell,long tick){
         Profile kinetic=WeaponFxProfile.forType(Battle.DamageType.KINETIC);

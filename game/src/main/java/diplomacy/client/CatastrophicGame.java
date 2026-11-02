@@ -2758,6 +2758,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Query sprite availability before opening ShapeRenderer's GL batch.
         java.util.Set<Long> texturedMissiles=new java.util.HashSet<>();
         java.util.Set<Long> texturedBallistics=new java.util.HashSet<>();
+        boolean texturedRockets=weaponFx!=null&&weaponFx.hasRocketPayload();
         if(weaponFx!=null){
             for(Battle.Missile missile:battle.missiles())
                 if(weaponFx.hasMissilePayload(missile,battle.tick))
@@ -2775,6 +2776,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
             BattleRenderPoses.Pose pose=renderPoses.missile(m);
             if(!view.circle(pose.x(),pose.y(),4))continue;
             shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(m.torpedo?4.4f:2.8f),7);
+        }
+        // Only when approved rocket body art is genuinely unavailable:
+        // use bounded live projectile dots, never fabricate ship sprites.
+        if(!texturedRockets)for(Battle.Rocket rocket:battle.rockets()){
+            if(!view.circle((float)rocket.x,(float)rocket.y,4))continue;
+            shapes.setColor(rocket.burning()?Color.ORANGE:Color.GOLD);
+            shapes.circle((float)rocket.x,(float)rocket.y,
+                    CombatEffectScale.of(rocket.size==diplomacy.sim.RocketBarrage.Size.SIEGE?
+                            3.6f:2f),7);
         }
         for (Battle.Ballistic shell:battle.ballistics()) {
             if(texturedBallistics.contains(shell.visualId))continue;
