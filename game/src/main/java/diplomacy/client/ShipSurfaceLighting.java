@@ -54,6 +54,7 @@ final class ShipSurfaceLighting implements Disposable {
         "void main(){\n"+
         " vec4 albedo=texture2D(u_texture,v_uv);\n"+
         " albedo.a*=v_color.a;\n"+
+        " vec3 residualHeat=vec3(0.0);\n"+
         " if(u_hasDamage>0.5){\n"+
         "  vec4 peel=texture2D(u_damage,v_uv);\n"+
         "  albedo.a*=peel.a;\n"+
@@ -78,10 +79,14 @@ final class ShipSurfaceLighting implements Disposable {
         "   float coolMetal=1.0-smoothstep(0.005,0.08,peel.g);\n"+
         "   float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost)*coolMetal;\n"+
         "   albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
+        "   // Genuine compressed/melted edges emit a small steady amber\n"+
+        "   // contribution even on dark plating. Cooled laser oxide does not.\n"+
+        "   // G is zero outside the real armor impact mask.\n"+
+        "   residualHeat=vec3(0.32,0.105,0.018)*peel.g*peel.g;\n"+
         "  }\n"+
         " }\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
-        " if(u_detail<0.01){gl_FragColor=albedo;return;}\n"+
+        " if(u_detail<0.01){gl_FragColor=vec4(min(albedo.rgb+residualHeat,vec3(1.0)),albedo.a);return;}\n"+
         " vec3 n=normalize(texture2D(u_normal,v_uv).rgb*2.0-1.0);\n"+
         " vec2 axis=normalize(v_color.rg*2.0-1.0);\n"+
         " vec3 key=normalize(vec3(-0.52*axis.x+0.45*axis.y,\n"+
@@ -94,7 +99,7 @@ final class ShipSurfaceLighting implements Disposable {
         " lit+=vec3(0.055,0.10,0.13)*rim+emitted*0.95;\n"+
         " lit+=localLight(u_light0,u_color0,n,axis)*u_detail;\n"+
         " lit+=localLight(u_light1,u_color1,n,axis)*u_detail;\n"+
-        " lit=mix(albedo.rgb,lit,u_detail);\n"+
+        " lit=mix(albedo.rgb,lit,u_detail)+residualHeat;\n"+
         " gl_FragColor=vec4(min(lit,vec3(1.0)),albedo.a);\n"+
         "}\n";
 
