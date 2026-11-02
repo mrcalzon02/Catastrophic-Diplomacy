@@ -7,6 +7,7 @@ import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.sim.OrdnancePropulsion;
+import diplomacy.sim.RocketBarrage;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Real shipyard control mapping; pure logic, no OpenGL or fake taps. */
@@ -108,6 +109,30 @@ public final class GuidedShipyardPanelTest {
         check(ShipyardPanel.chooseGuided(payload,socket,0,-1)
                 .missileOrdnance.salvo()==OrdnanceDoctrine.Mode.SINGLE,
                 "Back arrow must restore the original salvo in one step");
+        // Rocket racks use the SAME touch-sized ordnance navigation without
+        // inventing seeker/warhead controls for physically unguided weapons.
+        var rocket=stock.install(socket,"BASE-TER-RKM");
+        var configuredRocket=ShipyardPanel.chooseRocket(rocket,socket,0,1);
+        check(configuredRocket.rocketBarrage(socket).count()==16,
+                "Rocket volley selector did not cycle 8 to 16");
+        configuredRocket=ShipyardPanel.chooseRocket(configuredRocket,socket,1,1);
+        check(configuredRocket.rocketBarrage(socket).motor()==
+                        RocketBarrage.Motor.BOOST_COAST,
+                "Rocket motor selector did not cycle sustained to boost/coast");
+        check(ShipyardPanel.chooseRocket(configuredRocket,socket,0,-1)
+                        .rocketBarrage(socket).count()==8,
+                "Rocket previous-arrow must reverse the volley selection");
+        var savedRocket=Shipyard.decode(Shipyard.encode(configuredRocket),catalog);
+        check(savedRocket.rocketBarrage(socket).equals(configuredRocket.rocketBarrage(socket))
+                        &&Shipyard.encode(configuredRocket).startsWith("CD-SHIP-6|"),
+                "Touch-selected rocket program did not survive shipyard SAVE/LOAD");
+        check(rocket.rocketBarrage(socket).equals(RocketBarrage.defaults(
+                        RocketBarrage.Size.MEDIUM)),
+                "Changing rocket options mutated the original active design");
+        reject(()->ShipyardPanel.chooseRocket(stock,socket,0,1),
+                "Guided missile socket must reject unguided rocket programming");
+        reject(()->ShipyardPanel.chooseRocket(rocket,socket,2,1),
+                "Rocket has no seeker or warhead programming axis");
         System.out.println("PASS touch-sized guided shipyard tabs, selection arrows, researched skip,"
                 +" salvo/motor/seeker/warhead edits, saved blueprint and compatibility");
     }
