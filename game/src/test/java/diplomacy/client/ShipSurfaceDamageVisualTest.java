@@ -65,6 +65,24 @@ public final class ShipSurfaceDamageVisualTest {
                 "Hot edge must brighten plating without changing the original alpha cut");
         check(ShipSurfaceDamageVisual.stampedPixel(0xffaa2200,1,.5f,1f,0)==0,
                 "Rim cannot paint pixels where there is no hull artwork");
+        // In all severity states, char -> soot -> heat must fade to the
+        // EXACT original source pixel before reaching the neighboring tile.
+        for(float severity:new float[]{.2f,.5f,1f}){
+            float center=ShipDamageScorch.falloffAt(8,8,8,8,severity,0,0);
+            float middle=ShipDamageScorch.falloffAt(8,8.34f,8,8,severity,0,0);
+            float outside=ShipDamageScorch.falloffAt(8,9.05f,8,8,severity,0,.5f);
+            check(center>middle&&middle>0&&outside==0,
+                    "Impact scorch must have a small strict radial gradient");
+            int centerPixel=ShipSurfaceDamageVisual.stampedPixel(source,center,0,0);
+            int midPixel=ShipSurfaceDamageVisual.stampedPixel(source,middle,0,0);
+            int untouched=ShipSurfaceDamageVisual.stampedPixel(source,outside,0,0);
+            check((centerPixel>>>24)<(midPixel>>>24)&&
+                    (midPixel>>>24)<(source>>>24),
+                    "Localized scorch must blend smoothly back into real hull color");
+            check(untouched==source,"No recoloring outside physical hit footprint");
+        }
+        check(ShipDamageScorch.falloffAt(8,8,8,8,0,0,.5f)==0,
+                "Noise must never create damage on an untouched ship");
         // Actual spatial damage stamps are localized, irregular and physically
         // gated by the armor/structure state of the corresponding plate.
         for(int shipId:new int[]{11,482,1931}){

@@ -365,16 +365,21 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         return result;
     }
-    private static float cellDamage(float[][] values,int row,int col) {
-        if(row<0||col<0||row>=GRID||col>=GRID)return 0;
-        return values[row][col];
-    }
-    private static float surfaceDamage(float[][] values,double row,double col) {
-        int r=(int)StrictMath.floor(row),c=(int)StrictMath.floor(col);
-        float dy=(float)(row-r),dx=(float)(col-c);
-        float first=cellDamage(values,r,c)*(1-dx)+cellDamage(values,r,c+1)*dx;
-        float second=cellDamage(values,r+1,c)*(1-dx)+cellDamage(values,r+1,c+1)*dx;
-        return first*(1-dy)+second*dy;
+    /** Single-cell scorch footprints, not bilinearly smeared plate damage. */
+    private static float localizedScorch(float[][] wear,float[][] internal,
+                                          ShipArmorStampAnchors anchors,
+                                          float row,float col,float rough){
+        int nearRow=(int)StrictMath.floor(row+.5f);
+        int nearCol=(int)StrictMath.floor(col+.5f);
+        float value=0f;
+        for(int r=Math.max(0,nearRow-1);r<=Math.min(GRID-1,nearRow+1);r++)
+            for(int c=Math.max(0,nearCol-1);c<=Math.min(GRID-1,nearCol+1);c++){
+                if(wear[r][c]<=0f&&internal[r][c]<=0f)continue;
+                value=Math.max(value,ShipDamageScorch.falloffAt(
+                        row,col,anchors.row(r,c),anchors.col(r,c),
+                        wear[r][c],internal[r][c],rough));
+            }
+        return value;
     }
     private static float noise(int x,int y,int salt) {
         int hash=x*374761393+y*668265263+salt*224682251;
@@ -451,10 +456,12 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(originalAlpha==0){output.drawPixel(localX,localY,0);continue;}
                 double tileRow=(y+0.5)*GRID/MASK_H-0.5;
                 double tileCol=(x+0.5)*GRID/MASK_W-0.5;
-                // Wear darkens source plating; only localized physically
-                // damaged cells cut alpha. Neighbor lookups catch crater lips.
-                float damage=surfaceDamage(wear,tileRow,tileCol);
+                // All three scorch bands remain within the struck tile's
+                // small registered footprint, with no spread over the ship.
                 float row=(float)tileRow,col=(float)tileCol;
+                float rough=noise(x/4,y/4,ship.id)*.70f+
+                        noise(x,y,ship.id*31)*.30f;
+                float damage=localizedScorch(wear,internal,aligned,row,col,rough);
                 float crater=craterAt(wear,internal,aligned,row,col,ship.id);
                 float rim=0f;
                 // Interior render layer is clipped to original opaque pixels.
@@ -470,8 +477,6 @@ public final class TerranPlaceholderSprites implements Disposable {
                     rim=ShipSurfaceDamageVisual.breachRim(crater,left,right,up,down,
                             originalAlpha,originalAlpha);
                 }
-                float rough=noise(x/4,y/4,ship.id)*0.70f+
-                        noise(x,y,ship.id*31)*0.30f;
                 output.drawPixel(localX,localY,ShipSurfaceDamageVisual.stampedPixel(
                         originalPixel,damage,crater,rim,rough));
             }
