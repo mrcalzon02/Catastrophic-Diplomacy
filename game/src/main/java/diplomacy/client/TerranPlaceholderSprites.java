@@ -763,6 +763,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                                float centerX,float centerY,float maxWidth,float maxHeight) {
         if(!hasHull(faction,hull))return false;
         Texture texture=texture(faction,hull);
+        // An optional failed GL upload must not crash the shipyard itself.
+        if(texture==null)return false;
         float factor=previewScale(texture,maxWidth,maxHeight);
         float w=texture.getWidth()*factor,h=texture.getHeight()*factor;
         batch.setColor(1,1,1,0.94f);
