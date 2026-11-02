@@ -36,7 +36,7 @@ public final class PointDefenseLoadDiagnostic {
     // physical siege rocket reload (nominally ~29 seconds), without
     // fabricating magazine reloads. Another 10 seconds clears flight.
     private static final int ACTIVE=1800, DRAIN=300;
-    private static final int[] BOUNDARY={0,600,1200,1800,2100};
+    // Window boundaries differ across exposure types to retain useful rate bins.
 
     private static void check(boolean ok,String message){
         if(!ok)throw new IllegalStateException(message);
@@ -161,9 +161,14 @@ public final class PointDefenseLoadDiagnostic {
                     missilePaid,torpedoPaid);
         }
     }
-    private static int band(long tick){
-        for(int i=0;i<BOUNDARY.length-1;i++)
-            if(tick>=BOUNDARY[i]&&tick<BOUNDARY[i+1])return i;
+    private static int band(long tick,Load load){
+        int[] limits=switch(load){
+            case INCIDENTAL -> new int[]{0,150,300,600,900};
+            case SURGE -> new int[]{0,36,126,226,336};
+            case SUSTAINED -> new int[]{0,600,1200,1800,2100};
+        };
+        for(int i=0;i<limits.length-1;i++)
+            if(tick>=limits[i]&&tick<limits[i+1])return i;
         return 3;
     }
     private static Result run(TechnologyCatalog catalog,Load load,Threat threat,
@@ -234,7 +239,7 @@ public final class PointDefenseLoadDiagnostic {
             }
             battle.step();
             if(battle.pointDefenseCraftKills>previousCraftKills){
-                killsByBand[band(tick)]+=battle.pointDefenseCraftKills-previousCraftKills;
+                killsByBand[band(tick,load)]+=battle.pointDefenseCraftKills-previousCraftKills;
                 previousCraftKills=battle.pointDefenseCraftKills;
             }
             for(Battle.Craft fighter:battle.crafts())if(fighter.team==0)
@@ -266,7 +271,7 @@ public final class PointDefenseLoadDiagnostic {
             for(int i=events.size()-1;i>=0;i--){
                 Battle.VisualEvent e=events.get(i);
                 if(e.sequence()<=lastEvent)break;
-                int b=band(e.tick());
+                int b=band(e.tick(),load);
                 if(e.phase()==Battle.VisualPhase.FIRE &&e.team()==1
                         &&"POINT_DEFENSE".equals(e.weapon())){
                     pdShots++;pdByBand[b]++;
@@ -397,9 +402,10 @@ public final class PointDefenseLoadDiagnostic {
                 .append("ship launcher lanes; sustained permits real physical reloads through tick 1800 ")
                 .append("and resolves in-flight ordnance to tick 2100. Shorter incidental ")
                 .append("and surge runs each get their own 300-tick flight drain. ")
-                .append("Window counts are EVENT ")
-                .append("throughput, not cohort-matched kill rates. Projectiles not resolved by ")
-                .append("tick 960 remain explicitly counted as unresolved.\n");
+                .append("The four event-count windows are incidental 0/150/300/600/900, ")
+                .append("surge 0/36/126/226/336, sustained 0/600/1200/1800/2100. ")
+                .append("These are throughput counts, NOT cohort-matched kill rates. ")
+                .append("Unresolved bodies are counted at each actual run horizon.\n");
         Files.write(out.resolve("profiles.csv"),rows,StandardCharsets.UTF_8);
         Files.writeString(out.resolve("summary.md"),summary.toString());
         System.out.println(summary);
