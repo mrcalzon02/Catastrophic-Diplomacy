@@ -34,7 +34,7 @@ for row in rows:
         structure=float(row["internal_exposure"])
         if row["milestone"]=="false":
             warnings.append(f"{row['scenario']}: requested combat milestone was not reached (tick {row['tick']})")
-        if row["scenario"] not in ("pristine","rectangle-stress"):
+        if row["scenario"] not in ("pristine","kinetic-pristine","kinetic-heavy-pristine","rectangle-stress"):
             if hits<=2 and armor>=.99:
                 warnings.append(f"{row['scenario']}: local armor fully exposed after just {hits} hit(s)")
             if hits<=2 and structure>=.99:
@@ -43,7 +43,7 @@ for row in rows:
                 warnings.append("Shield contact also depleted physical armor")
         if armor>.01 and int(row["mask_uploads"])==0:
             warnings.append(f"{row['scenario']}: worn armor without any actual GPU mask upload")
-        if hits==0 and row["scenario"] not in ("pristine","rectangle-stress"):
+        if hits==0 and row["scenario"] not in ("pristine","kinetic-pristine","kinetic-heavy-pristine","rectangle-stress"):
             warnings.append(f"{row['scenario']}: no actual weapon hits registered")
     # Scenario-local, individually downloadable artifact directory.
     folder=out/"individual"/row["scenario"]
