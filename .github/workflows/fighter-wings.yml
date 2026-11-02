@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 # PR verification must not duplicate the signed three-platform release.
-# Superseded PR revisions can be cancelled; main-commit releases cannot.
+# Superseded PR revisions cancel independently of latest-only main releases.
 concurrency:
   group: cd-pr-functional-${{ github.event.pull_request.number }}
   cancel-in-progress: true

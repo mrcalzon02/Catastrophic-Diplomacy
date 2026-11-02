@@ -19,6 +19,13 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# Latest push wins for this diagnostic. An explicit manual run has a
+# unique concurrency group and never cancels either another manual run
+# or a release. No current balance/style diagnostic blocks publication.
+concurrency:
+  group: cd-diagnostic-${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 jobs:
   measured-rocket-pd-ladder:
     runs-on: ubuntu-24.04
