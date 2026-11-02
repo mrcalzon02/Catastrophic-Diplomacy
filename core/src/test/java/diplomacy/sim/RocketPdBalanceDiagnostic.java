@@ -55,7 +55,7 @@ public final class RocketPdBalanceDiagnostic {
     }
     private record Sample(String label,int tier,int modules,int barrage,
                           RocketBarrage.Motor motor,boolean evasive,boolean pdOnline,
-                          int seed,int launched,int intercepted,int collided,
+                          int seed,int launched,int intercepted,int terminalEntries,int collided,
                           int pdShots,int detectionFrames,double firstDetectionSeconds,
                           double initialPdRange,double coldDetection,double hotDetection,
                           double damageToProtection,double targetHullLoss,
@@ -65,9 +65,9 @@ public final class RocketPdBalanceDiagnostic {
                           double rocketReload,double rocketSingleDamage) {
         String csv(){
             return String.format(Locale.ROOT,
-                    "%s,%d,%d,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f",
+                    "%s,%d,%d,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f",
                     label,tier,modules,barrage,motor,evasive,pdOnline,seed,launched,intercepted,
-                    collided,pdShots,detectionFrames,firstDetectionSeconds,initialPdRange,
+                    terminalEntries,collided,pdShots,detectionFrames,firstDetectionSeconds,initialPdRange,
                     coldDetection,hotDetection,damageToProtection,targetHullLoss,
                     launchCostCredits,nominalRocketSpeed,rocketHealth,rocketCrossSection,
                     rocketSignature,pdTracking,pdCycle,rocketReload,rocketSingleDamage);
@@ -123,6 +123,8 @@ public final class RocketPdBalanceDiagnostic {
         double startHull=defender.hull,startArmor=defender.armor,
                 startShield=defender.shields;
         int detectedFrames=0;double firstDetection=-1;
+        java.util.HashSet<Long> innerEntries=new java.util.HashSet<>();
+        final double innerProtectionRadius=90.0;
         RocketBarrage.Rack first=attacker.rocketRacks.get(0);
         double pdReach=defender.pdRange;
         // Capture exact sensor envelopes even if a rocket is destroyed by
@@ -150,18 +152,33 @@ public final class RocketPdBalanceDiagnostic {
                 }
             }
             battle.step();
+            // These rockets actually reached the threatened hull's final
+            // defensive zone after PD has had its ordinary firing turn.
+            for(Battle.Rocket rocket:battle.rockets())
+                if(StrictMath.hypot(rocket.x-defender.x,rocket.y-defender.y)
+                        <=innerProtectionRadius)
+                    innerEntries.add(rocket.visualId);
         }
         require(battle.rockets().isEmpty(),
                 "A rocket was still in flight at end of balance measurement");
         int shots=0;
-        for(Battle.VisualEvent e:battle.visualEvents())
+        for(Battle.VisualEvent e:battle.visualEvents()){
             if(e.phase()==Battle.VisualPhase.FIRE&&"POINT_DEFENSE".equals(e.weapon()))
                 shots++;
+            // An actual physical hit vanishes during updateRockets(), before
+            // the post-step living-rocket scan. Include that event exactly
+            // once using the real projectile shot ID.
+            if(e.phase()==Battle.VisualPhase.IMPACT&&"MISSILE".equals(e.weapon())
+                    &&e.team()==attacker.team&&e.sourceId()==attacker.id
+                    &&e.targetId()==defender.id)
+                innerEntries.add(e.shotId());
+        }
         double protectionLoss=Math.max(0,startShield-defender.shields)
                 +Math.max(0,startArmor-defender.armor)
                 +Math.max(0,startHull-defender.hull);
         return new Sample(size.name(),tier,modules,barrage,motor,evasive,pdOnline,seed,
-                battle.rocketRoundsFired,battle.rocketIntercepts,battle.rocketHits,
+                battle.rocketRoundsFired,battle.rocketIntercepts,innerEntries.size(),
+                battle.rocketHits,
                 shots,detectedFrames,firstDetection,pdReach,coldDetection,hotDetection,
                 protectionLoss,Math.max(0,startHull-defender.hull),paidFor,
                 first.body.speed(),first.body.health(),first.body.crossSection(),
@@ -174,7 +191,7 @@ public final class RocketPdBalanceDiagnostic {
         Files.createDirectories(output);
         List<String> rows=new ArrayList<>();
         List<Sample> all=new ArrayList<>();
-        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,pd_online,seed,launched,intercepted,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage");
+        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,pd_online,seed,launched,intercepted,terminal_entries,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage");
         int runs=0,launches=0,intercepts=0,hits=0;
         for(RocketBarrage.Size size:RocketBarrage.Size.values())
             for(int tier:TIERS)
