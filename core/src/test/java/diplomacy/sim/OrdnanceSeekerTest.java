@@ -85,6 +85,44 @@ public final class OrdnanceSeekerTest {
         check(target.power>=4&&DeceptionProjection.falseContacts(target)==0,
                 "Depleted emitters must stop projecting false contacts");
     }
+    private static void realMissilesPursueProjectedContacts(){
+        Battle battle=scene(272729L);
+        Battle.Ship target=battle.ships().get(1);
+        target.power=500;target.ecmCondition=1;target.hologramNoise=.75;
+        target.ecmStrength=0;
+        // The first missile may pass an ECM check. Other independent
+        // physical launchers must be eligible for the decoy, not merely a
+        // made-up counter in a status text or a copied visual projectile.
+        for(int i=0;i<6;i++){
+            Battle.Ship shooter=battle.addShip(0,Battle.Faction.TERRAN,190-i*18,300+i*9);
+            shooter.speed=0;
+            shooter.laserDamage=shooter.kineticDamage=shooter.plasmaDamage=
+                    shooter.particleDamage=shooter.torpedoDamage=0;
+            shooter.missileDamage=30;shooter.missileAmmo=1;
+            shooter.pdRange=0;shooter.fighterReserve=shooter.droneReserve=0;
+            shooter.maxPower=shooter.power=20000;
+        }
+        battle.step();
+        Battle.Missile diverted=null;
+        for(Battle.Missile m:battle.missiles())
+            if(m.falseContactIndex>=0){diverted=m;break;}
+        check(diverted!=null,
+                "Live autonomous missile salvos never acquired a real false contact");
+        check(diverted.targetId==target.id&&diverted.seekerLocked,
+                "Hologram must fool the original lock, not fabricate a second target hull");
+        check(StrictMath.hypot(diverted.lastKnownX-target.x,
+                diverted.lastKnownY-target.y)>25,
+                "Real projectile guidance must be fed the hologram's world position");
+        double ghostX=DeceptionProjection.ghostX(target,diverted.falseContactIndex,battle.tick);
+        double ghostY=DeceptionProjection.ghostY(target,diverted.falseContactIndex,battle.tick);
+        check(diverted.lastKnownX==ghostX&&diverted.lastKnownY==ghostY,
+                "Live seeker coordinates must match the very same visible decoy sprite");
+        target.power=0;
+        battle.step();
+        check(diverted.falseContactIndex==-1
+                &&diverted.lastKnownX==target.x&&diverted.lastKnownY==target.y,
+                "Shutting down the holo emitter must restore live missile guidance");
+    }
     private static void pointDefenseStillWorks(){
         Battle b=scene(7711L);
         Battle.Ship a=b.ships().get(0),t=b.ships().get(1);
@@ -129,7 +167,8 @@ public final class OrdnanceSeekerTest {
         }
     }
     public static void main(String[] args){
-        lossAndReacquisition();hologramFalseGuidance();pointDefenseStillWorks();replay();
+        lossAndReacquisition();hologramFalseGuidance();
+        realMissilesPursueProjectedContacts();pointDefenseStillWorks();replay();
         System.out.println("PASS seeded seeker ECM loss/reacquisition, cold-coast PD counterplay and replay");
     }
 }
