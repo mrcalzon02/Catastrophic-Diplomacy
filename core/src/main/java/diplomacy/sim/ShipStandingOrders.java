@@ -6,7 +6,16 @@ package diplomacy.sim;
  */
 public record ShipStandingOrders(
         BattleOrders.Orders tactics,int aggression,int caution,int shieldWithdrawPercent,
-        ShipTacticalDirectives directives) {
+        ShipTacticalDirectives directives,ShipResourceOrders resources) {
+    /** Old caller signatures remain valid and inherit unlimited default fire. */
+    public ShipStandingOrders(BattleOrders.Orders tactics,int aggression,int caution,
+            int shieldWithdrawPercent,ShipTacticalDirectives directives){
+        this(tactics,aggression,caution,shieldWithdrawPercent,directives,ShipResourceOrders.DEFAULT);
+    }
+    public ShipStandingOrders withResources(ShipResourceOrders orders){
+        return new ShipStandingOrders(tactics,aggression,caution,shieldWithdrawPercent,
+                directives,orders);
+    }
     public ShipStandingOrders(BattleOrders.Orders tactics,int aggression,int caution,int shieldWithdrawPercent){
         this(tactics,aggression,caution,shieldWithdrawPercent,ShipTacticalDirectives.DEFAULT);
     }
@@ -28,7 +37,8 @@ public record ShipStandingOrders(
     };
     public ShipStandingOrders {
         if(tactics==null||aggression<0||aggression>100||caution<0||caution>100||
-                shieldWithdrawPercent<0||shieldWithdrawPercent>100||directives==null)
+                shieldWithdrawPercent<0||shieldWithdrawPercent>100||directives==null
+                ||resources==null)
             throw new IllegalArgumentException("Invalid standing doctrine");
         if(tactics.anchorShipId()!=0||tactics.position()==BattleOrders.Position.ESCORT
                 ||tactics.position()==BattleOrders.Position.FORMATION)
@@ -89,7 +99,7 @@ public record ShipStandingOrders(
             case 22 -> d=d.withEscortRange(moved(d.escortRange(),step,25,30,1500));
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         }
-        return new ShipStandingOrders(next,a,c,shield,d);
+        return new ShipStandingOrders(next,a,c,shield,d,resources);
     }
     public String display(int setting){
         return switch(setting){
