@@ -105,12 +105,42 @@ dismiss_updater(){
   return 1
 }
 start_game(){
-  adb shell am force-stop "$package"
-  adb logcat -c
-  adb shell am start -W -n "$activity" > "$report/$current-start.txt"
-  # Swiftshader startup after multiple campaign scenes varies widely. A live
-  # process must actually emit the main-menu marker; no timestamp-only pass.
-  wait_log 'CD-GAME-FLOW.*MAIN_MENU' 90
+  local attempt
+  # Some API29 SwiftShader sessions retain a live process while startup
+  # emits no rendered MAIN_MENU marker after a prior full combat scene.
+  # Retry precisely one fresh process launch only for that distinguishable
+  # stalled-start condition. A crashed app still fails immediately.
+  for attempt in 1 2; do
+    adb shell am force-stop "$package"
+    adb logcat -c
+    adb shell am start -W -n "$activity" > "$report/$current-start-$attempt.txt"
+    # A real main-menu telemetry event from THIS launch is mandatory.
+    if wait_log 'CD-GAME-FLOW.*MAIN_MENU' 90; then
+      echo "PASS: Android 10 campaign $current genuinely rendered MAIN_MENU on launch $attempt"
+      break
+    fi
+    echo "WARNING: no rendered main menu for $current launch $attempt" >&2
+    # Save evidence before any new force-stop/logcat clear. This isn't a
+    # test-only shortcut: no command below changes installed APK or app data.
+    timeout 12s adb logcat -d -v time \
+      > "$report/$current-startup-$attempt-logcat.txt" || true
+    timeout 12s adb shell dumpsys activity activities \
+      > "$report/$current-startup-$attempt-activity.txt" || true
+    timeout 12s adb exec-out screencap -p \
+      > "$report/$current-startup-$attempt.png" 2>/dev/null || true
+    # An actual exception or terminated process is a functional failure,
+    # not an emulator-startup retry candidate.
+    if ! assert_no_crash; then
+      echo "FAIL: campaign crashed or exited while starting $current" >&2
+      return 1
+    fi
+    if (( attempt==2 )); then
+      echo "FAIL: two live Android 10 launches failed to render MAIN_MENU for $current" >&2
+      return 1
+    fi
+    echo "RETRY: one bounded fresh launch after live, noncrashing startup stall" >&2
+    sleep 3
+  done
   dismiss_updater
   # 400-ship test emulators may draw fewer than 2 UI frames per second.
   # Log MAIN_MENU is not proof that the first interactive frame is ready.
