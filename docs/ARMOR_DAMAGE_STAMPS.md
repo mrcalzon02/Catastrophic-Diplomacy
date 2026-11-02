@@ -468,3 +468,32 @@ The optional original-ship OpenGL diagnostic runs on this code change and
 must supply both a real unhit control and actual kinetic hit screenshot;
 no generated proxy may count as visual acceptance. Keep this rollback in
 place unless the user explicitly approves another kinetic design.
+
+### Six seeded asymmetric variants per weapon (2026-11-02)
+
+The material renderer and the physical alpha cutout now share one immutable
+variant selector: `ShipDamageVariants.tileSeed(shipId,row,col)`, mixed with
+`Battle.DamageType`. Every actual directly hit armor tile has one of six
+variant identities and one of eight stable orientations. Variant selection
+never consumes random numbers during rendering; repeated GPU mask uploads
+and replayed saved ship states reproduce the same result. This is visual
+only; actual weapon damage, armor exposure and game combat are untouched.
+
+- **Fighter:** smallest off-center puncture with unequal star cracks.
+- **Particle:** oblique incoming score and compressed one-sided lip, ending
+  in a tiny penetrator hole with unequal branching fissures.
+- **Missile:** irregular raised crater / fracture and off-center hot ejecta.
+- **Heavy kinetic:** preserved the approved cold pock / silver fracture
+  appearance with varied physical notch orientation; rejected dark amber
+  annulus must NOT be reintroduced.
+- **Torpedo:** six seeded jagged structural breaches, with differing tooth
+  frequencies, angled petal seams, tapered tear branches and forks.
+- **Plasma:** asymmetric molten wash with bent directional tail.
+- **Laser:** slight oblique heat scoring and uneven annealed oxide bands.
+
+Each family has distinct physical alpha morphology, not just RGB overlays.
+The existing author-approved hull silhouette is always respected; absent
+original pixels stay transparent, and worn-out armor is the only source of
+structural exposure. Visual tests verify variant diversity, determinism,
+localization and untouched undamaged cells. These tests remain **optional
+nonblocking diagnostics**, not a functional release gate.

@@ -10,6 +10,7 @@ on:
       - 'core/src/test/java/diplomacy/sim/ShipSurfaceDamageTest.java'
       - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageVisual.java'
+      - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
       - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
       - 'game/src/main/java/diplomacy/client/CombatLightingRenderer.java'
