@@ -179,3 +179,19 @@ jobs:
           path: test-output/armor-observation/individual/kinetic-heavy/
           if-no-files-found: warn
           retention-days: 30
+      - name: Downloadable kinetic-pristine original-hull baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-heavy-pristine original-hull baseline
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-heavy-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-heavy-pristine/
+          if-no-files-found: warn
+          retention-days: 30

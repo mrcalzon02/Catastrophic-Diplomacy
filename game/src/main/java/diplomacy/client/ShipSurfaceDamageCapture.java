@@ -17,7 +17,8 @@ final class ShipSurfaceDamageCapture {
         "pristine", "shield-contact", "laser-scoring", "kinetic-impact",
         "missile-splash", "laser-repeat", "armor-breach", "structure-hit",
         "rectangle-stress", "plasma-impact", "particle-puncture",
-        "torpedo-impact", "kinetic-heavy"
+        "torpedo-impact", "kinetic-heavy",
+        "kinetic-pristine", "kinetic-heavy-pristine"
     };
     static final long SEED=202611010140L;
     record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
@@ -78,7 +79,7 @@ final class ShipSurfaceDamageCapture {
                     stress.ships().get(2),true,true);
         }
         final String weapon=switch(index){
-            case 3,7,12 -> "KINETIC";
+            case 3,7,12,13,14 -> "KINETIC";
             case 4 -> "MISSILE";
             case 9 -> "PLASMA";
             case 10 -> "PARTICLE";
@@ -93,9 +94,9 @@ final class ShipSurfaceDamageCapture {
             case "TORPEDO" -> "TOR";
             default -> "LAS";
         };
-        final Shipyard.Hull hull=index==3||index==4||index==11?
+        final Shipyard.Hull hull=index==3||index==4||index==11||index==13?
                 Shipyard.Hull.FRIGATE:
-                index==7||index==12?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
+                index==7||index==12||index==14?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
         Shipyard.Design bare=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         Shipyard.Design shooter=bare.install(firstWeaponSlot(bare),"BASE-TER-"+suffix);
         // Actual factory-fitted defenses and structural systems, but no guns:
@@ -106,7 +107,7 @@ final class ShipSurfaceDamageCapture {
         // pockmark without painting outside approved art. Use broad Terran
         // plating to demonstrate real kinetic pockmark geometry while keeping
         // the genuine fitted shooter, projectile, impact, and physics intact.
-        Battle.Faction targetFaction=(index==3||index==12)?
+        Battle.Faction targetFaction=(index==3||index==12||index==13||index==14)?
                 Battle.Faction.TERRAN:Battle.Faction.VAERITH_PRISM;
         Shipyard.Design targetDesign=Shipyard.starter(targetFaction,hull);
         for(Shipyard.Slot slot:targetDesign.placements())
@@ -156,7 +157,8 @@ final class ShipSurfaceDamageCapture {
         // Identical target pose across every deterministic screenshot. The
         // attacker remains autonomous and still hits with genuine projectiles.
         final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
-        if(index==0)return record(KEYS[index],weapon,seed,battle,victim,true,false);
+        if(index==0||index==13||index==14)
+            return record(KEYS[index],weapon,seed,battle,victim,true,false);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
         for(int i=0;i<maxSteps&&!battle.finished();i++){

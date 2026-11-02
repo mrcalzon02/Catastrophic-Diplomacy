@@ -79,6 +79,26 @@ for key in keys:
         "mask-coefficients.png (when present) — actual 96x144 GPU mask data, not ship art\n"
         "These are NOT concept images or generated fake hull damage.\n",
         encoding="utf8")
+# Audit a genuinely comparable BEFORE/AFTER pair: identical faction, hull,
+# pose and seed; the only state difference is real Battle.step() weapon damage.
+# These are lossless image DIFFERENCES, never invented gameplay screenshots.
+for pristine,damaged in (("kinetic-pristine","kinetic-impact"),
+                         ("kinetic-heavy-pristine","kinetic-heavy")):
+    first=next((x for x in rows if x["scenario"]==pristine and x["view"]=="surface"),None)
+    second=next((x for x in rows if x["scenario"]==damaged and x["view"]=="surface"),None)
+    if first is None or second is None:
+        warnings.append(f"{damaged}: corresponding genuine pristine reference missing")
+        continue
+    if first["hull"]!=second["hull"] or first["seed"]!=second["seed"]:
+        warnings.append(f"{damaged}: baseline hull or seed mismatch")
+        continue
+    with Image.open(root/first["file"]) as baseline,Image.open(root/second["file"]) as after:
+        delta=ImageChops.difference(baseline.convert("RGB"),after.convert("RGB"))
+        filename=f"{pristine}-vs-{damaged}-surface-difference.png"
+        delta.save(out/filename)
+        changes=sum(1 for value in delta.convert("L").getdata() if value>16)
+        print(f"ARMOR-PAIRED-IMAGE {damaged} changed_pixels={changes} file={filename}")
+        if changes==0:warnings.append(f"{damaged}: ZERO rendered pixels differ from pristine")
 # A lossless per-hull difference image, without changing/overwriting the sources.
 try:
     a=next(row for row in rows if row["scenario"]=="pristine" and row["view"]=="surface")

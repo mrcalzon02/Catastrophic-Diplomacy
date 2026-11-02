@@ -43,13 +43,14 @@ public final class ShipSurfaceDamageCaptureTest {
                 System.out.printf("ARMOR-IMPACT-SITES %s hits=%d touched-tiles=%d marks=%d%n",
                         scene.key(),scene.hits(),changed,impactMarks);
             }
-            if(i==0)check(scene.ticks()==0&&scene.hits()==0,
+            if(i==0||i==13||i==14)check(scene.ticks()==0&&scene.hits()==0&&
+                        scene.wornCells()==0,
                     "Pristine reference is already battle-damaged");
-            if(i>1&&i!=8)
+            if(i>1&&i!=8&&i!=13&&i!=14)
                 check(scene.ticks()>0,"Live-fire scenario never simulated "+scene.key());
             if(i==8)
                 check(scene.syntheticStress(),"Rectangle must be labeled as artificial stress");
-            if(i==3||i==12){
+            if(i==3||i==12||i==13||i==14){
                 check(scene.target().faction==Battle.Faction.TERRAN,
                     "Kinetic pockmark review must use real broad Terran plating");
             }

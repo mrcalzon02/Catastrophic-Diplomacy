@@ -338,3 +338,16 @@ physics are entirely unchanged; the approved Vaerith laser captures
 remain exactly as before. Only if the genuine new framebuffer and mask
 show bright-edged circular damage can this style be considered visually
 verified.
+
+
+### Exact pristine kinetic reference pair
+
+The diagnostic now records two new real, unshot fixed-pose targets:
+`kinetic-pristine` is the same TERRAN FRIGATE, seed and orientation as
+`kinetic-impact`; `kinetic-heavy-pristine` is the same TERRAN DESTROYER
+as `kinetic-heavy`. Each has zero physical hits and intact armor and is
+rendered through the genuine desktop OpenGL material renderer. The gallery
+produces lossless pixel differences, alongside untouched original 1280x720
+source framebuffer PNGs. This prevents claiming a different source hull or
+other faction's texture details are kinetic craters. The aesthetic
+distinction remains a nonblocking visual diagnostic.
