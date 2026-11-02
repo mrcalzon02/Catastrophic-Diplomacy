@@ -76,9 +76,15 @@ public final class RocketPdBalanceDiagnostic {
     private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
                               boolean evasive,boolean pdOnline,int seed) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,seed,0);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
+        if(pdOnline&&pressure>0)battle.configureRocketPdCrowdingForDiagnostic(pressure);
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,tier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
@@ -145,6 +151,8 @@ public final class RocketPdBalanceDiagnostic {
             }
             battle.step();
         }
+        require(battle.rockets().isEmpty(),
+                "A rocket was still in flight at end of balance measurement");
         int shots=0;
         for(Battle.VisualEvent e:battle.visualEvents())
             if(e.phase()==Battle.VisualPhase.FIRE&&"POINT_DEFENSE".equals(e.weapon()))
