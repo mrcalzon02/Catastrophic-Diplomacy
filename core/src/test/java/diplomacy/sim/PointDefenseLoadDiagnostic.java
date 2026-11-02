@@ -94,7 +94,11 @@ public final class PointDefenseLoadDiagnostic {
     private static Source source(Battle battle,TechnologyCatalog catalog,Threat threat,
                                   Load load,int index){
         Battle.Ship s;
-        double x=140+index*7,y=300+(index%3-1)*17;
+        // Armed craft need a real initial ship contact before deck release.
+        // At 410 world units the legacy fitted cruiser can fail to detect
+        // anything, preventing fighter launches before the test begins.
+        double x=(threat.fighter()?300:140)+index*7,
+                y=300+(index%3-1)*17;
         if(threat.fighter()){
             battle.spawnWing(0,carrier(catalog,threat.fighterHull()),catalog,1,x,y);
             s=battle.ships().get(battle.ships().size()-1);
@@ -224,7 +228,8 @@ public final class PointDefenseLoadDiagnostic {
                 // incidental/surge order closes the real launch lane after
                 // the opening aircraft, without erasing stored craft or
                 // interfering with aircraft already flying.
-                if(src.weapon.fighter()&&load!=Load.SUSTAINED&&tick>0)
+                if(src.weapon.fighter()&&load!=Load.SUSTAINED&&
+                        src.ship.fightersLaunched>0)
                     src.ship.fighterLaunchBays=0;
             }
             battle.step();
@@ -266,7 +271,18 @@ public final class PointDefenseLoadDiagnostic {
                         &&"POINT_DEFENSE".equals(e.weapon())){
                     pdShots++;pdByBand[b]++;
                 }
-                if(e.team()!=0||!isPhysical(e.weapon()))continue;
+                if(e.team()!=0)continue;
+                // Armed fighters launch real shared-projectile ordnance with
+                // FIGHTER_* FIRE labels, but the same physical shot ID later
+                // emits its underlying KINETIC/MISSILE/TORPEDO INTERCEPT.
+                // Treat these as launches, NOT extra fighter craft entities.
+                if(e.phase()==Battle.VisualPhase.FIRE &&
+                        isFighterPhysical(e.weapon())){
+                    launchIds.add(e.shotId());
+                    firedByBand[b]++;
+                    continue;
+                }
+                if(!isPhysical(e.weapon()))continue;
                 if(e.phase()==Battle.VisualPhase.FIRE){
                     launchIds.add(e.shotId());firedByBand[b]++;
                 }else if(e.phase()==Battle.VisualPhase.INTERCEPT){
@@ -302,7 +318,11 @@ public final class PointDefenseLoadDiagnostic {
         check(actualLaunched>0,"No actual paid projectile or fitted craft launched");
         check(pdOn||pdShots==0,"PD shots while defensive system was ordered HOLD_FIRE");
         check(actualIntercepted<=actualLaunched,
-                "Intercept count exceeds launched physical bodies or craft");
+                "Intercept count exceeds launched physical bodies or craft: "+
+                        "launchEvents="+launchIds.size()+" craftLaunched="+
+                        craftLaunched+" missileShellIntercepts="+
+                        interceptIds.size()+" pdCraftKills="+
+                        battle.pointDefenseCraftKills);
         check(kineticPaid>=0&&missilePaid>=0&&torpedoPaid>=0,
                 "A diagnostic source created ammunition");
         return new Result(load,threat,layout,rank,seed,pdOn,actualLaunched,
@@ -313,6 +333,11 @@ public final class PointDefenseLoadDiagnostic {
                 firedByBand[0],firedByBand[1],firedByBand[2],
                 minPower,peakHeat,Math.max(0,originalHull-endingHull),
                 totalTicks,kineticPaid,missilePaid,torpedoPaid);
+    }
+    private static boolean isFighterPhysical(String kind){
+        return "FIGHTER_CANNON".equals(kind)||
+                "FIGHTER_MISSILE".equals(kind)||
+                "FIGHTER_TORPEDO".equals(kind);
     }
     private static boolean isPhysical(String kind){
         return "KINETIC".equals(kind)||"ROCKET".equals(kind)||
