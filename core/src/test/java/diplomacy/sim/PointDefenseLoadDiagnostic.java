@@ -23,6 +23,8 @@ import java.util.Set;
 public final class PointDefenseLoadDiagnostic {
     private PointDefenseLoadDiagnostic(){}
     private enum Load { INCIDENTAL, SURGE, SUSTAINED }
+    /** Only the long-duration profile has a depleted, damaged-reactor trial. */
+    private enum PowerState { NOMINAL, DAMAGED_REACTOR }
     private enum Threat {
         KINETIC, MISSILE, TORPEDO, ROCKET_BOOST, ROCKET_SUSTAIN,
         FIGHTER_INTERCEPTOR, FIGHTER_TORPEDO_BOMBER, MIXED;
@@ -142,7 +144,7 @@ public final class PointDefenseLoadDiagnostic {
         return new Source(s,threat);
     }
     private record Result(Load load,Threat threat,Layout layout,int pdRank,int seed,
-                          boolean pdOn,int launched,int intercepted,int impacted,
+                          boolean pdOn,PowerState powerState,int launched,int intercepted,int impacted,
                           int timedOut,int terminal,int unresolved,int naturalCraftAttrition,int pdShots,
                           int firstShots,int middleShots,int lateShots,int drainShots,
                           int firstKills,int middleKills,int lateKills,int drainKills,
@@ -152,8 +154,8 @@ public final class PointDefenseLoadDiagnostic {
                           int kineticPaid,int missilePaid,int torpedoPaid) {
         String csv(){
             return String.format(Locale.ROOT,
-                    "%s,%s,%s,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.3f,%d,%d,%d,%d",
-                    load,threat,layout,pdRank,seed,pdOn,launched,intercepted,impacted,
+                    "%s,%s,%s,%d,%d,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.3f,%d,%d,%d,%d",
+                    load,threat,layout,pdRank,seed,pdOn,powerState,launched,intercepted,impacted,
                     timedOut,terminal,unresolved,naturalCraftAttrition,pdShots,firstShots,middleShots,
                     lateShots,drainShots,firstKills,middleKills,lateKills,drainKills,
                     firstLaunched,middleLaunched,lateLaunched,minPowerFraction,
@@ -172,7 +174,8 @@ public final class PointDefenseLoadDiagnostic {
         return 3;
     }
     private static Result run(TechnologyCatalog catalog,Load load,Threat threat,
-                              Layout layout,int rank,int seed,boolean pdOn){
+                              Layout layout,int rank,int seed,boolean pdOn,
+                              PowerState powerState){
         long randomSeed=4583007L+load.ordinal()*100003L+
                 threat.ordinal()*971L+layout.ordinal()*61L+rank*11L+seed*3L;
         Battle battle=new Battle(randomSeed);
@@ -205,6 +208,17 @@ public final class PointDefenseLoadDiagnostic {
             guard.add(ship);
         }
         check(guard.size()==defenders,"Missing physical PD defenders");
+        if(powerState==PowerState.DAMAGED_REACTOR){
+            check(load==Load.SUSTAINED,"Only the long profile can deplete a reactor");
+            // Controlled damaged-engineering condition: keep real physical
+            // reactor/thermal dynamics but begin with half stored charge.
+            // Neither interception chance nor target durability is modified.
+            for(Battle.Ship ship:guard){
+                ship.power*=.5;
+                ship.powerRegen*=.08;
+                ship.coolingRate*=.12;
+            }
+        }
         battle.setTeamPointDefense(1,pdOn?BattleOrders.PointDefense.BALANCED:
                 BattleOrders.PointDefense.HOLD_FIRE);
         long lastEvent=-1;
@@ -335,7 +349,7 @@ public final class PointDefenseLoadDiagnostic {
                         battle.pointDefenseCraftKills);
         check(kineticPaid>=0&&missilePaid>=0&&torpedoPaid>=0,
                 "A diagnostic source created ammunition");
-        return new Result(load,threat,layout,rank,seed,pdOn,actualLaunched,
+        return new Result(load,threat,layout,rank,seed,pdOn,powerState,actualLaunched,
                 actualIntercepted,impactIds.size(),timeoutIds.size(),
                 actualTerminal,unresolved,naturalCraftLosses,pdShots,
                 pdByBand[0],pdByBand[1],pdByBand[2],pdByBand[3],
@@ -359,25 +373,27 @@ public final class PointDefenseLoadDiagnostic {
         Path out=Path.of("test-output","pd-load-profiles");
         Files.createDirectories(out);
         List<String> rows=new ArrayList<>();
-        rows.add("load,threat,pd_layout,pd_tier,seed,pd_enabled,launched,intercepted,impacted,timed_out,terminal_entries,unresolved_at_end,natural_craft_losses,pd_shots,early_pd_shots,middle_pd_shots,late_pd_shots,drain_pd_shots,early_kills,middle_kills,late_kills,drain_kills,early_launched,middle_launched,late_launched,min_reactor_fraction,peak_heat_fraction,hull_damage,simulated_ticks,kinetic_units_spent,missile_units_spent,torpedo_units_spent");
+        rows.add("load,threat,pd_layout,pd_tier,seed,pd_enabled,power_state,launched,intercepted,impacted,timed_out,terminal_entries,unresolved_at_end,natural_craft_losses,pd_shots,early_pd_shots,middle_pd_shots,late_pd_shots,drain_pd_shots,early_kills,middle_kills,late_kills,drain_kills,early_launched,middle_launched,late_launched,min_reactor_fraction,peak_heat_fraction,hull_damage,simulated_ticks,kinetic_units_spent,missile_units_spent,torpedo_units_spent");
         StringBuilder summary=new StringBuilder("# Incidental, surge and sustained point-defense load\n\n");
         summary.append("One vs four independent PD controllers with the SAME four genuine installed PD modules. ")
                 .append("Baseline versus specialist IX. Two paired seeds, PD on/off; all percentages advisory. ")
                 .append("One gun controller per ship means four mounts on one hull may have less throughput ")
                 .append("than four independently firing hulls.\n\n");
-        summary.append("|Profile|Threat|PD layout|Tier|Launches|Intercepted|Kill %|Terminal entries|PD shots|Min power|Peak heat|Unresolved|\n");
-        summary.append("|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        summary.append("|Profile|Threat|PD layout|Tier|Power state|Launches|Intercepted|Kill %|Terminal entries|PD shots|Min power|Peak heat|Unresolved|\n");
+        summary.append("|---|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         int cases=0,errors=0;
         for(Load load:Load.values())
             for(Threat threat:Threat.values())
                 for(Layout layout:Layout.values())
-                    for(int rank:new int[]{0,9}){
+                    for(int rank:new int[]{0,9})
+                    for(PowerState powerState:load==Load.SUSTAINED?
+                            PowerState.values():new PowerState[]{PowerState.NOMINAL}){
                         int launched=0,killed=0,terminal=0,pdShots=0,unresolved=0;
                         double minPower=1,peakHeat=0;
                         for(int seed=0;seed<2;seed++){
                             try{
-                                Result active=run(catalog,load,threat,layout,rank,seed,true);
-                                Result control=run(catalog,load,threat,layout,rank,seed,false);
+                                Result active=run(catalog,load,threat,layout,rank,seed,true,powerState);
+                                Result control=run(catalog,load,threat,layout,rank,seed,false,powerState);
                                 rows.add(active.csv());rows.add(control.csv());
                                 launched+=active.launched;killed+=active.intercepted;
                                 terminal+=active.terminal;pdShots+=active.pdShots;
@@ -388,15 +404,16 @@ public final class PointDefenseLoadDiagnostic {
                             }catch(RuntimeException ex){
                                 errors++;
                                 rows.add("# DIAGNOSTIC_ERROR,"+load+","+threat+","+layout+
-                                        ","+rank+","+seed+","+ex.getClass().getSimpleName()+
+                                        ","+rank+","+seed+","+powerState+","+
+                                        ex.getClass().getSimpleName()+
                                         ":"+ex.getMessage());
                                 System.err.println("PD load case "+load+"/"+threat+"/"+layout+
-                                        "/"+rank+"/"+seed+": "+ex);
+                                        "/"+rank+"/"+seed+"/"+powerState+": "+ex);
                             }
                         }
                         summary.append(String.format(Locale.ROOT,
-                                "|%s|%s|%s|%d|%d|%d|%.1f%%|%d|%d|%.2f|%.2f|%d|\n",
-                                load,threat,layout,rank,launched,killed,
+                                "|%s|%s|%s|%d|%s|%d|%d|%.1f%%|%d|%d|%.2f|%.2f|%d|\n",
+                                load,threat,layout,rank,powerState,launched,killed,
                                 launched==0?0:100.0*killed/launched,terminal,pdShots,
                                 minPower,peakHeat,unresolved));
                     }
