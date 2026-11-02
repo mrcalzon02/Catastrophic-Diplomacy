@@ -14,7 +14,7 @@ public final class ShipStandingOrdersTest {
     }
     public static void main(String[] args)throws Exception {
         ShipStandingOrders policy=ShipStandingOrders.DEFAULT;
-        check(ShipStandingOrders.SETTINGS.length==23,"Missing advanced independent combat policies");
+        check(ShipStandingOrders.SETTINGS.length==29,"Missing persistent resource-fire policy controls");
         for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
             check(!policy.display(i).isBlank(),"Invisible standing policy row "+i);
         ShipStandingOrders attack=policy.adjust(0,4).adjust(1,-3);
