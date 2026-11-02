@@ -387,6 +387,14 @@ tasks.register('ordnanceSeekerSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.OrdnanceSeekerTest'
     dependsOn testClasses
 }
+tasks.register('rocketBarrageSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Four rocket sizes, 4/8/16 physical volleys, two dumbfire motors, dodging, laser PD, finite ammo and replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.RocketBarrageTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { dependsOn(tasks.named('rocketBarrageSmoke')) }
 tasks.named('ordnanceRacksSmoke') { finalizedBy(tasks.named('ordnanceSeekerSmoke')) }
 tasks.register('ordnanceSubmunitionsSmoke', JavaExec) {
     group = 'verification'
