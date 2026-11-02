@@ -1,9 +1,13 @@
 # Resource-aware ship orders: firing, targeting, propellant, resupply and damage
 
-**Status:** implementation specification and staged acceptance plan, not a claim that all the
-behavior below is already implemented. This document is grounded in the current Java 17
-simulation and orders editor. Existing 23 standing orders, fleet template defaults and
-legacy AI behavior must remain intact until their new policies are explicitly enabled.
+**Status:** implementation in progress. P0 audit and rocket-only tender correction
+are committed. The first P1/P2 functional slice is committed: 29 captain settings (23
+original plus six resource controls), CD-STANDING-3 legacy-safe persistence, live
+ammunition reserves/energy-only/hold-offense/continuous ration/spacing and
+whole-salvo commitments, with desktop/mobile editor page 3 and functional regression
+tests. **CI validation for the new head is pending**: do not call this release-verified.
+P3 precision tracking, per-weapon target selection, P4 fuel/reactor/repair coordination,
+and further per-family tuning remain specified below, not implemented.
 
 ## 1. Verified current implementation, boundaries, and gaps
 
@@ -412,6 +416,37 @@ corruption, illegal resource creation, missing required multiplayer/updater
 paths, or mandatory user control not working. **Advisory only:** tuning,
 expected hit/damage efficiency, relative fleet win rate, art, animation,
 balance or performance measurements absent a genuine functional hang.
+
+## 10a. First implemented slice and exact boundaries
+
+As of the initial resource-orders implementation:
+- `ShipResourceOrders` stores the validated immutable `IMMEDIATE/HOLD_OFFENSE`
+  and `UNRESTRICTED/AUTO_RATION/HOLD_RESERVE/SPACE_VOLLEYS/ENERGY_ONLY`
+  policies, with a 10–90% ration threshold, percent/minimum-round reserve
+  and 0–900-tick minimum spacing. These are the first exposed policies,
+  not all of the proposed targeting/fuel/energy presets above.
+- `ShipStandingOrders` retains the original 23 settings and adds six rows,
+  with a third page of enlarged touch targets. New rows persist through
+  `ShipStandingOrdersCodec` CD-STANDING-3; V1/V2 entries load unrestricted.
+- `ShipFireControl` computes a pure authorization decision and a continuous
+  rate fraction. `Battle.fire`, `queueRackSalvos` and
+  `queueRocketBarrage` consult it at initiation. The shared kinetic
+  budget includes outstanding rocket salvo bodies. Guided pending launch
+  bodies also count against missile/torpedo budgets. Only real firing
+  debits stock; existing physical reload/power/heat checks remain mandatory.
+- A newly selected `ENERGY_ONLY` policy blocks new kinetic, missile,
+  torpedo and rocket attacks, not existing already-in-flight/projectile
+  bodies. The separate fighter mission remains controlled by the existing
+  fighter orders. `HOLD_OFFENSE` currently gates the ship's offensive
+  main-battery firing path, not separate craft and defensive PD.
+- Per-family override selectors, precision lock accumulation, energy-first
+  scheduling, hard reactor reserves, fuel autonomy, target-profile
+  scoring and on-screen hold-reason telemetry still await P3/P4/P5
+  work. They must not be described as shipped.
+- Regression coverage extends existing standing orders, fleet group,
+  battle orders, rocket barrage and menu flow smoke tests. The current
+  cross-platform CI results are tracked by GitHub Actions and are not
+  presumed successful merely because source was committed.
 
 ## 11. Staged delivery with reviewable commits
 
