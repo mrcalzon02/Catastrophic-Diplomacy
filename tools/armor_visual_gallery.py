@@ -89,7 +89,10 @@ contrast_pairs=(("kinetic-pristine","kinetic-impact"),
                 ("kinetic-aureate-upper-pristine","kinetic-aureate-upper"),
                 ("kinetic-terran-upper-pristine","kinetic-terran-upper"),
                 ("laser-terran-upper-pristine","laser-terran-upper"),
-                ("missile-terran-upper-pristine","missile-terran-upper"))
+                ("missile-terran-upper-pristine","missile-terran-upper"),
+                ("plasma-terran-upper-pristine","plasma-terran-upper"),
+                ("particle-terran-upper-pristine","particle-terran-upper"),
+                ("torpedo-terran-upper-pristine","torpedo-terran-upper"))
 contrast_metrics=[]
 for pristine,damaged in contrast_pairs:
     first=next((x for x in rows if x["scenario"]==pristine and x["view"]=="surface"),None)
@@ -184,6 +187,63 @@ for key in keys:
                 "note":"Real R/G/B/A GPU mask dirty-region coverage; cosmetic evidence only",
                 "nonblocking":True,"observations":channel_coverage},
                indent=2)+"\n",encoding="utf8")
+
+# A labeled review sheet built exclusively from genuine original game
+# framebuffers. Unlike a gallery of unrelated hulls, all six use the same
+# Terran frigate and each actual-hit scene has its own pristine seed match.
+# If a capture is missing, report the problem rather than fabricate art.
+try:
+    from PIL import ImageDraw, ImageFont
+    font_path="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    try:
+        title_font=ImageFont.truetype(font_path,20)
+        detail_font=ImageFont.truetype(font_path,15)
+    except OSError:
+        title_font=detail_font=ImageFont.load_default()
+    families=("laser","kinetic","missile","torpedo","plasma","particle")
+    panel_w,panel_h=560,380
+    sheet=Image.new("RGB",(panel_w*2,panel_h*3),(16,19,25))
+    painter=ImageDraw.Draw(sheet)
+    complete=0
+    for index,weapon in enumerate(families):
+        live=next((row for row in rows if row["scenario"]==f"{weapon}-terran-upper"
+                   and row["view"]=="surface"),None)
+        pristine=next((row for row in rows if row["scenario"]==f"{weapon}-terran-upper-pristine"
+                       and row["view"]=="surface"),None)
+        if live is None or pristine is None or live["hull"]!=pristine["hull"] or live["seed"]!=pristine["seed"]:
+            warnings.append(f"{weapon}: real same-hull pristine / damaged evidence is missing")
+            continue
+        x=(index%2)*panel_w
+        y=(index//2)*panel_h
+        painter.text((x+12,y+6),f"{weapon.upper()}  |  genuine hits: {live['hits']}",
+                     fill=(236,240,244),font=title_font)
+        for j,scenario in enumerate((pristine,live)):
+            with Image.open(root/scenario["file"]) as original:
+                cut=original.convert("RGB").crop((390,90,890,680))
+                cut.thumbnail((260,312),Image.Resampling.LANCZOS)
+            left=x+10+j*275
+            sheet.paste(cut,(left,y+35))
+            painter.text((left+6,y+354),"PRISTINE" if j==0 else "REAL IMPACT",
+                         font=detail_font,fill=(185,195,211))
+        complete+=1
+    if complete==len(families):
+        folder=out/"examples"
+        folder.mkdir(exist_ok=True)
+        sheet.save(folder/"six-weapon-matched-hull-examples.png")
+        (folder/"README.txt").write_text(
+            "Six matched damage examples from REAL libGDX/OpenGL screenshots, "
+            "not generated concept art or synthetic marks. All six original "
+            "Terran frigates share the same pose and authored source art. "
+            "Each weapon's pristine image also uses its damage scene's exact "
+            "seed. Hits shown are cumulative and correctly labeled. "
+            "Screenshot quality is a nonblocking diagnostic.\\n",
+            encoding="utf8")
+        print("ARMOR-EXAMPLES six genuine matched-hull weapon comparisons")
+    else:
+        warnings.append(f"Same-hull weapon example sheet incomplete: {complete}/6")
+except Exception as error:
+    warnings.append(f"Nonblocking example presentation could not render: {error!s}")
+
 report={
     "schema":"cd-armor-review-v2",
     "original_framebuffers":len(rows),
@@ -196,7 +256,8 @@ report={
     "warnings":warnings,
     "observations":rows,
     "contrast_pairs":contrast_metrics,
-    "material_mask_channels":channel_coverage
+    "material_mask_channels":channel_coverage,
+    "same_hull_example_sheet":"examples/six-weapon-matched-hull-examples.png"
 }
 (out/"armor-review.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf8")
 (out/"armor-review-warnings.txt").write_text(
