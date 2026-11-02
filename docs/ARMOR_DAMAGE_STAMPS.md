@@ -300,3 +300,23 @@ expands only as necessary to cover the registered artwork and its 1.3-cell
 damage gradient; otherwise the previous small dirty rectangle is retained.
 Headless smoke tests validate the bounded projection, lack of teleporting
 across a large empty region, correct dirty masking, and no phantom marks.
+
+
+### Visual pockmark support inside the original silhouette
+
+After restoring actual R/G/B data, a real KINETIC hit still generated only
+10 bright-metal mask pixels, all within ONE vertical source-art column at the
+edge of the Vaerith corvette. The direct hit was registered to the nearest
+opaque border pixel, which has essentially no surrounding plating on which
+to draw a circular metallic rim or radial fractures. A deterministic,
+once-per-original-sprite secondary registration now picks a candidate no
+farther than .95 armor cell from the former nearest-surface point and never
+more than 3.25 cells from the real physical impact. It scores the ORIGINAL
+source alpha at 16 nearby samples and selects more solid **existing** armor
+only when there is meaningfully more room for a drawn crater. Candidate
+movement across a fully transparent gap is prohibited. LASER and untyped
+historic strikes still use the unchanged original anchors. Normal, high-res
+ship artwork and hull transparency remain authoritative. The existing GPU
+dirty rectangle also includes the inboard point, without disabling partial
+mask uploads. The optional visual workflow logs actual per-family mask
+coverage and provides original framebuffer screenshots.

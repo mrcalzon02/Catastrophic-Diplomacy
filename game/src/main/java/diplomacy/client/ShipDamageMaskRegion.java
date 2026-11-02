@@ -37,6 +37,14 @@ final class ShipDamageMaskRegion {
             right=Math.max(right,Math.min(width,(int)Math.ceil((visibleCol+2.5)*width/GRID)));
             top=Math.min(top,Math.max(0,(int)Math.floor((visibleRow-1.5)*height/GRID)));
             bottom=Math.max(bottom,Math.min(height,(int)Math.ceil((visibleRow+2.5)*height/GRID)));
+            // Inclusive of the alternate inboard presentation anchor; the
+            // unused region on ordinary laser impacts stays exactly as before.
+            float insetRow=alphaAnchors.row(r,c,diplomacy.sim.Battle.DamageType.KINETIC);
+            float insetCol=alphaAnchors.col(r,c,diplomacy.sim.Battle.DamageType.KINETIC);
+            left=Math.min(left,Math.max(0,(int)Math.floor((insetCol-1.5)*width/GRID)));
+            right=Math.max(right,Math.min(width,(int)Math.ceil((insetCol+2.5)*width/GRID)));
+            top=Math.min(top,Math.max(0,(int)Math.floor((insetRow-1.5)*height/GRID)));
+            bottom=Math.max(bottom,Math.min(height,(int)Math.ceil((insetRow+2.5)*height/GRID)));
         }
         return new Rect(left,top,right-left,bottom-top);
     }

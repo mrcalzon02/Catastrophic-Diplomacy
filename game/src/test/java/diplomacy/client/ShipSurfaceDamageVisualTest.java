@@ -179,6 +179,15 @@ public final class ShipSurfaceDamageVisualTest {
                 "A real hit just outside a thin hull must project to its nearest ACTUAL paint, not disappear");
         check(Math.abs(aligned.row(8,3)-8)<.5,
                 "Nearest artwork registration must stay in the same local impact band");
+        // An edge-nearest anchor can produce no visible metallic ring because
+        // the surrounding pixels are transparent. Move only nonlaser marks
+        // toward a nearby REAL painted interior. Never move approved lasers.
+        float kineticCol=aligned.col(8,5,diplomacy.sim.Battle.DamageType.KINETIC);
+        float laserCol=aligned.col(8,5,diplomacy.sim.Battle.DamageType.LASER);
+        check(kineticCol>=laserCol&&kineticCol<=laserCol+.95f,
+                "Kinetic pock must stay local while moving onto usable armor");
+        check(laserCol==aligned.col(8,5),
+                "Existing laser impact registration must remain byte-for-byte unchanged");
         float shifted=ShipArmorStamps.openingAt(aligned.row(8,5),aligned.col(8,5),
                 8,5,aligned.row(8,5),aligned.col(8,5),1,0,77);
         check(shifted==1f,"Aligned physical armor breach must expose the interior");
