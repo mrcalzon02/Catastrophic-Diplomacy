@@ -93,14 +93,22 @@ final class ShipSurfaceDamageCapture {
             case "TORPEDO" -> "TOR";
             default -> "LAS";
         };
-        final Shipyard.Hull hull=index==4||index==11?Shipyard.Hull.FRIGATE:
+        final Shipyard.Hull hull=index==3||index==4||index==11?
+                Shipyard.Hull.FRIGATE:
                 index==7||index==12?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
         Shipyard.Design bare=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         Shipyard.Design shooter=bare.install(firstWeaponSlot(bare),"BASE-TER-"+suffix);
         // Actual factory-fitted defenses and structural systems, but no guns:
         // otherwise an empty bare hull may have zero shields and make the
         // purported shield-only shot a misleading immediate armor breach.
-        Shipyard.Design targetDesign=Shipyard.starter(Battle.Faction.VAERITH_PRISM,hull);
+        // A thin Vaerith wing has room for only a one-pixel metal scar
+        // at its actual contact point; it CANNOT display an honest circular
+        // pockmark without painting outside approved art. Use broad Terran
+        // plating to demonstrate real kinetic pockmark geometry while keeping
+        // the genuine fitted shooter, projectile, impact, and physics intact.
+        Battle.Faction targetFaction=(index==3||index==12)?
+                Battle.Faction.TERRAN:Battle.Faction.VAERITH_PRISM;
+        Shipyard.Design targetDesign=Shipyard.starter(targetFaction,hull);
         for(Shipyard.Slot slot:targetDesign.placements())
             if(slot.mount()==Shipyard.Mount.WEAPON&&targetDesign.at(slot.index())!=null)
                 targetDesign=targetDesign.install(slot.index(),null);

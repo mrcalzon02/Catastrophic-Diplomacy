@@ -320,3 +320,21 @@ ship artwork and hull transparency remain authoritative. The existing GPU
 dirty rectangle also includes the inboard point, without disabling partial
 mask uploads. The optional visual workflow logs actual per-family mask
 coverage and provides original framebuffer screenshots.
+
+
+### Diagnostic kinetic target — source artwork constraint
+
+The attempt to shift kinetic damage stamps toward interior painted sections
+was reverted: real framebuffer mask coverage for ordinary kinetic changed
+from only 10 to 11 metal pixels and severe kinetic regressed from 49 to 35.
+The physical hit landed on a *single-pixel narrow Vaerith wing edge*,
+which cannot represent a circular raised pockmark without inventing ship
+pixels outside the original PNG. Keep actual edge strikes clipped to
+the approved source art rather than relocating their contact unnaturally.
+The optional KINETIC and heavy KINETIC **demonstration** lanes now fire
+the real fitted guns against a broad, originally illustrated TERRAN
+frigate/destroyer. Normal gameplay faction, damage, aiming and weapon
+physics are entirely unchanged; the approved Vaerith laser captures
+remain exactly as before. Only if the genuine new framebuffer and mask
+show bright-edged circular damage can this style be considered visually
+verified.

@@ -49,6 +49,10 @@ public final class ShipSurfaceDamageCaptureTest {
                 check(scene.ticks()>0,"Live-fire scenario never simulated "+scene.key());
             if(i==8)
                 check(scene.syntheticStress(),"Rectangle must be labeled as artificial stress");
+            if(i==3||i==12){
+                check(scene.target().faction==Battle.Faction.TERRAN,
+                    "Kinetic pockmark review must use real broad Terran plating");
+            }
             if(i>=9){
                 diplomacy.sim.Battle.DamageType expected=switch(i){
                     case 9 -> diplomacy.sim.Battle.DamageType.PLASMA;
