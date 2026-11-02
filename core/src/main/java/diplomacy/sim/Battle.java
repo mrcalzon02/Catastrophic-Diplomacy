@@ -122,7 +122,7 @@ public final class Battle {
          * no longer ignore real penetration due to per-hit integer truncation. */
         public double kineticStoreExposure,missileStoreExposure,torpedoStoreExposure;
         public double hazardInstability,hazardSeverity;
-        public int unsafeFlags;
+        public int unsafeFlags,lastFaultOrigin;
         public int escapePods,evacuatedCrew,hazardFailures;
         /** Real simulation ticks for visible engineering faults and repairs. */
         public long lastHazardTick=-10000,lastRepairTick=-10000;
@@ -1241,6 +1241,7 @@ public final class Battle {
         int origin=0;
         for(int flag=1;flag<=SurvivalHardwareCatalog.REACTOR_TAP;flag<<=1)
             if((s.unsafeFlags&flag)!=0 && selection--==0){origin=flag;break;}
+        s.lastFaultOrigin=origin;
         String fault;
         switch(origin){
             case SurvivalHardwareCatalog.GOVERNOR -> {
@@ -1263,7 +1264,8 @@ public final class Battle {
                 s.power=StrictMath.max(0,s.power-24*severity);
                 s.heat+=10*severity;
                 s.sensorsCondition=StrictMath.max(0,s.sensorsCondition-.24*severity);
-                s.commandCondition=StrictMath.max(0,s.commandCondition-.29*severity);
+                s.commandCondition=StrictMath.max(0,s.commandCondition-
+                        .29*severity*(1-s.commandProtection));
                 fault="illegal battery brick overloaded communications";
             }
             case SurvivalHardwareCatalog.THERMAL_SHUNT -> {
@@ -3266,6 +3268,7 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(s.torpedoStoreExposure));
             hash=mix(hash,s.hazardFailures);
             hash=mix(hash,s.unsafeFlags);
+            hash=mix(hash,s.lastFaultOrigin);
             hash=mix(hash,s.lastHazardTick);
             hash=mix(hash,s.lastRepairTick);
             hash=mix(hash,s.recoveryBeaconActivated?1:0);

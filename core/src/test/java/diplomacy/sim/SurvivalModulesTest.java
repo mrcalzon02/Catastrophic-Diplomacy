@@ -154,7 +154,8 @@ public final class SurvivalModulesTest {
                     "Installed unsafe hardware identity was lost for "+codes[type]);
             test.hazardInstability=100;
             for(int tick=0;tick<510;tick++)trial.step();
-            check(test.hazardFailures>0,"No real fault from "+codes[type]);
+            check(test.hazardFailures>0 && test.lastFaultOrigin==flags[type],
+                    "No distinguishable physical fault from "+codes[type]);
             check(switch(codes[type]){
                 case "PGO" -> test.reactorCondition<1;
                 case "JPB" -> test.reactorCondition<.95;

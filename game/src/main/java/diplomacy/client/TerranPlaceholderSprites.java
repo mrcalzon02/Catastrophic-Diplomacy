@@ -968,8 +968,22 @@ public final class TerranPlaceholderSprites implements Disposable {
             Texture art=layer!=null&&layer.overlay!=null?layer.overlay:original;
             float h=(float)(34*ship.visualScale());
             float w=h*original.getWidth()/(float)original.getHeight();
-            if(fault)batch.setColor(1f,.12f,.055f,(float)(.38*(1-faultAge/18.0)));
-            else batch.setColor(.20f,.94f,.67f,(float)(.15*(1-repairAge/6.0)));
+            if(fault){
+                // Distinct energy/cooling/communications faults now display
+                // different electrical flashes over their *actual* hull art.
+                float alpha=(float)(.38*(1-faultAge/18.0));
+                switch(ship.lastFaultOrigin){
+                    case diplomacy.tech.SurvivalHardwareCatalog.BATTERY_BRICK ->
+                            batch.setColor(.35f,.65f,1f,alpha);
+                    case diplomacy.tech.SurvivalHardwareCatalog.THERMAL_SHUNT ->
+                            batch.setColor(1f,.52f,.10f,alpha);
+                    case diplomacy.tech.SurvivalHardwareCatalog.PLASMA_CELL ->
+                            batch.setColor(.94f,.22f,.85f,alpha);
+                    case diplomacy.tech.SurvivalHardwareCatalog.REACTOR_TAP ->
+                            batch.setColor(1f,.09f,.05f,alpha);
+                    default -> batch.setColor(1f,.62f,.25f,alpha);
+                }
+            }else batch.setColor(.20f,.94f,.67f,(float)(.15*(1-repairAge/6.0)));
             drawWhole(batch,art,pose,w,h,(float)(StrictMath.toDegrees(pose.angle())-90));
         }
         if(drawing){batch.setColor(1,1,1,1);batch.end();}

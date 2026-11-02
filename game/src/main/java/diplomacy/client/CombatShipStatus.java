@@ -2,6 +2,8 @@ package diplomacy.client;
 
 import diplomacy.sim.Battle;
 import diplomacy.sim.DeceptionProjection;
+import diplomacy.shipyard.HullBaseline;
+import diplomacy.tech.SurvivalHardwareCatalog;
 
 /** Compact, non-interactive detail line for the actual currently followed hull. */
 final class CombatShipStatus {
@@ -14,8 +16,10 @@ final class CombatShipStatus {
         if(ship==null)throw new IllegalArgumentException("Ship required");
         StringBuilder status=new StringBuilder();
         if(DeceptionProjection.cloakActive(ship))status.append("OPTICAL CLOAK  ");
-        if(ship.radarCrossSection<.7)status.append("RADAR LOW  ");
-        if(ship.thermalSignature<.7)status.append("THERMAL LOW  ");
+        if(ship.hullClass!=null && ship.radarCrossSection<
+                HullBaseline.forHull(ship.faction,ship.hullClass).radarCrossSection()*.92)
+            status.append("RADAR STEALTH  ");
+        if(ship.thermalSignature<.98)status.append("THERMAL STEALTH  ");
         if(DeceptionProjection.falseContacts(ship)>0)
             status.append("HOLO CONTACTS ").append(DeceptionProjection.falseContacts(ship)).append("  ");
         if(ship.infraredRange>0)status.append("IR SCAN  ");
@@ -23,8 +27,17 @@ final class CombatShipStatus {
         if(ship.graviticRange>0)status.append("GRAV SCAN  ");
         if(ship.escapePods>0)status.append("PODS ").append(ship.escapePods).append("  ");
         if(ship.recoveryBeacon)status.append("RECOVERY BEACON  ");
-        if(ship.hazardInstability>0)
+        if(ship.hazardInstability>0){
             status.append("UNSAFE RETROFIT ").append(ship.hazardFailures).append(" FAULTS");
+            if(ship.lastFaultOrigin!=0)status.append(" (").append(switch(ship.lastFaultOrigin){
+                case SurvivalHardwareCatalog.GOVERNOR -> "GOVERNOR";
+                case SurvivalHardwareCatalog.PLASMA_CELL -> "PLASMA";
+                case SurvivalHardwareCatalog.BATTERY_BRICK -> "COMMS";
+                case SurvivalHardwareCatalog.THERMAL_SHUNT -> "COOLING";
+                case SurvivalHardwareCatalog.REACTOR_TAP -> "REACTOR";
+                default -> "UNKNOWN";
+            }).append(")");
+        }
         return status.toString().stripTrailing();
     }
     static String line(Battle.Ship ship){
