@@ -348,10 +348,30 @@ try:
                 edge_pen.text((15,10),
                     "TORPEDO | real original-hull impact / uploaded armor alpha",
                     font=title_font,fill=(240,243,247))
-                # Reuse the already-rendered full-size torpedo screenshot
-                # crop, never redraw the ship or invent material pixels.
-                with Image.open(root/"torpedo-terran-upper-surface.png") as shot:
-                    shot_crop=shot.convert("RGB").crop((505,285,760,540))
+                # Use the actual filenames recorded in frames.csv, not a
+                # guessed PNG path. Automatically find the strongest
+                # real before/after difference to center the tear itself.
+                torpedo_live=next(row for row in rows
+                    if row["scenario"]=="torpedo-terran-upper"
+                    and row["view"]=="surface")
+                torpedo_clean=next(row for row in rows
+                    if row["scenario"]=="torpedo-terran-upper-pristine"
+                    and row["view"]=="surface")
+                with Image.open(root/torpedo_live["file"]) as shot:
+                    real_ship=shot.convert("RGB")
+                with Image.open(root/torpedo_clean["file"]) as clean:
+                    real_pristine=clean.convert("RGB")
+                delta=ImageChops.difference(real_ship,real_pristine)
+                search=(415,110,860,630)
+                localized=delta.convert("L").filter(ImageFilter.BoxBlur(24)).crop(search)
+                signal=list(localized.getdata())
+                best=max(range(len(signal)),key=lambda i:signal[i])
+                center_x=search[0]+best%localized.width
+                center_y=search[1]+best//localized.width
+                center_x=max(85,min(1280-85,center_x))
+                center_y=max(85,min(720-85,center_y))
+                shot_crop=real_ship.crop((center_x-85,center_y-85,
+                                         center_x+85,center_y+85))
                 shot_crop=shot_crop.resize((440,440),Image.Resampling.NEAREST)
                 edge_sheet.paste(shot_crop,(10,50))
                 edge_sheet.paste(authentic_cut,
