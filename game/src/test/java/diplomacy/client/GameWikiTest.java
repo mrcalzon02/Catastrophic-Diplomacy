@@ -45,6 +45,13 @@ public final class GameWikiTest {
                     .filter(e->e.id.equals("salvo.MISSILE."+mode)
                             ||e.id.equals("salvo.TORPEDO."+mode)).count()==2,
                     "Missile and torpedo salvo entries must both exist for "+mode);
+
+        check(catalog.search("MODULES","BASE-TER-EPDA").stream()
+                .anyMatch(a->a.id.equals("module.BASE-TER-EPDA")),
+                "Advanced rescue hardware is missing from actual module encyclopedia");
+        check(catalog.search("UPGRADES","TECH-TER-EPDA-SPECIALIST-09").stream()
+                .anyMatch(a->a.id.equals("upgrade.TECH-TER-EPDA-SPECIALIST-09")),
+                "Virtual Tech IX rescue research cannot be browsed by exact ID");
         GameWikiPanel ui=new GameWikiPanel(catalog,true);
         check(ui.resultCount()>8&&ui.categoryIndex()==1,"Mobile guide landing page absent");
         ui.setCategory(0);
