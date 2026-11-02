@@ -94,10 +94,10 @@ public final class RocketPdBalanceDiagnostic {
         defender.laserDamage=defender.missileDamage=defender.kineticDamage=0;
         defender.plasmaDamage=defender.particleDamage=defender.torpedoDamage=0;
         defender.fighterReserve=defender.droneReserve=0;
-        attacker.power=attacker.maxPower=20000;
-        attacker.maxHeat=20000;attacker.heat=0;
-        defender.power=defender.maxPower=20000;
-        defender.maxHeat=20000;defender.heat=0;
+        // Preserve actual research-derived reactor power, cooling limits
+        // and real fire-control condition. Artificial infinite energy would
+        // hide whether the 4-vs-4 late-game siege barrage overheats its hull
+        // or starves the defender's PD laser banks.
         // The laboratory explicitly PROVISIONS and BILLS kinetic stock
         // required for simultaneous rocket launchers. A normal campaign ship
         // still has finite, purchased ammunition and its original store limit.
