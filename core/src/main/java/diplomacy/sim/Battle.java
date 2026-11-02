@@ -659,6 +659,8 @@ public final class Battle {
     /** Opt-in screensaver policy only. Player/campaign battles never make
      * autonomous extraction decisions for the player's surviving ships. */
     private boolean unattendedExhibition;
+    /** Diagnostic-only crowding trial, disabled for all ordinary battles. */
+    private double diagnosticRocketPdPressure;
     /**
      * Strictly opt-in stationary target vessels for local development firing
      * ranges. The vessel remains a regular damageable fitted Ship: only captain
@@ -685,6 +687,13 @@ public final class Battle {
     public SpaceWeather weather() { return weather; }
     /** Only the self-contained, unsaved exhibition simulator enables this.
      * Must be configured before the first combat tick. */
+    /** Evaluate density-only PD effects without changing player combat balance.
+     * Only callable at tick zero on laboratory battles. Zero is legacy PD. */
+    public void configureRocketPdCrowdingForDiagnostic(double pressure){
+        if(tick!=0||!Double.isFinite(pressure)||pressure<0||pressure>1)
+            throw new IllegalArgumentException("Invalid PD diagnostic configuration");
+        diagnosticRocketPdPressure=pressure;
+    }
     public void enableUnattendedExhibition(){
         if(tick!=0)throw new IllegalStateException("Set exhibition policy before combat");
         unattendedExhibition=true;
@@ -3222,6 +3231,7 @@ public final class Battle {
                 && defender.power>=pdLaw.minimumPower()) {
             Missile chosenMissile=null;Ballistic chosenShell=null;Rocket chosenRocket=null;
             double quickest=Double.POSITIVE_INFINITY;
+            int acquiredRockets=0;
             for(Missile m:missiles){
                 if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
@@ -3267,6 +3277,7 @@ public final class Battle {
                         defender.pointDefenseProfile,r.spec,
                         RocketBarrage.hotEmission(r.motor,r.burning()));
                 if(distance>detection)continue;
+                acquiredRockets++;
                 double eta=approachEta(defender.x,defender.y,
                         r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
                 if(defender.standingOrders!=null&&eta>=1000 &&
@@ -3303,6 +3314,13 @@ public final class Battle {
                     StrictMath.hypot(chosenMissile.vx,chosenMissile.vy):
                     chosenRocket!=null?StrictMath.hypot(chosenRocket.vx,chosenRocket.vy):
                     incoming.speed());
+            if(chosenRocket!=null&&diagnosticRocketPdPressure>0){
+                int fittedPd=0;
+                for(WeaponMuzzles.Emitter emitter:defender.weaponEmitters)
+                    if(emitter.family()==WeaponMuzzles.Family.POINT_DEFENSE)fittedPd++;
+                chance=RocketPdSaturation.chance(chance,acquiredRockets,
+                        Math.max(1,fittedPd),diagnosticRocketPdPressure);
+            }
             if(random.nextDouble()<chance){
                 if(chosenMissile!=null){
                     chosenMissile.integrity-=defender.pointDefenseProfile.damage();
