@@ -52,6 +52,7 @@ public final class GameWikiTest {
         ui.setQuery("TECH-TER-LAS-OUTPUT-01");
         check(ui.resultCount()>0&&ui.selectedId().contains("upgrade."),
                 "Searching exact research IDs must select the actual upgrade");
+        ui.setQuery("");
         ui.setCategory(5);
         check(ui.resultCount()==stages,
                 "Virtual upgrades must expose all ranks without eager articles");
