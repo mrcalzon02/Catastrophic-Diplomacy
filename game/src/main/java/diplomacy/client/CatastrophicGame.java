@@ -2873,6 +2873,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(selected.id!=focusedShipId||!selected.alive())continue;
             font.setColor(Color.WHITE);
             font.draw(batch,CombatShipStatus.line(selected),338,87);
+            String equipment=CombatShipStatus.equipment(selected);
+            if(!equipment.isEmpty()){
+                font.setColor(Color.CYAN);
+                font.draw(batch,equipment,338,65);
+            }
             break;
         }
         font.setColor(Color.GOLD);

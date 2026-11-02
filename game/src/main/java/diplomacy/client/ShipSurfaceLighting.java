@@ -132,10 +132,15 @@ final class ShipSurfaceLighting implements Disposable {
         heading(batch,spriteRotationDegrees,1f);
     }
     static void heading(SpriteBatch batch,float spriteRotationDegrees,float integrity){
+        heading(batch,spriteRotationDegrees,integrity,1f);
+    }
+    static void heading(SpriteBatch batch,float spriteRotationDegrees,float integrity,
+                        float opacity){
         double theta=Math.toRadians(spriteRotationDegrees);
         batch.setColor((float)(.5+.5*Math.cos(theta)),
                        (float)(.5+.5*Math.sin(theta)),
-                       Math.max(0f,Math.min(1f,integrity)),1f);
+                       Math.max(0f,Math.min(1f,integrity)),
+                       Math.max(0f,Math.min(1f,opacity)));
     }
     /** Strategic LOD uses the actual original art path, avoiding all material
      * texture binds and the three-sampler shader for distant fleet views. */
@@ -143,8 +148,11 @@ final class ShipSurfaceLighting implements Disposable {
         return ShipLightProbes.detail(view)<.01f;
     }
     void color(SpriteBatch batch,float rotation,float integrity){
-        if(flat)batch.setColor(1f,1f,1f,1f);
-        else heading(batch,rotation,integrity);
+        color(batch,rotation,integrity,1f);
+    }
+    void color(SpriteBatch batch,float rotation,float integrity,float opacity){
+        if(flat)batch.setColor(1f,1f,1f,opacity);
+        else heading(batch,rotation,integrity,opacity);
     }
     void color(SpriteBatch batch,float rotation){color(batch,rotation,1f);}
     void begin(SpriteBatch batch){begin(batch,null,null);}

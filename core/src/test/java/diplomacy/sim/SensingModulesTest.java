@@ -133,6 +133,30 @@ public final class SensingModulesTest {
         enemy.power=0;
         require(duel.hasTargetContact(spotter,enemy,300),
                 "Unpowered visual cloak must fail open");
+        require(!DeceptionProjection.cloakActive(enemy) &&
+                DeceptionProjection.hullOpacity(enemy,120)==1f,
+                "Unpowered optical cloak must visibly disappear");
+        enemy.power=40;enemy.ecmCondition=1;enemy.hologramNoise=.72;
+        require(DeceptionProjection.cloakActive(enemy) &&
+                DeceptionProjection.hullOpacity(enemy,120)<1,
+                "Powered cloak must use actual translucent hull art");
+        require(DeceptionProjection.falseContacts(enemy)==3,
+                "An advanced powered holo emitter must project several false contacts");
+        require(DeceptionProjection.lockMultiplier(enemy,1)<
+                DeceptionProjection.lockMultiplier(enemy,2.4),
+                "Better acquisition must defeat more holographic deception");
+        double x=DeceptionProjection.ghostX(enemy,0,120);
+        double y=DeceptionProjection.ghostY(enemy,0,120);
+        require(Double.isFinite(x)&&Double.isFinite(y) &&
+                StrictMath.hypot(x-enemy.x,y-enemy.y)>25,
+                "False contact must occupy a distinct world-space position");
+        require(x==DeceptionProjection.ghostX(enemy,0,120) &&
+                y==DeceptionProjection.ghostY(enemy,0,120),
+                "Contact position must replay deterministically");
+        enemy.power=0;
+        require(DeceptionProjection.falseContacts(enemy)==0 &&
+                DeceptionProjection.lockMultiplier(enemy,1)==1,
+                "Loss of emitter power must remove both ghosts and their combat advantage");
         System.out.println("PASS sensing module fittings, research, persistence and detection");
     }
 }

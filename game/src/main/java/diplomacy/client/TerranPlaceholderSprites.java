@@ -10,6 +10,7 @@ import diplomacy.shipyard.FactionArt;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.sim.Battle;
 import diplomacy.sim.DirectionalDefense;
+import diplomacy.sim.DeceptionProjection;
 import java.util.EnumMap;
 import java.util.List;
 
@@ -836,7 +837,8 @@ public final class TerranPlaceholderSprites implements Disposable {
             float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
             surfaces.bind(batch,tex);
             surfaces.color(batch,rotation,(float)Math.max(0,
-                    Math.min(1,ship.hull/Math.max(1,ship.maxHull))));
+                    Math.min(1,ship.hull/Math.max(1,ship.maxHull))),
+                    DeceptionProjection.hullOpacity(ship,battle.tick));
             if(!breached(ship)){
                 drawWhole(batch,tex,pose,width,height,rotation);
             }else{
@@ -849,6 +851,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         batch.setColor(1,1,1,1);
         surfaces.end(batch);
+        // Active holographic ECM displays false electronic contacts using
+        // transparent copies of the EXACT source-art hull. These are never
+        // second physical ships and receive no damage/shields/hardpoints.
+        renderHolographicContacts(battle,batch,poses,view);
         // Cached source-art hex textures are recolored using per-vertex RGB:
         // one shader for all factions, generators and independent facings.
         batch.setShader(shieldInk==null?null:shieldInk.program());
@@ -936,6 +942,32 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         batch.setShader(null);
         trimIdleShipTextures();
+    }
+    private void renderHolographicContacts(Battle battle,SpriteBatch batch,
+                                           BattleRenderPoses poses,CombatViewBounds view){
+        boolean drawing=false;
+        for(Battle.Ship ship:battle.ships()){
+            int contacts=DeceptionProjection.falseContacts(ship);
+            if(contacts==0)continue;
+            Texture original=texture(ship);
+            if(original==null)continue;
+            BattleRenderPoses.Pose actual=poses==null
+                    ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
+                    :poses.ship(ship);
+            float height=(float)(34*ship.visualScale());
+            float width=height*original.getWidth()/(float)original.getHeight();
+            for(int contact=0;contact<contacts;contact++){
+                float x=actual.x()+(float)(DeceptionProjection.ghostX(ship,contact,battle.tick)-ship.x);
+                float y=actual.y()+(float)(DeceptionProjection.ghostY(ship,contact,battle.tick)-ship.y);
+                BattleRenderPoses.Pose phantom=new BattleRenderPoses.Pose(x,y,actual.angle());
+                if(view!=null&&!view.ship(phantom,ship.visualScale()))continue;
+                if(!drawing){batch.setShader(null);batch.begin();drawing=true;}
+                batch.setColor(.31f,.78f,1f,.21f);
+                drawWhole(batch,original,phantom,width*.96f,height*.96f,
+                        (float)(StrictMath.toDegrees(phantom.angle())-90));
+            }
+        }
+        if(drawing){batch.setColor(1,1,1,1);batch.end();}
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
                             BattleRenderPoses.Pose pose,float width,float height,

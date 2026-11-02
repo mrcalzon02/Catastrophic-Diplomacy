@@ -1679,11 +1679,10 @@ public final class Battle {
         if(s.crewReadiness()<0.05)return;
         double distance=StrictMath.hypot(target.x-s.x,target.y-s.y);
         double lockRange=targetAcquisitionRange(s,target);
-        double holo=target.power>4?target.hologramNoise*target.ecmCondition:0;
         double lock=Math.max(0,1-distance/Math.max(1,lockRange))
                 *s.crewReadiness()*s.sensorsCondition*weather.sensorFactor()
                 *(1-target.ecmStrength*target.ecmCondition)
-                *(1-StrictMath.min(0.8,holo/StrictMath.max(0.6,s.sensorAcuity)));
+                *DeceptionProjection.lockMultiplier(target,s.sensorAcuity);
         double weatherAim=weather.accuracyFactor();
         var laser=WeaponBehaviorTable.gun(DamageType.LASER);
         var missile=WeaponBehaviorTable.gun(DamageType.MISSILE);
@@ -1715,11 +1714,20 @@ public final class Battle {
                     s.accuracy*laserType.aim,s.weapons.laserTracking(),weatherAim,lock);
             double endX=aim.x(),endY=aim.y();
             if(!landed){
-                double deviation=28+(shotId%5)*4;
-                double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
-                        +(shotId%2==0?1:-1)*1.15;
-                endX+=StrictMath.cos(angle)*deviation;
-                endY+=StrictMath.sin(angle)*deviation;
+                int phantoms=DeceptionProjection.falseContacts(target);
+                if(phantoms>0){
+                    // Failed electronic lock traces the actual visible
+                    // holographic contact, not an unrelated fake hit marker.
+                    int phantom=(int)Math.floorMod(shotId,phantoms);
+                    endX=DeceptionProjection.ghostX(target,phantom,tick);
+                    endY=DeceptionProjection.ghostY(target,phantom,tick);
+                }else{
+                    double deviation=28+(shotId%5)*4;
+                    double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
+                            +(shotId%2==0?1:-1)*1.15;
+                    endX+=StrictMath.cos(angle)*deviation;
+                    endY+=StrictMath.sin(angle)*deviation;
+                }
             }
             beams.add(new Beam(shotId,tick,laserMuzzle.x(),laserMuzzle.y(),
                     endX,endY,s.team,DamageType.LASER,false,laserType));
@@ -1764,7 +1772,15 @@ public final class Battle {
             double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x());
             boolean onTarget=random.nextDouble()<kinetic.aim(
                     s.accuracy,s.weapons.kineticTracking(),weatherAim,lock);
-            if(!onTarget)angle+=(shotId%2==0?1:-1)*WeaponBehaviorTable.BALLISTIC_MISS_ANGLE_RADIANS;
+            if(!onTarget){
+                int phantoms=DeceptionProjection.falseContacts(target);
+                if(phantoms>0){
+                    int phantom=(int)Math.floorMod(shotId,phantoms);
+                    angle=StrictMath.atan2(
+                            DeceptionProjection.ghostY(target,phantom,tick)-muzzle.y(),
+                            DeceptionProjection.ghostX(target,phantom,tick)-muzzle.x());
+                }else angle+=(shotId%2==0?1:-1)*WeaponBehaviorTable.BALLISTIC_MISS_ANGLE_RADIANS;
+            }
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
                     muzzle.x(),muzzle.y(),angle,s.kineticDamage*shell.damage(),
                     shell.physical(s.kineticProjectile),s.kineticType));
@@ -1783,11 +1799,20 @@ public final class Battle {
             // Keep a missed beam from appearing to strike and erode its target.
             double endX=aim.x(),endY=aim.y();
             if(!landed){
-                double deviation=28+(shotId%5)*4;
-                double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
-                        +(shotId%2==0?1:-1)*1.15;
-                endX+=StrictMath.cos(angle)*deviation;
-                endY+=StrictMath.sin(angle)*deviation;
+                int phantoms=DeceptionProjection.falseContacts(target);
+                if(phantoms>0){
+                    // Failed electronic lock traces the actual visible
+                    // holographic contact, not an unrelated fake hit marker.
+                    int phantom=(int)Math.floorMod(shotId,phantoms);
+                    endX=DeceptionProjection.ghostX(target,phantom,tick);
+                    endY=DeceptionProjection.ghostY(target,phantom,tick);
+                }else{
+                    double deviation=28+(shotId%5)*4;
+                    double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
+                            +(shotId%2==0?1:-1)*1.15;
+                    endX+=StrictMath.cos(angle)*deviation;
+                    endY+=StrictMath.sin(angle)*deviation;
+                }
             }
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.PLASMA,shotId);
             beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.PLASMA));
@@ -1807,11 +1832,20 @@ public final class Battle {
             // Keep a missed beam from appearing to strike and erode its target.
             double endX=aim.x(),endY=aim.y();
             if(!landed){
-                double deviation=28+(shotId%5)*4;
-                double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
-                        +(shotId%2==0?1:-1)*1.15;
-                endX+=StrictMath.cos(angle)*deviation;
-                endY+=StrictMath.sin(angle)*deviation;
+                int phantoms=DeceptionProjection.falseContacts(target);
+                if(phantoms>0){
+                    // Failed electronic lock traces the actual visible
+                    // holographic contact, not an unrelated fake hit marker.
+                    int phantom=(int)Math.floorMod(shotId,phantoms);
+                    endX=DeceptionProjection.ghostX(target,phantom,tick);
+                    endY=DeceptionProjection.ghostY(target,phantom,tick);
+                }else{
+                    double deviation=28+(shotId%5)*4;
+                    double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
+                            +(shotId%2==0?1:-1)*1.15;
+                    endX+=StrictMath.cos(angle)*deviation;
+                    endY+=StrictMath.sin(angle)*deviation;
+                }
             }
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.PARTICLE,shotId);
             beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.PARTICLE));
@@ -2919,7 +2953,7 @@ public final class Battle {
             if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
             // Maintain lock with actual target RCS and ECM; a broken lock
             // only reacquires on a bounded scan with stricter geometry.
-            double holograms=target.power>4?target.hologramNoise*target.ecmCondition:0;
+            double holograms=DeceptionProjection.hologramStrength(target);
             boolean visible=OrdnanceSeeker.canTrack(range,target.radarCrossSection,
                     StrictMath.min(0.95,target.ecmStrength*target.ecmCondition+
                             0.45*holograms),m.guidanceQuality,
