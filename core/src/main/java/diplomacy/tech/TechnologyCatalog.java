@@ -137,6 +137,20 @@ public final class TechnologyCatalog {
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
     public Map<String, Upgrade> upgrades() { return upgrades; }
+    /** Only canonical IDs are needed for navigation. Avoid allocating all
+     * 13,200 derived Upgrade records just to populate the field-wiki index. */
+    public List<String> upgradeIds(){
+        ArrayList<String> ids=new ArrayList<>(upgradeTotal);
+        ids.addAll(sixStages.keySet());
+        if(deferredHigherStages)for(Upgrade u:sixStages.values())
+            if(u.stage==6){
+                String stem=u.id.substring(0,u.id.length()-2);
+                ids.add(stem+"07");ids.add(stem+"08");ids.add(stem+"09");
+            }
+        if(ids.size()!=upgradeTotal)
+            throw new IllegalStateException("Virtual stage count mismatch");
+        return ids;
+    }
 
     /** Read-only enumeration generates one late-rank value at a time. */
     private final class LazyUpgrades extends AbstractMap<String,Upgrade> {

@@ -56,7 +56,7 @@ final class GameWikiCatalog {
         // Only their canonical IDs are retained; details use the same live
         // TechnologyCatalog on demand and never become a second permanent copy.
         List<String> ids=new ArrayList<>(technology.upgradeCount());
-        ids.addAll(technology.upgrades().keySet());
+        ids.addAll(technology.upgradeIds());
         ids.sort(String::compareTo);
         upgradeIds=List.copyOf(ids);
         if(upgradeIds.size()!=technology.upgradeCount())
