@@ -6,6 +6,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.AbstractMap;
+import java.util.AbstractSet;
+import java.util.Iterator;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,19 +73,108 @@ public final class TechnologyCatalog {
     }
     private final Map<String, Component> baseComponents;
     private final Map<String, Upgrade> upgrades;
+    private final Map<String, Upgrade> sixStages;
+    private final boolean deferredHigherStages;
+    private final int upgradeTotal;
     private final Set<String> components;
-    private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base) {
-        upgrades = Collections.unmodifiableMap(map);
-        baseComponents = Collections.unmodifiableMap(base);
-        components = Collections.unmodifiableSet(base.keySet());
+    private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base,
+                              boolean generateHigherStages) {
+        // Do NOT allocate 13,200 Stage VII-IX objects, CSV rows and Strings
+        // while an Android 10 VM is limited to a 16 MiB Java heap. These stages
+        // are direct, deterministic derivations of their Stage V/VI ancestors.
+        sixStages=Collections.unmodifiableMap(map);
+        deferredHigherStages=generateHigherStages;
+        int finalBranches=0;
+        if(generateHigherStages)for(Upgrade item:map.values())
+            if(item.stage==6){
+                String stem=item.id.substring(0,item.id.length()-2);
+                if(!map.containsKey(stem+"05"))
+                    throw new IllegalArgumentException("Missing fifth-stage source "+item.id);
+                finalBranches++;
+            }
+        upgradeTotal=Math.addExact(map.size(),Math.multiplyExact(finalBranches,3));
+        upgrades=generateHigherStages?Collections.unmodifiableMap(new LazyUpgrades()):
+                sixStages;
+        baseComponents=Collections.unmodifiableMap(base);
+        components=Collections.unmodifiableSet(base.keySet());
     }
-    public int upgradeCount() { return upgrades.size(); }
+    public int upgradeCount() { return upgradeTotal; }
     public int componentCount() { return components.size(); }
-    public Upgrade get(String id) { return upgrades.get(id); }
+    public Upgrade get(String id) {
+        Upgrade found=sixStages.get(id);
+        if(found!=null||!deferredHigherStages||id==null||id.length()<4)return found;
+        int end=id.length();
+        char tens=id.charAt(end-2),unit=id.charAt(end-1);
+        if(tens!='0'||unit<'7'||unit>'9')return null;
+        String stem=id.substring(0,end-2);
+        Upgrade stageSix=sixStages.get(stem+"06");
+        Upgrade stageFive=sixStages.get(stem+"05");
+        if(stageSix==null||stageFive==null)return null;
+        int stage=unit-'0';
+        long research=Math.round(stageSix.researchCost*StrictMath.pow(stage/6.0,2));
+        long industry=Math.round(stageSix.industryCost*StrictMath.pow(stage/6.0,2));
+        if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
+            throw new IllegalArgumentException("Higher-tier technology cost overflows "+id);
+        double[] current={stageSix.mass,stageSix.power,stageSix.heat,stageSix.output,
+                stageSix.accuracy,stageSix.integrity,stageSix.shield,stageSix.thrust,
+                stageSix.cooling,stageSix.maintenance};
+        double[] previous={stageFive.mass,stageFive.power,stageFive.heat,stageFive.output,
+                stageFive.accuracy,stageFive.integrity,stageFive.shield,stageFive.thrust,
+                stageFive.cooling,stageFive.maintenance};
+        ArrayList<String> cells=new ArrayList<>(COLS);
+        Collections.addAll(cells,id,stageSix.faction,stageSix.subsystem,
+                stageSix.track,Integer.toString(stage),
+                stageSix.name+" / Stage "+stage,
+                stem+"0"+(stage-1),
+                Long.toString(Math.max(1,research)),
+                Long.toString(Math.max(1,industry)));
+        for(int i=0;i<current.length;i++)
+            cells.add(ratio(Math.max(.05,current[i]+(current[i]-previous[i])*(stage-6)),1));
+        cells.add(stageSix.tradeoff+"; higher-stage engineering and upkeep");
+        return new Upgrade(cells);
+    }
     public boolean hasBase(String id) { return components.contains(id); }
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
     public Map<String, Upgrade> upgrades() { return upgrades; }
+
+    /** Read-only enumeration generates one late-rank value at a time. */
+    private final class LazyUpgrades extends AbstractMap<String,Upgrade> {
+        @Override public int size(){return upgradeTotal;}
+        @Override public Upgrade get(Object key){
+            return key instanceof String ? TechnologyCatalog.this.get((String)key):null;
+        }
+        @Override public Set<Entry<String,Upgrade>> entrySet(){
+            return new AbstractSet<>() {
+                @Override public int size(){return upgradeTotal;}
+                @Override public Iterator<Entry<String,Upgrade>> iterator(){
+                    Iterator<Entry<String,Upgrade>> early=sixStages.entrySet().iterator();
+                    Iterator<Upgrade> branch=sixStages.values().iterator();
+                    Upgrade nextBranch=null;
+                    int higher=7;
+                    return new Iterator<>() {
+                        @Override public boolean hasNext(){
+                            if(early.hasNext())return true;
+                            if(nextBranch!=null&&higher<=9)return true;
+                            while(branch.hasNext()){
+                                Upgrade test=branch.next();
+                                if(test.stage==6){nextBranch=test;higher=7;return true;}
+                            }
+                            return false;
+                        }
+                        @Override public Entry<String,Upgrade> next(){
+                            if(early.hasNext())return early.next();
+                            if(!hasNext())throw new NoSuchElementException();
+                            Upgrade value=TechnologyCatalog.this.get(
+                                    nextBranch.id.substring(0,nextBranch.id.length()-2)+
+                                    "0"+higher++);
+                            return new SimpleImmutableEntry<>(value.id,value);
+                        }
+                    };
+                }
+            };
+        }
+    }
 
     public static TechnologyCatalog loadDefault() throws IOException {
         try (InputStream upgrades = TechnologyCatalog.class.getResourceAsStream(UPGRADES_RESOURCE);
@@ -107,7 +201,8 @@ public final class TechnologyCatalog {
             addSensingFamilies(bases,rows);
             addSensingHardwareVariants(bases,rows);
             addSurvivalAndUnsafeFamilies(bases,rows);
-            extendToNineStages(rows);
+            // Ranks VII-IX are synthesized on demand. No 13,200 extra
+            // temporary CSV arrays/strings retained at Android startup.
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
         if (!bases.get(0).get(0).equals("Base ID") || !rows.get(0).get(0).equals("Tech ID")
@@ -123,6 +218,9 @@ public final class TechnologyCatalog {
         Map<String, Upgrade> upgrades = new LinkedHashMap<>();
         for (int i = 1; i < rows.size(); i++) {
             Upgrade upgrade = new Upgrade(rows.get(i));
+            // Discard expanded CSV row as soon as its immutable Upgrade is
+            // parsed. This avoids retaining both formats on constrained VMs.
+            rows.set(i,null);
             if (upgrades.putIfAbsent(upgrade.id, upgrade) != null)
                 throw new IllegalArgumentException("Duplicate technology ID: " + upgrade.id);
         }
@@ -136,7 +234,7 @@ public final class TechnologyCatalog {
                     || (u.stage > 1 && !upgrades.containsKey(expected)))
                 throw new IllegalArgumentException("Missing prerequisite for " + u.id);
         }
-        return new TechnologyCatalog(upgrades, baseMap);
+        return new TechnologyCatalog(upgrades, baseMap,includeNewCivilizations);
     }
 
     /**
