@@ -889,8 +889,11 @@ final class ShipyardPanel {
         if(item.contains("DRONE"))return "drone";
         if(item.contains("HANGAR") || item.contains("FIGHTER"))return "squadron";
         if(item.contains("EMP") || item.contains("ECM") || item.contains("JAMMER"))return "emp";
-        if(item.contains("STEALTH") || item.contains("CLOAK"))return "stealth";
-        if(item.contains("SENSOR") || item.contains("RADAR") || item.contains("SCANNER"))return "detect";
+        if(item.contains("STEALTH") || item.contains("CLOAK") ||
+                item.contains("DAMPER") || item.contains("HOLO"))return "stealth";
+        if(item.contains("SENSOR") || item.contains("RADAR") ||
+                item.contains("SCANNER") || item.contains("INFRARED") ||
+                item.contains("ACUITY") || item.contains("X-RAY"))return "detect";
         if(item.contains("SHIELD"))return "shield";
         if(item.contains("ARMOR"))return "armor";
         if(item.contains("REPAIR"))return "repair";

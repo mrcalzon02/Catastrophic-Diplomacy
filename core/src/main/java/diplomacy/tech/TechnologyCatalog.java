@@ -104,6 +104,7 @@ public final class TechnologyCatalog {
             addSpecializedSupportFamilies(bases,rows);
             addTenderFamilies(bases,rows);
             addArmorAndBulkheadFamilies(bases,rows);
+            addSensingFamilies(bases,rows);
             extendToNineStages(rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
@@ -506,6 +507,64 @@ public final class TechnologyCatalog {
                 row.set(6,row.get(6).replace("-XFR-","-"+kind[0]+"-")
                         .replace("-XFR","-"+kind[0]));
                 row.set(19,kind[1]+": "+row.get(19)+"; finite stores and support-slot tradeoffs");
+                upgrades.add(row);
+            }
+        }
+    }
+
+
+    /**
+     * Distinct detection and counter-detection hardware for all eleven native
+     * factions. Source SEN/ECM engineering tables are cloned, never modified:
+     * existing save IDs retain their meaning, and each new device gets its
+     * own four mutually exclusive nine-rank research branches.
+     */
+    private static void addSensingFamilies(List<List<String>> bases,
+                                           List<List<String>> upgrades) {
+        // code, name, parent, mount category, mass, power, heat, integrity, effect, price
+        String[][] types={
+            {"RDR","Long-Range Radar Array","SEN","systems","1.23","1.19","1.12","0.98","1.15","1.18"},
+            {"STC","Radar-Stealth Coating","ECM","defense","0.89","0.64","0.75","1.10","0.82","1.16"},
+            {"IRT","Infrared Telescope","SEN","systems","0.92","1.04","1.04","0.92","0.94","1.04"},
+            {"HTD","Thermal Emission Damper","ECM","systems","1.10","1.23","1.31","1.07","0.91","1.23"},
+            {"VCL","Active Visual Cloak","ECM","systems","1.21","1.45","1.32","0.87","1.10","1.42"},
+            {"ACU","Sensor Acuity Amplifier","SEN","systems","1.04","1.24","1.13","0.96","1.08","1.22"},
+            {"XRY","X-Ray Detector","SEN","systems","1.22","1.38","1.37","1.01","0.96","1.39"},
+            {"GRA","Gravitic Anomaly Sensor","SEN","systems","1.46","1.54","1.42","1.13","1.10","1.58"},
+            {"HLP","Holo-Decoy Projector","ECM","support","1.09","1.36","1.24","0.94","1.04","1.34"}
+        };
+        List<List<String>> sourceBases=List.copyOf(bases);
+        List<List<String>> sourceUpgrades=List.copyOf(upgrades);
+        for(String[] type:types) {
+            String code=type[0],parent=type[2];
+            for(int i=1;i<sourceBases.size();i++) {
+                List<String> base=sourceBases.get(i);
+                if(!parent.equals(base.get(2)))continue;
+                List<String> row=new ArrayList<>(base);
+                row.set(0,row.get(0).replace("-"+parent,"-"+code));
+                row.set(2,code);
+                row.set(3,type[1]);
+                row.set(4,type[3]);
+                for(int col=6;col<=9;col++)
+                    row.set(col,ratio(Double.parseDouble(row.get(col)),
+                            Double.parseDouble(type[col-2])));
+                row.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(row.get(10))*Double.parseDouble(type[9])))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),
+                        Double.parseDouble(type[8])));
+                row.set(12,"Dedicated powered detection or deception machinery; fitted socket required");
+                bases.add(row);
+            }
+            for(int i=1;i<sourceUpgrades.size();i++) {
+                List<String> source=sourceUpgrades.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-"+parent+"-","-"+code+"-"));
+                row.set(2,code);
+                row.set(5,type[1]+" - "+row.get(3)+" rank "+row.get(4));
+                row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
+                        .replace("-"+parent,"-"+code));
+                row.set(19,type[1]+": "+row.get(19));
                 upgrades.add(row);
             }
         }

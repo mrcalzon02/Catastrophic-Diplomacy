@@ -692,6 +692,12 @@ public final class Shipyard {
         }
         return bays;
     }
+    /** Fitted physical sensor suite. One empty hull has normal optics and radar,
+     * but no fictional free x-ray, thermal, gravitic or holographic array. */
+    public record Sensing(double radarGain,double infraredRange,double xrayRange,
+                          double graviticRange,double radarSignature,
+                          double thermalSignature,double opticalSignature,
+                          double acuity,double hologramNoise) { }
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
                          double speed, double accuracy, double laserDamage, double missileDamage,
@@ -706,7 +712,7 @@ public final class Shipyard {
                          Weapons weapons,Support support,double pdCycle,
                          HullBaseline.Stats baseline,Crew crew,
                          AmmunitionResearch.Access ammunition,
-                         double shieldRechargeBoost) { }
+                         double shieldRechargeBoost,Sensing sensing) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -724,6 +730,9 @@ public final class Shipyard {
         List<ProjectileModel.Spec> missileModules=new ArrayList<>();
         List<ProjectileModel.Spec> torpedoModules=new ArrayList<>();
         double pdWeight=0,pdOutput=0,pdTracking=0,pdCycle=0,sensorRatio=1;
+        double radarGain=1,infraredRange=0,xrayRange=0,graviticRange=0;
+        double radarSignature=1,thermalSignature=1,opticalSignature=1;
+        double acuity=1,hologramNoise=0;
         double[] ranges=new double[6],cycles=new double[6],trackers=new double[6];
         int[] weaponCounts=new int[6];
         double selfRate=0,remoteRate=0,remoteRange=180;
@@ -794,7 +803,26 @@ public final class Shipyard {
                     // Even an unupgraded sensor array improves PD acquisition.
                     // SPECIALIST upgrades add further fire-control reach.
                     sensorRatio+=0.08+0.25*(p.accuracy-1);
+                    radarGain+=0.12*p.accuracy*tuning.reach();
                 }
+                case "RDR" -> radarGain+=0.37*(p.effect/p.base.effect)
+                        *p.accuracy*tuning.reach();
+                case "STC" -> radarSignature/=1+0.70*(p.effect/p.base.effect)*tuning.reach();
+                case "IRT" -> infraredRange+=600*(p.effect/p.base.effect)
+                        *p.accuracy*tuning.reach();
+                case "HTD" -> thermalSignature/=1+0.78*(p.effect/p.base.effect)*tuning.reach();
+                case "VCL" -> opticalSignature/=1+0.92*(p.effect/p.base.effect)*tuning.reach();
+                case "ACU" -> {
+                    acuity+=0.34*(p.effect/p.base.effect)*p.accuracy*tuning.tracking();
+                    accuracy+=0.045*p.accuracy;
+                    sensorRatio+=0.13*p.accuracy;
+                }
+                case "XRY" -> xrayRange+=390*(p.effect/p.base.effect)
+                        *p.accuracy*tuning.reach();
+                case "GRA" -> graviticRange+=670*(p.effect/p.base.effect)
+                        *p.accuracy*tuning.reach();
+                case "HLP" -> hologramNoise+=0.25*(p.effect/p.base.effect)
+                        *p.accuracy*tuning.reach();
                 case "REP" -> {
                     repair+=p.effect*0.0004;
                     selfRate+=p.effect*0.028*tuning.selfRepair();
@@ -854,7 +882,12 @@ public final class Shipyard {
                 pdWeight==0?1:pdCycle/pdWeight,baseline,
                 new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
                         (int)StrictMath.floor(breathing)),
-                ammunitionAccess(design),shieldRechargeBoost);
+                ammunitionAccess(design),shieldRechargeBoost,
+                new Sensing(Math.min(4,radarGain),Math.min(1450,infraredRange),
+                        Math.min(950,xrayRange),Math.min(1800,graviticRange),
+                        Math.max(0.12,radarSignature),Math.max(0.12,thermalSignature),
+                        Math.max(0.12,opticalSignature),Math.min(2.5,acuity),
+                        Math.min(0.75,hologramNoise)));
     }
 
     /**

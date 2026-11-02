@@ -93,7 +93,7 @@ public final class ModuleBranchEffects {
                     case SPECIALIST -> {drone+=0.050*rank;remote+=0.050*rank;}
                 }
             }
-            case "SEN" -> {
+            case "SEN","RDR","STC","IRT","HTD","VCL","ACU","XRY","GRA","HLP" -> {
                 switch(branch){
                     case OUTPUT -> reach+=0.027*rank;
                     case EFFICIENCY -> efficiency+=0.040*rank;

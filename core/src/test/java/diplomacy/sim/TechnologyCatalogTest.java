@@ -11,8 +11,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 17028, "full technology count with tender chains");
-        require(c.componentCount() == 473, "all base components including fleet tenders");
+        require(c.upgradeCount() == 20592, "full technology count with sensing chains");
+        require(c.componentCount() == 572, "all base components including sensing systems");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -35,6 +35,19 @@ public final class TechnologyCatalogTest {
                                 String.format(java.util.Locale.ROOT,"%02d",rank);
                         require(c.get(id)!=null,"Missing defensive research "+id);
                     }
+            }
+            for(String module:new String[]{"RDR","STC","IRT","HTD","VCL",
+                    "ACU","XRY","GRA","HLP"}){
+                String category=module.equals("STC")?"defense":
+                        module.equals("HLP")?"support":"systems";
+                require(c.base("BASE-"+faction+"-"+module)!=null &&
+                        category.equals(c.base("BASE-"+faction+"-"+module).category),
+                        "Missing sensing/deception module "+faction+"/"+module);
+                for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=9;rank++)
+                        require(c.get("TECH-"+faction+"-"+module+"-"+track+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
+                                "Missing sensing research "+faction+"/"+module+"/"+track);
             }
             for(String module:new String[]{"KTS","MTS","TTS","FTS"}){
                 require(c.base("BASE-"+faction+"-"+module)!=null &&

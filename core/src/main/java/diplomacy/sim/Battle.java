@@ -111,6 +111,10 @@ public final class Battle {
         }
         /** Ship hull sensor and cross-section, independent from fitted scanner modules. */
         public double sensorRange=1100, radarCrossSection=1;
+        /** Independent sensors/countermeasures, paid for by fitted modules. */
+        public double infraredRange,xrayRange,graviticRange;
+        public double thermalSignature=1,opticalSignature=1,sensorAcuity=1;
+        public double hologramNoise;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
         public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
@@ -840,8 +844,16 @@ public final class Battle {
         HullBaseline.CoreSystems core=HullBaseline.core(design.hull);
         s.maxFuel=core.fuel();s.fuel=s.maxFuel;
         s.maxHull = machinery.hull(); s.hull = s.maxHull;
-        s.sensorRange=machinery.baseline().sensorRange();
-        s.radarCrossSection=machinery.baseline().radarCrossSection();
+        s.sensorRange=machinery.baseline().sensorRange()*machinery.sensing().radarGain();
+        s.radarCrossSection=machinery.baseline().radarCrossSection()
+                *machinery.sensing().radarSignature();
+        s.infraredRange=machinery.sensing().infraredRange();
+        s.xrayRange=machinery.sensing().xrayRange();
+        s.graviticRange=machinery.sensing().graviticRange();
+        s.thermalSignature=machinery.sensing().thermalSignature();
+        s.opticalSignature=machinery.sensing().opticalSignature();
+        s.sensorAcuity=machinery.sensing().acuity();
+        s.hologramNoise=machinery.sensing().hologramNoise();
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
@@ -1222,18 +1234,35 @@ public final class Battle {
         s.repairDroneReload=Math.max(0,s.repairDroneReload-DT);
     }
 
-    /** Radar can be blinded, but nearby silhouettes remain visible to optical
-     * spotters. Optical sighting is deliberately short and weather-dependent;
-     * neither it nor the search patrol reveals targets beyond real detection. */
+    /** Sensor channels are independent: coatings fool radar, heat dampers fool
+     * infrared, powered cloaks fool optics, while x-ray and gravitic detection
+     * supply shorter-range counters. All channels obey real range and weather. */
     private double targetAcquisitionRange(Ship observer,Ship target){
-        double rcs=StrictMath.max(0.15,StrictMath.min(4.0,target.radarCrossSection));
-        double radar=observer.sensorRange*observer.sensorsCondition*weather.sensorFactor()
-                *StrictMath.sqrt(StrictMath.sqrt(rcs));
-        // Passive thermal/optical spotting is a physical close-contact floor,
-        // even when nebular ions blind the long-range radar. Dense nebulae
-        // remain worse than clear space, never grant remote target knowledge.
-        double optical=weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390;
-        return StrictMath.max(radar,optical);
+        double condition=StrictMath.max(0,observer.sensorsCondition);
+        double weatherRange=weather.sensorFactor();
+        double acuity=observer.sensorAcuity;
+        double rcs=StrictMath.max(0.06,StrictMath.min(4,target.radarCrossSection));
+        double radar=observer.sensorRange*condition*weatherRange
+                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+0.09*(acuity-1));
+        // Visual silhouettes remain discernible even when electronic sensors fail.
+        // The cloak needs power and working electronic warfare electronics.
+        double cloak=target.power>4&&target.ecmCondition>0.15
+                ?target.opticalSignature:1;
+        double optical=(weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390)
+                *cloak;
+        double thermalDamping=1-(1-target.thermalSignature)
+                *StrictMath.max(0,target.coolingCondition);
+        double infrared=observer.infraredRange*condition*weatherRange
+                *StrictMath.sqrt(StrictMath.max(0.10,thermalDamping))
+                *(1+0.08*(acuity-1));
+        double xray=observer.xrayRange*condition*weatherRange
+                *(1+0.10*(acuity-1))/
+                (1+0.16*StrictMath.min(2,target.maxArmor/650));
+        double mass=StrictMath.max(0.45,StrictMath.min(2.4,target.maxHull/550));
+        double gravitic=observer.graviticRange*condition*weatherRange
+                *StrictMath.sqrt(mass)*(1+0.07*(acuity-1));
+        return StrictMath.max(optical,StrictMath.max(radar,
+                StrictMath.max(infrared,StrictMath.max(xray,gravitic))));
     }
     /** Independent optical/radar acquisition precedes any fleet datalink.
      * A relay is a detected enemy, not an omniscient target list: the spotter
@@ -1267,9 +1296,8 @@ public final class Battle {
         }
     }
 
-    private boolean hasTargetContact(Ship actor,Ship hostile,double distance){
-        if(!weather.preset().enabled()
-                ||distance<=targetAcquisitionRange(actor,hostile))return true;
+    boolean hasTargetContact(Ship actor,Ship hostile,double distance){
+        if(distance<=targetAcquisitionRange(actor,hostile))return true;
         if(actor.power<=3||actor.crewReadiness()<0.05||distance>1250)return false;
         Ship[] contacts=sharedSpotters[actor.team];
         if(hostile.id>=contacts.length)return false;
@@ -1561,9 +1589,12 @@ public final class Battle {
     private void fire(Ship s, Ship target) {
         if(s.crewReadiness()<0.05)return;
         double distance=StrictMath.hypot(target.x-s.x,target.y-s.y);
-        double lock=Math.max(0,1-distance/Math.max(1,s.sensorRange))
+        double lockRange=targetAcquisitionRange(s,target);
+        double holo=target.power>4?target.hologramNoise*target.ecmCondition:0;
+        double lock=Math.max(0,1-distance/Math.max(1,lockRange))
                 *s.crewReadiness()*s.sensorsCondition*weather.sensorFactor()
-                *(1-target.ecmStrength*target.ecmCondition);
+                *(1-target.ecmStrength*target.ecmCondition)
+                *(1-StrictMath.min(0.8,holo/StrictMath.max(0.6,s.sensorAcuity)));
         double weatherAim=weather.accuracyFactor();
         var laser=WeaponBehaviorTable.gun(DamageType.LASER);
         var missile=WeaponBehaviorTable.gun(DamageType.MISSILE);
@@ -2799,8 +2830,10 @@ public final class Battle {
             if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
             // Maintain lock with actual target RCS and ECM; a broken lock
             // only reacquires on a bounded scan with stricter geometry.
+            double holograms=target.power>4?target.hologramNoise*target.ecmCondition:0;
             boolean visible=OrdnanceSeeker.canTrack(range,target.radarCrossSection,
-                    target.ecmStrength*target.ecmCondition,m.guidanceQuality,
+                    StrictMath.min(0.95,target.ecmStrength*target.ecmCondition+
+                            0.45*holograms),m.guidanceQuality,
                     m.torpedo,!m.seekerLocked);
             if(m.seekerLocked&&!visible)m.seekerLocked=false;
             else if(!m.seekerLocked&&visible
