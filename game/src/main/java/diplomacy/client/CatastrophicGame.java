@@ -521,11 +521,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             selectDoctrineCaptain(Math.floorMod(selectedDeploymentShip+
                                     (key==Input.Keys.A?-1:1),deployment.ships()));
                         if(key==Input.Keys.TAB||key==Input.Keys.PAGE_UP||
-                                key==Input.Keys.PAGE_DOWN)standingPage=1-standingPage;
+                                key==Input.Keys.PAGE_DOWN)standingPage=(standingPage+1)%3;
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             selectedStandingSetting=Math.floorMod(selectedStandingSetting+
                                     (key==Input.Keys.UP?-1:1),ShipStandingOrders.SETTINGS.length);
-                            standingPage=selectedStandingSetting<13?0:1;
+                            standingPage=selectedStandingSetting<13?0:selectedStandingSetting<23?1:2;
                         }
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT)
                             adjustStandingOrders(selectedStandingSetting,key==Input.Keys.LEFT?-1:1);
@@ -1945,7 +1945,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 selectedStandingSetting=action-2;
                 adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
             }else if(action==30)screen=GameMenuPanel.Screen.DEPLOYMENT;
-            else if(action==31)standingPage=1-standingPage;
+            else if(action==31)standingPage=(standingPage+1)%3;
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
