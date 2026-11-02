@@ -706,7 +706,7 @@ public final class Shipyard {
                            double fuelBonus,double fuelProtection,
                            double magazineContainment,int escapePods,boolean recoveryBeacon,
                            double instability,double hazardSeverity,
-                           int unsafeFlags) { }
+                           int unsafeFlags,double recoveryStrength) { }
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
                          double speed, double accuracy, double laserDamage, double missileDamage,
@@ -748,6 +748,7 @@ public final class Shipyard {
         int unsafeFlags=0;
         int escapePods=0;
         boolean recoveryBeacon=false;
+        double recoveryStrength=0;
         double[] ranges=new double[6],cycles=new double[6],trackers=new double[6];
         int[] weaponCounts=new int[6];
         double selfRate=0,remoteRate=0,remoteRange=180;
@@ -872,7 +873,10 @@ public final class Shipyard {
                 }
                 case "EPD" -> escapePods+=Math.max(1,
                         (int)StrictMath.round(12*(survivalGain)));
-                case "RCB" -> recoveryBeacon=true;
+                case "RCB" -> {
+                    recoveryBeacon=true;
+                    recoveryStrength+=survivalGain;
+                }
                 case "PGO" -> {
                     unsafeFlags|=SurvivalHardwareCatalog.GOVERNOR;
                     rechargeBoost+=4.5*(survivalGain);
@@ -977,7 +981,8 @@ public final class Shipyard {
                 new Survival(Math.min(.80,crewProtection),Math.min(.85,commandProtection),
                         fuelBonus,Math.min(.80,fuelProtection),
                         Math.min(.85,magazineContainment),escapePods,recoveryBeacon,
-                        Math.min(2,hazardInstability),hazardSeverity,unsafeFlags));
+                        Math.min(2,hazardInstability),hazardSeverity,unsafeFlags,
+                        Math.min(1.75,recoveryStrength)));
     }
 
     /**
