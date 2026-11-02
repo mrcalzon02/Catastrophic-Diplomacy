@@ -192,8 +192,8 @@ final class GameMenuPanel {
         int first=page==0?0:page==1?13:23;
         int end=page==0?13:page==1?23:ShipStandingOrders.SETTINGS.length;
         for(int i=first;i<end;i++){
-            float y=page==2?519-(i-first)*62:519-(i-first)*29;
-            if(hit(x,y,650,y,570,page==2?54:27))return 2+i;
+            float rowY=page==2?519-(i-first)*62:519-(i-first)*29;
+            if(hit(x,y,650,rowY,570,page==2?54:27))return 2+i;
         }
         if(hit(x,y,900,32,300,55))return 30;
         return -1;
