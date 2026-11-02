@@ -127,6 +127,27 @@ public final class SurvivalModulesTest {
                 Shipyard.fit(advancedPod,catalog).survival().escapePods(),
                 "Alternate escape hardware must change finite rescue capacity");
 
+        // Beacon variants have different actual post-victory effectiveness:
+        // without a surviving friendly vessel no wreck yields salvage.
+        Shipyard.Design weakBeacon=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
+                "BASE-TER-RCBP");
+        Shipyard.Design strongBeacon=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
+                "BASE-TER-RCBA");
+        Battle weakRecovery=new Battle(8091L),strongRecovery=new Battle(8091L);
+        weakRecovery.spawnWing(0,weakBeacon,catalog,1,100,100);
+        weakRecovery.spawnWing(0,empty,catalog,1,100,200);
+        strongRecovery.spawnWing(0,strongBeacon,catalog,1,100,100);
+        strongRecovery.spawnWing(0,empty,catalog,1,100,200);
+        check(strongRecovery.ships().get(0).recoveryStrength>
+                weakRecovery.ships().get(0).recoveryStrength,
+                "Advanced beacon has no physical recovery improvement");
+        weakRecovery.destroyHull(weakRecovery.ships().get(0),null);
+        strongRecovery.destroyHull(strongRecovery.ships().get(0),null);
+        check(strongRecovery.recoverySalvageCredits(0)>
+                weakRecovery.recoverySalvageCredits(0) &&
+                strongRecovery.recoverySalvageCredits(0)<=8000,
+                "Beacon salvage must vary by actual hardware without refunding hull");
+
         Shipyard.Design bunker=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
                 "BASE-TER-FBN");
         Shipyard.Design vault=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
