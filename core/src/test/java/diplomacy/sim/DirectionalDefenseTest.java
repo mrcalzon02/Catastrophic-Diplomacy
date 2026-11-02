@@ -47,6 +47,42 @@ public final class DirectionalDefenseTest {
                 Battle.DamageType.PLASMA,0.25);
         same.impact(-1,0,-.8,0,150,Battle.DamageType.PLASMA);
         ok(same.fingerprint()==d.fingerprint(),"deterministic replay");
+        // One actual physical splash center may damage multiple mechanical
+        // armor cells, but must not create multiple visual strike centers.
+        var splash=new DirectionalDefense(0,120,240);
+        var strike=splash.impactSplash(1,0,.25,.05,12,
+                Battle.DamageType.LASER,0,1.15);
+        int affected=0,marked=0;
+        for(int r=0;r<16;r++)for(int c=0;c<16;c++){
+            var tile=splash.tile(r,c);
+            if(tile.exposure()>1e-6)affected++;
+            if(tile.directImpact()){
+                marked++;
+                ok(r==strike.row()&&c==strike.column(),
+                        "Splash neighbors must NOT fabricate impact locations");
+            }
+        }
+        ok(affected>1,"Fixture needs real mechanical splash spreading");
+        ok(marked==1,"One weapon impact should produce one damage mark");
+        String persisted=splash.saveIntegrity();
+        var reloaded=new DirectionalDefense(0,120,240);
+        reloaded.restoreIntegrity(persisted);
+        ok(reloaded.fingerprint()==splash.fingerprint(),
+                "Impact positions must persist alongside physical damage");
+        int bytes=4*8+16*16*2*8;
+        byte[] old=java.util.Base64.getUrlDecoder().decode(persisted);
+        String legacy=java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(java.util.Arrays.copyOf(old,bytes));
+        var restoredOld=new DirectionalDefense(0,120,240);
+        restoredOld.restoreIntegrity(legacy);
+        int inferred=0;
+        for(int r=0;r<16;r++)for(int c=0;c<16;c++)
+            if(restoredOld.tile(r,c).directImpact())inferred++;
+        ok(inferred==1,"Legacy splash should infer ONE mark, not one per worn tile");
+        reloaded.overhaul();
+        for(int r=0;r<16;r++)for(int c=0;c<16;c++)
+            ok(!reloaded.tile(r,c).directImpact(),
+                    "Overhaul must clear physical impact markers");
         boolean rejected=false;
         try{d.addArmor(DirectionalDefense.Facing.AFT,Double.NaN);}
         catch(IllegalArgumentException ex){rejected=true;}

@@ -19,6 +19,9 @@ public final class DirectionalDefense {
         public final int column, row;
         public final boolean occupied;
         private double armor, maxArmor, structure, maxStructure;
+        /** An actual collision point. Splash-neighbor erosion is NOT a hit. */
+        private boolean directImpact;
+        public boolean directImpact(){return directImpact;}
         private Tile(Facing zone, int col, int r, boolean valid) {
             facing=zone; column=col; row=r; occupied=valid;
         }
@@ -186,6 +189,9 @@ public final class DirectionalDefense {
             double gap=StrictMath.max(0,tile.maxArmor-tile.armor);
             tile.armor=StrictMath.min(tile.maxArmor,
                     tile.armor+restored*gap/missing);
+            if(tile.armor>=tile.maxArmor-1e-8 &&
+                    tile.structure>=tile.maxStructure-1e-8)
+                tile.directImpact=false;
         }
         return restored;
     }
@@ -244,6 +250,9 @@ public final class DirectionalDefense {
         double structural=remaining*damageFactor(Layer.STRUCTURE,t.facing,kind);
         double tileLoss=StrictMath.min(t.structure,structural);
         t.structure-=tileLoss;
+        // One physical strike => ONE appearance anchor, not a crater on each
+        // splash-damaged neighbor. The actual mechanical erosion is unchanged.
+        if(armorUsed>1e-10||tileLoss>1e-10)t.directImpact=true;
         return new Impact(facing,t.column,t.row,shieldUsed,armorUsed,structural,tileLoss);
     }
     /**
@@ -299,6 +308,9 @@ public final class DirectionalDefense {
             double lost=StrictMath.min(tile.structure,damage);
             tile.structure-=lost;structural+=damage;tileLoss+=lost;
         }
+        // The splash still consumes armor across all its real tiles, but it
+        // records only the physical impact center for visual crater placement.
+        if(armorUsed>1e-10||tileLoss>1e-10)center.directImpact=true;
         return new Impact(facing,center.column,center.row,
                 shieldUsed,armorUsed,structural,tileLoss);
     }
@@ -314,13 +326,22 @@ public final class DirectionalDefense {
      * Exact per-facing shields and occupied tile armor/structure persist between
      * campaign sorties. This is never a cosmetic approximation of hit regions.
      */
+    private static final int LEGACY_INTEGRITY_BYTES=4*8+GRID*GRID*2*8;
+    private static final int MARK_BYTES=GRID*GRID/8;
     public String saveIntegrity(){
-        java.nio.ByteBuffer b=java.nio.ByteBuffer.allocate(4*8+GRID*GRID*2*8)
+        // Retain exactly the old integrity payload prefix for old-save
+        // compatibility; append one bit per actual physical impact center.
+        java.nio.ByteBuffer b=java.nio.ByteBuffer.allocate(LEGACY_INTEGRITY_BYTES+MARK_BYTES)
                 .order(java.nio.ByteOrder.BIG_ENDIAN);
         for(Zone zone:zones)b.putDouble(zone.shield);
         for(Tile[] row:tiles)for(Tile tile:row){
             b.putDouble(tile.armor);b.putDouble(tile.structure);
         }
+        byte[] marks=new byte[MARK_BYTES];
+        for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++)
+            if(tiles[r][c].directImpact)
+                marks[(r*GRID+c)/8]|=1<<((r*GRID+c)%8);
+        b.put(marks);
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(b.array());
     }
     public void restoreIntegrity(String packed){
@@ -328,7 +349,8 @@ public final class DirectionalDefense {
         final byte[] data;
         try{data=java.util.Base64.getUrlDecoder().decode(packed);}
         catch(IllegalArgumentException malformed){throw new IllegalArgumentException("Invalid integrity encoding",malformed);}
-        if(data.length!=4*8+GRID*GRID*2*8)
+        if(data.length!=LEGACY_INTEGRITY_BYTES &&
+                data.length!=LEGACY_INTEGRITY_BYTES+MARK_BYTES)
             throw new IllegalArgumentException("Incorrect integrity image length");
         java.nio.ByteBuffer b=java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.BIG_ENDIAN);
         double[] shieldValues=new double[4],armorValues=new double[GRID*GRID],structureValues=new double[GRID*GRID];
@@ -345,8 +367,47 @@ public final class DirectionalDefense {
         for(int i=0;i<4;i++)zones[i].shield=shieldValues[i];
         n=0;
         for(Tile[] row:tiles)for(Tile tile:row){
-            tile.armor=armorValues[n];tile.structure=structureValues[n];n++;
+            tile.armor=armorValues[n];tile.structure=structureValues[n];
+            tile.directImpact=false;
+            n++;
         }
+        if(data.length>LEGACY_INTEGRITY_BYTES){
+            for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++)
+                tiles[r][c].directImpact=(data[LEGACY_INTEGRITY_BYTES+(r*GRID+c)/8]
+                        &(1<<((r*GRID+c)%8)))!=0;
+        }else{
+            // Old saves do not contain collision coordinates. Infer one
+            // representative center per connected damaged region, NOT one
+            // invented crater per mechanically weakened neighbor.
+            restoreLegacyVisualCenters();
+        }
+    }
+    private void restoreLegacyVisualCenters(){
+        boolean[][] seen=new boolean[GRID][GRID];
+        int[] rows=new int[GRID*GRID],cols=new int[GRID*GRID];
+        for(int sr=0;sr<GRID;sr++)for(int sc=0;sc<GRID;sc++){
+            Tile first=tiles[sr][sc];
+            if(seen[sr][sc]||!damaged(first))continue;
+            int count=1;rows[0]=sr;cols[0]=sc;seen[sr][sc]=true;
+            int bestR=sr,bestC=sc;double best=-1;
+            for(int at=0;at<count;at++){
+                int r=rows[at],c=cols[at];
+                Tile candidate=tiles[r][c];
+                double depth=candidate.exposure()+candidate.internalDamage();
+                if(depth>best){best=depth;bestR=r;bestC=c;}
+                for(int dr=-1;dr<=1;dr++)for(int dc=-1;dc<=1;dc++){
+                    int nr=r+dr,nc=c+dc;
+                    if(nr<0||nc<0||nr>=GRID||nc>=GRID||seen[nr][nc]||
+                            !damaged(tiles[nr][nc]))continue;
+                    seen[nr][nc]=true;rows[count]=nr;cols[count]=nc;count++;
+                }
+            }
+            tiles[bestR][bestC].directImpact=true;
+        }
+    }
+    private static boolean damaged(Tile tile){
+        return tile.occupied&&(tile.exposure()>1e-5||
+                tile.internalDamage()>1e-5);
     }
     private static void bounded(double value,double capacity){
         if(!Double.isFinite(value)||value<0||value>capacity+1e-6)
@@ -357,6 +418,7 @@ public final class DirectionalDefense {
         for(Zone zone:zones){zone.shield=zone.maxShield;zone.delayRemaining=0;}
         for(Tile[] row:tiles)for(Tile tile:row){
             tile.armor=tile.maxArmor;tile.structure=tile.maxStructure;
+            tile.directImpact=false;
         }
     }
 
@@ -369,6 +431,7 @@ public final class DirectionalDefense {
         }
         for(Tile[] line:tiles)for(Tile t:line)if(t.occupied) {
             hash=mix(hash,t.armor);hash=mix(hash,t.structure);
+            hash=mix(hash,t.directImpact?1.0:0.0);
         }
         return hash;
     }

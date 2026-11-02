@@ -362,11 +362,13 @@ public final class TerranPlaceholderSprites implements Disposable {
             long internal=tile.occupied?StrictMath.round(tile.internalDamage()*128.0):0;
             result=(result^armor)*0x100000001b3L;
             result=(result^internal)*0x100000001b3L;
+            result=(result^(tile.directImpact()?1:0))*0x100000001b3L;
         }
         return result;
     }
     /** Single-cell scorch footprints, not bilinearly smeared plate damage. */
     private static float localizedScorch(float[][] wear,float[][] internal,
+                                          boolean[][] anchorsImpact,
                                           ShipArmorStampAnchors anchors,
                                           float row,float col,float rough){
         int nearRow=(int)StrictMath.floor(row+.5f);
@@ -374,7 +376,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         float value=0f;
         for(int r=Math.max(0,nearRow-1);r<=Math.min(GRID-1,nearRow+1);r++)
             for(int c=Math.max(0,nearCol-1);c<=Math.min(GRID-1,nearCol+1);c++){
-                if(wear[r][c]<=0f&&internal[r][c]<=0f)continue;
+                if(!anchorsImpact[r][c]||wear[r][c]<=0f&&internal[r][c]<=0f)continue;
                 value=Math.max(value,ShipDamageScorch.falloffAt(
                         row,col,anchors.row(r,c),anchors.col(r,c),
                         wear[r][c],internal[r][c],rough));
@@ -392,6 +394,7 @@ public final class TerranPlaceholderSprites implements Disposable {
      * alpha mask; they cannot invent additional geometry.
      */
     private static float craterAt(float[][] wear,float[][] internal,
+                                   boolean[][] anchorsImpact,
                                    ShipArmorStampAnchors aligned,
                                    float tileRow,float tileCol,int shipId) {
         int centerR=(int)StrictMath.floor(tileRow+.5);
@@ -399,7 +402,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         float crater=0f;
         for(int r=Math.max(0,centerR-1);r<=Math.min(GRID-1,centerR+1);r++)
             for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
-                if(wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
+                if(!anchorsImpact[r][c]||
+                        wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
                 crater=Math.max(crater,ShipArmorStamps.openingAt(
                         tileRow,tileCol,r,c,aligned.row(r,c),aligned.col(r,c),
                         wear[r][c],internal[r][c],shipId));
@@ -428,15 +432,20 @@ public final class TerranPlaceholderSprites implements Disposable {
         // Avoid dereferencing defenses and recomputing integrity for every
         // mask pixel (and all 9 neighboring tiles) in mass engagements.
         float[][] wear=new float[GRID][GRID],internal=new float[GRID][GRID];
+        boolean[][] impactCenters=new boolean[GRID][GRID];
         int[] levels=new int[GRID*GRID*2];
         for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++){
             var tile=ship.defense.tile(r,c);
             if(!tile.occupied)continue;
             wear[r][c]=(float)tile.exposure();
             internal[r][c]=(float)tile.internalDamage();
+            impactCenters[r][c]=tile.directImpact();
             int index=(r*GRID+c)*2;
             levels[index]=(int)StrictMath.round(tile.exposure()*128.0);
-            levels[index+1]=(int)StrictMath.round(tile.internalDamage()*128.0);
+            // The visual impact bit also invalidates a repaired/re-struck
+            // mask even when quantized physical exposure barely changes.
+            levels[index+1]=(int)StrictMath.round(tile.internalDamage()*128.0)
+                    +(tile.directImpact()?256:0);
         }
         ShipDamageMaskRegion.Rect region=ShipDamageMaskRegion.changed(
                 item.levels,levels,MASK_W,MASK_H);
@@ -461,18 +470,18 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float row=(float)tileRow,col=(float)tileCol;
                 float rough=noise(x/4,y/4,ship.id)*.70f+
                         noise(x,y,ship.id*31)*.30f;
-                float damage=localizedScorch(wear,internal,aligned,row,col,rough);
-                float crater=craterAt(wear,internal,aligned,row,col,ship.id);
+                float damage=localizedScorch(wear,internal,impactCenters,aligned,row,col,rough);
+                float crater=craterAt(wear,internal,impactCenters,aligned,row,col,ship.id);
                 float rim=0f;
                 // Interior render layer is clipped to original opaque pixels.
                 // No original hull pixel => the branch above already skipped.
                 // No breach => no 4-neighbor sampling or emissive overhead.
                 if(crater>.07f && crater<.98f){
                     float sx=GRID/(float)MASK_W,sy=GRID/(float)MASK_H;
-                    float left=craterAt(wear,internal,aligned,row,col-sx,ship.id);
-                    float right=craterAt(wear,internal,aligned,row,col+sx,ship.id);
-                    float up=craterAt(wear,internal,aligned,row-sy,col,ship.id);
-                    float down=craterAt(wear,internal,aligned,row+sy,col,ship.id);
+                    float left=craterAt(wear,internal,impactCenters,aligned,row,col-sx,ship.id);
+                    float right=craterAt(wear,internal,impactCenters,aligned,row,col+sx,ship.id);
+                    float up=craterAt(wear,internal,impactCenters,aligned,row-sy,col,ship.id);
+                    float down=craterAt(wear,internal,impactCenters,aligned,row+sy,col,ship.id);
                     // The interior layer shares the source alpha silhouette.
                     rim=ShipSurfaceDamageVisual.breachRim(crater,left,right,up,down,
                             originalAlpha,originalAlpha);

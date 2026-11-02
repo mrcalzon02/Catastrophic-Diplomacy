@@ -200,3 +200,27 @@ is used by the diagnostics. Normal campaign/skirmish/network battles do not
 register stationary test targets. The visual smoke task verifies no drift,
 no autonomous target selection and no default opt-in, while keeping visual
 acceptance out of the release gates.
+
+
+### One physical impact, one localized damage anchor
+
+The prior visual algorithm treated **every tile touched by splash damage**
+as a separate direct strike and stamped an independent soot/crater mark.
+A single laser can physically wear ~10 adjacent tiles, so merely shrinking
+each stamp still produced a ship-wide pattern. The rendering now reads an
+actual *direct-impact* marker from the center tile selected by the existing
+physics impact. Neighbors still lose physical armor and structure normally,
+but do **not** invent cosmetic impact centers. The small three-band scorch
+and any exposed-metal crater are rendered only at those genuine direct hit
+locations, all still clipped to original hull art. This changes no weapon
+damage, radius, hit detection, armor energy, shield, or gameplay balance.
+
+A 256-bit (32-byte) impact-location field is appended to the persisted
+per-vessel directional-integrity snapshot. Old snapshots without this field
+are accepted and infer one local center per connected region of worn armor
+instead of producing a stamp per old damaged cell. Repairs clear centers
+once the physical tile is restored, and an overhaul clears all markers.
+The standalone core test proves that multiple mechanically damaged cells
+from one LASER splash produce exactly one visual mark, survives reload,
+and respects legacy-save compatibility. Capture tests report impact-center
+count against actual weapon hit count.

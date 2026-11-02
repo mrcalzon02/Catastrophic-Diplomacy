@@ -27,6 +27,22 @@ public final class ShipSurfaceDamageCaptureTest {
                         scene.target().lastTargetId==0,
                         "Diagnostic target autonomously navigated or chose a target");
             }
+            if(i<ShipSurfaceDamageCapture.KEYS.length-1){
+                int impactMarks=0,changed=0;
+                for(int row=0;row<diplomacy.sim.DirectionalDefense.GRID;row++)
+                    for(int col=0;col<diplomacy.sim.DirectionalDefense.GRID;col++){
+                        var tile=scene.target().defense.tile(row,col);
+                        if(tile.directImpact())impactMarks++;
+                        if(tile.exposure()>.01||tile.internalDamage()>.01)changed++;
+                    }
+                check(impactMarks<=scene.hits(),
+                        "One real weapon hit MUST NOT generate many independent scorch craters: "+scene.key());
+                if(i>1&&scene.hits()>0&&changed>0)
+                    check(impactMarks>0,
+                            "Actual armor damage lacks the original impact point: "+scene.key());
+                System.out.printf("ARMOR-IMPACT-SITES %s hits=%d touched-tiles=%d marks=%d%n",
+                        scene.key(),scene.hits(),changed,impactMarks);
+            }
             if(i==0)check(scene.ticks()==0&&scene.hits()==0,
                     "Pristine reference is already battle-damaged");
             if(i>1&&i<ShipSurfaceDamageCapture.KEYS.length-1)

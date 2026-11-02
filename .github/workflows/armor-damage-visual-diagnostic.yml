@@ -12,6 +12,8 @@ on:
       - 'game/src/main/java/diplomacy/client/ShipArmorStampAnchors.java'
       - 'game/src/test/java/diplomacy/client/ShipDamageMaskRegionTest.java'
       - 'core/src/test/java/diplomacy/sim/ArmorBreachTelemetry.java'
+      - 'core/src/main/java/diplomacy/sim/DirectionalDefense.java'
+      - 'core/src/test/java/diplomacy/sim/DirectionalDefenseTest.java'
       - 'core/build.gradle'
       - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageVisualTest.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageFixture.java'
@@ -36,6 +38,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: {gradle-version: '8.11.1'}
       # Independent workflow: failures are visible here, NEVER a release dependency.
+      - name: Prove one impact generates only one visible damage anchor
+        run: gradle --no-daemon :core:directionalDefenseTest
       - name: Inspect physical armor masks and cropped GPU updates
         run: gradle --no-daemon :game:shipDamageVisualSmoke
       - name: Verify deterministic real-weapon screenshot scenarios
