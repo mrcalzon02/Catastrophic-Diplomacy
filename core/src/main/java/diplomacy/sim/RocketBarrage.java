@@ -14,10 +14,10 @@ public final class RocketBarrage {
     private RocketBarrage() { }
 
     public enum Size {
-        SMALL("RKS",.68,500,.70,1.05,48,11,750,1100),
-        MEDIUM("RKM",1.05,465,.90,1.18,48,15,880,1280),
-        LARGE("RKL",1.65,430,1.05,1.34,32,21,1040,1480),
-        SIEGE("RKG",2.75,380,1.35,1.55,32,29,1180,1680);
+        SMALL("RKS",.68,500,.70,1.05,48,11,175,1100),
+        MEDIUM("RKM",1.05,465,.90,1.18,48,15,160,1280),
+        LARGE("RKL",1.65,430,1.05,1.34,32,21,145,1480),
+        SIEGE("RKG",2.75,380,1.35,1.55,32,29,125,1680);
         public final String code;
         public final double damageMultiplier,terminalSpeed,health,signature;
         public final int magazine;
