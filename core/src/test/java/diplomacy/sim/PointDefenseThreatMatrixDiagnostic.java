@@ -277,6 +277,23 @@ public final class PointDefenseThreatMatrixDiagnostic {
                             threat,rank,mounts,fired,intercepts,interception,
                             entries,impacts,shots,baselineImpact));
                 }
+        // Tactical PD orders must select the real physical target class.
+        // These are functional guards, not a tuning pass-rate threshold.
+        Result antiCraftOnly=run(catalog,Threat.MISSILE_SINGLE,0,1,0,
+                BattleOrders.PointDefense.ANTI_CRAFT);
+        require(antiCraftOnly.shots==0&&antiCraftOnly.primaryIntercepted==0,
+                "Anti-craft-only PD improperly engaged ship-launched missiles");
+        Result ordnanceOnly=run(catalog,Threat.FIGHTER_LASER_FIGHTER,0,1,0,
+                BattleOrders.PointDefense.INTERCEPT_ONLY);
+        require(ordnanceOnly.shots==0&&ordnanceOnly.craftLost==0,
+                "Ordnance-only PD improperly engaged energy-armed aircraft");
+        Result noBallistics=run(catalog,Threat.KINETIC,0,1,0,
+                BattleOrders.PointDefense.ANTI_CRAFT);
+        require(noBallistics.shots==0&&noBallistics.primaryIntercepted==0,
+                "Anti-craft-only PD improperly engaged kinetic shells");
+        summary.append("\nMode exclusions: ANTI_CRAFT against missile/kinetic "
+                + "and INTERCEPT_ONLY against energy-armed fighter "
+                + "were explicitly checked for zero unauthorized shots.\n");
         summary.append("\n**Interception vs penetration:** 'intercepted' is a ")
                 .append("physical destroyed body, not an evasive miss. ")
                 .append("90-unit entries indicate threats that reached the ")
