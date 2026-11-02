@@ -358,6 +358,8 @@ public final class Battle {
         /** The seeker tracks only its original assigned hull. Lost locks retain
          * the last actually observed position; scans never grant perfect telemetry. */
         public boolean seekerLocked=true;
+        /** Physical-world holographic contact currently deceiving this seeker. */
+        public int falseContactIndex=-1;
         public double lastKnownX,lastKnownY,lastKnownVX,lastKnownVY;
         void setPropulsion(OrdnancePropulsion.Mode mode){
             if(mode==null)throw new IllegalArgumentException("No propulsion mode");
@@ -1400,6 +1402,7 @@ public final class Battle {
                         * s.crewReadiness() - weather.powerDrainPerSecond() * DT));
         s.heat = Math.max(0, s.heat + (s.passiveHeat + weather.heatPerSecond()
                 - s.coolingRate * s.coolingCondition * weather.coolingFactor()) * DT);
+        DeceptionProjection.operate(s,DT);
         checkUnsafeEngineering(s);
         // Regenerate individual shield facings, subject to cooldown, reactor and power headroom.
         double rechargeCost=s.defense.recharge(DT,StrictMath.max(0,s.power-3),
@@ -3078,9 +3081,22 @@ public final class Battle {
                     &&OrdnanceSeeker.scanDue(m.flightTicks,m.visualId))
                 m.seekerLocked=true;
             if(m.seekerLocked){
-                m.lastKnownX=target.x;m.lastKnownY=target.y;
-                m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
-            }
+                int phantom=DeceptionProjection.seekerGhostIndex(
+                        target,m.visualId,m.flightTicks,m.guidanceQuality);
+                m.falseContactIndex=phantom;
+                if(phantom>=0){
+                    // The same physical decoy world-position the renderer
+                    // displays also steers the *real* missile. No false damage
+                    // event is created: only a collision with an actual hull
+                    // can apply payload damage.
+                    m.lastKnownX=DeceptionProjection.ghostX(target,phantom,tick);
+                    m.lastKnownY=DeceptionProjection.ghostY(target,phantom,tick);
+                    m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
+                }else{
+                    m.lastKnownX=target.x;m.lastKnownY=target.y;
+                    m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
+                }
+            }else m.falseContactIndex=-1;
             if (range < 13) {
                 if(m.decoy){
                     // A decoy has NO warhead and may never apply hull damage.
@@ -3405,6 +3421,7 @@ public final class Battle {
             hash=mix(hash,m.approachSide);
             hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.seekerLocked?1:0);
+            hash=mix(hash,m.falseContactIndex);
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownX));
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownY));
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownVX));

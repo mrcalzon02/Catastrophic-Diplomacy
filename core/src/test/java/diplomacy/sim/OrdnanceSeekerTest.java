@@ -51,6 +51,40 @@ public final class OrdnanceSeekerTest {
         check(!OrdnanceSeeker.canTrack(1300,1,0,1,false,true),
                 "new locks require tighter geometry than maintained locks");
     }
+    private static void hologramFalseGuidance(){
+        Battle b=scene(272728L);
+        Battle.Ship target=b.ships().get(1);
+        target.hologramNoise=.75;
+        target.ecmCondition=1;
+        target.opticalSignature=.38;
+        target.power=500;target.maxPower=20000;
+        int suitable=-1;
+        for(int id=1;id<500;id++)
+            if(DeceptionProjection.seekerGhostIndex(target,id,1,1)>=0){
+                suitable=id;break;
+            }
+        check(suitable>0,"Real holographic emitter never deceives a standard seeker");
+        int ghost=DeceptionProjection.seekerGhostIndex(target,suitable,1,1);
+        check(ghost<DeceptionProjection.falseContacts(target),
+                "Seeker selected an emitter contact that is not actually rendered");
+        double falseX=DeceptionProjection.ghostX(target,ghost,1);
+        double falseY=DeceptionProjection.ghostY(target,ghost,1);
+        check(StrictMath.hypot(falseX-target.x,falseY-target.y)>25,
+                "Deceived missile must steer toward an actual displaced contact");
+        check(ghost==DeceptionProjection.seekerGhostIndex(target,suitable,1,1),
+                "Seeker spoofing must be replay deterministic");
+        target.power=4;
+        check(DeceptionProjection.seekerGhostIndex(target,suitable,1,1)==-1,
+                "Power failure must stop holographic seeker misdirection");
+        target.power=12;target.maxPower=12;
+        double previous=target.power,heat=target.heat;
+        for(int frame=0;frame<130;frame++)
+            DeceptionProjection.operate(target,1.0/30);
+        check(target.power<previous&&target.heat>heat,
+                "Powered cloak and holograms must consume real power and emit heat");
+        check(target.power>=4&&DeceptionProjection.falseContacts(target)==0,
+                "Depleted emitters must stop projecting false contacts");
+    }
     private static void pointDefenseStillWorks(){
         Battle b=scene(7711L);
         Battle.Ship a=b.ships().get(0),t=b.ships().get(1);
@@ -95,7 +129,7 @@ public final class OrdnanceSeekerTest {
         }
     }
     public static void main(String[] args){
-        lossAndReacquisition();pointDefenseStillWorks();replay();
+        lossAndReacquisition();hologramFalseGuidance();pointDefenseStillWorks();replay();
         System.out.println("PASS seeded seeker ECM loss/reacquisition, cold-coast PD counterplay and replay");
     }
 }

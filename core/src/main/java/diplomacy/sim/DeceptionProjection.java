@@ -27,6 +27,43 @@ public final class DeceptionProjection {
         return 1-StrictMath.min(.8,hologramStrength(host)/
                 StrictMath.max(.6,hostileAcuity));
     }
+    /** One locked seeker acquires a coherent real-world false contact.
+     * A 45-tick lock epoch keeps the phantom stable enough for a physical
+     * missile to pursue, then allows normal electronic reacquisition.
+     * Better quality seekers are less susceptible; no RNG is consumed.
+     * Returns -1 for an unspoofed solution. */
+    public static int seekerGhostIndex(Battle.Ship target,long missileId,
+                                       int flightTicks,double seekerQuality){
+        int contacts=falseContacts(target);
+        if(contacts==0||flightTicks<1)return -1;
+        long epoch=(flightTicks-1)/45L;
+        long v=missileId*0x9e3779b97f4a7c15L
+                ^((long)target.id*0xbf58476d1ce4e5b9L)
+                ^(epoch*0x94d049bb133111ebL);
+        v^=v>>>30;v*=0xbf58476d1ce4e5b9L;
+        v^=v>>>27;v*=0x94d049bb133111ebL;v^=v>>>31;
+        double roll=(v>>>11)*0x1.0p-53;
+        double strength=hologramStrength(target)/
+                StrictMath.max(.65,seekerQuality);
+        if(roll>=StrictMath.min(.65,strength))return -1;
+        return (int)StrictMath.floorMod(v>>>32,contacts);
+    }
+    /** Cloaks and image emitters are operating equipment, not perpetual
+     * zero-cost passive buffs. Fitted, powered emitters debit the actual
+     * reactor store and create physical heat; a depleted emitter shuts off.
+     * Return actual energy charged so diagnostic tests can verify finiteness. */
+    public static double operate(Battle.Ship host,double seconds){
+        if(host==null||!host.alive()||seconds<=0)return 0;
+        boolean cloak=cloakActive(host);
+        double holo=hologramStrength(host);
+        double draw=(cloak?1.3*(1-StrictMath.max(.08,host.opticalSignature)):0)
+                +holo*2.1;
+        if(draw<=0)return 0;
+        double spent=StrictMath.min(StrictMath.max(0,host.power-4),draw*seconds);
+        host.power-=spent;
+        host.heat+=spent*.65;
+        return spent;
+    }
     /** Optical cloak fails without operating emitter, ECM circuits and power. */
     public static boolean cloakActive(Battle.Ship host) {
         return host!=null&&host.alive()&&host.opticalSignature<.995
