@@ -99,6 +99,24 @@ public final class GuidedShipyardPanelTest {
                 "Editing an individual launcher must use the socket-specific format");
         check(Shipyard.decode(Shipyard.encode(mount),catalog).launcher(socket).equals(
                 mount.launcher(socket)),"Real rack edits must persist and reload");
+        // A research-specialized guided hardpoint can be replaced by a rocket
+        // without retaining an impossible seeker/warhead loadout on that slot.
+        var rocketSwap=mount.install(socket,"BASE-TER-RKM");
+        check(!rocketSwap.launcherFittings.containsKey(socket)&&
+                        rocketSwap.rocketBarrage(socket).equals(
+                                RocketBarrage.defaults(RocketBarrage.Size.MEDIUM)),
+                "Replacing guided launcher with rocket retained stale seeker controls");
+        var rocketSet=rocketSwap.withRocketBarrage(socket,16,
+                RocketBarrage.Motor.BOOST_COAST);
+        var guidedSwapBack=rocketSet.install(socket,"BASE-TER-MSL");
+        check(!guidedSwapBack.rocketFittings.containsKey(socket)&&
+                        !guidedSwapBack.launcherFittings.containsKey(socket)&&
+                        guidedSwapBack.launcher(socket).guided().equals(
+                                OrdnanceFitting.Guided.STANDARD),
+                "Replacing rocket with guided launcher retained stale rocket program");
+        check(Shipyard.decode(Shipyard.encode(rocketSet),catalog)
+                        .rocketBarrage(socket).equals(rocketSet.rocketBarrage(socket)),
+                "Shipyard rocket replacement was not persistable as a blueprint");
         check(ShipyardPanel.chooseRack(stock,socket,1,1)==stock,
                 "Stock socket must skip unavailable specialized rack engines");
         String encoded=Shipyard.encode(payload);
