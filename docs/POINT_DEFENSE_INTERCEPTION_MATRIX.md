@@ -42,8 +42,9 @@ belong in PD interception denominators.
   armor, shields and damage active
 - Control: identical equipped defender with explicit `HOLD_FIRE`, so
   missed unguided rounds and late-arriving craft are not mistaken for PD kills
-- Repeats: two deterministic PD-enabled seeds and one PD-off paired seed
-  per threat/tier/PD-mount combination
+- Repeats: two deterministic PD-enabled seeds, each with a **same-seed
+  paired PD-off control**, per threat/tier/PD-mount combination; online and
+  offline impact counts therefore share an equal denominator
 - Additional functional mode exclusions: `ANTI_CRAFT` must not fire at
   isolated missile/kinetic targets; `INTERCEPT_ONLY` must not fire at
   fighter laser craft without incoming physical ordnance
