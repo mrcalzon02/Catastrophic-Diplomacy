@@ -260,7 +260,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         summary.append("All results are measured in real headless 30 Hz Battle simulation. ")
                 .append("The ship-launched projectile test source is a legacy fixture; ")
                 .append("defenders use real installed research-tier PD modules. ")
-                .append("No-PD controls use the same installed hardware with HOLD_FIRE. ")
+                .append("Every seed has a paired no-PD control using the same installed hardware with HOLD_FIRE. ")
                 .append("Balance outcomes never block release.\n\n");
         summary.append("|Threat|PD tier|Mounts|Trials|Launched|Intercepted|Intercept %|90-unit entries|Impact|PD shots|No-PD impacts|\n");
         summary.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
@@ -279,12 +279,13 @@ public final class PointDefenseThreatMatrixDiagnostic {
                         entries+=sample.terminalEntries;
                         impacts+=threat.craft()?sample.secondaryHits:sample.primaryHits;
                         shots+=sample.shots;
-                        if(seed==0){
-                            Result control=run(catalog,threat,rank,mounts,seed,
-                                    BattleOrders.PointDefense.HOLD_FIRE);
-                            csv.add(control.csv());cases++;
-                            baselineImpact+=threat.craft()?control.secondaryHits:control.primaryHits;
-                        }
+                        // Every online trial has an identically seeded
+                        // offline-PD control, so raw impacts have the same
+                        // denominator and can be compared directly.
+                        Result control=run(catalog,threat,rank,mounts,seed,
+                                BattleOrders.PointDefense.HOLD_FIRE);
+                        csv.add(control.csv());cases++;
+                        baselineImpact+=threat.craft()?control.secondaryHits:control.primaryHits;
                     }
                     double interception=fired==0?0:100.0*intercepts/fired;
                     summary.append(String.format(Locale.ROOT,
