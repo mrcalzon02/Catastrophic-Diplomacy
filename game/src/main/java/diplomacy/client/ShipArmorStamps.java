@@ -42,15 +42,65 @@ final class ShipArmorStamps {
             float edge=(.15f+.16f*peeled+.05f*puncture)*asym;
             return depth*clamp((edge-radius)/.065f);
         }
-        // High-explosive torpedo's single *real* impact is a systemic
-        // ripped opening, not an amber stain; jagged tears stay local.
-        float four=nx*nx*nx*nx-6f*nx*nx*ny*ny+ny*ny*ny*ny;
-        float three=3f*nx*nx*ny-ny*ny*ny;
-        float serration=clamp(1f+.14f*four+.13f*three+
-                ((hash>>>5&7)-3)*.012f);
-        float edge=Math.min(1.28f,(.18f+.62f*peeled+.30f*puncture)*
-                Math.max(.78f,Math.min(1.19f,serration)));
-        return depth*clamp((edge-radius)/.095f);
+        // Break the previous smooth four-lobed outline into sharp,
+        // scale-separated tears. Piecewise angular teeth produce a truly
+        // fractured perimeter even at the small 96x144 GPU mask resolution.
+        // No per-pixel trig, no procedural paint over transparent source art.
+        float ax=Math.abs(nx),ay=Math.abs(ny);
+        float t=ay/Math.max(.0001f,ax+ay);
+        float sectorAngle=nx>=0f ?
+                (ny>=0f?t:4f-t):
+                (ny>=0f?2f-t:2f+t);
+        float largePhase=sectorAngle*3.5f;
+        int largeSector=(int)StrictMath.floor(largePhase);
+        float largeTooth=1f-2f*Math.abs(
+                largePhase-(float)StrictMath.floor(largePhase)-.5f);
+        int largeHash=hash^(largeSector*0x7f4a7c15);
+        largeHash^=largeHash>>>16;
+        float coarse=((largeHash&255)/255f-.50f)*.30f;
+        float largeJag=(.11f+coarse)*largeTooth;
+        float finePhase=sectorAngle*9f;
+        int fineSector=(int)StrictMath.floor(finePhase);
+        float fineTooth=1f-2f*Math.abs(
+                finePhase-(float)StrictMath.floor(finePhase)-.5f);
+        int fineHash=hash^(fineSector*0x6c8e9cf5);
+        fineHash^=fineHash>>>13;
+        float fineJag=(((fineHash>>>8&255)/255f)-.50f)*.22f*fineTooth;
+        float edge=Math.min(1.27f,(.22f+.61f*peeled+.27f*puncture)*
+                Math.max(.88f,Math.min(1.21f,1f+largeJag+fineJag)));
+        float torn=depth*clamp((edge-radius)/.075f);
+        // Five tapered, slightly bent tearing seams lead out from the
+        // original puncture. They all share ONE genuine physical hit center;
+        // nothing here adds independent damage, armor wear, or extra hits.
+        // Their branches remain inside the 1.30-cell dirty-mask radius.
+        for(int i=0;i<5;i++){
+            float ux=switch(i){
+                case 0 -> .97f; case 1 -> -.76f; case 2 -> -.17f;
+                case 3 -> .49f; default -> -.40f;
+            };
+            float uy=switch(i){
+                case 0 -> .24f; case 1 -> .65f; case 2 -> -.985f;
+                case 3 -> -.87f; default -> -.915f;
+            };
+            float along=dx*ux+dy*uy;
+            if(along<.70f||along>1.30f)continue;
+            float across=dx*uy-dy*ux;
+            float bend=(i%2==0?.19f:-.16f)*(along-.76f);
+            float side=Math.abs(across-bend);
+            float taper=.15f*(1f-clamp((along-1.12f)/.18f));
+            float seam=depth*clamp((taper-side)/.052f)*
+                    clamp((along-.70f)/.12f);
+            torn=Math.max(torn,seam);
+            // A short off-axis fork on alternating major tears: the
+            // branch should read as bent plating, not a soft lumpy rim.
+            if((i&1)==0&&along>.98f){
+                float fork=Math.abs(across-bend-.38f*(along-.98f));
+                float forkEdge=.10f*(1f-clamp((along-1.18f)/.12f));
+                torn=Math.max(torn,depth*clamp((forkEdge-fork)/.04f)*
+                        clamp((along-.98f)/.08f));
+            }
+        }
+        return torn;
     }
 
     /**
