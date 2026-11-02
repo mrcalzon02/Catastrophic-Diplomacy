@@ -855,6 +855,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         // transparent copies of the EXACT source-art hull. These are never
         // second physical ships and receive no damage/shields/hardpoints.
         renderHolographicContacts(battle,batch,poses,view);
+        renderEngineeringResponse(battle,batch,poses,view);
         // Cached source-art hex textures are recolored using per-vertex RGB:
         // one shader for all factions, generators and independent facings.
         batch.setShader(shieldInk==null?null:shieldInk.program());
@@ -942,6 +943,36 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         batch.setShader(null);
         trimIdleShipTextures();
+    }
+    /** Visible consequence of a real hazard roll or repair pulse, drawn from
+     * original hull alpha, never a substitute geometry silhouette. */
+    private void renderEngineeringResponse(Battle battle,SpriteBatch batch,
+                                           BattleRenderPoses poses,CombatViewBounds view){
+        boolean drawing=false;
+        for(Battle.Ship ship:battle.ships()){
+            if(!ship.alive())continue;
+            long faultAge=battle.tick-ship.lastHazardTick;
+            long repairAge=battle.tick-ship.lastRepairTick;
+            boolean fault=faultAge>=0&&faultAge<18;
+            boolean repair=repairAge>=0&&repairAge<6;
+            if(!fault&&!repair)continue;
+            BattleRenderPoses.Pose pose=poses==null
+                    ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
+                    :poses.ship(ship);
+            if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
+            Texture original=texture(ship);
+            if(original==null)continue;
+            if(!drawing){batch.setShader(null);batch.begin();drawing=true;}
+            // Keep existing armor peel/silhouette in the response flash.
+            Peel layer=peeled.get(ship.id);
+            Texture art=layer!=null&&layer.overlay!=null?layer.overlay:original;
+            float h=(float)(34*ship.visualScale());
+            float w=h*original.getWidth()/(float)original.getHeight();
+            if(fault)batch.setColor(1f,.12f,.055f,(float)(.38*(1-faultAge/18.0)));
+            else batch.setColor(.20f,.94f,.67f,(float)(.15*(1-repairAge/6.0)));
+            drawWhole(batch,art,pose,w,h,(float)(StrictMath.toDegrees(pose.angle())-90));
+        }
+        if(drawing){batch.setColor(1,1,1,1);batch.end();}
     }
     private void renderHolographicContacts(Battle battle,SpriteBatch batch,
                                            BattleRenderPoses poses,CombatViewBounds view){

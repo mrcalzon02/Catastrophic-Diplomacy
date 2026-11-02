@@ -122,6 +122,8 @@ public final class Battle {
         public double kineticStoreExposure,missileStoreExposure,torpedoStoreExposure;
         public double hazardInstability,hazardSeverity;
         public int escapePods,evacuatedCrew,hazardFailures;
+        /** Real simulation ticks for visible engineering faults and repairs. */
+        public long lastHazardTick=-10000,lastRepairTick=-10000;
         public boolean recoveryBeacon,recoveryBeaconActivated;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
         public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
@@ -1227,6 +1229,7 @@ public final class Battle {
         if(roll>=StrictMath.min(.68,s.hazardInstability*(.014+.082*stress)))return;
         double severity=StrictMath.max(.1,s.hazardSeverity);
         s.hazardFailures++;
+        s.lastHazardTick=tick;
         s.power=StrictMath.max(0,s.power-10*severity);
         s.heat+=6*severity;
         s.sensorsCondition=StrictMath.max(0,s.sensorsCondition-.09*severity);
@@ -1264,7 +1267,8 @@ public final class Battle {
         ship.torpedoAmmo=Math.max(0,ship.torpedoAmmo-lostTorpedo);
     }
 
-    private void destroyHull(Ship defender,Ship attacker) {
+    /** Shared genuine destruction path, also exercised by end-state tests. */
+    void destroyHull(Ship defender,Ship attacker) {
         if(defender.retired)return;
         defender.hull=0;defender.retired=true;destructions++;
         if(attacker!=null)attacker.kills++;
@@ -1299,6 +1303,7 @@ public final class Battle {
                     * (s.faction == Faction.MANDRALLY ? 1.0 : 0.20);
             double actual=Math.min(Math.max(0,s.maxHull-s.hull),restoration);
             s.hull+=actual;s.hullRepaired+=actual;
+            if(actual>0)s.lastRepairTick=tick;
         }
         if(s.power>6 && s.support.selfRepairRate()>0 && s.hull<s.maxHull) {
             double desired=s.support.selfRepairRate()*DT;
@@ -1307,6 +1312,7 @@ public final class Battle {
                     (s.power-6)*efficiency/0.85);
             s.power-=actual*0.85/efficiency;
             s.hull+=actual;s.hullRepaired+=actual;
+            if(actual>0)s.lastRepairTick=tick;
             s.heat+=actual*0.11;
         }
         s.laserReload = Math.max(0, s.laserReload - DT);

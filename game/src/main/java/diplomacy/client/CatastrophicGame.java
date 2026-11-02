@@ -2880,6 +2880,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             break;
         }
+        // The deceased hull cannot render a physical sprite. Its REAL escape
+        // and beacon telemetry persists as a map-space salvage/rescue signal.
+        // This is a tactical overlay, not fabricated escape-pod artwork.
+        int displayedWreckSignals=0;
+        for(Battle.Ship wreck:battle.ships()){
+            if(!wreck.retired || (wreck.evacuatedCrew<=0 &&
+                    !wreck.recoveryBeaconActivated))continue;
+            float sx=(float)((wreck.x-battleCamera.position.x)/battleCamera.zoom+W*.5);
+            float sy=(float)((wreck.y-battleCamera.position.y)/battleCamera.zoom+H*.5);
+            if(sx<15||sx>W-180||sy<170||sy>H-75)continue;
+            font.setColor(wreck.recoveryBeaconActivated?Color.GOLD:Color.CYAN);
+            String signal=(wreck.evacuatedCrew>0?"PODS "+wreck.evacuatedCrew:"")
+                    +(wreck.recoveryBeaconActivated?"  RECOVERY BEACON":"");
+            font.draw(batch,signal,sx,sy+28);
+            if(++displayedWreckSignals>=12)break;
+        }
         font.setColor(Color.GOLD);
         SpaceWeather.Preset activeWeather = battle.weather().preset();
         String condition = activeWeather.enabled()

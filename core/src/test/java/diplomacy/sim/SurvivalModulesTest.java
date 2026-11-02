@@ -106,6 +106,36 @@ public final class SurvivalModulesTest {
         check(fuelFraction>ordinary.fuel/ordinary.maxFuel,
                 "Penetrating torpedo strike must remove some unprotected fuel");
 
+        // The exact destruction routine used by combat must preserve only
+        // finite physical pod capacity and activate ONLY fitted beacons.
+        int podSlot=-1,beaconSlot=-1;
+        for(Shipyard.Slot slot:empty.hull.slots)if(slot.mount()==Shipyard.Mount.SUPPORT){
+            if(podSlot<0)podSlot=slot.index();
+            else {beaconSlot=slot.index();break;}
+        }
+        check(podSlot>=0&&beaconSlot>=0,"Survival test hull needs two support mounts");
+        Shipyard.Design rescueFitted=empty.install(podSlot,"BASE-TER-EPD")
+                .install(beaconSlot,"BASE-TER-RCB");
+        Battle rescues=new Battle(516L);
+        rescues.spawnWing(0,rescueFitted,catalog,1,200,200);
+        rescues.spawnWing(0,empty,catalog,1,200,300);
+        Battle.Ship outfitted=rescues.ships().get(0),unfitted=rescues.ships().get(1);
+        int initialCrew=(int)outfitted.crewCount;
+        check(outfitted.escapePods>0 && outfitted.recoveryBeacon,
+                "Equipped rescue systems did not enter a real combat ship");
+        rescues.destroyHull(outfitted,null);
+        rescues.destroyHull(unfitted,null);
+        check(outfitted.evacuatedCrew>0 && outfitted.evacuatedCrew<=outfitted.escapePods
+                &&outfitted.evacuatedCrew<=initialCrew &&
+                outfitted.crewCount==0 && outfitted.hull==0,
+                "Destroyed ship must evacuate only real crew, never regenerate hull");
+        check(outfitted.recoveryBeaconActivated &&
+                !unfitted.recoveryBeaconActivated && unfitted.evacuatedCrew==0,
+                "Beacon and pod signals must require fitted physical hardware");
+        int destroyed=rescues.destructions;
+        rescues.destroyHull(outfitted,null);
+        check(destroyed==rescues.destructions,
+                "Repeated wreck processing must not duplicate destroyed hulls or survivors");
         Shipyard.Design illegal=empty.install(socket(empty.hull,Shipyard.Mount.SYSTEM),
                 "BASE-TER-IBR");
         Battle a=new Battle(45998L),b=new Battle(45998L);
@@ -115,8 +145,9 @@ public final class SurvivalModulesTest {
         check(one.hazardInstability>0,"Illegal retrofit did not enter live battle");
         one.hazardInstability=100;two.hazardInstability=100;
         for(int tick=0;tick<510;tick++){a.step();b.step();}
-        check(one.hazardFailures>0,
-                "Explicitly overloaded unsafe system did not fail under test stress");
+        check(one.hazardFailures>0 &&
+                one.lastHazardTick>=0 && one.lastHazardTick<=a.tick,
+                "Explicitly overloaded unsafe system must produce a timed visible fault");
         check(one.hazardFailures==two.hazardFailures && a.fingerprint()==b.fingerprint(),
                 "Hazard failures must replay deterministically");
         Battle clean=new Battle(45998L);
