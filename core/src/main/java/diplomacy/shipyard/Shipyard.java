@@ -371,15 +371,23 @@ public final class Shipyard {
                 throw new IllegalArgumentException("Invalid base component ID");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,baseId==null?null:new Installed(baseId, Map.of()));
-            // Switching/removing a launcher invalidates only that socket's old program.
-            Map<Integer,RocketBarrage.Fitting> programs=rocketFittings;
+            // The socket's old guided rack or unguided fire program must not
+            // survive replacement with a different weapon. Other hardpoints
+            // retain their settings and paid hardware.
             Installed previous=at(slot);
-            if(previous!=null&&!previous.component.equals(baseId)&&rocketFittings.containsKey(slot)){
+            boolean replaced=previous!=null&&!previous.component.equals(baseId);
+            Map<Integer,RocketBarrage.Fitting> programs=rocketFittings;
+            Map<Integer,OrdnanceFitting.Mounted> guided=launcherFittings;
+            if(replaced&&rocketFittings.containsKey(slot)){
                 programs=new java.util.TreeMap<>(rocketFittings);
                 programs.remove(slot);
             }
+            if(replaced&&launcherFittings.containsKey(slot)){
+                guided=new java.util.TreeMap<>(launcherFittings);
+                guided.remove(slot);
+            }
             return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,launcherFittings,programs).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,guided,programs).verifyAmmo();
         }
         public Design stage(int slot, Track track, int level) {
             if(level<0||level>9||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..9");
