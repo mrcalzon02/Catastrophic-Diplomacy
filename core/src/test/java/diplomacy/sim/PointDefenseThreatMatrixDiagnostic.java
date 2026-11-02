@@ -254,7 +254,10 @@ public final class PointDefenseThreatMatrixDiagnostic {
             }
         // The craft themselves use integer craft IDs rather than projectile
         // shot IDs. Their PD damage is recorded as POINT_DEFENSE IMPACT.
-        int craftKilled=threat.craft()?battle.craftLosses-craftLostBefore:0;
+        int craftKilled=threat.craft()?battle.pointDefenseCraftKills:0;
+        int naturalCraftLosses=battle.craftLosses-craftLostBefore-craftKilled;
+        require(naturalCraftLosses>=0,
+                "Non-defense craft attrition counter underflow");
         int terminalCount=threat.craft()?craftTerminal.size():terminal.size();
         int spent=threat.kinetic()?initialRounds-attacker.kineticAmmo:
                 threat.guided()?initialRounds-(threat.heavy()?attacker.torpedoAmmo:
