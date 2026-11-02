@@ -59,7 +59,10 @@ final class ShipSurfaceLighting implements Disposable {
         "  albedo.a*=peel.a;\n"+
         "  albedo.rgb*=1.0-0.54*peel.r;\n"+
         "  albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
-        "  albedo.rgb=mix(albedo.rgb,vec3(0.86,0.91,0.96),peel.b*0.82);\n"+
+        "  float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
+        "  float metalBoost=1.0-smoothstep(0.12,0.60,sourceLum);\n"+
+        "  float metalStrength=peel.b*mix(0.82,1.0,metalBoost);\n"+
+        "  albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
         " }\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
         " if(u_detail<0.01){gl_FragColor=albedo;return;}\n"+
