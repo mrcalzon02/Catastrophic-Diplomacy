@@ -234,7 +234,6 @@ public final class TechnologyCatalog {
                         @Override public Entry<String,Upgrade> next(){
                             if(early.hasNext())return early.next();
                             if(!hasNext())throw new NoSuchElementException();
-                            if(!hasNext())throw new NoSuchElementException();
                             if(nextBranch!=null&&higher<=9){
                                 Upgrade value=TechnologyCatalog.this.get(
                                         nextBranch.id.substring(0,nextBranch.id.length()-2)+
