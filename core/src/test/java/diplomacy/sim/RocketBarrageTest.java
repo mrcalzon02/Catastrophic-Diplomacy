@@ -286,6 +286,53 @@ public final class RocketBarrageTest {
             require(a.fingerprint()==b.fingerprint(),
                     "Seeded rocket burst failed deterministic replay");
         }
+        // Actual battle: energy-only policy means zero rocket expenditures,
+        // even though a fully armed rack is ready and an enemy is in reach.
+        Battle withheld=scene(tech,RocketBarrage.Size.SMALL,4,
+                RocketBarrage.Motor.BOOST_COAST,false);
+        Battle.Ship disciplined=withheld.ships().get(0);
+        int withheldStock=disciplined.kineticAmmo;
+        withheld.setShipStandingOrders(disciplined.id,
+                ShipStandingOrders.DEFAULT.withResources(ShipResourceOrders.DEFAULT
+                        .withAmmunition(ShipResourceOrders.AmmoPolicy.ENERGY_ONLY)));
+        for(int n=0;n<45;n++)withheld.step();
+        require(withheld.rocketRoundsFired==0&&
+                        disciplined.kineticAmmo==withheldStock,
+                "Real rocket rack ignored ENERGY_ONLY captain doctrine");
+        // A reserve is enforced on the WHOLE scheduled salvo, never after
+        // the first rocket has already committed the other rounds.
+        Battle protectedBoat=scene(tech,RocketBarrage.Size.SMALL,4,
+                RocketBarrage.Motor.BOOST_COAST,false);
+        Battle.Ship conservator=protectedBoat.ships().get(0);
+        RocketBarrage.Rack stocked=conservator.rocketRacks.get(0);
+        conservator.kineticAmmo=stocked.salvoCount*stocked.cheapAmmoUnitsPerRocket;
+        protectedBoat.setShipStandingOrders(conservator.id,
+                ShipStandingOrders.DEFAULT.withResources(ShipResourceOrders.DEFAULT
+                        .withAmmunition(ShipResourceOrders.AmmoPolicy.HOLD_RESERVE)
+                        .withReserve(0,1)));
+        for(int n=0;n<35;n++)protectedBoat.step();
+        require(protectedBoat.rocketRoundsFired==0&&stocked.salvoRemaining==0,
+                "SAVE_LAST_ROUND incorrectly committed a whole rocket barrage");
+        // Two launchers share one paid kinetic store: the second cannot
+        // double-book rounds already reserved for the first queued barrage.
+        Battle contested=new Battle(79541L);
+        contested.spawnWing(0,restored,tech,1,220,300);
+        Battle.Ship waiting=contested.addShip(1,Battle.Faction.CARNELIAN,590,300);
+        contested.registerDiagnosticStationaryTarget(waiting.id);
+        Battle.Ship dual=contested.ships().get(0);
+        dual.laserDamage=dual.missileDamage=dual.kineticDamage=0;
+        dual.plasmaDamage=dual.particleDamage=dual.torpedoDamage=0;
+        dual.fighterReserve=dual.droneReserve=0;
+        dual.maxPower=dual.power=20000;dual.maxHeat=20000;
+        dual.kineticAmmo=39; // medium 16*2 and small 8*1 needs 40 units.
+        contested.setShipStandingOrders(dual.id,ShipStandingOrders.DEFAULT
+                .withResources(ShipResourceOrders.DEFAULT
+                        .withAmmunition(ShipResourceOrders.AmmoPolicy.HOLD_RESERVE)));
+        contested.step();
+        require(contested.rocketRoundsFired==1&&
+                        dual.rocketRacks.get(0).salvoRemaining==15&&
+                        dual.rocketRacks.get(1).salvoRemaining==0,
+                "Two rocket racks double-booked the same finite kinetic stock");
         System.out.println("PASS four native rocket sizes, 4/8/16 cheap physical volleys, two fixed-bearing motor envelopes, long reloads, PD, dodge, hit and replay");
     }
 }
