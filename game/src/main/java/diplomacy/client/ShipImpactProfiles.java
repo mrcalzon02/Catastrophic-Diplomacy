@@ -118,7 +118,17 @@ final class ShipImpactProfiles {
                     p=merge(p,pock(x+.22f,y+.78f,intensity*.58f,
                             seed+29,false,.42f,0));
                 }
-                return p;
+                // Compressed brown armor and patchy incandescent
+                // metal outside the still-cool silver fracture ridges.
+                // Warmth is concentrated on chipped gaps, never a
+                // single glowing circular ring or an entire ship tint.
+                float chrome=metal(p)/255f;
+                float scorch=intensity*.54f*
+                        smooth(.42f,.67f,d)*(1-smooth(.97f,1.18f,d));
+                float hot=intensity*.47f*
+                        smooth(.60f,.81f,d)*(1-smooth(.93f,1.10f,d))*
+                        (1-smooth(.11f,.65f,chrome));
+                return merge(p,pack(scorch,hot,0));
             }
             case MISSILE, TORPEDO:{
                 // Missiles leave compact soot and small fragmented spall.
@@ -182,18 +192,43 @@ final class ShipImpactProfiles {
                         Math.max(melt,rim),0);
             }
             case PARTICLE:{
-                // Tight, cool twin needle holes, almost no burn halo.
-                if(d>1.01f)return 0;
-                float physical=breachRadius(armor,internal);
-                int body=merge(pock(x,y,intensity*.58f,seed,false,.44f,0f),
-                        pock(x-.20f,y+.13f,intensity*.47f,seed+5,false,.32f,0f));
-                // Cooling micro-burrs on surviving plating: one real hit,
-                // not extra damage anchors or invented missing pixels.
-                body=merge(body,pock(x-.88f,y+.08f,intensity*.32f,
-                        seed+13,false,.25f,0f));
-                body=merge(body,pock(x+.17f,y-.90f,intensity*.29f,
-                        seed+23,false,.23f,0f));
-                return merge(body,pack(0,0,survivingLip(d,physical,intensity*.60f)));
+                // Pin-sized central puncture, with 7 hairline fracture
+                // spokes and short stress branches in surviving plating.
+                // This does NOT fabricate additional combat impacts.
+                if(d>1.02f)return 0;
+                float dark=intensity*.74f*(1-smooth(.10f,.25f,d));
+                float metal=intensity*.40f*smooth(.26f,.36f,d)*
+                        (1-smooth(.38f,.48f,d));
+                for(int i=0;i<7;i++){
+                    // One horizontal spoke makes the difference measurable
+                    // in the 96x144 damage mask; others radiate outward.
+                    float ux=i==0?1f:DX[(i+seed)%DX.length];
+                    float uy=i==0?0f:DY[(i+seed)%DY.length];
+                    float along=x*ux+y*uy;
+                    float across=x*uy-y*ux;
+                    if(along<.24f||along>1.00f)continue;
+                    float warp=(i%3-1)*.035f*along;
+                    float stroke=smooth(.23f,.34f,along)*
+                            (1-smooth(.87f,1.00f,along));
+                    float fissure=1-smooth(.035f,.115f,Math.abs(across-warp));
+                    dark=Math.max(dark,intensity*.77f*stroke*fissure);
+                    float burr=1-smooth(.025f,.10f,
+                            Math.abs(across-warp-.095f));
+                    metal=Math.max(metal,intensity*.35f*stroke*burr);
+                    if((i&1)==0){
+                        // Branch takes a short angled step away from
+                        // the main crack at ~0.62 radius.
+                        float branchAlong=(along-.59f)*.93f+
+                                (across-warp)*.36f;
+                        float branchAcross=(across-warp)*.93f-
+                                (along-.59f)*.36f;
+                        if(branchAlong>0f&&branchAlong<.30f)
+                            dark=Math.max(dark,intensity*.46f*
+                                (1-smooth(.035f,.095f,Math.abs(branchAcross)))*
+                                (1-smooth(.20f,.30f,branchAlong)));
+                    }
+                }
+                return pack(dark,0,metal);
             }
             case FIGHTER:{
                 // Small shallow munition contact, not a capital strike.

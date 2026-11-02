@@ -1,5 +1,7 @@
 package diplomacy.client;
 
+import diplomacy.sim.Battle;
+
 /**
  * Localized alpha-cut armor stamps derived exclusively from the authoritative
  * per-tile armor and structural integrity. Never changes source sprite pixels,
@@ -8,6 +10,48 @@ package diplomacy.client;
 final class ShipArmorStamps {
     private ShipArmorStamps(){}
     private static float clamp(float x){return Math.max(0,Math.min(1,x));}
+
+    /**
+     * Weapon-specific visual armor opening. Combat tile wear and internal
+     * damage remain authoritative; only the alpha silhouette differs.
+     * Tiny high-velocity penetrators leave a narrow pucker. Torpedoes tear
+     * a large, irregular cavity exposing the already-authored structural
+     * underlay. Normal weapons retain the original physical stamp.
+     */
+    static float typedOpeningAt(float localRow,float localCol,int row,int col,
+                                float stampedRow,float stampedCol,
+                                float exposure,float structural,int shipId,
+                                Battle.DamageType kind){
+        if(kind!=Battle.DamageType.PARTICLE&&kind!=Battle.DamageType.TORPEDO)
+            return openingAt(localRow,localCol,row,col,stampedRow,stampedCol,
+                    exposure,structural,shipId);
+        float wear=clamp(exposure),internal=clamp(structural);
+        if(wear<=.70f&&internal<=.00001f)return 0f;
+        float peeled=clamp((wear-.70f)/.20f);
+        float puncture=(float)StrictMath.sqrt(internal);
+        float dx=localCol-stampedCol,dy=localRow-stampedRow;
+        float radius=(float)StrictMath.hypot(dx,dy);
+        int hash=shipId*0x9e3779b9+row*0x7f4a7c15+col*0x6c8e9cf5;
+        hash^=hash>>>16;
+        float nx=dx/Math.max(.0001f,radius),ny=dy/Math.max(.0001f,radius);
+        float depth=Math.max(peeled,Math.min(.80f,puncture*.80f));
+        if(kind==Battle.DamageType.PARTICLE){
+            // ~0.36 grid-cell maximum puncture, with a tiny puckered lip.
+            // Spider cracking belongs to the RGB material, NOT the alpha.
+            float asym=1f+(.07f*nx*ny)+((hash&7)-3)*.008f;
+            float edge=(.15f+.16f*peeled+.05f*puncture)*asym;
+            return depth*clamp((edge-radius)/.065f);
+        }
+        // High-explosive torpedo's single *real* impact is a systemic
+        // ripped opening, not an amber stain; jagged tears stay local.
+        float four=nx*nx*nx*nx-6f*nx*nx*ny*ny+ny*ny*ny*ny;
+        float three=3f*nx*nx*ny-ny*ny*ny;
+        float serration=clamp(1f+.14f*four+.13f*three+
+                ((hash>>>5&7)-3)*.012f);
+        float edge=Math.min(1.28f,(.18f+.62f*peeled+.30f*puncture)*
+                Math.max(.78f,Math.min(1.19f,serration)));
+        return depth*clamp((edge-radius)/.095f);
+    }
 
     /**
      * Pixel coordinates in defense-grid tile units; tile centers are integer

@@ -409,6 +409,7 @@ public final class TerranPlaceholderSprites implements Disposable {
      */
     private static float craterAt(float[][] wear,float[][] internal,
                                    boolean[][] anchorsImpact,
+                                   Battle.DamageType[][] impactTypes,
                                    ShipArmorStampAnchors aligned,
                                    float tileRow,float tileCol,int shipId) {
         int centerR=(int)StrictMath.floor(tileRow+.5);
@@ -418,9 +419,9 @@ public final class TerranPlaceholderSprites implements Disposable {
             for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
                 if(!anchorsImpact[r][c]||
                         wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
-                crater=Math.max(crater,ShipArmorStamps.openingAt(
+                crater=Math.max(crater,ShipArmorStamps.typedOpeningAt(
                         tileRow,tileCol,r,c,aligned.row(r,c),aligned.col(r,c),
-                        wear[r][c],internal[r][c],shipId));
+                        wear[r][c],internal[r][c],shipId,impactTypes[r][c]));
             }
         return crater;
     }
@@ -503,17 +504,17 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float heat=ShipImpactProfiles.hot(style)/255f;
                 float metal=ShipImpactProfiles.metal(style)/255f;
                 int family=(style>>>24)&255;
-                float crater=craterAt(wear,internal,impactCenters,aligned,row,col,ship.id);
+                float crater=craterAt(wear,internal,impactCenters,impactTypes,aligned,row,col,ship.id);
                 float rim=0f;
                 // Interior render layer is clipped to original opaque pixels.
                 // No original hull pixel => the branch above already skipped.
                 // No breach => no 4-neighbor sampling or emissive overhead.
                 if(crater>.07f && crater<.98f){
                     float sx=GRID/(float)MASK_W,sy=GRID/(float)MASK_H;
-                    float left=craterAt(wear,internal,impactCenters,aligned,row,col-sx,ship.id);
-                    float right=craterAt(wear,internal,impactCenters,aligned,row,col+sx,ship.id);
-                    float up=craterAt(wear,internal,impactCenters,aligned,row-sy,col,ship.id);
-                    float down=craterAt(wear,internal,impactCenters,aligned,row+sy,col,ship.id);
+                    float left=craterAt(wear,internal,impactCenters,impactTypes,aligned,row,col-sx,ship.id);
+                    float right=craterAt(wear,internal,impactCenters,impactTypes,aligned,row,col+sx,ship.id);
+                    float up=craterAt(wear,internal,impactCenters,impactTypes,aligned,row-sy,col,ship.id);
+                    float down=craterAt(wear,internal,impactCenters,impactTypes,aligned,row+sy,col,ship.id);
                     // The interior layer shares the source alpha silhouette.
                     rim=ShipSurfaceDamageVisual.breachRim(crater,left,right,up,down,
                             originalAlpha,originalAlpha);

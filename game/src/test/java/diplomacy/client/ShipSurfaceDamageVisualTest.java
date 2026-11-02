@@ -170,6 +170,39 @@ public final class ShipSurfaceDamageVisualTest {
             check(profiles.add(signature),
                     "Weapon profiles indistinguishable: "+family);
         }
+        // Weapon-specific alpha openings stay anchored to actual damage.
+        // The rail/particle family makes a needle hole, while a torpedo
+        // tears a visibly larger cavity, all clipped to original art.
+        int id=17;
+        float particleCenter=ShipArmorStamps.typedOpeningAt(8,8,8,8,
+                8,8,1,1,id,diplomacy.sim.Battle.DamageType.PARTICLE);
+        float torpedoCenter=ShipArmorStamps.typedOpeningAt(8,8,8,8,
+                8,8,1,1,id,diplomacy.sim.Battle.DamageType.TORPEDO);
+        check(particleCenter>.95f&&torpedoCenter>.95f,
+                "Fully penetrated hull must expose structure at direct hit");
+        float atNine=.89f;
+        float particleOuter=ShipArmorStamps.typedOpeningAt(8,8+atNine,8,8,
+                8,8,1,1,id,diplomacy.sim.Battle.DamageType.PARTICLE);
+        float torpedoOuter=ShipArmorStamps.typedOpeningAt(8,8+atNine,8,8,
+                8,8,1,1,id,diplomacy.sim.Battle.DamageType.TORPEDO);
+        check(particleOuter==0&&torpedoOuter>.10f,
+                "Torpedo must physically expose plating well beyond a particle pucker");
+        check(ShipArmorStamps.typedOpeningAt(8,9.40f,8,8,
+                8,8,1,1,id,diplomacy.sim.Battle.DamageType.TORPEDO)==0,
+                "Torpedo rupture must remain localized");
+        check(ShipArmorStamps.typedOpeningAt(8,8,8,8,
+                8,8,0,0,id,diplomacy.sim.Battle.DamageType.TORPEDO)==0,
+                "Undamaged hull must not show a torpedo breach");
+        int particleCrack=ShipImpactProfiles.sample(
+                diplomacy.sim.Battle.DamageType.PARTICLE,8,8.78f,
+                8,8,1,1,17,0);
+        check(ShipImpactProfiles.dark(particleCrack)>30,
+                "Particle pinhole must retain narrow radial stress fractures");
+        int kineticHeated=ShipImpactProfiles.sample(
+                diplomacy.sim.Battle.DamageType.KINETIC,8,8.87f,
+                8,8,1,1,17,0);
+        check(ShipImpactProfiles.dark(kineticHeated)>0,
+                "Kinetic hot-metal compression needs brown carbonized plating");
         check(ShipSurfaceDamageVisual.blueCoefficient(1f,false)==.56f &&
                 ShipSurfaceDamageVisual.blueCoefficient(1f,true)==1f,
                 "Tagged laser oxide and kinetic metal must occupy different material ranges");
