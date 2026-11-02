@@ -191,9 +191,9 @@ public final class RocketPdBalanceDiagnostic {
                 "- Balance results are deliberately **diagnostic**. No target hit "+
                 "percentage, win rate or cosmetic change can fail a release.\n";
         StringBuilder detail=new StringBuilder(summary);
-        detail.append("\\n## Endgame: rank IX SIEGE versus same-rank laser PD, 16 rockets per rack\\n\\n");
-        detail.append("|Modules each|Motor|Target moves|Runs|Rockets|Intercepted|Impact|PD shots|Protection lost|\\n");
-        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|\\n");
+        detail.append("\n## Endgame: rank IX SIEGE versus same-rank laser PD, 16 rockets per rack\n\n");
+        detail.append("|Modules each|Motor|Target moves|Runs|Rockets|Intercepted|Impact|PD shots|Protection lost|\n");
+        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|\n");
         for(int modules:MODULES)
             for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
                 for(boolean moving:new boolean[]{false,true}){
@@ -208,13 +208,13 @@ public final class RocketPdBalanceDiagnostic {
                             damage+=measure.damageToProtection;
                         }
                     detail.append(String.format(Locale.ROOT,
-                            "|%d / %d|%s|%s|%d|%d|%d|%d|%d|%.1f|\\n",
+                            "|%d / %d|%s|%s|%d|%d|%d|%d|%d|%.1f|\n",
                             modules,modules,motor,moving,samples,fired,stopped,
                             landed,shots,damage));
                 }
-        detail.append("\\nReference ratios are empirical outcomes, not pass/fail targets. "+
+        detail.append("\nReference ratios are empirical outcomes, not pass/fail targets. "+
                 "Use the CSV to compare rocket speed, hit points and radar/thermal "+
-                "detection ranges against point-defense tracking and reload.\\n");
+                "detection ranges against point-defense tracking and reload.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
