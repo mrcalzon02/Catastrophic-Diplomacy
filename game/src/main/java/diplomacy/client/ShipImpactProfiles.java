@@ -56,10 +56,23 @@ final class ShipImpactProfiles {
         for(int i=0;i<(heavy?7:4);i++){
             int k=Math.floorMod(id+i,DX.length);
             float along=x*DX[k]+y*DY[k];
-            float across=Math.abs(x*DY[k]-y*DX[k]);
-            float end=Math.min(1.30f,radius+(.18f+(i%3)*.045f)*scale);
-            if(along>radius*.98f&&along<end&&across<.07f*scale)
-                bright=Math.max(bright,s*.79f*(1-smooth(radius*.98f,end,along)));
+            float across=x*DY[k]-y*DX[k];
+            // The mask is only 96x144 (6x9 samples per armor cell).
+            // The former .07-cell hairline was narrower than one texel and
+            // vanished in real captures. Use a short two-sided ridge: bright
+            // sheared metal next to its darker fracture shadow, on plating
+            // that survives the physical cutout.
+            float end=Math.min(1.30f,radius+(.32f+(i%3)*.07f)*scale);
+            float start=radius*.91f;
+            if(along<start||along>end)continue;
+            float ridge=smooth(start,radius+.035f*scale,along)*
+                    (1f-smooth(end-.12f*scale,end,along));
+            float crest=1f-smooth(.025f*scale,.17f*scale,
+                    Math.abs(across+.045f*scale));
+            float shadow=1f-smooth(.035f*scale,.18f*scale,
+                    Math.abs(across-.16f*scale));
+            bright=Math.max(bright,s*.96f*ridge*crest);
+            dark=Math.max(dark,s*.37f*ridge*shadow);
         }
         return pack(dark,0,bright);
     }
