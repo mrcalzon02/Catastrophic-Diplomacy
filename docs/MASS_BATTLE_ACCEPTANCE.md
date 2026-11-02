@@ -32,3 +32,22 @@ Re-run the test suite at the eventual committed SHA before interpreting results 
 5. Profile large fleets over sustained engagements; headless wall-time measurements are not GPU FPS or proof of good device performance. Optimization should follow actual frame-time traces, not fabricated FPS claims.
 
 No GitHub Actions workflows were introduced for this campaign.
+
+
+## Progress-aware endurance ceiling (2026-11-01)
+
+The seven seeded 200-versus-200 runs previously imposed an unconditional
+30,000-tick (1,000 simulated seconds) ceiling. Seed `2026103106` was
+**still landing hits and killing ships** at that threshold: survivors on one
+side fell from 10 at tick 27,000 to 3 at tick 30,000. That is active combat,
+not a crash, deadlock, or terminal outcome.
+
+The 30k threshold is now a **telemetry checkpoint**, with subsequent
+6,000-tick contact dumps. The hard safety ceiling becomes 90,000 ticks,
+and the 6,000-consecutive-ticks-without-hits/losses/fighter-fire watchdog
+still fails truly stalled engagements. The existing 42-minute wall-time
+ceiling is unchanged. No ending is synthesized, no ship or AI is made to
+win for the test, and PASS still requires a true victory or withdrawal
+terminal state. Only the headless endurance test's time budget and
+diagnostic messages are changed; armor graphics and combat mechanics are
+left intact.

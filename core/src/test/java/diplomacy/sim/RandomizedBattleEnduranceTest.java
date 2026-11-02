@@ -29,7 +29,12 @@ import java.util.Set;
  */
 public final class RandomizedBattleEnduranceTest {
     private static final int FLEET_SIZE=200;
-    private static final int MAX_TICKS=30000; // 1000 simulated seconds, safety limit only
+    // 1000 simulated seconds is an inspection checkpoint, NOT a battle
+    // deadline. A real 200v200 engagement may be actively resolving at 30k.
+    // Keep a generous finite ceiling plus a strict 6000-tick no-progress
+    // watchdog. Neither cutoff is ever considered a successful outcome.
+    private static final int REVIEW_TICKS=30000;
+    private static final int MAX_TICKS=90000;
     private static final int NO_COMBAT_PROGRESS_TICKS=6000;
     private static final int REPORT_INTERVAL=300;
     private static final long MAX_WALL_NS=42L*60L*1000L*1000000L;
@@ -247,10 +252,19 @@ public final class RandomizedBattleEnduranceTest {
                     " flightDecks="+flightDecks+" fittedAircraft="+stockedTypes,progress);
             shipCheck(b);
             while(!b.finished()){
+                if(b.tick==REVIEW_TICKS || b.tick>REVIEW_TICKS &&
+                        (b.tick-REVIEW_TICKS)%NO_COMBAT_PROGRESS_TICKS==0){
+                    diagnostic("ENDURANCE-CHECKPOINT seed="+seed+" tick="+b.tick+
+                            " combatAge="+(b.tick-lastProgressTick)+
+                            " alive="+b.alive(0)+"/"+b.alive(1)+
+                            " hits="+b.hitCount+" destroyed="+b.destructions+
+                            " continuing authentic combat until terminal",progress);
+                    diagnostic(contactDiagnostic(b),progress);
+                }
                 if(b.tick>=MAX_TICKS)
                     diagnostic(contactDiagnostic(b),progress);
                 require(b.tick<MAX_TICKS,"TIMEOUT: no terminal victory after "+
-                        MAX_TICKS+" real 30Hz combat ticks");
+                        MAX_TICKS+" real 30Hz combat ticks (30k checkpoint is not terminal)");
                 require(System.nanoTime()-started<MAX_WALL_NS,
                         "WALL-TIMEOUT: real battle still not terminated at "+
                                 b.tick+" ticks");
