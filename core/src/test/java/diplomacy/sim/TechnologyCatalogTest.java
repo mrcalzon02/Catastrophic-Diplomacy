@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
@@ -12,8 +13,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 34848, "full technology count with variant research");
-        require(c.componentCount() == 968, "all base components including variant hardware");
+        require(c.upgradeCount() == 39600, "full technology count with survival research");
+        require(c.componentCount() == 1100, "all base components including survival hardware");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -60,6 +61,16 @@ public final class TechnologyCatalogTest {
                         require(c.get("TECH-"+faction+"-"+model.code()+"-"+track+"-"+
                                 String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
                                 "Missing variant research "+id+" "+track+" "+rank);
+            }
+            for(var family:SurvivalHardwareCatalog.FAMILIES){
+                String baseId="BASE-"+faction+"-"+family.code();
+                require(c.base(baseId)!=null&&c.base(baseId).category.equals(family.category()),
+                        "Missing survival module "+baseId);
+                for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=9;rank++)
+                        require(c.get("TECH-"+faction+"-"+family.code()+"-"+track+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
+                                "Missing independent survival research "+baseId);
             }
             for(String module:new String[]{"KTS","MTS","TTS","FTS"}){
                 require(c.base("BASE-"+faction+"-"+module)!=null &&

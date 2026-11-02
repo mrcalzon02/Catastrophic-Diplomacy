@@ -106,6 +106,7 @@ public final class TechnologyCatalog {
             addArmorAndBulkheadFamilies(bases,rows);
             addSensingFamilies(bases,rows);
             addSensingHardwareVariants(bases,rows);
+            addSurvivalAndUnsafeFamilies(bases,rows);
             extendToNineStages(rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
@@ -607,6 +608,47 @@ public final class TechnologyCatalog {
                 row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
                         .replace("-"+parent,"-"+code));
                 row.set(19,model.name()+": "+row.get(19));
+                upgrades.add(row);
+            }
+        }
+    }
+
+
+    /** Native, socket-bound damage control and unsafe retrofit families.
+     * Clone root equipment and its independent four engineering tracks.
+     * Existing components and saved design IDs are not modified. */
+    private static void addSurvivalAndUnsafeFamilies(List<List<String>> bases,
+                                                     List<List<String>> upgrades) {
+        List<List<String>> sourceBases=List.copyOf(bases);
+        List<List<String>> sourceUpgrades=List.copyOf(upgrades);
+        for(SurvivalHardwareCatalog.Family family:SurvivalHardwareCatalog.FAMILIES) {
+            String code=family.code(),parent=family.parent();
+            for(int i=1;i<sourceBases.size();i++){
+                List<String> source=sourceBases.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-"+parent,"-"+code));
+                row.set(2,code);row.set(3,family.name());row.set(4,family.category());
+                row.set(5,"Native "+family.name()+"; engineering tier "+family.requiredTier());
+                row.set(6,ratio(Double.parseDouble(row.get(6)),family.mass()));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),family.power()));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),family.heat()));
+                row.set(9,ratio(Double.parseDouble(row.get(9)),family.integrity()));
+                row.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(row.get(10))*family.cost()))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),family.output()));
+                row.set(12,"Physical survival or risky retrofit equipment; real fitting budget");
+                bases.add(row);
+            }
+            for(int i=1;i<sourceUpgrades.size();i++){
+                List<String> source=sourceUpgrades.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-"+parent+"-","-"+code+"-"));
+                row.set(2,code);row.set(5,family.name()+" "+row.get(3)+" "+row.get(4));
+                row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
+                        .replace("-"+parent,"-"+code));
+                row.set(19,family.name()+": "+row.get(19));
                 upgrades.add(row);
             }
         }
