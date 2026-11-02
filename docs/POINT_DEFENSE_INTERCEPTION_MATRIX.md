@@ -7,13 +7,17 @@ runner execution**. This is an advisory diagnostic, not a new release gate.
 
 The existing rocket ladder separately measures all four unguided rocket
 sizes, 4/8/16-round salvos, both engine types, target motion, and research
-tiers. The new `PointDefenseThreatMatrixDiagnostic` exercises **24 additional
+tiers. The new `PointDefenseThreatMatrixDiagnostic` exercises **38 additional
 threat configurations**:
 
-- Physical kinetic cannon shells
-- Guided missiles: SINGLE, RIPPLE, SATURATION, MICRO_SWARM,
+- All five physical kinetic shells: standard, armor-piercing, fragmentation,
+  high explosive, and relativistic high-velocity rounds
+- Guided missiles: five additional physical warhead profiles
+  (armor-piercing, fragmentation, high explosive, EMP, shield breaker),
+  plus SINGLE, RIPPLE, SATURATION, MICRO_SWARM,
   HEAVY_STRIKE, COLD_LAUNCH, DECOY_CLOUD, CLUSTER_CARRIER, CASCADE_SWARM
-- Guided torpedoes: SINGLE, SATURATION, HEAVY_STRIKE, DECOY_CLOUD,
+- Guided torpedoes: those same five alternate physical warheads,
+  plus SINGLE, SATURATION, HEAVY_STRIKE, DECOY_CLOUD,
   CLUSTER_CARRIER, CASCADE_SWARM
 - Each of the six actual fighter hulls: INTERCEPTOR, ASSAULT_GUNSHIP,
   LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER
