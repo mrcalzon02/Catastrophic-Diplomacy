@@ -312,6 +312,21 @@ final class GameMenuPanel {
                 .sorted(Comparator.comparing((Component c)->c.category)
                         .thenComparing(c->c.name)).collect(java.util.stream.Collectors.toList());
     }
+    private TechnologyCatalog cachedTechnologyCatalog;
+    private Battle.Faction cachedTechnologyFaction;
+    private int cachedTechnologyBranch=-1;
+    private List<Component> cachedTechnologyList;
+    private List<Component> visibleTechnology(TechnologyCatalog catalog,
+                                              Battle.Faction faction,int branch){
+        if(catalog!=cachedTechnologyCatalog || faction!=cachedTechnologyFaction ||
+                branch!=cachedTechnologyBranch || cachedTechnologyList==null){
+            cachedTechnologyCatalog=catalog;
+            cachedTechnologyFaction=faction;
+            cachedTechnologyBranch=branch;
+            cachedTechnologyList=technologySubsystems(catalog,faction,branch);
+        }
+        return cachedTechnologyList;
+    }
     static List<Component> technologySubsystems(TechnologyCatalog catalog,
                                                Battle.Faction faction,int branch){
         if(branch<0||branch>=INDUSTRY_TABS.length)
@@ -507,7 +522,7 @@ final class GameMenuPanel {
                 rectangle(shapes,30,130,304,484,PANEL);
                 rectangle(shapes,345,130,488,484,PANEL);
                 rectangle(shapes,844,130,406,484,PANEL);
-                int modules=technologySubsystems(techCatalog,progress.faction(),
+                int modules=visibleTechnology(techCatalog,progress.faction(),
                         technologyBranch).size();
                 for(int branch=0;branch<INDUSTRY_TABS.length;branch++)
                     button(shapes,44+(branch%3)*96,528-(branch/3)*42,90,38,
@@ -853,7 +868,7 @@ final class GameMenuPanel {
             case TECHNOLOGY -> {
                 title(batch,font,"FACTION TECHNOLOGY LAB",
                         "INDIVIDUAL DISCOVERIES / PAID ONCE / PERSISTENT CAMPAIGN UNLOCKS");
-                List<Component> components=technologySubsystems(techCatalog,progress.faction(),
+                List<Component> components=visibleTechnology(techCatalog,progress.faction(),
                         technologyBranch);
                 label(batch,font,"INDUSTRIAL RESEARCH BRANCHES",50,588,Color.CYAN);
                 label(batch,font,"BRANCH / NINE DEVELOPMENT STAGES",366,585,Color.CYAN);
