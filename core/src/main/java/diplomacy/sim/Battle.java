@@ -134,6 +134,8 @@ public final class Battle {
         /** Real simulation ticks for visible engineering faults and repairs. */
         public long lastHazardTick=-10000,lastRepairTick=-10000;
         public boolean recoveryBeacon,recoveryBeaconActivated;
+        /** Effective strength of real fitted recovery hardware; zero without a beacon. */
+        public double recoveryStrength;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
         public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
@@ -946,6 +948,7 @@ public final class Battle {
         s.magazineContainment=machinery.survival().magazineContainment();
         s.escapePods=machinery.survival().escapePods();
         s.recoveryBeacon=machinery.survival().recoveryBeacon();
+        s.recoveryStrength=machinery.survival().recoveryStrength();
         s.hazardInstability=machinery.survival().instability();
         s.hazardSeverity=machinery.survival().hazardSeverity();
         s.unsafeFlags=machinery.survival().unsafeFlags();
@@ -1412,7 +1415,8 @@ public final class Battle {
             // Modest hull-only scrap value, NOT free replacement modules, crew,
             // fuel or ammunition. Victory is the real recovery operation.
             long scrap=Math.min(8000L,
-                    Math.round(wreck.hullClass.baseHull*4.0));
+                    Math.round(wreck.hullClass.baseHull*4.0*
+                            Math.max(0,Math.min(1.75,wreck.recoveryStrength))));
             salvaged=Math.addExact(salvaged,scrap);
         }
         return salvaged;
