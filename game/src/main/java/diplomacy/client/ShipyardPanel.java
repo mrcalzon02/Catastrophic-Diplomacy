@@ -10,6 +10,7 @@ import diplomacy.shipyard.OrdnanceFitting;
 import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnancePropulsion;
 import diplomacy.sim.OrdnanceGuidance;
+import diplomacy.tech.SensingVariantCatalog;
 import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.LaserFamilies;
@@ -819,6 +820,13 @@ final class ShipyardPanel {
             int position=modulePage*MODULE_OPTIONS_PER_PAGE+index-1;
             if(index>0&&index<=MODULE_OPTIONS_PER_PAGE&&position<options.size()){
                 Component part=options.get(position);
+                int required=SensingVariantCatalog.requiredTier(part.subsystem);
+                if(campaignTechnology()&&campaignRank<required){
+                    notice="LOCKED: "+part.name+" requires tech "+required;return true;
+                }
+                if(usage==Usage.SKIRMISH&&challenge().maxStage()<required){
+                    notice="LOCKED: "+part.name+" exceeds challenge tech cap";return true;
+                }
                 try{draft=draft.install(selectedSlot,part.id);}
                 catch(IllegalArgumentException blocked){notice=blocked.getMessage();return true;}
                 notice="Installed "+part.name+" (upgrades reset for this mount)";

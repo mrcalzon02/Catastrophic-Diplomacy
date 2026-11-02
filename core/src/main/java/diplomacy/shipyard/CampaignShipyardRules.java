@@ -5,6 +5,7 @@ import diplomacy.sim.FighterModel;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignTechnology;
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SensingVariantCatalog;
 import java.util.Locale;
 
 /**
@@ -27,6 +28,10 @@ public final class CampaignShipyardRules {
         for(int i=0;i<design.slots();i++){
             Shipyard.Installed installed=design.at(i);
             if(installed==null)continue;
+            String subsystem=installed.component.substring(installed.component.lastIndexOf('-')+1);
+            if(researchRank<SensingVariantCatalog.requiredTier(subsystem))
+                throw new IllegalArgumentException("Hardware "+subsystem+
+                        " requires engineering tier "+SensingVariantCatalog.requiredTier(subsystem));
             for(int stage:installed.stages().values())
                 if(stage>researchRank)
                     throw new IllegalArgumentException("Module "+(i+1)+

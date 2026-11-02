@@ -3,6 +3,7 @@ package diplomacy.shipyard;
 import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SensingVariantCatalog;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -82,6 +83,10 @@ public record SkirmishTechnologyRules(
         for(int i=0;i<design.slots();i++){
             Shipyard.Installed module=design.at(i);
             if(module==null)continue;
+            String subsystem=module.component.substring(module.component.lastIndexOf('-')+1);
+            if(maxStage<SensingVariantCatalog.requiredTier(subsystem))
+                throw new IllegalArgumentException("Hardware "+subsystem+
+                        " exceeds skirmish technology cap "+maxStage);
             if(module.mark>Math.min(4,maxStage+1))
                 throw new IllegalArgumentException("Hardware mark exceeds challenge technology limit");
             if(maxStage<2&&module.pattern!=ModuleVersions.Pattern.STANDARD)

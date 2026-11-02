@@ -2,6 +2,10 @@ package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.shipyard.ModuleBranchEffects;
+import diplomacy.shipyard.CampaignShipyardRules;
+import diplomacy.shipyard.SkirmishTechnologyRules;
 
 /** Runnable standalone acceptance test: sensing is real hardware, not a UI label. */
 public final class SensingModulesTest {
@@ -50,6 +54,58 @@ public final class SensingModulesTest {
             require(researched!=null,"Research chain must fit "+code);
             require(Shipyard.decode(Shipyard.encode(design),catalog).at(index)!=null,
                     "Sensing module lost in save/load: "+code);
+        }
+        for(var model:SensingVariantCatalog.VARIANTS) {
+            Shipyard.Mount mount=model.base().equals("STC")?Shipyard.Mount.DEFENSE:
+                    model.base().equals("HLP")?Shipyard.Mount.SUPPORT:Shipyard.Mount.SYSTEM;
+            int index=socket(bare.hull,mount);
+            var design=bare.install(index,"BASE-TER-"+model.code());
+            require(Shipyard.inspect(design,catalog).valid(),
+                    "Variant fitting invalid "+model.code());
+            require(Shipyard.decode(Shipyard.encode(design),catalog).at(index).component
+                            .equals("BASE-TER-"+model.code()),
+                    "Variant identity lost on save/load "+model.code());
+            require(ModuleBranchEffects.tune(model.code(),Shipyard.Track.SPECIALIST,2).reach()>1,
+                    "Variant lacks functioning specialist research "+model.code());
+            if(model.requiredTier()>0){
+                boolean blocked=false;
+                try{CampaignShipyardRules.requireAllowed(design,design.faction,
+                        model.requiredTier()-1,1);
+                }catch(IllegalArgumentException expected){blocked=true;}
+                require(blocked,"Campaign tier improperly permits "+model.code());
+                blocked=false;
+                try{SkirmishTechnologyRules.unrestricted().withStage(model.requiredTier()-1)
+                        .requireAllowed(design,catalog);
+                }catch(IllegalArgumentException expected){blocked=true;}
+                require(blocked,"Skirmish tier improperly permits "+model.code());
+            }
+        }
+        for(String root:new String[]{"RDR","STC","IRT","HTD","VCL","ACU","XRY","GRA","HLP"}){
+            String precursor=null,advanced=null;
+            for(var m:SensingVariantCatalog.VARIANTS){
+                if(!m.base().equals(root))continue;
+                if(m.requiredTier()==0)precursor=m.code();
+                if(m.requiredTier()==6)advanced=m.code();
+            }
+            require(precursor!=null&&advanced!=null,"Missing hardware generations "+root);
+            Shipyard.Mount mount=root.equals("STC")?Shipyard.Mount.DEFENSE:
+                    root.equals("HLP")?Shipyard.Mount.SUPPORT:Shipyard.Mount.SYSTEM;
+            int slot=socket(bare.hull,mount);
+            var crude=Shipyard.fit(bare.install(slot,"BASE-TER-"+precursor),catalog).sensing();
+            var late=Shipyard.fit(bare.install(slot,"BASE-TER-"+advanced),catalog).sensing();
+            boolean better=switch(root){
+                case "RDR" -> late.radarGain()>crude.radarGain();
+                case "STC" -> late.radarSignature()<crude.radarSignature();
+                case "IRT" -> late.infraredRange()>crude.infraredRange();
+                case "HTD" -> late.thermalSignature()<crude.thermalSignature();
+                case "VCL" -> late.opticalSignature()<crude.opticalSignature();
+                case "ACU" -> late.acuity()>crude.acuity();
+                case "XRY" -> late.xrayRange()>crude.xrayRange();
+                case "GRA" -> late.graviticRange()>crude.graviticRange();
+                case "HLP" -> late.hologramNoise()>crude.hologramNoise();
+                default -> false;
+            };
+            require(better,"Advanced sensor variant does not outperform its precursor "+root);
         }
         Battle duel=new Battle(501L);
         duel.spawnWing(0,bare,catalog,1,100,100);

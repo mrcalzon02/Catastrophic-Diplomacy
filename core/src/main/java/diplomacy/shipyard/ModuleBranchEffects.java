@@ -1,6 +1,7 @@
 package diplomacy.shipyard;
 
 import java.util.Set;
+import diplomacy.tech.SensingVariantCatalog;
 
 /**
  * Per-component behavioral deltas from a single exclusive technology branch.
@@ -28,6 +29,10 @@ public final class ModuleBranchEffects {
                 ||(branch!=null&&rank==0))
             throw new IllegalArgumentException("Invalid specialized module");
         if(rank==0)return NEUTRAL;
+        // An alternative gets its own research IDs but retains the tuned
+        // behavioral physics of its base sensor/detector lineage.
+        String parent=SensingVariantCatalog.root(subsystem);
+        if(!parent.equals(subsystem))return tune(parent,branch,rank);
         // Every newly installed logistics family has its own research ID but
         // uses the corresponding calibrated doctrine rather than neutral tuning.
         if(Set.of("HPR","APR","PWR","AHL","ASH","AAR","APW").contains(subsystem))

@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.SensingVariantCatalog;
 import java.util.List;
 
 /**
@@ -78,7 +79,8 @@ public final class ShipDamageTargeting {
     /** Map real fitted module types onto their physical combat subsystems. */
     public static Battle.Subsystem subsystem(String component){
         if(component==null||component.length()<3)return null;
-        String kind=component.substring(component.lastIndexOf('-')+1);
+        String kind=SensingVariantCatalog.root(
+                component.substring(component.lastIndexOf('-')+1));
         return switch(kind){
             case "REA","SIF","SHD","XFR","HPR","APR","PWR","DHL","DSH","DAR","DPW","AHL","ASH","AAR","APW" -> Battle.Subsystem.REACTOR;
             case "ENG" -> Battle.Subsystem.ENGINES;

@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SensingVariantCatalog;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
@@ -11,8 +12,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 20592, "full technology count with sensing chains");
-        require(c.componentCount() == 572, "all base components including sensing systems");
+        require(c.upgradeCount() == 34848, "full technology count with variant research");
+        require(c.componentCount() == 968, "all base components including variant hardware");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -48,6 +49,17 @@ public final class TechnologyCatalogTest {
                         require(c.get("TECH-"+faction+"-"+module+"-"+track+"-"+
                                 String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
                                 "Missing sensing research "+faction+"/"+module+"/"+track);
+            }
+            for(var model:SensingVariantCatalog.VARIANTS){
+                String id="BASE-"+faction+"-"+model.code();
+                require(c.base(id)!=null,"Missing independent hardware "+id);
+                require(c.base(id).category.equals(c.base("BASE-"+faction+"-"+model.base()).category),
+                        "Variant changed required physical socket: "+id);
+                for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=9;rank++)
+                        require(c.get("TECH-"+faction+"-"+model.code()+"-"+track+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
+                                "Missing variant research "+id+" "+track+" "+rank);
             }
             for(String module:new String[]{"KTS","MTS","TTS","FTS"}){
                 require(c.base("BASE-"+faction+"-"+module)!=null &&

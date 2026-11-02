@@ -10,6 +10,7 @@ import diplomacy.sim.FighterModel;
 import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnancePropulsion;
 import diplomacy.sim.OrdnanceGuidance;
+import diplomacy.tech.SensingVariantCatalog;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 import diplomacy.tech.TechnologyCatalog.Upgrade;
@@ -753,7 +754,8 @@ public final class Shipyard {
                 trackers[weaponIndex]+=tuning.tracking();
                 weaponCounts[weaponIndex]++;
             }
-            switch(p.base.subsystem) {
+            double variantPower=SensingVariantCatalog.performance(p.base.subsystem);
+            switch(SensingVariantCatalog.root(p.base.subsystem)) {
                 case "ARM", "CMP", "ABL", "DEN", "RAC" ->
                     armor+=p.effect*2.0*p.integrity/p.base.integrity;
                 case "BLK" -> hull+=p.effect*3.2*p.integrity/p.base.integrity;
@@ -805,23 +807,23 @@ public final class Shipyard {
                     sensorRatio+=0.08+0.25*(p.accuracy-1);
                     radarGain+=0.12*p.accuracy*tuning.reach();
                 }
-                case "RDR" -> radarGain+=0.37*(p.effect/p.base.effect)
+                case "RDR" -> radarGain+=0.37*variantPower*(p.effect/p.base.effect)
                         *p.accuracy*tuning.reach();
-                case "STC" -> radarSignature/=1+0.70*(p.effect/p.base.effect)*tuning.reach();
-                case "IRT" -> infraredRange+=600*(p.effect/p.base.effect)
+                case "STC" -> radarSignature/=1+0.70*variantPower*(p.effect/p.base.effect)*tuning.reach();
+                case "IRT" -> infraredRange+=600*variantPower*(p.effect/p.base.effect)
                         *p.accuracy*tuning.reach();
-                case "HTD" -> thermalSignature/=1+0.78*(p.effect/p.base.effect)*tuning.reach();
-                case "VCL" -> opticalSignature/=1+0.92*(p.effect/p.base.effect)*tuning.reach();
+                case "HTD" -> thermalSignature/=1+0.78*variantPower*(p.effect/p.base.effect)*tuning.reach();
+                case "VCL" -> opticalSignature/=1+0.92*variantPower*(p.effect/p.base.effect)*tuning.reach();
                 case "ACU" -> {
-                    acuity+=0.34*(p.effect/p.base.effect)*p.accuracy*tuning.tracking();
-                    accuracy+=0.045*p.accuracy;
-                    sensorRatio+=0.13*p.accuracy;
+                    acuity+=0.34*variantPower*(p.effect/p.base.effect)*p.accuracy*tuning.tracking();
+                    accuracy+=0.045*variantPower*p.accuracy;
+                    sensorRatio+=0.13*variantPower*p.accuracy;
                 }
-                case "XRY" -> xrayRange+=390*(p.effect/p.base.effect)
+                case "XRY" -> xrayRange+=390*variantPower*(p.effect/p.base.effect)
                         *p.accuracy*tuning.reach();
-                case "GRA" -> graviticRange+=670*(p.effect/p.base.effect)
+                case "GRA" -> graviticRange+=670*variantPower*(p.effect/p.base.effect)
                         *p.accuracy*tuning.reach();
-                case "HLP" -> hologramNoise+=0.25*(p.effect/p.base.effect)
+                case "HLP" -> hologramNoise+=0.25*variantPower*(p.effect/p.base.effect)
                         *p.accuracy*tuning.reach();
                 case "REP" -> {
                     repair+=p.effect*0.0004;
@@ -848,6 +850,13 @@ public final class Shipyard {
                 case "LFS" -> breathing+=p.effect*design.hull.massCapacity*0.12;
                 default -> { }
             }
+            // Focused active emitters also make their host easier to detect.
+            if("RDS".equals(p.base.subsystem)||"RDA".equals(p.base.subsystem))
+                radarSignature*=1.18;
+            if("VLS".equals(p.base.subsystem)||"VLA".equals(p.base.subsystem))
+                thermalSignature*=1.24;
+            if("HLS".equals(p.base.subsystem)||"HLA".equals(p.base.subsystem))
+                radarSignature*=1.14;
             hull+=p.integrity*0.08;
         }
         // Every hull can move and power essential avionics on its own.

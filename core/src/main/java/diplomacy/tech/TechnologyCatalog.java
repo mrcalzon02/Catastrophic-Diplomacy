@@ -105,6 +105,7 @@ public final class TechnologyCatalog {
             addTenderFamilies(bases,rows);
             addArmorAndBulkheadFamilies(bases,rows);
             addSensingFamilies(bases,rows);
+            addSensingHardwareVariants(bases,rows);
             extendToNineStages(rows);
         }
         if (bases.size() < 2 || rows.size() < 2) throw new IllegalArgumentException("Missing technology table data");
@@ -565,6 +566,47 @@ public final class TechnologyCatalog {
                 row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
                         .replace("-"+parent,"-"+code));
                 row.set(19,type[1]+": "+row.get(19));
+                upgrades.add(row);
+            }
+        }
+    }
+
+
+    /** Each root sensor line gains four independent hardware research chains.
+     * Clone six-stage root data, then pass through the existing IX-rank engine. */
+    private static void addSensingHardwareVariants(List<List<String>> bases,
+                                                   List<List<String>> upgrades) {
+        List<List<String>> roots=List.copyOf(bases);
+        List<List<String>> research=List.copyOf(upgrades);
+        for(SensingVariantCatalog.Model model:SensingVariantCatalog.VARIANTS) {
+            String parent=model.base(),code=model.code();
+            for(int i=1;i<roots.size();i++) {
+                List<String> source=roots.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-"+parent,"-"+code));
+                row.set(2,code);row.set(3,model.name());
+                row.set(5,model.name()+"; technology tier "+model.requiredTier());
+                row.set(6,ratio(Double.parseDouble(row.get(6)),model.mass()));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),model.power()));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),model.heat()));
+                row.set(9,ratio(Double.parseDouble(row.get(9)),model.integrity()));
+                row.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(row.get(10))*model.price()))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),model.performance()));
+                row.set(12,"Purpose-built physical "+parent+" alternative; engineering tier "+
+                        model.requiredTier()+" with mass, heat, power and efficiency tradeoffs");
+                bases.add(row);
+            }
+            for(int i=1;i<research.size();i++) {
+                List<String> source=research.get(i);
+                if(!parent.equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-"+parent+"-","-"+code+"-"));
+                row.set(2,code);row.set(5,model.name()+" "+row.get(3)+" "+row.get(4));
+                row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
+                        .replace("-"+parent,"-"+code));
+                row.set(19,model.name()+": "+row.get(19));
                 upgrades.add(row);
             }
         }
