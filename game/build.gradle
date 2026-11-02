@@ -146,6 +146,14 @@ tasks.register('combatShipStatusSmoke', JavaExec) {
     mainClass = 'diplomacy.client.CombatShipStatusTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatShipStatusSmoke') }
+tasks.register('rocketHudSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Exercise real friendly-ship rocket rack selection, 4/8/16 salvos and motor controls via 46px HUD hitboxes.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.RocketTacticalPanelTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('rocketHudSmoke') }
 
 tasks.register('shipDeathSmoke', JavaExec) {
     group = 'verification'

@@ -175,6 +175,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int fleetIndex = 4;
     private float manualZoom = 1f;
     private int focusedShipId = -1;
+    /** Only the active selected ship's rocket rack index; no enemy controls. */
+    private int selectedRocketRackIndex;
     private float battlePanX,battlePanY;
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private final ShipInspectionPanel shipInspector=new ShipInspectionPanel();
@@ -652,6 +654,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 com.badlogic.gdx.math.Vector2 world = viewport.unproject(new com.badlogic.gdx.math.Vector2(x, y));
                 if(screen==GameMenuPanel.Screen.BATTLE&&!shipyard.open()
+                        &&!tacticalMenuOpen
+                        &&(fleetOrdersPanel==null||!fleetOrdersPanel.open())
+                        &&tapRocketControls(world.x,world.y))return true;
+                if(screen==GameMenuPanel.Screen.BATTLE&&!shipyard.open()
                         &&shipInspector.tap(world.x,world.y))return true;
                 if(!verifyDemo&&!shipyard.open()&&screen==GameMenuPanel.Screen.BATTLE
                         && GameMenuPanel.hit(world.x,world.y,1060,126,185,44)){
@@ -892,7 +898,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         manualZoom=(float)Math.max(0.18,Math.min(4.0,manualZoom*Math.pow(1.18,steps)));
     }
     private void resetBattleView(){
-        manualZoom=1f;focusedShipId=-1;shipInspector.close();
+        manualZoom=1f;focusedShipId=-1;selectedRocketRackIndex=0;shipInspector.close();
         battlePanX=battlePanY=0f;battleTouch.cancel();
         if(battle!=null)updateBattleCamera();
     }
@@ -920,7 +926,33 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
     }
     private void focusNearest(float uiX,float uiY){
+        int previous=focusedShipId;
         inspectNearest(uiX,uiY,true);
+        if(focusedShipId!=previous)selectedRocketRackIndex=0;
+    }
+    private Battle.Ship controlledRocketShip(){
+        if(battle==null||focusedShipId<0)return null;
+        for(Battle.Ship ship:battle.ships())
+            if(ship.id==focusedShipId&&ship.team==0&&ship.alive()
+                    &&!ship.rocketRacks.isEmpty())return ship;
+        return null;
+    }
+    /** Touch and mouse use the same 46px button geometry. No special
+     * development menu and no silent enemy-fleet modification. */
+    private boolean tapRocketControls(float x,float y){
+        Battle.Ship ship=controlledRocketShip();
+        if(ship==null)return false;
+        int action=RocketTacticalPanel.action(x,y);
+        if(action<0)return false;
+        if(action==0){
+            selectedRocketRackIndex=(selectedRocketRackIndex+1)%ship.rocketRacks.size();
+        }else{
+            var rack=RocketTacticalPanel.selected(ship,selectedRocketRackIndex);
+            if(rack!=null&&rack.salvoRemaining==0)
+                RocketTacticalPanel.apply(battle,ship,selectedRocketRackIndex,action);
+        }
+        if(audio!=null)audio.ui();
+        return true;
     }
 
     private void selectScenario(ScenarioCatalog.Preset choice){
@@ -2858,6 +2890,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.rect(0, 649, W, 71);
         shapes.setColor(0.035f, 0.085f, 0.15f, 0.93f);
         shapes.rect(0, 613, W, 36);
+        RocketTacticalPanel.shapes(shapes,controlledRocketShip(),selectedRocketRackIndex);
         shapes.end();
         batch.setProjectionMatrix(camera.combined); batch.begin();
         if (uiIcons != null) {
@@ -2920,6 +2953,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             break;
         }
+        RocketTacticalPanel.text(batch,font,controlledRocketShip(),selectedRocketRackIndex);
         // The deceased hull cannot render a physical sprite. Its REAL escape
         // and beacon telemetry persists as a map-space salvage/rescue signal.
         // This is a tactical overlay, not fabricated escape-pod artwork.
