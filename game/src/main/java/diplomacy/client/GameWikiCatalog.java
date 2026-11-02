@@ -1,6 +1,7 @@
 package diplomacy.client;
 
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.HullProgression;
 import diplomacy.shipyard.ShipLineages;
@@ -281,6 +282,15 @@ final class GameWikiCatalog {
         };
     }
     private static String subsystemExplanation(String code){
+        SurvivalHardwareCatalog.Variant variant=SurvivalHardwareCatalog.findVariant(code);
+        if(variant!=null)
+            return subsystemExplanation(variant.root())+
+                    " This separately mounted variant requires Tech "+
+                    variant.requiredTier()+"; it changes mass, power, heat, "+
+                    "integrity, expense and actual fitted performance."+
+                    (variant.name().startsWith("UNSAFE RETROFIT")?
+                            " UNSAFE RETROFIT: deterministic hardware faults "+
+                            "remain possible under combat stress.":"");
         return switch(code){
             case "KIN" -> "Kinetic battery. Fires physical ballistic rounds; the chosen ammunition alters damage, velocity, penetration, splash and detection. Requires firing power, heat budget and stored rounds.";
             case "MSL" -> "Missile launcher. Spawns physical guided missiles with finite ammunition. Each rack selects its own warhead, salvo pattern, seeker and propulsion options under its technology license.";
@@ -316,6 +326,18 @@ final class GameWikiCatalog {
             case "APW" -> "Power restoration aura. Offers modest local electrical assistance, separate from direct transfer projectors.";
             case "CRW" -> "Crew accommodation. Physical habitat module provides berths; a warship cannot legally commission crew solely from hull art or nominal tonnage.";
             case "LFS" -> "Life-support system. Supports onboard crew through an installed habitat socket. Both accommodation and actual life support matter.";
+            case "DMC" -> "Dedicated damage-control equipment. Restores actual hull damage using installed shipboard repair machinery.";
+            case "HCR" -> "Hardened crew compartment. Provides protected physical berths and reduces casualties from penetrating strikes.";
+            case "CIC" -> "Armored command citadel. Shields command crew and combat coordination against subsystem damage.";
+            case "FBN" -> "Armored fuel bunker. Carries extra propellant and reduces real fuel loss after a penetrating hit.";
+            case "AMV" -> "Isolated ammunition vault. Increases real magazine capacity and reduces ammunition-loss exposure.";
+            case "EPD" -> "Dedicated escape-pod battery. Evacuates up to a finite installed capacity of surviving crew after ship destruction.";
+            case "RCB" -> "Recovery beacon. Records real wreck coordinates; only a friendly victory may recover capped hull scrap, scaled by installed beacon effectiveness.";
+            case "PGO" -> "UNSAFE RETROFIT: overdriven governor gives more power but increases heat and seeded reactor fault risk.";
+            case "JPB" -> "UNSAFE RETROFIT: illegally modified plasma confinement bank gives high output at catastrophic stability and thermal cost.";
+            case "IBR" -> "UNSAFE RETROFIT: improvised battery pack gives cheap emergency power with seeded command and sensing failures.";
+            case "IST" -> "UNSAFE RETROFIT: improvised thermal shunt increases cooling but risks seeded thermal-system failure.";
+            case "IRG" -> "UNSAFE RETROFIT: illicit reactor tap yields surplus power with high reactor and crew danger.";
             default -> "Purpose-built physical subsystem. Read its exact installed category, mass, heat, energy, effect and research tradeoffs; no free hull bonuses.";
         };
     }
