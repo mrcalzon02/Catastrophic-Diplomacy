@@ -148,11 +148,13 @@ public final class TechnologyCatalog {
             return new AbstractSet<>() {
                 @Override public int size(){return upgradeTotal;}
                 @Override public Iterator<Entry<String,Upgrade>> iterator(){
-                    Iterator<Entry<String,Upgrade>> early=sixStages.entrySet().iterator();
-                    Iterator<Upgrade> branch=sixStages.values().iterator();
-                    Upgrade nextBranch=null;
-                    int higher=7;
                     return new Iterator<>() {
+                        private final Iterator<Entry<String,Upgrade>> early=
+                                sixStages.entrySet().iterator();
+                        private final Iterator<Upgrade> branch=
+                                sixStages.values().iterator();
+                        private Upgrade nextBranch;
+                        private int higher=7;
                         @Override public boolean hasNext(){
                             if(early.hasNext())return true;
                             if(nextBranch!=null&&higher<=9)return true;
