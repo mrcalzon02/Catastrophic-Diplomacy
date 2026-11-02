@@ -52,6 +52,20 @@ public final class GameWikiTest {
         ui.setQuery("TECH-TER-LAS-OUTPUT-01");
         check(ui.resultCount()>0&&ui.selectedId().contains("upgrade."),
                 "Searching exact research IDs must select the actual upgrade");
+        ui.setCategory(5);
+        check(ui.resultCount()==stages,
+                "Virtual upgrades must expose all ranks without eager articles");
+        ui.setQuery("TECH-TER-KIN-OUTPUT-09");
+        check(ui.resultCount()==1 && ui.selectedId().equals(
+                "upgrade.TECH-TER-KIN-OUTPUT-09"),
+                "Exact tier IX search must retrieve the real on-demand article");
+        ui.setQuery("");
+        ui.pageList(300);
+        check(ui.listPage()>0,"Virtual research articles must remain pageable");
+        ui.select(2500);
+        check(ui.selectedId()!=null && ui.selectedId().startsWith("upgrade."),
+                "Virtual research selection lost the canonical identifier");
+        ui.setCategory(0);
         ui.setQuery("___a_nonexistent_entry___");
         check(ui.resultCount()==0&&ui.selectedId()==null,
                 "No-match query must not show stale article details");

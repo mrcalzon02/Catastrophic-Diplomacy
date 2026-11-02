@@ -364,6 +364,16 @@ final class GameWikiCatalog {
             if(selected.equals("UPGRADES"))
                 return articles.subList(staticArticles.size(),articles.size());
         }
+        // Exact technology identifiers are common shipyard lookups. Resolve
+        // directly instead of materializing and searching every research
+        // article on a memory-constrained Android handset.
+        if((selected.equals("ALL")||selected.equals("UPGRADES")) &&
+                needle.startsWith("tech-") && needle.length()>15 &&
+                Character.isDigit(needle.charAt(needle.length()-1))){
+            TechnologyCatalog.Upgrade direct=technology.get(
+                    needle.toUpperCase(Locale.ROOT));
+            if(direct!=null)return List.of(upgradeArticle(direct));
+        }
         List<Article> hits=new ArrayList<>();
         if(!selected.equals("UPGRADES"))
             for(Article article:staticArticles)
