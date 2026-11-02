@@ -394,7 +394,11 @@ tasks.register('rocketBarrageSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.RocketBarrageTest'
     dependsOn testClasses
 }
-tasks.named('gameFlowSmoke') { dependsOn(tasks.named('rocketBarrageSmoke')) }
+// The gameFlowSmoke task is declared later; configure it lazily.
+tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('rocketBarrageSmoke'))
+}
+tasks.named('massBattleCampaign') { dependsOn(tasks.named('rocketBarrageSmoke')) }
 tasks.named('ordnanceRacksSmoke') { finalizedBy(tasks.named('ordnanceSeekerSmoke')) }
 tasks.register('ordnanceSubmunitionsSmoke', JavaExec) {
     group = 'verification'
