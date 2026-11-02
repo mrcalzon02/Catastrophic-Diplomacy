@@ -32,8 +32,11 @@ public final class PointDefenseLoadDiagnostic {
         }
     }
     private enum Layout { FOUR_MOUNTS_ONE_HULL, FOUR_INDEPENDENT_HULLS }
-    private static final int ACTIVE=660, DRAIN=300;
-    private static final int[] BOUNDARY={0,220,440,660,960};
+    // Sixty seconds of sustained fire is enough to exercise a second
+    // physical siege rocket reload (nominally ~29 seconds), without
+    // fabricating magazine reloads. Another 10 seconds clears flight.
+    private static final int ACTIVE=1800, DRAIN=300;
+    private static final int[] BOUNDARY={0,600,1200,1800,2100};
 
     private static void check(boolean ok,String message){
         if(!ok)throw new IllegalStateException(message);
@@ -199,7 +202,7 @@ public final class PointDefenseLoadDiagnostic {
         Set<Long> launchIds=new HashSet<>(),interceptIds=new HashSet<>();
         Set<Long> impactIds=new HashSet<>(),timeoutIds=new HashSet<>(),terminalIds=new HashSet<>();
         int[] firedByBand=new int[4],pdByBand=new int[4],killsByBand=new int[4];
-        int pdShots=0,previousCraftLosses=0;double minPower=1,peakHeat=0;
+        int pdShots=0,previousCraftKills=0;double minPower=1,peakHeat=0;
         Set<Integer> craftTerminal=new HashSet<>();
         for(int tick=0;tick<ACTIVE+DRAIN;tick++){
             for(int index=0;index<attackers.size();index++){
@@ -208,7 +211,7 @@ public final class PointDefenseLoadDiagnostic {
                 // offensive hardware to create the desired load schedule;
                 // all launched bodies remain real and continue flight.
                 boolean active=switch(load){
-                    case INCIDENTAL -> tick<300&&tick%105<12&&index==0;
+                    case INCIDENTAL -> tick<450&&tick%150<12&&index==0;
                     case SURGE -> tick<36;
                     case SUSTAINED -> tick<ACTIVE;
                 };
@@ -221,9 +224,9 @@ public final class PointDefenseLoadDiagnostic {
                     src.ship.fighterLaunchBays=0;
             }
             battle.step();
-            if(battle.craftLosses>previousCraftLosses){
-                killsByBand[band(tick)]+=battle.craftLosses-previousCraftLosses;
-                previousCraftLosses=battle.craftLosses;
+            if(battle.pointDefenseCraftKills>previousCraftKills){
+                killsByBand[band(tick)]+=battle.pointDefenseCraftKills-previousCraftKills;
+                previousCraftKills=battle.pointDefenseCraftKills;
             }
             for(Battle.Craft fighter:battle.crafts())if(fighter.team==0)
                 for(Battle.Ship defender:guard)
@@ -283,9 +286,13 @@ public final class PointDefenseLoadDiagnostic {
             if(!interceptIds.contains(id)&&!impactIds.contains(id)&&!timeoutIds.contains(id))
                 unresolved++;
         int actualLaunched=launchIds.size()+craftLaunched;
-        int actualIntercepted=interceptIds.size()+battle.craftLosses;
+        int actualIntercepted=interceptIds.size()+battle.pointDefenseCraftKills;
         int actualTerminal=terminalIds.size()+craftTerminal.size();
-        unresolved+=craftLaunched-battle.craftLosses;
+        // A craft that expires through fuel starvation must NOT count as
+        // successfully intercepted. It is resolved by natural flight life,
+        // but not credited to the defender.
+        int naturalCraftLosses=battle.craftLosses-battle.pointDefenseCraftKills;
+        unresolved+=Math.max(0,craftLaunched-battle.craftLosses);
         double endingHull=0;
         for(Battle.Ship defender:guard)endingHull+=defender.hull;
         check(actualLaunched>0,"No actual paid projectile or fitted craft launched");
@@ -357,9 +364,9 @@ public final class PointDefenseLoadDiagnostic {
         summary.append("\nCompleted paired scenarios: ").append(cases/2)
                 .append("; failed diagnostic scenarios: ").append(errors)
                 .append(". Failures are reported, NOT release-blocking.\n")
-                .append("Incidentals are spaced by 105 ticks; surge opens four simultaneous ")
-                .append("ship launcher lanes; sustained permits physical reloads through tick 660 ")
-                .append("and resolves in-flight ordnance to tick 960. Window counts are EVENT ")
+                .append("Incidentals are spaced by 150 ticks; surge opens four simultaneous ")
+                .append("ship launcher lanes; sustained permits real physical reloads through tick 1800 ")
+                .append("and resolves in-flight ordnance to tick 2100. Window counts are EVENT ")
                 .append("throughput, not cohort-matched kill rates. Projectiles not resolved by ")
                 .append("tick 960 remain explicitly counted as unresolved.\n");
         Files.write(out.resolve("profiles.csv"),rows,StandardCharsets.UTF_8);
