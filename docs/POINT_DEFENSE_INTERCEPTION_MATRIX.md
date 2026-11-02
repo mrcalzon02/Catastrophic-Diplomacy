@@ -41,14 +41,16 @@ belong in PD interception denominators.
   of all guided salvo modes, not yet a rank-matched attacker research module
 - Craft: actual fitted cruiser flight deck, with the real fighter variant;
   physical stock consumption, fuel and fighter-borne weapons
-- Position: approximately 390 world units initially, source held stationary,
-  defender AI disabled but physical PD, sensors, power, heat, weather,
-  armor, shields and damage active
+- Position: approximately **390 world units** for ordnance, plus **220
+  and 390 world-unit** engagements for each fighter and drone variant,
+  to distinguish inner-PD exposure from long-range standoff. Source held
+  stationary, defender AI disabled but real PD, sensors, power, heat,
+  weather, armor, shields and damage active
 - Control: identical equipped defender with explicit `HOLD_FIRE`, so
   missed unguided rounds and late-arriving craft are not mistaken for PD kills
 - Repeats: two deterministic PD-enabled seeds, each with a **same-seed
-  paired PD-off control**, per threat/tier/PD-mount combination; online and
-  offline impact counts therefore share an equal denominator
+  paired PD-off control**, per threat/distance/tier/PD-mount combination;
+  online and offline impact counts therefore share an equal denominator
 - Additional functional mode exclusions: `ANTI_CRAFT` must not fire at
   isolated missile/kinetic targets; `INTERCEPT_ONLY` must not fire at
   fighter laser craft without incoming physical ordnance
@@ -58,7 +60,7 @@ belong in PD interception denominators.
 
 ## Reported measures
 
-`matrix.csv` records each configuration's actual:
+`matrix.csv` records each configuration's launch distance and actual:
 `primary_launched`, `primary_intercepted`, `terminal_entries`,
 `primary_hits`, `decoys_launched`, `decoys_intercepted`,
 `children_launched`, `carriers_split`,
