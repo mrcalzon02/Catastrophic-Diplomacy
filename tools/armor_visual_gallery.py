@@ -218,7 +218,7 @@ else:
     json.dumps({"schema":"cd-armor-wound-comparison-v1",
                 "source":"Actual uploaded RGBA armor mask, not projected effect pixels",
                 "no_release_gate":True,
-                "observations":opening_observations},indent=2)+"\\n",
+                "observations":opening_observations},indent=2)+"\n",
     encoding="utf8")
 
 # A labeled review sheet built exclusively from genuine original game
