@@ -769,7 +769,11 @@ public final class Shipyard {
                 weaponCounts[weaponIndex]++;
             }
             double variantPower=SensingVariantCatalog.performance(p.base.subsystem);
-            switch(SensingVariantCatalog.root(p.base.subsystem)) {
+            double survivalGain=(p.effect/p.base.effect)*
+                    SurvivalHardwareCatalog.performance(p.base.subsystem);
+            double survivalRisk=SurvivalHardwareCatalog.risk(p.base.subsystem);
+            switch(SurvivalHardwareCatalog.root(
+                    SensingVariantCatalog.root(p.base.subsystem))) {
                 case "ARM", "CMP", "ABL", "DEN", "RAC" ->
                     armor+=p.effect*2.0*p.integrity/p.base.integrity;
                 case "BLK" -> hull+=p.effect*3.2*p.integrity/p.base.integrity;
@@ -852,56 +856,56 @@ public final class Shipyard {
                 }
                 case "HCR" -> {
                     accommodation+=p.effect*design.hull.massCapacity*0.12;
-                    crewProtection+=0.21*(p.effect/p.base.effect);
+                    crewProtection+=0.21*(survivalGain);
                 }
                 case "CIC" -> {
-                    commandProtection+=0.30*(p.effect/p.base.effect);
-                    crewProtection+=0.09*(p.effect/p.base.effect);
+                    commandProtection+=0.30*(survivalGain);
+                    crewProtection+=0.09*(survivalGain);
                 }
                 case "FBN" -> {
-                    fuelBonus+=46*(p.effect/p.base.effect);
-                    fuelProtection+=0.34*(p.effect/p.base.effect);
+                    fuelBonus+=46*(survivalGain);
+                    fuelProtection+=0.34*(survivalGain);
                 }
                 case "AMV" -> {
-                    magazines+=(int)StrictMath.round(12*(p.effect/p.base.effect));
-                    magazineContainment+=0.43*(p.effect/p.base.effect);
+                    magazines+=(int)StrictMath.round(12*(survivalGain));
+                    magazineContainment+=0.43*(survivalGain);
                 }
                 case "EPD" -> escapePods+=Math.max(1,
-                        (int)StrictMath.round(12*(p.effect/p.base.effect)));
+                        (int)StrictMath.round(12*(survivalGain)));
                 case "RCB" -> recoveryBeacon=true;
                 case "PGO" -> {
                     unsafeFlags|=SurvivalHardwareCatalog.GOVERNOR;
-                    rechargeBoost+=4.5*(p.effect/p.base.effect);
-                    extraHazardHeat+=1.8;
-                    hazardInstability+=0.045;
-                    hazardSeverity=Math.max(hazardSeverity,0.6);
+                    rechargeBoost+=4.5*(survivalGain);
+                    extraHazardHeat+=1.8*survivalRisk;
+                    hazardInstability+=0.045*survivalRisk;
+                    hazardSeverity=Math.max(hazardSeverity,0.6*survivalRisk);
                 }
                 case "JPB" -> {
                     unsafeFlags|=SurvivalHardwareCatalog.PLASMA_CELL;
-                    rechargeBoost+=14*(p.effect/p.base.effect);
-                    extraHazardHeat+=7.5;
-                    hazardInstability+=0.24;
-                    hazardSeverity=Math.max(hazardSeverity,1.25);
+                    rechargeBoost+=14*(survivalGain);
+                    extraHazardHeat+=7.5*survivalRisk;
+                    hazardInstability+=0.24*survivalRisk;
+                    hazardSeverity=Math.max(hazardSeverity,1.25*survivalRisk);
                 }
                 case "IBR" -> {
                     unsafeFlags|=SurvivalHardwareCatalog.BATTERY_BRICK;
-                    rechargeBoost+=9*(p.effect/p.base.effect);
-                    extraHazardHeat+=5.7;
-                    hazardInstability+=0.34;
-                    hazardSeverity=Math.max(hazardSeverity,1.08);
+                    rechargeBoost+=9*(survivalGain);
+                    extraHazardHeat+=5.7*survivalRisk;
+                    hazardInstability+=0.34*survivalRisk;
+                    hazardSeverity=Math.max(hazardSeverity,1.08*survivalRisk);
                 }
                 case "IST" -> {
                     unsafeFlags|=SurvivalHardwareCatalog.THERMAL_SHUNT;
-                    extraHazardHeat+=1.2;
-                    hazardInstability+=0.28;
-                    hazardSeverity=Math.max(hazardSeverity,0.88);
+                    extraHazardHeat+=1.2*survivalRisk;
+                    hazardInstability+=0.28*survivalRisk;
+                    hazardSeverity=Math.max(hazardSeverity,0.88*survivalRisk);
                 }
                 case "IRG" -> {
                     unsafeFlags|=SurvivalHardwareCatalog.REACTOR_TAP;
-                    rechargeBoost+=12*(p.effect/p.base.effect);
-                    extraHazardHeat+=8.4;
-                    hazardInstability+=0.43;
-                    hazardSeverity=Math.max(hazardSeverity,1.5);
+                    rechargeBoost+=12*(survivalGain);
+                    extraHazardHeat+=8.4*survivalRisk;
+                    hazardInstability+=0.43*survivalRisk;
+                    hazardSeverity=Math.max(hazardSeverity,1.5*survivalRisk);
                 }
                 case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
                 case "FTR" -> fighters+=2+(int)(p.effect/18.0);
