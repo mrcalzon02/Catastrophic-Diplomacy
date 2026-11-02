@@ -43,21 +43,21 @@ public final class ShipSurfaceDamageCaptureTest {
                 System.out.printf("ARMOR-IMPACT-SITES %s hits=%d touched-tiles=%d marks=%d%n",
                         scene.key(),scene.hits(),changed,impactMarks);
             }
-            if(i==0||i==13||i==14||i==16||i==18)
+            if(i==0||i==13||i==14||i==16||i==18||i==20||i==22)
                 check(scene.ticks()==0&&scene.hits()==0&&
                         scene.wornCells()==0,
                     "Pristine reference is already battle-damaged");
-            if(i>1&&i!=8&&i!=13&&i!=14&&i!=16&&i!=18)
+            if(i>1&&i!=8&&i!=13&&i!=14&&i!=16&&i!=18&&i!=20&&i!=22)
                 check(scene.ticks()>0,"Live-fire scenario never simulated "+scene.key());
             if(i==8)
                 check(scene.syntheticStress(),"Rectangle must be labeled as artificial stress");
-            if(i==15||i==16)
+            if(i==15||i==16||i==19||i==20)
                 check(scene.target().faction==Battle.Faction.AUREATE_SYNOD,
                         "Aureate review must use original approved faction art");
             if(i==17||i==18)
                 check(scene.target().faction==Battle.Faction.ZELTHAR_LUMINARI,
                         "Zelthar review must use original approved faction art");
-            if(i==3||i==12||i==13||i==14){
+            if(i==3||i==12||i==13||i==14||i==21||i==22){
                 check(scene.target().faction==Battle.Faction.TERRAN,
                     "Kinetic pockmark review must use real broad Terran plating");
             }
@@ -73,7 +73,7 @@ public final class ShipSurfaceDamageCaptureTest {
                     var tile=scene.target().defense.tile(row,col);
                     if(tile.directImpact()&&tile.impactType()==expected)found=true;
                 }
-                if(i==15||i==17)
+                if(i==15||i==17||i==19||i==21)
                     check(scene.hits()>0,"Contrast lane must fire actual kinetic weapon");
                 if(i==9)check(scene.hits()>0,
                         "Plasma test must fire from within its genuine weapon range");
