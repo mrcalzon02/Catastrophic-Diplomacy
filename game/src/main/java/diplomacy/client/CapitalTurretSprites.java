@@ -42,6 +42,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case PLASMA -> 4;
             case PARTICLE -> 3;
             case MISSILE -> 7;
+            case ROCKET -> 7; // Reuse the genuine authored missile launcher turret.
             case TORPEDO -> 8;
             case POINT_DEFENSE -> (slot&1)==0?6:5;
         };
