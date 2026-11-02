@@ -408,6 +408,15 @@ tasks.register('pdThreatMatrixDiagnostic', JavaExec) {
     dependsOn testClasses
     maxHeapSize = '512m'
 }
+// Advisory time-profile PD load test; no balance expectation can block builds.
+tasks.register('pdLoadProfileDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Measure incidental, simultaneous surge and sustained PD interception under real physical ammunition, power, heat and cooldown.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PointDefenseLoadDiagnostic'
+    dependsOn testClasses
+    maxHeapSize = '512m'
+}
 tasks.register('rocketBarrageSmoke', JavaExec) {
     group = 'verification'
     description = 'Four rocket sizes, 4/8/16 physical volleys, two dumbfire motors, dodging, laser PD, finite ammo and replay.'
