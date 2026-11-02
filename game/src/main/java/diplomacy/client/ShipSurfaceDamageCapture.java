@@ -24,7 +24,10 @@ final class ShipSurfaceDamageCapture {
         "kinetic-aureate-upper", "kinetic-aureate-upper-pristine",
         "kinetic-terran-upper", "kinetic-terran-upper-pristine",
         "laser-terran-upper", "laser-terran-upper-pristine",
-        "missile-terran-upper", "missile-terran-upper-pristine"
+        "missile-terran-upper", "missile-terran-upper-pristine",
+        "plasma-terran-upper", "plasma-terran-upper-pristine",
+        "particle-terran-upper", "particle-terran-upper-pristine",
+        "torpedo-terran-upper", "torpedo-terran-upper-pristine"
     };
     static final long SEED=202611010140L;
     record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
@@ -89,9 +92,9 @@ final class ShipSurfaceDamageCapture {
         final String weapon=switch(index){
             case 3,7,12,13,14,15,16,17,18,19,20,21,22 -> "KINETIC";
             case 4,25,26 -> "MISSILE";
-            case 9 -> "PLASMA";
-            case 10 -> "PARTICLE";
-            case 11 -> "TORPEDO";
+            case 9,27,28 -> "PLASMA";
+            case 10,29,30 -> "PARTICLE";
+            case 11,31,32 -> "TORPEDO";
             default -> "LASER";
         };
         final String suffix=switch(weapon){
@@ -192,7 +195,8 @@ final class ShipSurfaceDamageCapture {
         // attacker remains autonomous and still hits with genuine projectiles.
         final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
         if(index==0||index==13||index==14||index==16||index==18||
-                index==20||index==22||index==24||index==26)
+                index==20||index==22||index==24||index==26||
+                index==28||index==30||index==32)
             return record(KEYS[index],weapon,seed,battle,victim,true,false,axialAtSpawn);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
@@ -218,6 +222,7 @@ final class ShipSurfaceDamageCapture {
                 case 12 -> battle.hitCount>=3&&interior>.01;
                 case 15,17,19,21 -> battle.hitCount>=3&&armor>.01;
                 case 23,25 -> battle.hitCount>=2&&armor>.01;
+                case 27,29,31 -> battle.hitCount>=1&&armor>.01;
                 default -> false;
             };
             // Never fabricate a surviving ship or repair a dead target simply
