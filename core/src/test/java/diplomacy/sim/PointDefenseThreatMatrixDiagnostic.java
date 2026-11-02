@@ -56,7 +56,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
             double pdTracking,double pdRange) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
+                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
                 threat,pdTier,pdMounts,seed,mode,shots,primaryLaunched,
                 primaryIntercepted,terminalEntries,primaryHits,decoysLaunched,
                 decoysIntercepted,childrenLaunched,carrierSplits,
