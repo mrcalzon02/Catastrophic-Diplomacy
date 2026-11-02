@@ -167,7 +167,7 @@ public final class GameMenuFlowTest {
                 "Tech subsystem/branch/stage hit targets do not match displayed controls");
         check(GameMenuPanel.technologyAction(60,547)==300&&
                 GameMenuPanel.technologyAction(160,547)==301&&
-                GameMenuPanel.technologyAction(160,462)==307-1&&
+                GameMenuPanel.technologyAction(256,502)==305&&
                 GameMenuPanel.technologyAction(60,463)==306,
                 "Industrial branch hit targets must match actual touch buttons");
         check(GameMenuPanel.technologyAction(1050,59)==3&&
