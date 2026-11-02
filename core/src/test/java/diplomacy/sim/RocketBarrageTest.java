@@ -53,6 +53,15 @@ public final class RocketBarrageTest {
     }
     public static void main(String[] args)throws Exception {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
+        // Saturation experiments never alter single-rocket/4-track defenses,
+        // and normal battles use the unmodified point-defense probability.
+        require(RocketPdSaturation.chance(.8,1,1,.5)==.8&&
+                        RocketPdSaturation.chance(.8,4,1,.5)==.8&&
+                        RocketPdSaturation.chance(.8,16,1,0)==.8&&
+                        RocketPdSaturation.chance(.8,16,1,.5)<.8&&
+                        RocketPdSaturation.chance(.8,64,4,.5)==
+                                RocketPdSaturation.chance(.8,16,1,.5),
+                "Rocket PD saturation pressure miscounts real fitted emitters");
         for(RocketBarrage.Size size:RocketBarrage.Size.values()){
             require(tech.hasBase("BASE-TER-"+size.code)
                     &&tech.get("TECH-TER-"+size.code+"-OUTPUT-09")!=null,
