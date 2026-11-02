@@ -337,7 +337,9 @@ public final class Shipyard {
         /** Slot coordinates are authoritative for this faction's physical fitting diagram. */
         public List<Slot> placements() { return HullLayouts.slots(faction,hull); }
         public Design install(int slot, String baseId) {
-            if(baseId!=null && (baseId.length()>60||!baseId.matches("BASE-[A-Z]{3}-[A-Z]{2,3}")))
+            // Survival hardware alternatives use four-letter codes (e.g. DMCP),
+            // while established subsystem IDs remain two or three letters.
+            if(baseId!=null && (baseId.length()>60||!baseId.matches("BASE-[A-Z]{3}-[A-Z]{2,4}")))
                 throw new IllegalArgumentException("Invalid base component ID");
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,baseId==null?null:new Installed(baseId, Map.of()));
