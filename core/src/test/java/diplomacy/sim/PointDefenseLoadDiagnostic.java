@@ -79,12 +79,19 @@ public final class PointDefenseLoadDiagnostic {
             s=battle.ships().get(battle.ships().size()-1);
             quiet(s);
             // A real mounted rack keeps its on-board magazine and reload.
-            for(RocketBarrage.Rack rack:s.rocketRacks)
+            // The lab provisions and accounts for its paid campaign-equivalent
+            // kinetic supply, as the original rocket/PD ladder does; do not
+            // leave a zero-stock hull and then measure "no launches".
+            int stock=0;
+            for(RocketBarrage.Rack rack:s.rocketRacks){
                 battle.setShipRocketBarrage(s.id,rack.slot,
                         load==Load.INCIDENTAL?4:16,
                         threat==Threat.ROCKET_BOOST?
                                 RocketBarrage.Motor.BOOST_COAST:
                                 RocketBarrage.Motor.SUSTAINED_BURN);
+                stock+=rack.rounds*rack.cheapAmmoUnitsPerRocket;
+            }
+            s.kineticAmmo=s.maxKineticAmmo=stock;
         }else{
             s=battle.addShip(0,Battle.Faction.TERRAN,x,y);
             quiet(s);
