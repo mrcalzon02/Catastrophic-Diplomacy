@@ -157,6 +157,17 @@ public final class SensingModulesTest {
         require(DeceptionProjection.falseContacts(enemy)==0 &&
                 DeceptionProjection.lockMultiplier(enemy,1)==1,
                 "Loss of emitter power must remove both ghosts and their combat advantage");
+        // Radar stealth must actually break an otherwise valid distant radar
+        // acquisition, independently of optical, infrared or gravitic sensors.
+        spotter.sensorRange=450;spotter.infraredRange=0;
+        spotter.xrayRange=0;spotter.graviticRange=0;
+        enemy.power=80;enemy.opticalSignature=1;enemy.hologramNoise=0;
+        enemy.x=spotter.x+510;enemy.radarCrossSection=4;
+        require(duel.hasTargetContact(spotter,enemy,510),
+                "Large radar return must be observed beyond optical silhouette");
+        enemy.radarCrossSection=.15;
+        require(!duel.hasTargetContact(spotter,enemy,510),
+                "Installed radar-stealth plating must defeat the distant radar contact");
         System.out.println("PASS sensing module fittings, research, persistence and detection");
     }
 }
