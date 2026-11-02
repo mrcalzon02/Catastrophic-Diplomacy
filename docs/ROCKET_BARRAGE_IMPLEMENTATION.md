@@ -69,9 +69,30 @@ magazines, stored blueprint identity, both acceleration curves, evasive
 target dodging, high-visibility laser PD, actual warhead hits, and seeded
 replay. Hooked into the existing functional game chain.
 
+### Live controls added
+
+Tap a **friendly** ship in combat to follow/inspect it. If it carries rockets,
+a 46-pixel-high row appears beneath the selected-ship status. Choose **NEXT
+RACK** (for multiple independently mounted launchers), **4 / 8 / 16** rounds,
+or **BOOST/COAST / LONG BURN**. Each setting directly calls the actual
+`Battle.setShipRocketBarrage(...)` API for that physical socket. A salvo already
+in flight cannot be reprogrammed. The same controls work with mouse and touch.
+The HUD shows the selected rack, rocket magazine, paid kinetic stock, reload
+time, and a warning when there is insufficient ammunition for the selected
+barrage. No enemy weapon rack can be controlled.
+
+`game:rocketHudSmoke` is a functional menu test wired into
+`game:menuFlowSmoke`, with exact button hit targets and evidence that
+different physical racks retain independent settings. **Settings are currently
+per-battle and not yet persisted in the ship's blueprint.** Do not claim that
+future missions remember a custom barrage configuration.
+
+A recently fired short-booster rocket remains thermally conspicuous while
+coasting (emission factor 1.20, compared with 2.50 under active boost); it
+does not gain the silent-ghost signature of a purpose-built guided missile.
+
 Pending objective verification: latest Java 17 build, Android launch and
-live battles, all rocket smoke assertions, and 200v200 endurance (including
-real PD/rocket projectile saturation). Screenshot review is diagnostic
-only, not a release gate. Not yet implemented: menu controls to configure
-count/motor and persist that override between battles; defaults are playable.
-Existing sensing/deception and damage-control completion gates remain in force.
+live battles, rocket smoke **and** HUD assertions, and 200v200 endurance
+(including real PD/rocket projectile saturation). Screenshot review is
+diagnostic only, not a release gate. Inherited guidance/deception and damage-
+control completion gates remain in force.
