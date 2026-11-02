@@ -137,6 +137,30 @@ public final class RocketBarrageTest {
         require(persistedWing.ships().get(0).rocketRacks.get(0)!=
                         persistedWing.ships().get(1).rocketRacks.get(0),
                 "Persisted launch profiles incorrectly share mutable magazines");
+        // Both record kinds must coexist in the version-six blueprint:
+        // an explicitly loaded guided missile socket and an independently
+        // programmed unguided rocket socket on the same physical vessel.
+        Shipyard.Design mixed=restored.install(secondSocket,"BASE-TER-MSL")
+                .withLauncher(secondSocket,new diplomacy.shipyard.OrdnanceFitting.Mounted(
+                        diplomacy.shipyard.OrdnanceFitting.Guided.STANDARD,
+                        AmmunitionTable.Warhead.STANDARD));
+        String combined=Shipyard.encode(mixed);
+        require(combined.startsWith("CD-SHIP-6|")&&
+                        combined.contains("\nL|"+secondSocket+"|")&&
+                        combined.contains("\nR|"+programmedSocket+"|"),
+                "Mixed guided and dumbfire rack records lost their distinct identities");
+        Shipyard.Design mixedRestored=Shipyard.decode(combined,tech);
+        require(Shipyard.encode(mixedRestored).equals(combined)&&
+                        mixedRestored.rocketBarrage(programmedSocket).count()==16&&
+                        mixedRestored.launcher(secondSocket).equals(
+                                mixed.launcher(secondSocket)),
+                "Combined L and R blueprint records failed a round-trip");
+        Battle mixedBattle=new Battle(74579L);
+        mixedBattle.spawnWing(0,mixedRestored,tech,1,260,315);
+        require(mixedBattle.ships().get(0).rocketRacks.size()==1&&
+                        mixedBattle.ships().get(0).rocketRacks.get(0).salvoCount==16&&
+                        !mixedBattle.ships().get(0).launchers.isEmpty(),
+                "Battle spawn dropped rockets or explicit guided launcher in hybrid fit");
         Shipyard.Design retuned=restored.stage(programmedSocket,Shipyard.Track.OUTPUT,1)
                 .withModuleVersion(programmedSocket,
                         diplomacy.shipyard.ModuleVersions.Pattern.STANDARD,2);
