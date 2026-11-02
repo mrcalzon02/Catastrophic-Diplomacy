@@ -34,9 +34,9 @@ public final class PointDefenseThreatMatrixDiagnostic {
         TORPEDO_CLUSTER_CARRIER, TORPEDO_CASCADE_SWARM,
         FIGHTER_INTERCEPTOR, FIGHTER_ASSAULT_GUNSHIP,
         FIGHTER_LASER_FIGHTER, FIGHTER_PARTICLE_FIGHTER,
-        FIGHTER_MISSILE_FIGHTER, FIGHTER_TORPEDO_BOMBER, DRONE;
+        FIGHTER_MISSILE_FIGHTER, FIGHTER_TORPEDO_BOMBER, DRONE, REPAIR_DRONE;
         boolean guided(){return name().startsWith("MISSILE_")||name().startsWith("TORPEDO_");}
-        boolean craft(){return name().startsWith("FIGHTER_")||this==DRONE;}
+        boolean craft(){return name().startsWith("FIGHTER_")||this==DRONE||this==REPAIR_DRONE;}
         boolean heavy(){return name().startsWith("TORPEDO_");}
         OrdnanceDoctrine.Mode pattern(){
             String n=name();
@@ -136,6 +136,19 @@ public final class PointDefenseThreatMatrixDiagnostic {
                     threat.pattern());
         }else if(threat==Threat.DRONE){
             attacker.droneReserve=1;
+        }else if(threat==Threat.REPAIR_DRONE){
+            // Physical support drones target allies rather than a hostile
+            // ship. Keep a damaged friendly hull in range to cause a real
+            // launch, then observe whether hostile PD can acquire it.
+            Battle.Ship casualty=battle.addShip(0,Battle.Faction.TERRAN,192,346);
+            casualty.hull=casualty.maxHull*.55;
+            casualty.laserDamage=casualty.missileDamage=0;
+            casualty.kineticDamage=casualty.torpedoDamage=0;
+            casualty.plasmaDamage=casualty.particleDamage=0;
+            casualty.fighterReserve=casualty.droneReserve=0;
+            casualty.pdRange=0;
+            battle.registerDiagnosticStationaryTarget(casualty.id);
+            attacker.repairDroneReserve=1;
         }else{
             attacker.fighterReserve=1;
         }
@@ -153,6 +166,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 attacker.missileReload=attacker.torpedoReload=10000;
                 attacker.fighterReserve=0;
                 attacker.droneReserve=0;
+                attacker.repairDroneReserve=0;
             }
             if(tick==65&&threat==Threat.KINETIC)
                 attacker.kineticDamage=0; // End realistic initial gun train.
@@ -175,7 +189,8 @@ public final class PointDefenseThreatMatrixDiagnostic {
                     &&event.team()==0){
                 String weapon=event.weapon();
                 boolean launched=threat.craft()?
-                        ("FIGHTER".equals(weapon)||"DRONE".equals(weapon)):
+                        ("FIGHTER".equals(weapon)||"DRONE".equals(weapon)||
+                         "REPAIR_DRONE".equals(weapon)):
                         (threat==Threat.KINETIC?"KINETIC".equals(weapon):
                         "MISSILE".equals(weapon)||"TORPEDO".equals(weapon)||
                         "DECOY".equals(weapon));
