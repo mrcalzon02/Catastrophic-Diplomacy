@@ -227,3 +227,35 @@ jobs:
           path: test-output/armor-observation/individual/kinetic-zelthar-pristine/
           if-no-files-found: warn
           retention-days: 30
+      - name: Downloadable kinetic-aureate-upper upper-panel source control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-aureate-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-aureate-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-aureate-upper-pristine upper-panel source control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-aureate-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-aureate-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-terran-upper upper-panel source control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-terran-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-terran-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-terran-upper-pristine upper-panel source control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-terran-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-terran-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
