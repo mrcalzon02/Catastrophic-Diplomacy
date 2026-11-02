@@ -52,6 +52,10 @@ for row in rows:
 
 for key in keys:
     folder=out/"individual"/key
+    source_mask=root/(key+"-mask-coefficients.png")
+    if source_mask.exists():
+        # Actual GPU-upload coefficient image, never a synthesized ship view.
+        shutil.copyfile(source_mask,folder/"mask-coefficients.png")
     sample=[row for row in rows if row["scenario"]==key]
     (folder/"evidence.json").write_text(json.dumps({
         "schema":"cd-armor-scene-v2",
@@ -72,6 +76,7 @@ for key in keys:
         "tactical.png — normal battle with effects and HUD\n"
         "close.png — normal close-up with effects and HUD\n"
         "surface.png — same real ship renderer, without transient beam/HUD overlays\n"
+        "mask-coefficients.png (when present) — actual 96x144 GPU mask data, not ship art\n"
         "These are NOT concept images or generated fake hull damage.\n",
         encoding="utf8")
 # A lossless per-hull difference image, without changing/overwriting the sources.
