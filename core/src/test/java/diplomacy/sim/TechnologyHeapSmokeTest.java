@@ -13,10 +13,11 @@ public final class TechnologyHeapSmokeTest {
             throw new AssertionError("Technology memory smoke did not run under a constrained heap");
         long before=used();
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
-        if(technology.componentCount()!=1144 || technology.upgradeCount()!=41184)
+        if(technology.componentCount()!=1672 || technology.upgradeCount()!=60192)
             throw new AssertionError("Memory optimization discarded real hardware or research");
         String[] late={"TECH-TER-KIN-OUTPUT-09","TECH-ZIP-HLP-SPECIALIST-07",
-                "TECH-NYX-AMV-RESILIENCE-08","TECH-UMB-IRG-EFFICIENCY-09"};
+                "TECH-NYX-AMV-RESILIENCE-08","TECH-UMB-IRG-EFFICIENCY-09",
+                "TECH-TER-EPDA-SPECIALIST-09","TECH-UMB-IRGH-RESILIENCE-08"};
         for(String id:late){
             TechnologyCatalog.Upgrade u=technology.get(id);
             if(u==null||u.stage<7||technology.get(u.prerequisite)==null)
