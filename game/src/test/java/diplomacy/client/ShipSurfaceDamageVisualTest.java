@@ -190,6 +190,21 @@ public final class ShipSurfaceDamageVisualTest {
         check(ShipArmorStamps.typedOpeningAt(8,9.40f,8,8,
                 8,8,1,1,id,diplomacy.sim.Battle.DamageType.TORPEDO)==0,
                 "Torpedo rupture must remain localized");
+        // The torpedo edge must actually fracture into open teeth AND
+        // closed deep notches. A smooth/lumpy ellipse can no longer pass.
+        // This is appearance validation in this OPTIONAL diagnostic only.
+        int jaggedTeeth=0,deepNotches=0;
+        for(int n=0;n<64;n++){
+            double angle=n*2.0*StrictMath.PI/64.0;
+            float rad=(float)StrictMath.cos(angle)*1.16f;
+            float tang=(float)StrictMath.sin(angle)*1.16f;
+            float edge=ShipArmorStamps.typedOpeningAt(8+tang,8+rad,8,8,
+                    8,8,1,1,id,diplomacy.sim.Battle.DamageType.TORPEDO);
+            if(edge>.15f)jaggedTeeth++;
+            else if(edge<.01f)deepNotches++;
+        }
+        check(jaggedTeeth>=8&&deepNotches>=12,
+                "Torpedo rupture must have distinct projecting tears and notches");
         check(ShipArmorStamps.typedOpeningAt(8,8,8,8,
                 8,8,0,0,id,diplomacy.sim.Battle.DamageType.TORPEDO)==0,
                 "Undamaged hull must not show a torpedo breach");
