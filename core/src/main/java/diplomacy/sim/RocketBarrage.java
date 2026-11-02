@@ -43,7 +43,7 @@ public final class RocketBarrage {
         public final double damage, reloadSeconds, magazineUnitCost;
         public int rounds,salvoCount,salvoRemaining;
         public double reload;
-        public Motor motor=Motor.BOOST_COAST;
+        public Motor motor;
         public long nextLaunchTick;
         public int intendedTarget;
         public double lockedBearing;
@@ -55,6 +55,10 @@ public final class RocketBarrage {
             this.slot=slot;this.size=size;
             rounds=size.magazine;
             salvoCount=size==Size.SMALL?4:size==Size.SIEGE?16:8;
+            // Both physically distinct motor envelopes appear in ordinary
+            // AI fleets without needing a debug API or hidden control.
+            motor=size==Size.MEDIUM||size==Size.SIEGE
+                    ?Motor.SUSTAINED_BURN:Motor.BOOST_COAST;
             damage=24*size.damageMultiplier*output;
             reloadSeconds=size.reloadSeconds/StrictMath.min(1.4,StrictMath.max(.7,tracking));
             // Simplified, cheap non-seeker ammunition. This is the material
