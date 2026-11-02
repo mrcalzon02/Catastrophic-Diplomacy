@@ -2550,7 +2550,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             // The close-up is intentionally large enough to inspect true
             // physical impact holes, not merely admire a tiny ship icon.
             battleCamera.zoom=armorCaptureView==0?Math.max(.27f,height/175f):
-                    Math.max(.08f,height/420f);
+                    armorCaptureView==1?Math.max(.08f,height/420f):
+                    Math.max(.08f,height/520f);
             battleCamera.update();
         }
         if (audio != null) audio.advance(battle,battleCamera.position.x,
@@ -2625,7 +2626,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }
                 }
             }
-        for (Battle.Beam beam : battle.beams()) {
+        // The third forensic view omits only transient beam artwork,
+        // allowing the unchanged actual armor mask and hull shader to be seen.
+        boolean surfaceCapture=currentArmorCapture!=null && armorCaptureView==2;
+        if(!surfaceCapture)for (Battle.Beam beam : battle.beams()) {
             if(!view.segment(beam.x1,beam.y1,beam.x2,beam.y2,7))continue;
             if(weaponBeams!=null && weaponBeams.canDraw(beam,battle.tick))continue;
             if(weaponFx!=null && weaponFx.hasLaserBeam(beam,battle.tick))continue;
@@ -2708,6 +2712,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // camera. Weapon discharge is still emitted by authoritative Battle.
         if(capitalTurrets!=null)
             capitalTurrets.render(battle,batch,renderPoses,view,battleCamera.zoom);
+        // A source-art-only photograph: the real battle surface shader,
+        // cached armor peel and fitted hardpoints have already been rendered.
+        // Do NOT obscure that evidence with HUD, beams, glow or hit particles.
+        if(surfaceCapture){
+            captureArmorFramebuffer();
+            return;
+        }
         if(lighting!=null){
             long beforeLight=System.nanoTime();
             lighting.renderSmoke(battle,batch,battleCamera,hitFeedback);
@@ -3021,7 +3032,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(terranSprites==null||!terranSprites.hasSprite(currentArmorCapture.target()))
             throw new IllegalStateException("Actual source-art target missing from framebuffer: "+
                     currentArmorCapture.key());
-        String suffix=armorCaptureView==0?"tactical":"close";
+        String suffix=armorCaptureView==0?"tactical":
+                armorCaptureView==1?"close":"surface";
         String filename=String.format(java.util.Locale.ROOT,"%02d-%s-%s.png",
                 armorCaptureStage+1,currentArmorCapture.key(),suffix);
         int width=Gdx.graphics.getBackBufferWidth();
@@ -3056,7 +3068,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 " milestone="+currentArmorCapture.milestoneReached()+
                 " masks="+terranSprites.maskTextureUploads());
         armorCaptureFrame=0;
-        if(armorCaptureView==0)armorCaptureView=1;
+        if(armorCaptureView<2)armorCaptureView++;
         else if(armorCaptureStage+1<ShipSurfaceDamageCapture.KEYS.length)
             selectArmorCapture(armorCaptureStage+1);
         else Gdx.app.exit();

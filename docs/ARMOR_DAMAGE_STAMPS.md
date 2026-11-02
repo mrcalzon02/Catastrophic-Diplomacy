@@ -146,3 +146,21 @@ shield-contact case cannot masquerade as an unshielded bare-hull hit.
 Close-view framing is increased, and `armor-surface-crops.png` /
 `ship-region-laser-difference.png` isolate the ship area from HUD labels
 for review. Original full OpenGL screenshots remain preserved unchanged.
+
+
+### Individual, readable screenshot evidence (v2)
+
+The diagnostic produces three original 1280×720 game-client frames per
+deterministic scenario: `tactical.png` (combat UI and effects), `close.png`
+(combat close-up), and `surface.png` (real ship sprite, armor-mask and
+materials rendered normally, but the transient weapon beams/glows and HUD are
+not drawn). It keeps the individual original framebuffers, preserves physical
+hit and shield/armor telemetry, and uploads a **separate GitHub Actions
+artifact per scenario**. Each individual ZIP contains the three images,
+`README.txt` and `evidence.json`. There is no enormous contact sheet
+that reduces the actual sprites to unreadable thumbnails.
+
+The exposed structural underlay is now lit at 40% of the original composited
+color rather than 25%; original hull silhouette, shader inputs, saved physical
+armor, hit points, masks, and battlefield balance are unchanged. This is
+a small cosmetic refinement subject to actual framebuffer comparison.

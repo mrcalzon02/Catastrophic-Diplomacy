@@ -59,11 +59,84 @@ jobs:
           # Fail this optional workflow if actual captured evidence is missing.
           # Artwork quality observations are report warnings, NEVER release gates.
           python3 tools/armor_visual_gallery.py
+      # One-click downloads per scenario; no multi-thousand-pixel microscopic sheet.
       - name: Preserve optional armor-readability measurements and framebuffer PNGs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cd-armor-readability-${{ github.sha }}
           path: test-output/armor-observation/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable pristine screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable shield-contact screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-shield-contact-${{ github.run_id }}
+          path: test-output/armor-observation/individual/shield-contact/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable laser-scoring screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-laser-scoring-${{ github.run_id }}
+          path: test-output/armor-observation/individual/laser-scoring/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-impact screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-impact-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-impact/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable missile-splash screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-missile-splash-${{ github.run_id }}
+          path: test-output/armor-observation/individual/missile-splash/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable laser-repeat screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-laser-repeat-${{ github.run_id }}
+          path: test-output/armor-observation/individual/laser-repeat/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable armor-breach screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-armor-breach-${{ github.run_id }}
+          path: test-output/armor-observation/individual/armor-breach/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable structure-hit screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-structure-hit-${{ github.run_id }}
+          path: test-output/armor-observation/individual/structure-hit/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable rectangle-stress screenshot set
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-rectangle-stress-${{ github.run_id }}
+          path: test-output/armor-observation/individual/rectangle-stress/
           if-no-files-found: warn
           retention-days: 30

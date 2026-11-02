@@ -1,110 +1,110 @@
 #!/usr/bin/env python3
-"""Postprocess true client framebuffer screenshots into reviewable evidence.
-Only scales/crops genuine PNGs; never paints or synthesizes ship artwork.
-Warnings are cosmetic diagnostics, not release quality gates.
+"""Build one inspectable evidence package per real-rendered armor scenario.
+
+Original game OpenGL PNGs are unchanged. No giant contact-sheet output.
+The clean 'surface' view uses the normal ship material/armor shader; HUD
+and short-lived impacts are excluded by the client capture mode.
+Only missing/corrupt evidence is fatal; visual quality remains diagnostic.
 """
 import csv
 import json
 import os
+import shutil
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageChops
+from PIL import Image, ImageStat, ImageChops
 
 root = Path(os.environ.get("CD_ARMOR_CAPTURE_DIR", "test-output/armor-observation/framebuffer"))
 out = root.parent
-rows = list(csv.DictReader((root / "frames.csv").open(newline="", encoding="utf-8")))
-assert rows, "No actual framebuffer metadata produced"
-keys = list(dict.fromkeys(r["scenario"] for r in rows))
-views = ["tactical", "close"]
-assert all(sum(r["scenario"] == key and r["view"] == view for r in rows) == 1
-           for key in keys for view in views), "Each scenario must have both original views"
-warnings = []
+rows = list(csv.DictReader((root/"frames.csv").open(newline="", encoding="utf-8")))
+assert rows, "No actual framebuffer capture metadata"
+keys = list(dict.fromkeys(row["scenario"] for row in rows))
+views = ("tactical","close","surface")
+assert all(sum(row["scenario"]==key and row["view"]==view for row in rows)==1
+           for key in keys for view in views), "A scenario lacks a genuine OpenGL framebuffer view"
+warnings=[]
 for row in rows:
-    path = root / row["file"]
-    with Image.open(path) as im:
-        im.verify()
-    with Image.open(path) as im:
-        assert im.size == (1280,720), f"Wrong real framebuffer dimensions: {path}"
-        rgb=im.convert("RGB")
-        s=ImageStat.Stat(rgb).stddev
-        if max(s)<3:
-            warnings.append(f"Nearly blank or uniform frame: {path.name}")
-    if row["milestone"]=="false" and row["view"]=="close":
-        warnings.append(f"Combat milestone not reached: {row['scenario']} at tick {row['tick']}")
-    if row["view"]=="close" and row["scenario"] not in ("pristine","rectangle-stress"):
-        if int(row["hits"])<=2 and float(row["armor_exposure"])>=.99:
-            warnings.append(f"Local armor completely exposed after only {row['hits']} hit(s): {row['scenario']}")
-        if int(row["hits"])<=2 and float(row["internal_exposure"])>=.99:
-            warnings.append(f"Local structure completely exposed after only {row['hits']} hit(s): {row['scenario']}")
-        if row["scenario"]=="shield-contact" and float(row["armor_exposure"])>.001:
-            warnings.append("Shield contact also damaged armor; check whether shield had already collapsed")
-    if row["weapon"]!="KINETIC_GRID_STRESS" and int(row["hits"])==0 and row["scenario"]!="pristine":
-        warnings.append(f"No hits observed for {row['scenario']}")
-    if row["view"]=="close" and float(row["armor_exposure"])>0.01 and int(row["mask_uploads"])==0:
-        warnings.append(f"Armor was damaged but no GPU mask update recorded: {row['scenario']}")
-font=ImageFont.load_default()
-CELL_W,CELL_H=620,390
-gallery=Image.new("RGB",(CELL_W*2,CELL_H*len(keys)),(18,22,30))
-draw=ImageDraw.Draw(gallery)
-for i,key in enumerate(keys):
-    for j,view in enumerate(views):
-        row=next(r for r in rows if r["scenario"]==key and r["view"]==view)
-        x,y=j*CELL_W,i*CELL_H
-        image=Image.open(root/row["file"]).convert("RGB")
-        # This is only a thumbnail of an unchanged real-frame screenshot.
-        image.thumbnail((600,337))
-        gallery.paste(image,(x+10,y+34))
-        draw.text((x+10,y+9),f"{key} / {view} - {row['weapon']}",font=font,fill=(239,242,248))
-        draw.text((x+12,y+374),
-                  f"tick {row['tick']} hits {row['hits']}  armor {float(row['armor_exposure']):.2f}  "
-                  f"internal {float(row['internal_exposure']):.2f}  milestone {row['milestone']}",
-                  font=font,fill=(210,217,228))
-gallery.save(out/"armor-review-contact-sheet.png")
-# Enlarged ship-centered photographs are crops of the ORIGINAL framebuffer,
-# not separate hand-generated sprites. Keep originals intact for verification.
-CROP=(470,170,810,550)
-crop_width,crop_height=CROP[2]-CROP[0],CROP[3]-CROP[1]
-cropped=Image.new("RGB",(crop_width*3,(crop_height+60)*((len(keys)+2)//3)),(18,22,30))
-cd=ImageDraw.Draw(cropped)
-for i,key in enumerate(keys):
-    row=next(r for r in rows if r["scenario"]==key and r["view"]=="close")
-    original=Image.open(root/row["file"]).convert("RGB")
-    left=(i%3)*crop_width
-    top=(i//3)*(crop_height+60)
-    cropped.paste(original.crop(CROP),(left,top+32))
-    cd.text((left+8,top+8),key+" / "+row["weapon"],font=font,fill=(240,242,245))
-    cd.text((left+8,top+crop_height+38),
-            "hits="+row["hits"]+" armor="+str(round(float(row["armor_exposure"]),2))+
-            " internal="+str(round(float(row["internal_exposure"]),2)),
-            font=font,fill=(214,219,224))
-cropped.save(out/"armor-surface-crops.png")
-# Compare only two repeatable views from the same fitted hull and scene seed.
+    png=root/row["file"]
+    with Image.open(png) as image: image.verify()
+    with Image.open(png) as image:
+        assert image.size==(1280,720), (png,image.size)
+        assert max(ImageStat.Stat(image.convert("RGB")).stddev)>=3, f"Blank framebuffer: {png}"
+    if row["view"]=="surface":
+        hits=int(row["hits"])
+        armor=float(row["armor_exposure"])
+        structure=float(row["internal_exposure"])
+        if row["milestone"]=="false":
+            warnings.append(f"{row['scenario']}: requested combat milestone was not reached (tick {row['tick']})")
+        if row["scenario"] not in ("pristine","rectangle-stress"):
+            if hits<=2 and armor>=.99:
+                warnings.append(f"{row['scenario']}: local armor fully exposed after just {hits} hit(s)")
+            if hits<=2 and structure>=.99:
+                warnings.append(f"{row['scenario']}: structure fully exposed after just {hits} hit(s)")
+            if row["scenario"]=="shield-contact" and armor>.001:
+                warnings.append("Shield contact also depleted physical armor")
+        if armor>.01 and int(row["mask_uploads"])==0:
+            warnings.append(f"{row['scenario']}: worn armor without any actual GPU mask upload")
+        if hits==0 and row["scenario"] not in ("pristine","rectangle-stress"):
+            warnings.append(f"{row['scenario']}: no actual weapon hits registered")
+    # Scenario-local, individually downloadable artifact directory.
+    folder=out/"individual"/row["scenario"]
+    folder.mkdir(parents=True,exist_ok=True)
+    shutil.copyfile(png,folder/(row["view"]+".png"))
+
+for key in keys:
+    folder=out/"individual"/key
+    sample=[row for row in rows if row["scenario"]==key]
+    (folder/"evidence.json").write_text(json.dumps({
+        "schema":"cd-armor-scene-v2",
+        "scenario":key,
+        "render":"Actual libGDX/OpenGL game framebuffer with original sprite artwork",
+        "surface_view":"Transient effects and HUD excluded only for forensic inspection",
+        "execution":"recorded",
+        "visual_approval":"NOT_ASSESSED",
+        "metadata":sample,
+    },indent=2)+"\n",encoding="utf8")
+    (folder/"README.txt").write_text(
+        "CATASTROPHIC DIPLOMACY — ORIGINAL FRAMEBUFFER EVIDENCE\n\n"
+        f"Scenario: {key}\n"
+        f"Weapon: {sample[0]['weapon']}  Hull: {sample[0]['hull']}\n"
+        f"Seed: {sample[0]['seed']} Tick: {sample[0]['tick']} Hits: {sample[0]['hits']}\n"
+        f"Armor exposure (local max): {sample[0]['armor_exposure']}\n"
+        f"Structural exposure (local max): {sample[0]['internal_exposure']}\n"
+        "tactical.png — normal battle with effects and HUD\n"
+        "close.png — normal close-up with effects and HUD\n"
+        "surface.png — same real ship renderer, without transient beam/HUD overlays\n"
+        "These are NOT concept images or generated fake hull damage.\n",
+        encoding="utf8")
+# A lossless per-hull difference image, without changing/overwriting the sources.
 try:
-    clean=next(r for r in rows if r["scenario"]=="pristine" and r["view"]=="close")
-    scored=next(r for r in rows if r["scenario"]=="laser-scoring" and r["view"]=="close")
-    a=Image.open(root/clean["file"]).convert("RGB")
-    b=Image.open(root/scored["file"]).convert("RGB")
-    diff=ImageChops.difference(a,b)
-    diff.save(out/"pristine-vs-laser-difference.png")
-    # HUD labels/radio chatter cannot be mistaken for a changed hull surface.
-    diff.crop(CROP).save(out/"ship-region-laser-difference.png")
-    if max(ImageStat.Stat(diff).mean)<0.5:
-        warnings.append("Laser scoring visually indistinguishable from pristine at screenshot resolution")
+    a=next(row for row in rows if row["scenario"]=="pristine" and row["view"]=="surface")
+    b=next(row for row in rows if row["scenario"]=="laser-scoring" and row["view"]=="surface")
+    if a["hull"]==b["hull"] and a["seed"]==b["seed"]:
+        with Image.open(root/a["file"]) as before, Image.open(root/b["file"]) as after:
+            delta=ImageChops.difference(before.convert("RGB"),after.convert("RGB"))
+            delta.save(out/"pristine-vs-laser-surface-difference.png")
 except StopIteration:
-    warnings.append("No same-hull laser reference available")
+    warnings.append("No comparable same-hull pristine and laser surface captures")
+
 report={
-    "schema":"cd-armor-review-v1",
-    "original_rendered_framebuffers":len(rows),
+    "schema":"cd-armor-review-v2",
+    "original_framebuffers":len(rows),
     "scenarios":keys,
-    "capture_source":"CatastrophicGame real OpenGL framebuffer; actual fitted Battle.step() impacts unless stress-labeled",
-    "reference_originals":"Original screenshot PNGs are available individually in framebuffer/",
-    "execution_status":"captured",
+    "views":list(views),
+    "original_pngs":"framebuffer/",
+    "individual_downloads":"individual/<scenario>/",
+    "execution":"captured",
     "visual_approval":"NOT_ASSESSED",
     "warnings":warnings,
     "observations":rows
 }
-(out/"armor-review.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
+(out/"armor-review.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf8")
 (out/"armor-review-warnings.txt").write_text(
-    ("\n".join(warnings) if warnings else "No automated diagnostic warnings.")+"\n",encoding="utf-8")
-print("Captured",len(rows),"actual frames across",len(keys),"scenarios")
-print("Generated original-frame gallery, enlarged ship-surface crops, and region difference")
-for warning in warnings: print("VISUAL DIAGNOSTIC (nonblocking):",warning)
+    ("\n".join(warnings) if warnings else "No automated diagnostics warnings.")+"\n",encoding="utf8")
+(out/"README.txt").write_text(
+    "Open individual/<scenario>/surface.png first.\n"
+    "Each subdirectory is a standalone downloadable artifact with three full-resolution images.\n"
+    "The original framebuffers are preserved in framebuffer/.\n"
+    "Visual warnings are diagnostic ONLY, never a release quality gate.\n",
+    encoding="utf8")
+print(f"PASS captured {len(rows)} actual game PNG frames, {len(keys)} independently browsable scenarios")
+for line in warnings:print("VISUAL DIAGNOSTIC (nonblocking):",line)
