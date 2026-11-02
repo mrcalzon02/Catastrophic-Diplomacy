@@ -92,8 +92,9 @@ public final class SurvivalModulesTest {
                 ordinary.missileStoreExposure;
         double protectedLoss=isolatedMag.maxMissileAmmo-isolatedMag.missileAmmo+
                 isolatedMag.missileStoreExposure;
-        check(ordinaryLoss>protectedLoss,
-                "Magazine vault failed to limit accumulated physical ammunition damage");
+        check(ordinaryLoss/ordinary.maxMissileAmmo >
+                protectedLoss/isolatedMag.maxMissileAmmo,
+                "Magazine vault failed to reduce fractional inventory exposure");
         for(int hit=0;hit<12;hit++){
             Battle.breachStores(ordinary,Battle.DamageType.TORPEDO,250,true);
             Battle.breachStores(isolatedMag,Battle.DamageType.TORPEDO,250,true);
