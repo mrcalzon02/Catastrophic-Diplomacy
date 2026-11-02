@@ -96,8 +96,8 @@ public final class ShipSurfaceDamageVisualTest {
         // physically transparent ~0.82-cell alpha cutout. Check effects
         // at a pixel that still has original plating after a full breach.
         float outer=1.04f;
-        float hole=ShipArmorStamps.openingAt(8,8+outer,8,8,1,1,17);
-        check(hole<.01f,"Fixture requires source plating OUTSIDE the armor hole");
+        float outsideOpening=ShipArmorStamps.openingAt(8,8+outer,8,8,1,1,17);
+        check(outsideOpening<.01f,"Fixture requires source plating OUTSIDE the armor hole");
         for(diplomacy.sim.Battle.DamageType family:new diplomacy.sim.Battle.DamageType[]{
                 diplomacy.sim.Battle.DamageType.KINETIC,
                 diplomacy.sim.Battle.DamageType.PLASMA,
