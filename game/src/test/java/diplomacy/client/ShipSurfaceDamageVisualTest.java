@@ -86,7 +86,7 @@ public final class ShipSurfaceDamageVisualTest {
         int pock=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.KINETIC,
                 8,8,8,8,1,1,17,0);
         int rimChrome=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.KINETIC,
-                8,8.34f,8,8,1,1,17,0);
+                8,9.04f,8,8,1,1,17,0);
         check(ShipImpactProfiles.dark(pock)>0&&ShipImpactProfiles.hot(pock)==0,
                 "Kinetic needs dark pit with no thermal orange glow");
         check(ShipImpactProfiles.metal(rimChrome)>0,
