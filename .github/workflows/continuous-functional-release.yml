@@ -7,9 +7,12 @@ on:
 permissions:
   contents: write
 
+# One active release per branch. A newer main commit supersedes the entire
+# older build/test/emulator matrix, rather than filling the runner queue with
+# mutually obsolete signed packages. Every required check remains intact.
 concurrency:
-  group: functional-release-${{ github.sha }}
-  cancel-in-progress: false
+  group: cd-functional-release-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CD_RELEASE_TAG: cd-v0.1.5-dev.${{ github.run_number }}
@@ -288,6 +291,9 @@ jobs:
     # and a genuine saved-campaign process restart. Every shard is required.
     strategy:
       fail-fast: false
+      # Keep the full 11-faction Android 10 campaign regression, but avoid
+      # consuming eleven hosted emulators at once while diagnostics starve.
+      max-parallel: 3
       matrix:
         include:
           - {first: 0, last: 0}
@@ -361,6 +367,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Even if this run passes every functional test, do not publish a
+          # stale commit when main advanced during the final packaging stage.
+          # The latest-only rule applies to actual published prereleases too.
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)"
+          if [[ "$GITHUB_REF" != "refs/heads/main" || "$latest_sha" != "$GITHUB_SHA" ]]; then
+            echo "BLOCKED: obsolete/non-main candidate ($GITHUB_SHA); current main is $latest_sha"
+            exit 1
+          fi
           cd dist
           sha256sum -c Catastrophic-Diplomacy-Linux-x64.zip.sha256
           sha256sum -c Catastrophic-Diplomacy-Windows-x64.msi.sha256
