@@ -3,14 +3,18 @@ package diplomacy.android;
 import android.os.Bundle;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.util.Log;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import diplomacy.client.CatastrophicGame;
 
 public final class AndroidLauncher extends AndroidApplication {
     private SideloadUpdater updater;
+    private static final String LIFECYCLE_TAG="CD-ANDROID-LIFECYCLE";
     @Override public void onCreate(Bundle state) {
+        Log.i(LIFECYCLE_TAG,"ON_CREATE_BEGIN");
         super.onCreate(state);
+        Log.i(LIFECYCLE_TAG,"ON_CREATE_AFTER_SUPER");
         updater=new SideloadUpdater(this);
         AndroidApplicationConfiguration config = new AndroidApplicationConfiguration();
         // Fire tablets and older Android GPUs may provide GLES 2 only. Keep
@@ -32,11 +36,14 @@ public final class AndroidLauncher extends AndroidApplication {
         // a signed production APK even if passed through an external Intent.
         boolean updateDialogReview=debug && getIntent()!=null &&
                 getIntent().getBooleanExtra("cd.verify_update_dialog",false);
+        Log.i(LIFECYCLE_TAG,"BEFORE_GDX_INITIALIZE gl3="+gl3);
         initialize(new CatastrophicGame(updater::checkForUpdates,verify,review), config);
+        Log.i(LIFECYCLE_TAG,"AFTER_GDX_INITIALIZE");
         if(updateDialogReview)updater.showVerificationDialog();
         else if(!verify && !review)updater.checkForUpdates(false); // prereleases eligible
     }
     @Override protected void onDestroy(){
+        Log.i(LIFECYCLE_TAG,"ON_DESTROY");
         if(updater!=null)updater.close();
         super.onDestroy();
     }
