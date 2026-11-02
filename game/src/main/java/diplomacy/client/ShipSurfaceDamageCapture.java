@@ -20,7 +20,9 @@ final class ShipSurfaceDamageCapture {
         "torpedo-impact", "kinetic-heavy",
         "kinetic-pristine", "kinetic-heavy-pristine",
         "kinetic-aureate", "kinetic-aureate-pristine",
-        "kinetic-zelthar", "kinetic-zelthar-pristine"
+        "kinetic-zelthar", "kinetic-zelthar-pristine",
+        "kinetic-aureate-upper", "kinetic-aureate-upper-pristine",
+        "kinetic-terran-upper", "kinetic-terran-upper-pristine"
     };
     static final long SEED=202611010140L;
     record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
@@ -81,7 +83,7 @@ final class ShipSurfaceDamageCapture {
                     stress.ships().get(2),true,true);
         }
         final String weapon=switch(index){
-            case 3,7,12,13,14,15,16,17,18 -> "KINETIC";
+            case 3,7,12,13,14,15,16,17,18,19,20,21,22 -> "KINETIC";
             case 4 -> "MISSILE";
             case 9 -> "PLASMA";
             case 10 -> "PARTICLE";
@@ -111,10 +113,10 @@ final class ShipSurfaceDamageCapture {
         // the genuine fitted shooter, projectile, impact, and physics intact.
         // Compare real approved original source artwork, never artificial
         // brightened sprites. Measure actual source luminance separately.
-        Battle.Faction targetFaction=index==15||index==16?
+        Battle.Faction targetFaction=index==15||index==16||index==19||index==20?
                 Battle.Faction.AUREATE_SYNOD:
                 index==17||index==18?Battle.Faction.ZELTHAR_LUMINARI:
-                (index==3||index==12||index==13||index==14)?
+                (index==3||index==12||index==13||index==14||index==21||index==22)?
                 Battle.Faction.TERRAN:Battle.Faction.VAERITH_PRISM;
         Shipyard.Design targetDesign=Shipyard.starter(targetFaction,hull);
         for(Shipyard.Slot slot:targetDesign.placements())
@@ -136,7 +138,14 @@ final class ShipSurfaceDamageCapture {
         // its actual firing envelope, unlike the 280-unit standard lane.
         // We move only this disposable diagnostic firing lane; gun range,
         // ship mobility and combat weapon mechanics are unchanged.
-        battle.spawnWing(0,shooter,technology,1,index==9?470:380,360);
+        // Upper-quarter shot into the original central plating rather than
+        // the peripheral dark wing pod. Same genuine weapon and targeting,
+        // fixed target, source art, seed and physics. Both controls use the
+        // identical approach; no attack effects are painted into screenshots.
+        boolean upperStrike=index>=19;
+        battle.spawnWing(0,shooter,technology,1,
+                upperStrike?510:index==9?470:380,
+                upperStrike?190:360);
         battle.spawnWing(1,targetDesign,technology,1,660,360);
         Battle.Ship gun=battle.ships().get(0),victim=battle.ships().get(1);
         if(gun.laserDamage+gun.kineticDamage+gun.missileDamage+
@@ -164,7 +173,8 @@ final class ShipSurfaceDamageCapture {
         // Identical target pose across every deterministic screenshot. The
         // attacker remains autonomous and still hits with genuine projectiles.
         final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
-        if(index==0||index==13||index==14||index==16||index==18)
+        if(index==0||index==13||index==14||index==16||index==18||
+                index==20||index==22)
             return record(KEYS[index],weapon,seed,battle,victim,true,false);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
@@ -188,7 +198,7 @@ final class ShipSurfaceDamageCapture {
                 case 7 -> interior>=.01;
                 case 9,10,11 -> battle.hitCount>=1&&armor>.01;
                 case 12 -> battle.hitCount>=3&&interior>.01;
-                case 15,17 -> battle.hitCount>=3&&armor>.01;
+                case 15,17,19,21 -> battle.hitCount>=3&&armor>.01;
                 default -> false;
             };
             // Never fabricate a surviving ship or repair a dead target simply
