@@ -377,3 +377,15 @@ The pixel-channel forensic gallery now reports the actual tagged
 coverage, avoiding false attribution of the laser oxide ring as kinetic silver.
 These are diagnostic observations only. Color-treatment assertions are kept in
 the separate nonblocking damage test, never the required functional build gate.
+
+### Bright-plating forensic alignment
+
+The original `*-terran-upper` comparison was still striking a narrow,
+already-dark left wing during diagonal approach; enlarging metallic scratches
+on that region alone would not establish color separation. The real fitted
+attacker in upper-panel scenarios now starts on the target's central bow axis,
+190 world units forward. Pristine / kinetic / laser / missile controls share
+the same shooter alignment and fixed target pose. This changes only the optional
+no-AI screenshot fixture, never gameplay targeting or weapon behavior. Whether
+the new shot actually contacts brighter paint must be verified from the next
+physical OpenGL capture and reported honestly if it misses.

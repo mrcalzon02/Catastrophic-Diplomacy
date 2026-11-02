@@ -140,14 +140,15 @@ final class ShipSurfaceDamageCapture {
         // its actual firing envelope, unlike the 280-unit standard lane.
         // We move only this disposable diagnostic firing lane; gun range,
         // ship mobility and combat weapon mechanics are unchanged.
-        // Upper-quarter shot into the original central plating rather than
-        // the peripheral dark wing pod. Same genuine weapon and targeting,
-        // fixed target, source art, seed and physics. Both controls use the
-        // identical approach; no attack effects are painted into screenshots.
+        // Match all four upper-panel pristine / weapon lanes with a real
+        // bow-on approach: our previous upper-left diagonal still struck
+        // the peripheral dark wing pod, not the broad source-art plating.
+        // Keep fixed-heading real target physics and autonomous gun firing;
+        // only the disposable forensic firing-lane approach changes.
         boolean upperStrike=index>=19;
         battle.spawnWing(0,shooter,technology,1,
-                upperStrike?510:index==9?470:380,
-                upperStrike?190:360);
+                upperStrike?660:index==9?470:380,
+                upperStrike?170:360);
         battle.spawnWing(1,targetDesign,technology,1,660,360);
         Battle.Ship gun=battle.ships().get(0),victim=battle.ships().get(1);
         if(gun.laserDamage+gun.kineticDamage+gun.missileDamage+
