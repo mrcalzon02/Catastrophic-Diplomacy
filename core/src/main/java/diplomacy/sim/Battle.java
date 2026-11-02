@@ -2474,7 +2474,10 @@ public final class Battle {
     }
     private static double tenderDeficit(Ship recipient,TenderDoctrine.Cargo cargo){
         return switch(cargo){
-            case KINETIC -> recipient.kineticDamage>0?
+            // Unguided rocket racks draw the SAME paid kinetic store as guns.
+            // Rocket-only ships are eligible for KTS resupply even when they
+            // mount no KIN cannon. Rack magazines remain separately finite.
+            case KINETIC -> (recipient.kineticDamage>0||!recipient.rocketRacks.isEmpty())?
                     Math.max(0,recipient.maxKineticAmmo-recipient.kineticAmmo):0;
             case MISSILE -> recipient.missileDamage>0?
                     Math.max(0,recipient.maxMissileAmmo-recipient.missileAmmo):0;
