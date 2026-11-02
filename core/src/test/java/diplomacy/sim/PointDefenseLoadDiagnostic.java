@@ -113,7 +113,7 @@ public final class PointDefenseLoadDiagnostic {
                           int kineticPaid,int missilePaid,int torpedoPaid) {
         String csv(){
             return String.format(Locale.ROOT,
-                    "%s,%s,%s,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.3f,%d,%d,%d,%d",
+                    "%s,%s,%s,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.5f,%.5f,%.3f,%d,%d,%d,%d",
                     load,threat,layout,pdRank,seed,pdOn,launched,intercepted,impacted,
                     timedOut,terminal,unresolved,pdShots,firstShots,middleShots,
                     lateShots,drainShots,firstKills,middleKills,lateKills,drainKills,
