@@ -145,7 +145,7 @@ public final class SurvivalModulesTest {
         check(once==rescues.recoverySalvageCredits(0) && once<=8000L,
                 "Salvage must be deterministic, bounded, and not re-buy the hull");
         CampaignProgress.State winnings=CampaignProgress.start(Battle.Faction.TERRAN)
-                .complete(1,2,1);
+                .complete(1,1,1);
         var recovered=winnings.awardAfterActionSalvage(once);
         check(recovered.credits()==winnings.credits()+once &&
                 recovered.victories()==winnings.victories(),
