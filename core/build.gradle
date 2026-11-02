@@ -397,6 +397,17 @@ tasks.register('rocketPdBalanceDiagnostic', JavaExec) {
     dependsOn testClasses
     maxHeapSize = '512m'
 }
+// ADVISORY physical interception performance measurements, never a release gate.
+// Complements rocket-specific saturation with shells, guided bodies/decoys,
+// cluster micro-ordnance and fighter/drone target classes.
+tasks.register('pdThreatMatrixDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Measure live PD interceptions, terminal penetration and damage for guided, kinetic and craft threats with matched disabled-PD controls.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PointDefenseThreatMatrixDiagnostic'
+    dependsOn testClasses
+    maxHeapSize = '512m'
+}
 tasks.register('rocketBarrageSmoke', JavaExec) {
     group = 'verification'
     description = 'Four rocket sizes, 4/8/16 physical volleys, two dumbfire motors, dodging, laser PD, finite ammo and replay.'
