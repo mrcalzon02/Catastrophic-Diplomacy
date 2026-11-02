@@ -82,8 +82,12 @@ for key in keys:
 # Audit a genuinely comparable BEFORE/AFTER pair: identical faction, hull,
 # pose and seed; the only state difference is real Battle.step() weapon damage.
 # These are lossless image DIFFERENCES, never invented gameplay screenshots.
-for pristine,damaged in (("kinetic-pristine","kinetic-impact"),
-                         ("kinetic-heavy-pristine","kinetic-heavy")):
+contrast_pairs=(("kinetic-pristine","kinetic-impact"),
+                ("kinetic-heavy-pristine","kinetic-heavy"),
+                ("kinetic-aureate-pristine","kinetic-aureate"),
+                ("kinetic-zelthar-pristine","kinetic-zelthar"))
+contrast_metrics=[]
+for pristine,damaged in contrast_pairs:
     first=next((x for x in rows if x["scenario"]==pristine and x["view"]=="surface"),None)
     second=next((x for x in rows if x["scenario"]==damaged and x["view"]=="surface"),None)
     if first is None or second is None:
@@ -96,9 +100,43 @@ for pristine,damaged in (("kinetic-pristine","kinetic-impact"),
         delta=ImageChops.difference(baseline.convert("RGB"),after.convert("RGB"))
         filename=f"{pristine}-vs-{damaged}-surface-difference.png"
         delta.save(out/filename)
-        changes=sum(1 for value in delta.convert("L").getdata() if value>16)
-        print(f"ARMOR-PAIRED-IMAGE {damaged} changed_pixels={changes} file={filename}")
+        # Paired original source pixels: quantify whether the base plating
+        # starts too dark for a black compression crater to read. These
+        # measures are image observations, not physical armor-hit metrics.
+        changes=bright=dark=low=mid=high=0
+        source_luma_sum=after_luma_sum=0.0
+        for source_rgb,damage_rgb in zip(baseline.convert("RGB").getdata(),
+                                         after.convert("RGB").getdata()):
+            if max(abs(damage_rgb[i]-source_rgb[i]) for i in range(3))<=20:
+                continue
+            changes+=1
+            old=.2126*source_rgb[0]+.7152*source_rgb[1]+.0722*source_rgb[2]
+            new=.2126*damage_rgb[0]+.7152*damage_rgb[1]+.0722*damage_rgb[2]
+            source_luma_sum+=old
+            after_luma_sum+=new
+            if old<70:low+=1
+            elif old<160:mid+=1
+            else:high+=1
+            if new-old>18:bright+=1
+            elif old-new>18:dark+=1
+        metric={"scenario":damaged,"pristine":pristine,"changed_pixels":changes,
+                "source_mean_luma_0_255":round(source_luma_sum/max(1,changes),2),
+                "damaged_mean_luma_0_255":round(after_luma_sum/max(1,changes),2),
+                "source_dark_changed_pixels_below_70":low,
+                "source_mid_changed_pixels_70_to_159":mid,
+                "source_bright_changed_pixels_160_plus":high,
+                "brightened_pixels_over_18":bright,"darkened_pixels_over_18":dark,
+                "interpretation":"Paired actual OpenGL framebuffer differences, not a crater-quality grade"}
+        contrast_metrics.append(metric)
+        print(f"ARMOR-CONTRAST {damaged} changed={changes} "
+              f"source_luma={metric['source_mean_luma_0_255']} "
+              f"bright={bright} dark={dark} baseline_dark={low}")
         if changes==0:warnings.append(f"{damaged}: ZERO rendered pixels differ from pristine")
+(out/"damage-contrast-report.json").write_text(
+    json.dumps({"schema":"cd-armor-contrast-v1",
+                "measure":"Paired actual OpenGL surface RGB changes versus pristine",
+                "nonblocking":True,"pairs":contrast_metrics},indent=2)+"\n",
+    encoding="utf8")
 # A lossless per-hull difference image, without changing/overwriting the sources.
 try:
     a=next(row for row in rows if row["scenario"]=="pristine" and row["view"]=="surface")
@@ -120,7 +158,8 @@ report={
     "execution":"captured",
     "visual_approval":"NOT_ASSESSED",
     "warnings":warnings,
-    "observations":rows
+    "observations":rows,
+    "contrast_pairs":contrast_metrics
 }
 (out/"armor-review.json").write_text(json.dumps(report,indent=2)+"\n",encoding="utf8")
 (out/"armor-review-warnings.txt").write_text(
