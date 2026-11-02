@@ -24,7 +24,14 @@ import java.util.Set;
 public final class PointDefenseThreatMatrixDiagnostic {
     private PointDefenseThreatMatrixDiagnostic(){}
     private enum Threat {
-        KINETIC,
+        KINETIC_STANDARD, KINETIC_ARMOR_PIERCING, KINETIC_FRAGMENTATION,
+        KINETIC_HIGH_EXPLOSIVE, KINETIC_RELATIVISTIC,
+        MISSILE_WARHEAD_ARMOR_PIERCING, MISSILE_WARHEAD_FRAGMENTATION,
+        MISSILE_WARHEAD_HIGH_EXPLOSIVE, MISSILE_WARHEAD_EMP,
+        MISSILE_WARHEAD_SHIELD_BREAKER,
+        TORPEDO_WARHEAD_ARMOR_PIERCING, TORPEDO_WARHEAD_FRAGMENTATION,
+        TORPEDO_WARHEAD_HIGH_EXPLOSIVE, TORPEDO_WARHEAD_EMP,
+        TORPEDO_WARHEAD_SHIELD_BREAKER,
         MISSILE_SINGLE, MISSILE_RIPPLE, MISSILE_SATURATION,
         MISSILE_MICRO_SWARM, MISSILE_HEAVY_STRIKE,
         MISSILE_COLD_LAUNCH, MISSILE_DECOY_CLOUD,
@@ -35,12 +42,22 @@ public final class PointDefenseThreatMatrixDiagnostic {
         FIGHTER_INTERCEPTOR, FIGHTER_ASSAULT_GUNSHIP,
         FIGHTER_LASER_FIGHTER, FIGHTER_PARTICLE_FIGHTER,
         FIGHTER_MISSILE_FIGHTER, FIGHTER_TORPEDO_BOMBER, DRONE, REPAIR_DRONE;
+        boolean kinetic(){return name().startsWith("KINETIC_");}
         boolean guided(){return name().startsWith("MISSILE_")||name().startsWith("TORPEDO_");}
+        AmmunitionTable.Kinetic kineticRound(){
+            return AmmunitionTable.Kinetic.valueOf(name().substring("KINETIC_".length()));
+        }
+        AmmunitionTable.Warhead warhead(){
+            int start=name().indexOf("_WARHEAD_");
+            return start<0?AmmunitionTable.Warhead.STANDARD:
+                    AmmunitionTable.Warhead.valueOf(name().substring(start+9));
+        }
         boolean craft(){return name().startsWith("FIGHTER_")||this==DRONE||this==REPAIR_DRONE;}
         boolean heavy(){return name().startsWith("TORPEDO_");}
         OrdnanceDoctrine.Mode pattern(){
             String n=name();
-            return OrdnanceDoctrine.Mode.valueOf(n.substring(n.indexOf('_')+1));
+            return n.contains("_WARHEAD_")?OrdnanceDoctrine.Mode.SINGLE:
+                    OrdnanceDoctrine.Mode.valueOf(n.substring(n.indexOf('_')+1));
         }
         FighterModel.Hull fighter(){
             return FighterModel.Hull.valueOf(name().substring("FIGHTER_".length()));
@@ -124,16 +141,18 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 initialArmor=defender.armor,initialPower=defender.power;
         double heatPeak=defender.heat;
         int initialRounds=0;
-        if(threat==Threat.KINETIC){
+        if(threat.kinetic()){
             attacker.kineticDamage=26;attacker.kineticAmmo=16;
             initialRounds=attacker.kineticAmmo;
+            battle.setShipKineticAmmunition(attacker.id,threat.kineticRound());
         }else if(threat.guided()){
             if(threat.heavy()){attacker.torpedoDamage=65;attacker.torpedoAmmo=40;}
             else {attacker.missileDamage=35;attacker.missileAmmo=40;}
             initialRounds=threat.heavy()?attacker.torpedoAmmo:attacker.missileAmmo;
-            battle.setShipLaunchMode(attacker.id,
-                    threat.heavy()?Battle.DamageType.TORPEDO:Battle.DamageType.MISSILE,
-                    threat.pattern());
+            Battle.DamageType family=threat.heavy()?Battle.DamageType.TORPEDO:
+                    Battle.DamageType.MISSILE;
+            battle.setShipLaunchMode(attacker.id,family,threat.pattern());
+            battle.setShipWarhead(attacker.id,family,threat.warhead());
         }else if(threat==Threat.DRONE){
             attacker.droneReserve=1;
         }else if(threat==Threat.REPAIR_DRONE){
@@ -168,7 +187,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 attacker.droneReserve=0;
                 attacker.repairDroneReserve=0;
             }
-            if(tick==65&&threat==Threat.KINETIC)
+            if(tick==65&&threat.kinetic())
                 attacker.kineticDamage=0; // End realistic initial gun train.
             for(Battle.Missile m:battle.missiles())
                 if(m.team==0 && StrictMath.hypot(m.x-defender.x,m.y-defender.y)<=90)
@@ -191,7 +210,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 boolean launched=threat.craft()?
                         ("FIGHTER".equals(weapon)||"DRONE".equals(weapon)||
                          "REPAIR_DRONE".equals(weapon)):
-                        (threat==Threat.KINETIC?"KINETIC".equals(weapon):
+                        (threat.kinetic()?"KINETIC".equals(weapon):
                         "MISSILE".equals(weapon)||"TORPEDO".equals(weapon)||
                         "DECOY".equals(weapon));
                 if(launched){
@@ -229,7 +248,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         // shot IDs. Their PD damage is recorded as POINT_DEFENSE IMPACT.
         int craftKilled=threat.craft()?battle.craftLosses-craftLostBefore:0;
         int terminalCount=threat.craft()?craftTerminal.size():terminal.size();
-        int spent=threat==Threat.KINETIC?initialRounds-attacker.kineticAmmo:
+        int spent=threat.kinetic()?initialRounds-attacker.kineticAmmo:
                 threat.guided()?initialRounds-(threat.heavy()?attacker.torpedoAmmo:
                         attacker.missileAmmo):attacker.fightersLaunched+attacker.dronesLaunched;
         double protectionLoss=Math.max(0,initialShield-defender.shields)+
@@ -303,7 +322,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 BattleOrders.PointDefense.INTERCEPT_ONLY);
         require(ordnanceOnly.shots==0&&ordnanceOnly.craftLost==0,
                 "Ordnance-only PD improperly engaged energy-armed aircraft");
-        Result noBallistics=run(catalog,Threat.KINETIC,0,1,0,
+        Result noBallistics=run(catalog,Threat.KINETIC_STANDARD,0,1,0,
                 BattleOrders.PointDefense.ANTI_CRAFT);
         require(noBallistics.shots==0&&noBallistics.primaryIntercepted==0,
                 "Anti-craft-only PD improperly engaged kinetic shells");
