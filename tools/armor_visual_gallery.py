@@ -28,8 +28,15 @@ for row in rows:
         s=ImageStat.Stat(rgb).stddev
         if max(s)<3:
             warnings.append(f"Nearly blank or uniform frame: {path.name}")
-    if row["milestone"]=="false":
+    if row["milestone"]=="false" and row["view"]=="close":
         warnings.append(f"Combat milestone not reached: {row['scenario']} at tick {row['tick']}")
+    if row["view"]=="close" and row["scenario"] not in ("pristine","rectangle-stress"):
+        if int(row["hits"])<=2 and float(row["armor_exposure"])>=.99:
+            warnings.append(f"Local armor completely exposed after only {row['hits']} hit(s): {row['scenario']}")
+        if int(row["hits"])<=2 and float(row["internal_exposure"])>=.99:
+            warnings.append(f"Local structure completely exposed after only {row['hits']} hit(s): {row['scenario']}")
+        if row["scenario"]=="shield-contact" and float(row["armor_exposure"])>.001:
+            warnings.append("Shield contact also damaged armor; check whether shield had already collapsed")
     if row["weapon"]!="KINETIC_GRID_STRESS" and int(row["hits"])==0 and row["scenario"]!="pristine":
         warnings.append(f"No hits observed for {row['scenario']}")
     if row["view"]=="close" and float(row["armor_exposure"])>0.01 and int(row["mask_uploads"])==0:
@@ -52,6 +59,24 @@ for i,key in enumerate(keys):
                   f"internal {float(row['internal_exposure']):.2f}  milestone {row['milestone']}",
                   font=font,fill=(210,217,228))
 gallery.save(out/"armor-review-contact-sheet.png")
+# Enlarged ship-centered photographs are crops of the ORIGINAL framebuffer,
+# not separate hand-generated sprites. Keep originals intact for verification.
+CROP=(470,170,810,550)
+crop_width,crop_height=CROP[2]-CROP[0],CROP[3]-CROP[1]
+cropped=Image.new("RGB",(crop_width*3,(crop_height+60)*((len(keys)+2)//3)),(18,22,30))
+cd=ImageDraw.Draw(cropped)
+for i,key in enumerate(keys):
+    row=next(r for r in rows if r["scenario"]==key and r["view"]=="close")
+    original=Image.open(root/row["file"]).convert("RGB")
+    left=(i%3)*crop_width
+    top=(i//3)*(crop_height+60)
+    cropped.paste(original.crop(CROP),(left,top+32))
+    cd.text((left+8,top+8),key+" / "+row["weapon"],font=font,fill=(240,242,245))
+    cd.text((left+8,top+crop_height+38),
+            "hits="+row["hits"]+" armor="+str(round(float(row["armor_exposure"]),2))+
+            " internal="+str(round(float(row["internal_exposure"]),2)),
+            font=font,fill=(214,219,224))
+cropped.save(out/"armor-surface-crops.png")
 # Compare only two repeatable views from the same fitted hull and scene seed.
 try:
     clean=next(r for r in rows if r["scenario"]=="pristine" and r["view"]=="close")
@@ -60,6 +85,8 @@ try:
     b=Image.open(root/scored["file"]).convert("RGB")
     diff=ImageChops.difference(a,b)
     diff.save(out/"pristine-vs-laser-difference.png")
+    # HUD labels/radio chatter cannot be mistaken for a changed hull surface.
+    diff.crop(CROP).save(out/"ship-region-laser-difference.png")
     if max(ImageStat.Stat(diff).mean)<0.5:
         warnings.append("Laser scoring visually indistinguishable from pristine at screenshot resolution")
 except StopIteration:
@@ -79,5 +106,5 @@ report={
 (out/"armor-review-warnings.txt").write_text(
     ("\n".join(warnings) if warnings else "No automated diagnostic warnings.")+"\n",encoding="utf-8")
 print("Captured",len(rows),"actual frames across",len(keys),"scenarios")
-print("Generated review contact sheet and comparison difference")
+print("Generated original-frame gallery, enlarged ship-surface crops, and region difference")
 for warning in warnings: print("VISUAL DIAGNOSTIC (nonblocking):",warning)

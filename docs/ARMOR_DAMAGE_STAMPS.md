@@ -130,3 +130,19 @@ concept art.
 Only objective screenshot production and real simulation execution may fail
 the independent diagnostic. Pixel-art appearance, rectangularity, legibility,
 and balance are human-review observations and never dependencies of releases.
+
+
+### First-use diagnostic observations and review refinements
+
+The first expanded run produced 18 actual framebuffer PNGs. It revealed that
+some seed/loadout combinations completely expose local armor and structure
+within the first one or two registered hits, leaving no gradual damage states.
+This is now reported explicitly as a nonblocking diagnostic warning, not
+silently called a successful visual progression.
+
+The follow-up version outfits unarmed targets with the **actual faction
+starter shield and defensive systems** (removing only their weapons), so a
+shield-contact case cannot masquerade as an unshielded bare-hull hit.
+Close-view framing is increased, and `armor-surface-crops.png` /
+`ship-region-laser-difference.png` isolate the ship area from HUD labels
+for review. Original full OpenGL screenshots remain preserved unchanged.

@@ -2547,8 +2547,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Battle.Ship subject=currentArmorCapture.target();
             battleCamera.position.set((float)subject.x,(float)subject.y,0);
             float height=(float)(34*subject.visualScale());
-            battleCamera.zoom=armorCaptureView==0?Math.max(.32f,height/125f):
-                    Math.max(.16f,height/290f);
+            // The close-up is intentionally large enough to inspect true
+            // physical impact holes, not merely admire a tiny ship icon.
+            battleCamera.zoom=armorCaptureView==0?Math.max(.27f,height/175f):
+                    Math.max(.08f,height/420f);
             battleCamera.update();
         }
         if (audio != null) audio.advance(battle,battleCamera.position.x,

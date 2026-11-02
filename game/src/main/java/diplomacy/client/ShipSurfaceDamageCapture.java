@@ -84,7 +84,13 @@ final class ShipSurfaceDamageCapture {
                 index==7?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
         Shipyard.Design bare=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         Shipyard.Design shooter=bare.install(firstWeaponSlot(bare),"BASE-TER-"+suffix);
-        Shipyard.Design targetDesign=Shipyard.bareHull(Battle.Faction.VAERITH_PRISM,hull);
+        // Actual factory-fitted defenses and structural systems, but no guns:
+        // otherwise an empty bare hull may have zero shields and make the
+        // purported shield-only shot a misleading immediate armor breach.
+        Shipyard.Design targetDesign=Shipyard.starter(Battle.Faction.VAERITH_PRISM,hull);
+        for(Shipyard.Slot slot:targetDesign.placements())
+            if(slot.mount()==Shipyard.Mount.WEAPON&&targetDesign.at(slot.index())!=null)
+                targetDesign=targetDesign.install(slot.index(),null);
         if(!Shipyard.inspect(shooter,technology).valid()||
                 !Shipyard.inspect(targetDesign,technology).valid())
             throw new IllegalStateException("Live-fire capture needs real legal fitted hulls: "+weapon+"/"+hull);
@@ -98,6 +104,8 @@ final class ShipSurfaceDamageCapture {
         if(victim.laserDamage+victim.kineticDamage+victim.missileDamage+
                 victim.plasmaDamage+victim.particleDamage+victim.torpedoDamage>0)
             throw new IllegalStateException("Live-fire target must remain unarmed");
+        if(index==1 && victim.maxShields<=0)
+            throw new IllegalStateException("Shield contact diagnostic requires a physical fitted shield");
         gun.speed=0;gun.vx=gun.vy=0;
         victim.speed=0;victim.vx=victim.vy=0;
         victim.facing=Math.PI/2;
