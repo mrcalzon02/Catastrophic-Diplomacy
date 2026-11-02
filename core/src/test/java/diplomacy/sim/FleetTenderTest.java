@@ -133,6 +133,34 @@ public final class FleetTenderTest {
         check(farTarget.kineticAmmo==0&&farDonor.roundsDelivered==0,
                 "Tender transferred ammunition beyond fitted range");
 
+        // A rocket-only vessel has no KIN gun, but all unguided rocket
+        // bodies consume the SAME paid kinetic stock. A physical KTS tender
+        // must recognize that consumer without minting rounds or reloading
+        // the separately finite rack magazines.
+        for(RocketBarrage.Size size:RocketBarrage.Size.values()){
+            Battle rocketFleet=new Battle(8922L+size.ordinal());
+            rocketFleet.spawnWing(0,shells,tech,1,250,310);
+            rocketFleet.spawnWing(0,target(base,size.code),tech,1,290,310);
+            Battle.Ship rocketTender=rocketFleet.ships().get(0);
+            Battle.Ship rocketBoat=rocketFleet.ships().get(1);
+            for(Battle.Ship ship:rocketFleet.ships()){
+                ship.speed=0;ship.vx=ship.vy=0;ship.weaponsCondition=0;
+            }
+            check(rocketBoat.kineticDamage==0&&rocketBoat.rocketRacks.size()==1,
+                    "Rocket-only tender fixture accidentally has kinetic guns");
+            int stored=rocketBoat.rocketRacks.get(0).rounds;
+            rocketBoat.kineticAmmo=0;
+            int donorBefore=rocketTender.kineticAmmo;
+            for(int i=0;i<150;i++)rocketFleet.step();
+            check(rocketBoat.kineticAmmo>0&&rocketBoat.kineticAmmo<=rocketBoat.maxKineticAmmo,
+                    "KTS ignored rocket-only "+size+" hull's shared kinetic stock");
+            check(donorBefore-rocketTender.kineticAmmo==rocketBoat.kineticAmmo&&
+                            rocketTender.roundsDelivered==rocketBoat.kineticAmmo,
+                    "Rocket resupply duplicated or destroyed a paid kinetic round");
+            check(rocketBoat.rocketRacks.get(0).rounds==stored,
+                    "KTS improperly manufactured additional physical rack magazines");
+        }
+
         // A physical donor cannot refuel an opponent even at close range.
         Battle hostile=new Battle(8884);
         Shipyard.Design tank=base.install(slot(base,Shipyard.Mount.SUPPORT),"BASE-TER-FTS");
