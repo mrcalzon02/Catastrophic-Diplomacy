@@ -21,6 +21,35 @@ public final class TerranPlaceholderSprites implements Disposable {
     private static final int GRID=DirectionalDefense.GRID;
     private final EnumMap<Battle.Faction,EnumMap<Shipyard.Hull,Texture>> textures=
             new EnumMap<>(Battle.Faction.class);
+    /** Manifest paths stay cheap on startup; actual GPU images load on first use.
+     * Only an idle, unused image can be evicted after a finished draw frame. */
+    private final EnumMap<Battle.Faction,EnumMap<Shipyard.Hull,String>> assetPaths=
+            new EnumMap<>(Battle.Faction.class);
+    private final java.util.LinkedHashMap<String,Texture> resident=
+            new java.util.LinkedHashMap<>(32,.75f,true);
+    private final java.util.Map<String,Long> lastUsedFrame=new java.util.HashMap<>();
+    private final java.util.Set<String> unavailable=new java.util.HashSet<>();
+    private final boolean boundedResidency=Gdx.app!=null &&
+            Gdx.app.getType()==com.badlogic.gdx.Application.ApplicationType.Android;
+    private static final int MOBILE_MAX_SHIP_IMAGES=24;
+    private long artFrame;
+    private int retiredOriginalTextures,peakResidentOriginalTextures;
+    public int residentOriginalTextures(){return resident.size();}
+    public int peakResidentOriginalTextures(){return peakResidentOriginalTextures;}
+    public int evictedOriginalTextures(){return retiredOriginalTextures;}
+    /** RGBA8888 full mip chain is roughly 4/3 the base level; estimate only. */
+    public long estimatedResidentAlbedoBytes(){
+        long bytes=0;
+        for(Texture texture:resident.values()){
+            int w=texture.getWidth(),h=texture.getHeight();
+            for(;;){
+                bytes+=(long)w*h*4;
+                if(w==1&&h==1)break;
+                w=Math.max(1,w/2);h=Math.max(1,h/2);
+            }
+        }
+        return bytes;
+    }
     /** Campaign flagships use separate art, never overwrite faction hulls. */
     private final java.util.Map<String,Texture> bossTextures=new java.util.HashMap<>();
     // Shipyard hardpoints are aligned once to each approved transparent PNG.
@@ -107,58 +136,30 @@ public final class TerranPlaceholderSprites implements Disposable {
         damagedMaterial=loadMaterial("materials/structure_damaged.png");
         destroyedMaterial=loadMaterial("materials/structure_destroyed.png");
         shieldMaterial=loadMaterial("materials/shield_energy_blue.png");
-        // Only the owning civilization may use its approved sheet.
-        // Share GPU textures when hull variants use one image, never across races.
-        java.util.Map<String,Texture> uniqueTextures=new java.util.HashMap<>();
+        // Discover ORIGINAL approved source sprites without decoding all
+        // eleven navies into GPU memory at the main menu.
         for(Battle.Faction faction:Battle.Faction.values()){
-            EnumMap<Shipyard.Hull,Texture> fleet=new EnumMap<>(Shipyard.Hull.class);
+            EnumMap<Shipyard.Hull,String> paths=new EnumMap<>(Shipyard.Hull.class);
             for(Shipyard.Hull hull:Shipyard.Hull.values()){
                 String file=faction==Battle.Faction.TERRAN
                         ?"ships/terran/"+spriteName(hull)+".png"
                         :FactionArt.runtimePath(faction,hull);
                 if(file==null||!Gdx.files.internal(file).exists())continue;
-                // Source art may contain a UNIQUE dreadnought (Terran and the
-                // five legacy fleets). Reuse textures only when runtime paths
-                // actually match, via the shared per-path cache below.
-                if(fleet.containsKey(hull.spriteHull())){
-                    fleet.put(hull,fleet.get(hull.spriteHull()));
-                    continue;
-                }
-                try{
-                    Texture tex=uniqueTextures.get(file);
-                    if(tex==null){
-                        tex=new Texture(Gdx.files.internal(file));
-                        tex.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-                        uniqueTextures.put(file,tex);
-                        originals.put(tex,file);
-                    }
-                    fleet.put(hull,tex);
-                }catch(RuntimeException ex){
-                    Gdx.app.error("SPRITES","Unable to load selected faction sprite: "+file,ex);
-                }
+                if(paths.containsKey(hull.spriteHull())){
+                    paths.put(hull,paths.get(hull.spriteHull()));
+                }else paths.put(hull,file);
             }
-            if(!fleet.isEmpty())textures.put(faction,fleet);
+            if(!paths.isEmpty())assetPaths.put(faction,paths);
         }
-        // Optional dedicated flagship art: load once; all weapons remain the
-        // actual fitted modules and are rendered separately by the game.
-        String bossPath="ships/bosses/warrant_spire.png";
-        if(Gdx.files.internal(bossPath).exists()){
-            try{
-                Texture boss=new Texture(Gdx.files.internal(bossPath));
-                boss.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-                bossTextures.put("warrant_spire",boss);
-                originals.put(boss,bossPath);
-            }catch(RuntimeException error){
-                Gdx.app.error("SPRITES","Unable to load Warrant Spire sprite: "+bossPath,error);
-            }
-        }
+        // Optional boss artwork is also loaded on first real appearance.
+        // All originals retain their complete source-pixel dimensions.
         // A full artwork release may NOT silently substitute colored geometric
         // hulls for a missing PNG. The 200v200 verification previously accepted
         // 333 sprites while ignoring 67 missing Terran ships.
         for(Battle.Faction faction:Battle.Faction.values())
             if(faction==Battle.Faction.TERRAN||FactionArt.supports(faction)||FactionArt.hasLegacyArt(faction))
                 for(Shipyard.Hull hull:Shipyard.Hull.values())
-                    if(texture(faction,hull)==null)
+                    if(!hasHull(faction,hull))
                         throw new IllegalStateException(
                                 "Approved combat ship sprite missing from packaged assets: "+
                                 faction+"/"+hull);
@@ -507,13 +508,81 @@ public final class TerranPlaceholderSprites implements Disposable {
     public int damageLayersBuilt() { return damagedLayers.size()+severeLayers.size(); }
 
     public int loaded() {
+        // Number of valid source-art assignments, not resident GL textures.
         int count=0;
-        for(var fleet:textures.values())count+=fleet.size();
+        for(var fleet:assetPaths.values())count+=fleet.size();
         return count;
     }
+    private Texture acquire(String path){
+        if(path==null||unavailable.contains(path))return null;
+        Texture image=resident.get(path);
+        if(image==null){
+            try{
+                // Actual GPU mip levels; close-up remains the original RGBA PNG.
+                image=new Texture(Gdx.files.internal(path),true);
+                image.setFilter(Texture.TextureFilter.MipMapLinearLinear,
+                        Texture.TextureFilter.Linear);
+                resident.put(path,image);
+                originals.put(image,path);
+                peakResidentOriginalTextures=Math.max(peakResidentOriginalTextures,resident.size());
+            }catch(RuntimeException failure){
+                unavailable.add(path);
+                Gdx.app.error("SHIP-TEXTURE","Original source art could not be uploaded: "+path,
+                        failure);
+                return null;
+            }
+        }
+        lastUsedFrame.put(path,artFrame);
+        return image;
+    }
     private Texture texture(Battle.Faction faction,Shipyard.Hull hull) {
-        var fleet=textures.get(faction);
-        return fleet==null?null:fleet.get(hull);
+        var paths=assetPaths.get(faction);
+        if(paths==null||hull==null)return null;
+        String path=paths.get(hull);
+        if(path==null)return null;
+        Texture result=acquire(path);
+        if(result!=null)textures.computeIfAbsent(faction,
+                key->new EnumMap<>(Shipyard.Hull.class)).put(hull,result);
+        return result;
+    }
+    /** Release every derived resource before destroying its original GL image. */
+    private void evict(String path,Texture image){
+        for(var fleet:textures.values())fleet.values().removeIf(t->t==image);
+        bossTextures.values().removeIf(t->t==image);
+        for(var it=peeled.entrySet().iterator();it.hasNext();){
+            Peel peel=it.next().getValue();
+            if(peel.original!=image)continue;
+            if(peel.overlay!=null)peel.overlay.dispose();
+            it.remove();
+        }
+        Texture damaged=damagedLayers.remove(image);
+        if(damaged!=null)damaged.dispose();
+        Texture severe=severeLayers.remove(image);
+        if(severe!=null)severe.dispose();
+        Texture[] shield=shieldSections.remove(image);
+        if(shield!=null)for(Texture sector:shield)if(sector!=null)sector.dispose();
+        Pixmap source=sourcePixels.remove(image);
+        if(source!=null)source.dispose();
+        alphaClouds.remove(image);
+        armorAnchors.remove(image);
+        surfaces.forget(image);
+        originals.remove(image);
+        lastUsedFrame.remove(path);
+        image.dispose();
+        retiredOriginalTextures++;
+    }
+    /** Called only after all SpriteBatches finish, never during drawing. */
+    private void trimIdleShipTextures(){
+        if(!boundedResidency||resident.size()<=MOBILE_MAX_SHIP_IMAGES)return;
+        var iterator=resident.entrySet().iterator();
+        while(resident.size()>MOBILE_MAX_SHIP_IMAGES&&iterator.hasNext()){
+            var entry=iterator.next();
+            // Do not force a reload every frame for fleets containing more
+            // distinct hulls than the cache budget; protect recent ship draws.
+            if(artFrame-lastUsedFrame.getOrDefault(entry.getKey(),artFrame)<90)continue;
+            iterator.remove();
+            evict(entry.getKey(),entry.getValue());
+        }
     }
     /** Retired hulls still retain their authentic faction art for post-mortem shards. */
     Texture sourceTexture(Battle.Faction faction,Shipyard.Hull hull){
@@ -687,7 +756,8 @@ public final class TerranPlaceholderSprites implements Disposable {
 
     /** Approved source artwork is the primary fitting canvas. */
     public boolean hasHull(Battle.Faction faction, Shipyard.Hull hull) {
-        return texture(faction,hull)!=null;
+        var paths=assetPaths.get(faction);
+        return hull!=null&&paths!=null&&paths.containsKey(hull);
     }
     public boolean drawPreview(SpriteBatch batch,Battle.Faction faction,Shipyard.Hull hull,
                                float centerX,float centerY,float maxWidth,float maxHeight) {
@@ -703,6 +773,11 @@ public final class TerranPlaceholderSprites implements Disposable {
     private Texture texture(Battle.Ship ship){
         if(ship==null)return null;
         Texture override=ship.campaignBossArt==null?null:bossTextures.get(ship.campaignBossArt);
+        if(override==null&&"warrant_spire".equals(ship.campaignBossArt) &&
+                Gdx.files.internal("ships/bosses/warrant_spire.png").exists()){
+            override=acquire("ships/bosses/warrant_spire.png");
+            if(override!=null)bossTextures.put("warrant_spire",override);
+        }
         return override!=null?override:ship.hullClass==null?null:texture(ship.faction,ship.hullClass);
     }
     /** True only when this living vessel has an actual image, never for unapproved alien sheets. */
@@ -719,7 +794,8 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
                        CombatViewBounds view,ShieldFxTimeline shieldFx) {
-        if(textures.isEmpty())return;
+        if(assetPaths.isEmpty())return;
+        artFrame++;
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
         // Upload damage masks outside the SpriteBatch; only changed quantized
         // armor cells rebuild. One damaged ship draws two hull quads, not 256.
@@ -859,6 +935,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                     com.badlogic.gdx.graphics.GL20.GL_ONE_MINUS_SRC_ALPHA);
         }
         batch.setShader(null);
+        trimIdleShipTextures();
     }
     private void drawShield(SpriteBatch batch,Battle.Ship ship,Texture original,
                             BattleRenderPoses.Pose pose,float width,float height,
@@ -907,6 +984,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         textures.clear();
         for(Texture image:bossTextures.values())if(disposed.add(image))image.dispose();
         bossTextures.clear();
+        for(Texture image:resident.values())if(disposed.add(image))image.dispose();
+        resident.clear();lastUsedFrame.clear();assetPaths.clear();unavailable.clear();
         resetPeelCache();activeBattle=null;
         for(Texture[] sections:shieldSections.values())
             for(Texture sector:sections)if(sector!=null)sector.dispose();
