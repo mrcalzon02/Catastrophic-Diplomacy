@@ -40,6 +40,20 @@ public final class BattleRetreatTest {
                 "Full player evacuation did not concede the battlefield");
         ok(ship.commandQueue.nextIndex()==0,"Escaped vessel executed abandoned movement queue");
 
+        // Cautious battle orders must order a real extraction BEFORE a damaged
+        // captain can burn its last fuel fleeing thousands of units away.
+        Battle cautious=Battle.duel(994,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
+        Battle.Ship cautiousHull=cautious.ships().get(0);
+        cautiousHull.x=52;cautiousHull.y=315;
+        cautious.setShipOrders(cautiousHull.id,BattleOrders.DEFAULT
+                .withPosition(BattleOrders.Position.CAUTIOUS).withRetreat(.65));
+        cautiousHull.hull=cautiousHull.maxHull*.42;
+        cautious.step();
+        ok(cautiousHull.withdrawing&&cautiousHull.withdrawalTick==1,
+                "Cautious low-hull officer continued runaway search instead of real retreat");
+        escapes(cautious,cautiousHull,800);
+        ok(cautious.destroyed(0)==0,"Cautious extraction fabricated a ship destruction");
+
         Battle rightBattle=Battle.duel(992,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship right=rightBattle.ships().get(1);
         right.x=1238;right.y=320;

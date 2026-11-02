@@ -1105,7 +1105,14 @@ public final class Battle {
             }
             // Retreat overrides waypoint queues and navigation doctrines.
             // Recharge/repair cannot reverse a committed escape under fire.
-            if(s.withdrawing||(s.standingOrders!=null&&s.standingOrders.mustWithdraw(s))) {
+            // CAUTIOUS's hull threshold is an actual withdraw order, not an
+            // endless powered flight away from the enemy until fuel runs dry.
+            // Once committed, use the same real rear-boundary extraction as
+            // explicit captain standing orders; it never fabricates an escape.
+            boolean cautiousRetreat=s.orders.position()==BattleOrders.Position.CAUTIOUS
+                    &&s.hull<s.maxHull*s.orders.retreatAtHullFraction();
+            if(s.withdrawing||cautiousRetreat||
+                    (s.standingOrders!=null&&s.standingOrders.mustWithdraw(s))) {
                 if(!s.withdrawing) {
                     s.withdrawing=true;
                     s.withdrawalTick=tick;
@@ -1573,7 +1580,7 @@ public final class Battle {
             case HOLD -> {
                 ship.vx*=0.82;ship.vy*=0.82;
                 ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
-        ship.fuel=Math.max(0,ship.fuel-StrictMath.hypot(ship.vx,ship.vy)*DT*.018);
+                // Unpowered inertia costs no thrust propellant.
                 ship.commandQueue.tickTimed();
                 return true;
             }
@@ -1611,13 +1618,6 @@ public final class Battle {
         if(orders.position()==BattleOrders.Position.HOLD){
             ship.vx*=0.82;ship.vy*=0.82;
             ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
-            return;
-        }
-        if(orders.position()==BattleOrders.Position.CAUTIOUS &&
-                ship.hull<ship.maxHull*orders.retreatAtHullFraction()){
-            double dx=ship.x-target.x,dy=ship.y-target.y;
-            double length=StrictMath.max(1,StrictMath.hypot(dx,dy));
-            steerToward(ship,ship.x+dx/length*400,ship.y+dy/length*400);
             return;
         }
         Ship dedicated=findShip(ship.escortShipId);
