@@ -30,10 +30,11 @@ public final class CampaignShipyardRules {
             Shipyard.Installed installed=design.at(i);
             if(installed==null)continue;
             String subsystem=installed.component.substring(installed.component.lastIndexOf('-')+1);
-            if(researchRank<Math.max(SensingVariantCatalog.requiredTier(subsystem),
-                    SurvivalHardwareCatalog.requiredTier(subsystem)))
+            int hardwareTier=Math.max(SensingVariantCatalog.requiredTier(subsystem),
+                    SurvivalHardwareCatalog.requiredTier(subsystem));
+            if(researchRank<hardwareTier)
                 throw new IllegalArgumentException("Hardware "+subsystem+
-                        " requires engineering tier "+SensingVariantCatalog.requiredTier(subsystem));
+                        " requires engineering tier "+hardwareTier);
             for(int stage:installed.stages().values())
                 if(stage>researchRank)
                     throw new IllegalArgumentException("Module "+(i+1)+
