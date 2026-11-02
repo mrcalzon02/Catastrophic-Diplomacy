@@ -87,7 +87,7 @@ public final class ShipStandingOrdersTest {
         // Rebuild authentic older files with their own valid SHA-256
         // checksums: a label-only substitution would correctly be rejected.
         for(int previous=1;previous<=2;previous++){
-            String[] rows=resourceSave.split("\\n");
+            String[] rows=resourceSave.split("\\n",-1);
             StringBuilder older=new StringBuilder("CD-STANDING-").append(previous)
                     .append('\n').append("TERRAN").append('\n');
             int fields=previous==1?14:24;
