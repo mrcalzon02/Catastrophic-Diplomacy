@@ -55,3 +55,13 @@ The continuous functional release gates on catalog, mission-economy, campaign
 technology, shipyard lineage and skirmish technology tests in addition to
 combat, multiplayer, and install/runtime tests. Hardware and performance are
 not certified by a passing simulator test.
+
+## Forty-eight additional survival lineages
+
+The twelve survival roots each have four separate fitted alternatives
+throughout all eleven civilizations. The complete catalog, including the
+existing dumbfire rocket families, now targets **1,672 physical components**
+and **60,192 research entries** (1,672 × 4 exclusive branches × 9 stages).
+The additional survival research is generated lazily, protecting Android's
+startup heap while keeping independent IDs, cost, prerequisites and per-socket
+branch choices. License milestones and hull availability are unchanged.
