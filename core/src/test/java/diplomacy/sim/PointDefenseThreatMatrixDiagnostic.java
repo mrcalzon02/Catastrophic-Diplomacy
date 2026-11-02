@@ -63,7 +63,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
             return FighterModel.Hull.valueOf(name().substring("FIGHTER_".length()));
         }
     }
-    private record Result(Threat threat,int pdTier,int pdMounts,int seed,
+    private record Result(Threat threat,int pdTier,int pdMounts,int separation,int seed,
             BattleOrders.PointDefense mode,int shots,int primaryLaunched,
             int primaryIntercepted,int terminalEntries,int primaryHits,
             int decoysLaunched,int decoysIntercepted,int childrenLaunched,
@@ -73,8 +73,8 @@ public final class PointDefenseThreatMatrixDiagnostic {
             double pdTracking,double pdRange) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
-                threat,pdTier,pdMounts,seed,mode,shots,primaryLaunched,
+                "%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
+                threat,pdTier,pdMounts,separation,seed,mode,shots,primaryLaunched,
                 primaryIntercepted,terminalEntries,primaryHits,decoysLaunched,
                 decoysIntercepted,childrenLaunched,carrierSplits,
                 secondaryLaunched,secondaryIntercepted,secondaryHits,craftLost,fighterShots,
@@ -112,6 +112,13 @@ public final class PointDefenseThreatMatrixDiagnostic {
     }
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode){
+        return run(catalog,threat,tier,mounts,seed,pdMode,390);
+    }
+    private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
+                              int mounts,int seed,BattleOrders.PointDefense pdMode,
+                              int separation){
+        if(separation!=220&&separation!=390)
+            throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
                 threat.ordinal()*193L);
         Battle.Ship attacker;
@@ -121,7 +128,8 @@ public final class PointDefenseThreatMatrixDiagnostic {
         }else{
             attacker=battle.addShip(0,Battle.Faction.TERRAN,180,330);
         }
-        battle.spawnWing(1,pdFitting(catalog,tier,mounts),catalog,1,570,330);
+        battle.spawnWing(1,pdFitting(catalog,tier,mounts),catalog,1,
+                180+separation,330);
         Battle.Ship defender=battle.ships().get(1);
         battle.registerDiagnosticStationaryTarget(defender.id);
         battle.setShipOrders(defender.id,BattleOrders.DEFAULT.withPointDefense(pdMode));
@@ -262,7 +270,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 "Decoy event count not equal to real physical launches");
         require(decoyKills<=decoys&&primaryIntercepts<=primary,
                 "Invalid interceptor accounting for "+threat);
-        return new Result(threat,tier,mounts,seed,pdMode,pdShots,primary,
+        return new Result(threat,tier,mounts,separation,seed,pdMode,pdShots,primary,
                 primaryIntercepts,terminalCount,primaryImpacts,decoys,decoyKills,
                 battle.submunitionsDeployed,battle.carriersSplit,secondary,
                 secondaryIntercepts,secondaryHits,craftKilled,fighterShots,spent,
@@ -274,24 +282,25 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Path output=Path.of("test-output","pd-interception-matrix");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
-        csv.add("threat,pd_rank,pd_mounts,seed,pd_mode,pd_shots,launched,intercepted,terminal_entries,impacts,decoys,decoys_intercepted,children_launched,carriers_split,secondary_launched,secondary_intercepted,secondary_hits,craft_lost,fighter_shots,paid_units,protection_loss,power_spent_net,heat_peak,pd_tracking,pd_range");
+        csv.add("threat,pd_rank,pd_mounts,launch_distance,seed,pd_mode,pd_shots,launched,intercepted,terminal_entries,impacts,decoys,decoys_intercepted,children_launched,carriers_split,secondary_launched,secondary_intercepted,secondary_hits,craft_lost,fighter_shots,paid_units,protection_loss,power_spent_net,heat_peak,pd_tracking,pd_range");
         StringBuilder summary=new StringBuilder("# Full point-defense interception matrix\n\n");
         summary.append("All results are measured in real headless 30 Hz Battle simulation. ")
                 .append("The ship-launched projectile test source is a legacy fixture; ")
                 .append("defenders use real installed research-tier PD modules. ")
                 .append("Every seed has a paired no-PD control using the same installed hardware with HOLD_FIRE. ")
                 .append("Balance outcomes never block release.\n\n");
-        summary.append("|Threat|PD tier|Mounts|Trials|Launched|Intercepted|Intercept %|90-unit entries|Impact|PD shots|No-PD impacts|\n");
-        summary.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        summary.append("|Threat|Range|PD tier|Mounts|Trials|Launched|Intercepted|Intercept %|90-unit entries|Impact|PD shots|No-PD impacts|\n");
+        summary.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         int cases=0;
         for(Threat threat:Threat.values())
+            for(int separation:threat.craft()?new int[]{220,390}:new int[]{390})
             for(int rank:new int[]{0,9})
                 for(int mounts:new int[]{1,4}){
                     int fired=0,intercepts=0,entries=0,impacts=0,shots=0,
                             baselineImpact=0;
                     for(int seed=0;seed<2;seed++){
                         Result sample=run(catalog,threat,rank,mounts,seed,
-                                BattleOrders.PointDefense.BALANCED);
+                                BattleOrders.PointDefense.BALANCED,separation);
                         csv.add(sample.csv());cases++;
                         fired+=sample.primaryLaunched;
                         intercepts+=threat.craft()?sample.craftLost:sample.primaryIntercepted;
@@ -302,14 +311,14 @@ public final class PointDefenseThreatMatrixDiagnostic {
                         // offline-PD control, so raw impacts have the same
                         // denominator and can be compared directly.
                         Result control=run(catalog,threat,rank,mounts,seed,
-                                BattleOrders.PointDefense.HOLD_FIRE);
+                                BattleOrders.PointDefense.HOLD_FIRE,separation);
                         csv.add(control.csv());cases++;
                         baselineImpact+=threat.craft()?control.secondaryHits:control.primaryHits;
                     }
                     double interception=fired==0?0:100.0*intercepts/fired;
                     summary.append(String.format(Locale.ROOT,
-                            "|%s|%d|%d|2|%d|%d|%.1f%%|%d|%d|%d|%d|\n",
-                            threat,rank,mounts,fired,intercepts,interception,
+                            "|%s|%d|%d|%d|2|%d|%d|%.1f%%|%d|%d|%d|%d|\n",
+                            threat,separation,rank,mounts,fired,intercepts,interception,
                             entries,impacts,shots,baselineImpact));
                 }
         // Tactical PD orders must select the real physical target class.
