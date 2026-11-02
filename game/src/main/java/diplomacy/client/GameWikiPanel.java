@@ -37,10 +37,13 @@ final class GameWikiPanel {
         String previous=chosen==null?null:chosen.id;
         hits=catalog.search(GameWikiCatalog.CATEGORIES[category],query);
         chosen=null;
-        for(GameWikiCatalog.Article candidate:hits)
-            if(candidate.id.equals(previous)){chosen=candidate;break;}
+        int chosenIndex=0;
+        if(previous!=null)for(int i=0;i<hits.size();i++){
+            GameWikiCatalog.Article candidate=hits.get(i);
+            if(candidate.id.equals(previous)){chosen=candidate;chosenIndex=i;break;}
+        }
         if(chosen==null&&!hits.isEmpty())chosen=hits.get(0);
-        listPage=chosen==null?0:Math.max(0,hits.indexOf(chosen)/ROWS);
+        listPage=chosen==null?0:chosenIndex/ROWS;
         scroll=0;buildText();
     }
     void setQuery(String text){
@@ -140,8 +143,11 @@ final class GameWikiPanel {
         box(shapes,440,105,810,401,PANEL);
         for(int i=0;i<ROWS;i++){
             int idx=listPage*ROWS+i;
-            if(idx<hits.size())box(shapes,35,462-i*49,375,44,
-                    hits.get(idx)==chosen?EDGE:BG);
+            if(idx<hits.size()){
+                GameWikiCatalog.Article entry=hits.get(idx);
+                box(shapes,35,462-i*49,375,44,
+                        chosen!=null&&entry.id.equals(chosen.id)?EDGE:BG);
+            }
         }
         for(int i=0;i<4;i++){
             int x=switch(i){case 0->35;case 1->235;case 2->455;default->1065;};
@@ -165,11 +171,12 @@ final class GameWikiPanel {
         for(int row=0;row<ROWS;row++){
             int idx=listPage*ROWS+row;
             if(idx>=hits.size())break;
-            String name=hits.get(idx).title;
+            GameWikiCatalog.Article entry=hits.get(idx);
+            String name=entry.title;
             int max=mobile?29:36;
             if(name.length()>max)name=name.substring(0,max-2)+"..";
             label(batch,font,name,45,491-row*49,
-                    hits.get(idx)==chosen?ACCENT:Color.WHITE);
+                    chosen!=null&&entry.id.equals(chosen.id)?ACCENT:Color.WHITE);
         }
         label(batch,font,"RESULTS "+hits.size()+" / "+catalog.size(),45,117,MUTED);
         if(chosen==null){
