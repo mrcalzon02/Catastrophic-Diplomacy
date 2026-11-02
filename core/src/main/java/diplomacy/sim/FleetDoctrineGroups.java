@@ -35,7 +35,7 @@ public final class FleetDoctrineGroups {
                     common.fighterMission(),
                     own.defendSlots(),own.escortSlot(),common.escortRange());
             revised.put(slot,new ShipStandingOrders(leader.tactics(),leader.aggression(),
-                    leader.caution(),leader.shieldWithdrawPercent(),combined));
+                    leader.caution(),leader.shieldWithdrawPercent(),combined,leader.resources()));
         }
         // Build once: atomic validation of every policy, relationship, fleet
         // position and old movement queue, even for a full 200-ship group.
