@@ -328,7 +328,8 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-boot-timeout: 1200
-          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -camera-back none
+          # Emulator 37+ deprecates swiftshader_indirect; request its supported SwiftShader backend.
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader -camera-back none
           # android-emulator-runner invokes each script line in a separate sh -c.
           # Installation retries transient ADB transport failures; actual APK and game failures remain blocking.
           script: |
