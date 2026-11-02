@@ -30,6 +30,7 @@ public final class CombatShipStatusTest {
         s.power=80;s.ecmCondition=1;
         s.opticalSignature=.35;s.thermalSignature=.52;
         s.hologramNoise=.65;s.infraredRange=580;s.xrayRange=600;
+        s.holoSeekersDiverted=7;s.holoShotsDiverted=12;
         s.escapePods=12;s.recoveryBeacon=true;
         s.hazardInstability=.4;s.hazardFailures=3;
         s.lastFaultOrigin=diplomacy.tech.SurvivalHardwareCatalog.BATTERY_BRICK;
@@ -37,6 +38,7 @@ public final class CombatShipStatusTest {
         check(equipment.contains("OPTICAL CLOAK") &&
                 equipment.contains("THERMAL STEALTH") &&
                 equipment.contains("HOLO CONTACTS 3") &&
+                equipment.contains("SPOOFED 7 SEEKERS / 12 SHOTS") &&
                 equipment.contains("IR SCAN") &&
                 equipment.contains("X-RAY SCAN") &&
                 equipment.contains("PODS 12") &&

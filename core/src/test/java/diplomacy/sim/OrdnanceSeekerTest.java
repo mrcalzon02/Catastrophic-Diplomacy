@@ -110,6 +110,8 @@ public final class OrdnanceSeekerTest {
                 "Live autonomous missile salvos never acquired a real false contact");
         check(diverted.targetId==target.id&&diverted.seekerLocked,
                 "Hologram must fool the original lock, not fabricate a second target hull");
+        check(target.holoSeekersDiverted>0,
+                "Real redirected seekers must affect the actual tactical counter");
         check(StrictMath.hypot(diverted.lastKnownX-target.x,
                 diverted.lastKnownY-target.y)>25,
                 "Real projectile guidance must be fed the hologram's world position");

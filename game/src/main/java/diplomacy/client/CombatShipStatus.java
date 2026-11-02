@@ -22,6 +22,10 @@ final class CombatShipStatus {
         if(ship.thermalSignature<.98)status.append("THERMAL STEALTH  ");
         if(DeceptionProjection.falseContacts(ship)>0)
             status.append("HOLO CONTACTS ").append(DeceptionProjection.falseContacts(ship)).append("  ");
+        if(ship.holoSeekersDiverted+ship.holoShotsDiverted>0)
+            status.append("SPOOFED ").append(ship.holoSeekersDiverted)
+                    .append(" SEEKERS / ").append(ship.holoShotsDiverted)
+                    .append(" SHOTS  ");
         if(ship.infraredRange>0)status.append("IR SCAN  ");
         if(ship.xrayRange>0)status.append("X-RAY SCAN  ");
         if(ship.graviticRange>0)status.append("GRAV SCAN  ");

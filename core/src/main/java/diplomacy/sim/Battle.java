@@ -118,6 +118,9 @@ public final class Battle {
         public double infraredRange,xrayRange,graviticRange;
         public double thermalSignature=1,opticalSignature=1,sensorAcuity=1;
         public double hologramNoise;
+        /** Actual kinetic, beam and fighter shots and physical guided seekers
+         * fooled by this emitter, not fictional effects counters. */
+        public int holoShotsDiverted,holoSeekersDiverted;
         /** Fitted crew, command, fuel, magazine, rescue and unsafe engineering. */
         public double crewProtection,commandProtection,fuelProtection,magazineContainment;
         /** Fractional physical loss carries across hits; small ammo stores
@@ -1834,6 +1837,7 @@ public final class Battle {
             if(!landed){
                 int phantoms=DeceptionProjection.falseContacts(target);
                 if(phantoms>0){
+                    target.holoShotsDiverted++;
                     // Failed electronic lock traces the actual visible
                     // holographic contact, not an unrelated fake hit marker.
                     int phantom=(int)Math.floorMod(shotId,phantoms);
@@ -1893,6 +1897,7 @@ public final class Battle {
             if(!onTarget){
                 int phantoms=DeceptionProjection.falseContacts(target);
                 if(phantoms>0){
+                    target.holoShotsDiverted++;
                     int phantom=(int)Math.floorMod(shotId,phantoms);
                     angle=StrictMath.atan2(
                             DeceptionProjection.ghostY(target,phantom,tick)-muzzle.y(),
@@ -1919,6 +1924,7 @@ public final class Battle {
             if(!landed){
                 int phantoms=DeceptionProjection.falseContacts(target);
                 if(phantoms>0){
+                    target.holoShotsDiverted++;
                     // Failed electronic lock traces the actual visible
                     // holographic contact, not an unrelated fake hit marker.
                     int phantom=(int)Math.floorMod(shotId,phantoms);
@@ -1952,6 +1958,7 @@ public final class Battle {
             if(!landed){
                 int phantoms=DeceptionProjection.falseContacts(target);
                 if(phantoms>0){
+                    target.holoShotsDiverted++;
                     // Failed electronic lock traces the actual visible
                     // holographic contact, not an unrelated fake hit marker.
                     int phantom=(int)Math.floorMod(shotId,phantoms);
@@ -2602,6 +2609,7 @@ public final class Battle {
             if(random.nextDouble()>accuracy){
                 int ghosts=target==null?0:DeceptionProjection.falseContacts(target);
                 if(ghosts>0){
+                    target.holoShotsDiverted++;
                     int index=(int)Math.floorMod(shot,ghosts);
                     heading=StrictMath.atan2(
                             DeceptionProjection.ghostY(target,index,tick)-craft.y,
@@ -2624,6 +2632,7 @@ public final class Battle {
             if(!landed&&target!=null){
                 int ghosts=DeceptionProjection.falseContacts(target);
                 if(ghosts>0){
+                    target.holoShotsDiverted++;
                     int index=(int)Math.floorMod(shot,ghosts);
                     beamX=DeceptionProjection.ghostX(target,index,tick);
                     beamY=DeceptionProjection.ghostY(target,index,tick);
@@ -3108,6 +3117,8 @@ public final class Battle {
             if(m.seekerLocked){
                 int phantom=DeceptionProjection.seekerGhostIndex(
                         target,m.visualId,m.flightTicks,m.guidanceQuality);
+                if(phantom>=0&&phantom!=m.falseContactIndex)
+                    target.holoSeekersDiverted++;
                 m.falseContactIndex=phantom;
                 if(phantom>=0){
                     // The same physical decoy world-position the renderer
@@ -3366,6 +3377,8 @@ public final class Battle {
             hash=mix(hash,s.hazardFailures);
             hash=mix(hash,s.unsafeFlags);
             hash=mix(hash,s.lastFaultOrigin);
+            hash=mix(hash,s.holoShotsDiverted);
+            hash=mix(hash,s.holoSeekersDiverted);
             hash=mix(hash,s.lastHazardTick);
             hash=mix(hash,s.lastRepairTick);
             hash=mix(hash,s.recoveryBeaconActivated?1:0);
