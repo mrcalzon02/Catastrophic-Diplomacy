@@ -195,3 +195,35 @@ jobs:
           path: test-output/armor-observation/individual/kinetic-heavy-pristine/
           if-no-files-found: warn
           retention-days: 30
+      - name: Downloadable kinetic-aureate original-faction control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-aureate-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-aureate/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-aureate-pristine original-faction control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-aureate-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-aureate-pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-zelthar original-faction control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-zelthar-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-zelthar/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable kinetic-zelthar-pristine original-faction control
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-kinetic-zelthar-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/kinetic-zelthar-pristine/
+          if-no-files-found: warn
+          retention-days: 30
