@@ -21,7 +21,10 @@ public final class DirectionalDefense {
         private double armor, maxArmor, structure, maxStructure;
         /** An actual collision point. Splash-neighbor erosion is NOT a hit. */
         private boolean directImpact;
+        /** Last actual weapon family at this cell; never inferred from splash. */
+        private Battle.DamageType impactType;
         public boolean directImpact(){return directImpact;}
+        public Battle.DamageType impactType(){return impactType;}
         private Tile(Facing zone, int col, int r, boolean valid) {
             facing=zone; column=col; row=r; occupied=valid;
         }
@@ -191,7 +194,7 @@ public final class DirectionalDefense {
                     tile.armor+restored*gap/missing);
             if(tile.armor>=tile.maxArmor-1e-8 &&
                     tile.structure>=tile.maxStructure-1e-8)
-                tile.directImpact=false;
+                {tile.directImpact=false;tile.impactType=null;}
         }
         return restored;
     }
@@ -252,7 +255,9 @@ public final class DirectionalDefense {
         t.structure-=tileLoss;
         // One physical strike => ONE appearance anchor, not a crater on each
         // splash-damaged neighbor. The actual mechanical erosion is unchanged.
-        if(armorUsed>1e-10||tileLoss>1e-10)t.directImpact=true;
+        if(armorUsed>1e-10||tileLoss>1e-10){
+            t.directImpact=true;t.impactType=kind;
+        }
         return new Impact(facing,t.column,t.row,shieldUsed,armorUsed,structural,tileLoss);
     }
     /**
@@ -310,7 +315,9 @@ public final class DirectionalDefense {
         }
         // The splash still consumes armor across all its real tiles, but it
         // records only the physical impact center for visual crater placement.
-        if(armorUsed>1e-10||tileLoss>1e-10)center.directImpact=true;
+        if(armorUsed>1e-10||tileLoss>1e-10){
+            center.directImpact=true;center.impactType=kind;
+        }
         return new Impact(facing,center.column,center.row,
                 shieldUsed,armorUsed,structural,tileLoss);
     }
@@ -328,10 +335,12 @@ public final class DirectionalDefense {
      */
     private static final int LEGACY_INTEGRITY_BYTES=4*8+GRID*GRID*2*8;
     private static final int MARK_BYTES=GRID*GRID/8;
+    private static final int TYPE_BYTES=GRID*GRID;
     public String saveIntegrity(){
-        // Retain exactly the old integrity payload prefix for old-save
-        // compatibility; append one bit per actual physical impact center.
-        java.nio.ByteBuffer b=java.nio.ByteBuffer.allocate(LEGACY_INTEGRITY_BYTES+MARK_BYTES)
+        // Old integrity and impact-bit prefixes are byte-for-byte preserved.
+        // The new tail records the LAST actual damage family at each struck
+        // cell, without reconstructing a fictional family from armor erosion.
+        java.nio.ByteBuffer b=java.nio.ByteBuffer.allocate(LEGACY_INTEGRITY_BYTES+MARK_BYTES+TYPE_BYTES)
                 .order(java.nio.ByteOrder.BIG_ENDIAN);
         for(Zone zone:zones)b.putDouble(zone.shield);
         for(Tile[] row:tiles)for(Tile tile:row){
@@ -342,6 +351,11 @@ public final class DirectionalDefense {
             if(tiles[r][c].directImpact)
                 marks[(r*GRID+c)/8]|=1<<((r*GRID+c)%8);
         b.put(marks);
+        for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++){
+            Tile tile=tiles[r][c];
+            b.put((byte)(tile.directImpact&&tile.impactType!=null
+                    ?tile.impactType.ordinal()+1:0));
+        }
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(b.array());
     }
     public void restoreIntegrity(String packed){
@@ -350,7 +364,8 @@ public final class DirectionalDefense {
         try{data=java.util.Base64.getUrlDecoder().decode(packed);}
         catch(IllegalArgumentException malformed){throw new IllegalArgumentException("Invalid integrity encoding",malformed);}
         if(data.length!=LEGACY_INTEGRITY_BYTES &&
-                data.length!=LEGACY_INTEGRITY_BYTES+MARK_BYTES)
+                data.length!=LEGACY_INTEGRITY_BYTES+MARK_BYTES &&
+                data.length!=LEGACY_INTEGRITY_BYTES+MARK_BYTES+TYPE_BYTES)
             throw new IllegalArgumentException("Incorrect integrity image length");
         java.nio.ByteBuffer b=java.nio.ByteBuffer.wrap(data).order(java.nio.ByteOrder.BIG_ENDIAN);
         double[] shieldValues=new double[4],armorValues=new double[GRID*GRID],structureValues=new double[GRID*GRID];
@@ -369,12 +384,23 @@ public final class DirectionalDefense {
         for(Tile[] row:tiles)for(Tile tile:row){
             tile.armor=armorValues[n];tile.structure=structureValues[n];
             tile.directImpact=false;
+            tile.impactType=null;
             n++;
         }
         if(data.length>LEGACY_INTEGRITY_BYTES){
             for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++)
                 tiles[r][c].directImpact=(data[LEGACY_INTEGRITY_BYTES+(r*GRID+c)/8]
                         &(1<<((r*GRID+c)%8)))!=0;
+            if(data.length==LEGACY_INTEGRITY_BYTES+MARK_BYTES+TYPE_BYTES)
+                for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++){
+                    int encoded=data[LEGACY_INTEGRITY_BYTES+MARK_BYTES+r*GRID+c]&255;
+                    if(encoded>Battle.DamageType.values().length)
+                        throw new IllegalArgumentException("Unknown saved impact weapon family");
+                    Tile t=tiles[r][c];
+                    if(encoded!=0&&!t.directImpact)
+                        throw new IllegalArgumentException("Saved weapon family without real impact anchor");
+                    t.impactType=encoded==0?null:Battle.DamageType.values()[encoded-1];
+                }
         }else{
             // Old saves do not contain collision coordinates. Infer one
             // representative center per connected damaged region, NOT one
@@ -419,6 +445,7 @@ public final class DirectionalDefense {
         for(Tile[] row:tiles)for(Tile tile:row){
             tile.armor=tile.maxArmor;tile.structure=tile.maxStructure;
             tile.directImpact=false;
+            tile.impactType=null;
         }
     }
 
@@ -432,6 +459,7 @@ public final class DirectionalDefense {
         for(Tile[] line:tiles)for(Tile t:line)if(t.occupied) {
             hash=mix(hash,t.armor);hash=mix(hash,t.structure);
             hash=mix(hash,t.directImpact?1.0:0.0);
+            hash=mix(hash,t.impactType==null?0:t.impactType.ordinal()+1);
         }
         return hash;
     }

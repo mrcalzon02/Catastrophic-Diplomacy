@@ -64,25 +64,50 @@ public final class DirectionalDefenseTest {
         }
         ok(affected>1,"Fixture needs real mechanical splash spreading");
         ok(marked==1,"One weapon impact should produce one damage mark");
+        ok(splash.tile(strike.row(),strike.column()).impactType()==Battle.DamageType.LASER,
+                "The actual direct weapon family must be recorded");
         String persisted=splash.saveIntegrity();
         var reloaded=new DirectionalDefense(0,120,240);
         reloaded.restoreIntegrity(persisted);
         ok(reloaded.saveIntegrity().equals(persisted),
-                "Impact positions must persist alongside physical damage");
+                "Impact locations AND weapon families must survive save/load");
+        ok(reloaded.tile(strike.row(),strike.column()).impactType()==Battle.DamageType.LASER,
+                "Saved actual weapon provenance lost after reload");
         int bytes=4*8+16*16*2*8;
         byte[] old=java.util.Base64.getUrlDecoder().decode(persisted);
         String legacy=java.util.Base64.getUrlEncoder().withoutPadding()
                 .encodeToString(java.util.Arrays.copyOf(old,bytes));
+        // Last-generation saves carried directImpact bits but no type.
+        String oldMarks=java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(java.util.Arrays.copyOf(old,bytes+16*16/8));
+        var previous=new DirectionalDefense(0,120,240);
+        previous.restoreIntegrity(oldMarks);
+        ok(previous.tile(strike.row(),strike.column()).directImpact()&&
+                previous.tile(strike.row(),strike.column()).impactType()==null,
+                "Old impact-bit saves must preserve legacy untyped visual behavior");
         var restoredOld=new DirectionalDefense(0,120,240);
         restoredOld.restoreIntegrity(legacy);
         int inferred=0;
         for(int r=0;r<16;r++)for(int c=0;c<16;c++)
             if(restoredOld.tile(r,c).directImpact())inferred++;
         ok(inferred==1,"Legacy splash should infer ONE mark, not one per worn tile");
+        // Every supported family must survive a direct hit and restore.
+        for(Battle.DamageType family:Battle.DamageType.values()){
+            var sample=new DirectionalDefense(0,120,240);
+            var impact=sample.impactSplash(1,0,.25,.05,12,family,0,1.15);
+            var tile=sample.tile(impact.row(),impact.column());
+            ok(tile.directImpact()&&tile.impactType()==family,
+                    "Weapon family was not registered at the real hit center: "+family);
+            var clone=new DirectionalDefense(0,120,240);
+            clone.restoreIntegrity(sample.saveIntegrity());
+            ok(clone.tile(impact.row(),impact.column()).impactType()==family,
+                    "Weapon family changed after save/load: "+family);
+        }
         reloaded.overhaul();
         for(int r=0;r<16;r++)for(int c=0;c<16;c++)
-            ok(!reloaded.tile(r,c).directImpact(),
-                    "Overhaul must clear physical impact markers");
+            ok(!reloaded.tile(r,c).directImpact()&&
+                    reloaded.tile(r,c).impactType()==null,
+                    "Overhaul must clear physical impact markers AND weapon families");
         boolean rejected=false;
         try{d.addArmor(DirectionalDefense.Facing.AFT,Double.NaN);}
         catch(IllegalArgumentException ex){rejected=true;}
