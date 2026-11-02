@@ -440,3 +440,15 @@ Also corrected a failing diagnostic invariant: previously it checked the
 attacker's position AFTER legitimate combat AI movement, incorrectly
 labeling the initial bow-on test setup invalid. The initial firing alignment
 is now recorded before simulation and checked from its captured provenance.
+
+### Diagnostic shooter formation-offset correction
+
+The screenshot case still failed after recording the initial axis because
+`Battle.spawnWing()` applies a wing-formation offset to requested start
+coordinates. The deterministic forensic shooter for upper-panel cases is now
+explicitly placed at the target's x-coordinate and 190 world units forward
+**after spawning and before the first simulation tick**. The fitted gun
+still fires genuine projectiles with normal AI and weapon physics. Only the
+isolated screenshot scenario is repositioned; production fleet spawns are
+untouched. The pristine case additionally verifies the actual coordinates,
+and live-fire cases store the before-step axial start in their snapshot.

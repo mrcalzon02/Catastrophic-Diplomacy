@@ -161,7 +161,17 @@ final class ShipSurfaceDamageCapture {
             throw new IllegalStateException("Live-fire target must remain unarmed");
         if(index==1 && victim.maxShields<=0)
             throw new IllegalStateException("Shield contact diagnostic requires a physical fitted shield");
-        // Capture initial geometry, not the gun AI's later moving position.
+        // spawnWing() deliberately applies its own starting formation
+        // offsets, so merely requesting x=660 does NOT produce a true
+        // central firing lane. This repositioning is confined to the
+        // expendable screenshot diagnostic, before any Battle.step().
+        if(upperStrike){
+            gun.x=victim.x;
+            gun.y=victim.y-190;
+            gun.vx=gun.vy=0;
+        }
+        // Capture the resulting real initial pose, not the later position
+        // after the attacker's legitimate AI has moved during firing.
         final boolean axialAtSpawn=Math.abs(gun.x-victim.x)<.0001
                 &&gun.y<victim.y;
         gun.speed=0;gun.vx=gun.vy=0;

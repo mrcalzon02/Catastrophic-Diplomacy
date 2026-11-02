@@ -66,6 +66,12 @@ public final class ShipSurfaceDamageCaptureTest {
             if(i>=19)
                 check(scene.axialAtSpawn(),
                     "Upper-panel comparison must START on the true axial lane");
+            if(i>=19 && scene.ticks()==0){
+                var gun=scene.battle().ships().get(0);
+                check(Math.abs(gun.x-scene.target().x)<.0001 &&
+                        Math.abs(gun.y-(scene.target().y-190))<.0001,
+                        "Wing spawn offset wasn't removed before the pristine capture");
+            }
             if(i>=9){
                 diplomacy.sim.Battle.DamageType expected=switch(i){
                     case 9 -> diplomacy.sim.Battle.DamageType.PLASMA;
