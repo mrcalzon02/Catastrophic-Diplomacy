@@ -90,6 +90,24 @@ public final class RocketBarrageTest {
                 }
             }
         }
+        // Spawn-time catalog parsing must NOT multiply by 200 in fleet tests;
+        // actual mutable missile magazines must never be shared across hulls.
+        Battle wing=new Battle(70077L);
+        wing.spawnWing(0,mounted(tech,RocketBarrage.Size.LARGE),tech,2,240,310);
+        var firstRack=wing.ships().get(0).rocketRacks.get(0);
+        var secondRack=wing.ships().get(1).rocketRacks.get(0);
+        require(firstRack!=secondRack && firstRack.body==secondRack.body,
+                "Shared rocket artwork/specs must NOT share physical magazines");
+        firstRack.rounds--;
+        require(secondRack.rounds==RocketBarrage.Size.LARGE.magazine,
+                "One launcher's ammunition leaked into another fleet ship");
+        for(RocketBarrage.Size size:RocketBarrage.Size.values()){
+            require(RocketBarrage.acceleration(size,RocketBarrage.Motor.BOOST_COAST,.10)>0
+                    &&RocketBarrage.acceleration(size,RocketBarrage.Motor.BOOST_COAST,.70)==0
+                    &&RocketBarrage.acceleration(size,RocketBarrage.Motor.SUSTAINED_BURN,1.80)>0
+                    &&RocketBarrage.acceleration(size,RocketBarrage.Motor.SUSTAINED_BURN,2.60)==0,
+                    "Short burn and longer acceleration must have independent envelopes");
+        }
         // Both motors must accelerate in a straight line then coast forever
         // without guidance. The target can simply vacate the line of fire.
         for(RocketBarrage.Motor motor:RocketBarrage.Motor.values()){
