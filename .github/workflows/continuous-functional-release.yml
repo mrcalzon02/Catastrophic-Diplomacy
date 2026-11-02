@@ -1,7 +1,7 @@
-name: Release functional game on each commit
+# Full Windows/Linux/Android packages are built ONLY when explicitly
+# requested. Routine asset/armor/test commits must not schedule releases.
+name: Manual verified three-platform release
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
