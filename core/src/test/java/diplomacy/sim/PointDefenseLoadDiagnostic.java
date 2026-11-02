@@ -168,7 +168,7 @@ public final class PointDefenseLoadDiagnostic {
                 threat.ordinal()*971L+layout.ordinal()*61L+rank*11L+seed*3L;
         Battle battle=new Battle(randomSeed);
         List<Source> attackers=new ArrayList<>();
-        int attackShips=load==Load.INCIDENTAL?1:4;
+        int attackShips=load==Load.INCIDENTAL&&threat!=Threat.MIXED?1:4;
         if(threat==Threat.MIXED){
             Threat[] pattern={Threat.ROCKET_BOOST,Threat.MISSILE,
                     Threat.KINETIC,Threat.TORPEDO};
@@ -205,7 +205,7 @@ public final class PointDefenseLoadDiagnostic {
         int pdShots=0,previousCraftKills=0;double minPower=1,peakHeat=0;
         Set<Integer> craftTerminal=new HashSet<>();
         int activeTicks=load==Load.SUSTAINED?ACTIVE:
-                load==Load.INCIDENTAL?450:36;
+                load==Load.INCIDENTAL?600:36;
         int totalTicks=activeTicks+DRAIN;
         for(int tick=0;tick<totalTicks;tick++){
             for(int index=0;index<attackers.size();index++){
@@ -214,7 +214,8 @@ public final class PointDefenseLoadDiagnostic {
                 // offensive hardware to create the desired load schedule;
                 // all launched bodies remain real and continue flight.
                 boolean active=switch(load){
-                    case INCIDENTAL -> tick<450&&tick%150<12&&index==0;
+                    case INCIDENTAL -> tick<600&&tick%150<12&&
+                            index==(tick/150)%attackers.size();
                     case SURGE -> tick<36;
                     case SUSTAINED -> tick<ACTIVE;
                 };
