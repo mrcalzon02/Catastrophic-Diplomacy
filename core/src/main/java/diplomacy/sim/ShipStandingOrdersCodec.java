@@ -8,7 +8,8 @@ import java.util.TreeMap;
 
 /** Versioned, checksummed per-faction standing orders; never rewrites fleet blueprints. */
 public final class ShipStandingOrdersCodec {
-    private static final String MAGIC="CD-STANDING-2";
+    private static final String MAGIC="CD-STANDING-3";
+    private static final String PREVIOUS="CD-STANDING-2";
     private static final String LEGACY="CD-STANDING-1";
     private ShipStandingOrdersCodec(){}
     public record File(Battle.Faction faction,Map<Long,ShipStandingOrders> policies) {
@@ -39,14 +40,22 @@ public final class ShipStandingOrdersCodec {
                     .append(',').append(d.fighterMission()).append(',').append(d.escortSlot())
                     .append(',').append(d.escortRange());
             for(int defended:d.defendSlots())content.append(',').append(defended);
+            var resources=policy.resources();
+            content.append(',').append(resources.fireIntent())
+                    .append(',').append(resources.ammunition())
+                    .append(',').append(resources.rationStartPercent())
+                    .append(',').append(resources.reservePercent())
+                    .append(',').append(resources.minimumRounds())
+                    .append(',').append(resources.spacingTicks());
             content.append('\n');
         }
         return content.toString()+sha256(content.toString())+"\n";
     }
     public static File decode(String data){
-        if(data==null||data.length()>60000)throw new IllegalArgumentException("Oversized standing orders file");
+        if(data==null||data.length()>80000)throw new IllegalArgumentException("Oversized standing orders file");
         String[] lines=data.split("\n",-1);
-        if(lines.length<4||(!MAGIC.equals(lines[0])&&!LEGACY.equals(lines[0]))||
+        if(lines.length<4||(!MAGIC.equals(lines[0])&&!PREVIOUS.equals(lines[0])
+                &&!LEGACY.equals(lines[0]))||
                 !lines[lines.length-1].isEmpty())
             throw new IllegalArgumentException("Unsupported standing orders format");
         StringBuilder content=new StringBuilder();
@@ -59,7 +68,7 @@ public final class ShipStandingOrdersCodec {
             Map<Long,ShipStandingOrders> result=new TreeMap<>();
             for(int i=2;i<lines.length-2;i++){
                 String[] p=lines[i].split(",",-1);
-                if(p.length!=(MAGIC.equals(lines[0])?24:14))
+                if(p.length!=(MAGIC.equals(lines[0])?30:PREVIOUS.equals(lines[0])?24:14))
                     throw new IllegalArgumentException("Invalid doctrine field count");
                 long slot=Long.parseLong(p[0]);
                 if(((slot<0||slot>=200)&&!VesselIdentifiers.valid(slot))||result.containsKey(slot))
@@ -73,7 +82,7 @@ public final class ShipStandingOrdersCodec {
                         new BattleOrders.Engagement(Integer.parseInt(p[11]),Double.parseDouble(p[12])),
                         0,180,Double.parseDouble(p[13]));
                 ShipTacticalDirectives directives=ShipTacticalDirectives.DEFAULT;
-                if(p.length==24)
+                if(p.length>=24)
                     directives=new ShipTacticalDirectives(Integer.parseInt(p[14]),
                             ShipTacticalDirectives.InterceptStrategy.valueOf(p[15]),
                             ShipTacticalDirectives.DefenseScope.valueOf(p[16]),
@@ -81,8 +90,14 @@ public final class ShipStandingOrdersCodec {
                             java.util.List.of(Integer.parseInt(p[20]),Integer.parseInt(p[21]),
                                     Integer.parseInt(p[22]),Integer.parseInt(p[23])),
                             Integer.parseInt(p[18]),Integer.parseInt(p[19]));
+                ShipResourceOrders resource=ShipResourceOrders.DEFAULT;
+                if(p.length==30)resource=new ShipResourceOrders(
+                        ShipResourceOrders.FireIntent.valueOf(p[24]),
+                        ShipResourceOrders.AmmoPolicy.valueOf(p[25]),
+                        Integer.parseInt(p[26]),Integer.parseInt(p[27]),
+                        Integer.parseInt(p[28]),Integer.parseInt(p[29]));
                 result.put(slot,new ShipStandingOrders(orders,Integer.parseInt(p[1]),
-                        Integer.parseInt(p[2]),Integer.parseInt(p[3]),directives));
+                        Integer.parseInt(p[2]),Integer.parseInt(p[3]),directives,resource));
             }
             return new File(faction,result);
         }catch(RuntimeException malformed){
