@@ -98,6 +98,33 @@ public final class TechnologyCatalogTest {
                 }
             }
         }
+        // Enumerating the virtual catalog is used by the live field wiki.
+        // Its size, prerequisites and exact IDs must remain complete even
+        // though ranks VII–IX are now generated only when actually requested.
+        int enumerated=0,highestStages=0;
+        for(var entry:c.upgrades().entrySet()){
+            TechnologyCatalog.Upgrade upgrade=entry.getValue();
+            require(entry.getKey().equals(upgrade.id),
+                    "Virtual technology index returned the wrong ID");
+            if(upgrade.stage>=7){
+                highestStages++;
+                require(upgrade.prerequisite.endsWith(
+                        String.format(java.util.Locale.ROOT,"%02d",upgrade.stage-1)),
+                        "Virtual research lost its true direct prerequisite "+upgrade.id);
+                require(upgrade.researchCost>0&&upgrade.industryCost>0 &&
+                        c.get(upgrade.prerequisite)!=null,
+                        "Virtual upgrade has invalid cost or missing actual prerequisite");
+            }
+            enumerated++;
+        }
+        require(enumerated==c.upgradeCount() && highestStages==13200,
+                "Lazy technology enumeration missed or duplicated a stage");
+        TechnologyCatalog.Upgrade sixth=c.get("TECH-TER-KIN-OUTPUT-06");
+        TechnologyCatalog.Upgrade ninth=c.get("TECH-TER-KIN-OUTPUT-09");
+        require(ninth!=null && ninth.stage==9 &&
+                ninth.researchCost>sixth.researchCost &&
+                ninth.prerequisite.equals("TECH-TER-KIN-OUTPUT-08"),
+                "Evolved technology is not actually stronger/costlier or directly chained");
         boolean rejected = false;
         String badUpgrades = "Tech ID,Faction ID,Subsystem,Parallel Track,Stage,Rank Name,Prerequisite ID,Research,Industry,Mass ×,Power Draw ×,Heat ×,Effect ×,Accuracy ×,Integrity ×,Shield Capacity ×,Thrust ×,Cooling ×,Maintenance ×,Tradeoff\n"
                 + "TECH-TER-KIN-OUTPUT-01,TER,KIN,OUTPUT,1,Bad,BASE-NONEXISTENT,10,10,1,1,1,1,1,1,1,1,1,1,invalid\n";
