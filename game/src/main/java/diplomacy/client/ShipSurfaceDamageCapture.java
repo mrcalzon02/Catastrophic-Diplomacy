@@ -116,7 +116,11 @@ final class ShipSurfaceDamageCapture {
             default -> 0;
         };
         Battle battle=new Battle(seed);
-        battle.spawnWing(0,shooter,technology,1,380,360);
+        // Short-range plasma (245 world-unit base range) must begin within
+        // its actual firing envelope, unlike the 280-unit standard lane.
+        // We move only this disposable diagnostic firing lane; gun range,
+        // ship mobility and combat weapon mechanics are unchanged.
+        battle.spawnWing(0,shooter,technology,1,index==9?470:380,360);
         battle.spawnWing(1,targetDesign,technology,1,660,360);
         Battle.Ship gun=battle.ships().get(0),victim=battle.ships().get(1);
         if(gun.laserDamage+gun.kineticDamage+gun.missileDamage+

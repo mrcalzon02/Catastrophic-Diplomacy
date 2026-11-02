@@ -61,6 +61,8 @@ public final class ShipSurfaceDamageCaptureTest {
                     var tile=scene.target().defense.tile(row,col);
                     if(tile.directImpact()&&tile.impactType()==expected)found=true;
                 }
+                if(i==9)check(scene.hits()>0,
+                        "Plasma test must fire from within its genuine weapon range");
                 if(scene.hits()>0&&scene.wornCells()>0)
                     check(found,"Fitted weapon used wrong surface profile: "+scene.key());
             }
