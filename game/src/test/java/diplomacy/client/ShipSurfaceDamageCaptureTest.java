@@ -63,12 +63,9 @@ public final class ShipSurfaceDamageCaptureTest {
                 check(scene.target().faction==Battle.Faction.TERRAN,
                     "Kinetic pockmark review must use real broad Terran plating");
             }
-            if(i>=19){
-                var gun=scene.battle().ships().get(0);
-                check(Math.abs(gun.x-scene.target().x)<.0001 &&
-                        gun.y<scene.target().y,
-                        "Upper-panel impact comparison needs the same real axial firing approach");
-            }
+            if(i>=19)
+                check(scene.axialAtSpawn(),
+                    "Upper-panel comparison must START on the true axial lane");
             if(i>=9){
                 diplomacy.sim.Battle.DamageType expected=switch(i){
                     case 9 -> diplomacy.sim.Battle.DamageType.PLASMA;

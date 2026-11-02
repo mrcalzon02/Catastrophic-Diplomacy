@@ -103,8 +103,8 @@ public final class ShipSurfaceDamageVisualTest {
         // apparently pristine: the old pock's R/G/B all fell INSIDE a
         // physically transparent ~0.82-cell alpha cutout. Check effects
         // at a pixel that still has original plating after a full breach.
-        float outer=1.04f;
-        float outsideOpening=ShipArmorStamps.openingAt(8,8+outer,8,8,1,1,17);
+        float outer=.95f;
+        float outsideOpening=ShipArmorStamps.openingAt(8,9.04f,8,8,1,1,17);
         check(outsideOpening<.01f,"Fixture requires source plating OUTSIDE the armor hole");
         for(diplomacy.sim.Battle.DamageType family:new diplomacy.sim.Battle.DamageType[]{
                 diplomacy.sim.Battle.DamageType.KINETIC,
@@ -128,15 +128,48 @@ public final class ShipSurfaceDamageVisualTest {
         // Actual surviving plating immediately outside a deep crater MUST
         // retain a visible cooling oxide band; a laser is not a kinetic dent.
         int annealed=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
-                8,9.04f,8,8,1,1,17,0);
+                8,8.91f,8,8,1,1,17,0);
         check(ShipImpactProfiles.metal(annealed)>164&&ShipImpactProfiles.hot(annealed)>0,
                 "Surviving laser-heated plating lacks iridescent oxidation data");
         check(ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
                 8,9.30f,8,8,1,1,17,0)==0,
-                "Laser oxidation must not tint plating outside its 1.27-cell footprint");
+                "Laser oxidation must not tint plating outside its 1.05-cell footprint");
         check(ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
                 8,9.04f,8,8,0,0,17,0)==0,
                 "Laser oxide must not persist on a pristine ship");
+        // All single impacts stay compact; a torpedo and heavy kinetic
+        // deliberately retain a somewhat broader mechanical footprint.
+        for(diplomacy.sim.Battle.DamageType family:new diplomacy.sim.Battle.DamageType[]{
+                diplomacy.sim.Battle.DamageType.LASER,
+                diplomacy.sim.Battle.DamageType.MISSILE,
+                diplomacy.sim.Battle.DamageType.PLASMA,
+                diplomacy.sim.Battle.DamageType.PARTICLE,
+                diplomacy.sim.Battle.DamageType.FIGHTER})
+            check(ShipImpactProfiles.sample(family,8f,9.12f,8f,8f,1f,1f,17,0)==0,
+                    "Single hit too broad: "+family);
+        check(ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.TORPEDO,
+                8f,9.22f,8f,8f,1f,1f,17,0)==0,
+                "Torpedo blast reaches unrelated neighboring plating");
+        // Dense local material signatures must diverge for each weapon,
+        // even with equal damage and identical impact coordinates.
+        java.util.HashSet<Long> profiles=new java.util.HashSet<>();
+        for(diplomacy.sim.Battle.DamageType family:new diplomacy.sim.Battle.DamageType[]{
+                diplomacy.sim.Battle.DamageType.LASER,
+                diplomacy.sim.Battle.DamageType.KINETIC,
+                diplomacy.sim.Battle.DamageType.MISSILE,
+                diplomacy.sim.Battle.DamageType.TORPEDO,
+                diplomacy.sim.Battle.DamageType.PLASMA,
+                diplomacy.sim.Battle.DamageType.PARTICLE,
+                diplomacy.sim.Battle.DamageType.FIGHTER}){
+            long signature=0xcbf29ce484222325L;
+            for(float radius:new float[]{0f,.27f,.52f,.74f,.94f,1.04f}){
+                int pixel=ShipImpactProfiles.sample(family,8f,8f+radius,
+                        8f,8f,1f,1f,17,0f);
+                signature=(signature^pixel)*0x100000001b3L;
+            }
+            check(profiles.add(signature),
+                    "Weapon profiles indistinguishable: "+family);
+        }
         check(ShipSurfaceDamageVisual.blueCoefficient(1f,false)==.56f &&
                 ShipSurfaceDamageVisual.blueCoefficient(1f,true)==1f,
                 "Tagged laser oxide and kinetic metal must occupy different material ranges");

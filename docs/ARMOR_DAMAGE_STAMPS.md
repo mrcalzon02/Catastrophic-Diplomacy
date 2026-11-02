@@ -417,3 +417,26 @@ The oxide field's outer falloff shrinks to 1.17 cells (from 1.27) and its
 source-color blend softens, without modifying any damage physics. This
 is an actual-capture-driven cosmetic adjustment, not an approved final result;
 the new run must be inspected before evaluating the fix.
+
+### Compact per-impact footprints and distinct damage physics (November 2)
+
+The visible scorch from ONE direct LASER impact now reaches about 0.68
+armor grid cells, rather than 0.87; the permanent oil-sheen temper band
+fades by 1.05 cells, rather than 1.17. These represent about 39% less
+maximum scorch footprint by area before clipping to approved hull art.
+Genuine armor-hole size, structure exposure, alpha silhouette and gameplay
+physics remain unchanged; multiple hits retain their own direct centers.
+
+KINETIC is a cool punched hole with raised metallic fracture spokes (heavy
+strikes retain their extended broken lips). MISSILE is a small soot/fragment
+burst with only residual heat. TORPEDO retains a slightly larger, hotter and
+coarser spall pattern. PLASMA is a short directional melted scar without
+silver crack edges. PARTICLE produces a pinhole cluster. FIGHTER hits remain
+shallow and small. These effects reuse the original resolution albedo and
+96x144 material mask; no new effect texture, broad tint, or changes to combat
+values. All art tests remain nonblocking.
+
+Also corrected a failing diagnostic invariant: previously it checked the
+attacker's position AFTER legitimate combat AI movement, incorrectly
+labeling the initial bow-on test setup invalid. The initial firing alignment
+is now recorded before simulation and checked from its captured provenance.

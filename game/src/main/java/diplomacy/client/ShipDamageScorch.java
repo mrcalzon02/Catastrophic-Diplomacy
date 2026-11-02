@@ -11,7 +11,7 @@ final class ShipDamageScorch {
     /**
      * Three narrow burn bands (char, soot, fading heat) centered on ONE
      * physically damaged armor cell, in local 16x16 grid coordinates.
-     * Absolute maximum reach is below 0.9 cell; there is no hull-wide wash.
+     * Maximum reach is below 0.70 cell for a severe hit, without a hull-wide wash.
      * No allocation and no trigonometry in the damage-mask pixel loop.
      */
     static float falloffAt(float row,float col,float hitRow,float hitCol,
@@ -19,7 +19,7 @@ final class ShipDamageScorch {
         float severity=clamp(Math.max(armor,structure*.65f));
         if(severity<=0)return 0;
         float dx=col-hitCol,dy=row-hitRow;
-        float radius=(.24f+.63f*(float)StrictMath.sqrt(severity))*
+        float radius=(.21f+.47f*(float)StrictMath.sqrt(severity))*
                      (1f+.04f*Math.max(-.5f,Math.min(.5f,rough)));
         float unit=(float)StrictMath.sqrt(dx*dx+dy*dy)/Math.max(.01f,radius);
         if(unit>=1f)return 0;

@@ -30,7 +30,8 @@ final class ShipSurfaceDamageCapture {
     record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
                     int targetId,int ticks,int hits,double armorExposure,
                     double internalExposure,int wornCells,int exposedCells,
-                    boolean milestoneReached,boolean syntheticStress) {
+                    boolean milestoneReached,boolean syntheticStress,
+                    boolean axialAtSpawn) {
         Battle.Ship target(){
             for(Battle.Ship ship:battle.ships())
                 if(ship.id==targetId)return ship;
@@ -62,7 +63,8 @@ final class ShipSurfaceDamageCapture {
     }
     private static Snapshot record(String key,String weapon,long seed,
                                    Battle battle,Battle.Ship ship,
-                                   boolean reached,boolean stress) {
+                                   boolean reached,boolean stress,
+                                   boolean axialAtSpawn) {
         int worn=0,exposed=0;
         for(int r=0;r<DirectionalDefense.GRID;r++)
             for(int c=0;c<DirectionalDefense.GRID;c++){
@@ -73,7 +75,7 @@ final class ShipSurfaceDamageCapture {
             }
         return new Snapshot(key,weapon,ship.hullClass.name(),seed,battle,ship.id,
                 (int)battle.tick,battle.hitCount,maxArmor(ship),maxInterior(ship),
-                worn,exposed,reached,stress);
+                worn,exposed,reached,stress,axialAtSpawn);
     }
     static Snapshot create(TechnologyCatalog technology,int index){
         if(index<0||index>=KEYS.length)throw new IllegalArgumentException("Unknown armor case "+index);
@@ -82,7 +84,7 @@ final class ShipSurfaceDamageCapture {
             // Retain it so the workflow catches blocky-grid regressions.
             Battle stress=ShipSurfaceDamageFixture.create(technology);
             return record(KEYS[index],"KINETIC_GRID_STRESS",SEED,stress,
-                    stress.ships().get(2),true,true);
+                    stress.ships().get(2),true,true,false);
         }
         final String weapon=switch(index){
             case 3,7,12,13,14,15,16,17,18,19,20,21,22 -> "KINETIC";
@@ -159,6 +161,9 @@ final class ShipSurfaceDamageCapture {
             throw new IllegalStateException("Live-fire target must remain unarmed");
         if(index==1 && victim.maxShields<=0)
             throw new IllegalStateException("Shield contact diagnostic requires a physical fitted shield");
+        // Capture initial geometry, not the gun AI's later moving position.
+        final boolean axialAtSpawn=Math.abs(gun.x-victim.x)<.0001
+                &&gun.y<victim.y;
         gun.speed=0;gun.vx=gun.vy=0;
         victim.speed=0;victim.vx=victim.vy=0;
         victim.facing=Math.PI/2;
@@ -178,7 +183,7 @@ final class ShipSurfaceDamageCapture {
         final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
         if(index==0||index==13||index==14||index==16||index==18||
                 index==20||index==22||index==24||index==26)
-            return record(KEYS[index],weapon,seed,battle,victim,true,false);
+            return record(KEYS[index],weapon,seed,battle,victim,true,false,axialAtSpawn);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
         for(int i=0;i<maxSteps&&!battle.finished();i++){
@@ -211,6 +216,6 @@ final class ShipSurfaceDamageCapture {
         }
         victim.shields=victim.defense.totalShields();
         victim.armor=victim.defense.totalArmor();
-        return record(KEYS[index],weapon,seed,battle,victim,reached,false);
+        return record(KEYS[index],weapon,seed,battle,victim,reached,false,axialAtSpawn);
     }
 }

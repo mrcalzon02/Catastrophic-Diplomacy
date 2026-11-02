@@ -46,7 +46,7 @@ final class ShipImpactProfiles {
         // Raised fracture spokes must extend beyond the circular rim.
         // The old +.34 radius early-exit silently clipped strokes whose
         // explicit ends reach +.46. Keep every sample within 1.30 cells.
-        if(r>Math.min(1.30f,radius+.52f*scale))return 0;
+        if(r>Math.min(heavy?1.30f:1.12f,radius+.52f*scale))return 0;
         float q=r/Math.max(.01f,radius);
         float dark=s*.75f*(1-smooth(.12f,.56f,q));
         float bright=s*.96f*smooth(.88f,1.04f,q)*
@@ -92,15 +92,15 @@ final class ShipImpactProfiles {
         if(kind==Battle.DamageType.LASER){
             // Cool, optically thin heat-oxide interference colors on the
             // *surviving* plating around the actual laser strike. A charcoal
-            // center remains separate; the annulus extends only 1.27 cells.
+            // center remains separate; the annealed annulus fades by 1.05 cells.
             // G carries gold -> bronze -> violet -> blue oxide phase while
             // B>0.64 tags the annealing coefficient in the existing mask.
             // No new textures, damage events, or per-frame animations.
             float charred=ShipDamageScorch.falloffAt(
                     row,col,hr,hc,armor,internal,rough);
-            float annulus=smooth(.37f,.62f,d)*
-                    (1f-smooth(.98f,1.17f,d));
-            float strength=intensity*.50f*annulus;
+            float annulus=smooth(.32f,.50f,d)*
+                    (1f-smooth(.84f,1.05f,d));
+            float strength=intensity*.56f*annulus;
             if(strength<.005f)return pack(charred,0,0);
             float oxidePhase=clamp(1f-smooth(.48f,1.30f,d)+rough*.035f);
             return pack(charred,oxidePhase,.64f+.36f*strength);
@@ -121,42 +121,56 @@ final class ShipImpactProfiles {
                 return p;
             }
             case MISSILE, TORPEDO:{
-                float scale=kind==Battle.DamageType.TORPEDO?1.16f:1f;
+                // Missiles leave compact soot and small fragmented spall.
+                // Torpedoes leave fewer, coarser shards and a wider hot halo.
+                boolean torpedo=kind==Battle.DamageType.TORPEDO;
+                float scale=torpedo?1.08f:.90f;
                 float q=d/scale;
-                if(q>1.12f)return 0;
+                if(d>(torpedo?1.19f:.99f))return 0;
                 float physical=breachRadius(armor,internal);
-                float soot=intensity*.74f*(1-smooth(.17f,.96f,q));
+                float soot=intensity*(torpedo?.83f:.68f)*
+                        (1-smooth(.15f,.83f,q));
                 // Preserve original blast center, but show the ring ON intact
                 // armor outside the transparent puncture. Torpedoes have a
                 // slightly wider halo, still bounded to 1.3 cells.
                 soot=Math.max(soot,survivingLip(d,physical,
-                        intensity*(kind==Battle.DamageType.TORPEDO?.72f:.61f)));
-                float heat=intensity*.32f*smooth(.24f,.46f,q)*(1-smooth(.65f,.9f,q));
-                heat=Math.max(heat,survivingLip(d,physical,intensity*.33f));
+                        intensity*(torpedo?.72f:.54f)));
+                float heat=intensity*(torpedo?.54f:.21f)*
+                        smooth(.22f,.42f,q)*(1-smooth(.68f,.94f,q));
+                heat=Math.max(heat,survivingLip(d,physical,
+                        intensity*(torpedo?.42f:.19f)));
                 float chips=0;
-                for(int k=0;k<5;k++){
-                    float outward=physical>.47f?1.7f:1f;
+                for(int k=0;k<(torpedo?3:5);k++){
+                    float outward=physical>.47f?(torpedo?1.7f:1.35f):1f;
                     float px=(k==0?.46f:k==1?-.52f:k==2?.14f:k==3?-.28f:.55f)*scale*outward;
                     float py=(k==0?.14f:k==1?-.24f:k==2?-.66f:k==3?.53f:.41f)*scale*outward;
-                    chips=Math.max(chips,1-smooth(.025f,.13f*scale,
+                    chips=Math.max(chips,1-smooth(.028f,(torpedo?.18f:.10f)*scale,
                             (float)StrictMath.hypot(x-px,y-py)));
                 }
-                return pack(soot,heat,chips*intensity*.75f);
+                return pack(soot,heat,chips*intensity*(torpedo?.62f:.88f));
             }
             case PLASMA:{
+                // Directional thermal melt, not a cold metal crack or
+                // an explosive shrapnel field.
+                if(d>1.06f)return 0;
                 float physical=breachRadius(armor,internal);
-                if(d>1.3f)return 0;
-                return pack(intensity*.31f*(1-smooth(.2f,.56f,d)),
-                    Math.max(intensity*(1-smooth(.17f,.89f,d)),
-                            survivingLip(d,physical,intensity*.96f)),0);
+                float flow=(float)StrictMath.hypot(x*.83f,y*1.18f);
+                float melt=intensity*(1-smooth(.13f,.82f,flow));
+                float rim=survivingLip(d,physical,intensity*.72f);
+                return pack(intensity*.24f*(1-smooth(.15f,.49f,flow)),
+                        Math.max(melt,rim),0);
             }
             case PARTICLE:{
+                // Tight, cool twin needle holes, almost no burn halo.
+                if(d>1.01f)return 0;
                 float physical=breachRadius(armor,internal);
                 int body=merge(pock(x,y,intensity*.68f,seed,false,.50f,0f),
                         pock(x-.20f,y+.13f,intensity*.45f,seed+5,false,.38f,0f));
                 return merge(body,pack(0,0,survivingLip(d,physical,intensity*.75f)));
             }
             case FIGHTER:{
+                // Small shallow munition contact, not a capital strike.
+                if(d>1.00f)return 0;
                 float physical=breachRadius(armor,internal);
                 int body=pock(x,y,intensity*.48f,seed,false,.48f,0f);
                 return merge(body,pack(0,0,survivingLip(d,physical,intensity*.40f)));
