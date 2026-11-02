@@ -175,6 +175,10 @@ public final class ShipSurfaceDamageVisualTest {
                 "Nearby narrow hull armor should receive the crater, not transparent padding");
         check(aligned.col(8,0)==0f,
                 "A remote disconnected impact cannot teleport its crater across transparent space");
+        check(aligned.col(8,3)>5.4f&&aligned.col(8,3)<6.5f,
+                "A real hit just outside a thin hull must project to its nearest ACTUAL paint, not disappear");
+        check(Math.abs(aligned.row(8,3)-8)<.5,
+                "Nearest artwork registration must stay in the same local impact band");
         float shifted=ShipArmorStamps.openingAt(aligned.row(8,5),aligned.col(8,5),
                 8,5,aligned.row(8,5),aligned.col(8,5),1,0,77);
         check(shifted==1f,"Aligned physical armor breach must expose the interior");

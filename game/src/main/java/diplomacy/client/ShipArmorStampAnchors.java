@@ -3,8 +3,11 @@ package diplomacy.client;
 /**
  * Once-per-original-sprite visual registration for physical armor-tile craters.
  * A narrow source-alpha hull may not occupy an entire 16x16 protection cell.
- * Shift the visual crater center only to the NEAREST nearby opaque source pixel
- * (max 1 tile); never change the physical hit coordinate or the PNG alpha.
+ * Shift the visual crater center to the NEAREST valid source pixel.
+ * First search within one armor cell as before (approved laser unchanged).
+ * Only if the narrow authored hull has no art nearby, search at most 3.25
+ * cells for the closest actual hull surface. Physical impact coordinates
+ * and source PNG alpha are NEVER modified or invented.
  *
  * Pure int alpha grid enables graphics-device-independent regression tests.
  */
@@ -42,6 +45,29 @@ final class ShipArmorStampAnchors {
                 float distance=dx*dx+dy*dy;
                 if(distance<best){
                     best=distance;foundX=x;foundY=y;
+                }
+            }
+            // Real fitted hits can land on a model's collision ellipse or
+            // projected hardpoint whose pixel is transparent in the much
+            // narrower AUTHORED sprite. Such events previously made an
+            // invisible mask (confirmed zero R/G/B/A marks for kinetic).
+            // A second bounded nearest-surface pass is only used when the
+            // approved one-cell registration found no actual source alpha.
+            if(foundX<0){
+                final float maxShift=3.25f;
+                final float maximumSquared=maxShift*maxShift;
+                int fromX=Math.max(1,(int)Math.floor(cx-maxShift*tw));
+                int toX=Math.min(width-2,(int)Math.ceil(cx+maxShift*tw));
+                int fromY=Math.max(1,(int)Math.floor(cy-maxShift*th));
+                int toY=Math.min(height-2,(int)Math.ceil(cy+maxShift*th));
+                best=maximumSquared+.00001f;
+                for(int y=fromY;y<=toY;y++)for(int x=fromX;x<=toX;x++){
+                    if(!solid(alpha,width,height,x,y))continue;
+                    float dx=(x-cx)/tw,dy=(y-cy)/th;
+                    float distance=dx*dx+dy*dy;
+                    if(distance<best){
+                        best=distance;foundX=x;foundY=y;
+                    }
                 }
             }
             if(foundX>=0){

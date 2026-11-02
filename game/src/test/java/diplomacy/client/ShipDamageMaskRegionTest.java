@@ -24,6 +24,22 @@ final class ShipDamageMaskRegionTest {
         check(local.x()<=tileX&&local.x()+local.width()>tileX
                 &&local.y()<=tileY&&local.y()+local.height()>tileY,
                 "Updated rectangle must contain the true impact center");
+        // A physically real hit may target a transparent gap in a narrow
+        // alien silhouette. Preserve the compact default, but enlarge only
+        // if its nearest ACTUAL source pixel is outside that rectangle.
+        int[] narrowAlpha=new int[w*h];
+        for(int yy=4;yy<h-4;yy++)for(int xx=36;xx<=58;xx++)
+            narrowAlpha[yy*w+xx]=255;
+        var mapped=ShipArmorStampAnchors.fromAlpha(narrowAlpha,w,h);
+        int[] shifted=pristine.clone();
+        shifted[(8*16+3)*2]=115;
+        var resized=ShipDamageMaskRegion.changed(pristine,shifted,w,h,mapped);
+        int projected=(int)((mapped.col(8,3)+.5f)*w/16);
+        check(resized.x()<=projected&&resized.x()+resized.width()>projected,
+                "Dirty update must include the registered real source pixel");
+        var unchangedAnchored=ShipDamageMaskRegion.changed(pristine,pristine,w,h,mapped);
+        check(unchangedAnchored==null,
+                "Source alpha alignment cannot invent GPU updates without physical damage");
         int[] puncture=hit.clone();
         puncture[(8*16+8)*2+1]=80;
         var internal=ShipDamageMaskRegion.changed(hit,puncture,w,h);

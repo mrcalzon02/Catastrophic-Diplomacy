@@ -465,7 +465,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                     (tile.impactType()==null?0:(tile.impactType().ordinal()+1)*512);
         }
         ShipDamageMaskRegion.Rect region=ShipDamageMaskRegion.changed(
-                item.levels,levels,MASK_W,MASK_H);
+                item.levels,levels,MASK_W,MASK_H,aligned);
         if(region==null){
             item.signature=signature;
             return item.overlay;

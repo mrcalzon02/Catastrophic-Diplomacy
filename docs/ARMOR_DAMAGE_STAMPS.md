@@ -279,3 +279,24 @@ profile, armor cutout geometry, true physical damage and normal-resolution
 source sprites remain unchanged. The separate nonblocking visual smoke test
 now asserts each family has nonzero coefficients at a provably intact pixel
 immediately outside a severe physical alpha hole.
+
+
+### Fixed missing impacts on narrow authored faction silhouettes
+
+Actual diagnostic mask reads showed ZERO colored or transparent pixels for
+KINETIC and heavy KINETIC even though armor cells lost physical integrity.
+The physical 16x16 defense ellipse and a narrow original faction sprite
+do not always overlap at the selected hit cell. The previous one-cell
+source-alpha search found no opaque sprite pixel in those cases and emitted
+a completely transparent/neutral mask. Preserve its existing first-pass
+registration for already-visible impacts, especially the approved laser.
+When that pass finds no source pixel, a second bounded search (max 3.25
+defense-cell units) registers the impact to the NEAREST actual opaque,
+surrounded source pixel. Any hit still further from source artwork remains
+unmapped rather than jumping to an unrelated distant hull section.
+This does not change physical collision points, armor damage, module
+targeting, or original sprite transparency. The dirty GPU upload rectangle
+expands only as necessary to cover the registered artwork and its 1.3-cell
+damage gradient; otherwise the previous small dirty rectangle is retained.
+Headless smoke tests validate the bounded projection, lack of teleporting
+across a large empty region, correct dirty masking, and no phantom marks.
