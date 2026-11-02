@@ -113,7 +113,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int selectedResearchNode;
     private CampaignProgress.Project armedResearch=CampaignProgress.Project.NONE;
     private long armedResearchCost=-1,armedResearchWallet=-1;
-    private int technologyPage,technologyModule,technologyTrack,technologyStage=1;
+    private int technologyPage,technologyModule,technologyTrack,technologyStage=1,
+            technologyBranch;
     private String technologyNotice="Select an individual subsystem technology.";
     private String armedTechnology;
     private long armedTechnologyWallet=-1;
@@ -1155,12 +1156,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void openTechnology(){
         if(campaign==null||discoveries==null)return;
         technologyPage=0;technologyModule=0;technologyTrack=0;technologyStage=1;
+        technologyBranch=0;
         armedTechnology=null;
         technologyNotice="Discoveries are permanent; shipyards install researched specializations.";
         screen=GameMenuPanel.Screen.TECHNOLOGY;
     }
     private String selectedTechnologyId(){
-        var subsystems=GameMenuPanel.technologySubsystems(technology,campaign.faction());
+        var subsystems=GameMenuPanel.technologySubsystems(technology,campaign.faction(),
+                technologyBranch);
         if(subsystems.isEmpty())throw new IllegalStateException("Faction lacks engineering catalog");
         var part=subsystems.get(Math.max(0,Math.min(technologyModule,subsystems.size()-1)));
         return GameMenuPanel.technologyId(campaign.faction(),part.subsystem,
@@ -1170,15 +1173,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(action==0){
             armedTechnology=null;screen=GameMenuPanel.Screen.RESEARCH;return;
         }
-        int count=GameMenuPanel.technologySubsystems(technology,campaign.faction()).size();
-        if(action==1||action==2){
-            int pages=Math.max(1,(count+7)/8);
+        int count=GameMenuPanel.technologySubsystems(technology,campaign.faction(),
+                technologyBranch).size();
+        if(action>=300 && action<300+GameMenuPanel.INDUSTRY_TABS.length){
+            technologyBranch=action-300;
+            technologyPage=0;technologyModule=0;
+            technologyTrack=0;technologyStage=1;
+        }else if(action==1||action==2){
+            int rows=GameMenuPanel.INDUSTRY_PAGE_ROWS;
+            int pages=Math.max(1,(count+rows-1)/rows);
             technologyPage=Math.max(0,Math.min(pages-1,
                     technologyPage+(action==1?-1:1)));
-            technologyModule=technologyPage*8;
+            technologyModule=technologyPage*rows;
         }else if(action==3){requestTechnology();return;}
-        else if(action>=100&&action<108){
-            int target=technologyPage*8+action-100;
+        else if(action>=100&&action<100+GameMenuPanel.INDUSTRY_PAGE_ROWS){
+            int target=technologyPage*GameMenuPanel.INDUSTRY_PAGE_ROWS+action-100;
             if(target<count)technologyModule=target;
         }else if(action>=200&&action<236){
             technologyTrack=(action-200)/9;
@@ -2494,7 +2503,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     afterActionPage,themePage,themeCandidate,
                     selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn,
                     technology,discoveries,technologyPage,technologyModule,technologyTrack,
-                    technologyStage,technologyNotice,armedTechnology);
+                    technologyStage,technologyBranch,technologyNotice,armedTechnology);
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
                 // An actual completed framebuffer menu draw, not merely a
                 // click-handler state transition. Android campaign CI requires it.

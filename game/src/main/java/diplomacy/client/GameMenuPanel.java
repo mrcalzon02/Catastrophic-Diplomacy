@@ -10,6 +10,8 @@ import diplomacy.sim.CampaignStoryAtlas;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignTechnology;
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 import java.util.Comparator;
 import diplomacy.sim.CampaignDeployment;
@@ -265,14 +267,39 @@ final class GameMenuPanel {
         return -1;
     }
 
+    // Seven industrial browsers, ONE authoritative research catalog, ONE save
+    // schema. No extra research costs or duplicate parallel technology data.
+    static final String[] INDUSTRY_TABS={
+            "ALL","WEAPONS","DEFENSE","POWER","SENSORS","SUPPORT","SURVIVAL"};
+    static final int INDUSTRY_PAGE_ROWS=5;
+    private static final java.util.Set<String> SENSOR_ROOTS=java.util.Set.of(
+            "SEN","ECM","RDR","STC","IRT","HTD","VCL","ACU","XRY","GRA","HLP");
+    private static boolean industrialBranch(Component c,int branch){
+        if(branch==0)return true;
+        if(SurvivalHardwareCatalog.find(c.subsystem)!=null)
+            return branch==6;
+        if(SENSOR_ROOTS.contains(SensingVariantCatalog.root(c.subsystem)))
+            return branch==4;
+        return switch(c.category){
+            case "weapons" -> branch==1;
+            case "defense" -> branch==2;
+            case "systems" -> branch==3;
+            case "support" -> branch==5;
+            case "habitat" -> branch==6;
+            default -> throw new IllegalStateException("Unclassified component "+c.id);
+        };
+    }
     /** One shared input map for desktop mouse and Android touch. */
     static int technologyAction(float x,float y){
         if(hit(x,y,35,35,208,55))return 0;
         if(hit(x,y,48,144,112,45))return 1;
         if(hit(x,y,174,144,125,45))return 2;
         if(hit(x,y,917,35,317,55))return 3;
-        for(int row=0;row<8;row++)
-            if(hit(x,y,48,551-row*51,270,44))return 100+row;
+        for(int branch=0;branch<INDUSTRY_TABS.length;branch++)
+            if(hit(x,y,44+(branch%3)*96,528-(branch/3)*42,90,38))
+                return 300+branch;
+        for(int row=0;row<INDUSTRY_PAGE_ROWS;row++)
+            if(hit(x,y,48,390-row*48,270,42))return 100+row;
         for(int track=0;track<4;track++)for(int stage=0;stage<9;stage++)
             if(hit(x,y,374+stage*49,439-track*100,42,49))
                 return 200+track*9+stage;
@@ -284,6 +311,15 @@ final class GameMenuPanel {
                 .filter(c->c.faction.equals(code))
                 .sorted(Comparator.comparing((Component c)->c.category)
                         .thenComparing(c->c.name)).collect(java.util.stream.Collectors.toList());
+    }
+    static List<Component> technologySubsystems(TechnologyCatalog catalog,
+                                               Battle.Faction faction,int branch){
+        if(branch<0||branch>=INDUSTRY_TABS.length)
+            throw new IllegalArgumentException("Invalid industry tab");
+        if(branch==0)return technologySubsystems(catalog,faction);
+        return technologySubsystems(catalog,faction).stream()
+                .filter(c->industrialBranch(c,branch))
+                .collect(java.util.stream.Collectors.toList());
     }
     static String technologyId(Battle.Faction faction,String subsystem,int track,int stage){
         if(track<0||track>=4||stage<1||stage>9)
@@ -366,7 +402,7 @@ final class GameMenuPanel {
                int selectedResearchNode,CampaignProgress.Project armedResearch,Screen researchReturn,
                TechnologyCatalog techCatalog,CampaignTechnology.State discoveries,
                int technologyPage,int technologyModule,int technologyTrack,int technologyStage,
-               String technologyNotice,String armedTechnology){
+               int technologyBranch,String technologyNotice,String armedTechnology){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -471,11 +507,15 @@ final class GameMenuPanel {
                 rectangle(shapes,30,130,304,484,PANEL);
                 rectangle(shapes,345,130,488,484,PANEL);
                 rectangle(shapes,844,130,406,484,PANEL);
-                int modules=technologySubsystems(techCatalog,progress.faction()).size();
-                for(int row=0;row<8;row++){
-                    int index=technologyPage*8+row;
+                int modules=technologySubsystems(techCatalog,progress.faction(),
+                        technologyBranch).size();
+                for(int branch=0;branch<INDUSTRY_TABS.length;branch++)
+                    button(shapes,44+(branch%3)*96,528-(branch/3)*42,90,38,
+                            branch==technologyBranch);
+                for(int row=0;row<INDUSTRY_PAGE_ROWS;row++){
+                    int index=technologyPage*INDUSTRY_PAGE_ROWS+row;
                     if(index>=modules)break;
-                    button(shapes,48,551-row*51,270,44,index==technologyModule);
+                    button(shapes,48,390-row*48,270,42,index==technologyModule);
                 }
                 shapes.setColor(MilitaryUiTheme.FRAME_BRIGHT);
                 for(int track=0;track<4;track++)
@@ -813,22 +853,28 @@ final class GameMenuPanel {
             case TECHNOLOGY -> {
                 title(batch,font,"FACTION TECHNOLOGY LAB",
                         "INDIVIDUAL DISCOVERIES / PAID ONCE / PERSISTENT CAMPAIGN UNLOCKS");
-                List<Component> components=technologySubsystems(techCatalog,progress.faction());
-                label(batch,font,"SUBSYSTEM CATALOG",50,588,Color.CYAN);
-                label(batch,font,"BRANCH / SIX DEVELOPMENT STAGES",366,585,Color.CYAN);
-                for(int row=0;row<8;row++){
-                    int index=technologyPage*8+row;
+                List<Component> components=technologySubsystems(techCatalog,progress.faction(),
+                        technologyBranch);
+                label(batch,font,"INDUSTRIAL RESEARCH BRANCHES",50,588,Color.CYAN);
+                label(batch,font,"BRANCH / NINE DEVELOPMENT STAGES",366,585,Color.CYAN);
+                for(int branch=0;branch<INDUSTRY_TABS.length;branch++)
+                    label(batch,font,INDUSTRY_TABS[branch],47+(branch%3)*96,
+                            554-(branch/3)*42,
+                            branch==technologyBranch?Color.GOLD:Color.WHITE);
+                for(int row=0;row<INDUSTRY_PAGE_ROWS;row++){
+                    int index=technologyPage*INDUSTRY_PAGE_ROWS+row;
                     if(index>=components.size())break;
                     Component c=components.get(index);
-                    label(batch,font,shortLabel(c.name,30),57,580-row*51,
+                    label(batch,font,shortLabel(c.name,29),57,419-row*48,
                             index==technologyModule?Color.GOLD:Color.WHITE);
                     label(batch,font,c.subsystem+"  /  "+c.category.toUpperCase(java.util.Locale.ROOT),
-                            57,563-row*51,MUTED);
+                            57,401-row*48,MUTED);
                 }
                 label(batch,font,"PREV",64,174,Color.WHITE);
                 label(batch,font,"NEXT",191,174,Color.WHITE);
                 label(batch,font,"PAGE "+(technologyPage+1)+" / "+
-                        Math.max(1,(components.size()+7)/8),55,124,MUTED);
+                        Math.max(1,(components.size()+INDUSTRY_PAGE_ROWS-1)/
+                                INDUSTRY_PAGE_ROWS),55,124,MUTED);
                 Component selected=components.get(Math.min(components.size()-1,technologyModule));
                 String[] tracks={"OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"};
                 for(int track=0;track<4;track++){

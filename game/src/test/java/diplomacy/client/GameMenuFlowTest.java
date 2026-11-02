@@ -161,10 +161,15 @@ public final class GameMenuFlowTest {
                 "Campaign technology laboratory entry is not clickable");
         check(GameMenuPanel.Screen.valueOf("TECHNOLOGY")!=null,
                 "Faction technology browser screen not present");
-        check(GameMenuPanel.technologyAction(110,575)==100&&
+        check(GameMenuPanel.technologyAction(110,410)==100&&
                 GameMenuPanel.technologyAction(390,458)==200&&
                 GameMenuPanel.technologyAction(780,160)==235,
                 "Tech subsystem/branch/stage hit targets do not match displayed controls");
+        check(GameMenuPanel.technologyAction(60,547)==300&&
+                GameMenuPanel.technologyAction(160,547)==301&&
+                GameMenuPanel.technologyAction(160,462)==307-1&&
+                GameMenuPanel.technologyAction(60,463)==306,
+                "Industrial branch hit targets must match actual touch buttons");
         check(GameMenuPanel.technologyAction(1050,59)==3&&
                 GameMenuPanel.technologyAction(108,60)==0,
                 "Technology lab confirmation and return are missing");
@@ -175,6 +180,23 @@ public final class GameMenuFlowTest {
                     .filter(part->"TER".equals(part.faction)).count();
             check(nativeParts.size()==actual,
                     "Technology browser must expose all actual native subsystem families");
+            java.util.Set<String> partition=new java.util.HashSet<>();
+            for(int branch=1;branch<GameMenuPanel.INDUSTRY_TABS.length;branch++){
+                var group=GameMenuPanel.technologySubsystems(engineering,
+                        Battle.Faction.TERRAN,branch);
+                check(!group.isEmpty(),"Empty technology industrial branch "+branch);
+                for(var component:group)
+                    check(partition.add(component.id),
+                            "Component duplicated across industrial branches "+component.id);
+            }
+            check(partition.size()==nativeParts.size(),
+                    "Industrial tabs must neither hide nor duplicate technology");
+            check(GameMenuPanel.technologySubsystems(engineering,
+                        Battle.Faction.TERRAN,4).stream().anyMatch(c->c.subsystem.equals("HLP")),
+                    "Holographic deception missing from sensors and stealth");
+            check(GameMenuPanel.technologySubsystems(engineering,
+                        Battle.Faction.TERRAN,6).stream().anyMatch(c->c.subsystem.equals("EPD")),
+                    "Escape-pod survival engineering missing from industry tabs");
             for(String required:new String[]{"XFR","HPR","APR","PWR",
                     "DHL","DSH","DAR","DPW","AHL","ASH","AAR","APW"}){
                 check(nativeParts.stream().anyMatch(part->part.subsystem.equals(required)),
