@@ -363,25 +363,32 @@ public final class TerranPlaceholderSprites implements Disposable {
             result=(result^armor)*0x100000001b3L;
             result=(result^internal)*0x100000001b3L;
             result=(result^(tile.directImpact()?1:0))*0x100000001b3L;
+            result=(result^(tile.impactType()==null?0:tile.impactType().ordinal()+1))
+                    *0x100000001b3L;
         }
         return result;
     }
-    /** Single-cell scorch footprints, not bilinearly smeared plate damage. */
-    private static float localizedScorch(float[][] wear,float[][] internal,
-                                          boolean[][] anchorsImpact,
-                                          ShipArmorStampAnchors anchors,
-                                          float row,float col,float rough){
-        int nearRow=(int)StrictMath.floor(row+.5f);
-        int nearCol=(int)StrictMath.floor(col+.5f);
-        float value=0f;
-        for(int r=Math.max(0,nearRow-1);r<=Math.min(GRID-1,nearRow+1);r++)
-            for(int c=Math.max(0,nearCol-1);c<=Math.min(GRID-1,nearCol+1);c++){
-                if(!anchorsImpact[r][c]||wear[r][c]<=0f&&internal[r][c]<=0f)continue;
-                value=Math.max(value,ShipDamageScorch.falloffAt(
-                        row,col,anchors.row(r,c),anchors.col(r,c),
-                        wear[r][c],internal[r][c],rough));
+    /** Only real physical impact centers contribute one small typed mark. */
+    private static int typedMark(float[][] wear,float[][] internal,
+                    boolean[][] direct,Battle.DamageType[][] type,
+                    ShipArmorStampAnchors anchors,float row,float col,
+                    int id,float rough){
+        int nearR=(int)StrictMath.floor(row+.5f),nearC=(int)StrictMath.floor(col+.5f);
+        int combined=0,nearestType=0;
+        float best=Float.POSITIVE_INFINITY;
+        for(int r=Math.max(0,nearR-2);r<=Math.min(GRID-1,nearR+2);r++)
+            for(int c=Math.max(0,nearC-2);c<=Math.min(GRID-1,nearC+2);c++){
+                if(!direct[r][c]||(wear[r][c]<=0&&internal[r][c]<=0))continue;
+                float ar=anchors.row(r,c),ac=anchors.col(r,c);
+                float d=(row-ar)*(row-ar)+(col-ac)*(col-ac);
+                if(d>1.7f)continue;
+                combined=ShipImpactProfiles.merge(combined,ShipImpactProfiles.sample(
+                    type[r][c],row,col,ar,ac,wear[r][c],internal[r][c],
+                    id*31+r*17+c*7,rough));
+                if(d<best){best=d;nearestType=type[r][c]==null?
+                    0:type[r][c].ordinal()+1;}
             }
-        return value;
+        return (nearestType<<24)|combined;
     }
     private static float noise(int x,int y,int salt) {
         int hash=x*374761393+y*668265263+salt*224682251;
@@ -433,6 +440,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         // mask pixel (and all 9 neighboring tiles) in mass engagements.
         float[][] wear=new float[GRID][GRID],internal=new float[GRID][GRID];
         boolean[][] impactCenters=new boolean[GRID][GRID];
+        Battle.DamageType[][] impactTypes=new Battle.DamageType[GRID][GRID];
         int[] levels=new int[GRID*GRID*2];
         for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++){
             var tile=ship.defense.tile(r,c);
@@ -440,12 +448,14 @@ public final class TerranPlaceholderSprites implements Disposable {
             wear[r][c]=(float)tile.exposure();
             internal[r][c]=(float)tile.internalDamage();
             impactCenters[r][c]=tile.directImpact();
+            impactTypes[r][c]=tile.impactType();
             int index=(r*GRID+c)*2;
             levels[index]=(int)StrictMath.round(tile.exposure()*128.0);
             // The visual impact bit also invalidates a repaired/re-struck
             // mask even when quantized physical exposure barely changes.
             levels[index+1]=(int)StrictMath.round(tile.internalDamage()*128.0)
-                    +(tile.directImpact()?256:0);
+                    +(tile.directImpact()?256:0)+
+                    (tile.impactType()==null?0:(tile.impactType().ordinal()+1)*512);
         }
         ShipDamageMaskRegion.Rect region=ShipDamageMaskRegion.changed(
                 item.levels,levels,MASK_W,MASK_H);
@@ -476,7 +486,12 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float row=(float)tileRow,col=(float)tileCol;
                 float rough=noise(x/4,y/4,ship.id)*.70f+
                         noise(x,y,ship.id*31)*.30f;
-                float damage=localizedScorch(wear,internal,impactCenters,aligned,row,col,rough);
+                int style=typedMark(wear,internal,impactCenters,impactTypes,
+                        aligned,row,col,ship.id,rough);
+                float damage=ShipImpactProfiles.dark(style)/255f;
+                float heat=ShipImpactProfiles.hot(style)/255f;
+                float metal=ShipImpactProfiles.metal(style)/255f;
+                int family=(style>>>24)&255;
                 float crater=craterAt(wear,internal,impactCenters,aligned,row,col,ship.id);
                 float rim=0f;
                 // Interior render layer is clipped to original opaque pixels.
@@ -494,8 +509,13 @@ public final class TerranPlaceholderSprites implements Disposable {
                 }
                 // Preserve original artwork at native resolution: encode
                 // local mask coefficients, not a downsampled ship photograph.
+                if(family==Battle.DamageType.KINETIC.ordinal()+1||
+                        family==Battle.DamageType.PARTICLE.ordinal()+1||
+                        family==Battle.DamageType.FIGHTER.ordinal()+1)
+                    metal=Math.max(metal,rim*.88f);
+                else heat=Math.max(heat,rim);
                 output.drawPixel(localX,localY,
-                        ShipSurfaceDamageVisual.maskPixel(damage,crater,rim));
+                        ShipSurfaceDamageVisual.maskPixel(damage,crater,heat,metal));
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);

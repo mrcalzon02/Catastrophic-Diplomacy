@@ -238,3 +238,21 @@ after extensive damage; authored normal/emissive maps remain registered.
 Only true armor openings reveal the separate, silhouette-clipped structural
 layer. No damage values, weapon radii, armor balance or source sprites changed.
 Visual checks are diagnostic, not release gates.
+
+
+### Weapon-dependent pockmark and thermal surface profiles
+
+Keep the approved original-resolution hull albedo and the same physical
+armor-alpha/mask pipeline. Damage mask R=localized dark pit/soot,
+G=hot thermal lip, B=bright cool sheared metal and raised crack edge,
+A=missing armor. LASER retains prior localized scorch. KINETIC gains a
+compact dark circular pit, thin silver sheared rim, raised radial fracture
+lines; heavy kinetic impacts add 2 smaller close pockmarks instead of a
+large diffuse crushed-metal patch. MISSILE/TORPEDO add a small soot-blast
+field with metallic fragments. PLASMA is a compact hot melt, PARTICLE a
+fine pinprick cluster, and FIGHTER a small impact dimple.
+All are deterministic and bounded to at most 1.3 armor cells from an
+actual impact anchor, never one cosmetic stamp per splash-eroded tile.
+The damage family is captured and persisted by DirectionalDefense; older
+untagged impacts remain on their prior generic scorch style.
+Visual inspection is a nonblocking diagnostic.

@@ -59,6 +59,7 @@ final class ShipSurfaceLighting implements Disposable {
         "  albedo.a*=peel.a;\n"+
         "  albedo.rgb*=1.0-0.54*peel.r;\n"+
         "  albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
+        "  albedo.rgb=mix(albedo.rgb,vec3(0.86,0.91,0.96),peel.b*0.82);\n"+
         " }\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
         " if(u_detail<0.01){gl_FragColor=albedo;return;}\n"+

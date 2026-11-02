@@ -75,6 +75,26 @@ public final class ShipSurfaceDamageVisualTest {
                 "Full armor puncture must reveal actual structural underlay");
         check(((ShipSurfaceDamageVisual.maskPixel(0,0,1)>>>16)&255)==255,
                 "Heat rim must be independent of armor alpha");
+        check(((ShipSurfaceDamageVisual.maskPixel(.2f,0,0,1)>>>8)&255)==255,
+                "Metal channel must transmit actual cool exposed edges");
+        for(diplomacy.sim.Battle.DamageType type:diplomacy.sim.Battle.DamageType.values()){
+            int impact=ShipImpactProfiles.sample(type,8,8,8,8,1,0,17,0);
+            int far=ShipImpactProfiles.sample(type,8,9.5f,8,8,1,0,17,0);
+            check(impact!=0,"Missing actual weapon damage profile: "+type);
+            check(far==0,"Whole-hull cosmetic contamination: "+type);
+        }
+        int pock=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.KINETIC,
+                8,8,8,8,1,1,17,0);
+        int rimChrome=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.KINETIC,
+                8,8.34f,8,8,1,1,17,0);
+        check(ShipImpactProfiles.dark(pock)>0&&ShipImpactProfiles.hot(pock)==0,
+                "Kinetic needs dark pit with no thermal orange glow");
+        check(ShipImpactProfiles.metal(rimChrome)>0,
+                "Kinetic must expose a raised bright metallic crater rim");
+        int laser=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
+                8,8,8,8,1,1,17,0);
+        check(ShipImpactProfiles.metal(laser)==0,
+                "Approved laser scorch must not inherit kinetic silver");
         // In all severity states, char -> soot -> heat must fade to the
         // EXACT original source pixel before reaching the neighboring tile.
         for(float severity:new float[]{.2f,.5f,1f}){

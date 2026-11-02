@@ -6,6 +6,7 @@ on:
       - 'game/src/main/java/diplomacy/client/ShipArmorStamps.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageVisual.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
+      - 'game/src/main/java/diplomacy/client/ShipImpactProfiles.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
       - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceSampleGrid.java'
