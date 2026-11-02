@@ -410,5 +410,11 @@ public final class PointDefenseLoadDiagnostic {
         Files.writeString(out.resolve("summary.md"),summary.toString());
         System.out.println(summary);
         System.out.println("PD_LOAD_PROFILE_CSV="+out.resolve("profiles.csv"));
+        // Preserve all partial CSV/summary artifacts, but do not let the
+        // optional diagnostic step appear successful when cases failed.
+        // The workflow uses continue-on-error, so this never blocks a build.
+        if(errors>0)
+            throw new IllegalStateException(errors+
+                    " physical PD load scenarios failed validation; see profiles.csv");
     }
 }
