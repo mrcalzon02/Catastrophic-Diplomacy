@@ -22,14 +22,34 @@ final class ShipImpactProfiles {
         return (Math.max(dark(a),dark(b))<<16)|
                 (Math.max(hot(a),hot(b))<<8)|Math.max(metal(a),metal(b));
     }
+    /** Real armor-hole reach for the SAME physical mask geometry. */
+    private static float breachRadius(float armor,float internal){
+        float peeled=clamp((armor-.70f)/.20f);
+        return .12f+.50f*peeled+.20f*(float)StrictMath.sqrt(clamp(internal));
+    }
+    /** A thin edge just OUTSIDE the physical hole. Never drawn inside missing alpha. */
+    private static float survivingLip(float dist,float radius,float intensity){
+        return intensity*smooth(radius-.09f,radius+.075f,dist)*
+                (1f-smooth(radius+.16f,radius+.35f,dist));
+    }
     /** Compact shadowed pit, thin bright sheared rim, raised short fractures. */
-    private static int pock(float x,float y,float s,int id,boolean heavy,float scale){
+    private static int pock(float x,float y,float s,int id,boolean heavy,float scale,
+                            float physicalRadius){
         float r=(float)StrictMath.hypot(x,y);
-        float radius=(.22f+.23f*(float)StrictMath.sqrt(s))*scale;
-        if(r>radius+.28f*scale)return 0;
+        // At full armor penetration the alpha opening is ~0.82 cells.
+        // The OLD pock stopped at 0.73 cells, wholly INSIDE that hole:
+        // the fragment shader correctly erased every intended highlight.
+        // Keep the real crater as the dark pit, but move the sheared edge
+        // to SURVIVING plating on the outside of the physical opening.
+        float radius=Math.max((.22f+.23f*(float)StrictMath.sqrt(s))*scale,
+                physicalRadius);
+        if(r>Math.min(1.30f,radius+.34f*scale))return 0;
         float q=r/Math.max(.01f,radius);
-        float dark=s*.88f*(1-smooth(.12f,.56f,q));
-        float bright=s*.96f*smooth(.42f,.63f,q)*(1-smooth(.90f,1.10f,q));
+        float dark=s*.75f*(1-smooth(.12f,.56f,q));
+        float bright=s*.96f*smooth(.88f,1.04f,q)*
+                (1-smooth(1.16f,1.35f,q));
+        if(physicalRadius>.45f)
+            bright=Math.max(bright,survivingLip(r,physicalRadius,s*.94f));
         // Break the metallic ring at deterministic chipped sectors.
         int chip=(id*13+((int)(x*42))*31+((int)(y*42))*17)&7;
         if(chip==0)bright*=.66f;
@@ -37,9 +57,9 @@ final class ShipImpactProfiles {
             int k=Math.floorMod(id+i,DX.length);
             float along=x*DX[k]+y*DY[k];
             float across=Math.abs(x*DY[k]-y*DX[k]);
-            float end=radius+(.10f+(i%3)*.045f)*scale;
-            if(along>radius*.77f&&along<end&&across<.07f*scale)
-                bright=Math.max(bright,s*.69f*(1-smooth(radius*.7f,end,along)));
+            float end=Math.min(1.30f,radius+(.18f+(i%3)*.045f)*scale);
+            if(along>radius*.98f&&along<end&&across<.07f*scale)
+                bright=Math.max(bright,s*.79f*(1-smooth(radius*.98f,end,along)));
         }
         return pack(dark,0,bright);
     }
@@ -56,11 +76,15 @@ final class ShipImpactProfiles {
         switch(kind){
             case KINETIC:{
                 boolean heavy=internal>.15f||armor>.86f;
-                int p=pock(x,y,intensity,seed,heavy,1f);
+                float physical=breachRadius(armor,internal);
+                int p=pock(x,y,intensity,seed,heavy,1f,physical);
                 if(heavy){
-                    // Heavy hits gain secondary PITS, not diffuse crush smears.
-                    p=merge(p,pock(x-.24f,y+.18f,intensity*.68f,seed+19,false,.55f));
-                    p=merge(p,pock(x+.23f,y+.27f,intensity*.60f,seed+29,false,.45f));
+                    // Two tiny subsidiary pocks near the real opening edge,
+                    // rather than underneath the already-removed armor.
+                    p=merge(p,pock(x-.76f,y+.16f,intensity*.62f,
+                            seed+19,false,.43f,0));
+                    p=merge(p,pock(x+.22f,y+.78f,intensity*.58f,
+                            seed+29,false,.42f,0));
                 }
                 return p;
             }
@@ -68,25 +92,43 @@ final class ShipImpactProfiles {
                 float scale=kind==Battle.DamageType.TORPEDO?1.16f:1f;
                 float q=d/scale;
                 if(q>1.12f)return 0;
+                float physical=breachRadius(armor,internal);
                 float soot=intensity*.74f*(1-smooth(.17f,.96f,q));
+                // Preserve original blast center, but show the ring ON intact
+                // armor outside the transparent puncture. Torpedoes have a
+                // slightly wider halo, still bounded to 1.3 cells.
+                soot=Math.max(soot,survivingLip(d,physical,
+                        intensity*(kind==Battle.DamageType.TORPEDO?.72f:.61f)));
                 float heat=intensity*.32f*smooth(.24f,.46f,q)*(1-smooth(.65f,.9f,q));
+                heat=Math.max(heat,survivingLip(d,physical,intensity*.33f));
                 float chips=0;
                 for(int k=0;k<5;k++){
-                    float px=(k==0?.46f:k==1?-.52f:k==2?.14f:k==3?-.28f:.55f)*scale;
-                    float py=(k==0?.14f:k==1?-.24f:k==2?-.66f:k==3?.53f:.41f)*scale;
+                    float outward=physical>.47f?1.7f:1f;
+                    float px=(k==0?.46f:k==1?-.52f:k==2?.14f:k==3?-.28f:.55f)*scale*outward;
+                    float py=(k==0?.14f:k==1?-.24f:k==2?-.66f:k==3?.53f:.41f)*scale*outward;
                     chips=Math.max(chips,1-smooth(.025f,.13f*scale,
                             (float)StrictMath.hypot(x-px,y-py)));
                 }
                 return pack(soot,heat,chips*intensity*.75f);
             }
-            case PLASMA:
-                return d>.89f?0:pack(intensity*.31f*(1-smooth(.2f,.56f,d)),
-                    intensity*(1-smooth(.17f,.89f,d)),0);
-            case PARTICLE:
-                return merge(pock(x,y,intensity*.68f,seed,false,.50f),
-                        pock(x-.20f,y+.13f,intensity*.45f,seed+5,false,.38f));
-            case FIGHTER:
-                return pock(x,y,intensity*.48f,seed,false,.48f);
+            case PLASMA:{
+                float physical=breachRadius(armor,internal);
+                if(d>1.3f)return 0;
+                return pack(intensity*.31f*(1-smooth(.2f,.56f,d)),
+                    Math.max(intensity*(1-smooth(.17f,.89f,d)),
+                            survivingLip(d,physical,intensity*.96f)),0);
+            }
+            case PARTICLE:{
+                float physical=breachRadius(armor,internal);
+                int body=merge(pock(x,y,intensity*.68f,seed,false,.50f,0f),
+                        pock(x-.20f,y+.13f,intensity*.45f,seed+5,false,.38f,0f));
+                return merge(body,pack(0,0,survivingLip(d,physical,intensity*.75f)));
+            }
+            case FIGHTER:{
+                float physical=breachRadius(armor,internal);
+                int body=pock(x,y,intensity*.48f,seed,false,.48f,0f);
+                return merge(body,pack(0,0,survivingLip(d,physical,intensity*.40f)));
+            }
             default:return 0;
         }
     }

@@ -91,6 +91,28 @@ public final class ShipSurfaceDamageVisualTest {
                 "Kinetic needs dark pit with no thermal orange glow");
         check(ShipImpactProfiles.metal(rimChrome)>0,
                 "Kinetic must expose a raised bright metallic crater rim");
+        // This is the actual failure that left every kinetic screenshot
+        // apparently pristine: the old pock's R/G/B all fell INSIDE a
+        // physically transparent ~0.82-cell alpha cutout. Check effects
+        // at a pixel that still has original plating after a full breach.
+        float outer=1.04f;
+        float hole=ShipArmorStamps.openingAt(8,8+outer,8,8,1,1,17);
+        check(hole<.01f,"Fixture requires source plating OUTSIDE the armor hole");
+        for(diplomacy.sim.Battle.DamageType family:new diplomacy.sim.Battle.DamageType[]{
+                diplomacy.sim.Battle.DamageType.KINETIC,
+                diplomacy.sim.Battle.DamageType.PLASMA,
+                diplomacy.sim.Battle.DamageType.PARTICLE,
+                diplomacy.sim.Battle.DamageType.MISSILE,
+                diplomacy.sim.Battle.DamageType.TORPEDO,
+                diplomacy.sim.Battle.DamageType.FIGHTER}){
+            int outside=ShipImpactProfiles.sample(family,8,8+outer,8,8,1,1,17,0);
+            check(ShipImpactProfiles.dark(outside)>18||
+                            ShipImpactProfiles.hot(outside)>18||
+                            ShipImpactProfiles.metal(outside)>18,
+                    "Effect erased by the real alpha hole: "+family);
+            check(ShipImpactProfiles.sample(family,8,9.4f,8,8,1,1,17,0)==0,
+                    "Effect must remain within 1.3 actual armor cells: "+family);
+        }
         int laser=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
                 8,8,8,8,1,1,17,0);
         check(ShipImpactProfiles.metal(laser)==0,

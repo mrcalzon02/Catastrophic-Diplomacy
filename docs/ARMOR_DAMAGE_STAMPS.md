@@ -259,3 +259,23 @@ Visual inspection is a nonblocking diagnostic.
 
 ### Fitted plasma/particle/torpedo/heavy-kinetic forensic captures
 Four additional deterministic no-AI firing-lane cases now fire genuine base weapon modules PLA, PAR, TOR and heavy KIN against the fixed target. Every case captures 3 true 1280x720 client frames, typed impact metadata and an individual ZIP. The old rectangle stress test remains distinct and never impersonates a real hit. An unreached milestone remains labeled as such; the artwork quality cannot block releases.
+
+
+### Corrected invisible weapon-family highlights (alpha-cut overlap)
+
+An objective screenshot comparison found the former kinetic/missile renders
+identical before and after the R/G/B profile addition. The profile geometry
+was being drawn *under a physically missing armor pixel*: at a fully
+penetrated target the physical alpha hole reaches ~0.82 defense cells,
+while the kinetic profile stopped at ~0.73 cells. The fragment shader
+correctly discarded its entire dark pit and silver rim. MISSILE, TORPEDO,
+PLASMA and small particle highlights suffered the same inward placement.
+The visual profiles now follow the surviving outer rim of the SAME real
+physical crater: dark interior comes from the existing structural underlay,
+thin bright/silver lifted edges and short radial fractures sit on intact
+armor, and explosive soot/shrapnel or plasma heat occupy their own bounded
+outer bands. Maximum affected radius remains 1.3 tile units. The LASER
+profile, armor cutout geometry, true physical damage and normal-resolution
+source sprites remain unchanged. The separate nonblocking visual smoke test
+now asserts each family has nonzero coefficients at a provably intact pixel
+immediately outside a severe physical alpha hole.
