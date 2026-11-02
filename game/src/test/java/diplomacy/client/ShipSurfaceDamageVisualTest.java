@@ -211,7 +211,10 @@ public final class ShipSurfaceDamageVisualTest {
         for(String token:new String[]{"if(peel.b>0.62)",
                 "float anneal=clamp((peel.b-0.64)/0.36",
                 "vec3 oxide=mix(","float coolMetal=1.0-smoothstep(0.005,0.08,peel.g)",
-                "metalStrength=clamp(peel.b/0.56"})
+                "metalStrength=clamp(peel.b/0.56",
+                "vec3 residualHeat=vec3(0.0)",
+                "residualHeat=vec3(0.32,0.105,0.018)*peel.g*peel.g",
+                "lit=mix(albedo.rgb,lit,u_detail)+residualHeat"})
             check(ShipSurfaceLighting.FRAGMENT.contains(token),
                     "Laser temper / kinetic metal shader path missing: "+token);
         // In all severity states, char -> soot -> heat must fade to the
