@@ -37,7 +37,9 @@ public final class RocketPdBalanceDiagnostic {
         Shipyard.Design fit=Shipyard.bareHull(Battle.Faction.TERRAN,
                 Shipyard.Hull.DREADNOUGHT);
         int count=0;
-        Shipyard.Mount mount=defense?Shipyard.Mount.DEFENSE:Shipyard.Mount.WEAPON;
+        // PD/FLK are physical weapon hardpoints, not DEFENSE-layer slots.
+        // Match the same number of real weapon mounts on both vessels.
+        Shipyard.Mount mount=Shipyard.Mount.WEAPON;
         for(Shipyard.Slot slot:fit.hull.slots){
             if(count==modules)break;
             if(slot.mount()!=mount)continue;
