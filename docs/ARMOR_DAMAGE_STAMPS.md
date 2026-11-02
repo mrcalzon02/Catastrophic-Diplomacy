@@ -224,3 +224,17 @@ The standalone core test proves that multiple mechanically damaged cells
 from one LASER splash produce exactly one visual mark, survives reload,
 and respects legacy-save compatibility. Capture tests report impact-center
 count against actual weapon hit count.
+
+
+### Keep native source artwork while using the cheap armor mask
+
+The pre-fix renderer discarded high-resolution ship artwork after the first
+hit and drew a 96x144 tinted copy as the *entire hull*. This blurred, discolored
+and degraded every untouched surface. A GPU material pass now samples that
+same inexpensive per-ship mask only as coefficients:
+R=localized scorch, G=heated breach lip, A=remaining armor coverage.
+The original full-resolution sprite remains the GL2/ES2 albedo source even
+after extensive damage; authored normal/emissive maps remain registered.
+Only true armor openings reveal the separate, silhouette-clipped structural
+layer. No damage values, weapon radii, armor balance or source sprites changed.
+Visual checks are diagnostic, not release gates.

@@ -65,6 +65,16 @@ public final class ShipSurfaceDamageVisualTest {
                 "Hot edge must brighten plating without changing the original alpha cut");
         check(ShipSurfaceDamageVisual.stampedPixel(0xffaa2200,1,.5f,1f,0)==0,
                 "Rim cannot paint pixels where there is no hull artwork");
+        // All undamaged pixels must sample the original hull RGB, not a
+        // low-resolution duplicate of its texture.
+        check(ShipSurfaceDamageVisual.maskPixel(0,0,0)==0x000000ff,
+                "Pristine peel must leave original hull unchanged");
+        check(ShipSurfaceDamageVisual.maskPixel(1,0,0)==0xff0000ff,
+                "Scorch intensity is not a substitute ship color");
+        check((ShipSurfaceDamageVisual.maskPixel(0,1,0)&255)==0,
+                "Full armor puncture must reveal actual structural underlay");
+        check(((ShipSurfaceDamageVisual.maskPixel(0,0,1)>>>16)&255)==255,
+                "Heat rim must be independent of armor alpha");
         // In all severity states, char -> soot -> heat must fade to the
         // EXACT original source pixel before reaching the neighboring tile.
         for(float severity:new float[]{.2f,.5f,1f}){

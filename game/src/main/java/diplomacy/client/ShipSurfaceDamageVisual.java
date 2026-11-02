@@ -88,6 +88,12 @@ final class ShipSurfaceDamageVisual {
         return (r<<24)|(g<<16)|(b<<8)|a;
     }
 
+    /** Compact damage coefficients: R=soot, G=hot edge, A=remaining armor. */
+    static int maskPixel(float scorch,float opening,float rim){
+        return (Math.round(clamp(scorch)*255f)<<24)
+                |(Math.round(clamp(rim)*255f)<<16)
+                |Math.round((1f-clamp(opening))*255f);
+    }
     /** Pixmap RGBA8888; nothing may extend beyond the original PNG alpha. */
     static int pixel(int original,float armorExposure,float internalDamage,float grit) {
         int originalAlpha=original&255;

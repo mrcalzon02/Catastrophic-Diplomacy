@@ -486,8 +486,10 @@ public final class TerranPlaceholderSprites implements Disposable {
                     rim=ShipSurfaceDamageVisual.breachRim(crater,left,right,up,down,
                             originalAlpha,originalAlpha);
                 }
-                output.drawPixel(localX,localY,ShipSurfaceDamageVisual.stampedPixel(
-                        originalPixel,damage,crater,rim,rough));
+                // Preserve original artwork at native resolution: encode
+                // local mask coefficients, not a downsampled ship photograph.
+                output.drawPixel(localX,localY,
+                        ShipSurfaceDamageVisual.maskPixel(damage,crater,rim));
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);
@@ -863,13 +865,17 @@ public final class TerranPlaceholderSprites implements Disposable {
                     Math.min(1,ship.hull/Math.max(1,ship.maxHull))),
                     DeceptionProjection.hullOpacity(ship,battle.tick));
             if(!breached(ship)){
+                surfaces.damage(batch,null);
                 drawWhole(batch,tex,pose,width,height,rotation);
             }else{
-                // Damage remains authored-UV registered: peel alpha stays under
-                // the surface shader; uncovered steel is a separate image layer.
+                // Source art must NEVER be replaced by the tiny damage mask.
+                // Only the actual punched-through regions reveal the shared
+                // full-resolution, silhouette-clipped structural material.
+                surfaces.damage(batch,null);
                 drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*.30),
                         pose,width,height,rotation);
-                drawWhole(batch,peeled.get(ship.id).overlay,pose,width,height,rotation);
+                surfaces.damage(batch,peeled.get(ship.id).overlay);
+                drawWhole(batch,tex,pose,width,height,rotation);
             }
         }
         batch.setColor(1,1,1,1);
