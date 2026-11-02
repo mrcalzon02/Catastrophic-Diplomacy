@@ -89,12 +89,12 @@ public final class ShipStandingOrdersTest {
         for(int previous=1;previous<=2;previous++){
             String[] rows=resourceSave.split("\\n");
             StringBuilder older=new StringBuilder("CD-STANDING-").append(previous)
-                    .append('\\n').append("TERRAN").append('\\n');
+                    .append('\n').append("TERRAN").append('\n');
             int fields=previous==1?14:24;
             for(int i=2;i<rows.length-2;i++){
                 String[] values=rows[i].split(",",-1);
                 older.append(String.join(",",java.util.Arrays.copyOf(values,fields)))
-                        .append('\\n');
+                        .append('\n');
             }
             byte[] digest=java.security.MessageDigest.getInstance("SHA-256")
                     .digest(older.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -102,7 +102,7 @@ public final class ShipStandingOrdersTest {
                 older.append(Character.forDigit((value>>>4)&15,16))
                         .append(Character.forDigit(value&15,16));
             }
-            older.append('\\n');
+            older.append('\n');
             var migrated=ShipStandingOrdersCodec.decode(older.toString());
             check(migrated.policies().size()==200&&migrated.policies().get(7L)
                             .resources().equals(ShipResourceOrders.DEFAULT),
