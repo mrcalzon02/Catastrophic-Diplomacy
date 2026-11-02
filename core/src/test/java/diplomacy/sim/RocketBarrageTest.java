@@ -68,15 +68,19 @@ public final class RocketBarrageTest {
                 Battle.Ship shooter=battle.ships().get(0);
                 RocketBarrage.Rack rack=shooter.rocketRacks.get(0);
                 int original=rack.rounds;
+                int cheapStock=shooter.kineticAmmo;
                 for(int tick=0;tick<36;tick++)battle.step();
                 require(battle.rocketRoundsFired==count,
                         "Failed to physically launch every rocket "+size+"/"+count);
-                require(rack.rounds==original-count&&rack.reload>7,
-                        "Cheap rocket magazine is not finite with a real long reload");
+                require(rack.rounds==original-count&&rack.reload>7 &&
+                        shooter.kineticAmmo==cheapStock-
+                                count*rack.cheapAmmoUnitsPerRocket,
+                        "Rocket inventory must consume persisted cheap kinetic stock and reload slowly");
                 require(battle.missiles().isEmpty(),
                         "Dumbfire rockets incorrectly created guided seeker entities");
-                require(rack.magazineUnitCost<30,
-                        "Unguided rocket unit replenishment is not economical");
+                require(rack.magazineUnitCost<55 &&
+                        rack.magazineUnitCost==12*rack.cheapAmmoUnitsPerRocket,
+                        "Cheap rocket stock has no real campaign-credit price advantage");
                 for(Battle.Rocket rocket:battle.rockets()){
                     require(rocket.spec.health()<4
                             &&rocket.targetId==battle.ships().get(1).id,

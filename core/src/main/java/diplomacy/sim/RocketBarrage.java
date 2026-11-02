@@ -41,6 +41,9 @@ public final class RocketBarrage {
         public final Size size;
         public final ProjectileModel.Spec body;
         public final double damage, reloadSeconds, magazineUnitCost;
+        /** Existing campaign kinetic resupply costs 12 credits per unit.
+         * Unlike a 55-credit seeker missile, rockets spend 1-4 simple units. */
+        public final int cheapAmmoUnitsPerRocket;
         public int rounds,salvoCount,salvoRemaining;
         public double reload;
         public Motor motor;
@@ -63,8 +66,8 @@ public final class RocketBarrage {
             reloadSeconds=size.reloadSeconds/StrictMath.min(1.4,StrictMath.max(.7,tracking));
             // Simplified, cheap non-seeker ammunition. This is the material
             // resupply equivalent of rounds, not a guided missile inventory.
-            magazineUnitCost=StrictMath.max(1,StrictMath.ceil(
-                    (size.ordinal()+1)*2.0*StrictMath.sqrt(output)));
+            cheapAmmoUnitsPerRocket=size.ordinal()+1;
+            magazineUnitCost=12.0*cheapAmmoUnitsPerRocket;
             body=new ProjectileModel.Spec(
                     StrictMath.min(900,size.terminalSpeed*StrictMath.min(1.35,tracking)),
                     StrictMath.max(.2,StrictMath.min(4,size.health*integrity)),

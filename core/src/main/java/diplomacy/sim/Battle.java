@@ -2053,7 +2053,9 @@ public final class Battle {
         if(ship.rocketRacks.isEmpty()||ship.power<5||
                 ship.weaponsCondition<=.16||ship.magazineCondition<=.16)return;
         for(RocketBarrage.Rack rack:ship.rocketRacks){
-            if(!rack.canStart()||distance>1900+rack.size.ordinal()*200)continue;
+            if(!rack.canStart()||distance>1900+rack.size.ordinal()*200
+                    ||ship.kineticAmmo<rack.salvoCount*rack.cheapAmmoUnitsPerRocket)
+                continue;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
                     ship,WeaponMuzzles.Family.ROCKET,rack.slot);
             rack.lockedBearing=RocketBarrage.firingAngle(muzzle.x(),muzzle.y(),
@@ -2073,6 +2075,7 @@ public final class Battle {
                 rack.reload=StrictMath.max(0,rack.reload-DT);
                 if(rack.salvoRemaining<=0||rack.nextLaunchTick>tick)continue;
                 if(!source.alive()||source.withdrawing||rack.rounds<=0||
+                        source.kineticAmmo<rack.cheapAmmoUnitsPerRocket||
                         source.magazineCondition<=.16||source.weaponsCondition<=.16||
                         source.power<2||source.heat>source.maxHeat-1){
                     rack.salvoRemaining=0;continue;
@@ -2088,6 +2091,9 @@ public final class Battle {
                         rack.intendedTarget,muzzle.x(),muzzle.y(),bearing);
                 rockets.add(round);
                 rack.rounds--;rack.salvoRemaining--;rack.nextLaunchTick=tick+2;
+                // Paid from persisted campaign stock: physical rocket reload
+                // is 12-48 credits, always cheaper than a seeker missile.
+                source.kineticAmmo-=rack.cheapAmmoUnitsPerRocket;
                 source.power-=1.8;source.heat+=.68;
                 rocketRoundsFired++;
                 source.launched++;
