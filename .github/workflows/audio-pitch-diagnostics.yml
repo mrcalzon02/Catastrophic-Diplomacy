@@ -1,15 +1,9 @@
 name: Optional audio repetition diagnostics
+# On-demand diagnostic: temporarily retired from automatic main-push CI.
+# Its commands, seed matrix, test assertions and artifacts remain intact.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'game/src/main/java/diplomacy/client/AudioPitchVariants.java'
-      - 'game/src/main/java/diplomacy/client/CombatAudio.java'
-      - 'game/src/main/java/diplomacy/client/SpatialAudioRuntime.java'
-      - 'game/src/test/java/diplomacy/client/AudioPitchVariantsTest.java'
-      - 'game/build.gradle'
-      - '.github/workflows/audio-pitch-diagnostics.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
 # Latest push wins for this diagnostic. An explicit manual run has a

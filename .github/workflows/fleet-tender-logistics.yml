@@ -1,16 +1,9 @@
 name: Optional fleet tender logistics diagnostic
+# On-demand diagnostic: temporarily retired from automatic main-push CI.
+# Its commands, seed matrix, test assertions and artifacts remain intact.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/shipyard/TenderDoctrine.java'
-      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
-      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
-      - 'core/src/main/java/diplomacy/sim/Battle.java'
-      - 'core/src/test/java/diplomacy/sim/FleetTenderTest.java'
-      - 'core/build.gradle'
-      - '.github/workflows/fleet-tender-logistics.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
 # Latest push wins for this diagnostic. An explicit manual run has a

@@ -1,21 +1,8 @@
 name: Hull coverage diagnostic - 11 duels and mixed 11v11
 
+# On-demand diagnostic: temporarily retired from automatic main-push CI.
+# Its commands, seed matrix, test assertions and artifacts remain intact.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/hull-coverage-diagnostics.yml'
-      - 'core/src/main/java/diplomacy/sim/HullCoverageBattle.java'
-      - 'core/src/test/java/diplomacy/sim/HullCoverageBattleTest.java'
-      - 'core/src/test/java/diplomacy/sim/ShipSurfaceDamageTest.java'
-      - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
-      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageVisual.java'
-      - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
-      - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
-      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
-      - 'game/src/main/java/diplomacy/client/CombatLightingRenderer.java'
-      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageVisualTest.java'
-      - 'game/build.gradle'
   workflow_dispatch:
 
 permissions:

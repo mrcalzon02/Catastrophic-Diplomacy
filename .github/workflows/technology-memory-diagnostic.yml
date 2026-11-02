@@ -1,13 +1,9 @@
 name: Optional 16MiB technology heap diagnostic
+# On-demand diagnostic: retired from automatic main-push CI.
+# Keep actual full-length test commands and evidence for manual execution.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/tech/**'
-      - 'core/src/test/java/diplomacy/sim/TechnologyHeapSmokeTest.java'
-      - 'core/build.gradle'
-      - '.github/workflows/technology-memory-diagnostic.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
 # Latest push wins for this diagnostic. An explicit manual run has a

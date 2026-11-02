@@ -1,27 +1,8 @@
 name: Authored turret and projectile art diagnostics
 
+# On-demand diagnostic: retired from automatic main-push CI.
+# Keep actual full-length test commands and evidence for manual execution.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/weapon-art-diagnostics.yml'
-      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
-      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
-      - 'game/src/main/java/diplomacy/client/GuidedPayloadVisual.java'
-      - 'game/src/main/java/diplomacy/client/OrdnanceLibrarySprites.java'
-      - 'game/src/test/java/diplomacy/client/OrdnanceLibrarySpritesTest.java'
-      - 'game/src/main/java/diplomacy/client/KineticPayloadVisual.java'
-      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
-      - 'game/src/main/java/diplomacy/client/WeaponStageArt.java'
-      - 'game/src/test/java/diplomacy/client/WeaponStageArtTest.java'
-      - 'game/src/test/java/diplomacy/client/CapitalTurretSpritesTest.java'
-      - 'game/src/test/java/diplomacy/client/GuidedPayloadVisualTest.java'
-      - 'game/src/test/java/diplomacy/client/KineticPayloadVisualTest.java'
-      - 'assets/modules/turrets/**'
-      - 'assets/effects/projectile_fx/curated/**'
-      - 'asset_packs/missile-engine/**'
-      - 'tools/generate_missile_engine_art.py'
-      - 'game/build.gradle'
   workflow_dispatch:
 
 permissions:

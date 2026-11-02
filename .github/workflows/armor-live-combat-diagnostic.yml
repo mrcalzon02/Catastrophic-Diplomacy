@@ -1,18 +1,9 @@
 name: Optional armor live-fire and engineering diagnostic
+# On-demand diagnostic: temporarily retired from automatic main-push CI.
+# Its commands, seed matrix, test assertions and artifacts remain intact.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/test/java/diplomacy/sim/ArmorLiveFireTrial.java'
-      - 'core/src/test/java/diplomacy/sim/ArmorEngineeringTest.java'
-      - 'core/src/test/java/diplomacy/sim/CampaignAfterActionTest.java'
-      - 'core/src/main/java/diplomacy/shipyard/ArmorMaterials.java'
-      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
-      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
-      - 'core/src/main/java/diplomacy/sim/Battle.java'
-      - 'core/build.gradle'
-      - '.github/workflows/armor-live-combat-diagnostic.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
 # Latest push wins for this diagnostic. An explicit manual run has a

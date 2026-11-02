@@ -89,3 +89,65 @@ not disabled.
 
 This is an execution audit; successful completion of the new workflows
 must be read back from GitHub rather than inferred from committed YAML.
+
+## Immediate runner-queue reduction — 2026-11-02
+
+This supersedes the earlier policy table **for automatic scheduling**.
+The original trigger arrangement was still scheduling complete Windows MSI,
+Linux application, signed Android APK, Android emulators, and a release
+publication attempt for **every push to main**, even when only weapon visuals
+or documentation changed. A live REST audit found **19 queued** and **6
+reported in-progress** runs; queued included **12 obsolete releases** and
+three SHA-specific seven-seed 200v200 battle matrices.
+
+### Automatic workflows after this change
+
+1. `armor-damage-visual-diagnostic.yml`: **push only on its narrow
+   armor renderer/test/file changes**, plus manual dispatch. This is the
+   current visual iteration workstream; 33 scenarios remain in the existing
+   capture until the fast subset has been verified.
+2. `rocket-pd-balance-diagnostic.yml`: **push only on its point-defense,
+   ordnance and diagnostic source changes**, plus manual dispatch. Current
+   PD-load work is actively exercised here.
+3. `fighter-wings.yml`: **pull_request only**, retaining objective
+   functional gates before merge; no `main` push trigger.
+
+### On-demand / dormant workflows (no automatic push)
+
+- `continuous-functional-release.yml` — **manual only**. All complete
+  Windows/Linux/Android installs, Android 10 faction regressions, signing,
+  updater checks and the draft-before-publish safety gate are preserved
+  verbatim. Ordinary source commits no longer build release packages.
+- `randomized-combat-endurance.yml` — **manual only**, existing seven
+  seeds and terminal replay evidence retained. This changes scheduling
+  for NEW pushes; it does not cancel any previous in-progress work.
+- `armor-live-combat-diagnostic.yml`
+- `audio-pitch-diagnostics.yml`
+- `fleet-logistics-diagnostics.yml`
+- `fleet-tender-logistics.yml`
+- `hull-coverage-diagnostics.yml`
+- `technology-memory-diagnostic.yml`
+- `weapon-art-diagnostics.yml`
+
+The last seven are also **manual-only**; no test code, assertions or
+artifact outputs have been deleted. Dormant diagnostic suites can be
+manually dispatched when their area of development becomes active again.
+All 12 definitions stay in version control for reproducibility.
+
+### Legacy queued jobs
+
+Editing triggers **does not retroactively cancel runs** already queued
+by GitHub. Older SHA-based release groups also do not participate in
+newer release concurrency. The GitHub connector currently supports
+workflow read, rerun and artifact actions but does **not** expose a
+cancel-run action. To free those runners immediately, the obsolete
+legacy releases must be cancelled in GitHub Actions; do not cancel the
+current armor diagnostic, current PD diagnostics, or actively executing
+user-requested endurance runs.
+
+### Release policy
+
+Full-release checks remain a prerequisite to **publishing** a manual
+release, not a prerequisite for every individual artwork iteration.
+PR functional validation remains automatic. Test failures require repair
+rather than being converted into silent passes or art-style release gates.
