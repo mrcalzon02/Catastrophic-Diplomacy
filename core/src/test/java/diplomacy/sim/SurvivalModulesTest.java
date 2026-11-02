@@ -69,6 +69,64 @@ public final class SurvivalModulesTest {
                 check(blocked,"Premature skirmish unlock "+id);
             }
         }
+
+        check(SurvivalHardwareCatalog.VARIANTS.size()==48,
+                "Exactly 48 additional survival variants required");
+        for(var v:SurvivalHardwareCatalog.VARIANTS){
+            var parent=SurvivalHardwareCatalog.find(v.root());
+            check(parent!=null&&v.requiredTier()>=parent.requiredTier(),
+                    "Variant bypasses parent tier "+v.code());
+            Shipyard.Mount mount=switch(parent.category()){
+                case "systems" -> Shipyard.Mount.SYSTEM;
+                case "habitat" -> Shipyard.Mount.HABITAT;
+                case "support" -> Shipyard.Mount.SUPPORT;
+                default -> throw new AssertionError("Invalid survival mount");
+            };
+            int slot=socket(empty.hull,mount);
+            String id="BASE-TER-"+v.code();
+            var module=catalog.base(id);
+            check(module!=null&&Shipyard.accepts(empty.hull,slot,module),
+                    "Missing actual physical variant "+id);
+            Shipyard.Design design=empty.install(slot,id);
+            check(Shipyard.inspect(design,catalog).valid(),"Invalid fitted variant "+id);
+            check(Shipyard.decode(Shipyard.encode(design),catalog)
+                    .at(slot).component.equals(id),"Variant blueprint lost ID "+id);
+            var fitted=Shipyard.fit(design,catalog);
+            check(switch(v.root()){
+                case "DMC" -> fitted.damageControl()>baseline.damageControl();
+                case "HCR" -> fitted.survival().crewProtection()>0;
+                case "CIC" -> fitted.survival().commandProtection()>0;
+                case "FBN" -> fitted.survival().fuelBonus()>0;
+                case "AMV" -> fitted.magazineCapacity()>baseline.magazineCapacity();
+                case "EPD" -> fitted.survival().escapePods()>0;
+                case "RCB" -> fitted.survival().recoveryBeacon();
+                case "PGO","JPB","IBR","IRG" -> fitted.powerRegen()>baseline.powerRegen()
+                        &&fitted.survival().instability()>0;
+                case "IST" -> fitted.coolingRate()>baseline.coolingRate()
+                        &&fitted.survival().instability()>0;
+                default -> false;
+            },"Survival variant has no real battle effect "+id);
+            if(v.requiredTier()>0){
+                boolean rejected=false;
+                try{CampaignShipyardRules.requireAllowed(design,design.faction,
+                        v.requiredTier()-1,1);
+                }catch(IllegalArgumentException expected){rejected=true;}
+                check(rejected,"Premature campaign authorization "+id);
+                rejected=false;
+                try{SkirmishTechnologyRules.unrestricted()
+                        .withStage(v.requiredTier()-1).requireAllowed(design,catalog);
+                }catch(IllegalArgumentException expected){rejected=true;}
+                check(rejected,"Premature skirmish authorization "+id);
+            }
+        }
+        Shipyard.Design fieldPod=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
+                "BASE-TER-EPDP");
+        Shipyard.Design advancedPod=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
+                "BASE-TER-EPDA");
+        check(Shipyard.fit(fieldPod,catalog).survival().escapePods()<
+                Shipyard.fit(advancedPod,catalog).survival().escapePods(),
+                "Alternate escape hardware must change finite rescue capacity");
+
         Shipyard.Design bunker=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
                 "BASE-TER-FBN");
         Shipyard.Design vault=empty.install(socket(empty.hull,Shipyard.Mount.SUPPORT),
@@ -205,6 +263,6 @@ public final class SurvivalModulesTest {
         for(int tick=0;tick<510;tick++)clean.step();
         check(clean.ships().get(0).hazardFailures==0,
                 "Undamaged safe bare hull must never roll retrofit faults");
-        System.out.println("PASS twelve physical survival and unsafe engineering lines");
+        System.out.println("PASS twelve survival roots and 48 physical variants including unsafe engineering");
     }
 }
