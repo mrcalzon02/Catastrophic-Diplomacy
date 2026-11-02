@@ -94,16 +94,26 @@ public final class RocketBarrageTest {
         // throughput, not only add radar reach or decoration to a ship.
         Shipyard.Design pdOne=Shipyard.bareHull(Battle.Faction.TERRAN,
                 Shipyard.Hull.DREADNOUGHT);
-        int firstDefense=-1,secondDefense=-1;
+        // PD/FLK are weapon-category turret hardware in the real catalog,
+        // not shield/armor DEFENSE fittings. Use two separate legal hardpoints
+        // rather than relaxing the shipyard's physical mount restrictions.
+        var pdModule=tech.base("BASE-TER-PD");
+        require(pdModule!=null&&"weapons".equals(pdModule.category),
+                "PD benchmark must use the catalog's real weapon-category turret");
+        int firstWeapon=-1,secondWeapon=-1;
         for(Shipyard.Slot slot:pdOne.hull.slots)
-            if(slot.mount()==Shipyard.Mount.DEFENSE){
-                if(firstDefense<0)firstDefense=slot.index();
-                else if(secondDefense<0){secondDefense=slot.index();break;}
+            if(slot.mount()==Shipyard.Mount.WEAPON &&
+                    Shipyard.accepts(pdOne.hull,slot.index(),pdModule)){
+                if(firstWeapon<0)firstWeapon=slot.index();
+                else if(secondWeapon<0){secondWeapon=slot.index();break;}
             }
-        require(firstDefense>=0&&secondDefense>=0,
-                "PD module count benchmark requires actual distinct sockets");
-        pdOne=pdOne.install(firstDefense,"BASE-TER-PD");
-        Shipyard.Design pdTwo=pdOne.install(secondDefense,"BASE-TER-PD");
+        require(firstWeapon>=0&&secondWeapon>=0,
+                "PD module count benchmark requires two legal distinct weapon sockets");
+        pdOne=pdOne.install(firstWeapon,"BASE-TER-PD");
+        Shipyard.Design pdTwo=pdOne.install(secondWeapon,"BASE-TER-PD");
+        require(Shipyard.inspect(pdOne,tech).valid()&&
+                Shipyard.inspect(pdTwo,tech).valid(),
+                "Paid PD benchmark fittings must both pass actual shipyard engineering");
         require(Shipyard.fit(pdTwo,tech).pdCycle()<
                 Shipyard.fit(pdOne,tech).pdCycle()*.65,
                 "Two paid laser PD mounts must provide more real firing capacity than one");
