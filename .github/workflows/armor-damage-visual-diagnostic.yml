@@ -291,3 +291,60 @@ jobs:
           path: test-output/armor-observation/individual/missile-terran-upper-pristine/
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Downloadable six-weapon matched-hull evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-six-weapon-examples-${{ github.run_id }}
+          path: test-output/armor-observation/examples/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable plasma-terran-upper original-ship comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-plasma-terran-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/plasma-terran-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable plasma-terran-upper-pristine original-ship comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-plasma-terran-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/plasma-terran-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable particle-terran-upper original-ship comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-particle-terran-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/particle-terran-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable particle-terran-upper-pristine original-ship comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-particle-terran-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/particle-terran-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable torpedo-terran-upper original-ship comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-torpedo-terran-upper-${{ github.run_id }}
+          path: test-output/armor-observation/individual/torpedo-terran-upper/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Downloadable torpedo-terran-upper-pristine original-ship comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-armor-torpedo-terran-upper-pristine-${{ github.run_id }}
+          path: test-output/armor-observation/individual/torpedo-terran-upper-pristine/
+          if-no-files-found: warn
+          retention-days: 30
