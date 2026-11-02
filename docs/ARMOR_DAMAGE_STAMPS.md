@@ -164,3 +164,20 @@ The exposed structural underlay is now lit at 40% of the original composited
 color rather than 25%; original hull silhouette, shader inputs, saved physical
 armor, hit points, masks, and battlefield balance are unchanged. This is
 a small cosmetic refinement subject to actual framebuffer comparison.
+
+
+### Weapon-light contamination diagnosis and forensic isolation
+
+The same Vaerith Prism corvette has ordinary purple/silver source art when
+pristine, but near-full cyan tint after LASER impact, and gold tint after
+KINETIC impact. The prior `surface.png` excluded floating/glow FX but
+**still fed the real `Battle.visualEvents()` into `ShipLightProbes`**.
+That shader adds the weapon color to the albedo across its 108–150-unit
+light influence radius, obscuring the vessel's own material.
+
+In an optional forensic-only rendering entrypoint, the game's original
+ship surface shader and real directional armor peel remain active, but the
+transient weapon probes are disabled and shield/ECM overlays are omitted.
+Production five-argument rendering is unchanged. Compare the new
+`surface.png` (physical damage) with `close.png` (full combat lighting).
+No combat mechanics or source sprites are modified.

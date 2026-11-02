@@ -2697,7 +2697,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
-        if(terranSprites!=null && terranSprites.loaded()>0)terranSprites.render(battle,batch,renderPoses,view,shieldFx);
+        if(terranSprites!=null && terranSprites.loaded()>0)
+            terranSprites.render(battle,batch,renderPoses,view,shieldFx,surfaceCapture);
         if(craftSprites!=null)try {
             craftSprites.render(battle,batch,renderPoses,view);
         }catch(RuntimeException failed){

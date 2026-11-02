@@ -795,6 +795,13 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
                        CombatViewBounds view,ShieldFxTimeline shieldFx) {
+        render(battle,batch,poses,view,shieldFx,false);
+    }
+    /** Diagnostic surface capture: real damage masks and original ship art
+     * without transient weapon probe lighting or shield coverage. */
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
+                       CombatViewBounds view,ShieldFxTimeline shieldFx,
+                       boolean forensicSurface) {
         if(assetPaths.isEmpty())return;
         artFrame++;
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
@@ -823,7 +830,9 @@ public final class TerranPlaceholderSprites implements Disposable {
         // Prune only truly repaired/dead/missing ships. Off-screen vessels
         // retain their masks so a camera pan cannot cause texture thrashing.
         retireUnusedPeels();
-        surfaces.begin(batch,battle,view);
+        // Do not allow recent weapon events to recolor the entire ship during
+        // forensic inspection. Production five-argument rendering is unchanged.
+        surfaces.begin(batch,forensicSurface?null:battle,view);
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship))continue;
             Texture tex=texture(ship);
@@ -851,6 +860,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         batch.setColor(1,1,1,1);
         surfaces.end(batch);
+        if(forensicSurface){
+            trimIdleShipTextures();
+            return;
+        }
         // Active holographic ECM displays false electronic contacts using
         // transparent copies of the EXACT source-art hull. These are never
         // second physical ships and receive no damage/shields/hardpoints.
