@@ -22,7 +22,9 @@ final class ShipSurfaceDamageCapture {
         "kinetic-aureate", "kinetic-aureate-pristine",
         "kinetic-zelthar", "kinetic-zelthar-pristine",
         "kinetic-aureate-upper", "kinetic-aureate-upper-pristine",
-        "kinetic-terran-upper", "kinetic-terran-upper-pristine"
+        "kinetic-terran-upper", "kinetic-terran-upper-pristine",
+        "laser-terran-upper", "laser-terran-upper-pristine",
+        "missile-terran-upper", "missile-terran-upper-pristine"
     };
     static final long SEED=202611010140L;
     record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
@@ -84,7 +86,7 @@ final class ShipSurfaceDamageCapture {
         }
         final String weapon=switch(index){
             case 3,7,12,13,14,15,16,17,18,19,20,21,22 -> "KINETIC";
-            case 4 -> "MISSILE";
+            case 4,25,26 -> "MISSILE";
             case 9 -> "PLASMA";
             case 10 -> "PARTICLE";
             case 11 -> "TORPEDO";
@@ -116,7 +118,7 @@ final class ShipSurfaceDamageCapture {
         Battle.Faction targetFaction=index==15||index==16||index==19||index==20?
                 Battle.Faction.AUREATE_SYNOD:
                 index==17||index==18?Battle.Faction.ZELTHAR_LUMINARI:
-                (index==3||index==12||index==13||index==14||index==21||index==22)?
+                (index==3||index==12||index==13||index==14||index>=21)?
                 Battle.Faction.TERRAN:Battle.Faction.VAERITH_PRISM;
         Shipyard.Design targetDesign=Shipyard.starter(targetFaction,hull);
         for(Shipyard.Slot slot:targetDesign.placements())
@@ -174,7 +176,7 @@ final class ShipSurfaceDamageCapture {
         // attacker remains autonomous and still hits with genuine projectiles.
         final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
         if(index==0||index==13||index==14||index==16||index==18||
-                index==20||index==22)
+                index==20||index==22||index==24||index==26)
             return record(KEYS[index],weapon,seed,battle,victim,true,false);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
@@ -199,6 +201,7 @@ final class ShipSurfaceDamageCapture {
                 case 9,10,11 -> battle.hitCount>=1&&armor>.01;
                 case 12 -> battle.hitCount>=3&&interior>.01;
                 case 15,17,19,21 -> battle.hitCount>=3&&armor>.01;
+                case 23,25 -> battle.hitCount>=2&&armor>.01;
                 default -> false;
             };
             // Never fabricate a surviving ship or repair a dead target simply
