@@ -33,6 +33,7 @@ public final class ModuleBranchEffects {
         // behavioral physics of its base sensor/detector lineage.
         String parent=SensingVariantCatalog.root(subsystem);
         if(!parent.equals(subsystem))return tune(parent,branch,rank);
+        if(subsystem.equals("DMC"))return tune("REP",branch,rank);
         // Every newly installed logistics family has its own research ID but
         // uses the corresponding calibrated doctrine rather than neutral tuning.
         if(Set.of("HPR","APR","PWR","AHL","ASH","AAR","APW").contains(subsystem))

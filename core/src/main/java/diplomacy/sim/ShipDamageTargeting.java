@@ -86,6 +86,10 @@ public final class ShipDamageTargeting {
             case "ENG" -> Battle.Subsystem.ENGINES;
             case "RAD" -> Battle.Subsystem.COOLING;
             case "SEN","RDR","IRT","ACU","XRY","GRA" -> Battle.Subsystem.SENSORS;
+            case "DMC","HCR","CIC","EPD","RCB" -> Battle.Subsystem.COMMAND;
+            case "FBN","AMV" -> Battle.Subsystem.MAGAZINE;
+            case "PGO","JPB","IBR","IRG" -> Battle.Subsystem.REACTOR;
+            case "IST" -> Battle.Subsystem.COOLING;
             case "HTD" -> Battle.Subsystem.COOLING;
             case "LAS","KIN","MSL","TOR","PAR","PLA" -> Battle.Subsystem.WEAPONS;
             case "PD","FLK" -> Battle.Subsystem.POINT_DEFENSE;

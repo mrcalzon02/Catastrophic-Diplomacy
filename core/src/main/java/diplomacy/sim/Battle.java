@@ -115,6 +115,11 @@ public final class Battle {
         public double infraredRange,xrayRange,graviticRange;
         public double thermalSignature=1,opticalSignature=1,sensorAcuity=1;
         public double hologramNoise;
+        /** Fitted crew, command, fuel, magazine, rescue and unsafe engineering. */
+        public double crewProtection,commandProtection,fuelProtection,magazineContainment;
+        public double hazardInstability,hazardSeverity;
+        public int escapePods,evacuatedCrew,hazardFailures;
+        public boolean recoveryBeacon,recoveryBeaconActivated;
         /** Physical ammunition comes from fitted launch modules, not sprite geometry. */
         public ProjectileModel.Spec kineticProjectile=ProjectileModel.standard(ProjectileModel.Kind.KINETIC);
         public ProjectileModel.Spec missileProjectile=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
@@ -854,6 +859,14 @@ public final class Battle {
         s.opticalSignature=machinery.sensing().opticalSignature();
         s.sensorAcuity=machinery.sensing().acuity();
         s.hologramNoise=machinery.sensing().hologramNoise();
+        s.crewProtection=machinery.survival().crewProtection();
+        s.commandProtection=machinery.survival().commandProtection();
+        s.fuelProtection=machinery.survival().fuelProtection();
+        s.magazineContainment=machinery.survival().magazineContainment();
+        s.escapePods=machinery.survival().escapePods();
+        s.recoveryBeacon=machinery.survival().recoveryBeacon();
+        s.hazardInstability=machinery.survival().instability();
+        s.hazardSeverity=machinery.survival().hazardSeverity();
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
@@ -910,7 +923,8 @@ public final class Battle {
                 +(int)StrictMath.floor(s.tenders.capacity(TenderDoctrine.Cargo.MISSILE));
         s.maxTorpedoAmmo=core.torpedoStores()+machinery.magazineCapacity()/3
                 +(int)StrictMath.floor(s.tenders.capacity(TenderDoctrine.Cargo.TORPEDO));
-        s.maxFuel+=s.tenders.capacity(TenderDoctrine.Cargo.FUEL);
+        s.maxFuel+=s.tenders.capacity(TenderDoctrine.Cargo.FUEL)
+                +machinery.survival().fuelBonus();
         s.fuel=s.maxFuel;
         s.kineticAmmo=s.maxKineticAmmo;
         s.missileAmmo=s.maxMissileAmmo;
@@ -1070,6 +1084,7 @@ public final class Battle {
         refreshSharedContacts();
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
+            if(!s.alive())continue;
             // A lone, unarmed exhibition captain with viable engines has no
             // remaining offensive mission. Order a genuine physical extraction
             // instead of leaving two opposing fleets alive indefinitely.
@@ -1193,12 +1208,55 @@ public final class Battle {
         }
     }
 
+    /** Unsafe hardware only: deterministic per-ship risk, heat and crew consequences.
+     * Does not use the global combat random stream. */
+    private void checkUnsafeEngineering(Ship s) {
+        if(s.hazardInstability<=0||tick%30!=0)return;
+        double stress=StrictMath.max(0,s.heat/StrictMath.max(1,s.maxHeat));
+        long noise=seed^(((long)s.id)<<32)^(tick*0x9e3779b97f4a7c15L);
+        noise^=noise>>>33;noise*=0xff51afd7ed558ccdL;
+        noise^=noise>>>33;noise*=0xc4ceb9fe1a85ec53L;noise^=noise>>>33;
+        double roll=(noise>>>11)*0x1.0p-53;
+        if(roll>=StrictMath.min(.68,s.hazardInstability*(.014+.082*stress)))return;
+        double severity=StrictMath.max(.1,s.hazardSeverity);
+        s.hazardFailures++;
+        s.power=StrictMath.max(0,s.power-10*severity);
+        s.heat+=6*severity;
+        s.sensorsCondition=StrictMath.max(0,s.sensorsCondition-.09*severity);
+        s.commandCondition=StrictMath.max(0,s.commandCondition-.07*severity);
+        if(s.fittedCrewSystems)
+            s.crewCount=StrictMath.max(0,s.crewCount-
+                    severity*1.2*(1-s.crewProtection));
+        // Unsafe internal faults bypass the OUTER shield, not crew protection.
+        s.hull-=StrictMath.min(s.maxHull*.12,4.5*severity);
+        log(s.name+" unsafe power retrofit suffered internal fault");
+        if(s.hull<=0)destroyHull(s,null);
+    }
+
+    private void destroyHull(Ship defender,Ship attacker) {
+        if(defender.retired)return;
+        defender.hull=0;defender.retired=true;destructions++;
+        if(attacker!=null)attacker.kills++;
+        if(defender.fittedCrewSystems) {
+            defender.evacuatedCrew=(int)StrictMath.floor(
+                    StrictMath.min(defender.crewCount,defender.escapePods));
+            defender.crewCount=0;
+        }
+        defender.recoveryBeaconActivated=defender.recoveryBeacon;
+        if(defender.evacuatedCrew>0)
+            log(defender.name+" evacuated "+defender.evacuatedCrew+" crew via escape pods");
+        if(defender.recoveryBeaconActivated)
+            log(defender.name+" recovery beacon transmitted wreck position");
+        log(defender.name+" shattered at T+"+tick/30+"s");
+    }
+
     private void replenish(Ship s) {
         s.power = Math.max(0, Math.min(s.maxPower * s.reactorCondition,
                 s.power + s.powerRegen * DT * s.reactorCondition
                         * s.crewReadiness() - weather.powerDrainPerSecond() * DT));
         s.heat = Math.max(0, s.heat + (s.passiveHeat + weather.heatPerSecond()
                 - s.coolingRate * s.coolingCondition * weather.coolingFactor()) * DT);
+        checkUnsafeEngineering(s);
         // Regenerate individual shield facings, subject to cooldown, reactor and power headroom.
         double rechargeCost=s.defense.recharge(DT,StrictMath.max(0,s.power-3),
                 s.reactorCondition>0.15 && s.heat<s.maxHeat*0.9);
@@ -3004,7 +3062,8 @@ public final class Battle {
             // Penetrating hits may kill personnel or disrupt occupied decks.
             // No random free crew is conjured when shields subsequently recharge.
             defender.crewCount=Math.max(0,defender.crewCount
-                    -damage/Math.max(1,defender.maxHull)*defender.crewRequired*0.38);
+                    -damage/Math.max(1,defender.maxHull)*defender.crewRequired*0.38
+                    *(1-defender.crewProtection));
         }
         var secondary=WeaponBehaviorTable.damage(kind);
         if(secondary.energyDrain()>0)
@@ -3027,18 +3086,15 @@ public final class Battle {
                 case POINT_DEFENSE: defender.pointDefenseCondition = Math.max(0, defender.pointDefenseCondition - loss); break;
                 case SENSORS: defender.sensorsCondition = Math.max(0, defender.sensorsCondition - loss); break;
                 case COOLING: defender.coolingCondition = Math.max(0, defender.coolingCondition - loss); break;
-                case COMMAND: defender.commandCondition = Math.max(0, defender.commandCondition - loss); break;
+                case COMMAND: defender.commandCondition = Math.max(0,
+                        defender.commandCondition-loss*(1-defender.commandProtection)); break;
                 case HANGAR: defender.damageFighterBay(socket,loss); break;
                 case MAGAZINE: defender.magazineCondition=Math.max(0,defender.magazineCondition-loss); break;
                 case ELECTRONIC_WARFARE: defender.ecmCondition=Math.max(0,defender.ecmCondition-loss); break;
                 default: break;
             }
         }
-        if (defender.hull <= 0) {
-            defender.hull = 0; defender.retired = true; destructions++;
-            if (attacker != null) attacker.kills++;
-            log(defender.name + " shattered at T+" + tick / 30 + "s");
-        }
+        if(defender.hull<=0)destroyHull(defender,attacker);
     }
     private void radio(Battle.Ship source,CrewChatter.Event event){
         if(source==null||tick-source.lastChatterTick<90||
@@ -3078,6 +3134,9 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));
+            hash=mix(hash,s.evacuatedCrew);
+            hash=mix(hash,s.hazardFailures);
+            hash=mix(hash,s.recoveryBeaconActivated?1:0);
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));
             hash = mix(hash,s.defense.fingerprint());

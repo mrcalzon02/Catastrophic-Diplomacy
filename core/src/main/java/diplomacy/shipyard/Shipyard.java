@@ -532,9 +532,10 @@ public final class Shipyard {
             draw+=p.power;
             switch(p.base.subsystem) {
                 case "REA" -> generation+=p.effect*3.0;
-                case "RAD" -> cooling+=p.effect*p.cooling*2.3;
+                case "PGO","JPB","IBR","IRG" -> generation+=p.effect*2.1;
+                case "RAD","IST" -> cooling+=p.effect*p.cooling*2.3;
                 case "ENG" -> { /* existing drive is upgraded in fit() */ }
-                case "CRW" -> crewBerths+=p.effect*design.hull.massCapacity*0.12;
+                case "CRW","HCR" -> crewBerths+=p.effect*design.hull.massCapacity*0.12;
                 case "LFS" -> lifeSupport+=p.effect*design.hull.massCapacity*0.12;
                 case "KIN", "LAS", "MSL", "TOR", "PAR", "PLA" -> { }
                 default -> { }
@@ -699,6 +700,10 @@ public final class Shipyard {
                           double graviticRange,double radarSignature,
                           double thermalSignature,double opticalSignature,
                           double acuity,double hologramNoise) { }
+    public record Survival(double crewProtection,double commandProtection,
+                           double fuelBonus,double fuelProtection,
+                           double magazineContainment,int escapePods,boolean recoveryBeacon,
+                           double instability,double hazardSeverity) { }
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
                          double speed, double accuracy, double laserDamage, double missileDamage,
@@ -713,7 +718,7 @@ public final class Shipyard {
                          Weapons weapons,Support support,double pdCycle,
                          HullBaseline.Stats baseline,Crew crew,
                          AmmunitionResearch.Access ammunition,
-                         double shieldRechargeBoost,Sensing sensing) { }
+                         double shieldRechargeBoost,Sensing sensing,Survival survival) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -734,6 +739,11 @@ public final class Shipyard {
         double radarGain=1,infraredRange=0,xrayRange=0,graviticRange=0;
         double radarSignature=1,thermalSignature=1,opticalSignature=1;
         double acuity=1,hologramNoise=0;
+        double crewProtection=0,commandProtection=0,fuelBonus=0,fuelProtection=0,
+                magazineContainment=0,hazardInstability=0,hazardSeverity=0,
+                rechargeBoost=0,extraHazardHeat=0;
+        int escapePods=0;
+        boolean recoveryBeacon=false;
         double[] ranges=new double[6],cycles=new double[6],trackers=new double[6];
         int[] weaponCounts=new int[6];
         double selfRate=0,remoteRate=0,remoteRange=180;
@@ -832,6 +842,58 @@ public final class Shipyard {
                     remoteRange=Math.max(remoteRange,180*tuning.reach());
                     efficiency=Math.max(efficiency,tuning.supportEfficiency());
                 }
+                case "DMC" -> {
+                    repair+=p.effect*0.0008;
+                    selfRate+=p.effect*0.040*tuning.selfRepair();
+                }
+                case "HCR" -> {
+                    accommodation+=p.effect*design.hull.massCapacity*0.12;
+                    crewProtection+=0.21*(p.effect/p.base.effect);
+                }
+                case "CIC" -> {
+                    commandProtection+=0.30*(p.effect/p.base.effect);
+                    crewProtection+=0.09*(p.effect/p.base.effect);
+                }
+                case "FBN" -> {
+                    fuelBonus+=46*(p.effect/p.base.effect);
+                    fuelProtection+=0.34*(p.effect/p.base.effect);
+                }
+                case "AMV" -> {
+                    magazines+=(int)StrictMath.round(12*(p.effect/p.base.effect));
+                    magazineContainment+=0.43*(p.effect/p.base.effect);
+                }
+                case "EPD" -> escapePods+=Math.max(1,
+                        (int)StrictMath.round(12*(p.effect/p.base.effect)));
+                case "RCB" -> recoveryBeacon=true;
+                case "PGO" -> {
+                    rechargeBoost+=4.5*(p.effect/p.base.effect);
+                    extraHazardHeat+=1.8;
+                    hazardInstability+=0.045;
+                    hazardSeverity=Math.max(hazardSeverity,0.6);
+                }
+                case "JPB" -> {
+                    rechargeBoost+=14*(p.effect/p.base.effect);
+                    extraHazardHeat+=7.5;
+                    hazardInstability+=0.24;
+                    hazardSeverity=Math.max(hazardSeverity,1.25);
+                }
+                case "IBR" -> {
+                    rechargeBoost+=9*(p.effect/p.base.effect);
+                    extraHazardHeat+=5.7;
+                    hazardInstability+=0.34;
+                    hazardSeverity=Math.max(hazardSeverity,1.08);
+                }
+                case "IST" -> {
+                    extraHazardHeat+=1.2;
+                    hazardInstability+=0.28;
+                    hazardSeverity=Math.max(hazardSeverity,0.88);
+                }
+                case "IRG" -> {
+                    rechargeBoost+=12*(p.effect/p.base.effect);
+                    extraHazardHeat+=8.4;
+                    hazardInstability+=0.43;
+                    hazardSeverity=Math.max(hazardSeverity,1.5);
+                }
                 case "ECM" -> ecm+=p.effect*0.007*p.accuracy;
                 case "FTR" -> fighters+=2+(int)(p.effect/18.0);
                 case "DRN" -> {
@@ -864,7 +926,8 @@ public final class Shipyard {
         double mobility=(36+thrust*1.3)*design.hull.mobility
                 *(1-0.35*report.mass()/design.hull.massCapacity);
         double charge=baseline.powerRegen()
-                +Math.max(2,(report.generation()-report.demand())*0.36);
+                +Math.max(2,(report.generation()-report.demand())*0.36)
+                +rechargeBoost;
         for(int i=0;i<6;i++){
             ranges[i]=weaponCounts[i]==0?1:ranges[i]/weaponCounts[i];
             cycles[i]=weaponCounts[i]==0?1:cycles[i]/weaponCounts[i];
@@ -872,7 +935,8 @@ public final class Shipyard {
         }
         return new Fitted(hull,shields,armor,Math.min(0.75,sif),
                 baseline.power()+report.generation()*0.95,
-                110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),report.generatedHeat()*0.15,
+                110+report.cooling()*0.3,charge,Math.max(6,report.cooling()*0.27),
+                report.generatedHeat()*0.15+extraHazardHeat,
                 baseline.speed()+Math.max(0,mobility)*0.65,
                 Math.min(0.97,accuracy),laser,missile,pd==0?0:70+pd,
                 repair,kinetic,plasma,particle,torpedo,Math.min(0.65,ecm),
@@ -896,7 +960,11 @@ public final class Shipyard {
                         Math.min(950,xrayRange),Math.min(1800,graviticRange),
                         Math.max(0.12,radarSignature),Math.max(0.12,thermalSignature),
                         Math.max(0.12,opticalSignature),Math.min(2.5,acuity),
-                        Math.min(0.75,hologramNoise)));
+                        Math.min(0.75,hologramNoise)),
+                new Survival(Math.min(.80,crewProtection),Math.min(.85,commandProtection),
+                        fuelBonus,Math.min(.80,fuelProtection),
+                        Math.min(.85,magazineContainment),escapePods,recoveryBeacon,
+                        Math.min(2,hazardInstability),hazardSeverity));
     }
 
     /**

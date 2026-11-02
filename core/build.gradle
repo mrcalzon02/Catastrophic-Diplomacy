@@ -459,6 +459,14 @@ tasks.register('gameFlowSmoke', JavaExec) {
 }
 tasks.named('smoke') { finalizedBy(tasks.named('gameFlowSmoke')) }
 tasks.named('gameFlowSmoke') { dependsOn(tasks.named('sensingModulesSmoke')) }
+tasks.register('survivalModulesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Survival, damage control, evacuation and deterministic engineering fault checks.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SurvivalModulesTest'
+    dependsOn testClasses
+}
+tasks.named('gameFlowSmoke') { dependsOn(tasks.named('survivalModulesSmoke')) }
 // Verify all guided salvos and physical flight during functional releases.
 tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
 

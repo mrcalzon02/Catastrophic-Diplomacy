@@ -63,7 +63,7 @@ public final class CampaignAfterAction {
             int pct=(int)Math.round(100*Math.max(0,Math.min(1,
                     now.maxHull<=0?0:now.hull/now.maxHull)));
             entries.add(new Entry(prior.id(),prior.name(),prior.fitting().hull,outcome,pct,
-                    (int)Math.ceil(Math.max(0,before.crew()-now.crewCount)),
+                    (int)Math.ceil(Math.max(0,before.crew()-now.crewCount-now.evacuatedCrew)),
                     Math.max(0,before.kinetic()-now.kineticAmmo),
                     Math.max(0,before.missiles()-now.missileAmmo),
                     Math.max(0,before.torpedoes()-now.torpedoAmmo),

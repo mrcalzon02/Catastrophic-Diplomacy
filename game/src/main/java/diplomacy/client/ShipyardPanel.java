@@ -11,6 +11,7 @@ import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnancePropulsion;
 import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 import diplomacy.shipyard.ModuleBranchEffects;
 import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.LaserFamilies;
@@ -820,7 +821,8 @@ final class ShipyardPanel {
             int position=modulePage*MODULE_OPTIONS_PER_PAGE+index-1;
             if(index>0&&index<=MODULE_OPTIONS_PER_PAGE&&position<options.size()){
                 Component part=options.get(position);
-                int required=SensingVariantCatalog.requiredTier(part.subsystem);
+                int required=Math.max(SensingVariantCatalog.requiredTier(part.subsystem),
+                        SurvivalHardwareCatalog.requiredTier(part.subsystem));
                 if(campaignTechnology()&&campaignRank<required){
                     notice="LOCKED: "+part.name+" requires tech "+required;return true;
                 }
@@ -829,7 +831,10 @@ final class ShipyardPanel {
                 }
                 try{draft=draft.install(selectedSlot,part.id);}
                 catch(IllegalArgumentException blocked){notice=blocked.getMessage();return true;}
-                notice="Installed "+part.name+" (upgrades reset for this mount)";
+                notice=java.util.Set.of("PGO","JPB","IBR","IST","IRG")
+                        .contains(part.subsystem)
+                        ?"UNSAFE RETROFIT: "+part.name+" risks internal faults under load":
+                        "Installed "+part.name+" (upgrades reset for this mount)";
             }
             return true;
         }

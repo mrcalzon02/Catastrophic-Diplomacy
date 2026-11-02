@@ -4,6 +4,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -84,7 +85,8 @@ public record SkirmishTechnologyRules(
             Shipyard.Installed module=design.at(i);
             if(module==null)continue;
             String subsystem=module.component.substring(module.component.lastIndexOf('-')+1);
-            if(maxStage<SensingVariantCatalog.requiredTier(subsystem))
+            if(maxStage<Math.max(SensingVariantCatalog.requiredTier(subsystem),
+                    SurvivalHardwareCatalog.requiredTier(subsystem)))
                 throw new IllegalArgumentException("Hardware "+subsystem+
                         " exceeds skirmish technology cap "+maxStage);
             if(module.mark>Math.min(4,maxStage+1))
