@@ -38,3 +38,32 @@ modules are never automatically restored.
 Acceptance: verify eleven native families per subsystem, nine levels x four
 parallel tracks, functional fittings, survival outcomes, unsafe-only fault
 probabilities, deterministic replays, and persistence through existing designs.
+
+## Forty-eight additional survival sidegrades
+
+All twelve original survival and unsafe-retrofit roots now have four physical
+alternatives: field (P), compact (C), hardened (H) and advanced (A). For
+example, `EPDP`, `EPDC`, `EPDH`, and `EPDA` represent separate
+escape-pod batteries. Every alternative occupies the parent's actual hull
+socket but has its own native module ID, mass, power, heat, integrity,
+purchase cost, output, and minimum technology tier. These alternatives
+are separate from the four mutually exclusive research branches and the
+five existing manufacturing patterns.
+
+Field hardware is cheap and weak; compact reduces installed mass but
+costs integrity and thermal efficiency; hardened increases durability
+at considerable mass and expense; advanced equipment has the greatest
+output and most demanding cost and power budgets. Unsafe variants carry
+an explicit **UNSAFE RETROFIT** label and preserve the same seeded
+underlying fault origins, modified by each variant's reliability risk.
+No safe device gains random retrofit failures.
+
+There are 48 new hardware lineages across eleven factions: **528 additional
+physical components** and **19,008 nine-tier research entries**. Their
+independent research IDs are resolved on demand instead of materializing
+12,672 extra Stage I–VI objects at Android startup. Existing root IDs and
+blueprint formats remain unchanged.
+
+Acceptance includes physical fitting, mounted effects, tier enforcement,
+nine-tier prerequisite chains, blueprint persistence, unsafe-fault isolation
+and the 16 MiB technology heap regression test.
