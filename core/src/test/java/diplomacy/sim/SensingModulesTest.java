@@ -181,6 +181,18 @@ public final class SensingModulesTest {
         enemy.maxHull=140;
         require(!duel.hasTargetContact(spotter,enemy,430),
                 "Tiny unpowered escort must not inherit capital visual range");
+        enemy.x=spotter.x+780;
+        spotter.sensorRange=1050;spotter.infraredRange=960;
+        spotter.xrayRange=960;spotter.graviticRange=980;
+        spotter.power=50;spotter.sensorsCondition=1;
+        require(duel.hasTargetContact(spotter,enemy,780),
+                "Powerful real scanner hardware must acquire a distant target");
+        spotter.power=0;
+        require(!duel.hasTargetContact(spotter,enemy,780),
+                "Unpowered radar/IR/X-ray/gravitic equipment must not grant target locks");
+        spotter.power=50;spotter.sensorsCondition=0;
+        require(!duel.hasTargetContact(spotter,enemy,780),
+                "Disabled scanner circuits must not keep detecting distant vessels");
         enemy.maxHull=550;enemy.radarCrossSection=1;enemy.power=70;
         enemy.opticalSignature=1;
         double fighterNormal=DeceptionProjection.fighterContactRange(enemy,540,1);

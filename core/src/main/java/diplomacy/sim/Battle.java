@@ -1448,7 +1448,12 @@ public final class Battle {
      * infrared, powered cloaks fool optics, while x-ray and gravitic detection
      * supply shorter-range counters. All channels obey real range and weather. */
     private double targetAcquisitionRange(Ship observer,Ship target){
-        double condition=StrictMath.max(0,observer.sensorsCondition);
+        // Active radar/IR/X-ray/gravitic arrays need reactor electricity and
+        // working operators. Passive naked-eye optical identification does
+        // not. Previously a ship at zero power could still aim through its
+        // fully powered exotic scanner range; that was not a real module.
+        double condition=(observer.power>3&&observer.crewReadiness()>=.05)
+                ?StrictMath.max(0,observer.sensorsCondition):0;
         double weatherRange=weather.sensorFactor();
         double acuity=observer.sensorAcuity;
         double rcs=StrictMath.max(0.06,StrictMath.min(4,target.radarCrossSection));

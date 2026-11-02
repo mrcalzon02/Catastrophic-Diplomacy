@@ -48,8 +48,10 @@ public final class CombatShipStatusTest {
         s.power=0;
         equipment=CombatShipStatus.equipment(s);
         check(!equipment.contains("OPTICAL CLOAK") &&
-                !equipment.contains("HOLO CONTACTS"),
-                "Unpowered deception must visibly disengage in tactical status");
+                !equipment.contains("HOLO CONTACTS") &&
+                !equipment.contains("IR SCAN") &&
+                equipment.contains("SENSORS OFF"),
+                "Unpowered detection and deception must disengage visibly");
         System.out.println("PASS selected-hull stats, live deception and engineering status");
     }
 }

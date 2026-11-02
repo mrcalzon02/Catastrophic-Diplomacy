@@ -26,9 +26,16 @@ final class CombatShipStatus {
             status.append("SPOOFED ").append(ship.holoSeekersDiverted)
                     .append(" SEEKERS / ").append(ship.holoShotsDiverted)
                     .append(" SHOTS  ");
-        if(ship.infraredRange>0)status.append("IR SCAN  ");
-        if(ship.xrayRange>0)status.append("X-RAY SCAN  ");
-        if(ship.graviticRange>0)status.append("GRAV SCAN  ");
+        boolean exoticSensors=ship.infraredRange>0||ship.xrayRange>0
+                ||ship.graviticRange>0;
+        boolean operational=ship.power>3&&ship.sensorsCondition>0
+                &&ship.crewReadiness()>=.05;
+        if(exoticSensors&&!operational)status.append("SENSORS OFF  ");
+        if(operational){
+            if(ship.infraredRange>0)status.append("IR SCAN  ");
+            if(ship.xrayRange>0)status.append("X-RAY SCAN  ");
+            if(ship.graviticRange>0)status.append("GRAV SCAN  ");
+        }
         if(ship.escapePods>0)status.append("PODS ").append(ship.escapePods).append("  ");
         if(ship.recoveryBeacon)status.append("RECOVERY BEACON  ");
         if(ship.hazardInstability>0){
