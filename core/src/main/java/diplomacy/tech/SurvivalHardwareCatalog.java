@@ -6,6 +6,9 @@ import java.util.List;
  * The names are game-fiction only, not instructions for physical equipment. */
 public final class SurvivalHardwareCatalog {
     private SurvivalHardwareCatalog(){}
+    /** Runtime hazards retain their exact installed physical origin. */
+    public static final int GOVERNOR=1, PLASMA_CELL=2, BATTERY_BRICK=4,
+                            THERMAL_SHUNT=8, REACTOR_TAP=16;
     public record Family(String code,String parent,String name,String category,
                          int requiredTier,double mass,double power,double heat,
                          double integrity,double cost,double output) {

@@ -136,6 +136,34 @@ public final class SurvivalModulesTest {
         rescues.destroyHull(outfitted,null);
         check(destroyed==rescues.destructions,
                 "Repeated wreck processing must not duplicate destroyed hulls or survivors");
+        // Each unsafe architecture must produce distinguishable, deterministic
+        // real failures under the same extreme forced stress.
+        int[] flags={SurvivalHardwareCatalog.GOVERNOR,
+                     SurvivalHardwareCatalog.PLASMA_CELL,
+                     SurvivalHardwareCatalog.BATTERY_BRICK,
+                     SurvivalHardwareCatalog.THERMAL_SHUNT,
+                     SurvivalHardwareCatalog.REACTOR_TAP};
+        String[] codes={"PGO","JPB","IBR","IST","IRG"};
+        for(int type=0;type<codes.length;type++){
+            Shipyard.Design retrofit=empty.install(socket(empty.hull,Shipyard.Mount.SYSTEM),
+                    "BASE-TER-"+codes[type]);
+            Battle trial=new Battle(6600L+type);
+            trial.spawnWing(0,retrofit,catalog,1,400,320);
+            Battle.Ship test=trial.ships().get(0);
+            check(test.unsafeFlags==flags[type],
+                    "Installed unsafe hardware identity was lost for "+codes[type]);
+            test.hazardInstability=100;
+            for(int tick=0;tick<510;tick++)trial.step();
+            check(test.hazardFailures>0,"No real fault from "+codes[type]);
+            check(switch(codes[type]){
+                case "PGO" -> test.reactorCondition<1;
+                case "JPB" -> test.reactorCondition<.95;
+                case "IBR" -> test.commandCondition<1 && test.sensorsCondition<1;
+                case "IST" -> test.coolingCondition<1;
+                case "IRG" -> test.reactorCondition<.80;
+                default -> false;
+            },"Retrofit has no distinct damage mechanism "+codes[type]);
+        }
         Shipyard.Design illegal=empty.install(socket(empty.hull,Shipyard.Mount.SYSTEM),
                 "BASE-TER-IBR");
         Battle a=new Battle(45998L),b=new Battle(45998L);

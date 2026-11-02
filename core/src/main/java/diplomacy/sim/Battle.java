@@ -16,6 +16,7 @@ import diplomacy.shipyard.SupportDoctrine;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.HullBaseline;
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 
 /** Deterministic 30 Hz combat simulation. No graphics, files, time or Android APIs. */
 public final class Battle {
@@ -121,6 +122,7 @@ public final class Battle {
          * no longer ignore real penetration due to per-hit integer truncation. */
         public double kineticStoreExposure,missileStoreExposure,torpedoStoreExposure;
         public double hazardInstability,hazardSeverity;
+        public int unsafeFlags;
         public int escapePods,evacuatedCrew,hazardFailures;
         /** Real simulation ticks for visible engineering faults and repairs. */
         public long lastHazardTick=-10000,lastRepairTick=-10000;
@@ -872,6 +874,7 @@ public final class Battle {
         s.recoveryBeacon=machinery.survival().recoveryBeacon();
         s.hazardInstability=machinery.survival().instability();
         s.hazardSeverity=machinery.survival().hazardSeverity();
+        s.unsafeFlags=machinery.survival().unsafeFlags();
         s.maxShields = machinery.shields(); s.shields = s.maxShields;
         s.maxArmor = machinery.armor(); s.armor = s.maxArmor;
         s.sif = machinery.sif();
@@ -1230,16 +1233,64 @@ public final class Battle {
         double severity=StrictMath.max(.1,s.hazardSeverity);
         s.hazardFailures++;
         s.lastHazardTick=tick;
-        s.power=StrictMath.max(0,s.power-10*severity);
-        s.heat+=6*severity;
-        s.sensorsCondition=StrictMath.max(0,s.sensorsCondition-.09*severity);
-        s.commandCondition=StrictMath.max(0,s.commandCondition-.07*severity);
-        if(s.fittedCrewSystems)
-            s.crewCount=StrictMath.max(0,s.crewCount-
-                    severity*1.2*(1-s.crewProtection));
-        // Unsafe internal faults bypass the OUTER shield, not crew protection.
-        s.hull-=StrictMath.min(s.maxHull*.12,4.5*severity);
-        log(s.name+" unsafe power retrofit suffered internal fault");
+        // Choose one real installed illegal assembly, not an identical
+        // generic malfunction for every engineering design. All branches use
+        // the existing deterministic fault roll; no per-frame RNG or extras.
+        int installed=Integer.bitCount(s.unsafeFlags);
+        int selection=installed==0?0:Math.floorMod((int)(noise>>>32),installed);
+        int origin=0;
+        for(int flag=1;flag<=SurvivalHardwareCatalog.REACTOR_TAP;flag<<=1)
+            if((s.unsafeFlags&flag)!=0 && selection--==0){origin=flag;break;}
+        String fault;
+        switch(origin){
+            case SurvivalHardwareCatalog.GOVERNOR -> {
+                s.power=StrictMath.max(0,s.power-18*severity);
+                s.heat+=12*severity;
+                s.reactorCondition=StrictMath.max(0,s.reactorCondition-.025*severity);
+                fault="governor override tripped reactor output";
+            }
+            case SurvivalHardwareCatalog.PLASMA_CELL -> {
+                s.power=StrictMath.max(0,s.power-30*severity);
+                s.heat+=25*severity;
+                s.reactorCondition=StrictMath.max(0,s.reactorCondition-.09*severity);
+                s.hull-=8*severity;
+                if(s.fittedCrewSystems)
+                    s.crewCount=StrictMath.max(0,s.crewCount-2.0*severity*
+                            (1-s.crewProtection));
+                fault="jailbroken plasma cell lost confinement";
+            }
+            case SurvivalHardwareCatalog.BATTERY_BRICK -> {
+                s.power=StrictMath.max(0,s.power-24*severity);
+                s.heat+=10*severity;
+                s.sensorsCondition=StrictMath.max(0,s.sensorsCondition-.24*severity);
+                s.commandCondition=StrictMath.max(0,s.commandCondition-.29*severity);
+                fault="illegal battery brick overloaded communications";
+            }
+            case SurvivalHardwareCatalog.THERMAL_SHUNT -> {
+                s.coolingCondition=StrictMath.max(0,s.coolingCondition-.19*severity);
+                s.heat+=26*severity;
+                s.hull-=4.0*severity;
+                fault="improvised thermal shunt burned out cooling manifold";
+            }
+            case SurvivalHardwareCatalog.REACTOR_TAP -> {
+                s.reactorCondition=StrictMath.max(0,s.reactorCondition-.23*severity);
+                s.power=StrictMath.max(0,s.power-38*severity);
+                s.heat+=30*severity;
+                s.hull-=11*severity;
+                if(s.fittedCrewSystems)
+                    s.crewCount=StrictMath.max(0,s.crewCount-3*severity*
+                            (1-s.crewProtection));
+                fault="unlicensed reactor tap breached containment";
+            }
+            default -> {
+                s.power=StrictMath.max(0,s.power-10*severity);
+                s.heat+=6*severity;
+                fault="unsafe power retrofit suffered internal fault";
+            }
+        }
+        // No outer shield can suppress an already-internal hardware failure.
+        s.hull-=StrictMath.min(s.maxHull*.06,1.8*severity);
+        log(s.name+" "+fault);
         if(s.hull<=0)destroyHull(s,null);
     }
 
@@ -3214,6 +3265,9 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(s.missileStoreExposure));
             hash=mix(hash,Double.doubleToLongBits(s.torpedoStoreExposure));
             hash=mix(hash,s.hazardFailures);
+            hash=mix(hash,s.unsafeFlags);
+            hash=mix(hash,s.lastHazardTick);
+            hash=mix(hash,s.lastRepairTick);
             hash=mix(hash,s.recoveryBeaconActivated?1:0);
             hash = mix(hash, Double.doubleToLongBits(s.shields));
             hash = mix(hash, Double.doubleToLongBits(s.armor));

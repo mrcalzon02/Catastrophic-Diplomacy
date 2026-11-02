@@ -11,6 +11,7 @@ import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnancePropulsion;
 import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SurvivalHardwareCatalog;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
 import diplomacy.tech.TechnologyCatalog.Upgrade;
@@ -703,7 +704,8 @@ public final class Shipyard {
     public record Survival(double crewProtection,double commandProtection,
                            double fuelBonus,double fuelProtection,
                            double magazineContainment,int escapePods,boolean recoveryBeacon,
-                           double instability,double hazardSeverity) { }
+                           double instability,double hazardSeverity,
+                           int unsafeFlags) { }
     public record Fitted(double hull, double shields, double armor, double sif, double maxPower,
                          double maxHeat, double powerRegen, double coolingRate, double passiveHeat,
                          double speed, double accuracy, double laserDamage, double missileDamage,
@@ -742,6 +744,7 @@ public final class Shipyard {
         double crewProtection=0,commandProtection=0,fuelBonus=0,fuelProtection=0,
                 magazineContainment=0,hazardInstability=0,hazardSeverity=0,
                 rechargeBoost=0,extraHazardHeat=0;
+        int unsafeFlags=0;
         int escapePods=0;
         boolean recoveryBeacon=false;
         double[] ranges=new double[6],cycles=new double[6],trackers=new double[6];
@@ -866,29 +869,34 @@ public final class Shipyard {
                         (int)StrictMath.round(12*(p.effect/p.base.effect)));
                 case "RCB" -> recoveryBeacon=true;
                 case "PGO" -> {
+                    unsafeFlags|=SurvivalHardwareCatalog.GOVERNOR;
                     rechargeBoost+=4.5*(p.effect/p.base.effect);
                     extraHazardHeat+=1.8;
                     hazardInstability+=0.045;
                     hazardSeverity=Math.max(hazardSeverity,0.6);
                 }
                 case "JPB" -> {
+                    unsafeFlags|=SurvivalHardwareCatalog.PLASMA_CELL;
                     rechargeBoost+=14*(p.effect/p.base.effect);
                     extraHazardHeat+=7.5;
                     hazardInstability+=0.24;
                     hazardSeverity=Math.max(hazardSeverity,1.25);
                 }
                 case "IBR" -> {
+                    unsafeFlags|=SurvivalHardwareCatalog.BATTERY_BRICK;
                     rechargeBoost+=9*(p.effect/p.base.effect);
                     extraHazardHeat+=5.7;
                     hazardInstability+=0.34;
                     hazardSeverity=Math.max(hazardSeverity,1.08);
                 }
                 case "IST" -> {
+                    unsafeFlags|=SurvivalHardwareCatalog.THERMAL_SHUNT;
                     extraHazardHeat+=1.2;
                     hazardInstability+=0.28;
                     hazardSeverity=Math.max(hazardSeverity,0.88);
                 }
                 case "IRG" -> {
+                    unsafeFlags|=SurvivalHardwareCatalog.REACTOR_TAP;
                     rechargeBoost+=12*(p.effect/p.base.effect);
                     extraHazardHeat+=8.4;
                     hazardInstability+=0.43;
@@ -964,7 +972,7 @@ public final class Shipyard {
                 new Survival(Math.min(.80,crewProtection),Math.min(.85,commandProtection),
                         fuelBonus,Math.min(.80,fuelProtection),
                         Math.min(.85,magazineContainment),escapePods,recoveryBeacon,
-                        Math.min(2,hazardInstability),hazardSeverity));
+                        Math.min(2,hazardInstability),hazardSeverity,unsafeFlags));
     }
 
     /**
