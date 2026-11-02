@@ -51,16 +51,16 @@ public final class PointDefenseThreatMatrixDiagnostic {
             int primaryIntercepted,int terminalEntries,int primaryHits,
             int decoysLaunched,int decoysIntercepted,int childrenLaunched,
             int carrierSplits,int secondaryLaunched,int secondaryIntercepted,
-            int craftLost,int fighterShots,int paidRounds,
+            int secondaryHits,int craftLost,int fighterShots,int paidRounds,
             double shieldArmorHullLoss,double powerUsed,double heatPeak,
             double pdTracking,double pdRange) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
+                "%s,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f",
                 threat,pdTier,pdMounts,seed,mode,shots,primaryLaunched,
                 primaryIntercepted,terminalEntries,primaryHits,decoysLaunched,
                 decoysIntercepted,childrenLaunched,carrierSplits,
-                secondaryLaunched,secondaryIntercepted,craftLost,fighterShots,
+                secondaryLaunched,secondaryIntercepted,secondaryHits,craftLost,fighterShots,
                 paidRounds,shieldArmorHullLoss,powerUsed,heatPeak,pdTracking,pdRange);
         }
     }
@@ -168,7 +168,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
             heatPeak=Math.max(heatPeak,defender.heat);
         }
         int pdShots=0,primary=0,primaryIntercepts=0,primaryImpacts=0,
-                secondary=0,secondaryIntercepts=0,fighterShots=0;
+                secondary=0,secondaryIntercepts=0,secondaryHits=0,fighterShots=0;
         int decoys=0,decoyKills=0;
         for(Battle.VisualEvent event:battle.visualEvents()){
             if(event.phase()==Battle.VisualPhase.FIRE && event.sourceId()==attacker.id
@@ -203,8 +203,12 @@ public final class PointDefenseThreatMatrixDiagnostic {
                         primaryImpacts++;
                         terminal.add(event.shotId());
                     }
-                }else if(threat.craft()&&event.phase()==Battle.VisualPhase.INTERCEPT)
-                    secondaryIntercepts++;
+                }else if(threat.craft()){
+                    if(event.phase()==Battle.VisualPhase.INTERCEPT)
+                        secondaryIntercepts++;
+                    if(event.phase()==Battle.VisualPhase.IMPACT)
+                        secondaryHits++;
+                }
             }
         // The craft themselves use integer craft IDs rather than projectile
         // shot IDs. Their PD damage is recorded as POINT_DEFENSE IMPACT.
@@ -227,7 +231,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         return new Result(threat,tier,mounts,seed,pdMode,pdShots,primary,
                 primaryIntercepts,terminalCount,primaryImpacts,decoys,decoyKills,
                 battle.submunitionsDeployed,battle.carriersSplit,secondary,
-                secondaryIntercepts,craftKilled,fighterShots,spent,
+                secondaryIntercepts,secondaryHits,craftKilled,fighterShots,spent,
                 protectionLoss,initialPower-defender.power,heatPeak,
                 defender.pointDefenseProfile.tracking(),defender.pdRange);
     }
@@ -236,7 +240,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Path output=Path.of("test-output","pd-interception-matrix");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
-        csv.add("threat,pd_rank,pd_mounts,seed,pd_mode,pd_shots,launched,intercepted,terminal_entries,impacts,decoys,decoys_intercepted,children_launched,carriers_split,secondary_launched,secondary_intercepted,craft_lost,fighter_shots,paid_units,protection_loss,power_spent_net,heat_peak,pd_tracking,pd_range");
+        csv.add("threat,pd_rank,pd_mounts,seed,pd_mode,pd_shots,launched,intercepted,terminal_entries,impacts,decoys,decoys_intercepted,children_launched,carriers_split,secondary_launched,secondary_intercepted,secondary_hits,craft_lost,fighter_shots,paid_units,protection_loss,power_spent_net,heat_peak,pd_tracking,pd_range");
         StringBuilder summary=new StringBuilder("# Full point-defense interception matrix\n\n");
         summary.append("All results are measured in real headless 30 Hz Battle simulation. ")
                 .append("The ship-launched projectile test source is a legacy fixture; ")
@@ -258,13 +262,13 @@ public final class PointDefenseThreatMatrixDiagnostic {
                         fired+=sample.primaryLaunched;
                         intercepts+=threat.craft()?sample.craftLost:sample.primaryIntercepted;
                         entries+=sample.terminalEntries;
-                        impacts+=sample.primaryHits;
+                        impacts+=threat.craft()?sample.secondaryHits:sample.primaryHits;
                         shots+=sample.shots;
                         if(seed==0){
                             Result control=run(catalog,threat,rank,mounts,seed,
                                     BattleOrders.PointDefense.HOLD_FIRE);
                             csv.add(control.csv());cases++;
-                            baselineImpact+=control.primaryHits;
+                            baselineImpact+=threat.craft()?control.secondaryHits:control.primaryHits;
                         }
                     }
                     double interception=fired==0?0:100.0*intercepts/fired;
@@ -277,7 +281,9 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 .append("physical destroyed body, not an evasive miss. ")
                 .append("90-unit entries indicate threats that reached the ")
                 .append("terminal defensive zone, not guaranteed hull hits. ")
-                .append("Guided cluster children are included as independent ")
+                .append("Fighter-launched kinetic/guided secondary weapons are tracked " +
+                "separately from the aircraft shot down. " +
+                "Guided cluster children are included as independent ")
                 .append("physical FIRE objects; carrier splits and actual ")
                 .append("child counts are preserved per CSV row. Fighters and ")
                 .append("drones are counted by physical craft losses, not ")
