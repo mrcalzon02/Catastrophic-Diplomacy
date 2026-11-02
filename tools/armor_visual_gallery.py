@@ -319,6 +319,56 @@ try:
                     "PRISTINE" if j==0 else f"REAL HITS: {live['hits']}",
                     fill=(185,195,211),font=detail_font)
         summary.save(folder/"particle-torpedo-kinetic-impact-closeups.png")
+        # Exact torpedo alpha edge cutout at native 96x144 GPU-mask
+        # resolution, enlarged with nearest-pixel sampling. This is NOT
+        # a procedural illustration: every gray value is uploaded alpha
+        # from the same real in-game damaged Terran frigate.
+        torpedo_mask=root/"torpedo-terran-upper-mask-coefficients.png"
+        if torpedo_mask.exists():
+            with Image.open(torpedo_mask) as original_mask:
+                rgba=original_mask.convert("RGBA")
+                alpha=rgba.getchannel("A")
+            cuts=[(ix%alpha.width,ix//alpha.width)
+                  for ix,value in enumerate(alpha.getdata()) if value<243]
+            if cuts:
+                x0=max(0,min(x for x,y in cuts)-7)
+                x1=min(alpha.width,max(x for x,y in cuts)+8)
+                y0=max(0,min(y for x,y in cuts)-7)
+                y1=min(alpha.height,max(y for x,y in cuts)+8)
+                # Gray is actual missing-hull alpha amount.
+                authentic_cut=Image.eval(alpha.crop((x0,y0,x1,y1)),
+                                         lambda a:255-a).convert("RGB")
+                authentic_cut.thumbnail((360,360))
+                authentic_cut=authentic_cut.resize(
+                    (authentic_cut.width*12,authentic_cut.height*12),
+                    Image.Resampling.NEAREST)
+                authentic_cut.thumbnail((430,430),Image.Resampling.NEAREST)
+                edge_sheet=Image.new("RGB",(1024,510),(16,19,25))
+                edge_pen=ImageDraw.Draw(edge_sheet)
+                edge_pen.text((15,10),
+                    "TORPEDO | real original-hull impact / uploaded armor alpha",
+                    font=title_font,fill=(240,243,247))
+                # Reuse the already-rendered full-size torpedo screenshot
+                # crop, never redraw the ship or invent material pixels.
+                with Image.open(root/"torpedo-terran-upper-surface.png") as shot:
+                    shot_crop=shot.convert("RGB").crop((505,285,760,540))
+                shot_crop=shot_crop.resize((440,440),Image.Resampling.NEAREST)
+                edge_sheet.paste(shot_crop,(10,50))
+                edge_sheet.paste(authentic_cut,
+                                 (535+(440-authentic_cut.width)//2,
+                                  50+(440-authentic_cut.height)//2))
+                edge_pen.text((15,490),"REAL OpenGL ship framebuffer",
+                              font=detail_font,fill=(185,195,211))
+                edge_pen.text((535,490),
+                    "REAL GPU hole alpha; white = removed armor",
+                    font=detail_font,fill=(185,195,211))
+                edge_sheet.save(folder/"torpedo-actual-rupture-edge-review.png")
+                print(f"ARMOR-EDGE original alpha cutout pixels={len(cuts)} "
+                      f"bbox={(x0,y0,x1,y1)}")
+            else:
+                warnings.append("Torpedo alpha edge review has no physical cutout")
+        else:
+            warnings.append("Torpedo GPU alpha mask missing: no edge review produced")
         print("ARMOR-DETAIL actual particle / torpedo / kinetic source-pixel close-ups")
 
     else:
