@@ -72,11 +72,11 @@ public final class RocketBarrage {
                 throw new IllegalArgumentException("Invalid fitted rocket rack");
             this.slot=slot;this.size=size;
             rounds=size.magazine;
-            salvoCount=size==Size.SMALL?4:size==Size.SIEGE?16:8;
-            // Both physically distinct motor envelopes appear in ordinary
-            // AI fleets without needing a debug API or hidden control.
-            motor=size==Size.MEDIUM||size==Size.SIEGE
-                    ?Motor.SUSTAINED_BURN:Motor.BOOST_COAST;
+            // Use the exact same fallback as legacy CD-SHIP-1..5 blueprints.
+            // No separate default tables may drift between combat and save/load.
+            Fitting standard=defaults(size);
+            salvoCount=standard.count();
+            motor=standard.motor();
             damage=24*size.damageMultiplier*output;
             reloadSeconds=size.reloadSeconds/StrictMath.min(1.4,StrictMath.max(.7,tracking));
             // Simplified, cheap non-seeker ammunition. This is the material
