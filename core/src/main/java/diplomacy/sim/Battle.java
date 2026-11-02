@@ -68,6 +68,8 @@ public final class Battle {
         public List<WeaponMuzzles.Emitter> weaponEmitters=List.of();
         /** Opt-in physically distinct rack controllers; legacy remains family-wide. */
         public List<Launcher> launchers=List.of();
+        /** Separate cheap dumbfire magazine per installed rocket hardpoint. */
+        public List<RocketBarrage.Rack> rocketRacks=List.of();
         public Launcher launcher(int slot){
             for(Launcher rack:launchers)if(rack.slot==slot)return rack;
             return null;
@@ -458,6 +460,31 @@ public final class Battle {
         }
     }
 
+    /** Rockets are real point-defensible bodies. Heading is IMMUTABLE after
+     * launch: neither the real target nor any hologram can redirect them. */
+    public static final class Rocket {
+        public final long visualId,spawnTick;
+        public final int sourceId,team,targetId;
+        public final RocketBarrage.Size size;
+        public final RocketBarrage.Motor motor;
+        public final ProjectileModel.Spec spec;
+        public final double heading,damage;
+        public double x,y,vx,vy,life=7.5,integrity;
+        public int flightTicks;
+        Rocket(long id,long start,Ship source,RocketBarrage.Rack rack,
+               int aimedAt,double px,double py,double bearing){
+            visualId=id;spawnTick=start;sourceId=source.id;team=source.team;
+            targetId=aimedAt;size=rack.size;motor=rack.motor;
+            spec=rack.body;damage=rack.damage;
+            x=px;y=py;heading=bearing;
+            vx=StrictMath.cos(heading)*78;vy=StrictMath.sin(heading)*78;
+            integrity=spec.health();
+        }
+        public boolean burning(){
+            return RocketBarrage.acceleration(size,motor,flightTicks*DT)>0;
+        }
+    }
+
     /** Fighters attack hostile hulls. Defensive drones deliberately hunt hostile ordnance. */
     public static final class Craft {
         public final int id, sourceId, team;
@@ -565,6 +592,8 @@ public final class Battle {
     private static final int MAX_GUIDED_BODIES=12000;
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
+    private final List<Rocket> rockets = new ArrayList<>();
+    private static final int MAX_ROCKET_BODIES=8000;
     /** Queued physical salvo is owned by one socket, or -1 for legacy fleets. */
     private static final class PendingLaunch {
         final int sourceId,targetId,slotId;
@@ -593,6 +622,7 @@ public final class Battle {
     }
     private final List<PendingLaunch> launchQueue=new ArrayList<>();
     public int decoysLaunched,decoysIntercepted,salvosStarted,roundsFiredBySalvos;
+    public int rocketRoundsFired,rocketIntercepts,rocketHits;
     /** Actual in-flight deployments, not fictitious visual particle counts. */
     public int carriersSplit,submunitionsDeployed;
     private final List<Craft> crafts = new ArrayList<>();
@@ -662,6 +692,16 @@ public final class Battle {
     }
     public List<Ship> ships() { return Collections.unmodifiableList(ships); }
     public List<Missile> missiles() { return Collections.unmodifiableList(missiles); }
+    public List<Rocket> rockets(){return Collections.unmodifiableList(rockets);}
+    /** Live tactical selection; salvo count and motor do NOT affect other
+     * independent launchers, guided missiles, or existing saved blueprints. */
+    public void setShipRocketBarrage(int shipId,int slot,int count,RocketBarrage.Motor motor){
+        Ship ship=findShip(shipId);
+        if(ship==null)throw new IllegalArgumentException("Ship does not exist");
+        for(RocketBarrage.Rack rack:ship.rocketRacks)
+            if(rack.slot==slot){rack.configure(count,motor);return;}
+        throw new IllegalArgumentException("No fitted rocket rack in slot "+slot);
+    }
     public int pendingSalvoCount(){return launchQueue.size();}
     public void setShipKineticAmmunition(int id,AmmunitionTable.Kinetic type){
         Ship ship=findShip(id);
@@ -860,6 +900,7 @@ public final class Battle {
         }
         s.impactHardpoints=List.copyOf(installed);
         s.weaponEmitters=WeaponMuzzles.equipped(design,HullLayouts.slots(design.faction,design.hull));
+        s.rocketRacks=Shipyard.rocketRacks(design,catalog);
         s.laserFittings=LaserFamilies.fitted(design);
         s.installedSubsystems=Map.copyOf(located);
         int strongestShieldRank=0;
@@ -1178,7 +1219,9 @@ public final class Battle {
         updateSupport();
         updateTenderSupport();
         updateQueuedLaunches();
+        updateRocketLaunches();
         updateMissiles();
+        updateRockets();
         updateBallistics();
         updateCraft();
     }
@@ -1983,6 +2026,7 @@ public final class Battle {
                     muzzle.x(),muzzle.y(),endX,endY);
             if(landed)hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId,aim.x(),aim.y());
         }
+        queueRocketBarrage(s,target,distance);
         if(!s.launchers.isEmpty()){
             queueRackSalvos(s,target,DamageType.TORPEDO,distance,torpedo);
         }else if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
@@ -2003,6 +2047,57 @@ public final class Battle {
         }
     }
 
+    /** Each rocket battery freezes a single predictive bearing at trigger.
+     * It will never track the victim again, even between salvo rounds. */
+    private void queueRocketBarrage(Ship ship,Ship target,double distance){
+        if(ship.rocketRacks.isEmpty()||ship.power<5||
+                ship.weaponsCondition<=.16||ship.magazineCondition<=.16)return;
+        for(RocketBarrage.Rack rack:ship.rocketRacks){
+            if(!rack.canStart()||distance>1900+rack.size.ordinal()*200)continue;
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
+                    ship,WeaponMuzzles.Family.ROCKET,rack.slot);
+            rack.lockedBearing=RocketBarrage.firingAngle(muzzle.x(),muzzle.y(),
+                    target.x,target.y,target.vx,target.vy,rack.body.speed());
+            rack.intendedTarget=target.id;
+            rack.salvoRemaining=rack.salvoCount;
+            rack.nextLaunchTick=tick;
+            rack.reload=rack.reloadSeconds();
+        }
+    }
+    /** Actual round release consumes rack inventory and ship power PER BODY.
+     * A vanished target does not magically redirect already committed rockets. */
+    private void updateRocketLaunches(){
+        for(Ship source:ships){
+            if(source.rocketRacks.isEmpty())continue;
+            for(RocketBarrage.Rack rack:source.rocketRacks){
+                rack.reload=StrictMath.max(0,rack.reload-DT);
+                if(rack.salvoRemaining<=0||rack.nextLaunchTick>tick)continue;
+                if(!source.alive()||source.withdrawing||rack.rounds<=0||
+                        source.magazineCondition<=.16||source.weaponsCondition<=.16||
+                        source.power<2||source.heat>source.maxHeat-1){
+                    rack.salvoRemaining=0;continue;
+                }
+                if(rockets.size()>=MAX_ROCKET_BODIES)continue;
+                int index=rack.salvoCount-rack.salvoRemaining;
+                double spread=(index-(rack.salvoCount-1)*.5)
+                        *(0.012+(1-source.accuracy)*.014);
+                double bearing=rack.lockedBearing+spread;
+                WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
+                        source,WeaponMuzzles.Family.ROCKET,rack.slot);
+                Rocket round=new Rocket(nextVisualShotId++,tick,source,rack,
+                        rack.intendedTarget,muzzle.x(),muzzle.y(),bearing);
+                rockets.add(round);
+                rack.rounds--;rack.salvoRemaining--;rack.nextLaunchTick=tick+2;
+                source.power-=1.8;source.heat+=.68;
+                rocketRoundsFired++;
+                source.launched++;
+                visual(round.visualId,VisualPhase.FIRE,"ROCKET",
+                        source.team,source.id,round.targetId,round.x,round.y,
+                        round.x+StrictMath.cos(bearing)*100,
+                        round.y+StrictMath.sin(bearing)*100);
+            }
+        }
+    }
     private void queueRackSalvos(Ship source,Ship target,DamageType family,
                                  double distance,WeaponBehaviorTable.Gun gun){
         int ammo=family==DamageType.MISSILE?source.missileAmmo:source.torpedoAmmo;
@@ -2768,31 +2863,47 @@ public final class Battle {
                 ProjectileModel.Defense suite=controller==null?ProjectileModel.STANDARD_PD
                         :controller.pointDefenseProfile;
                 double sensor=controller==null?1:controller.sensorsCondition;
-                Missile missileTarget=null;Ballistic shellTarget=null;
+                Missile missileTarget=null;Ballistic shellTarget=null;Rocket rocketTarget=null;
                 double nearest=Double.POSITIVE_INFINITY;
                 for(Missile m:missiles)if(m.team!=craft.team){
                     double d=StrictMath.hypot(m.x-craft.x,m.y-craft.y);
                     double detection=ProjectileModel.acquisitionRange(150,sensor,
                             weather.sensorFactor(),suite,m.spec,
                             OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
-                    if(d<nearest&&d<=detection){nearest=d;missileTarget=m;shellTarget=null;}
+                    if(d<nearest&&d<=detection){
+                        nearest=d;missileTarget=m;shellTarget=null;rocketTarget=null;
+                    }
                 }
                 for(Ballistic p:ballistics)if(p.team!=craft.team){
                     double d=StrictMath.hypot(p.x-craft.x,p.y-craft.y);
                     double detection=ProjectileModel.acquisitionRange(150,sensor,
                             weather.sensorFactor(),suite,p.spec);
-                    if(d<nearest&&d<=detection){nearest=d;shellTarget=p;missileTarget=null;}
+                    if(d<nearest&&d<=detection){
+                        nearest=d;shellTarget=p;missileTarget=null;rocketTarget=null;
+                    }
                 }
-                if(missileTarget!=null||shellTarget!=null){
-                    double x=missileTarget!=null?missileTarget.x:shellTarget.x;
-                    double y=missileTarget!=null?missileTarget.y:shellTarget.y;
+                for(Rocket p:rockets)if(p.team!=craft.team){
+                    double d=StrictMath.hypot(p.x-craft.x,p.y-craft.y);
+                    double detection=ProjectileModel.acquisitionRange(150,sensor,
+                            weather.sensorFactor(),suite,p.spec,
+                            RocketBarrage.hotEmission(p.motor,p.burning()));
+                    if(d<nearest&&d<=detection){
+                        nearest=d;rocketTarget=p;missileTarget=null;shellTarget=null;
+                    }
+                }
+                if(missileTarget!=null||shellTarget!=null||rocketTarget!=null){
+                    double x=missileTarget!=null?missileTarget.x:
+                            shellTarget!=null?shellTarget.x:rocketTarget.x;
+                    double y=missileTarget!=null?missileTarget.y:
+                            shellTarget!=null?shellTarget.y:rocketTarget.y;
                     if(nearest>0){
                         craft.x+=(x-craft.x)/nearest*205*DT;
                         craft.y+=(y-craft.y)/nearest*205*DT;
                     }
                     if(StrictMath.hypot(x-craft.x,y-craft.y)<28){
                         ProjectileModel.Spec incoming=missileTarget!=null
-                                ?missileTarget.spec:shellTarget.spec;
+                                ?missileTarget.spec:shellTarget!=null?
+                                shellTarget.spec:rocketTarget.spec;
                         if(random.nextDouble()<ProjectileModel.interceptionChance(
                                 incoming,suite,controller==null?1:controller.pointDefenseCondition,
                                 weather.accuracyFactor(),missileTarget!=null?
@@ -2806,6 +2917,14 @@ public final class Battle {
                                         missileTarget.torpedo?"TORPEDO":"MISSILE",
                                         missileTarget.team,missileTarget.sourceId,missileTarget.targetId,
                                         missileTarget.x,missileTarget.y,missileTarget.x,missileTarget.y);
+                            }
+                        }else if(rocketTarget!=null){
+                            rocketTarget.integrity-=Math.max(3,suite.damage());
+                            if(rocketTarget.integrity<=0&&rockets.remove(rocketTarget)){
+                                rocketIntercepts++;
+                                visual(rocketTarget.visualId,VisualPhase.INTERCEPT,"ROCKET",
+                                        rocketTarget.team,rocketTarget.sourceId,rocketTarget.targetId,
+                                        rocketTarget.x,rocketTarget.y,rocketTarget.x,rocketTarget.y);
                             }
                         }else{
                             shellTarget.integrity-=Math.max(3,suite.damage());
@@ -2849,6 +2968,44 @@ public final class Battle {
         return Math.max(0,Math.min(1,(-(dx*ox+dy*oy)-StrictMath.sqrt(discriminant))/a));
     }
 
+    /** Entirely inertial flight, after straight-line acceleration. No seeker
+     * update, target telemetry, retroburn, homing, or impact oracle. */
+    private void updateRockets(){
+        for(int i=rockets.size()-1;i>=0;i--){
+            Rocket rocket=rockets.get(i);
+            if((rocket.life-=DT)<=0){
+                visual(rocket.visualId,VisualPhase.TIMEOUT,"ROCKET",
+                        rocket.team,rocket.sourceId,rocket.targetId,
+                        rocket.x,rocket.y,rocket.x,rocket.y);
+                rockets.remove(i);continue;
+            }
+            double age=rocket.flightTicks*DT;
+            rocket.flightTicks++;
+            double accel=RocketBarrage.acceleration(rocket.size,rocket.motor,age);
+            if(accel>0){
+                double speed=StrictMath.hypot(rocket.vx,rocket.vy);
+                double next=StrictMath.min(rocket.spec.speed(),speed+accel*DT);
+                rocket.vx=StrictMath.cos(rocket.heading)*next;
+                rocket.vy=StrictMath.sin(rocket.heading)*next;
+            }
+            double nx=rocket.x+rocket.vx*DT,ny=rocket.y+rocket.vy*DT;
+            Ship hit=null;double earliest=Double.POSITIVE_INFINITY;
+            for(Ship enemy:ships)if(enemy.team!=rocket.team&&enemy.alive()){
+                double contact=segmentHit(rocket.x,rocket.y,nx,ny,
+                        enemy.x,enemy.y,12*enemy.visualScale());
+                if(contact<earliest){earliest=contact;hit=enemy;}
+            }
+            if(hit!=null){
+                rocket.x+=(nx-rocket.x)*earliest;
+                rocket.y+=(ny-rocket.y)*earliest;
+                hitPayload(hit,rocket.damage,findShip(rocket.sourceId),
+                        DamageType.MISSILE,rocket.visualId,rocket.x,rocket.y,
+                        AmmunitionTable.warhead(AmmunitionTable.Warhead.HIGH_EXPLOSIVE));
+                rocketHits++;
+                rockets.remove(i);
+            }else {rocket.x=nx;rocket.y=ny;}
+        }
+    }
     private void updateBallistics() {
         for(int i=ballistics.size()-1;i>=0;i--){
             Ballistic p=ballistics.get(i);
@@ -2977,7 +3134,7 @@ public final class Battle {
                 && defender.pointDefenseCondition>pdLaw.minimumCondition()
                 && defender.pdRange>0 && defender.orders.pointDefense().ordnance()
                 && defender.power>=pdLaw.minimumPower()) {
-            Missile chosenMissile=null;Ballistic chosenShell=null;
+            Missile chosenMissile=null;Ballistic chosenShell=null;Rocket chosenRocket=null;
             double quickest=Double.POSITIVE_INFINITY;
             for(Missile m:missiles){
                 if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
@@ -2994,7 +3151,7 @@ public final class Battle {
                                 ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
                 double score=defensiveScore(defender,distance,eta);
                 if(score<quickest){
-                    quickest=score;chosenMissile=m;chosenShell=null;
+                    quickest=score;chosenMissile=m;chosenShell=null;chosenRocket=null;
                 }
             }
             for(Ballistic p:ballistics){
@@ -3011,15 +3168,38 @@ public final class Battle {
                                 ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
                 double score=defensiveScore(defender,distance,eta);
                 if(score<quickest){
-                    quickest=score;chosenShell=p;chosenMissile=null;
+                    quickest=score;chosenShell=p;chosenMissile=null;chosenRocket=null;
                 }
             }
-            if(chosenMissile==null && chosenShell==null)continue;
+            // Even a coasting rocket retains a large, hot physical signature.
+            // Its flimsy construction makes one accurate laser hit lethal.
+            for(Rocket r:rockets){
+                if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
+                double distance=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
+                double detection=ProjectileModel.acquisitionRange(
+                        defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
+                        defender.pointDefenseProfile,r.spec,
+                        RocketBarrage.hotEmission(r.motor,r.burning()));
+                if(distance>detection)continue;
+                double eta=approachEta(defender.x,defender.y,
+                        r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
+                if(defender.standingOrders!=null&&eta>=1000 &&
+                        defender.standingOrders.directives().interceptStrategy()!=
+                                ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)continue;
+                double score=defensiveScore(defender,distance,eta);
+                if(score<quickest){
+                    quickest=score;chosenRocket=r;chosenMissile=null;chosenShell=null;
+                }
+            }
+            if(chosenMissile==null && chosenShell==null && chosenRocket==null)continue;
             defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
             defender.pdReload=pdLaw.reload(false,defender.pdCycle,defender.pointDefenseCondition);
-            double tx=chosenMissile!=null?chosenMissile.x:chosenShell.x;
-            double ty=chosenMissile!=null?chosenMissile.y:chosenShell.y;
-            int hostileSource=chosenMissile!=null?chosenMissile.sourceId:chosenShell.sourceId;
+            double tx=chosenMissile!=null?chosenMissile.x:
+                    chosenShell!=null?chosenShell.x:chosenRocket.x;
+            double ty=chosenMissile!=null?chosenMissile.y:
+                    chosenShell!=null?chosenShell.y:chosenRocket.y;
+            int hostileSource=chosenMissile!=null?chosenMissile.sourceId:
+                    chosenShell!=null?chosenShell.sourceId:chosenRocket.sourceId;
             long defensiveShot=nextVisualShotId++;
             WeaponMuzzles.Origin pdMuzzle=WeaponMuzzles.at(
                     defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot);
@@ -3029,11 +3209,14 @@ public final class Battle {
                     tx,ty,defender.team,DamageType.LASER,true));
             // Fast shells are harder to track than guided ordnance, but genuinely
             // interceptable; visual glows alone cannot be shot down.
-            ProjectileModel.Spec incoming=chosenMissile!=null?chosenMissile.spec:chosenShell.spec;
+            ProjectileModel.Spec incoming=chosenMissile!=null?chosenMissile.spec:
+                    chosenShell!=null?chosenShell.spec:chosenRocket.spec;
             double chance=ProjectileModel.interceptionChance(incoming,
                     defender.pointDefenseProfile,defender.pointDefenseCondition,
                     weather.accuracyFactor(),chosenMissile!=null?
-                    StrictMath.hypot(chosenMissile.vx,chosenMissile.vy):incoming.speed());
+                    StrictMath.hypot(chosenMissile.vx,chosenMissile.vy):
+                    chosenRocket!=null?StrictMath.hypot(chosenRocket.vx,chosenRocket.vy):
+                    incoming.speed());
             if(random.nextDouble()<chance){
                 if(chosenMissile!=null){
                     chosenMissile.integrity-=defender.pointDefenseProfile.damage();
@@ -3044,6 +3227,15 @@ public final class Battle {
                                 chosenMissile.decoy?"DECOY":chosenMissile.torpedo?"TORPEDO":"MISSILE",
                                 chosenMissile.team,chosenMissile.sourceId,chosenMissile.targetId,
                                 chosenMissile.x,chosenMissile.y,chosenMissile.x,chosenMissile.y);
+                    }
+                }else if(chosenRocket!=null){
+                    chosenRocket.integrity-=defender.pointDefenseProfile.damage();
+                    if(chosenRocket.integrity<=0&&rockets.remove(chosenRocket)){
+                        defender.intercepted++;rocketIntercepts++;
+                        visual(chosenRocket.visualId,VisualPhase.INTERCEPT,"ROCKET",
+                                chosenRocket.team,chosenRocket.sourceId,
+                                chosenRocket.targetId,chosenRocket.x,chosenRocket.y,
+                                chosenRocket.x,chosenRocket.y);
                     }
                 }else{
                     chosenShell.integrity-=defender.pointDefenseProfile.damage();
@@ -3452,8 +3644,29 @@ public final class Battle {
         hash=mix(hash,decoysIntercepted);
         hash=mix(hash,salvosStarted);
         hash=mix(hash,roundsFiredBySalvos);
+        hash=mix(hash,rocketRoundsFired);
+        hash=mix(hash,rocketHits);hash=mix(hash,rocketIntercepts);
         hash=mix(hash,carriersSplit);
         hash=mix(hash,submunitionsDeployed);
+        for(Ship ship:ships)for(RocketBarrage.Rack rack:ship.rocketRacks){
+            hash=mix(hash,rack.slot);
+            hash=mix(hash,rack.size.ordinal());
+            hash=mix(hash,rack.motor.ordinal());
+            hash=mix(hash,rack.salvoCount);hash=mix(hash,rack.salvoRemaining);
+            hash=mix(hash,rack.rounds);hash=mix(hash,rack.nextLaunchTick);
+            hash=mix(hash,Double.doubleToLongBits(rack.reload));
+            hash=mix(hash,Double.doubleToLongBits(rack.lockedBearing));
+        }
+        for(Rocket r:rockets){
+            hash=mix(hash,r.visualId);hash=mix(hash,r.sourceId);
+            hash=mix(hash,r.targetId);hash=mix(hash,r.motor.ordinal());
+            hash=mix(hash,r.size.ordinal());hash=mix(hash,r.flightTicks);
+            hash=mix(hash,Double.doubleToLongBits(r.x));
+            hash=mix(hash,Double.doubleToLongBits(r.y));
+            hash=mix(hash,Double.doubleToLongBits(r.vx));
+            hash=mix(hash,Double.doubleToLongBits(r.vy));
+            hash=mix(hash,Double.doubleToLongBits(r.integrity));
+        }
         for (Missile m : missiles) {
             hash=mix(hash,m.payload.ordinal());
             hash=mix(hash,Double.doubleToLongBits(m.releaseRange));
