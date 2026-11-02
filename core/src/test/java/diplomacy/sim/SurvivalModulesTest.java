@@ -119,6 +119,9 @@ public final class SurvivalModulesTest {
         Battle rescues=new Battle(516L);
         rescues.spawnWing(0,rescueFitted,catalog,1,200,200);
         rescues.spawnWing(0,empty,catalog,1,200,300);
+        // Victory settlement requires at least one real surviving friendly
+        // vessel; two destroyed hulls do not constitute a winning fleet.
+        rescues.spawnWing(0,empty,catalog,1,200,400);
         Battle.Ship outfitted=rescues.ships().get(0),unfitted=rescues.ships().get(1);
         int initialCrew=(int)outfitted.crewCount;
         check(outfitted.escapePods>0 && outfitted.recoveryBeacon,
