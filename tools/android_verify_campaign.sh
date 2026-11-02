@@ -20,7 +20,7 @@ on_failure(){
   echo "FAIL: API29 campaign playability at $current (exit $rc)" >&2
   adb logcat -d -v time > "$report/failure-$current-logcat.txt" || true
   echo "--- APP TRANSITIONS / ACTUAL ANDROID ERRORS ---" >&2
-  grep -E 'CD-GAME-FLOW|CD-CAMPAIGN-RUNTIME|AndroidRuntime|FATAL EXCEPTION|NoSuchMethodError|NoClassDefFoundError|[Cc]rash|[Ee]xception' "$report/failure-$current-logcat.txt" | tail -n 75 >&2 || true
+  grep -E 'CD-GAME-FLOW|CD-CAMPAIGN-RUNTIME|CD-ANDROID-LIFECYCLE|AndroidRuntime|FATAL EXCEPTION|NoSuchMethodError|NoClassDefFoundError|[Cc]rash|[Ee]xception' "$report/failure-$current-logcat.txt" | tail -n 75 >&2 || true
   adb shell dumpsys activity activities > "$report/failure-activity.txt" || true
   # Preserve process/heap state to distinguish a slow emulator start from an
   # actual game-thread hang; do not mislabel a timeout as a Java exception.
