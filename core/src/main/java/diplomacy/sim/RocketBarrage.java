@@ -35,6 +35,21 @@ public final class RocketBarrage {
     }
     public enum Motor { BOOST_COAST, SUSTAINED_BURN }
 
+    /** Blueprint-only fire program: no live ammunition or reload is serialized. */
+    public record Fitting(int count,Motor motor) {
+        public Fitting {
+            if(count!=4&&count!=8&&count!=16)
+                throw new IllegalArgumentException("Rocket salvo must be 4, 8 or 16 rounds");
+            if(motor==null)throw new IllegalArgumentException("Rocket motor absent");
+        }
+    }
+    public static Fitting defaults(Size size) {
+        if(size==null)throw new IllegalArgumentException("Rocket size absent");
+        return new Fitting(size==Size.SMALL?4:size==Size.SIEGE?16:8,
+                size==Size.MEDIUM||size==Size.SIEGE?
+                        Motor.SUSTAINED_BURN:Motor.BOOST_COAST);
+    }
+
     /** Mounted hardware and finite magazines belong to one fitted weapon slot. */
     public static final class Rack {
         public final int slot;
