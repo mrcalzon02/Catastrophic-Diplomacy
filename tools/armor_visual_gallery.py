@@ -161,19 +161,24 @@ for key in keys:
     if not path.exists():continue
     with Image.open(path) as original:
         pixels=original.convert("RGBA")
-        dark=hot=metal=opening=0
+        dark=hot=metal=anneal=opening=0
         for red,green,blue,alpha in pixels.getdata():
             dark+=(red>12)
-            hot+=(green>12)
-            metal+=(blue>12)
+            # Laser's B>0.64 tags cooled heat-oxide. Never count it as
+            # raised silver metal or interpret its G hue as orange glow.
+            is_anneal=blue>158
+            anneal+=is_anneal
+            hot+=(green>12 and not is_anneal)
+            metal+=(blue>12 and not is_anneal)
             opening+=(alpha<243)
         item={"scenario":key,"dirty_mask_width":pixels.width,
               "dirty_mask_height":pixels.height,
               "dark_pixels":dark,"heated_edge_pixels":hot,
-              "bright_metal_pixels":metal,"real_opening_pixels":opening}
+              "bright_metal_pixels":metal,"tempered_laser_pixels":anneal,
+              "real_opening_pixels":opening}
         channel_coverage.append(item)
         print(f"ARMOR-MATERIAL {key} dark={dark} heat={hot} "
-              f"metal={metal} opening={opening}")
+              f"metal={metal} annealed={anneal} opening={opening}")
 (out/"damage-channels-report.json").write_text(
     json.dumps({"schema":"cd-armor-channels-v1",
                 "note":"Real R/G/B/A GPU mask dirty-region coverage; cosmetic evidence only",

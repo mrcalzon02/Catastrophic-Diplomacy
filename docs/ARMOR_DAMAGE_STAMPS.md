@@ -371,3 +371,9 @@ source pixel rather than replacing it. All unchanged ships retain their original
 full-resolution artwork. Objective path/separation tests remain in the
 **nonblocking** ship-damage visual and surface shader diagnostics. Final color
 readability on original bright and dark hulls still requires real screenshots.
+
+The pixel-channel forensic gallery now reports the actual tagged
+`tempered_laser_pixels` independently from metallic fracture and orange heat
+coverage, avoiding false attribution of the laser oxide ring as kinetic silver.
+These are diagnostic observations only. Color-treatment assertions are kept in
+the separate nonblocking damage test, never the required functional build gate.

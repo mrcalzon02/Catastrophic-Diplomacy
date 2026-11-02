@@ -132,6 +132,13 @@ public final class ShipSurfaceDamageVisualTest {
         check(ShipSurfaceDamageVisual.blueCoefficient(1f,false)==.56f &&
                 ShipSurfaceDamageVisual.blueCoefficient(1f,true)==1f,
                 "Tagged laser oxide and kinetic metal must occupy different material ranges");
+        // Artistic palette assertions belong ONLY to this nonblocking
+        // diagnostic, not the functional release's shipSurfaceSmoke gate.
+        for(String token:new String[]{"if(peel.b>0.62)",
+                "float anneal=clamp((peel.b-0.64)/0.36",
+                "vec3 oxide=mix(","metalStrength=clamp(peel.b/0.56"})
+            check(ShipSurfaceLighting.FRAGMENT.contains(token),
+                    "Laser temper / kinetic metal shader path missing: "+token);
         // In all severity states, char -> soot -> heat must fade to the
         // EXACT original source pixel before reaching the neighboring tile.
         for(float severity:new float[]{.2f,.5f,1f}){

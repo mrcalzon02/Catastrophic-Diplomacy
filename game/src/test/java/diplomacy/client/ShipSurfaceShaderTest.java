@@ -16,10 +16,6 @@ public final class ShipSurfaceShaderTest {
                 "gl_FragColor=vec4(min(lit,vec3(1.0)),albedo.a)"})
             if(!ShipSurfaceLighting.FRAGMENT.contains(token))
                 throw new AssertionError("Missing real surface shader input: "+token);
-        for(String token:new String[]{"if(peel.b>0.62)","float anneal=clamp((peel.b-0.64)/0.36",
-                "vec3 oxide=mix(","metalStrength=clamp(peel.b/0.56"})
-            if(!ShipSurfaceLighting.FRAGMENT.contains(token))
-                throw new AssertionError("Laser temper / kinetic metal shader path missing: "+token);
         if(ShipSurfaceLighting.FRAGMENT.contains("gl_FragColor=vec4(1.0"))
             throw new AssertionError("Flat placeholder shader");
         CombatViewBounds far=new CombatViewBounds(0,0,4100,800);

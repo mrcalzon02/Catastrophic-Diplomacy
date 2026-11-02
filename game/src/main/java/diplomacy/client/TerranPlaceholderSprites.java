@@ -475,7 +475,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         final String diagnosticDir=System.getenv("CD_ARMOR_CAPTURE_DIR");
         final boolean visualDiagnostic=diagnosticDir!=null&&!diagnosticDir.isBlank()
                 &&ship.name!=null&&ship.name.startsWith("STATIONARY TEST TARGET / ");
-        int darkPixels=0,hotPixels=0,metalPixels=0,cutPixels=0;
+        int darkPixels=0,hotPixels=0,metalPixels=0,annealPixels=0,cutPixels=0;
         try {
             for(int localY=0;localY<region.height();localY++)
                 for(int localX=0;localX<region.width();localX++){
@@ -534,8 +534,11 @@ public final class TerranPlaceholderSprites implements Disposable {
                 output.drawPixel(localX,localY,maskPixel);
                 if(visualDiagnostic){
                     if((maskPixel>>>24&255)>12)darkPixels++;
-                    if((maskPixel>>>16&255)>12)hotPixels++;
-                    if((maskPixel>>>8&255)>12)metalPixels++;
+                    if(laserAnneal)annealPixels++;
+                    else {
+                        if((maskPixel>>>16&255)>12)hotPixels++;
+                        if((maskPixel>>>8&255)>12)metalPixels++;
+                    }
                     if((maskPixel&255)<243)cutPixels++;
                 }
             }
@@ -546,7 +549,8 @@ public final class TerranPlaceholderSprites implements Disposable {
                 com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(file),output);
                 Gdx.app.log("CD-ARMOR-PROFILE","scenario="+key+
                         " dark="+darkPixels+" hot="+hotPixels+
-                        " metal="+metalPixels+" opened="+cutPixels+
+                        " metal="+metalPixels+" annealed="+annealPixels+
+                        " opened="+cutPixels+
                         " maskRegion="+region.width()+"x"+region.height()+
                         " actualHitCenters="+countDirectImpacts(ship));
             }
