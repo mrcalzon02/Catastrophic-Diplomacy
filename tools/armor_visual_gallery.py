@@ -188,6 +188,39 @@ for key in keys:
                 "nonblocking":True,"observations":channel_coverage},
                indent=2)+"\n",encoding="utf8")
 
+# Compare measured upload-mask geometry between equal original Terran
+# frigates. This is an objective observation on REAL renderer mask bytes,
+# not a subjective grade, synthetic damage, or a release gate.
+by_scenario={item["scenario"]:item for item in channel_coverage}
+pair_names=("particle-terran-upper","torpedo-terran-upper","kinetic-terran-upper")
+opening_observations={
+    name:{"opening_pixels":by_scenario[name]["real_opening_pixels"],
+          "heated_edge_pixels":by_scenario[name]["heated_edge_pixels"],
+          "bright_metal_pixels":by_scenario[name]["bright_metal_pixels"],
+          "mask_size":(by_scenario[name]["dirty_mask_width"],
+                       by_scenario[name]["dirty_mask_height"])}
+    for name in pair_names if name in by_scenario
+}
+if len(opening_observations)==3:
+    needle=opening_observations["particle-terran-upper"]["opening_pixels"]
+    rupture=opening_observations["torpedo-terran-upper"]["opening_pixels"]
+    warmth=opening_observations["kinetic-terran-upper"]["heated_edge_pixels"]
+    print(f"ARMOR-WOUND-COMPARISON particle_cut={needle} "
+          f"torpedo_cut={rupture} kinetic_hot={warmth}")
+    if rupture<=needle:
+        warnings.append("Torpedo hole is not larger than particle hole in actual "
+                        "same-hull uploaded mask; inspect source silhouette clipping")
+    if warmth==0:
+        warnings.append("Kinetic mask has no hot-edge samples after physical strike")
+else:
+    warnings.append("Incomplete same-hull material-mask geometry comparison")
+(out/"damage-wound-comparison.json").write_text(
+    json.dumps({"schema":"cd-armor-wound-comparison-v1",
+                "source":"Actual uploaded RGBA armor mask, not projected effect pixels",
+                "no_release_gate":True,
+                "observations":opening_observations},indent=2)+"\\n",
+    encoding="utf8")
+
 # A labeled review sheet built exclusively from genuine original game
 # framebuffers. Unlike a gallery of unrelated hulls, all six use the same
 # Terran frigate and each actual-hit scene has its own pristine seed match.
