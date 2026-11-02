@@ -117,6 +117,9 @@ public final class Battle {
         public double hologramNoise;
         /** Fitted crew, command, fuel, magazine, rescue and unsafe engineering. */
         public double crewProtection,commandProtection,fuelProtection,magazineContainment;
+        /** Fractional physical loss carries across hits; small ammo stores
+         * no longer ignore real penetration due to per-hit integer truncation. */
+        public double kineticStoreExposure,missileStoreExposure,torpedoStoreExposure;
         public double hazardInstability,hazardSeverity;
         public int escapePods,evacuatedCrew,hazardFailures;
         public boolean recoveryBeacon,recoveryBeaconActivated;
@@ -1247,12 +1250,18 @@ public final class Battle {
         ship.fuel=StrictMath.max(0,ship.fuel-
                 ship.maxFuel*wound*(1-ship.fuelProtection));
         double exposed=wound*(1-ship.magazineContainment);
-        ship.kineticAmmo=StrictMath.max(0,ship.kineticAmmo-
-                (int)StrictMath.floor(ship.maxKineticAmmo*exposed*.42));
-        ship.missileAmmo=StrictMath.max(0,ship.missileAmmo-
-                (int)StrictMath.floor(ship.maxMissileAmmo*exposed*.75));
-        ship.torpedoAmmo=StrictMath.max(0,ship.torpedoAmmo-
-                (int)StrictMath.floor(ship.maxTorpedoAmmo*exposed*.90));
+        double kinetic=ship.kineticStoreExposure+ship.maxKineticAmmo*exposed*.42;
+        double missile=ship.missileStoreExposure+ship.maxMissileAmmo*exposed*.75;
+        double torpedo=ship.torpedoStoreExposure+ship.maxTorpedoAmmo*exposed*.90;
+        int lostKinetic=(int)StrictMath.floor(kinetic+1e-9);
+        int lostMissile=(int)StrictMath.floor(missile+1e-9);
+        int lostTorpedo=(int)StrictMath.floor(torpedo+1e-9);
+        ship.kineticStoreExposure=StrictMath.max(0,kinetic-lostKinetic);
+        ship.missileStoreExposure=StrictMath.max(0,missile-lostMissile);
+        ship.torpedoStoreExposure=StrictMath.max(0,torpedo-lostTorpedo);
+        ship.kineticAmmo=Math.max(0,ship.kineticAmmo-lostKinetic);
+        ship.missileAmmo=Math.max(0,ship.missileAmmo-lostMissile);
+        ship.torpedoAmmo=Math.max(0,ship.torpedoAmmo-lostTorpedo);
     }
 
     private void destroyHull(Ship defender,Ship attacker) {
@@ -3161,6 +3170,9 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));
             hash=mix(hash,s.evacuatedCrew);
+            hash=mix(hash,Double.doubleToLongBits(s.kineticStoreExposure));
+            hash=mix(hash,Double.doubleToLongBits(s.missileStoreExposure));
+            hash=mix(hash,Double.doubleToLongBits(s.torpedoStoreExposure));
             hash=mix(hash,s.hazardFailures);
             hash=mix(hash,s.recoveryBeaconActivated?1:0);
             hash = mix(hash, Double.doubleToLongBits(s.shields));
