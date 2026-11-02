@@ -1170,8 +1170,9 @@ public final class Battle {
      * A fog-blinded captain searches the finite combat theater instead of
      * accelerating blindly down its team's original heading and leaving the
      * battle by tens of thousands of units. No enemy identity or position is
-     * leaked: each ship patrols a stable, staggered sector until its own real
-     * sensors reacquire a target. Explicit HOLD/LAST_STAND orders remain still.
+     * leaked: each ship patrols an expanding, staggered sector until its own
+     * real sensors reacquire a target. HOLD/LAST_STAND ships remain stationary;
+     * mobile ships sweep broader sectors after prolonged loss of contact.
      */
     private void searchForContact(Ship ship) {
         // Advance patrol waypoints on simulation ticks, not frame time or
@@ -1181,7 +1182,10 @@ public final class Battle {
         long phaseY=ship.id*11L+tick/360L;
         double rallyX=480+(phaseX%6)*65;
         double rallyY=145+(phaseY%7)*75;
-        if(unattendedExhibition&&tick>6000){
+        if(tick>6000){
+            // Any autonomous tactical fleet must search beyond its starting
+            // rally box. This remains a non-omniscient deterministic patrol,
+            // not a read of hidden hostile coordinates.
             // A long, genuine loss of contact calls for a wider search,
             // not perpetual orbiting of the initial 325-unit rally strip.
             // Each physical captain patrols an independent, bounded lane;
@@ -1190,8 +1194,8 @@ public final class Battle {
             double expansion=StrictMath.min(4.0,1+(tick-6000)/4200.0);
             long legX=ship.id*7L+tick/600L;
             long legY=ship.id*11L+tick/900L;
-            rallyX=640+((legX%9)-4)*92*expansion;
-            rallyY=335+((legY%7)-3)*90*expansion;
+            rallyX=640+((legX%9)-4)*145*expansion;
+            rallyY=565+((legY%7)-3)*140*expansion;
         }
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
                 ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
