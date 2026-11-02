@@ -353,6 +353,13 @@ public final class TerranPlaceholderSprites implements Disposable {
         armorAnchors.put(original,registered);
         return registered;
     }
+    /** Lightweight, rendering-independent provenance count for CI receipt. */
+    private static int countDirectImpacts(Battle.Ship ship){
+        int n=0;
+        for(int r=0;r<GRID;r++)for(int c=0;c<GRID;c++)
+            if(ship.defense.tile(r,c).directImpact())n++;
+        return n;
+    }
     /** Only armor changes invalidate the overlay; regenerating shields do not. */
     private static long armorSignature(Battle.Ship ship) {
         long result=0xcbf29ce484222325L;
@@ -465,6 +472,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         Pixmap output=new Pixmap(region.width(),region.height(),Pixmap.Format.RGBA8888);
         output.setBlending(Pixmap.Blending.None);
+        final String diagnosticDir=System.getenv("CD_ARMOR_CAPTURE_DIR");
+        final boolean visualDiagnostic=diagnosticDir!=null&&!diagnosticDir.isBlank()
+                &&ship.name!=null&&ship.name.startsWith("STATIONARY TEST TARGET / ");
+        int darkPixels=0,hotPixels=0,metalPixels=0,cutPixels=0;
         try {
             for(int localY=0;localY<region.height();localY++)
                 for(int localX=0;localX<region.width();localX++){
@@ -514,8 +525,25 @@ public final class TerranPlaceholderSprites implements Disposable {
                         family==Battle.DamageType.FIGHTER.ordinal()+1)
                     metal=Math.max(metal,rim*.88f);
                 else heat=Math.max(heat,rim);
-                output.drawPixel(localX,localY,
-                        ShipSurfaceDamageVisual.maskPixel(damage,crater,heat,metal));
+                int maskPixel=ShipSurfaceDamageVisual.maskPixel(damage,crater,heat,metal);
+                output.drawPixel(localX,localY,maskPixel);
+                if(visualDiagnostic){
+                    if((maskPixel>>>24&255)>12)darkPixels++;
+                    if((maskPixel>>>16&255)>12)hotPixels++;
+                    if((maskPixel>>>8&255)>12)metalPixels++;
+                    if((maskPixel&255)<243)cutPixels++;
+                }
+            }
+            if(visualDiagnostic){
+                String key=ship.name.substring("STATIONARY TEST TARGET / ".length())
+                        .toLowerCase(java.util.Locale.ROOT).replace(' ','-');
+                String file=diagnosticDir+"/"+key+"-mask-coefficients.png";
+                com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(file),output);
+                Gdx.app.log("CD-ARMOR-PROFILE","scenario="+key+
+                        " dark="+darkPixels+" hot="+hotPixels+
+                        " metal="+metalPixels+" opened="+cutPixels+
+                        " maskRegion="+region.width()+"x"+region.height()+
+                        " actualHitCenters="+countDirectImpacts(ship));
             }
             if(item.overlay==null){
                 item.overlay=new Texture(output);
