@@ -10,7 +10,8 @@ public final class ShipSurfaceDamageCaptureTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
-        check(ShipSurfaceDamageCapture.KEYS.length>=8,"Missing review scenarios");
+        check(ShipSurfaceDamageCapture.KEYS.length==33,
+                "Expected all 33 real screenshot scenarios");
         for(int i=0;i<ShipSurfaceDamageCapture.KEYS.length;i++){
             var scene=ShipSurfaceDamageCapture.create(tech,i);
             check(scene.target()!=null,"Missing actual ship "+scene.key());
@@ -44,12 +45,12 @@ public final class ShipSurfaceDamageCaptureTest {
                         scene.key(),scene.hits(),changed,impactMarks);
             }
             if(i==0||i==13||i==14||i==16||i==18||i==20||i==22||
-                    i==24||i==26)
+                    i==24||i==26||i==28||i==30||i==32)
                 check(scene.ticks()==0&&scene.hits()==0&&
                         scene.wornCells()==0,
                     "Pristine reference is already battle-damaged");
             if(i>1&&i!=8&&i!=13&&i!=14&&i!=16&&i!=18&&i!=20&&i!=22&&
-                    i!=24&&i!=26)
+                    i!=24&&i!=26&&i!=28&&i!=30&&i!=32)
                 check(scene.ticks()>0,"Live-fire scenario never simulated "+scene.key());
             if(i==8)
                 check(scene.syntheticStress(),"Rectangle must be labeled as artificial stress");
@@ -79,6 +80,9 @@ public final class ShipSurfaceDamageCaptureTest {
                     case 11 -> diplomacy.sim.Battle.DamageType.TORPEDO;
                     case 23 -> diplomacy.sim.Battle.DamageType.LASER;
                     case 25 -> diplomacy.sim.Battle.DamageType.MISSILE;
+                    case 27,28 -> diplomacy.sim.Battle.DamageType.PLASMA;
+                    case 29,30 -> diplomacy.sim.Battle.DamageType.PARTICLE;
+                    case 31,32 -> diplomacy.sim.Battle.DamageType.TORPEDO;
                     default -> diplomacy.sim.Battle.DamageType.KINETIC;
                 };
                 boolean found=false;
@@ -86,9 +90,10 @@ public final class ShipSurfaceDamageCaptureTest {
                     var tile=scene.target().defense.tile(row,col);
                     if(tile.directImpact()&&tile.impactType()==expected)found=true;
                 }
-                if(i==15||i==17||i==19||i==21||i==23||i==25)
-                    check(scene.hits()>0,"Contrast lane must fire actual kinetic weapon");
-                if(i==9)check(scene.hits()>0,
+                if(i==15||i==17||i==19||i==21||i==23||i==25||
+                        i==27||i==29||i==31)
+                    check(scene.hits()>0,"Contrast lane must fire its genuinely fitted weapon");
+                if(i==9||i==27)check(scene.hits()>0,
                         "Plasma test must fire from within its genuine weapon range");
                 if(scene.hits()>0&&scene.wornCells()>0)
                     check(found,"Fitted weapon used wrong surface profile: "+scene.key());
