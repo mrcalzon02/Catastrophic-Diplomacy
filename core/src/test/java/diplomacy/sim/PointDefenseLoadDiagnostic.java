@@ -23,7 +23,14 @@ import java.util.Set;
 public final class PointDefenseLoadDiagnostic {
     private PointDefenseLoadDiagnostic(){}
     private enum Load { INCIDENTAL, SURGE, SUSTAINED }
-    private enum Threat { KINETIC, MISSILE, TORPEDO, ROCKET_BOOST, ROCKET_SUSTAIN, MIXED }
+    private enum Threat {
+        KINETIC, MISSILE, TORPEDO, ROCKET_BOOST, ROCKET_SUSTAIN,
+        FIGHTER_INTERCEPTOR, FIGHTER_TORPEDO_BOMBER, MIXED;
+        boolean fighter(){return name().startsWith("FIGHTER_");}
+        FighterModel.Hull fighterHull(){
+            return FighterModel.Hull.valueOf(name().substring("FIGHTER_".length()));
+        }
+    }
     private enum Layout { FOUR_MOUNTS_ONE_HULL, FOUR_INDEPENDENT_HULLS }
     private static final int ACTIVE=660, DRAIN=300;
     private static final int[] BOUNDARY={0,220,440,660,960};
@@ -57,6 +64,17 @@ public final class PointDefenseLoadDiagnostic {
                 "Missing genuine siege rocket rack");
         return design;
     }
+    private static Shipyard.Design carrier(TechnologyCatalog catalog,FighterModel.Hull hull){
+        Shipyard.Design fit=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        for(Shipyard.Slot slot:fit.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){
+                fit=fit.install(slot.index(),"BASE-TER-FTR").withFighterHull(hull);
+                check(Shipyard.inspect(fit,catalog).valid(),
+                        "Invalid physical fighter launch bay for "+hull);
+                return fit;
+            }
+        throw new IllegalStateException("No physical fighter hangar socket");
+    }
     private record Source(Battle.Ship ship,Threat weapon) { }
     private static void quiet(Battle.Ship s){
         s.speed=s.vx=s.vy=0;
@@ -74,7 +92,14 @@ public final class PointDefenseLoadDiagnostic {
                                   Load load,int index){
         Battle.Ship s;
         double x=140+index*7,y=300+(index%3-1)*17;
-        if(threat==Threat.ROCKET_BOOST||threat==Threat.ROCKET_SUSTAIN){
+        if(threat.fighter()){
+            battle.spawnWing(0,carrier(catalog,threat.fighterHull()),catalog,1,x,y);
+            s=battle.ships().get(battle.ships().size()-1);
+            int fittedFighters=s.fighterReserve;
+            quiet(s);
+            check(fittedFighters>0,"No genuine carrier fighter stores");
+            s.fighterReserve=load==Load.INCIDENTAL?1:fittedFighters;
+        }else if(threat==Threat.ROCKET_BOOST||threat==Threat.ROCKET_SUSTAIN){
             battle.spawnWing(0,rocketHull(catalog),catalog,1,x,y);
             s=battle.ships().get(battle.ships().size()-1);
             quiet(s);
@@ -168,13 +193,14 @@ public final class PointDefenseLoadDiagnostic {
             guard.add(ship);
         }
         check(guard.size()==defenders,"Missing physical PD defenders");
-        battle.setTeamPointDefense(1,pdOn?BattleOrders.PointDefense.INTERCEPT_ONLY:
+        battle.setTeamPointDefense(1,pdOn?BattleOrders.PointDefense.BALANCED:
                 BattleOrders.PointDefense.HOLD_FIRE);
         long lastEvent=-1;
         Set<Long> launchIds=new HashSet<>(),interceptIds=new HashSet<>();
         Set<Long> impactIds=new HashSet<>(),timeoutIds=new HashSet<>(),terminalIds=new HashSet<>();
         int[] firedByBand=new int[4],pdByBand=new int[4],killsByBand=new int[4];
         int pdShots=0;double minPower=1,peakHeat=0;
+        Set<Integer> craftTerminal=new HashSet<>();
         for(int tick=0;tick<ACTIVE+DRAIN;tick++){
             for(int index=0;index<attackers.size();index++){
                 Source src=attackers.get(index);
@@ -189,6 +215,11 @@ public final class PointDefenseLoadDiagnostic {
                 src.ship.weaponsCondition=active?1:0;
             }
             battle.step();
+            for(Battle.Craft fighter:battle.crafts())if(fighter.team==0)
+                for(Battle.Ship defender:guard)
+                    if(StrictMath.hypot(fighter.x-defender.x,
+                            fighter.y-defender.y)<=90)
+                        craftTerminal.add(fighter.id);
             for(Battle.Missile m:battle.missiles())if(m.team==0)
                 for(Battle.Ship defender:guard)
                     if(StrictMath.hypot(m.x-defender.x,m.y-defender.y)<=90)
@@ -230,8 +261,10 @@ public final class PointDefenseLoadDiagnostic {
             }
             if(!events.isEmpty())lastEvent=events.get(events.size()-1).sequence();
         }
-        int unresolved=0,kineticPaid=kineticBefore,missilePaid=missileBefore,torpedoPaid=torpedoBefore;
+        int unresolved=0,kineticPaid=kineticBefore,missilePaid=missileBefore,
+                torpedoPaid=torpedoBefore,craftLaunched=0;
         for(Source src:attackers){
+            if(src.weapon.fighter())craftLaunched+=src.ship.fightersLaunched;
             kineticPaid-=src.ship.kineticAmmo;
             missilePaid-=src.ship.missileAmmo;
             torpedoPaid-=src.ship.torpedoAmmo;
@@ -239,15 +272,20 @@ public final class PointDefenseLoadDiagnostic {
         for(long id:launchIds)
             if(!interceptIds.contains(id)&&!impactIds.contains(id)&&!timeoutIds.contains(id))
                 unresolved++;
+        int actualLaunched=launchIds.size()+craftLaunched;
+        int actualIntercepted=interceptIds.size()+battle.craftLosses;
+        int actualTerminal=terminalIds.size()+craftTerminal.size();
+        unresolved+=craftLaunched-battle.craftLosses;
         double endingHull=0;
         for(Battle.Ship defender:guard)endingHull+=defender.hull;
         check(pdOn||pdShots==0,"PD shots while defensive system was ordered HOLD_FIRE");
-        check(interceptIds.size()<=launchIds.size(),"Intercept count exceeds launched bodies");
+        check(actualIntercepted<=actualLaunched,
+                "Intercept count exceeds launched physical bodies or craft");
         check(kineticPaid>=0&&missilePaid>=0&&torpedoPaid>=0,
                 "A diagnostic source created ammunition");
-        return new Result(load,threat,layout,rank,seed,pdOn,launchIds.size(),
-                interceptIds.size(),impactIds.size(),timeoutIds.size(),
-                terminalIds.size(),unresolved,pdShots,
+        return new Result(load,threat,layout,rank,seed,pdOn,actualLaunched,
+                actualIntercepted,impactIds.size(),timeoutIds.size(),
+                actualTerminal,unresolved,pdShots,
                 pdByBand[0],pdByBand[1],pdByBand[2],pdByBand[3],
                 killsByBand[0],killsByBand[1],killsByBand[2],killsByBand[3],
                 firedByBand[0],firedByBand[1],firedByBand[2],
