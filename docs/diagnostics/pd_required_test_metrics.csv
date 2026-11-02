@@ -1,0 +1,27 @@
+﻿telemetry_field,unit,definition,test_requirement
+shot_id,ID,"Immutable physical projectile/craft identifier, paired FIRE to outcome",REQUIRED
+defense_mount_id,ID,Specific installed defense slot that fired,REQUIRED
+defense_family,CATEGORY,"PD FLK RCW RPD PPD PLS IMD, not ECM or armor",REQUIRED
+defense_upgrade_stage,INTEGER,0 or IX then intermediate stages on second pass,REQUIRED
+attack_upgrade_stage,INTEGER,0 or IX then intermediate stages on second pass,REQUIRED
+launched_physical_bodies,COUNT,Actual paid projectiles and real fighter craft launched,REQUIRED
+intercepted_before_terminal,COUNT,Hostile physical bodies destroyed before crossing defended 90-unit boundary,REQUIRED
+intercepted_after_terminal,COUNT,Bodies destroyed after zone breach; do not count as successful outer intercept,REQUIRED
+inner_zone_breaches,COUNT,Unique physical bodies crossing defended 90-unit boundary,REQUIRED
+impacts_real,COUNT,Actual shield/armor/hull impacts from surviving bodies,REQUIRED
+damage_prevented,DAMAGE,Compared against matched same-seed hold-fire control,REQUIRED
+natural_misses,COUNT,"Escapes, expiry and physical misses not caused by PD",REQUIRED
+unresolved_at_horizon,COUNT,Count in-flight bodies not yet resolved at diagnostic stop,REQUIRED
+defensive_shots,COUNT,Per-mount shots and physical area bursts,REQUIRED
+defensive_ammunition_units,COUNT,Ammo expended by RCW FLK RPD and IMD,REQUIRED
+defense_power_spent,ENERGY,Reactor consumption attributable to this mount,REQUIRED
+defense_peak_heat,HEAT,Peak temperature from firing and recharge,REQUIRED
+mount_busy_fraction,RATE,Fraction of real operating window with cooldown/tracking busy,RECOMMENDED
+physical_aoe_contacts,COUNT,Unique real projectile IDs intersecting burst volume,REQUIRED_FOR_AOE
+interceptor_missiles_launched,COUNT,Finite ammo spent by dedicated IMD launcher,REQUIRED_FOR_IMD
+interceptor_failure_reason,CATEGORY,"No track, too close, lost guidance, depleted, missed, exhausted, other",RECOMMENDED
+control_same_seed,ID,Identical attackers/geometry/seed with PD hold-fire,REQUIRED
+armament_credit_cost,CREDITS,Installed and ongoing defensive value for cost parity comparisons,RECOMMENDED
+softkill_diversion_separate,COUNT,"Existing ECM events recorded separately, never credited to physical PD kills",REQUIRED_WHEN_ECM_ACTIVE
+thermal_or_reactor_stress,CATEGORY,Nominal or damaged reactor; do not mix samples,RECOMMENDED
+runtime_ms,MILLISECONDS,Wall time and projectile simulation throughput,RECOMMENDED
