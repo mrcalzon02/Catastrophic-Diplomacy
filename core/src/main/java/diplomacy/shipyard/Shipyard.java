@@ -969,7 +969,12 @@ public final class Shipyard {
                 new Support(selfRate,remoteRate,remoteRange,shieldRate,shieldRange,
                         repairDrones,droneRepair,droneEndurance,efficiency,
                         repairDroneCapacity),
-                pdWeight==0?1:pdCycle/pdWeight,baseline,
+                // Separate fitted PD/FLK turrets share sensor coordination,
+                // but EACH physical mount provides firing throughput.
+                // Keep no-mount legacy ships at 1; bound the highest-end
+                // battery to four coordinated channels to protect 200v200 CPU.
+                pdWeight==0?1:(pdCycle/pdWeight)/
+                        StrictMath.min(4,pdWeight),baseline,
                 new Crew(minimumCrew(design),(int)StrictMath.floor(accommodation),
                         (int)StrictMath.floor(breathing)),
                 ammunitionAccess(design),shieldRechargeBoost,

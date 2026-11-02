@@ -90,6 +90,23 @@ public final class RocketBarrageTest {
                 }
             }
         }
+        // Independent fitted PD modules must genuinely increase interception
+        // throughput, not only add radar reach or decoration to a ship.
+        Shipyard.Design pdOne=Shipyard.bareHull(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        int firstDefense=-1,secondDefense=-1;
+        for(Shipyard.Slot slot:pdOne.hull.slots)
+            if(slot.mount()==Shipyard.Mount.DEFENSE){
+                if(firstDefense<0)firstDefense=slot.index();
+                else if(secondDefense<0){secondDefense=slot.index();break;}
+            }
+        require(firstDefense>=0&&secondDefense>=0,
+                "PD module count benchmark requires actual distinct sockets");
+        pdOne=pdOne.install(firstDefense,"BASE-TER-PD");
+        Shipyard.Design pdTwo=pdOne.install(secondDefense,"BASE-TER-PD");
+        require(Shipyard.fit(pdTwo,tech).pdCycle()<
+                Shipyard.fit(pdOne,tech).pdCycle()*.65,
+                "Two paid laser PD mounts must provide more real firing capacity than one");
         // Spawn-time catalog parsing must NOT multiply by 200 in fleet tests;
         // actual mutable missile magazines must never be shared across hulls.
         Battle wing=new Battle(70077L);
