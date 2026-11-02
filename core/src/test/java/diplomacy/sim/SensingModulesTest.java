@@ -168,6 +168,19 @@ public final class SensingModulesTest {
         enemy.radarCrossSection=.15;
         require(!duel.hasTargetContact(spotter,enemy,510),
                 "Installed radar-stealth plating must defeat the distant radar contact");
+        // Passive recognition depends on the real size of the silhouette.
+        // This closes the case where an inoperative, abandoned capital ship
+        // could stay invisible a few meters beyond an arbitrary 390-unit
+        // optical boundary, while preserving the value of stealth systems.
+        spotter.sensorRange=0;spotter.xrayRange=0;spotter.infraredRange=0;
+        spotter.graviticRange=0;
+        enemy.power=0;enemy.opticalSignature=1;
+        enemy.x=spotter.x+430;enemy.maxHull=2200;
+        require(duel.hasTargetContact(spotter,enemy,430),
+                "Large exposed capital silhouette should be passively visible nearby");
+        enemy.maxHull=140;
+        require(!duel.hasTargetContact(spotter,enemy,430),
+                "Tiny unpowered escort must not inherit capital visual range");
         System.out.println("PASS sensing module fittings, research, persistence and detection");
     }
 }

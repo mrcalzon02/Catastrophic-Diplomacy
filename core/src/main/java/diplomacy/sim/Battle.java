@@ -1423,8 +1423,15 @@ public final class Battle {
         // The cloak needs power and working electronic warfare electronics.
         double cloak=target.power>4&&target.ecmCondition>0.15
                 ?target.opticalSignature:1;
+        // A visible capital-hull silhouette is easier to identify optically
+        // than a tiny escort at the same distance. This is ordinary passive
+        // line-of-sight, not omniscient fleet targeting or a stealth bypass.
+        // Broken/idle cloaks still fail open. The bound preserves optical
+        // stealth and independent radar/IR/X-ray/gravitic sensor advantages.
+        double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
+                StrictMath.sqrt(StrictMath.max(1,target.maxHull)/550)));
         double optical=(weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390)
-                *cloak;
+                *cloak*silhouette;
         double thermalDamping=1-(1-target.thermalSignature)
                 *StrictMath.max(0,target.coolingCondition);
         double infrared=observer.infraredRange*condition*weatherRange
