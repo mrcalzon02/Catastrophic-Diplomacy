@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
+import diplomacy.sim.RocketBarrage;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -275,6 +276,37 @@ public final class CampaignFleetTest {
         var weaponRefit=baseline.withModuleVersion(weaponSlot,
                 diplomacy.shipyard.ModuleVersions.Pattern.STANDARD,2);
         var warehouse=original.setActive(ship1,false,20);
+        // Rocket fire-control reprogramming must count as a real owned-hull
+        // refit, even with unchanged hardware, hull and magazine formulation.
+        Shipyard.Design rocketBase=baseline.install(missileSlot,"BASE-TER-RKM");
+        var rocketOwned=warehouse.refit(ship1,rocketBase,tech);
+        Shipyard.Design rocketProgram=rocketBase.withRocketBarrage(missileSlot,16,
+                RocketBarrage.Motor.BOOST_COAST);
+        long fireControlQuote=rocketOwned.refitCost(ship1,rocketProgram,tech);
+        check(fireControlQuote>0,
+                "A changed rocket program was incorrectly classified as a no-op refit");
+        var rocketReprogrammed=rocketOwned.refit(ship1,rocketProgram,tech);
+        check(rocketReprogrammed.get(ship1).fitting().rocketBarrage(missileSlot)
+                        .equals(new RocketBarrage.Fitting(16,RocketBarrage.Motor.BOOST_COAST))
+                        &&rocketReprogrammed.get(ship1).stores().kinetic()<=
+                                rocketOwned.get(ship1).stores().kinetic()
+                        &&rocketReprogrammed.get(ship1).id()==ship1,
+                "Paid rocket reprogramming erased ship identity, ammo or saved controls");
+        var savedRocketFleet=CampaignFleetCodec.decode(
+                CampaignFleetCodec.encode(rocketReprogrammed),tech);
+        check(savedRocketFleet.get(ship1).fitting().rocketBarrage(missileSlot)
+                        .equals(rocketProgram.rocketBarrage(missileSlot))&&
+                        savedRocketFleet.get(ship1).fitting().rocketFittings.size()==1,
+                "Campaign fleet checksum round-trip discarded the rocket fire program");
+        Battle programmedBattle=new Battle(74019L);
+        programmedBattle.spawnWing(0,savedRocketFleet.get(ship1).fitting(),tech,
+                1,270,320);
+        var programmedRack=programmedBattle.ships().get(0).rocketRacks.get(0);
+        check(programmedRack.salvoCount==16&&
+                        programmedRack.motor==RocketBarrage.Motor.BOOST_COAST,
+                "Next campaign sortie ignored the paid stored rocket fire program");
+        reject(()->rocketReprogrammed.refitCost(ship1,rocketProgram,tech),
+                "Repeating an unchanged rocket program was charged as a refit");
         check(warehouse.get(ship1).stores().missiles()>0,
                 "Regression fixture must have purchased missile stock to preserve");
         var installed=warehouse.refit(ship1,weaponRefit,tech);
