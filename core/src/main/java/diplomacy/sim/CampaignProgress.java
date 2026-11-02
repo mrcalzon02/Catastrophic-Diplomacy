@@ -73,6 +73,15 @@ public final class CampaignProgress {
             return new State(faction,unlocked,credits-cost,victories,researchRank,
                     highestCompleted,speedUpgrades,activeProject,projectProgress);
         }
+        /** Award salvage only when combat verified a beacon-bearing wreck and
+         * victorious recovery; preserves the existing durable ledger format. */
+        public State awardAfterActionSalvage(long recoveredCredits){
+            if(recoveredCredits<0)throw new IllegalArgumentException("Negative salvage");
+            if(recoveredCredits==0)return this;
+            return new State(faction,unlocked,Math.addExact(credits,recoveredCredits),
+                    victories,researchRank,highestCompleted,speedUpgrades,
+                    activeProject,projectProgress);
+        }
         public long nextResearchCost(){
             return researchRank==9?0:LevelEconomy.draftResearchCost(researchRank+1);
         }

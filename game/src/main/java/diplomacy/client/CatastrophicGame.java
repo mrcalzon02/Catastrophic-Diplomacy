@@ -1701,8 +1701,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 afterActionPage=0;
                 CampaignFleet.Roster returned=campaignFleet.afterBattle(battle,campaignSortie);
                 CampaignProgress.State before=campaign;
+                long recoveredScrap=lastWon?battle.recoverySalvageCredits(0):0;
                 CampaignProgress.State next=lastWon?
-                        before.complete(activeMission,deployedAtLaunch,survivorsAtEnd):before;
+                        before.complete(activeMission,deployedAtLaunch,survivorsAtEnd)
+                                .awardAfterActionSalvage(recoveredScrap):before;
                 CampaignTechnology.State beforeTechnology=discoveries;
                 CampaignTechnology.State nextTechnology=lastWon?
                         beforeTechnology.victory():beforeTechnology;
@@ -1721,6 +1723,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                 "/"+next.currentProjectMissions()+" mission ticks.";
                     Gdx.app.log("CD-GAME-FLOW","MISSION_LEDGER_COMMITTED mission="+
                             activeMission+" replay="+replay+" credits="+lastReward+
+                            " recoveredScrap="+recoveredScrap+
                             " owned="+returned.ships().size());
                 }else{
                     lastReward=0; // An unsaved victory is not a credited victory.

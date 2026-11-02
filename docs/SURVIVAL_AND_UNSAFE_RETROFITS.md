@@ -13,7 +13,7 @@ paths, with existing save formats and original components untouched.
 | FBN | Armored Fuel Bunker | Support | I | Extra protected propellant capacity |
 | AMV | Isolated Ammunition Vault | Support | II | Paid ordnance capacity and magazine containment |
 | EPD | Dedicated Escape-Pod Battery | Support | I | Evacuate a finite number of surviving personnel on destruction |
-| RCB | Emergency Recovery Beacon | Support | I | Emit observable distress/salvage telemetry after hull loss |
+| RCB | Emergency Recovery Beacon | Support | I | Mark a real wreck; only a won postbattle recovery grants limited hull-only salvage credits |
 | PGO | Power Governor Override | System | III | Extra recharge with heat and stability penalties |
 | JPB | Jailbroken Plasma Confinement Battery | System | V | Extreme recharge with catastrophic failure potential |
 | IBR | Unauthorized Battery Brick | System | 0 | Cheap emergency power and terrible reliability |
@@ -30,7 +30,10 @@ battle stress make faults more likely. Faults may trip the reactor, disable
 communications, injure crew, ignite stores or breach internal compartments.
 Benefits have real reactor power, heat, mass and research cost. Escape pods save
 actual personnel counts, never regenerate a destroyed ship or grant free crew.
-Recovery beacons identify a wreck but do not instantly award salvage.
+Recovery beacons identify a wreck but do not instantly award salvage. On victory,
+the postbattle settlement may recover only a modest amount of scrap from a
+destroyed, beacon-bearing friendly hull; the destroyed ship, crew and purchased
+modules are never automatically restored.
 
 Acceptance: verify eleven native families per subsystem, nine levels x four
 parallel tracks, functional fittings, survival outcomes, unsafe-only fault

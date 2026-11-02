@@ -136,6 +136,24 @@ public final class SurvivalModulesTest {
         rescues.destroyHull(outfitted,null);
         check(destroyed==rescues.destructions,
                 "Repeated wreck processing must not duplicate destroyed hulls or survivors");
+        check(rescues.recoverySalvageCredits(0)>0,
+                "Victory must recover limited scrap from beacon-bearing friendly wrecks");
+        long once=rescues.recoverySalvageCredits(0);
+        check(once==rescues.recoverySalvageCredits(0) && once<=8000L,
+                "Salvage must be deterministic, bounded, and not re-buy the hull");
+        CampaignProgress.State winnings=CampaignProgress.start(Battle.Faction.TERRAN)
+                .complete(1,2,1);
+        var recovered=winnings.awardAfterActionSalvage(once);
+        check(recovered.credits()==winnings.credits()+once &&
+                recovered.victories()==winnings.victories(),
+                "Beacon scrap must pay through the existing durable victory ledger");
+        Battle contested=new Battle(517L);
+        contested.spawnWing(0,rescueFitted,catalog,1,100,100);
+        contested.spawnWing(0,empty,catalog,1,100,200);
+        contested.spawnWing(1,empty,catalog,1,900,900);
+        contested.destroyHull(contested.ships().get(0),null);
+        check(contested.recoverySalvageCredits(0)==0,
+                "No beacon salvage without actual battlefield victory");
         // Each unsafe architecture must produce distinguishable, deterministic
         // real failures under the same extreme forced stress.
         int[] flags={SurvivalHardwareCatalog.GOVERNOR,

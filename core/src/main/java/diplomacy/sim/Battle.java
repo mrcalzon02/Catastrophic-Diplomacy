@@ -1296,6 +1296,26 @@ public final class Battle {
         if(s.hull<=0)destroyHull(s,null);
     }
 
+    /** A locator is worth salvage ONLY during a won postbattle recovery.
+     * Destroyed hulls never return to the roster, and no in-battle credit
+     * appears merely because a beacon flashes on the tactical screen. */
+    public long recoverySalvageCredits(int friendlyTeam) {
+        if(friendlyTeam<0||friendlyTeam>1)
+            throw new IllegalArgumentException("Recovery side must be a real fleet");
+        if(alive(1-friendlyTeam)>0||engaged(friendlyTeam)<=0)return 0;
+        long salvaged=0;
+        for(Ship wreck:ships){
+            if(wreck.team!=friendlyTeam||!wreck.retired||
+                    !wreck.recoveryBeaconActivated||wreck.hullClass==null)continue;
+            // Modest hull-only scrap value, NOT free replacement modules, crew,
+            // fuel or ammunition. Victory is the real recovery operation.
+            long scrap=Math.min(8000L,
+                    Math.round(wreck.hullClass.baseHull*4.0));
+            salvaged=Math.addExact(salvaged,scrap);
+        }
+        return salvaged;
+    }
+
     /** No random stock destruction, phantom refills or global armor bypass.
      * Real armor/shield resolution has already supplied penetratingDamage. */
     static void breachStores(Ship ship,DamageType kind,double penetratingDamage,
