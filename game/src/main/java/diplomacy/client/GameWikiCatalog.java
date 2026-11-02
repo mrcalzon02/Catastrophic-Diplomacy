@@ -14,6 +14,7 @@ import diplomacy.sim.ShipStandingOrders;
 import diplomacy.sim.BattleOrders;
 import diplomacy.sim.Battle;
 import java.util.ArrayList;
+import java.util.AbstractList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -41,10 +42,33 @@ final class GameWikiCatalog {
         }
     }
     private final List<Article> articles;
-    private GameWikiCatalog(List<Article> list){
+    private final List<Article> staticArticles;
+    private final List<String> upgradeIds;
+    private final TechnologyCatalog technology;
+    private GameWikiCatalog(List<Article> list,TechnologyCatalog technology){
         list.sort(Comparator.comparing((Article e)->e.category)
                 .thenComparing(e->e.title).thenComparing(e->e.id));
-        articles=List.copyOf(list);
+        staticArticles=List.copyOf(list);
+        this.technology=technology;
+        // A full encyclopedia contains 39,600 research entries. On a 16MiB
+        // Android runtime, pre-rendering all eight-line Article objects and
+        // concatenated search text can exhaust memory without opening a page.
+        // Only their canonical IDs are retained; details use the same live
+        // TechnologyCatalog on demand and never become a second permanent copy.
+        List<String> ids=new ArrayList<>(technology.upgradeCount());
+        ids.addAll(technology.upgrades().keySet());
+        ids.sort(String::compareTo);
+        upgradeIds=List.copyOf(ids);
+        if(upgradeIds.size()!=technology.upgradeCount())
+            throw new IllegalStateException("Incomplete virtual research encyclopedia");
+        articles=new AbstractList<>() {
+            @Override public int size(){return staticArticles.size()+upgradeIds.size();}
+            @Override public Article get(int index){
+                if(index<0||index>=size())throw new IndexOutOfBoundsException(index);
+                if(index<staticArticles.size())return staticArticles.get(index);
+                return upgradeArticle(technology.get(upgradeIds.get(index-staticArticles.size())));
+            }
+        };
     }
     List<Article> articles(){return articles;}
     int size(){return articles.size();}
@@ -54,7 +78,7 @@ final class GameWikiCatalog {
     }
     static GameWikiCatalog build(TechnologyCatalog catalog){
         if(catalog==null)throw new IllegalArgumentException("Wiki requires live technology data");
-        List<Article> a=new ArrayList<>(catalog.upgradeCount()+catalog.componentCount()+160);
+        List<Article> a=new ArrayList<>(catalog.componentCount()+240);
         guide(a,"START HERE","How battles work",
             "Every encounter is simulated in authoritative 30 Hz ticks. A ship needs fitted machinery: hulls do not magically inherit expensive guns or support projectors.",
             "Weapons must meet their own range, power, heat, ammunition, sensor and firing conditions. Hits reduce directional shields, armor and physical structure. Damage can disable individual systems.",
@@ -148,21 +172,8 @@ final class GameWikiCatalog {
                 "This is a physical installable base component. A hull alone does not supply the effect; select a compatible socket and check capacity, power and heat.",
                 "Research tracks: OUTPUT for stronger effect, EFFICIENCY for lower operating burdens, RESILIENCE for survivability, SPECIALIST for role-specific specialization. Choose only one per installed socket.",
                 "Find its exact upgrade pages by searching "+m.faction+" "+m.subsystem+" or "+m.id+"."));
-        for(TechnologyCatalog.Upgrade u:catalog.upgrades().values())
-            a.add(new Article("upgrade."+u.id,"UPGRADES",u.name+" / "+u.id,
-                "Exact technology ID: "+u.id+". Faction "+u.faction+", subsystem "+u.subsystem+
-                    ", branch "+u.track+", stage "+u.stage+" of 9.",
-                "Prerequisite: "+u.prerequisite+". Research cost "+u.researchCost+
-                    "; industry cost "+u.industryCost+".",
-                "Physical multipliers: mass x"+number(u.mass)+", power x"+number(u.power)+
-                    ", heat x"+number(u.heat)+", output x"+number(u.output)+
-                    ", accuracy x"+number(u.accuracy)+".",
-                "Additional multipliers: integrity x"+number(u.integrity)+", shields x"+
-                    number(u.shield)+", thrust x"+number(u.thrust)+", cooling x"+
-                    number(u.cooling)+", maintenance x"+number(u.maintenance)+".",
-                "Research branch purpose: "+branchExplanation(u.track),
-                "Authoritative design tradeoff: "+u.tradeoff,
-                "The fitted module must own the appropriate branch and stage. This is not a whole-ship automatic buff."));
+        // Upgrade articles are virtual; creating every detailed entry here
+        // would nullify the startup-memory savings in TechnologyCatalog.
         for(ModuleVersions.Pattern pattern:ModuleVersions.Pattern.values())
             for(int mark=1;mark<=4;mark++){
                 ModuleVersions.Modifiers v=ModuleVersions.of(pattern,mark);
@@ -238,7 +249,24 @@ final class GameWikiCatalog {
             a.add(new Article("pd."+pd,"ORDERS",nice(pd.name())+" point defense",
                 "Point-defense strategy "+nice(pd.name())+".",
                 "A working point-defense module must be installed to intercept missiles, physical shells or fightercraft as permitted by this mode. Priorities and ally-protection policies also apply."));
-        return new GameWikiCatalog(a);
+        return new GameWikiCatalog(a,catalog);
+    }
+    private static Article upgradeArticle(TechnologyCatalog.Upgrade u){
+        if(u==null)throw new IllegalStateException("Missing authoritative upgrade article");
+        return new Article("upgrade."+u.id,"UPGRADES",u.name+" / "+u.id,
+            "Exact technology ID: "+u.id+". Faction "+u.faction+", subsystem "+u.subsystem+
+                ", branch "+u.track+", stage "+u.stage+" of 9.",
+            "Prerequisite: "+u.prerequisite+". Research cost "+u.researchCost+
+                "; industry cost "+u.industryCost+".",
+            "Physical multipliers: mass x"+number(u.mass)+", power x"+number(u.power)+
+                ", heat x"+number(u.heat)+", output x"+number(u.output)+
+                ", accuracy x"+number(u.accuracy)+".",
+            "Additional multipliers: integrity x"+number(u.integrity)+", shields x"+
+                number(u.shield)+", thrust x"+number(u.thrust)+", cooling x"+
+                number(u.cooling)+", maintenance x"+number(u.maintenance)+".",
+            "Research branch purpose: "+branchExplanation(u.track),
+            "Authoritative design tradeoff: "+u.tradeoff,
+            "The fitted module must own the appropriate branch and stage. This is not a whole-ship automatic buff.");
     }
     private static void guide(List<Article> a,String id,String title,String... body){
         a.add(new Article("guide."+id,"GUIDES",title,body));
@@ -328,11 +356,29 @@ final class GameWikiCatalog {
     List<Article> search(String category,String query){
         String needle=(query==null?"":query.trim()).toLowerCase(Locale.ROOT).replace('_',' ');
         String selected=(category==null?"ALL":category);
+        // Unfiltered ALL/UPGRADES views are virtual paged lists: no forty
+        // thousand eagerly allocated article details, even if the UI shows
+        // "RESULTS 39600" and supports random list-page selection.
+        if(needle.isEmpty()){
+            if(selected.equals("ALL"))return articles;
+            if(selected.equals("UPGRADES"))
+                return articles.subList(staticArticles.size(),articles.size());
+        }
         List<Article> hits=new ArrayList<>();
-        for(Article article:articles)
-            if((selected.equals("ALL")||article.category.equals(selected))
-                    &&(needle.isEmpty()||article.searchable.contains(needle)))
-                hits.add(article);
+        if(!selected.equals("UPGRADES"))
+            for(Article article:staticArticles)
+                if((selected.equals("ALL")||article.category.equals(selected))
+                        &&(needle.isEmpty()||article.searchable.contains(needle)))
+                    hits.add(article);
+        if(selected.equals("ALL")||selected.equals("UPGRADES"))
+            for(String id:upgradeIds){
+                // Avoid constructing the full text for an ID query when the
+                // searched ID itself matches; otherwise generate briefly,
+                // retain only actual matches, then release the Article.
+                Article article=upgradeArticle(technology.get(id));
+                if(needle.isEmpty()||article.searchable.contains(needle))
+                    hits.add(article);
+            }
         return hits;
     }
 }
