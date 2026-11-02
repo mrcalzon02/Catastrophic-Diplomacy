@@ -10,6 +10,7 @@ on:
       - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
       - 'core/src/test/java/diplomacy/sim/RocketPdBalanceDiagnostic.java'
       - 'core/src/test/java/diplomacy/sim/PointDefenseThreatMatrixDiagnostic.java'
+      - 'core/src/test/java/diplomacy/sim/PointDefenseLoadDiagnostic.java'
       - 'core/src/main/java/diplomacy/sim/OrdnanceDoctrine.java'
       - 'core/src/main/java/diplomacy/sim/OrdnanceSubmunitions.java'
       - 'core/src/main/java/diplomacy/sim/FighterModel.java'
@@ -44,6 +45,10 @@ jobs:
         id: matrix
         continue-on-error: true
         run: gradle --no-daemon :core:pdThreatMatrixDiagnostic
+      - name: Measure incidental, surge and sustained physical PD load
+        id: load
+        continue-on-error: true
+        run: gradle --no-daemon :core:pdLoadProfileDiagnostic
       - name: Surface sample metrics and diagnostic outcome
         if: always()
         run: |
@@ -53,6 +58,13 @@ jobs:
             cat core/test-output/pd-interception-matrix/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No all-threat metrics produced. Inspect the advisory matrix job logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "## Incidental, surge and sustained PD load" >> "$GITHUB_STEP_SUMMARY"
+          echo "Load diagnostic: ${{ steps.load.outcome }} (advisory only)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/pd-load-profiles/summary.md ]; then
+            cat core/test-output/pd-load-profiles/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Load diagnostic produced no metrics; see advisory run logs." >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "## Rocket versus point defense" >> "$GITHUB_STEP_SUMMARY"
           echo "Diagnostic execution: ${{ steps.ladder.outcome }} (advisory only)" >> "$GITHUB_STEP_SUMMARY"
@@ -69,5 +81,6 @@ jobs:
           path: |
             core/test-output/rocket-pd-balance/
             core/test-output/pd-interception-matrix/
+            core/test-output/pd-load-profiles/
           if-no-files-found: warn
           retention-days: 30
