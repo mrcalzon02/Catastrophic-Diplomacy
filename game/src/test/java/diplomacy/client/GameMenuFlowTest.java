@@ -372,12 +372,19 @@ public final class GameMenuFlowTest {
                 "Cannot return from standing-orders editor");
         check(GameMenuPanel.ordersAction(900,580)==31,
                 "Advanced orders page button is inert");
-        for(int i=13;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
+        for(int i=13;i<23;i++){
             float y=534-(i-13)*29;
             check(GameMenuPanel.ordersAction(700,y,1)==2+i,
                     "Cannot decrease advanced behavior "+i);
             check(GameMenuPanel.ordersAction(1150,y,1)==2+i,
                     "Cannot increase advanced behavior "+i);
+        }
+        for(int i=23;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
+            float y=544-(i-23)*62;
+            check(GameMenuPanel.ordersAction(700,y,2)==2+i,
+                    "Touch-sized resource order cannot decrease setting "+i);
+            check(GameMenuPanel.ordersAction(1150,y,2)==2+i,
+                    "Touch-sized resource order cannot increase setting "+i);
         }
         check(GameMenuPanel.ordersAction(1120,505,0)==3,
                 "Original doctrine page no longer handles persistent caution");
