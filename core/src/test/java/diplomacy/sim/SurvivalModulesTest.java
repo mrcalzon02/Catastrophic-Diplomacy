@@ -86,9 +86,22 @@ public final class SurvivalModulesTest {
         Battle.breachStores(isolatedMag,Battle.DamageType.TORPEDO,250,true);
         check(armoredFuel.fuel/armoredFuel.maxFuel>ordinary.fuel/ordinary.maxFuel,
                 "Armored bunker failed to protect finite propellant");
-        check(isolatedMag.missileAmmo/(double)isolatedMag.maxMissileAmmo>
-                ordinary.missileAmmo/(double)ordinary.maxMissileAmmo,
-                "Magazine vault failed to limit actual ammunition losses");
+        // Physical missile losses are integer-valued, but damage to a small
+        // magazine may be fractional on a single hit and must accumulate.
+        double ordinaryLoss=ordinary.maxMissileAmmo-ordinary.missileAmmo+
+                ordinary.missileStoreExposure;
+        double protectedLoss=isolatedMag.maxMissileAmmo-isolatedMag.missileAmmo+
+                isolatedMag.missileStoreExposure;
+        check(ordinaryLoss>protectedLoss,
+                "Magazine vault failed to limit accumulated physical ammunition damage");
+        for(int hit=0;hit<12;hit++){
+            Battle.breachStores(ordinary,Battle.DamageType.TORPEDO,250,true);
+            Battle.breachStores(isolatedMag,Battle.DamageType.TORPEDO,250,true);
+        }
+        check(ordinary.missileAmmo<ordinary.maxMissileAmmo,
+                "Repeated penetrating impacts never destroyed small-store ammunition");
+        check(isolatedMag.missileAmmo>=ordinary.missileAmmo,
+                "Protected magazine lost more real ammunition under identical impacts");
         check(fuelFraction>ordinary.fuel/ordinary.maxFuel,
                 "Penetrating torpedo strike must remove some unprotected fuel");
 
