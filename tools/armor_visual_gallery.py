@@ -239,6 +239,55 @@ try:
             "Screenshot quality is a nonblocking diagnostic.\\n",
             encoding="utf8")
         print("ARMOR-EXAMPLES six genuine matched-hull weapon comparisons")
+
+        # Inspection crops for the three newly differentiated materials.
+        # Find the most changed ORIGINAL surface region, then show the
+        # EXACT same source crop before/after, with nearest-pixel zoom.
+        # No painted holes, simulated fracturing, or AI illustrations.
+        from PIL import ImageFilter, ImageDraw
+        detail_types=("particle","torpedo","kinetic")
+        summary=Image.new("RGB",(1024,460*3),(16,19,25))
+        summary_draw=ImageDraw.Draw(summary)
+        for n,weapon in enumerate(detail_types):
+            live=next((row for row in rows if row["scenario"]==f"{weapon}-terran-upper"
+                       and row["view"]=="surface"),None)
+            virgin=next((row for row in rows if row["scenario"]==f"{weapon}-terran-upper-pristine"
+                         and row["view"]=="surface"),None)
+            with Image.open(root/live["file"]) as src,Image.open(root/virgin["file"]) as base:
+                a=src.convert("RGB")
+                b=base.convert("RGB")
+            # This bounding region contains the Terran hull, not HUD or
+            # remote sprites. Difference maxima are a review aid, never a
+            # physical-impact claim: multiple real hits may remain visible.
+            delta=ImageChops.difference(a,b).convert("L")
+            scan=(415,110,860,630)
+            blurred=delta.filter(ImageFilter.BoxBlur(24)).crop(scan)
+            peak=max(blurred.getdata())
+            if peak<7:
+                warnings.append(f"{weapon}: no visible surface difference for detail crop")
+                continue
+            pts=list(blurred.getdata())
+            peak_i=pts.index(peak)
+            cx=scan[0]+peak_i%blurred.width
+            cy=scan[1]+peak_i//blurred.width
+            # 136x136 square around the detected genuine changed surface.
+            left=max(0,min(1280-136,cx-68))
+            top=max(0,min(720-136,cy-68))
+            bounds=(left,top,left+136,top+136)
+            y=n*460
+            summary_draw.text((14,y+8),
+                f"{weapon.upper()} | paired real OpenGL material close-up",
+                fill=(236,240,244),font=title_font)
+            for j,original in enumerate((b,a)):
+                crop=original.crop(bounds).resize((408,408),Image.Resampling.NEAREST)
+                x=10+j*510
+                summary.paste(crop,(x,y+42))
+                summary_draw.text((x+6,y+445),
+                    "PRISTINE" if j==0 else f"REAL HITS: {live['hits']}",
+                    fill=(185,195,211),font=detail_font)
+        summary.save(folder/"particle-torpedo-kinetic-impact-closeups.png")
+        print("ARMOR-DETAIL actual particle / torpedo / kinetic source-pixel close-ups")
+
     else:
         warnings.append(f"Same-hull weapon example sheet incomplete: {complete}/6")
 except Exception as error:
