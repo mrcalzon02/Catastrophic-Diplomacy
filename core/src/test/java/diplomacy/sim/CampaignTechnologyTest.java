@@ -90,6 +90,39 @@ public final class CampaignTechnologyTest {
         CampaignShipyardRules.requireAllowed(apexShip,mature,apexProject,catalog);
         reject(()->CampaignShipyardRules.requireAllowed(apexShip,mature,
                 matureDiscoveries,catalog),"Unresearched Tier IX was installed in campaign");
+
+        // The 48 new survival lineages are permanently researched, not
+        // bestowed for free by a high license or a skirmish ruleset.
+        java.util.Set<String> variantAncestors=new java.util.HashSet<>();
+        for(int rank=1;rank<=8;rank++)
+            variantAncestors.add("TECH-TER-EPDA-SPECIALIST-"+
+                    String.format(java.util.Locale.ROOT,"%02d",rank));
+        var variantDiscoveries=new CampaignTechnology.State(Battle.Faction.TERRAN,
+                variantAncestors,null,0,0);
+        String rescueApex="TECH-TER-EPDA-SPECIALIST-09";
+        check(variantDiscoveries.quote(rescueApex,mature,catalog).allowed(),
+                "Tech IX rescue variant cannot begin after all eight prerequisites");
+        var rescueProject=variantDiscoveries.begin(rescueApex,mature,catalog);
+        for(int mission=0;mission<9;mission++)rescueProject=rescueProject.victory();
+        check(rescueProject.has(rescueApex) &&
+                CampaignTechnology.decode(CampaignTechnology.encode(rescueProject),catalog)
+                        .equals(rescueProject),
+                "Purchased variant research did not persist through campaign codec");
+        var rescueHull=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT);
+        int survivalSocket=-1;
+        for(Shipyard.Slot slot:rescueHull.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){
+                survivalSocket=slot.index();break;
+            }
+        check(survivalSocket>=0,"Survival research test needs a physical support mount");
+        var rescueDesign=rescueHull.install(survivalSocket,"BASE-TER-EPDA")
+                .stage(survivalSocket,Shipyard.Track.SPECIALIST,9);
+        check(Shipyard.inspect(rescueDesign,catalog).valid(),
+                "Purchased variant could not be fitted on a real hull");
+        CampaignShipyardRules.requireAllowed(rescueDesign,mature,rescueProject,catalog);
+        reject(()->CampaignShipyardRules.requireAllowed(rescueDesign,mature,
+                variantDiscoveries,catalog),
+                "Research license alone unlocked an unpurchased survival variant");
         System.out.println("PASS campaign technology: faction ownership, prerequisites, debit, victories, authorization, atomic ledger");
     }
 }
