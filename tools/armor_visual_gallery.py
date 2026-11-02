@@ -85,7 +85,9 @@ for key in keys:
 contrast_pairs=(("kinetic-pristine","kinetic-impact"),
                 ("kinetic-heavy-pristine","kinetic-heavy"),
                 ("kinetic-aureate-pristine","kinetic-aureate"),
-                ("kinetic-zelthar-pristine","kinetic-zelthar"))
+                ("kinetic-zelthar-pristine","kinetic-zelthar"),
+                ("kinetic-aureate-upper-pristine","kinetic-aureate-upper"),
+                ("kinetic-terran-upper-pristine","kinetic-terran-upper"))
 contrast_metrics=[]
 for pristine,damaged in contrast_pairs:
     first=next((x for x in rows if x["scenario"]==pristine and x["view"]=="surface"),None)
