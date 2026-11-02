@@ -67,7 +67,7 @@ public final class DirectionalDefenseTest {
         String persisted=splash.saveIntegrity();
         var reloaded=new DirectionalDefense(0,120,240);
         reloaded.restoreIntegrity(persisted);
-        ok(reloaded.fingerprint()==splash.fingerprint(),
+        ok(reloaded.saveIntegrity().equals(persisted),
                 "Impact positions must persist alongside physical damage");
         int bytes=4*8+16*16*2*8;
         byte[] old=java.util.Base64.getUrlDecoder().decode(persisted);
