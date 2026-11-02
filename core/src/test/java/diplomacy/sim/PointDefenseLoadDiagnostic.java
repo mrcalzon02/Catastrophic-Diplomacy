@@ -199,7 +199,7 @@ public final class PointDefenseLoadDiagnostic {
         Set<Long> launchIds=new HashSet<>(),interceptIds=new HashSet<>();
         Set<Long> impactIds=new HashSet<>(),timeoutIds=new HashSet<>(),terminalIds=new HashSet<>();
         int[] firedByBand=new int[4],pdByBand=new int[4],killsByBand=new int[4];
-        int pdShots=0;double minPower=1,peakHeat=0;
+        int pdShots=0,previousCraftLosses=0;double minPower=1,peakHeat=0;
         Set<Integer> craftTerminal=new HashSet<>();
         for(int tick=0;tick<ACTIVE+DRAIN;tick++){
             for(int index=0;index<attackers.size();index++){
@@ -213,8 +213,18 @@ public final class PointDefenseLoadDiagnostic {
                     case SUSTAINED -> tick<ACTIVE;
                 };
                 src.ship.weaponsCondition=active?1:0;
+                // Fighter sorties are independent of gun condition. An
+                // incidental/surge order closes the real launch lane after
+                // the opening aircraft, without erasing stored craft or
+                // interfering with aircraft already flying.
+                if(src.weapon.fighter()&&load!=Load.SUSTAINED&&tick>0)
+                    src.ship.fighterLaunchBays=0;
             }
             battle.step();
+            if(battle.craftLosses>previousCraftLosses){
+                killsByBand[band(tick)]+=battle.craftLosses-previousCraftLosses;
+                previousCraftLosses=battle.craftLosses;
+            }
             for(Battle.Craft fighter:battle.crafts())if(fighter.team==0)
                 for(Battle.Ship defender:guard)
                     if(StrictMath.hypot(fighter.x-defender.x,
@@ -278,6 +288,7 @@ public final class PointDefenseLoadDiagnostic {
         unresolved+=craftLaunched-battle.craftLosses;
         double endingHull=0;
         for(Battle.Ship defender:guard)endingHull+=defender.hull;
+        check(actualLaunched>0,"No actual paid projectile or fitted craft launched");
         check(pdOn||pdShots==0,"PD shots while defensive system was ordered HOLD_FIRE");
         check(actualIntercepted<=actualLaunched,
                 "Intercept count exceeds launched physical bodies or craft");
