@@ -26,6 +26,28 @@ public final class CombatShipStatusTest {
         check(damaged.contains("S 0%"),"nonfinite shield metric safe");
         check(damaged.contains("A 0%"),"zero denominator safe");
         check(!damaged.contains("TARGET #"),"no fictitious target");
-        System.out.println("PASS selected-hull actual stats, ammo and target display");
+        s.hull=s.maxHull;
+        s.power=80;s.ecmCondition=1;
+        s.opticalSignature=.35;s.thermalSignature=.52;
+        s.hologramNoise=.65;s.infraredRange=580;s.xrayRange=600;
+        s.escapePods=12;s.recoveryBeacon=true;
+        s.hazardInstability=.4;s.hazardFailures=3;
+        s.lastFaultOrigin=diplomacy.tech.SurvivalHardwareCatalog.BATTERY_BRICK;
+        String equipment=CombatShipStatus.equipment(s);
+        check(equipment.contains("OPTICAL CLOAK") &&
+                equipment.contains("THERMAL STEALTH") &&
+                equipment.contains("HOLO CONTACTS 3") &&
+                equipment.contains("IR SCAN") &&
+                equipment.contains("X-RAY SCAN") &&
+                equipment.contains("PODS 12") &&
+                equipment.contains("RECOVERY BEACON") &&
+                equipment.contains("UNSAFE RETROFIT 3 FAULTS (COMMS)"),
+                "Player must see the actually installed combat and survival systems");
+        s.power=0;
+        equipment=CombatShipStatus.equipment(s);
+        check(!equipment.contains("OPTICAL CLOAK") &&
+                !equipment.contains("HOLO CONTACTS"),
+                "Unpowered deception must visibly disengage in tactical status");
+        System.out.println("PASS selected-hull stats, live deception and engineering status");
     }
 }
