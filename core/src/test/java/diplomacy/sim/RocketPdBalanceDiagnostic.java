@@ -234,12 +234,12 @@ public final class RocketPdBalanceDiagnostic {
                 "percentage, win rate or cosmetic change can fail a release.\n";
         StringBuilder detail=new StringBuilder(summary);
         detail.append("\n## Endgame: rank IX SIEGE versus same-rank laser PD, 16 rockets per rack\n\n");
-        detail.append("|Modules each|Motor|Target moves|Runs|Rockets|Intercepted|Escaped PD|Escape %|Impacts|Offline-PD impacts|PD shots|Protection lost|\n");
-        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        detail.append("|Modules each|Motor|Target moves|Runs|Rockets|Intercepted|Escaped PD|Escape %|Terminal entry %|Impacts|Offline-PD impacts|PD shots|Protection lost|\n");
+        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         for(int modules:MODULES)
             for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
                 for(boolean moving:new boolean[]{false,true}){
-                    int samples=0,fired=0,stopped=0,landed=0,shots=0,offlineHits=0;
+                    int samples=0,fired=0,stopped=0,landed=0,shots=0,offlineHits=0,terminal=0;
                     double damage=0;
                     for(Sample measure:all){
                         if(measure.label.equals("SIEGE")&&measure.tier==9&&
@@ -250,52 +250,57 @@ public final class RocketPdBalanceDiagnostic {
                                 measure.modules==modules&&measure.barrage==16&&
                                 measure.motor==motor&&measure.evasive==moving&&measure.pdOnline){
                             samples++;fired+=measure.launched;stopped+=measure.intercepted;
-                            landed+=measure.collided;shots+=measure.pdShots;
+                            landed+=measure.collided;terminal+=measure.terminalEntries;shots+=measure.pdShots;
                             damage+=measure.damageToProtection;
                         }
                     }
                     detail.append(String.format(Locale.ROOT,
-                            "|%d / %d|%s|%s|%d|%d|%d|%d|%.1f%%|%d|%d|%d|%.1f|\n",
+                            "|%d / %d|%s|%s|%d|%d|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|%.1f|\n",
                             modules,modules,motor,moving,samples,fired,stopped,
                             fired-stopped,fired==0?0:100.0*(fired-stopped)/fired,
+                            fired==0?0:100.0*terminal/fired,
                             landed,offlineHits,shots,damage));
                 }
         detail.append("\nEscaped PD = launched - intercepted after all initial "+
                 "bodies resolve (impact or physical flight timeout). This is "+
-                "NOT the same as impacts, which also depend on inertial spread "+
+                "NOT the same as impacts or terminal-zone entry (within 90 world "+ 
+                "units of the actual defended hull), which exclude harmless "+ 
+                "wide misses. Impacts also depend on inertial spread "+
                 "and evasion. Offline-PD impacts represent one paired seed "+
                 "against three online seeds. The ~33% desired escape rate "+
                 "is a non-blocking balance goal, not an objective release gate.\n");
         // Optional A/B sweep exercises real physical rockets and fitted PD.
         // No proposed overload coefficient affects regular game battles.
         detail.append("\n## Experimental PD track-overload sensitivity (NOT live balance)\n\n");
-        detail.append("|PD racks|Motor|Moving target|Crowd pressure|Rockets|Intercepted|Escape %|Impacts|\n");
-        detail.append("|---:|---|---|---:|---:|---:|---:|---:|\n");
+        detail.append("|PD racks|Motor|Moving target|Crowd pressure|Rockets|Intercepted|Escape %|Terminal entry %|Impacts|\n");
+        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|\n");
         List<String> sweep=new ArrayList<>();
-        sweep.add("modules_each,motor,evasive,pressure,launched,intercepted,escaped,escape_fraction,impacts,shots");
+        sweep.add("modules_each,motor,evasive,pressure,launched,intercepted,escaped,escape_fraction,terminal_entries,terminal_fraction,impacts,shots");
         for(int modules:new int[]{1,4})
             for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
                 for(boolean moving:new boolean[]{false,true})
                     for(double pressure:new double[]{0,0.15,0.30,0.50,0.75}){
-                        int fired=0,intercepted=0,impacted=0,shots=0;
+                        int fired=0,intercepted=0,impacted=0,terminal=0,shots=0;
                         for(int seed=0;seed<REPEAT_SEEDS;seed++){
                             Sample sample=run(tech,RocketBarrage.Size.SIEGE,9,modules,
                                     16,motor,moving,true,seed,pressure);
                             fired+=sample.launched;
                             intercepted+=sample.intercepted;
                             impacted+=sample.collided;
+                            terminal+=sample.terminalEntries;
                             shots+=sample.pdShots;
                         }
                         double escape=fired==0?0:(fired-intercepted)/(double)fired;
+                        double entry=fired==0?0:terminal/(double)fired;
                         sweep.add(String.format(Locale.ROOT,
-                                "%d,%s,%s,%.2f,%d,%d,%d,%.6f,%d,%d",
+                                "%d,%s,%s,%.2f,%d,%d,%d,%.6f,%d,%.6f,%d,%d",
                                 modules,motor,moving,pressure,fired,intercepted,
-                                fired-intercepted,escape,impacted,shots));
+                                fired-intercepted,escape,terminal,entry,impacted,shots));
                         if(modules==4)
                             detail.append(String.format(Locale.ROOT,
-                                    "|%d|%s|%s|%.2f|%d|%d|%.1f%%|%d|\n",
+                                    "|%d|%s|%s|%.2f|%d|%d|%.1f%%|%.1f%%|%d|\n",
                                     modules,motor,moving,pressure,fired,intercepted,
-                                    escape*100,impacted));
+                                    escape*100,entry*100,impacted));
                     }
         Files.write(output.resolve("saturation-sweep.csv"),sweep,StandardCharsets.UTF_8);
         detail.append("\nThis sweep is isolated to laboratory battles and only changes "+
