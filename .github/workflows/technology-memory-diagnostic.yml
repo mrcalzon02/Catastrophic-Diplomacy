@@ -1,0 +1,32 @@
+name: Optional 16MiB technology heap diagnostic
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/main/java/diplomacy/tech/**'
+      - 'core/src/test/java/diplomacy/sim/TechnologyHeapSmokeTest.java'
+      - 'core/build.gradle'
+      - '.github/workflows/technology-memory-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  constrained-heap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.11.1' }
+      - name: Observe complete technology catalog under 16MiB desktop HotSpot heap
+        id: heap
+        continue-on-error: true
+        run: gradle --no-daemon :core:technologyHeapSmoke
+      - name: Report constrained heap result without misclassifying Android runtime
+        if: always()
+        run: |
+          echo "## Java 17 constrained heap diagnostic" >> "$GITHUB_STEP_SUMMARY"
+          echo "Result: ${{ steps.heap.outcome }}. This is an advisory HotSpot heap test." >> "$GITHUB_STEP_SUMMARY"
+          echo "The actual Android 10 campaign startup/crash checks remain release-blocking." >> "$GITHUB_STEP_SUMMARY"
