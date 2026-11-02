@@ -25,7 +25,7 @@ public final class RocketPdBalanceDiagnostic {
     private static final int[] TIERS={0,3,6,9};
     private static final int[] MODULES={1,2,4};
     private static final int REPEAT_SEEDS=3;
-    private static final int TICKS=210;
+    private static final int TICKS=300;
     private static final double LAUNCH_RANGE=440;
 
     private static void require(boolean condition,String why){
@@ -110,6 +110,10 @@ public final class RocketPdBalanceDiagnostic {
         for(RocketBarrage.Rack rack:attacker.rocketRacks)
             battle.setShipRocketBarrage(attacker.id,rack.slot,barrage,motor);
         battle.registerDiagnosticStationaryTarget(defender.id);
+        // Keep the instrumented target alive throughout the entire first
+        // launch. Otherwise repeated hits destroy its PD and later rockets
+        // become artificially unopposed. The hull still receives real damage.
+        defender.maxHull=defender.hull=2_000_000;
         double startHull=defender.hull,startArmor=defender.armor,
                 startShield=defender.shields;
         int detectedFrames=0;double firstDetection=-1;
