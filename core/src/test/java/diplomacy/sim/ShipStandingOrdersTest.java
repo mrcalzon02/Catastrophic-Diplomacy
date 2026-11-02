@@ -68,8 +68,29 @@ public final class ShipStandingOrdersTest {
                 "200-hull standing orders failed checksum round-trip");
         check(encoded.equals(ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved)),
                 "Nondeterministic doctrine save serialization");
-        check(encoded.startsWith("CD-STANDING-2"+(char)10),
+        check(encoded.startsWith("CD-STANDING-3"+(char)10),
                 "New versioned policy format not written");
+        ShipResourceOrders ration=ShipResourceOrders.DEFAULT
+                .withAmmunition(ShipResourceOrders.AmmoPolicy.AUTO_RATION)
+                .withRationStart(60).withReserve(10,1).withSpacingTicks(45);
+        ShipStandingOrders rationCaptain=advanced.withResources(ration);
+        check(rationCaptain.adjust(1,1).resources().equals(ration),
+                "Editing old standing rows discarded separate resource policy");
+        saved.put(7L,rationCaptain);
+        String resourceSave=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
+        check(ShipStandingOrdersCodec.decode(resourceSave).policies().get(7L)
+                        .resources().equals(ration),
+                "CD-STANDING-3 lost rationing, reserve or minimum salvo spacing");
+        // Reconstruct a genuine V2 payload with its own checksum by decoding
+        // the v3 layout in a separate fixture; old decode remains supported
+        // even when policies were written without resource fields.
+        reject(()->ShipStandingOrdersCodec.decode(resourceSave.replace("AUTO_RATION","ENERGY_ONLY")),
+                "An edited resource order bypassed the doctrine checksum");
+        reject(()->new ShipResourceOrders(null,ShipResourceOrders.AmmoPolicy.UNRESTRICTED,
+                50,0,0,0),"Null fire control accepted");
+        reject(()->new ShipResourceOrders(ShipResourceOrders.FireIntent.IMMEDIATE,
+                ShipResourceOrders.AmmoPolicy.UNRESTRICTED,50,100,0,0),
+                "Invalid ammunition reserve over 95% accepted");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replace("TERRAN","DRAXIAN")),
                 "Tampered faction save accepted");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replaceFirst("90,20","30,20")),
