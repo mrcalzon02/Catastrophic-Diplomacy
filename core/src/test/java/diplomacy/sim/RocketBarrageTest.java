@@ -324,14 +324,18 @@ public final class RocketBarrageTest {
         dual.plasmaDamage=dual.particleDamage=dual.torpedoDamage=0;
         dual.fighterReserve=dual.droneReserve=0;
         dual.maxPower=dual.power=20000;dual.maxHeat=20000;
-        dual.kineticAmmo=39; // medium 16*2 and small 8*1 needs 40 units.
+        RocketBarrage.Rack primary=dual.rocketRacks.get(0);
+        RocketBarrage.Rack secondary=dual.rocketRacks.get(1);
+        int required=primary.salvoCount*primary.cheapAmmoUnitsPerRocket+
+                secondary.salvoCount*secondary.cheapAmmoUnitsPerRocket;
+        dual.kineticAmmo=required-1; // enough for one rack, not for both.
         contested.setShipStandingOrders(dual.id,ShipStandingOrders.DEFAULT
                 .withResources(ShipResourceOrders.DEFAULT
                         .withAmmunition(ShipResourceOrders.AmmoPolicy.HOLD_RESERVE)));
         contested.step();
         require(contested.rocketRoundsFired==1&&
-                        dual.rocketRacks.get(0).salvoRemaining==15&&
-                        dual.rocketRacks.get(1).salvoRemaining==0,
+                        primary.salvoRemaining==primary.salvoCount-1&&
+                        secondary.salvoRemaining==0,
                 "Two rocket racks double-booked the same finite kinetic stock");
         System.out.println("PASS four native rocket sizes, 4/8/16 cheap physical volleys, two fixed-bearing motor envelopes, long reloads, PD, dodge, hit and replay");
     }
