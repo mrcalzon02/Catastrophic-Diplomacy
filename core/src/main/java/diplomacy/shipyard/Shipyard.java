@@ -4,6 +4,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.DirectionalDefense;
 import diplomacy.sim.WeaponBehaviorTable;
 import diplomacy.sim.ProjectileModel;
+import diplomacy.sim.RocketBarrage;
 import diplomacy.sim.AmmunitionResearch;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.FighterModel;
@@ -1073,6 +1074,30 @@ public final class Shipyard {
                 :evaluate(installed,catalog,design.faction).tuning();
     }
 
+    /** Each rocket pod has its own finite cheap ammunition, charge and actual
+     * physical socket, independent of guided missile magazines and research.
+     * The round count is 4/8/16 selectable on the live rack, and the size is
+     * determined by its installed hardware family (RKS/RKM/RKL/RKG). */
+    public static List<RocketBarrage.Rack> rocketRacks(Design design,
+                                                        TechnologyCatalog catalog){
+        if(!inspect(design,catalog).valid())
+            throw new IllegalArgumentException("Rocket battery requires a legal ship fitting");
+        List<RocketBarrage.Rack> result=new ArrayList<>();
+        for(int slot=0;slot<design.slots();slot++){
+            Installed installed=design.at(slot);
+            if(installed==null)continue;
+            Component source=catalog.base(installed.component);
+            if(source==null)continue;
+            RocketBarrage.Size size=RocketBarrage.Size.forCode(source.subsystem);
+            if(size==null)continue;
+            Part part=evaluate(installed,catalog,design.faction);
+            result.add(new RocketBarrage.Rack(slot,size,
+                    part.effect/part.base.effect,
+                    part.integrity/part.base.integrity,
+                    part.accuracy*part.tuning().cycle()));
+        }
+        return List.copyOf(result);
+    }
     /** Expose the exact fitted projectile parameters for an individual shipyard socket.
      * An empty or non-ordnance slot has no projectile body to inspect. */
     public static ProjectileModel.Spec projectileAt(Design design,TechnologyCatalog catalog,int slot) {

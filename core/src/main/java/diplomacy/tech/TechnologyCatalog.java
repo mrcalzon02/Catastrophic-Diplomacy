@@ -217,6 +217,7 @@ public final class TechnologyCatalog {
             addSensingFamilies(bases,rows);
             addSensingHardwareVariants(bases,rows);
             addSurvivalAndUnsafeFamilies(bases,rows);
+            addDumbfireRocketFamilies(bases,rows);
             // Ranks VII-IX are synthesized on demand. No 13,200 extra
             // temporary CSV arrays/strings retained at Android startup.
         }
@@ -764,6 +765,53 @@ public final class TechnologyCatalog {
                         .replace("-"+parent,"-"+code));
                 row.set(19,family.name()+": "+row.get(19));
                 upgrades.add(row);
+            }
+        }
+    }
+
+    /** Four independent physical dumbfire rocket sizes, not renamed guided MSL.
+     * The source weapon research is cloned with its real four 1-6 research
+     * tracks; VII-IX remain virtual like every other hardware line.
+     * Append-only codes keep existing purchased component IDs stable. */
+    private static void addDumbfireRocketFamilies(List<List<String>> bases,
+                                                   List<List<String>> upgrades) {
+        String[][] rocket={
+            // code, name, mass, power, heat, integrity, cost, output
+            {"RKS","Small Dumbfire Rocket Pod","0.70","0.52","0.64","0.54","0.45","0.65"},
+            {"RKM","Medium Dumbfire Rocket Rack","0.85","0.68","0.78","0.68","0.63","0.85"},
+            {"RKL","Large Dumbfire Rocket Battery","1.15","0.90","1.02","0.82","0.81","1.06"},
+            {"RKG","Siege Rocket Barrage Battery","1.52","1.17","1.30","0.96","1.05","1.28"}
+        };
+        List<List<String>> originals=List.copyOf(bases);
+        List<List<String>> research=List.copyOf(upgrades);
+        for(String[] spec:rocket){
+            for(int i=1;i<originals.size();i++){
+                List<String> root=originals.get(i);
+                if(!"MSL".equals(root.get(2)))continue;
+                List<String> part=new ArrayList<>(root);
+                part.set(0,root.get(0).replace("-MSL","-"+spec[0]));
+                part.set(2,spec[0]);part.set(3,spec[1]);
+                part.set(5,"No-seeker rapid barrage; 4/8/16 fixed-bearing rockets");
+                for(int col=6;col<=9;col++)
+                    part.set(col,ratio(Double.parseDouble(root.get(col)),
+                            Double.parseDouble(spec[col-4])));
+                part.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(root.get(10))*Double.parseDouble(spec[6])))));
+                part.set(11,ratio(Double.parseDouble(root.get(11)),
+                        Double.parseDouble(spec[7])));
+                part.set(12,"Unguided cheap explosive rounds; long reload and laser-vulnerable bodies");
+                bases.add(part);
+            }
+            for(int i=1;i<research.size();i++){
+                List<String> root=research.get(i);
+                if(!"MSL".equals(root.get(2)))continue;
+                List<String> rank=new ArrayList<>(root);
+                rank.set(0,root.get(0).replace("-MSL-","-"+spec[0]+"-"));
+                rank.set(2,spec[0]);rank.set(5,spec[1]+" "+root.get(3)+" "+root.get(4));
+                rank.set(6,root.get(6).replace("-MSL-","-"+spec[0]+"-")
+                        .replace("-MSL","-"+spec[0]));
+                rank.set(19,spec[1]+": "+root.get(19));
+                upgrades.add(rank);
             }
         }
     }
