@@ -129,7 +129,15 @@ final class ShipSurfaceDamageCapture {
         // its actual firing envelope, unlike the 280-unit standard lane.
         // We move only this disposable diagnostic firing lane; gun range,
         // ship mobility and combat weapon mechanics are unchanged.
-        battle.spawnWing(0,shooter,technology,1,index==9?470:380,360);
+        // An east-west side shot strikes only the frigate's exposed wing
+        // edge, so a true circular pockmark cannot fit under its source PNG.
+        // Take the actual kinetic diagnostics from an oblique bearing into
+        // a wider armor panel. The physical projectile and hitAt physics
+        // remain unchanged; pristine controls use the SAME gun position.
+        boolean obliqueKinetic=(index==3||index==12||index==13||index==14);
+        double shooterX=obliqueKinetic?520:index==9?470:380;
+        double shooterY=obliqueKinetic?530:360;
+        battle.spawnWing(0,shooter,technology,1,shooterX,shooterY);
         battle.spawnWing(1,targetDesign,technology,1,660,360);
         Battle.Ship gun=battle.ships().get(0),victim=battle.ships().get(1);
         if(gun.laserDamage+gun.kineticDamage+gun.missileDamage+
