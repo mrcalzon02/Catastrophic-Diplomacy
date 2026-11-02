@@ -28,7 +28,9 @@ public record ShipStandingOrders(
             "FIGHTER RANGE", "ESCORT RANGE", "CAPITAL RANGE",
             "ENGINE SPEED LIMIT", "PD INTERCEPTION PLAN", "PD PROTECTION SCOPE",
             "FIGHTER OPERATIONS", "DEFEND TARGET 1", "DEFEND TARGET 2",
-            "DEFEND TARGET 3", "DEFEND TARGET 4", "ESCORT ASSIGNMENT", "ESCORT DISTANCE"
+            "DEFEND TARGET 3", "DEFEND TARGET 4", "ESCORT ASSIGNMENT", "ESCORT DISTANCE",
+            "OFFENSIVE FIRE", "AMMUNITION DOCTRINE", "RATION BELOW", "HARD RESERVE",
+            "MINIMUM ROUNDS", "VOLLEY SPACING"
     };
     private static final BattleOrders.Position[] MOVEMENTS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
@@ -52,6 +54,7 @@ public record ShipStandingOrders(
     public ShipStandingOrders adjust(int setting,int step,int selfSlot,int deployed){
         BattleOrders.Orders next=tactics;
         ShipTacticalDirectives d=directives;
+        ShipResourceOrders resource=resources;
         int a=aggression,c=caution,shield=shieldWithdrawPercent;
         switch(setting){
             case 0 -> a=moved(a,step,10,0,100);
@@ -97,9 +100,21 @@ public record ShipStandingOrders(
             case 21 -> d=d.withEscort(nextReference(d.escortSlot(),step,selfSlot,deployed,
                     java.util.List.of(),-1));
             case 22 -> d=d.withEscortRange(moved(d.escortRange(),step,25,30,1500));
+            case 23 -> resource=resource.withFireIntent(cycle(resource.fireIntent(),step,
+                    ShipResourceOrders.FireIntent.values()));
+            case 24 -> resource=resource.withAmmunition(cycle(resource.ammunition(),step,
+                    ShipResourceOrders.AmmoPolicy.values()));
+            case 25 -> resource=resource.withRationStart(
+                    moved(resource.rationStartPercent(),step,5,10,90));
+            case 26 -> resource=resource.withReserve(
+                    moved(resource.reservePercent(),step,5,0,95),resource.minimumRounds());
+            case 27 -> resource=resource.withReserve(resource.reservePercent(),
+                    moved(resource.minimumRounds(),step,1,0,10000));
+            case 28 -> resource=resource.withSpacingTicks(
+                    moved(resource.spacingTicks(),step,30,0,900));
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         }
-        return new ShipStandingOrders(next,a,c,shield,d,resources);
+        return new ShipStandingOrders(next,a,c,shield,d,resource);
     }
     public String display(int setting){
         return switch(setting){
@@ -119,6 +134,12 @@ public record ShipStandingOrders(
             case 17,18,19,20 -> refLabel(directives.defendSlots().get(setting-17));
             case 21 -> refLabel(directives.escortSlot());
             case 22 -> directives.escortRange()+" units";
+            case 23 -> resources.fireIntent().name().replace('_',' ');
+            case 24 -> resources.ammunition().name().replace('_',' ');
+            case 25 -> resources.rationStartPercent()+"% remaining";
+            case 26 -> resources.reservePercent()+"%";
+            case 27 -> resources.minimumRounds()+" rounds";
+            case 28 -> (resources.spacingTicks()/30.0)+" seconds";
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         };
     }
