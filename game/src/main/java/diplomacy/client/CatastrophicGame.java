@@ -212,6 +212,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     @Override public void create() {
+        // Construct the authoritative technology corpus before any GPU asset,
+        // audio or UI decoder creates transient Java-side buffers. Android 10
+        // emulator heap limits can be 16 MiB; overlapping startup allocation
+        // peaks must not turn a valid research catalog into an OOM crash.
+        try { technology = TechnologyCatalog.loadDefault(); }
+        catch (IOException error) {
+            throw new IllegalStateException("Technology resources missing from game distribution",error);
+        }
         camera = new OrthographicCamera();
         battleCamera = new OrthographicCamera();
         battleCamera.setToOrtho(false,W,H);
@@ -274,8 +282,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
         } catch (RuntimeException error) {
             Gdx.app.error("GPU", "Instanced renderer unavailable; falling back", error);
         }
-        try { technology = TechnologyCatalog.loadDefault(); }
-        catch (IOException error) { throw new IllegalStateException("Technology resources missing from game distribution", error); }
         leftDesign=Shipyard.starter(left,Shipyard.Hull.CORVETTE);
         rightDesign=Shipyard.starter(right,Shipyard.Hull.CORVETTE);
         restoreFleets();
