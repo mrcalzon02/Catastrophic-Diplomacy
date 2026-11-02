@@ -49,13 +49,13 @@ final class ShipImpactProfiles {
         if(r>Math.min(heavy?1.30f:1.12f,radius+.52f*scale))return 0;
         float q=r/Math.max(.01f,radius);
         float dark=s*.75f*(1-smooth(.12f,.56f,q));
-        float bright=s*.96f*smooth(.88f,1.04f,q)*
+        float bright=s*.60f*smooth(.88f,1.04f,q)*
                 (1-smooth(1.16f,1.35f,q));
         if(physicalRadius>.45f)
-            bright=Math.max(bright,survivingLip(r,physicalRadius,s*.94f));
+            bright=Math.max(bright,survivingLip(r,physicalRadius,s*.63f));
         // Break the metallic ring at deterministic chipped sectors.
         int chip=(id*13+((int)(x*42))*31+((int)(y*42))*17)&7;
-        if(chip==0)bright*=.66f;
+        if(chip<3)bright*=.38f;
         for(int i=0;i<(heavy?7:4);i++){
             int k=Math.floorMod(id+i,DX.length);
             float along=x*DX[k]+y*DY[k];
@@ -74,7 +74,7 @@ final class ShipImpactProfiles {
                     Math.abs(across+.045f*scale));
             float shadow=1f-smooth(.035f*scale,.18f*scale,
                     Math.abs(across-.16f*scale));
-            bright=Math.max(bright,s*.96f*ridge*crest);
+            bright=Math.max(bright,s*.91f*ridge*crest);
             dark=Math.max(dark,s*.62f*ridge*shadow);
         }
         return pack(dark,0,bright);
@@ -139,13 +139,30 @@ final class ShipImpactProfiles {
                         smooth(.22f,.42f,q)*(1-smooth(.68f,.94f,q));
                 heat=Math.max(heat,survivingLip(d,physical,
                         intensity*(torpedo?.42f:.19f)));
+                // A torpedo pushes out asymmetric, hot faceted plating;
+                // a missile leaves many small cool shrapnel scratches.
+                if(torpedo){
+                    float facet=Math.max(Math.abs(x*.84f+y*.23f),
+                            Math.abs(y*.90f-x*.21f));
+                    heat=Math.max(heat,intensity*.36f*
+                            smooth(.63f,.79f,facet)*
+                            (1-smooth(.91f,1.12f,facet))*
+                            smooth(-.20f,.55f,x-y*.4f));
+                }
                 float chips=0;
                 for(int k=0;k<(torpedo?3:5);k++){
                     float outward=physical>.47f?(torpedo?1.7f:1.35f):1f;
                     float px=(k==0?.46f:k==1?-.52f:k==2?.14f:k==3?-.28f:.55f)*scale*outward;
                     float py=(k==0?.14f:k==1?-.24f:k==2?-.66f:k==3?.53f:.41f)*scale*outward;
-                    chips=Math.max(chips,1-smooth(.028f,(torpedo?.18f:.10f)*scale,
-                            (float)StrictMath.hypot(x-px,y-py)));
+                    float fragment=(float)StrictMath.hypot(x-px,y-py);
+                    float mark=1-smooth(.028f,(torpedo?.18f:.11f)*scale,fragment);
+                    if(!torpedo){
+                        float tangent=Math.abs((x-px)*.64f-(y-py)*.77f);
+                        float radial=(x-px)*.77f+(y-py)*.64f;
+                        mark=Math.max(mark,(1-smooth(.03f,.105f,tangent))*
+                                (1-smooth(.10f,.23f,Math.abs(radial)))*.68f);
+                    }
+                    chips=Math.max(chips,mark);
                 }
                 return pack(soot,heat,chips*intensity*(torpedo?.62f:.88f));
             }
@@ -154,8 +171,12 @@ final class ShipImpactProfiles {
                 // an explosive shrapnel field.
                 if(d>1.06f)return 0;
                 float physical=breachRadius(armor,internal);
-                float flow=(float)StrictMath.hypot(x*.83f,y*1.18f);
+                float flow=(float)StrictMath.hypot((x+.12f)*.78f,(y-.10f)*1.19f);
                 float melt=intensity*(1-smooth(.13f,.82f,flow));
+                float tail=intensity*.40f*
+                        (1-smooth(.04f,.20f,Math.abs(x+.09f)))*
+                        smooth(.07f,.23f,y)*(1-smooth(.65f,.93f,y));
+                melt=Math.max(melt,tail);
                 float rim=survivingLip(d,physical,intensity*.72f);
                 return pack(intensity*.24f*(1-smooth(.15f,.49f,flow)),
                         Math.max(melt,rim),0);
@@ -164,9 +185,15 @@ final class ShipImpactProfiles {
                 // Tight, cool twin needle holes, almost no burn halo.
                 if(d>1.01f)return 0;
                 float physical=breachRadius(armor,internal);
-                int body=merge(pock(x,y,intensity*.68f,seed,false,.50f,0f),
-                        pock(x-.20f,y+.13f,intensity*.45f,seed+5,false,.38f,0f));
-                return merge(body,pack(0,0,survivingLip(d,physical,intensity*.75f)));
+                int body=merge(pock(x,y,intensity*.58f,seed,false,.44f,0f),
+                        pock(x-.20f,y+.13f,intensity*.47f,seed+5,false,.32f,0f));
+                // Cooling micro-burrs on surviving plating: one real hit,
+                // not extra damage anchors or invented missing pixels.
+                body=merge(body,pock(x-.88f,y+.08f,intensity*.32f,
+                        seed+13,false,.25f,0f));
+                body=merge(body,pock(x+.17f,y-.90f,intensity*.29f,
+                        seed+23,false,.23f,0f));
+                return merge(body,pack(0,0,survivingLip(d,physical,intensity*.60f)));
             }
             case FIGHTER:{
                 // Small shallow munition contact, not a capital strike.
