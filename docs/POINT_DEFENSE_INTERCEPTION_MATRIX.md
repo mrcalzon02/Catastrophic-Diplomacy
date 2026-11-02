@@ -7,7 +7,7 @@ runner execution**. This is an advisory diagnostic, not a new release gate.
 
 The existing rocket ladder separately measures all four unguided rocket
 sizes, 4/8/16-round salvos, both engine types, target motion, and research
-tiers. The new `PointDefenseThreatMatrixDiagnostic` exercises **23 additional
+tiers. The new `PointDefenseThreatMatrixDiagnostic` exercises **24 additional
 threat configurations**:
 
 - Physical kinetic cannon shells
@@ -17,7 +17,7 @@ threat configurations**:
   CLUSTER_CARRIER, CASCADE_SWARM
 - Each of the six actual fighter hulls: INTERCEPTOR, ASSAULT_GUNSHIP,
   LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER
-- Physical defensive drone craft
+- Physical defensive drone craft and a repair drone repairing a real damaged ally
 
 Missile/torpedo dispensers spawn **real interceptable micro or ultra-micro
 submunitions**, which are included individually in launched/intercepted totals;
@@ -67,7 +67,10 @@ Definitions:
 - **Intercepted**: an actual projectile removed by a live defensive system,
   not simply a projectile that missed the enemy or ran out of fuel.
 - **Craft lost**: actual fighter/drone entity loss, distinguished from
-  destroying the missile/torpedo/cannon ammunition it fired.
+  destroying the missile/torpedo/cannon ammunition it fired. Repair craft
+  target a damaged friendly ally: that tests whether the existing PD
+  target-scope filter recognizes a support craft as hostile without
+  assuming it does.
 - **Terminal entry**: real object or its real impact entered the 90-world-unit
   threat zone; distinct from a direct hull impact.
 - **Impact**: actual physical hit or a fighter weapon's recorded damage event.
