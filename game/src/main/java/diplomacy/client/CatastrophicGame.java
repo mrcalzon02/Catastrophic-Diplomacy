@@ -1944,6 +1944,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             else if(action>=2&&action<2+ShipStandingOrders.SETTINGS.length){
                 selectedStandingSetting=action-2;
                 adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
+            }else if(action>=63&&action<=68){
+                selectedStandingSetting=action-40;
+                adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
             }else if(action==30)screen=GameMenuPanel.Screen.DEPLOYMENT;
             else if(action==31)standingPage=(standingPage+1)%3;
             return;
