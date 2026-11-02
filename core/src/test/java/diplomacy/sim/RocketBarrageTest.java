@@ -90,6 +90,93 @@ public final class RocketBarrageTest {
                 }
             }
         }
+        // Saved blueprints must preserve programmable fire-control settings,
+        // not just the underlying rocket hardware. Older blueprints retain
+        // the original per-size default configuration without conversion.
+        Shipyard.Design defaultRack=mounted(tech,RocketBarrage.Size.MEDIUM);
+        int programmedSocket=missileSocket(Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT));
+        require(Shipyard.encode(defaultRack).startsWith("CD-SHIP-1|"),
+                "Unmodified legacy rocket blueprint was needlessly migrated");
+        require(defaultRack.rocketBarrage(programmedSocket).equals(
+                        RocketBarrage.defaults(RocketBarrage.Size.MEDIUM)),
+                "Default rocket behavior changed for old saved ships");
+        Shipyard.Design configured=defaultRack.withRocketBarrage(programmedSocket,16,
+                RocketBarrage.Motor.BOOST_COAST);
+        int secondSocket=-1;
+        for(Shipyard.Slot candidate:configured.hull.slots)
+            if(candidate.mount()==Shipyard.Mount.WEAPON&&candidate.index()!=programmedSocket){
+                secondSocket=candidate.index();break;
+            }
+        require(secondSocket>=0,"Multi-rack test needs two physical weapon sockets");
+        configured=configured.install(secondSocket,"BASE-TER-RKS")
+                .withRocketBarrage(secondSocket,8,RocketBarrage.Motor.SUSTAINED_BURN);
+        String persisted=Shipyard.encode(configured);
+        require(persisted.startsWith("CD-SHIP-6|")&&persisted.contains("\nR|"),
+                "Custom physical rocket programs not written to the new blueprint");
+        Shipyard.Design restored=Shipyard.decode(persisted,tech);
+        require(Shipyard.encode(restored).equals(persisted)
+                        &&restored.rocketFittings.size()==2
+                        &&restored.rocketBarrage(programmedSocket).count()==16
+                        &&restored.rocketBarrage(programmedSocket).motor()==
+                                RocketBarrage.Motor.BOOST_COAST
+                        &&restored.rocketBarrage(secondSocket).count()==8
+                        &&restored.rocketBarrage(secondSocket).motor()==
+                                RocketBarrage.Motor.SUSTAINED_BURN,
+                "Per-socket fire-program round-trip lost count, motor or identity");
+        Battle persistedWing=new Battle(70421L);
+        persistedWing.spawnWing(0,restored,tech,2,210,320);
+        for(Battle.Ship ship:persistedWing.ships()){
+            require(ship.rocketRacks.size()==2,"Blueprint lost a physical rocket rack on spawn");
+            for(RocketBarrage.Rack rack:ship.rocketRacks){
+                RocketBarrage.Fitting expected=restored.rocketBarrage(rack.slot);
+                require(rack.salvoCount==expected.count()&&rack.motor==expected.motor(),
+                        "Battle ship ignored its saved rocket program");
+            }
+        }
+        require(persistedWing.ships().get(0).rocketRacks.get(0)!=
+                        persistedWing.ships().get(1).rocketRacks.get(0),
+                "Persisted launch profiles incorrectly share mutable magazines");
+        Shipyard.Design retuned=restored.stage(programmedSocket,Shipyard.Track.OUTPUT,1)
+                .withModuleVersion(programmedSocket,
+                        diplomacy.shipyard.ModuleVersions.Pattern.STANDARD,2);
+        require(retuned.rocketBarrage(programmedSocket).count()==16,
+                "Module research or manufacturing erased rocket fire settings");
+        Shipyard.Design replaced=restored.install(programmedSocket,"BASE-TER-LAS");
+        require(!replaced.rocketFittings.containsKey(programmedSocket)
+                        &&replaced.rocketFittings.containsKey(secondSocket),
+                "Replacing rocket hardware must clear only the abandoned socket program");
+        require(Shipyard.decode(Shipyard.encode(replaced),tech)
+                        .rocketBarrage(secondSocket).count()==8,
+                "Remaining rocket's program was incorrectly discarded on refit");
+        for(String corrupted:new String[]{
+                persisted.replace("R|"+programmedSocket+"|16|BOOST_COAST",
+                        "R|"+programmedSocket+"|12|BOOST_COAST"),
+                persisted+"R|"+programmedSocket+"|4|BOOST_COAST\n",
+                persisted.replace("R|"+programmedSocket+"|16|BOOST_COAST",
+                        "R|"+programmedSocket+"|16|NO_SEEKER"),
+                persisted.replace("R|"+programmedSocket+"|16|BOOST_COAST",
+                        "R|"+(configured.slots()+1)+"|16|BOOST_COAST"),
+                persisted.replace("R|"+programmedSocket+"|16|BOOST_COAST",
+                        "R|"+secondSocket+"|16|BOOST_COAST")
+        }){
+            boolean rejected=false;
+            try{Shipyard.decode(corrupted,tech);}catch(IllegalArgumentException denied){
+                rejected=true;
+            }
+            require(rejected,"Malformed or duplicate rocket blueprint record was accepted");
+        }
+        boolean rejected=false;
+        try{defaultRack.withRocketBarrage(programmedSocket,12,
+                RocketBarrage.Motor.BOOST_COAST);}
+        catch(IllegalArgumentException denied){rejected=true;}
+        require(rejected,"Illegal 12-rocket launch program was accepted");
+        rejected=false;
+        try{replaced.withRocketBarrage(programmedSocket,8,
+                RocketBarrage.Motor.SUSTAINED_BURN);}
+        catch(IllegalArgumentException denied){rejected=true;}
+        require(rejected,"Non-rocket hardpoint accepted a persistent rocket program");
+
         // Independent fitted PD modules must genuinely increase interception
         // throughput, not only add radar reach or decoration to a ship.
         Shipyard.Design pdOne=Shipyard.bareHull(Battle.Faction.TERRAN,
