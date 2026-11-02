@@ -53,6 +53,8 @@ public final class Battle {
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
         /** Optional individual standing policy, continuously enforced, not consumed. */
         public ShipStandingOrders standingOrders;
+        /** Explicit nondefault captain fire cadence, keyed by family or physical rack. */
+        public final java.util.Map<Integer,Long> resourceNextFireTick=new java.util.HashMap<>();
         public int escortShipId;
         public List<Integer> defendedShipIds=List.of();
         /** Per-hull sequential mission plan, independent of weapons and fleet doctrine. */
@@ -1866,8 +1868,50 @@ public final class Battle {
         double bow=point.x()*25.0,port=point.y()*19.0;
         return new SurfaceAim(target.x+bow*c-port*s,target.y+bow*s+port*c);
     }
+    /** Queued rounds are already committed, but not paid until actually fired. */
+    private int committedResource(Ship source,DamageType family){
+        int n=0;
+        if(family==DamageType.KINETIC)
+            for(RocketBarrage.Rack rack:source.rocketRacks)
+                n+=rack.salvoRemaining*rack.cheapAmmoUnitsPerRocket;
+        if(family==DamageType.MISSILE||family==DamageType.TORPEDO)
+            for(PendingLaunch pending:launchQueue)
+                if(pending.sourceId==source.id&&pending.family==family)
+                    n+=pending.pattern.count()-pending.nextIndex;
+        return n;
+    }
+    private static int resourceKey(DamageType type,int slot){
+        return slot<0?type.ordinal():100+type.ordinal()*100+slot;
+    }
+    /** New fire orders are opt-in; legacy battles do not acquire new RNG calls. */
+    private boolean resourcePermit(Ship ship,DamageType type,int slot,int cost){
+        ShipResourceOrders policy=ship.standingOrders==null?ShipResourceOrders.DEFAULT:
+                ship.standingOrders.resources();
+        if(policy.legacy())return true;
+        int stock=type==DamageType.KINETIC?ship.kineticAmmo:
+                type==DamageType.MISSILE?ship.missileAmmo:ship.torpedoAmmo;
+        int max=type==DamageType.KINETIC?ship.maxKineticAmmo:
+                type==DamageType.MISSILE?ship.maxMissileAmmo:ship.maxTorpedoAmmo;
+        return ShipFireControl.mayBegin(policy,true,stock,Math.max(max,stock),
+                committedResource(ship,type),cost,tick,
+                ship.resourceNextFireTick.getOrDefault(resourceKey(type,slot),0L));
+    }
+    private void recordResourceShot(Ship ship,DamageType type,int slot,double cooldown){
+        ShipResourceOrders policy=ship.standingOrders==null?ShipResourceOrders.DEFAULT:
+                ship.standingOrders.resources();
+        if(policy.legacy())return;
+        int stock=type==DamageType.KINETIC?ship.kineticAmmo:
+                type==DamageType.MISSILE?ship.missileAmmo:ship.torpedoAmmo;
+        int max=type==DamageType.KINETIC?ship.maxKineticAmmo:
+                type==DamageType.MISSILE?ship.maxMissileAmmo:ship.maxTorpedoAmmo;
+        ship.resourceNextFireTick.put(resourceKey(type,slot),
+                ShipFireControl.nextEligible(policy,stock,Math.max(max,stock),
+                        cooldown,tick));
+    }
     private void fire(Ship s, Ship target) {
-        if(s.crewReadiness()<0.05)return;
+        if(s.crewReadiness()<0.05||
+                (s.standingOrders!=null&&s.standingOrders.resources().fireIntent()
+                ==ShipResourceOrders.FireIntent.HOLD_OFFENSE))return;
         double distance=StrictMath.hypot(target.x-s.x,target.y-s.y);
         double lockRange=targetAcquisitionRange(s,target);
         double lock=Math.max(0,1-distance/Math.max(1,lockRange))
@@ -1937,7 +1981,8 @@ public final class Battle {
                 &&!hasPendingGuided(s.id,DamageType.MISSILE)){
             OrdnanceDoctrine.Pattern doctrine=OrdnanceDoctrine.forWeapon(
                     DamageType.MISSILE,s.launchMode(DamageType.MISSILE));
-            if(s.missileAmmo>=doctrine.ammoNeeded()){
+            if(s.missileAmmo>=doctrine.ammoNeeded()&&
+                    resourcePermit(s,DamageType.MISSILE,-1,doctrine.ammoNeeded())){
                 s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
                 launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,
@@ -1945,6 +1990,7 @@ public final class Battle {
                         s.propulsionMode(DamageType.MISSILE),
                         s.guidanceMode(DamageType.MISSILE)));
                 salvosStarted++;
+                recordResourceShot(s,DamageType.MISSILE,-1,s.missileReload);
             }
         }
         AmmunitionTable.Profile shell=AmmunitionTable.kinetic(s.kineticType);
@@ -1952,6 +1998,7 @@ public final class Battle {
                 s.kineticReload,s.power,s.heat,s.maxHeat,
                 s.weaponsCondition,s.magazineCondition)
                 &&s.kineticAmmo>0
+                &&resourcePermit(s,DamageType.KINETIC,-1,1)
                 &&s.power>kinetic.powerPerShot()*shell.powerCost()
                 &&s.heat+kinetic.heatPerShot()*shell.heatCost()<=s.maxHeat){
             s.kineticReload=kinetic.reload(s.weapons.kineticCycle(),s.weaponsCondition)
@@ -1959,6 +2006,7 @@ public final class Battle {
             s.power-=kinetic.powerPerShot()*shell.powerCost();
             s.heat+=kinetic.heatPerShot()*shell.heatCost();
             s.kineticAmmo--;
+            recordResourceShot(s,DamageType.KINETIC,-1,s.kineticReload);
             long shotId=nextVisualShotId++;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.KINETIC,shotId);
             double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x());
@@ -2057,7 +2105,8 @@ public final class Battle {
                 &&!hasPendingGuided(s.id,DamageType.TORPEDO)){
             OrdnanceDoctrine.Pattern doctrine=OrdnanceDoctrine.forWeapon(
                     DamageType.TORPEDO,s.launchMode(DamageType.TORPEDO));
-            if(s.torpedoAmmo>=doctrine.ammoNeeded()){
+            if(s.torpedoAmmo>=doctrine.ammoNeeded()&&
+                    resourcePermit(s,DamageType.TORPEDO,-1,doctrine.ammoNeeded())){
                 s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
                 launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,
@@ -2065,6 +2114,7 @@ public final class Battle {
                         s.propulsionMode(DamageType.TORPEDO),
                         s.guidanceMode(DamageType.TORPEDO)));
                 salvosStarted++;
+                recordResourceShot(s,DamageType.TORPEDO,-1,s.torpedoReload);
             }
         }
     }
@@ -2076,7 +2126,9 @@ public final class Battle {
                 ship.weaponsCondition<=.16||ship.magazineCondition<=.16)return;
         for(RocketBarrage.Rack rack:ship.rocketRacks){
             if(!rack.canStart()||distance>1900+rack.size.ordinal()*200
-                    ||ship.kineticAmmo<rack.salvoCount*rack.cheapAmmoUnitsPerRocket)
+                    ||ship.kineticAmmo<rack.salvoCount*rack.cheapAmmoUnitsPerRocket
+                    ||!resourcePermit(ship,DamageType.KINETIC,rack.slot,
+                            rack.salvoCount*rack.cheapAmmoUnitsPerRocket))
                 continue;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
                     ship,WeaponMuzzles.Family.ROCKET,rack.slot);
@@ -2086,6 +2138,7 @@ public final class Battle {
             rack.salvoRemaining=rack.salvoCount;
             rack.nextLaunchTick=tick;
             rack.reload=rack.reloadSeconds();
+            recordResourceShot(ship,DamageType.KINETIC,rack.slot,rack.reload);
         }
     }
     /** Actual round release consumes rack inventory and ship power PER BODY.
@@ -2143,12 +2196,14 @@ public final class Battle {
             OrdnanceFitting.Mounted loaded=rack.fitting;
             OrdnanceDoctrine.Pattern pattern=OrdnanceDoctrine.forWeapon(
                     family,loaded.guided().salvo());
-            if(ammo<pattern.ammoNeeded()||rack.magazine<pattern.ammoNeeded())continue;
+            if(ammo<pattern.ammoNeeded()||rack.magazine<pattern.ammoNeeded()||
+                    !resourcePermit(source,family,rack.slot,pattern.ammoNeeded()))continue;
             rack.reload=gun.reload(cycle,source.weaponsCondition)*pattern.reloadMultiplier();
             launchQueue.add(new PendingLaunch(source.id,target.id,family,pattern,tick,
                     loaded.warhead(),loaded.guided().motor(),loaded.guided().guidance(),
                     rack.slot));
             salvosStarted++;
+            recordResourceShot(source,family,rack.slot,rack.reload);
         }
     }
     private boolean hasPendingGuided(int sourceId,DamageType family,int slot){
