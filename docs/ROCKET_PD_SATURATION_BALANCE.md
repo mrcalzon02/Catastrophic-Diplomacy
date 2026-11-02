@@ -2,7 +2,9 @@
 
 **Goal:** at the *largest physical firing program* (16 dumbfire rockets per
 fitted rack), a massed barrage should get **roughly one-third of its launched
-rockets past concentrated, comparably researched point defense**. This is a
+rockets into the inner defense zone of a concentrated, comparably
+researched PD formation**. Track ordinary non-interception separately so a
+wide miss cannot count as a successful penetration. This is a
 combat-balance goal, **not a release-blocking functional requirement**.
 
 ## Measurement definition
@@ -12,10 +14,14 @@ combat-balance goal, **not a release-blocking functional requirement**.
 - **Escaped PD:** launched minus intercepted, measured **only after all
   bodies from the first physical barrage have either struck a target or
   timed out**. A rocket that misses an evasive target can still have escaped PD.
+- **Terminal-zone penetration:** the unique rocket body reaches within
+  **90 world units** of the defended ship while still in flight (or scores a
+  real hull impact). It is counted once using immutable physical projectile IDs.
+  This excludes harmless distant misses from the success measurement.
 - **Impact:** a rocket that physically collides with a damageable enemy hull
   and applies real shield/armor/structure effects. It is *not* the same as
   escaping PD, particularly for dumbfire weapons.
-- **Desired range:** approximately 30–37% escape in the matched heavy
+- **Desired range:** approximately 30–37% terminal-zone penetration in the matched heavy
   saturation reference scenario, across at least three stable random seeds.
   This is a tuning band, never a mandatory pass/fail check.
 - **Reference:** tier-IX SIEGE rocket racks, 16 per rack, four installed
@@ -49,7 +55,9 @@ turning off its sensors/PD through destruction. Original shielding, armor,
 reactor, heat and wear still operate in the actual `Battle` implementation.
 
 The report separates physical PD interceptions, *escaped* rocket bodies,
-impact counts, protected-damage totals, and a matched no-PD baseline.
+**unique 90-unit terminal-zone entries**, impact counts, protected-damage
+totals, and a matched no-PD baseline. All counted rockets must complete
+flight, so late in-flight rockets cannot inflate escape percentages.
 
 The additional `saturation-sweep.csv` varies **experimental** tracking
 pressure (0.00/0.15/0.30/0.50/0.75) against one and four real PD racks,
@@ -72,11 +80,14 @@ already existing optional rocket/PD diagnostic workflow:
 
 1. Confirm all launched first-salvo bodies resolve; verify the real PD
    defender survives long enough to service the entire engagement.
-2. Compare escaped-PD percentage to the 30–37% tuning band for 4:4 full
-   volleys **separately for each motor and target-motion state**; show
+2. Compare **terminal-zone penetration** to the 30–37% tuning band for
+   4:4 full volleys, **separately for each motor and target-motion state**;
+   show
    both per-seed variance and aggregate, not just an average.
-3. Check actual collisions under offline-PD control to identify dumbfire
-   misses and target evasion independent of interception effectiveness.
+3. Report both raw non-interception (launched minus intercepted) and actual
+   terminal-zone entries. Check collisions under offline-PD control to
+   identify dumbfire misses and target evasion independent of interception
+   effectiveness.
 4. Verify energy and heat remain real limitations; fitted PD and incoming
    rocket counts are not substituted by abstract firepower ratings.
 5. Evaluate the 1:1 and 2:2 controls. A massed 16-round barrage should
