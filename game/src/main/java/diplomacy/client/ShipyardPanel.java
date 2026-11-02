@@ -17,6 +17,7 @@ import diplomacy.shipyard.ModuleVersions;
 import diplomacy.sim.LaserFamilies;
 import diplomacy.sim.ProjectileModel;
 import diplomacy.sim.AmmunitionTable;
+import diplomacy.sim.RocketBarrage;
 import diplomacy.sim.FighterModel;
 import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignTechnology;
@@ -385,6 +386,31 @@ final class ShipyardPanel {
         }
         return source;
     }
+    /** Physical rocket socket programs are persisted through SAVE/APPLY. */
+    static Shipyard.Design chooseRocket(Shipyard.Design source,int slot,int axis,int step){
+        if(source==null||slot<0||slot>=source.slots()||axis<0||axis>1||
+                (step!=1&&step!=-1))
+            throw new IllegalArgumentException("Invalid rocket fire-control selection");
+        RocketBarrage.Fitting current=source.rocketBarrage(slot);
+        int[] counts={4,8,16};
+        int count=current.count();
+        RocketBarrage.Motor motor=current.motor();
+        if(axis==0){
+            int index=0;
+            for(int n=0;n<counts.length;n++)if(counts[n]==count){index=n;break;}
+            count=counts[Math.floorMod(index+step,counts.length)];
+        }else{
+            RocketBarrage.Motor[] modes=RocketBarrage.Motor.values();
+            motor=modes[Math.floorMod(motor.ordinal()+step,modes.length)];
+        }
+        return source.withRocketBarrage(slot,count,motor);
+    }
+    private RocketBarrage.Size selectedRocketSize(){
+        var installed=draft.at(selectedSlot);
+        if(installed==null)return null;
+        return RocketBarrage.Size.forCode(installed.component.substring(
+                installed.component.lastIndexOf('-')+1));
+    }
     private Battle.DamageType selectedGuidedFamily(){
         var installed=draft.at(selectedSlot);
         if(installed==null)return null;
@@ -393,6 +419,23 @@ final class ShipyardPanel {
         return null;
     }
     private void cycleGuided(int axis,int step){
+        RocketBarrage.Size rocket=selectedRocketSize();
+        if(rocket!=null){
+            if(axis>=2){
+                notice="Unguided rockets have NO SEEKER or guided WARHEAD; choose VOLLEY or MOTOR";
+                return;
+            }
+            try{
+                Shipyard.Design next=chooseRocket(draft,selectedSlot,axis,step);
+                if(!campaignTechnology())challenge().requireAllowed(next,catalog);
+                draft=next;purchaseArmedDesign=null;cachedQuote=null;
+                notice="ROCKET SOCKET "+(selectedSlot+1)+" "+
+                        (axis==0?"VOLLEY":"MOTOR")+" saved in blueprint; SAVE or APPLY";
+            }catch(IllegalArgumentException denied){
+                notice="ROCKET FIT DENIED: "+denied.getMessage();
+            }
+            return;
+        }
         Battle.DamageType family=selectedGuidedFamily();
         if(family==null){
             notice="Select an equipped missile or torpedo hardpoint first";return;
@@ -495,6 +538,9 @@ final class ShipyardPanel {
             guidedView=!guidedView;technologyView=false;return true;
         }
         if(code==com.badlogic.gdx.Input.Keys.M&&guidedView){
+            if(selectedRocketSize()!=null){
+                notice="Rocket controls always belong to their physical hardpoint";return true;
+            }
             perRackView=!perRackView;
             notice=perRackView?"EDIT PER HARDPOINT: rack owns magazine and cooldown":
                     "EDIT SHARED FAMILY: legacy missile configuration";
@@ -719,6 +765,10 @@ final class ShipyardPanel {
         }
         if(guidedView&&y<638){
             if(x>=342&&x<=795&&y>=170&&y<=224){
+                if(selectedRocketSize()!=null){
+                    notice="Rockets always use independent per-hardpoint fire programs";
+                    return true;
+                }
                 perRackView=!perRackView;
                 notice=perRackView?"EDIT PER HARDPOINT: own rounds and cooldown":
                         "EDIT SHARED FAMILY: legacy profile";
@@ -991,7 +1041,7 @@ final class ShipyardPanel {
         font.draw(batch,"SELECTED HARDPOINT",36,587);
         font.draw(batch,"VESSEL TECHNOLOGY PLAN",346,587);
         font.draw(batch,"MODULES",812,587);
-        font.draw(batch,"GUIDED",956,587);
+        font.draw(batch,"ORDNANCE",946,587);
         font.draw(batch,"TECH LOADOUT",1104,587);
         for(int n=0;n<SLOT_ROWS;n++){
             int index=scroll+n;
@@ -1073,6 +1123,9 @@ final class ShipyardPanel {
     private void drawGuided(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font){
         var report=Shipyard.inspect(draft,catalog);
         Battle.DamageType family=selectedGuidedFamily();
+        RocketBarrage.Size rocket=selectedRocketSize();
+        RocketBarrage.Fitting rocketProgram=rocket==null?null:
+                draft.rocketBarrage(selectedSlot);
         OrdnanceFitting.Mounted loaded=family==null?null:perRackView?
                 draft.launcher(selectedSlot):new OrdnanceFitting.Mounted(
                         draft.ordnance(family),family==Battle.DamageType.MISSILE?
@@ -1094,9 +1147,9 @@ final class ShipyardPanel {
         for(int row=0;row<4;row++){
             int bottom=455-row*100;
             rectangle(shapes,809,bottom,446,72,
-                    choice==null?new Color(.12f,.12f,.15f,1):
+                    choice==null&&rocketProgram==null?new Color(.12f,.12f,.15f,1):
                     new Color(.12f,.21f,.30f,1));
-            if(choice!=null){
+            if(choice!=null||(rocketProgram!=null&&row<2)){
                 rectangle(shapes,812,bottom+3,65,66,new Color(.16f,.29f,.38f,1));
                 rectangle(shapes,1184,bottom+3,67,66,new Color(.16f,.29f,.38f,1));
             }
@@ -1104,7 +1157,7 @@ final class ShipyardPanel {
         shapes.end();
         batch.begin();
         font.setColor(Color.WHITE);
-        font.draw(batch,"GUIDED ORDNANCE / SHIPYARD",22,704);
+        font.draw(batch,"ORDNANCE / SHIPYARD",22,704);
         font.draw(batch,"LEFT FLEET",34,660);
         if(!playerOnly)font.draw(batch,"RIGHT FLEET",175,660);
         font.draw(batch,"<",345,660);
@@ -1118,7 +1171,7 @@ final class ShipyardPanel {
         font.draw(batch,"HARDPOINTS",36,587);
         font.draw(batch,"SELECTED WEAPON",344,587);
         font.setColor(Color.LIGHT_GRAY);font.draw(batch,"MODULES",813,587);
-        font.setColor(Color.GOLD);font.draw(batch,"GUIDED",956,587);
+        font.setColor(Color.GOLD);font.draw(batch,"ORDNANCE",946,587);
         font.setColor(Color.CYAN);font.draw(batch,"TECH >",1104,587);
         for(int i=0;i<SLOT_ROWS;i++){
             int index=i+scroll;
@@ -1137,9 +1190,19 @@ final class ShipyardPanel {
         var installed=draft.at(selectedSlot);
         font.draw(batch,"SOCKET "+(selectedSlot+1)+" / "+draft.slots(),345,467);
         font.draw(batch,installed==null?"EMPTY":installed.component,345,430);
-        if(choice==null){
+        if(rocketProgram!=null){
+            font.setColor(Color.CYAN);
+            font.draw(batch,rocket+" / UNGUIDED BARRAGE",345,372);
+            font.setColor(Color.WHITE);
+            font.draw(batch,"FIXED LAUNCH-TIME BEARING",345,334);
+            font.draw(batch,"FOUR / EIGHT / SIXTEEN ROCKETS",345,284);
+            font.draw(batch,"NO SEEKER; KEEP MOVING TO EVADE",345,255);
+            font.draw(batch,"CHEAP KINETIC STOCK / LONG RELOAD",345,224);
+            font.draw(batch,"PER SOCKET, STORED WITH BLUEPRINT",345,194);
+            font.draw(batch,"KEYS G / 1-2 ALSO AVAILABLE",345,139);
+        }else if(choice==null){
             font.setColor(Color.GOLD);
-            font.draw(batch,"SELECT A MISSILE OR TORPEDO",346,355);
+            font.draw(batch,"SELECT A GUIDED OR ROCKET",346,355);
             font.draw(batch,"HARDPOINT FROM THE LEFT LIST",346,323);
             font.draw(batch,"GUIDED LOADOUT IS FAMILY-WIDE",346,268);
             font.draw(batch,"UNTIL PER-MOUNT FIRE CONTROL",346,240);
@@ -1156,20 +1219,28 @@ final class ShipyardPanel {
             font.draw(batch,"TOGGLE SCOPE BELOW OR PRESS M",345,244);
             font.draw(batch,"KEYS G / 1-4 ALSO AVAILABLE",345,139);
         }
-        font.setColor(Color.GOLD);
-        font.draw(batch,perRackView?"PER HARDPOINT   /   SWITCH TO FAMILY":
-                "SHARED FAMILY   /   SWITCH TO RACK",354,203);
-        String[] labels={"LAUNCH PATTERN","MOTOR / FLIGHT","GUIDANCE","WARHEAD"};
-        String[] values=choice==null?new String[]{"NO LAUNCHER","NO LAUNCHER",
-                "NO LAUNCHER","NO LAUNCHER"}:
+        if(rocketProgram==null){
+            font.setColor(Color.GOLD);
+            font.draw(batch,perRackView?"PER HARDPOINT   /   SWITCH TO FAMILY":
+                    "SHARED FAMILY   /   SWITCH TO RACK",354,203);
+        }
+        String[] labels=rocketProgram!=null?
+                new String[]{"VOLLEY SIZE","MOTOR / FLIGHT","TRACKING","AMMUNITION"}:
+                new String[]{"LAUNCH PATTERN","MOTOR / FLIGHT","GUIDANCE","WARHEAD"};
+        String[] values=rocketProgram!=null?
+                new String[]{rocketProgram.count()+" ROCKETS",rocketProgram.motor().name(),
+                        "NONE - INERTIAL","CHEAP KINETIC"}:
+                choice==null?new String[]{"NO LAUNCHER","NO LAUNCHER",
+                        "NO LAUNCHER","NO LAUNCHER"}:
                 new String[]{choice.salvo().name(),choice.motor().name(),
                         choice.guidance().name(),loaded.warhead().name()};
         for(int row=0;row<4;row++){
             int bottom=455-row*100;
             font.setColor(Color.CYAN);
             font.draw(batch,labels[row],814,bottom+90);
-            font.setColor(choice==null?Color.GRAY:Color.WHITE);
-            if(choice!=null){
+            boolean actionable=choice!=null||(rocketProgram!=null&&row<2);
+            font.setColor(actionable?Color.WHITE:Color.GRAY);
+            if(actionable){
                 font.draw(batch,"<",831,bottom+46);
                 font.draw(batch,">",1212,bottom+46);
             }
