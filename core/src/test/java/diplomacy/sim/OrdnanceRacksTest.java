@@ -60,8 +60,18 @@ public final class OrdnanceRacksTest {
                 "Tampered socket ID cannot be loaded");
         rejects(()->d.stage(first,Shipyard.Track.SPECIALIST,3),
                 "Downgrading a mounted rack must not retain high-tier propulsion");
-        rejects(()->d.install(second,null),
-                "Removing a configured rack must require clearing the loadout");
+        // A legal module refit automatically clears only the removed
+        // socket's stale fire-control payload. Keeping the old special
+        // guided fitting attached to an empty socket was a gameplay trap:
+        // it prevented replacing missile launchers with rocket batteries.
+        Shipyard.Design removed=d.install(second,null);
+        check(removed.at(second)==null&&!removed.launcherFittings.containsKey(second)
+                        &&removed.launcher(first).equals(d.launcher(first))
+                        &&removed.launcherFittings.size()==1,
+                "Removing a rack must discard only its own fire control");
+        check(Shipyard.decode(Shipyard.encode(removed),catalog)
+                        .launcher(first).equals(d.launcher(first)),
+                "Remaining guided hardpoint lost its profile after rack refit");
         Shipyard.Design untouched=Shipyard.starter(Battle.Faction.TERRAN,
                 Shipyard.Hull.DREADNOUGHT);
         check(Shipyard.encode(untouched).startsWith("CD-SHIP-1|"),
