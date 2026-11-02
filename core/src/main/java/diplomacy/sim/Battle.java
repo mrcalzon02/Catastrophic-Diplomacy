@@ -2599,6 +2599,7 @@ public final class Battle {
                 *DeceptionProjection.lockMultiplier(target,1.0);
         long shot=nextVisualShotId++;
         String shotName="FIGHTER_"+profile.weapon().name();
+        double observedShotX=tx,observedShotY=ty;
         if(profile.ammunition()>0)craft.ammunition--;
         craft.reload=profile.cooldown();
         craft.shotsFired++;
@@ -2616,6 +2617,10 @@ public final class Battle {
                             DeceptionProjection.ghostX(target,index,tick)-craft.x);
                 }else heading+=(shot%2==0?0.32:-0.32);
             }
+            // FIRE endpoints must match the actual physical cannon bearing,
+            // including when a holo contact is fooling the gunner.
+            observedShotX=craft.x+StrictMath.cos(heading)*distance;
+            observedShotY=craft.y+StrictMath.sin(heading)*distance;
             // Kinetic shot has its own flight time, integrity and swept collision.
             ProjectileModel.Spec spec=ProjectileModel.module(
                     carrier==null?Faction.TERRAN:carrier.faction,
@@ -2642,6 +2647,7 @@ public final class Battle {
                 }
             }
             beams.add(new Beam(shot,tick,craft.x,craft.y,beamX,beamY,craft.team,kind));
+            observedShotX=beamX;observedShotY=beamY;
             if(landed){
                 if(intercept!=null)hitCraft(intercept,profile.damage(),carrier,shot,shotName);
                 else hit(target,profile.damage(),carrier,kind,shot,tx,ty);
@@ -2661,7 +2667,7 @@ public final class Battle {
             if(heavy)fighterTorpedoesLaunched++;else fighterMissilesLaunched++;
         }
         visual(shot,VisualPhase.FIRE,shotName,craft.team,craft.sourceId,
-                target==null?0:target.id,craft.x,craft.y,tx,ty);
+                target==null?0:target.id,craft.x,craft.y,observedShotX,observedShotY);
     }
 
     private void hitCraft(Craft target,double damage,Ship shooter,long shot,String weapon){
