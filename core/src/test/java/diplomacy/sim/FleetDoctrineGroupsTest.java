@@ -16,7 +16,10 @@ public final class FleetDoctrineGroupsTest {
     }
     public static void main(String[] ignored)throws Exception{
         ShipStandingOrders captain=ShipStandingOrders.DEFAULT.adjust(0,3)
-                .adjust(1,-2).adjust(13,-5).adjust(14,1).adjust(16,1);
+                .adjust(1,-2).adjust(13,-5).adjust(14,1).adjust(16,1)
+                .withResources(ShipResourceOrders.DEFAULT
+                        .withAmmunition(ShipResourceOrders.AmmoPolicy.AUTO_RATION)
+                        .withRationStart(65).withReserve(15,2));
         ShipStandingOrders guard=new ShipStandingOrders(BattleOrders.DEFAULT,15,85,30,
                 new ShipTacticalDirectives(70,
                         ShipTacticalDirectives.InterceptStrategy.CLOSE_IN,
@@ -38,6 +41,11 @@ public final class FleetDoctrineGroupsTest {
                 "Selected vessels did not receive leader aggression");
         ok(result.standingFor(1).directives().speedPercent()==
                 captain.directives().speedPercent(),"Ship speed doctrine did not copy");
+        ok(result.standingFor(1).resources().equals(captain.resources())&&
+                        result.standingFor(3).resources().equals(captain.resources())&&
+                        result.standingFor(4).resources().equals(
+                                ShipResourceOrders.DEFAULT),
+                "Applying captain resource policy overwrote unrelated vessels");
         ok(result.standingFor(1).directives().fighterMission()==
                 captain.directives().fighterMission(),"Fighter doctrine did not copy");
         ok(result.standingFor(1).directives().defendSlots().equals(guard.directives().defendSlots())
