@@ -109,7 +109,8 @@ final class ShipSurfaceDamageCapture {
         gun.speed=0;gun.vx=gun.vy=0;
         victim.speed=0;victim.vx=victim.vy=0;
         victim.facing=Math.PI/2;
-        victim.name="LIVE FIRE "+KEYS[index].toUpperCase(java.util.Locale.ROOT);
+        victim.name="STATIONARY TEST TARGET / "+KEYS[index].toUpperCase(java.util.Locale.ROOT);
+        battle.registerDiagnosticStationaryTarget(victim.id);
         // The shield contact scenario retains real shields. Other lanes
         // disable recharge only in their disposable test battles so repeated
         // ammunition can be observed against armor without changing gameplay.
@@ -119,11 +120,21 @@ final class ShipSurfaceDamageCapture {
                 victim.defense.configureRecharge(face,0,2);
             victim.shields=victim.defense.totalShields();
         }
+        // Identical target pose across every deterministic screenshot. The
+        // attacker remains autonomous and still hits with genuine projectiles.
+        final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
         if(index==0)return record(KEYS[index],weapon,seed,battle,victim,true,false);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
         for(int i=0;i<maxSteps&&!battle.finished();i++){
             battle.step();
+            if(Double.compare(victim.x,fixedX)!=0||
+                    Double.compare(victim.y,fixedY)!=0||
+                    Double.compare(victim.facing,fixedFacing)!=0)
+                throw new IllegalStateException("Stationary target changed pose in "+KEYS[index]+
+                        " tick "+battle.tick);
+            if(victim.lastTargetId!=0||victim.withdrawing||victim.escaped)
+                throw new IllegalStateException("Stationary target ran autonomous orders in "+KEYS[index]);
             double armor=maxArmor(victim),interior=maxInterior(victim);
             reached=switch(index){
                 case 1 -> battle.hitCount>=1;

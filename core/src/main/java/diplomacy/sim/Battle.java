@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.List;
@@ -618,6 +620,26 @@ public final class Battle {
     /** Opt-in screensaver policy only. Player/campaign battles never make
      * autonomous extraction decisions for the player's surviving ships. */
     private boolean unattendedExhibition;
+    /**
+     * Strictly opt-in stationary target vessels for local development firing
+     * ranges. The vessel remains a regular damageable fitted Ship: only captain
+     * decisions (navigation, target selection, retreat, fire and launch) cease.
+     * Never enabled for campaign, skirmish or network play.
+     */
+    private final Set<Integer> diagnosticStationaryTargets=new HashSet<>();
+
+    /** Register only at tick zero: never change a vessel mid-battle. */
+    public void registerDiagnosticStationaryTarget(int shipId){
+        if(tick!=0)throw new IllegalStateException("Configure diagnostic target before battle ticks");
+        Ship target=findShip(shipId);
+        if(target==null||!target.alive())
+            throw new IllegalArgumentException("Diagnostic target must be a living ship");
+        target.vx=0;target.vy=0;
+        diagnosticStationaryTargets.add(shipId);
+    }
+    public boolean isDiagnosticStationaryTarget(int shipId){
+        return diagnosticStationaryTargets.contains(shipId);
+    }
 
     public Battle(long initialSeed) { seed = initialSeed; random = new Random(initialSeed); }
     public long seed() { return seed; }
@@ -1093,6 +1115,13 @@ public final class Battle {
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             if(!s.alive())continue;
+            if(diagnosticStationaryTargets.contains(s.id)){
+                // NO AI: skip captain/commands/retreat/fire/launch entirely.
+                // Keep real shields, armor, power, environmental effects,
+                // projectile collision, penetration and hull mortality.
+                s.vx=0;s.vy=0;
+                continue;
+            }
             // A lone, unarmed exhibition captain with viable engines has no
             // remaining offensive mission. Order a genuine physical extraction
             // instead of leaving two opposing fleets alive indefinitely.

@@ -16,6 +16,17 @@ public final class ShipSurfaceDamageCaptureTest {
             check(scene.target()!=null,"Missing actual ship "+scene.key());
             check(scene.battle().ships().size()>=2,"No combat scene "+scene.key());
             check(scene.target().hullClass!=null,"No approved hull class "+scene.key());
+            if(i<ShipSurfaceDamageCapture.KEYS.length-1){
+                check(scene.battle().isDiagnosticStationaryTarget(scene.targetId()),
+                        "Live-fire target was not registered as non-AI: "+scene.key());
+                check(scene.target().vx==0&&scene.target().vy==0,
+                        "Diagnostic target is moving: "+scene.key());
+                check(Double.compare(scene.target().facing,Math.PI/2)==0,
+                        "Diagnostic target heading drifted: "+scene.key());
+                check(!scene.target().withdrawing&&!scene.target().escaped&&
+                        scene.target().lastTargetId==0,
+                        "Diagnostic target autonomously navigated or chose a target");
+            }
             if(i==0)check(scene.ticks()==0&&scene.hits()==0,
                     "Pristine reference is already battle-damaged");
             if(i>1&&i<ShipSurfaceDamageCapture.KEYS.length-1)
@@ -33,6 +44,11 @@ public final class ShipSurfaceDamageCaptureTest {
         check(a.ticks()==b.ticks()&&a.hits()==b.hits()&&
                 Double.compare(a.armorExposure(),b.armorExposure())==0,
                 "Seeded armor replay is not deterministic");
-        System.out.println("PASS seeded fitted live-fire scenarios plus independently labeled grid stress");
+        // A separately constructed test scene proves the switch is local and
+        // never silently enabled for ordinary combat encounters.
+        Battle ordinary=new Battle(202611010140L);
+        check(!ordinary.isDiagnosticStationaryTarget(1),
+                "Stationary diagnostic behavior leaked into normal battle");
+        System.out.println("PASS seeded real-weapon impacts on fixed-heading no-AI targets; baseline battle unaffected");
     }
 }

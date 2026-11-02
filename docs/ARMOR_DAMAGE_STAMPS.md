@@ -181,3 +181,22 @@ transient weapon probes are disabled and shield/ECM overlays are omitted.
 Production five-argument rendering is unchanged. Compare the new
 `surface.png` (physical damage) with `close.png` (full combat lighting).
 No combat mechanics or source sprites are modified.
+
+
+### Development-only stationary vessel (no AI)
+
+The deterministic armor gallery registers its **actual fitted Vaerith target**
+as a stationary diagnostic target at battle tick zero. It has no autonomous
+target acquisition, steering, retreat, mission-command processing, firing,
+fighter launches, or other captain actions. Its position and facing remain
+fixed across shots, providing comparable pristine and damaged screenshots.
+Its physics and defenses remain completely real: shield recharge, armor and
+structure depletion, module damage, actual projectile hits, and destruction
+are still processed by the normal simulation. The shooting vessel's AI and
+real weapon system continue normally.
+
+The opt-in registration exists only on an individual `Battle` instance and
+is used by the diagnostics. Normal campaign/skirmish/network battles do not
+register stationary test targets. The visual smoke task verifies no drift,
+no autonomous target selection and no default opt-in, while keeping visual
+acceptance out of the release gates.
