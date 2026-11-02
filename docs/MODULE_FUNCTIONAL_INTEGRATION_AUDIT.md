@@ -21,10 +21,58 @@ functional regression checks are green.
 | HLP holographic emitter | Powered ECM reduces physical weapon lock and guided seeker tracking | Moving translucent source-art false contacts; missed beam/kinetic shots can track a false image |
 
 Holographic contacts are *electronic/image projections*, **not** second physical
-ships, independent hit-point pools, or direct AI fleet roster units. The actual
-combat benefit is paid ECM/lock/seeker degradation; never grant extra real hulls.
-The original source artwork is reused and no fabricated substitute ship silhouette
-is introduced.
+ships, independent hit-point pools, or direct AI fleet roster units. The original
+source artwork is reused and no fabricated substitute ship silhouette is introduced.
+
+### Current functional implementation (November 1 follow-up)
+
+- **Cloak:** running VCL fades the original art and reduces visual acquisition.
+  A damaged ECM circuit or power loss fails open; the actual emitter now draws
+  power and produces heat each combat tick. Radar, thermal, X-ray and gravitic
+  counters remain distinct and can defeat a cloak by their real sensing channels.
+- **Holo projector:** powered HLP creates one to three moving world-space
+  contacts, with count derived from module performance and ECM condition.
+  Live beam/kinetic/fighter misses can target the *identical coordinates*
+  drawn by the renderer. Projectors consume power/produce heat and shut down
+  at insufficient reactor headroom; they never gain hit points or invent hulls.
+- **Guided ordnance:** actual missiles and torpedoes may lock onto a projected
+  false contact for a stable 45-tick guidance epoch. Their real momentum,
+  thrust, finite propellant, seeker detection, point defense and hull collision
+  remain authoritative. Losing emitter power switches surviving locked seekers
+  back to actual target telemetry; there is NO free instant retarget to a new hull.
+  Higher-quality seekers resist deception. Each physical diversion contributes
+  to the target's tactical **SPOOFED SEEKERS** counter.
+- **Strike fighters:** individual craft must acquire a target with their own
+  radar/optical limits before shooting; carrier datalink does not grant
+  omniscient fire control. Active stealth can deny contact, and holographic
+  countermeasures reduce hit probability and redirect missed cannon/beam shots.
+  Physical fighter ammunition, projectile collisions and hits remain unchanged.
+- **Observability:** selected-ship tactical status displays powered cloak,
+  live holo contact count, and accumulated counts of actual diverted guided
+  seekers and weapon shots. Replay fingerprint records those counters and each
+  missile's false-contact lock for deterministic comparison.
+
+### Verification requirements (DO NOT mark completed based on code existence)
+
+1. `sensingModulesSmoke` must prove sensor channel counterplay including
+   damaged/unpowered cloaks and fighter-range suppression.
+2. `ordnanceSeekerSmoke` must launch **real missiles** against a powered holo
+   emitter, observe a physically spoofed missile's last-known world coordinates
+   matching the displayed ghost, and observe reacquisition after emitter shutdown.
+   Deterministic replay must retain the same simulation fingerprint.
+3. `combatShipStatusSmoke` must show actual spoof counters, not synthetic values.
+4. Platform runtime/screenshot diagnostics must capture original-art translucent
+   cloaks and multiple holograms at useful resolution; cosmetic differences are
+   diagnostic only. GPU rendering and startup failures are release-blocking.
+5. Measure CPU/memory impact in actual 200v200 fleets; ensure expensive texture
+   layers are culled and no per-contact hull image duplicates are uploaded.
+6. Confirm power/thermal drain, ECM degradation, seeker quality, and real range
+   counterplay do not create the never-ending late-battle deadlock or Android OOM.
+
+**Not implemented:** independent AI roster entities for ghosts (intentionally
+not required for functional deception); self-propelled escape-pod craft;
+48 extra survival-family hardware variants. Do not confuse planned items with
+verified implementation.
 
 ## Survival and engineering — 12 existing physical families
 
