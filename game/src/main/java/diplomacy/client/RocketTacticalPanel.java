@@ -72,13 +72,16 @@ final class RocketTacticalPanel {
         if(rack==null)return;
         font.setColor(Color.WHITE);
         for(int i=0;i<BUTTONS;i++)font.draw(batch,NAMES[i],X[i]+5,Y+29);
-        font.setColor(rack.salvoRemaining>0?Color.ORANGE:Color.CYAN);
+        boolean enoughStock=rack.rounds>=rack.salvoCount
+                &&ship.kineticAmmo>=rack.salvoCount*rack.cheapAmmoUnitsPerRocket;
+        font.setColor(rack.salvoRemaining>0?Color.ORANGE:
+                !enoughStock?Color.SALMON:Color.CYAN);
+        String note=rack.salvoRemaining>0?" FIRE "+rack.salvoRemaining:
+                !enoughStock?" NEED "+(rack.salvoCount*rack.cheapAmmoUnitsPerRocket):"";
         font.draw(batch,"R"+(index%ship.rocketRacks.size()+1)+"/"+
                 ship.rocketRacks.size()+" "+rack.size.name()+
-                "  AMMO "+rack.rounds+
-                "  STOCK "+ship.kineticAmmo+
-                "  RELOAD "+(int)Math.ceil(rack.reload)+
-                (rack.salvoRemaining>0?"  FIRING "+rack.salvoRemaining:""),979,31);
+                " "+rack.rounds+"R "+ship.kineticAmmo+"S "+
+                (int)Math.ceil(rack.reload)+"s"+note,979,31);
         font.setColor(Color.WHITE);
     }
 }

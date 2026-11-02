@@ -118,6 +118,11 @@ public final class RocketBarrageTest {
         firstRack.rounds--;
         require(secondRack.rounds==RocketBarrage.Size.LARGE.magazine,
                 "One launcher's ammunition leaked into another fleet ship");
+        require(RocketBarrage.hotEmission(RocketBarrage.Motor.BOOST_COAST,false)>1 &&
+                RocketBarrage.hotEmission(RocketBarrage.Motor.BOOST_COAST,true)>
+                        RocketBarrage.hotEmission(RocketBarrage.Motor.BOOST_COAST,false) &&
+                RocketBarrage.hotEmission(RocketBarrage.Motor.SUSTAINED_BURN,true)>1,
+                "Hot coasting rocket body must remain visible to laser PD; powered exhaust is hotter");
         for(RocketBarrage.Size size:RocketBarrage.Size.values()){
             require(RocketBarrage.acceleration(size,RocketBarrage.Motor.BOOST_COAST,.10)>0
                     &&RocketBarrage.acceleration(size,RocketBarrage.Motor.BOOST_COAST,.70)==0

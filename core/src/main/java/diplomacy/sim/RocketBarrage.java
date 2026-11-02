@@ -98,7 +98,10 @@ public final class RocketBarrage {
         }
     }
     public static double hotEmission(Motor motor,boolean burning) {
-        return burning?(motor==Motor.BOOST_COAST?2.5:1.85):.55;
+        // A spent booster has no bright exhaust, but its engine casing and
+        // plume wake remain thermally conspicuous for this short flight.
+        // A coasting ROCKET is not a silent-ghost guided missile.
+        return burning?(motor==Motor.BOOST_COAST?2.5:1.85):1.20;
     }
     /** No guidance degrees of freedom: acceleration always points along the
      * immutable initial bearing. A moving hull can evade the entire barrage. */
