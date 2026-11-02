@@ -118,17 +118,11 @@ final class ShipImpactProfiles {
                     p=merge(p,pock(x+.22f,y+.78f,intensity*.58f,
                             seed+29,false,.42f,0));
                 }
-                // Compressed brown armor and patchy incandescent
-                // metal outside the still-cool silver fracture ridges.
-                // Warmth is concentrated on chipped gaps, never a
-                // single glowing circular ring or an entire ship tint.
-                float chrome=metal(p)/255f;
-                float scorch=intensity*.54f*
-                        smooth(.42f,.67f,d)*(1-smooth(.97f,1.18f,d));
-                float hot=intensity*.47f*
-                        smooth(.60f,.81f,d)*(1-smooth(.93f,1.10f,d))*
-                        (1-smooth(.11f,.65f,chrome));
-                return merge(p,pack(scorch,hot,0));
+                // Approved pre-1f92 material profile: compact dark
+                // indentation with raised silver fractures, no broad
+                // brown/amber rim. Reverted after real-framebuffer review.
+                // Do not reintroduce the rejected thermal mask.
+                return p;
             }
             case MISSILE, TORPEDO:{
                 // Missiles leave compact soot and small fragmented spall.

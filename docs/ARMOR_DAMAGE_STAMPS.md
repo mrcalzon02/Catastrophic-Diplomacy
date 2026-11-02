@@ -452,3 +452,19 @@ still fires genuine projectiles with normal AI and weapon physics. Only the
 isolated screenshot scenario is repositioned; production fleet spawns are
 untouched. The pristine case additionally verifies the actual coordinates,
 and live-fire cases store the before-step axial start in their snapshot.
+
+### Kinetic material rollback after visual rejection (2026-11-02)
+
+The real OpenGL review of the three-hit Terran kinetic capture showed an
+unacceptable broad black/amber patch resembling a pasted-on dark plate.
+The user explicitly rejected this treatment. The KINETIC case in
+`ShipImpactProfiles` has been restored to the **pre-1f92a2b7** compact
+pockmark and raised cool-metal fracture profile from `a27a4963`.
+The kinetic-only brown compression annulus and extra orange heat mask are
+removed. Other weapon families, their penetration shapes, and all actual
+combat balancing, simulation armor and persisted damage remain unchanged.
+
+The optional original-ship OpenGL diagnostic runs on this code change and
+must supply both a real unhit control and actual kinetic hit screenshot;
+no generated proxy may count as visual acceptance. Keep this rollback in
+place unless the user explicitly approves another kinetic design.

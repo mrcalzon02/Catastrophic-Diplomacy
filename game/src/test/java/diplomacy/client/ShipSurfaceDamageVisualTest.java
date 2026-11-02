@@ -213,11 +213,13 @@ public final class ShipSurfaceDamageVisualTest {
                 8,8,1,1,17,0);
         check(ShipImpactProfiles.dark(particleCrack)>30,
                 "Particle pinhole must retain narrow radial stress fractures");
-        int kineticHeated=ShipImpactProfiles.sample(
+        int kineticOuter=ShipImpactProfiles.sample(
                 diplomacy.sim.Battle.DamageType.KINETIC,8,8.87f,
                 8,8,1,1,17,0);
-        check(ShipImpactProfiles.dark(kineticHeated)>0,
-                "Kinetic hot-metal compression needs brown carbonized plating");
+        check(ShipImpactProfiles.hot(kineticOuter)==0,
+                "Rejected kinetic brown/amber heat mask must not recur");
+        check(ShipImpactProfiles.metal(kineticOuter)>0,
+                "Earlier approved kinetic raised metal rim must survive rollback");
         check(ShipSurfaceDamageVisual.blueCoefficient(1f,false)==.56f &&
                 ShipSurfaceDamageVisual.blueCoefficient(1f,true)==1f,
                 "Tagged laser oxide and kinetic metal must occupy different material ranges");
