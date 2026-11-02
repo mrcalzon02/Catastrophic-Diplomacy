@@ -404,10 +404,28 @@ jobs:
           EOF
           gh release create "$CD_RELEASE_TAG" -R "$GH_REPO" --target "$GITHUB_SHA" \
             --title "Catastrophic Diplomacy $CD_ANDROID_VERSION_NAME — Windows Linux Android" \
-            --prerelease --notes-file notes.md \
+            --draft --prerelease --notes-file notes.md \
             Catastrophic-Diplomacy-Windows-x64.msi Catastrophic-Diplomacy-Linux-x64.zip \
             Catastrophic-Diplomacy-Android.apk release-manifest.json package-identity.txt \
             signature-verification.txt FULL-SHA256SUMS.txt
+          # A cancel can arrive midway through multi-file uploads. Keep the
+          # release PRIVATE as a draft until all three artifacts and source
+          # provenance have been read back, and until main is still current.
+          gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" \
+            --json tagName,targetCommitish,isDraft,isPrerelease,assets \
+            | jq -e --arg tag "$CD_RELEASE_TAG" --arg sha "$GITHUB_SHA" '
+              .tagName==$tag and .targetCommitish==$sha and
+              .isDraft==true and .isPrerelease==true and
+              ([.assets[].name] |
+                index("Catastrophic-Diplomacy-Windows-x64.msi")!=null and
+                index("Catastrophic-Diplomacy-Linux-x64.zip")!=null and
+                index("Catastrophic-Diplomacy-Android.apk")!=null)'
+          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)"
+          if [[ "$latest_sha" != "$GITHUB_SHA" ]]; then
+            echo "BLOCKED: main advanced during upload; obsolete release remains a draft"
+            exit 1
+          fi
+          gh release edit "$CD_RELEASE_TAG" -R "$GH_REPO" --draft=false
           # Read back the published release and require exactly this source's
           # public three-platform package set. A successful upload command
           # alone is not an independently verified publication.
