@@ -140,7 +140,15 @@ public final class FleetTenderTest {
         hostile.spawnWing(1,base,tech,1,345,300);
         var hostileDonor=hostile.ships().get(0);
         var enemy=hostile.ships().get(1);
-        for(Battle.Ship ship:hostile.ships()){ship.speed=0;ship.vx=ship.vy=0;}
+        // Isolate tender authorization from combat attrition: after store-breach
+        // simulation was introduced, active gunfire can burn the target's fuel.
+        // This fixture must test ONLY that no hostile refueling occurs.
+        for(Battle.Ship ship:hostile.ships()){
+            ship.speed=0;ship.vx=ship.vy=0;
+            ship.weaponsCondition=0;
+            ship.fighterReserve=0;
+            ship.droneReserve=0;
+        }
         enemy.fuel-=25;
         double hostileFuel=enemy.fuel;
         for(int i=0;i<180;i++)hostile.step();
