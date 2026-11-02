@@ -151,6 +151,49 @@ The expected ~33% inner-defense penetration goal applies only to **large
 massed 16-round rockets**, not to single missile contacts or armed fighters.
 No fixed kill-percentage expectation may gate the release.
 
+## First completed operating-load result and diagnostic repairs (2026-11-02)
+
+The first completed run
+[41527843801](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41527843801)
+compiled and ran all three optional programs. Its load test reported 153
+successful PD-on/off pairs and **39 failed fighter-related samples**. The
+workflow itself was green because the diagnostic deliberately returned zero
+despite missing samples. **Do not interpret those 39 as 0% interceptions.**
+
+Selected real physical surge/sustained 16-round siege rocket results with
+four specialist-rank IX PD mounts on **one hull**:
+
+| Loading | Boost/coast intercepted | Sustained-burn intercepted |
+|---|---:|---:|
+| SURGE, 128 launched | 94 (73.4%) | 114 (89.1%) |
+| SUSTAINED, 256 launched | 186 (72.7%) | 230 (89.8%) |
+
+The escaped-interception fraction is *not* the same as reaching the inner
+90-unit defended zone. The metrics show an apparent **motor-type imbalance**
+in favor of the boost/coast missiles. These results are advisory, not a
+permission to modify combat balance without a verified correction.
+
+The failing fighter cases were caused in part by **FIGHTER_CANNON /
+FIGHTER_MISSILE / FIGHTER_TORPEDO launch labels not matching subsequent
+KINETIC / MISSILE / TORPEDO interception events**. The revised test joins
+all physical shot IDs; starts fighter carriers close enough for real target
+acquisition; closes the fighter launch bay only after a real sortie;
+separates actual PD craft kills from natural fuel expiration; and marks the
+optional diagnostic step failed if any scenario fails after preserving
+its results as artifacts.
+
+The completed nominal load test also found a **94–99% minimum reactor
+charge and roughly 1% peak heat**. These measurements primarily reflect
+tracking/cooldown limits, not power exhaustion. Additional **SUSTAINED /
+DAMAGED_REACTOR** scenarios use half initial reactor charge, 8% normal
+power regeneration and 12% cooling (with actual engineering/power/heat
+rules unmodified), as a separate stress test rather than contaminating
+nominal balance measurements.
+
+The newer complete rerun must be read before accepting fighter, stage-by-
+stage or damaged-reactor performance numbers. Never report those new
+figures as verified merely because code was committed.
+
 ## How to run and retrieve
 
 Existing workflow:
