@@ -520,11 +520,16 @@ public final class TerranPlaceholderSprites implements Disposable {
                 }
                 // Preserve original artwork at native resolution: encode
                 // local mask coefficients, not a downsampled ship photograph.
+                boolean laserAnneal=family==Battle.DamageType.LASER.ordinal()+1
+                        &&metal>.64f;
                 if(family==Battle.DamageType.KINETIC.ordinal()+1||
                         family==Battle.DamageType.PARTICLE.ordinal()+1||
                         family==Battle.DamageType.FIGHTER.ordinal()+1)
                     metal=Math.max(metal,rim*.88f);
-                else heat=Math.max(heat,rim);
+                else if(!laserAnneal)heat=Math.max(heat,rim);
+                // A tagged blue coefficient selects the stable oxide shader.
+                // All ordinary silver chips/fractures stay in the lower range.
+                metal=ShipSurfaceDamageVisual.blueCoefficient(metal,laserAnneal);
                 int maskPixel=ShipSurfaceDamageVisual.maskPixel(damage,crater,heat,metal);
                 output.drawPixel(localX,localY,maskPixel);
                 if(visualDiagnostic){

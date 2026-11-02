@@ -84,8 +84,24 @@ final class ShipImpactProfiles {
         float x=col-hc,y=row-hr;
         float d=(float)StrictMath.hypot(x,y);
         if(d>1.30f)return 0;
-        if(kind==null||kind==Battle.DamageType.LASER)
+        if(kind==null)
             return pack(ShipDamageScorch.falloffAt(row,col,hr,hc,armor,internal,rough),0,0);
+        if(kind==Battle.DamageType.LASER){
+            // Cool, optically thin heat-oxide interference colors on the
+            // *surviving* plating around the actual laser strike. A charcoal
+            // center remains separate; the annulus extends only 1.27 cells.
+            // G carries gold -> bronze -> violet -> blue oxide phase while
+            // B>0.64 tags the annealing coefficient in the existing mask.
+            // No new textures, damage events, or per-frame animations.
+            float charred=ShipDamageScorch.falloffAt(
+                    row,col,hr,hc,armor,internal,rough);
+            float annulus=smooth(.37f,.62f,d)*
+                    (1f-smooth(1.05f,1.27f,d));
+            float strength=intensity*.72f*annulus;
+            if(strength<.005f)return pack(charred,0,0);
+            float oxidePhase=clamp(1f-smooth(.48f,1.30f,d)+rough*.035f);
+            return pack(charred,oxidePhase,.64f+.36f*strength);
+        }
         switch(kind){
             case KINETIC:{
                 boolean heavy=internal>.15f||armor>.86f;

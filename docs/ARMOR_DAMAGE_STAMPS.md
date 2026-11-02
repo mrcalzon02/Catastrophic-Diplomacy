@@ -351,3 +351,23 @@ produces lossless pixel differences, alongside untouched original 1280x720
 source framebuffer PNGs. This prevents claiming a different source hull or
 other faction's texture details are kinetic craters. The aesthetic
 distinction remains a nonblocking visual diagnostic.
+
+### Cooled laser annealing / interference oxide (second weapon-differentiation pass)
+
+Genuine laser impacts now retain a compact blackened core, plus a narrow,
+permanently cooled heat-affected zone on nearby **surviving armor plating**.
+The zone uses staggered straw-gold, bronze, purple and sapphire-blue interference
+tints resembling temper colors on heated metal. It is neither a bloom nor a
+ship-wide tint: full RGB source detail, normal/emissive art, source silhouette,
+and the actual armor cutout remain authoritative. It peaks just outside the
+physical hole and is zero beyond 1.27 directional grid cells, including on
+pristine / fully repaired ships. Non-laser effects keep their existing shapes.
+
+To maintain 200-versus-200 compatibility with no extra per-vessel texture, the
+same 96x144 RGBA mask multiplexes B=0..0.56 for ordinary raised silver metal
+and B=0.64..1 for laser oxidation; G is the oxide color phase **only** when the
+laser tag is present. The GLSL material pass mixes the tint against the actual
+source pixel rather than replacing it. All unchanged ships retain their original
+full-resolution artwork. Objective path/separation tests remain in the
+**nonblocking** ship-damage visual and surface shader diagnostics. Final color
+readability on original bright and dark hulls still requires real screenshots.

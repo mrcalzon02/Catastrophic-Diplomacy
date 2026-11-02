@@ -58,11 +58,23 @@ final class ShipSurfaceLighting implements Disposable {
         "  vec4 peel=texture2D(u_damage,v_uv);\n"+
         "  albedo.a*=peel.a;\n"+
         "  albedo.rgb*=1.0-0.54*peel.r;\n"+
-        "  albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
-        "  float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
-        "  float metalBoost=1.0-smoothstep(0.12,0.60,sourceLum);\n"+
-        "  float metalStrength=peel.b*mix(0.82,1.0,metalBoost);\n"+
-        "  albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
+        "  if(peel.b>0.62){\n"+
+        "   // Laser-annealed plating: gold/bronze/violet/blue interference oxide.\n"+
+        "   // The colored ring is permanent damage, not an emissive beam/glow.\n"+
+        "   float phase=peel.g;\n"+
+        "   vec3 oxide=mix(vec3(0.79,0.60,0.31),vec3(0.64,0.39,0.29),smoothstep(0.07,0.29,phase));\n"+
+        "   oxide=mix(oxide,vec3(0.49,0.35,0.66),smoothstep(0.30,0.57,phase));\n"+
+        "   oxide=mix(oxide,vec3(0.31,0.52,0.81),smoothstep(0.59,0.88,phase));\n"+
+        "   float anneal=clamp((peel.b-0.64)/0.36,0.0,1.0);\n"+
+        "   float luma=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
+        "   albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.35+0.22*smoothstep(0.06,0.70,luma)));\n"+
+        "  }else{\n"+
+        "   albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
+        "   float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
+        "   float metalBoost=1.0-smoothstep(0.12,0.60,sourceLum);\n"+
+        "   float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost);\n"+
+        "   albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
+        "  }\n"+
         " }\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
         " if(u_detail<0.01){gl_FragColor=albedo;return;}\n"+

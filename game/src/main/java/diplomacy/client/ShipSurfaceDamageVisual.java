@@ -88,7 +88,17 @@ final class ShipSurfaceDamageVisual {
         return (r<<24)|(g<<16)|(b<<8)|a;
     }
 
-    /** R=dark, G=thermal, B=sheared silver, A=remaining plating. */
+    /**
+     * The B channel holds either ordinary bright sheared metal (0..0.56)
+     * or tagged laser annealing (0.64..1.0). The 0.08 gap makes the two
+     * materials unambiguous at actual mask texel centers. Do not add a
+     * second per-ship material texture for a cosmetic heat-oxide effect.
+     */
+    static float blueCoefficient(float value,boolean laserAnneal){
+        return clamp(value)*(laserAnneal?1f:.56f);
+    }
+
+    /** R=dark, G=thermal or laser oxide phase, B=metal or anneal, A=plating. */
     static int maskPixel(float dark,float opening,float heat,float metal){
         return Math.round(clamp(dark)*255f)<<24|
                 Math.round(clamp(heat)*255f)<<16|

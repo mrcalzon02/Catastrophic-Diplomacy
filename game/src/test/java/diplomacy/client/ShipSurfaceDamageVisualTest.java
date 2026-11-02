@@ -116,7 +116,22 @@ public final class ShipSurfaceDamageVisualTest {
         int laser=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
                 8,8,8,8,1,1,17,0);
         check(ShipImpactProfiles.metal(laser)==0,
-                "Approved laser scorch must not inherit kinetic silver");
+                "Laser char center must retain its compact blackened appearance");
+        // Actual surviving plating immediately outside a deep crater MUST
+        // retain a visible cooling oxide band; a laser is not a kinetic dent.
+        int annealed=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
+                8,9.04f,8,8,1,1,17,0);
+        check(ShipImpactProfiles.metal(annealed)>164&&ShipImpactProfiles.hot(annealed)>0,
+                "Surviving laser-heated plating lacks iridescent oxidation data");
+        check(ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
+                8,9.30f,8,8,1,1,17,0)==0,
+                "Laser oxidation must not tint plating outside its 1.27-cell footprint");
+        check(ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.LASER,
+                8,9.04f,8,8,0,0,17,0)==0,
+                "Laser oxide must not persist on a pristine ship");
+        check(ShipSurfaceDamageVisual.blueCoefficient(1f,false)==.56f &&
+                ShipSurfaceDamageVisual.blueCoefficient(1f,true)==1f,
+                "Tagged laser oxide and kinetic metal must occupy different material ranges");
         // In all severity states, char -> soot -> heat must fade to the
         // EXACT original source pixel before reaching the neighboring tile.
         for(float severity:new float[]{.2f,.5f,1f}){
