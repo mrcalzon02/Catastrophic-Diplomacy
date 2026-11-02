@@ -104,9 +104,9 @@ with actual combat time and overlapping physical firing commitments:
 
 | Load | Physical schedule | What to compare |
 |---|---|---|
-| INCIDENTAL | One attacker, short firing opportunities spaced 105 simulation ticks; no restocking | Isolated interception, first-alert timing, wasting PD energy on one small threat |
+| INCIDENTAL | One attacker (four staggered sources for mixed threats), short firing opportunities spaced 150 simulation ticks; no restocking | Isolated interception, first-alert timing, wasting PD energy on one small threat |
 | SURGE | Four simultaneous launch platforms; one opening salvo/short firing window; then projectile flight | PD acquisition/target prioritization under overload, full-size 16-round siege rocket penetration, leakage despite multiple PD modules |
-| SUSTAINED | Four attackers authorized to fire for 660 ticks (22 seconds) under their actual reloads and finite supplies; 300 ticks (10 seconds) to resolve flight | Early/middle/late interception throughput, reactor and heat headroom, physical reload fatigue, stock depletion, terminal survival |
+| SUSTAINED | Four attackers authorized to fire for 1,800 ticks (60 seconds), long enough for multiple physical siege reloads, under finite supplies; 300 ticks (10 seconds) to resolve flight | Early/middle/late interception throughput, reactor and heat headroom, physical reload fatigue, stock depletion, terminal survival |
 
 Each condition includes six initially configured ship-launched threats:
 Kinetic, guided missile, guided torpedo, 16-round siege rockets with both
@@ -136,11 +136,14 @@ records remaining stock. It NEVER adds free ammunition mid-engagement.
 `core/test-output/pd-load-profiles/profiles.csv` reports each simulation's
 actual projectile/craft launches, real kills, terminal-zone entries,
 actual hull impacts, physical flight timeouts, remaining unresolved bodies,
-shot activity and kills during the 0–220, 220–440, 440–660 and 660–960-tick
-windows, observed minimum reactor fraction and peak heat, hull loss and
+shot activity and kills during the 0–600, 600–1,200, 1,200–1,800 and
+1,800–2,100-tick windows, observed minimum reactor fraction and peak heat,
+actual PD craft kills separately from fuel-expired craft, hull loss and
 kinetic/missile/torpedo stores physically consumed. These time buckets
 measure **event-time throughput**, NOT cohort-specific kill fractions; total
 run totals are the appropriate denominators for overall interception ratios.
+Incidental and surge cases stop after their shorter firing windows and a
+300-tick physical flight drain instead of simulating empty minutes.
 `summary.md` provides side-by-side comparisons and reports any diagnostic
 errors without converting balance targets into release blockers.
 
@@ -157,7 +160,7 @@ now executes all three diagnostics as independent, `continue-on-error` steps:
 `gradle --no-daemon :core:pdThreatMatrixDiagnostic`, and
 `gradle --no-daemon :core:pdLoadProfileDiagnostic`.
 
-Both run automatically when relevant core source changes on `main`,
+All three run automatically when relevant core source changes on `main`,
 or through the workflow's existing manual dispatch. Outputs are uploaded
 together (when produced) as
 `full-point-defense-interception-matrix`:
