@@ -401,3 +401,19 @@ removes that premature cut-off, maintains the absolute 1.30-cell bound,
 and strengthens only the darker fracture-side relief. The new nonblocking
 geometry diagnostic checks an outer radial crack sample on surviving armor.
 Actual visual readability awaits the next OpenGL screenshots.
+
+### Laser first-frame correction (real OpenGL evidence)
+
+First oxide capture `laser-scoring` (run 41504116639, original Vaerith
+source art) showed 415 tagged oxide mask texels and 3,521 changed framebuffer
+RGB pixels versus the old scorch treatment. Thus the new color is reaching
+real original ship plating. It also exposed a white/silver contour from
+bilinear interpolation of the tagged B channel: at the ring boundary, a
+fractional anneal tag was mistakenly interpreted as kinetic silver.
+The nonlaser cooler-metal branch now suppresses that stray silver where a
+thermal coefficient remains; kinetic-only sharp metal (G=0) is unchanged,
+and hot explosive chips remain primarily orange instead of chrome.
+The oxide field's outer falloff shrinks to 1.17 cells (from 1.27) and its
+source-color blend softens, without modifying any damage physics. This
+is an actual-capture-driven cosmetic adjustment, not an approved final result;
+the new run must be inspected before evaluating the fix.

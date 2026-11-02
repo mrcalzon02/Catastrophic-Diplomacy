@@ -144,7 +144,8 @@ public final class ShipSurfaceDamageVisualTest {
         // diagnostic, not the functional release's shipSurfaceSmoke gate.
         for(String token:new String[]{"if(peel.b>0.62)",
                 "float anneal=clamp((peel.b-0.64)/0.36",
-                "vec3 oxide=mix(","metalStrength=clamp(peel.b/0.56"})
+                "vec3 oxide=mix(","float coolMetal=1.0-smoothstep(0.005,0.08,peel.g)",
+                "metalStrength=clamp(peel.b/0.56"})
             check(ShipSurfaceLighting.FRAGMENT.contains(token),
                     "Laser temper / kinetic metal shader path missing: "+token);
         // In all severity states, char -> soot -> heat must fade to the

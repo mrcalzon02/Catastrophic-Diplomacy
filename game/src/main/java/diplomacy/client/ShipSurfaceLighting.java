@@ -67,12 +67,16 @@ final class ShipSurfaceLighting implements Disposable {
         "   oxide=mix(oxide,vec3(0.31,0.52,0.81),smoothstep(0.59,0.88,phase));\n"+
         "   float anneal=clamp((peel.b-0.64)/0.36,0.0,1.0);\n"+
         "   float luma=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
-        "   albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.35+0.22*smoothstep(0.06,0.70,luma)));\n"+
+        "   albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.25+0.17*smoothstep(0.06,0.70,luma)));\n"+
         "  }else{\n"+
         "   albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
         "   float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
         "   float metalBoost=1.0-smoothstep(0.12,0.60,sourceLum);\n"+
-        "   float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost);\n"+
+        "   // Bilinear sampling of tagged oxide edges must not turn into\n"+
+        "   // an invented, blinding silver kinetic rim. Thermal shrapnel\n"+
+        "   // remains warm while unheated kinetic fractures stay chrome.\n"+
+        "   float coolMetal=1.0-smoothstep(0.005,0.08,peel.g);\n"+
+        "   float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost)*coolMetal;\n"+
         "   albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
         "  }\n"+
         " }\n"+

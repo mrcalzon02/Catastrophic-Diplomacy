@@ -99,8 +99,8 @@ final class ShipImpactProfiles {
             float charred=ShipDamageScorch.falloffAt(
                     row,col,hr,hc,armor,internal,rough);
             float annulus=smooth(.37f,.62f,d)*
-                    (1f-smooth(1.05f,1.27f,d));
-            float strength=intensity*.72f*annulus;
+                    (1f-smooth(.98f,1.17f,d));
+            float strength=intensity*.50f*annulus;
             if(strength<.005f)return pack(charred,0,0);
             float oxidePhase=clamp(1f-smooth(.48f,1.30f,d)+rough*.035f);
             return pack(charred,oxidePhase,.64f+.36f*strength);
