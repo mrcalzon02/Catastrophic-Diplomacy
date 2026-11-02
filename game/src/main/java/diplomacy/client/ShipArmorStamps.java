@@ -58,14 +58,14 @@ final class ShipArmorStamps {
         int largeHash=hash^(largeSector*0x7f4a7c15);
         largeHash^=largeHash>>>16;
         float coarse=((largeHash&255)/255f-.50f)*.30f;
-        float largeJag=(.11f+coarse)*largeTooth;
+        float largeJag=(coarse*1.20f-.04f)*largeTooth;
         float finePhase=sectorAngle*9f;
         int fineSector=(int)StrictMath.floor(finePhase);
         float fineTooth=1f-2f*Math.abs(
                 finePhase-(float)StrictMath.floor(finePhase)-.5f);
         int fineHash=hash^(fineSector*0x6c8e9cf5);
         fineHash^=fineHash>>>13;
-        float fineJag=(((fineHash>>>8&255)/255f)-.50f)*.22f*fineTooth;
+        float fineJag=(((fineHash>>>8&255)/255f)-.50f)*.28f*fineTooth;
         float edge=Math.min(1.27f,(.22f+.61f*peeled+.27f*puncture)*
                 Math.max(.88f,Math.min(1.21f,1f+largeJag+fineJag)));
         float torn=depth*clamp((edge-radius)/.075f);
