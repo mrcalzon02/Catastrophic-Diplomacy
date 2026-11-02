@@ -17,8 +17,8 @@ on:
 permissions:
   contents: read
 
-# Standalone functional proof. No workflow concurrency, publication, or
-# cosmetic release gates; it survives routine unrelated main-branch changes.
+# Standalone functional proof. Supersede outdated push revisions, but keep
+# manual runs independent; cosmetic diagnostics never gate publication.
 # Latest push wins for this diagnostic. An explicit manual run has a
 # unique concurrency group and never cancels either another manual run
 # or a release. No current balance/style diagnostic blocks publication.
