@@ -389,3 +389,15 @@ the same shooter alignment and fixed target pose. This changes only the optional
 no-AI screenshot fixture, never gameplay targeting or weapon behavior. Whether
 the new shot actually contacts brighter paint must be verified from the next
 physical OpenGL capture and reported honestly if it misses.
+
+### Fracture-end visibility after real framebuffer comparison
+
+The previous kinetic material-mask refinement changed 1,008 source framebuffer
+pixels in the same-hull surface comparison, but the dark round hole remained
+visually dominant. Source inspection found a concrete cause: pockmark sampling
+exited at `radius + 0.34` even though raised fracture strokes were authored up
+to `radius + 0.46`. The remaining crack ends were never emitted. This iteration
+removes that premature cut-off, maintains the absolute 1.30-cell bound,
+and strengthens only the darker fracture-side relief. The new nonblocking
+geometry diagnostic checks an outer radial crack sample on surviving armor.
+Actual visual readability awaits the next OpenGL screenshots.

@@ -91,6 +91,14 @@ public final class ShipSurfaceDamageVisualTest {
                 "Kinetic needs dark pit with no thermal orange glow");
         check(ShipImpactProfiles.metal(rimChrome)>0,
                 "Kinetic must expose a raised bright metallic crater rim");
+        // Previous mask clipping prevented fracture spokes reaching plating
+        // farther outside the circular hole, even when the profile calculated
+        // those ends. This is a nonblocking cosmetic geometry diagnostic.
+        float ray=1.22f;
+        int fracture=ShipImpactProfiles.sample(diplomacy.sim.Battle.DamageType.KINETIC,
+                8f-ray*.88f,8f+ray*.47f,8f,8f,1f,1f,17,0);
+        check(ShipImpactProfiles.metal(fracture)>50,
+                "Heavy kinetic raised fracture is still clipped before its outer tip");
         // This is the actual failure that left every kinetic screenshot
         // apparently pristine: the old pock's R/G/B all fell INSIDE a
         // physically transparent ~0.82-cell alpha cutout. Check effects

@@ -43,7 +43,10 @@ final class ShipImpactProfiles {
         // to SURVIVING plating on the outside of the physical opening.
         float radius=Math.max((.22f+.23f*(float)StrictMath.sqrt(s))*scale,
                 physicalRadius);
-        if(r>Math.min(1.30f,radius+.34f*scale))return 0;
+        // Raised fracture spokes must extend beyond the circular rim.
+        // The old +.34 radius early-exit silently clipped strokes whose
+        // explicit ends reach +.46. Keep every sample within 1.30 cells.
+        if(r>Math.min(1.30f,radius+.52f*scale))return 0;
         float q=r/Math.max(.01f,radius);
         float dark=s*.75f*(1-smooth(.12f,.56f,q));
         float bright=s*.96f*smooth(.88f,1.04f,q)*
@@ -72,7 +75,7 @@ final class ShipImpactProfiles {
             float shadow=1f-smooth(.035f*scale,.18f*scale,
                     Math.abs(across-.16f*scale));
             bright=Math.max(bright,s*.96f*ridge*crest);
-            dark=Math.max(dark,s*.37f*ridge*shadow);
+            dark=Math.max(dark,s*.62f*ridge*shadow);
         }
         return pack(dark,0,bright);
     }
