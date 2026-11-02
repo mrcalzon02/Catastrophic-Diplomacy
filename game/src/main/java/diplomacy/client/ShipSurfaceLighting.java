@@ -107,20 +107,16 @@ final class ShipSurfaceLighting implements Disposable {
             throw new IllegalStateException("Required authored-source material maps missing: "+n+" / "+e);
         // Material layers must use the same LOD filtering as the original
         // authored hull image; trilinear filtering reduces distant shimmer.
-        Texture normal=new Texture(Gdx.files.internal(n),true);
+        Texture normal=ShipTextureSampling.load(n);
         Texture emissive=null;
         try {
-            emissive=new Texture(Gdx.files.internal(e),true);
+            emissive=ShipTextureSampling.load(e);
             if(normal.getWidth()!=emissive.getWidth()
                     ||normal.getHeight()!=emissive.getHeight()
                     ||normal.getWidth()>original.getWidth() || normal.getHeight()>original.getHeight()
                     ||Math.abs(normal.getWidth()/(float)original.getWidth()
                              -normal.getHeight()/(float)original.getHeight())>.015f)
                 throw new IllegalStateException("Ship normal/emissive UV dimensions differ: "+path);
-            normal.setFilter(Texture.TextureFilter.MipMapLinearLinear,
-                    Texture.TextureFilter.Linear);
-            emissive.setFilter(Texture.TextureFilter.MipMapLinearLinear,
-                    Texture.TextureFilter.Linear);
             pairs.put(original,new Pair(normal,emissive));
         }catch(RuntimeException failure){
             normal.dispose();if(emissive!=null)emissive.dispose();

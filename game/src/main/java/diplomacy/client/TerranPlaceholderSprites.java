@@ -44,7 +44,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             int w=texture.getWidth(),h=texture.getHeight();
             for(;;){
                 bytes+=(long)w*h*4;
-                if(w==1&&h==1)break;
+                if(!ShipTextureSampling.mipmapsAvailable()||(w==1&&h==1))break;
                 w=Math.max(1,w/2);h=Math.max(1,h/2);
             }
         }
@@ -519,9 +519,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(image==null){
             try{
                 // Actual GPU mip levels; close-up remains the original RGBA PNG.
-                image=new Texture(Gdx.files.internal(path),true);
-                image.setFilter(Texture.TextureFilter.MipMapLinearLinear,
-                        Texture.TextureFilter.Linear);
+                image=ShipTextureSampling.load(path);
                 resident.put(path,image);
                 originals.put(image,path);
                 peakResidentOriginalTextures=Math.max(peakResidentOriginalTextures,resident.size());
