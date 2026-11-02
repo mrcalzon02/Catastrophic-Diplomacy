@@ -192,6 +192,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final boolean verifyDemo;
     /** Hidden, debug-APK-only comparison of real armor/structure render states. */
     private final boolean verifySurfaceReview;
+    /** Explicitly requested CI capture directory, absent in normal gameplay. */
+    private final String armorCaptureDirectory=System.getenv("CD_ARMOR_CAPTURE_DIR");
+    private int armorCaptureFrame,armorCaptureStage;
     private final Runnable updateCheck;
     private long verifiedSequence;
     private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads,peakShieldEvents,peakShieldDrawn;
@@ -2532,6 +2535,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
             battleCamera.position.set(cinematic.centerX(),cinematic.centerY(),0);
             battleCamera.update();
         }else updateBattleCamera();
+        if(verifySurfaceReview && armorCaptureDirectory!=null &&
+                !armorCaptureDirectory.isBlank() && armorCaptureStage>0 && armorCaptureStage<=4){
+            // Detailed camera views move only the camera; damage remains
+            // authoritative 16x16 impact-grid state in the actual renderer.
+            Battle.Ship subject=battle.ships().get(armorCaptureStage-1);
+            battleCamera.position.set((float)subject.x,(float)subject.y,0);
+            battleCamera.zoom=.32f;
+            battleCamera.update();
+        }
         if (audio != null) audio.advance(battle,battleCamera.position.x,
                 battleCamera.position.y,battleCamera.zoom,
                 running && !tacticalMenuOpen && !shipyard.open()
@@ -2946,6 +2958,37 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         }
         if(verifyDemo)verifyRenderedDemoFrame();
+        captureArmorFramebuffer();
+    }
+
+    /** Real completed OpenGL game frames, never generated image mockups. */
+    private void captureArmorFramebuffer(){
+        if(!verifySurfaceReview || armorCaptureDirectory==null ||
+                armorCaptureDirectory.isBlank())return;
+        if(++armorCaptureFrame<12)return;
+        if(visibleSpriteShips()!=4 || terranSprites.maskTextureUploads()<3)
+            throw new IllegalStateException("Armor capture requires four approved hull sprites and three damaged-surface masks");
+        final String[] names={"01-overview-armor-stages.png","02-intact.png",
+                "03-armor-scored.png","04-exposed-metal.png","05-penetrated.png"};
+        int width=Gdx.graphics.getBackBufferWidth();
+        int height=Gdx.graphics.getBackBufferHeight();
+        byte[] rgba=com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(
+                0,0,width,height,true);
+        com.badlogic.gdx.graphics.Pixmap image=new com.badlogic.gdx.graphics.Pixmap(
+                width,height,com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+        try{
+            image.getPixels().put(rgba);
+            com.badlogic.gdx.graphics.PixmapIO.writePNG(
+                    Gdx.files.absolute(armorCaptureDirectory+"/"+names[armorCaptureStage]),image);
+        }finally{
+            image.dispose();
+        }
+        Gdx.app.log("CD-ARMOR-CAPTURE","FRAMEBUFFER "+names[armorCaptureStage]+
+                " "+width+"x"+height+" sprites="+visibleSpriteShips()+
+                " masks="+terranSprites.maskTextureUploads());
+        armorCaptureFrame=0;
+        armorCaptureStage++;
+        if(armorCaptureStage==names.length)Gdx.app.exit();
     }
 
     private int visibleSpriteShips(){

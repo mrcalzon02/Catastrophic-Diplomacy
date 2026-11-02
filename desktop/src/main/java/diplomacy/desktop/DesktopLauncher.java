@@ -26,7 +26,11 @@ public final class DesktopLauncher {
         }
         DesktopReleaseUpdater updater=new DesktopReleaseUpdater(installedTag,
                 System.getProperty("os.name",""));
-        updater.checkForUpdates(false);
-        new Lwjgl3Application(new CatastrophicGame(updater::checkForUpdates,false), cfg);
+        // CI-only real-frame capture uses the same client and approved ship art.
+        String captureDirectory=System.getenv("CD_ARMOR_CAPTURE_DIR");
+        boolean captureArmor=captureDirectory!=null&&!captureDirectory.isBlank();
+        if(!captureArmor)updater.checkForUpdates(false);
+        Runnable updateHandler=captureArmor?null:updater::checkForUpdates;
+        new Lwjgl3Application(new CatastrophicGame(updateHandler,false,captureArmor),cfg);
     }
 }

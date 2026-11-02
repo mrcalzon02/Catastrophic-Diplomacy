@@ -13,6 +13,9 @@ on:
       - 'core/src/test/java/diplomacy/sim/ArmorBreachTelemetry.java'
       - 'core/build.gradle'
       - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageVisualTest.java'
+      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageFixture.java'
+      - 'game/src/main/java/diplomacy/client/CatastrophicGame.java'
+      - 'desktop/src/main/java/diplomacy/desktop/DesktopLauncher.java'
       - '.github/workflows/armor-damage-visual-diagnostic.yml'
   workflow_dispatch:
 permissions:
@@ -20,6 +23,7 @@ permissions:
 jobs:
   mask-diagnostic:
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -33,7 +37,33 @@ jobs:
         run: |
           mkdir -p test-output/armor-observation
           gradle --no-daemon :core:armorBreachTelemetry | tee test-output/armor-observation/lifetime.csv
-      - name: Preserve optional armor-readability measurements
+      - name: Capture real armor-stage desktop OpenGL screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libgl1 libopenal1
+          mkdir -p test-output/armor-observation/framebuffer
+          export CD_ARMOR_CAPTURE_DIR="$PWD/test-output/armor-observation/framebuffer"
+          export LIBGL_ALWAYS_SOFTWARE=1
+          export ALSOFT_DRIVERS=null
+          timeout --signal=INT --kill-after=10s 12m \
+            xvfb-run -a -s "-screen 0 1280x720x24" gradle --no-daemon :desktop:run \
+            2>&1 | tee test-output/armor-observation/framebuffer-run.log
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          root=Path("test-output/armor-observation/framebuffer")
+          names=["01-overview-armor-stages.png","02-intact.png",
+                 "03-armor-scored.png","04-exposed-metal.png","05-penetrated.png"]
+          for name in names:
+              data=(root/name).read_bytes()
+              assert data.startswith(bytes.fromhex("89504e470d0a1a0a")), name
+              width,height=struct.unpack(">II",data[16:24])
+              assert width>=1280 and height>=720 and len(data)>10000, (name,width,height,len(data))
+              print(f"PASS actual framebuffer: {name} ({width}x{height}, {len(data)} bytes)")
+          PY
+      - name: Preserve optional armor-readability measurements and framebuffer PNGs
         if: always()
         uses: actions/upload-artifact@v4
         with:
