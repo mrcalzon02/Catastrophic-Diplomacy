@@ -462,7 +462,13 @@ public final class TerranPlaceholderSprites implements Disposable {
                 int originalPixel=source.getPixel(x*source.getWidth()/MASK_W,
                         y*source.getHeight()/MASK_H);
                 int originalAlpha=originalPixel&255;
-                if(originalAlpha==0){output.drawPixel(localX,localY,0);continue;}
+                if(originalAlpha==0){
+                    // Background alpha belongs solely to original high-res art.
+                    // Keep the coefficient mask opaque here; otherwise coarse
+                    // 96x144 alpha samples erase thin authentic ship geometry.
+                    output.drawPixel(localX,localY,ShipSurfaceDamageVisual.maskPixel(0,0,0));
+                    continue;
+                }
                 double tileRow=(y+0.5)*GRID/MASK_H-0.5;
                 double tileCol=(x+0.5)*GRID/MASK_W-0.5;
                 // All three scorch bands remain within the struck tile's
