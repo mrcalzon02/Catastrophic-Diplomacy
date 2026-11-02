@@ -97,13 +97,65 @@ one-third penetration applies to missiles or fighters: the user's stated
 ~33% goal applies to **large, concentrated rocket barrages**. Guided missile,
 torpedo, kinetic and fighter targets require their own empirical comparison.
 
+## Operating-load benchmarks: incidental, surge, sustained
+
+The separate `PointDefenseLoadDiagnostic` extends the per-object matrix
+with actual combat time and overlapping physical firing commitments:
+
+| Load | Physical schedule | What to compare |
+|---|---|---|
+| INCIDENTAL | One attacker, short firing opportunities spaced 105 simulation ticks; no restocking | Isolated interception, first-alert timing, wasting PD energy on one small threat |
+| SURGE | Four simultaneous launch platforms; one opening salvo/short firing window; then projectile flight | PD acquisition/target prioritization under overload, full-size 16-round siege rocket penetration, leakage despite multiple PD modules |
+| SUSTAINED | Four attackers authorized to fire for 660 ticks (22 seconds) under their actual reloads and finite supplies; 300 ticks (10 seconds) to resolve flight | Early/middle/late interception throughput, reactor and heat headroom, physical reload fatigue, stock depletion, terminal survival |
+
+Each condition includes six initially configured ship-launched threats:
+Kinetic, guided missile, guided torpedo, 16-round siege rockets with both
+boost/coast and sustained-burn motors, and a mixed 4-lane battery of two
+guided/one kinetic/one rocket. (INCIDENTAL uses the real 4-round rack setting.)
+The load matrix additionally runs real fitted **interceptor** and **torpedo
+bomber** squadrons; their craft destruction, secondary ordnance, range and
+limited onboard fuel must be read separately.
+
+PD layout is an intentional variable:
+**FOUR_MOUNTS_ONE_HULL** versus **FOUR_INDEPENDENT_HULLS**. The engine currently
+aggregates all mounts on a single ship under one `pdReload` controller:
+four separately mounted PD-capable ships can therefore deliver more
+independent shot opportunities. These configurations have exactly four
+installed PD mounts, but different fire-control parallelism. The benchmark
+must reveal this rather than falsely asserting equivalence.
+
+Defenders use real fitted PD ranks 0 and IX, and every online seed receives
+a same-seed `HOLD_FIRE` control. All defensive ships have physical shields,
+armor, heat/power budgets, sensors and PD tracking/reload. High durability
+is used only to avoid premature enemy death invalidating the long test.
+Dumbfire rockets still follow their frozen launch bearing; no test modifies
+live interception balance coefficients. The laboratory provisions a finite
+paid-equivalent initial shared kinetic store for its real rocket rack and
+records remaining stock. It NEVER adds free ammunition mid-engagement.
+
+`core/test-output/pd-load-profiles/profiles.csv` reports each simulation's
+actual projectile/craft launches, real kills, terminal-zone entries,
+actual hull impacts, physical flight timeouts, remaining unresolved bodies,
+shot activity and kills during the 0–220, 220–440, 440–660 and 660–960-tick
+windows, observed minimum reactor fraction and peak heat, hull loss and
+kinetic/missile/torpedo stores physically consumed. These time buckets
+measure **event-time throughput**, NOT cohort-specific kill fractions; total
+run totals are the appropriate denominators for overall interception ratios.
+`summary.md` provides side-by-side comparisons and reports any diagnostic
+errors without converting balance targets into release blockers.
+
+The expected ~33% inner-defense penetration goal applies only to **large
+massed 16-round rockets**, not to single missile contacts or armed fighters.
+No fixed kill-percentage expectation may gate the release.
+
 ## How to run and retrieve
 
 Existing workflow:
 ` .github/workflows/rocket-pd-balance-diagnostic.yml `
-now executes both diagnostics as independent, `continue-on-error` steps:
+now executes all three diagnostics as independent, `continue-on-error` steps:
 `gradle --no-daemon :core:rocketPdBalanceDiagnostic` and
-`gradle --no-daemon :core:pdThreatMatrixDiagnostic`.
+`gradle --no-daemon :core:pdThreatMatrixDiagnostic`, and
+`gradle --no-daemon :core:pdLoadProfileDiagnostic`.
 
 Both run automatically when relevant core source changes on `main`,
 or through the workflow's existing manual dispatch. Outputs are uploaded
@@ -111,7 +163,8 @@ together (when produced) as
 `full-point-defense-interception-matrix`:
 `core/test-output/rocket-pd-balance/ladder.csv`,
 `saturation-sweep.csv`, and `summary.md`;
-`core/test-output/pd-interception-matrix/matrix.csv` and `summary.md`.
+`core/test-output/pd-interception-matrix/matrix.csv` and `summary.md`;
+`core/test-output/pd-load-profiles/profiles.csv` and `summary.md`.
 
 Do not claim percentages until the matching runner has actually produced
 the report. Keep all diagnostic tuning observational; functional errors,
