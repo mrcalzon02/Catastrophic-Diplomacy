@@ -2581,11 +2581,15 @@ public final class Battle {
             craft.y+=(ty-craft.y)/distance*movement;
         }
         if(craft.reload>0 || distance>profile.range()
-                || distance>profile.sensors()*weather.sensorFactor())return;
+                || (target!=null && distance>DeceptionProjection.fighterContactRange(
+                        target,profile.sensors(),weather.sensorFactor()))
+                || (intercept!=null && distance>profile.sensors()*weather.sensorFactor()))
+            return;
         if(profile.ammunition()>0&&craft.ammunition<=0)return;
         Ship carrier=findShip(craft.sourceId);
         double accuracy=profile.accuracy()*weather.accuracyFactor();
-        if(target!=null)accuracy*=(1-target.ecmStrength*target.ecmCondition);
+        if(target!=null)accuracy*=(1-target.ecmStrength*target.ecmCondition)
+                *DeceptionProjection.lockMultiplier(target,1.0);
         long shot=nextVisualShotId++;
         String shotName="FIGHTER_"+profile.weapon().name();
         if(profile.ammunition()>0)craft.ammunition--;
@@ -2595,7 +2599,15 @@ public final class Battle {
             radioFighter(carrier,CrewChatter.Event.FIGHTER_ATTACK);
         if(profile.weapon()==FighterModel.Weapon.CANNON){
             double heading=StrictMath.atan2(ty-craft.y,tx-craft.x);
-            if(random.nextDouble()>accuracy)heading+=(shot%2==0?0.32:-0.32);
+            if(random.nextDouble()>accuracy){
+                int ghosts=target==null?0:DeceptionProjection.falseContacts(target);
+                if(ghosts>0){
+                    int index=(int)Math.floorMod(shot,ghosts);
+                    heading=StrictMath.atan2(
+                            DeceptionProjection.ghostY(target,index,tick)-craft.y,
+                            DeceptionProjection.ghostX(target,index,tick)-craft.x);
+                }else heading+=(shot%2==0?0.32:-0.32);
+            }
             // Kinetic shot has its own flight time, integrity and swept collision.
             ProjectileModel.Spec spec=ProjectileModel.module(
                     carrier==null?Faction.TERRAN:carrier.faction,
@@ -2607,8 +2619,21 @@ public final class Battle {
                 || profile.weapon()==FighterModel.Weapon.PARTICLE){
             DamageType kind=profile.weapon()==FighterModel.Weapon.LASER
                     ?DamageType.LASER:DamageType.PARTICLE;
-            beams.add(new Beam(shot,tick,craft.x,craft.y,tx,ty,craft.team,kind));
-            if(random.nextDouble()<accuracy){
+            boolean landed=random.nextDouble()<accuracy;
+            double beamX=tx,beamY=ty;
+            if(!landed&&target!=null){
+                int ghosts=DeceptionProjection.falseContacts(target);
+                if(ghosts>0){
+                    int index=(int)Math.floorMod(shot,ghosts);
+                    beamX=DeceptionProjection.ghostX(target,index,tick);
+                    beamY=DeceptionProjection.ghostY(target,index,tick);
+                }else{
+                    beamX+=shot%2==0?35:-35;
+                    beamY+=shot%3==0?35:-35;
+                }
+            }
+            beams.add(new Beam(shot,tick,craft.x,craft.y,beamX,beamY,craft.team,kind));
+            if(landed){
                 if(intercept!=null)hitCraft(intercept,profile.damage(),carrier,shot,shotName);
                 else hit(target,profile.damage(),carrier,kind,shot,tx,ty);
             }

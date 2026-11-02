@@ -181,6 +181,16 @@ public final class SensingModulesTest {
         enemy.maxHull=140;
         require(!duel.hasTargetContact(spotter,enemy,430),
                 "Tiny unpowered escort must not inherit capital visual range");
+        enemy.maxHull=550;enemy.radarCrossSection=1;enemy.power=70;
+        enemy.opticalSignature=1;
+        double fighterNormal=DeceptionProjection.fighterContactRange(enemy,540,1);
+        enemy.radarCrossSection=.12;enemy.opticalSignature=.2;
+        double fighterStealth=DeceptionProjection.fighterContactRange(enemy,540,1);
+        require(fighterStealth<fighterNormal,
+                "Radar-suppressed cloaked hull must disrupt actual fighter acquisition");
+        enemy.power=0;
+        require(DeceptionProjection.fighterContactRange(enemy,540,1)>fighterStealth,
+                "Destroying cloak power must restore ordinary fighter optical contact");
         System.out.println("PASS sensing module fittings, research, persistence and detection");
     }
 }

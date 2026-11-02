@@ -69,6 +69,20 @@ public final class DeceptionProjection {
         return host!=null&&host.alive()&&host.opticalSignature<.995
                 &&host.power>4&&host.ecmCondition>.15;
     }
+    /** Independent fighter radar/optical acquisition. Carrier targeting data
+     * can guide a fighter to an intercept, but cannot give its weapons an
+     * omniscient lock on a cloaked or radar-suppressed hull. */
+    public static double fighterContactRange(Battle.Ship target,
+                                             double radarRange,double weatherFactor){
+        if(target==null||radarRange<0||weatherFactor<0)
+            throw new IllegalArgumentException("Invalid fighter acquisition");
+        double rcs=StrictMath.max(.06,StrictMath.min(4,target.radarCrossSection));
+        double radar=radarRange*weatherFactor*StrictMath.sqrt(StrictMath.sqrt(rcs));
+        double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
+                StrictMath.sqrt(StrictMath.max(1,target.maxHull)/550)));
+        double optic=390*silhouette*(cloakActive(target)?target.opticalSignature:1);
+        return StrictMath.max(radar,optic);
+    }
     /** Ghosted original art remains visible to the PLAYER for tactical clarity.
      * Electronic sensors use the actual signature; this is visual presentation. */
     public static float hullOpacity(Battle.Ship host,long tick) {
