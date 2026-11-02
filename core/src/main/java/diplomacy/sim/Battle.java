@@ -1247,12 +1247,19 @@ public final class Battle {
                     (candidate.torpedoDamage>0&&candidate.torpedoAmmo>0))
                 return false;
         }
+        if(candidate.weaponsCondition>.05)
+            for(RocketBarrage.Rack rack:candidate.rocketRacks)
+                if((rack.salvoRemaining>0||rack.canStart()) &&
+                        candidate.kineticAmmo>=rack.cheapAmmoUnitsPerRocket)
+                    return false;
         if(candidate.fighterReserve>0&&candidate.fighterLaunchBays>0||
                 candidate.droneReserve>0)return false;
         for(Craft craft:crafts)
             if(craft.sourceId==candidate.id &&!craft.repair)return false;
         for(Missile missile:missiles)
             if(missile.sourceId==candidate.id)return false;
+        for(Rocket rocket:rockets)
+            if(rocket.sourceId==candidate.id)return false;
         for(Ballistic shell:ballistics)
             if(shell.sourceId==candidate.id)return false;
         return true;
