@@ -46,7 +46,7 @@ public final class DeceptionProjection {
         double strength=hologramStrength(target)/
                 StrictMath.max(.65,seekerQuality);
         if(roll>=StrictMath.min(.65,strength))return -1;
-        return (int)StrictMath.floorMod(v>>>32,contacts);
+        return (int)Math.floorMod(v>>>32,contacts);
     }
     /** Cloaks and image emitters are operating equipment, not perpetual
      * zero-cost passive buffs. Fitted, powered emitters debit the actual
