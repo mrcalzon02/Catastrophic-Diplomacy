@@ -534,7 +534,11 @@ public final class Shipyard {
         for(Part p:parts){
             mass+=p.mass;volume+=p.mass*1.5;heat+=p.heat;industry=Math.addExact(industry,p.industry);research=Math.addExact(research,p.research);
             draw+=p.power;
-            switch(p.base.subsystem) {
+            // Physical survival alternatives inherit their root engineering
+            // behavior. In particular, an overdrive variant must supply real
+            // reactor output before its power draw is budgeted; otherwise the
+            // ship reports a working generator that never actually generates.
+            switch(SurvivalHardwareCatalog.root(p.base.subsystem)) {
                 case "REA" -> generation+=p.effect*3.0;
                 case "PGO","JPB","IBR","IRG" -> generation+=p.effect*2.1;
                 case "RAD","IST" -> cooling+=p.effect*p.cooling*2.3;
