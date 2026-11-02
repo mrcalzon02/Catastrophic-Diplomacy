@@ -381,11 +381,14 @@ public final class GameMenuFlowTest {
         }
         for(int i=23;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
             float y=544-(i-23)*62;
-            check(GameMenuPanel.ordersAction(700,y,2)==2+i,
+            check(GameMenuPanel.ordersAction(700,y,2)==40+i,
                     "Touch-sized resource order cannot decrease setting "+i);
-            check(GameMenuPanel.ordersAction(1150,y,2)==2+i,
+            check(GameMenuPanel.ordersAction(1150,y,2)==40+i,
                     "Touch-sized resource order cannot increase setting "+i);
         }
+        check(GameMenuPanel.ordersAction(1040,60,2)==30&&
+                        GameMenuPanel.ordersAction(900,580,2)==31,
+                "Third resource page swallowed Back or Next navigation");
         check(GameMenuPanel.ordersAction(1120,505,0)==3,
                 "Original doctrine page no longer handles persistent caution");
         check(GameMenuPanel.ordersAction(385,376)==-1,
