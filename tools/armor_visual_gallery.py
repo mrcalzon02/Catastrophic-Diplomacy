@@ -34,7 +34,7 @@ for row in rows:
         structure=float(row["internal_exposure"])
         if row["milestone"]=="false":
             warnings.append(f"{row['scenario']}: requested combat milestone was not reached (tick {row['tick']})")
-        if row["scenario"] not in ("pristine","kinetic-pristine","kinetic-heavy-pristine","rectangle-stress"):
+        if row["scenario"]!="pristine" and not row["scenario"].endswith("-pristine") and row["scenario"]!="rectangle-stress":
             if hits<=2 and armor>=.99:
                 warnings.append(f"{row['scenario']}: local armor fully exposed after just {hits} hit(s)")
             if hits<=2 and structure>=.99:
@@ -43,7 +43,7 @@ for row in rows:
                 warnings.append("Shield contact also depleted physical armor")
         if armor>.01 and int(row["mask_uploads"])==0:
             warnings.append(f"{row['scenario']}: worn armor without any actual GPU mask upload")
-        if hits==0 and row["scenario"] not in ("pristine","kinetic-pristine","kinetic-heavy-pristine","rectangle-stress"):
+        if hits==0 and row["scenario"]!="pristine" and not row["scenario"].endswith("-pristine") and row["scenario"]!="rectangle-stress":
             warnings.append(f"{row['scenario']}: no actual weapon hits registered")
     # Scenario-local, individually downloadable artifact directory.
     folder=out/"individual"/row["scenario"]
@@ -87,7 +87,9 @@ contrast_pairs=(("kinetic-pristine","kinetic-impact"),
                 ("kinetic-aureate-pristine","kinetic-aureate"),
                 ("kinetic-zelthar-pristine","kinetic-zelthar"),
                 ("kinetic-aureate-upper-pristine","kinetic-aureate-upper"),
-                ("kinetic-terran-upper-pristine","kinetic-terran-upper"))
+                ("kinetic-terran-upper-pristine","kinetic-terran-upper"),
+                ("laser-terran-upper-pristine","laser-terran-upper"),
+                ("missile-terran-upper-pristine","missile-terran-upper"))
 contrast_metrics=[]
 for pristine,damaged in contrast_pairs:
     first=next((x for x in rows if x["scenario"]==pristine and x["view"]=="surface"),None)
