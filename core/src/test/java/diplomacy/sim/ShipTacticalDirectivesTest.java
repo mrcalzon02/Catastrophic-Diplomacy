@@ -17,12 +17,13 @@ public final class ShipTacticalDirectivesTest {
         rejects(()->d.withDefendSlot(0,200));
         rejects(()->d.withDefendSlot(0,2).withDefendSlot(1,2));
         var policy=ShipStandingOrders.DEFAULT;
-        // Legacy versions stored 14 fields and must still decode to sane defaults.
-        String v2=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,Map.of(0L,policy));
-        String[] lines=v2.split("\\n");
+        // New resource fields append to the 24-field tactical layout;
+        // legacy V1/V2 compatibility is exercised by ShipStandingOrdersTest.
+        String v3=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,Map.of(0L,policy));
+        String[] lines=v3.split("\\n");
         String[] values=lines[2].split(",");
-        ok(values.length==24,"Missing new saved order fields");
-        ok(ShipStandingOrdersCodec.decode(v2).policies().get(0L).equals(policy),
+        ok(values.length==30,"Missing six saved resource-fire fields");
+        ok(ShipStandingOrdersCodec.decode(v3).policies().get(0L).equals(policy),
                 "Extended orders lost in round trip");
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         Shipyard.Design ally=ScenarioCatalog.defaultDesign(ScenarioCatalog.Preset.DUEL,
