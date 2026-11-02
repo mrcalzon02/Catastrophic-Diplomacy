@@ -1,0 +1,138 @@
+package diplomacy.client;
+
+import diplomacy.shipyard.Shipyard;
+import diplomacy.sim.Battle;
+import diplomacy.sim.DirectionalDefense;
+import diplomacy.tech.TechnologyCatalog;
+
+/**
+ * Actual seeded weapon-lane evidence for the optional visual gallery.
+ * Every non-stress damaged target is produced by Battle.step(), with one
+ * physically fitted attacker and an unarmed fitted opponent. No painted
+ * damage states, altered HP, fake weapon events, or modified combat rules.
+ */
+final class ShipSurfaceDamageCapture {
+    private ShipSurfaceDamageCapture(){}
+    static final String[] KEYS={
+        "pristine", "shield-contact", "laser-scoring", "kinetic-impact",
+        "missile-splash", "laser-repeat", "armor-breach", "structure-hit",
+        "rectangle-stress"
+    };
+    static final long SEED=202611010140L;
+    record Snapshot(String key,String weapon,String hull,long seed,Battle battle,
+                    int targetId,int ticks,int hits,double armorExposure,
+                    double internalExposure,int wornCells,int exposedCells,
+                    boolean milestoneReached,boolean syntheticStress) {
+        Battle.Ship target(){
+            for(Battle.Ship ship:battle.ships())
+                if(ship.id==targetId)return ship;
+            throw new IllegalStateException("Capture target missing: "+key);
+        }
+    }
+    private static int firstWeaponSlot(Shipyard.Design design){
+        for(Shipyard.Slot slot:design.placements())
+            if(slot.mount()==Shipyard.Mount.WEAPON)return slot.index();
+        throw new IllegalStateException("No real weapon socket");
+    }
+    private static double maxArmor(Battle.Ship ship){
+        double result=0;
+        for(int r=0;r<DirectionalDefense.GRID;r++)
+            for(int c=0;c<DirectionalDefense.GRID;c++){
+                var cell=ship.defense.tile(r,c);
+                if(cell.occupied)result=Math.max(result,cell.exposure());
+            }
+        return result;
+    }
+    private static double maxInterior(Battle.Ship ship){
+        double result=0;
+        for(int r=0;r<DirectionalDefense.GRID;r++)
+            for(int c=0;c<DirectionalDefense.GRID;c++){
+                var cell=ship.defense.tile(r,c);
+                if(cell.occupied)result=Math.max(result,cell.internalDamage());
+            }
+        return result;
+    }
+    private static Snapshot record(String key,String weapon,long seed,
+                                   Battle battle,Battle.Ship ship,
+                                   boolean reached,boolean stress) {
+        int worn=0,exposed=0;
+        for(int r=0;r<DirectionalDefense.GRID;r++)
+            for(int c=0;c<DirectionalDefense.GRID;c++){
+                var cell=ship.defense.tile(r,c);
+                if(!cell.occupied)continue;
+                if(cell.exposure()>.01)worn++;
+                if(cell.exposure()>=.90||cell.internalDamage()>.01)exposed++;
+            }
+        return new Snapshot(key,weapon,ship.hullClass.name(),seed,battle,ship.id,
+                (int)battle.tick,battle.hitCount,maxArmor(ship),maxInterior(ship),
+                worn,exposed,reached,stress);
+    }
+    static Snapshot create(TechnologyCatalog technology,int index){
+        if(index<0||index>=KEYS.length)throw new IllegalArgumentException("Unknown armor case "+index);
+        if(index==KEYS.length-1){
+            // The former 6x6-cell image is a deliberately artificial STRESS test.
+            // Retain it so the workflow catches blocky-grid regressions.
+            Battle stress=ShipSurfaceDamageFixture.create(technology);
+            return record(KEYS[index],"KINETIC_GRID_STRESS",SEED,stress,
+                    stress.ships().get(2),true,true);
+        }
+        final String weapon=index==3||index==7?"KINETIC":
+                index==4?"MISSILE":"LASER";
+        final String suffix=weapon.equals("KINETIC")?"KIN":
+                weapon.equals("MISSILE")?"MSL":"LAS";
+        final Shipyard.Hull hull=index==4?Shipyard.Hull.FRIGATE:
+                index==7?Shipyard.Hull.DESTROYER:Shipyard.Hull.CORVETTE;
+        Shipyard.Design bare=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
+        Shipyard.Design shooter=bare.install(firstWeaponSlot(bare),"BASE-TER-"+suffix);
+        Shipyard.Design targetDesign=Shipyard.bareHull(Battle.Faction.VAERITH_PRISM,hull);
+        if(!Shipyard.inspect(shooter,technology).valid()||
+                !Shipyard.inspect(targetDesign,technology).valid())
+            throw new IllegalStateException("Live-fire capture needs real legal fitted hulls: "+weapon+"/"+hull);
+        long seed=SEED+(weapon.equals("KINETIC")?11:weapon.equals("MISSILE")?23:0);
+        Battle battle=new Battle(seed);
+        battle.spawnWing(0,shooter,technology,1,380,360);
+        battle.spawnWing(1,targetDesign,technology,1,660,360);
+        Battle.Ship gun=battle.ships().get(0),victim=battle.ships().get(1);
+        if(gun.laserDamage+gun.kineticDamage+gun.missileDamage<=0)
+            throw new IllegalStateException("Live-fire shooter lacks requested fitted weapon: "+weapon);
+        if(victim.laserDamage+victim.kineticDamage+victim.missileDamage+
+                victim.plasmaDamage+victim.particleDamage+victim.torpedoDamage>0)
+            throw new IllegalStateException("Live-fire target must remain unarmed");
+        gun.speed=0;gun.vx=gun.vy=0;
+        victim.speed=0;victim.vx=victim.vy=0;
+        victim.facing=Math.PI/2;
+        victim.name="LIVE FIRE "+KEYS[index].toUpperCase(java.util.Locale.ROOT);
+        // The shield contact scenario retains real shields. Other lanes
+        // disable recharge only in their disposable test battles so repeated
+        // ammunition can be observed against armor without changing gameplay.
+        if(index!=1){
+            victim.defense.disruptShields(victim.maxShields);
+            for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values())
+                victim.defense.configureRecharge(face,0,2);
+            victim.shields=victim.defense.totalShields();
+        }
+        if(index==0)return record(KEYS[index],weapon,seed,battle,victim,true,false);
+        boolean reached=false;
+        int maxSteps=(index>=6?1500:600);
+        for(int i=0;i<maxSteps&&!battle.finished();i++){
+            battle.step();
+            double armor=maxArmor(victim),interior=maxInterior(victim);
+            reached=switch(index){
+                case 1 -> battle.hitCount>=1;
+                case 2 -> battle.hitCount>=2&&armor>.01;
+                case 3 -> battle.hitCount>=3&&armor>.01;
+                case 4 -> battle.hitCount>=2&&armor>.01;
+                case 5 -> battle.hitCount>=10&&armor>.10;
+                case 6 -> armor>=.72;
+                case 7 -> interior>=.01;
+                default -> false;
+            };
+            // Never fabricate a surviving ship or repair a dead target simply
+            // to make an attractive image. Report an unmet milestone instead.
+            if(reached||!victim.alive()||victim.hull<=victim.maxHull*.15)break;
+        }
+        victim.shields=victim.defense.totalShields();
+        victim.armor=victim.defense.totalArmor();
+        return record(KEYS[index],weapon,seed,battle,victim,reached,false);
+    }
+}

@@ -107,3 +107,26 @@ functional hull HP, impact locations, repair and shielding are unchanged.
 
 The existing optional Android four-ship comparison must be re-captured for
 visual inspection; headless mask tests only validate structural invariants.
+
+
+## Repeatable live-fire framebuffer review (optional)
+
+The independent `armor-damage-visual-diagnostic.yml` now runs the actual desktop
+game under Mesa/Xvfb. `ShipSurfaceDamageCapture` creates deterministic fitted
+firing lanes (laser, kinetic, missile) and records `Battle.step()` hits and
+physical 16×16 armor state. These are NOT fake damage bitmaps. The original
+rectangular 6×6 tile fixture is intentionally retained under
+`rectangle-stress` only, to expose grid artifacts without mistaking it for
+ordinary battle damage.
+
+Artifacts include 1280×720 original PNG framebuffers at tactical and close
+zoom, `frames.csv` with seed/weapon/tick/hits/exposure/mask uploads,
+`armor-review-contact-sheet.png`, a pristine/laser difference image,
+`armor-review.json` and textual diagnostics. Cases that fail to reach a
+requested damage milestone are labeled as such, never silently fabricated.
+The contact sheet scales actual screenshots without generating replacement
+concept art.
+
+Only objective screenshot production and real simulation execution may fail
+the independent diagnostic. Pixel-art appearance, rectangularity, legibility,
+and balance are human-review observations and never dependencies of releases.

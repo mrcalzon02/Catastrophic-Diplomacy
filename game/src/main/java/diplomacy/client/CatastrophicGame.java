@@ -194,7 +194,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final boolean verifySurfaceReview;
     /** Explicitly requested CI capture directory, absent in normal gameplay. */
     private final String armorCaptureDirectory=System.getenv("CD_ARMOR_CAPTURE_DIR");
-    private int armorCaptureFrame,armorCaptureStage;
+    private int armorCaptureFrame,armorCaptureStage,armorCaptureView;
+    private ShipSurfaceDamageCapture.Snapshot currentArmorCapture;
     private final Runnable updateCheck;
     private long verifiedSequence;
     private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads,peakShieldEvents,peakShieldDrawn;
@@ -339,11 +340,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
             // populated by genuine DirectionalDefense impact calculations.
             // No generated diagrams, fake geometry or gameplay stat changes.
             screen=GameMenuPanel.Screen.BATTLE;
-            battle=ShipSurfaceDamageFixture.create(technology);
-            manualZoom=.88f;
+            if(armorCaptureDirectory!=null&&!armorCaptureDirectory.isBlank()){
+                selectArmorCapture(0);
+                Gdx.app.log("CD-SURFACE-VERIFY",
+                        "READY deterministic real Battle.step() live-fire gallery and labeled rectangle stress");
+            }else{
+                battle=ShipSurfaceDamageFixture.create(technology);
+                manualZoom=.88f;
+                Gdx.app.log("CD-SURFACE-VERIFY",
+                        "READY legacy 4-ship comparison (rectangle stress)");
+            }
             running=false;
-            Gdx.app.log("CD-SURFACE-VERIFY",
-                    "READY 4 fitted original sprites: INTACT / SCORCHED / EXPOSED / PENETRATED");
         }else if(verifyDemo){screen=GameMenuPanel.Screen.BATTLE;reset();}
         else{running=false;screen=GameMenuPanel.Screen.HOME;Gdx.app.log("CD-GAME-FLOW","MAIN_MENU");
             audio.announce(AnnouncerAudio.Cue.WELCOME);}
@@ -2535,13 +2542,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
             battleCamera.position.set(cinematic.centerX(),cinematic.centerY(),0);
             battleCamera.update();
         }else updateBattleCamera();
-        if(verifySurfaceReview && armorCaptureDirectory!=null &&
-                !armorCaptureDirectory.isBlank() && armorCaptureStage>0 && armorCaptureStage<=4){
-            // Detailed camera views move only the camera; damage remains
-            // authoritative 16x16 impact-grid state in the actual renderer.
-            Battle.Ship subject=battle.ships().get(armorCaptureStage-1);
+        if(currentArmorCapture!=null){
+            // Same actual renderer and physical target: only zoom changes.
+            Battle.Ship subject=currentArmorCapture.target();
             battleCamera.position.set((float)subject.x,(float)subject.y,0);
-            battleCamera.zoom=.32f;
+            float height=(float)(34*subject.visualScale());
+            battleCamera.zoom=armorCaptureView==0?Math.max(.32f,height/125f):
+                    Math.max(.16f,height/290f);
             battleCamera.update();
         }
         if (audio != null) audio.advance(battle,battleCamera.position.x,
@@ -2893,7 +2900,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             font.draw(batch,message,22,208-traffic*24);
             traffic++;
         }
-        if(verifySurfaceReview){
+        if(verifySurfaceReview && currentArmorCapture!=null){
+            font.setColor(Color.GOLD);
+            font.draw(batch,"REAL COMBAT DIAGNOSTIC: "+currentArmorCapture.key()+
+                    " / "+currentArmorCapture.weapon()+" TICK "+
+                    currentArmorCapture.ticks()+" HITS "+currentArmorCapture.hits(),24,610);
+        }else if(verifySurfaceReview){
             font.setColor(Color.GOLD);
             String[] labels={"INTACT", "ARMOR SCORED", "EXPOSED METAL", "PENETRATED"};
             for(int i=0;i<4;i++){
@@ -2961,15 +2973,34 @@ public final class CatastrophicGame extends ApplicationAdapter {
         captureArmorFramebuffer();
     }
 
-    /** Real completed OpenGL game frames, never generated image mockups. */
+    /** Setup a new self-contained seeded firing lane or explicit artificial stress. */
+    private void selectArmorCapture(int index){
+        currentArmorCapture=ShipSurfaceDamageCapture.create(technology,index);
+        battle=currentArmorCapture.battle();
+        running=false;
+        armorCaptureStage=index;
+        armorCaptureView=0;
+        armorCaptureFrame=0;
+        Gdx.app.log("CD-ARMOR-SCENARIO",
+                currentArmorCapture.key()+" weapon="+currentArmorCapture.weapon()+
+                " tick="+currentArmorCapture.ticks()+
+                " hits="+currentArmorCapture.hits()+
+                " exposure="+currentArmorCapture.armorExposure()+
+                " internal="+currentArmorCapture.internalExposure()+
+                " milestone="+currentArmorCapture.milestoneReached());
+    }
+
+    /** Original 1280x720 completed OpenGL game frames, not mockup art. */
     private void captureArmorFramebuffer(){
-        if(!verifySurfaceReview || armorCaptureDirectory==null ||
-                armorCaptureDirectory.isBlank())return;
+        if(!verifySurfaceReview||currentArmorCapture==null||
+                armorCaptureDirectory==null||armorCaptureDirectory.isBlank())return;
         if(++armorCaptureFrame<12)return;
-        if(visibleSpriteShips()!=4 || terranSprites.maskTextureUploads()<3)
-            throw new IllegalStateException("Armor capture requires four approved hull sprites and three damaged-surface masks");
-        final String[] names={"01-overview-armor-stages.png","02-intact.png",
-                "03-armor-scored.png","04-exposed-metal.png","05-penetrated.png"};
+        if(terranSprites==null||!terranSprites.hasSprite(currentArmorCapture.target()))
+            throw new IllegalStateException("Actual source-art target missing from framebuffer: "+
+                    currentArmorCapture.key());
+        String suffix=armorCaptureView==0?"tactical":"close";
+        String filename=String.format(java.util.Locale.ROOT,"%02d-%s-%s.png",
+                armorCaptureStage+1,currentArmorCapture.key(),suffix);
         int width=Gdx.graphics.getBackBufferWidth();
         int height=Gdx.graphics.getBackBufferHeight();
         byte[] rgba=com.badlogic.gdx.utils.ScreenUtils.getFrameBufferPixels(
@@ -2979,16 +3010,33 @@ public final class CatastrophicGame extends ApplicationAdapter {
         try{
             image.getPixels().put(rgba);
             com.badlogic.gdx.graphics.PixmapIO.writePNG(
-                    Gdx.files.absolute(armorCaptureDirectory+"/"+names[armorCaptureStage]),image);
-        }finally{
-            image.dispose();
-        }
-        Gdx.app.log("CD-ARMOR-CAPTURE","FRAMEBUFFER "+names[armorCaptureStage]+
-                " "+width+"x"+height+" sprites="+visibleSpriteShips()+
+                    Gdx.files.absolute(armorCaptureDirectory+"/"+filename),image);
+        }finally{image.dispose();}
+        String csv=String.format(java.util.Locale.ROOT,
+                "%s,%s,%s,%s,%s,%d,%d,%d,%.6f,%.6f,%d,%d,%s,%s,%d,%d,%d%n",
+                filename,currentArmorCapture.key(),suffix,currentArmorCapture.weapon(),
+                currentArmorCapture.hull(),currentArmorCapture.seed(),currentArmorCapture.ticks(),
+                currentArmorCapture.hits(),currentArmorCapture.armorExposure(),
+                currentArmorCapture.internalExposure(),currentArmorCapture.wornCells(),
+                currentArmorCapture.exposedCells(),currentArmorCapture.milestoneReached(),
+                currentArmorCapture.syntheticStress(),
+                terranSprites.maskTextureUploads(),terranSprites.maskPixelsUploaded(),
+                terranSprites.loaded());
+        com.badlogic.gdx.files.FileHandle report=Gdx.files.absolute(
+                armorCaptureDirectory+"/frames.csv");
+        if(!report.exists())report.writeString(
+                "file,scenario,view,weapon,hull,seed,tick,hits,armor_exposure,internal_exposure,worn_cells,exposed_cells,milestone,synthetic_stress,mask_uploads,mask_pixels,source_sprites\n",false);
+        report.writeString(csv,true);
+        Gdx.app.log("CD-ARMOR-CAPTURE","ACTUAL-FRAME "+filename+
+                " tick="+currentArmorCapture.ticks()+
+                " hits="+currentArmorCapture.hits()+
+                " milestone="+currentArmorCapture.milestoneReached()+
                 " masks="+terranSprites.maskTextureUploads());
         armorCaptureFrame=0;
-        armorCaptureStage++;
-        if(armorCaptureStage==names.length)Gdx.app.exit();
+        if(armorCaptureView==0)armorCaptureView=1;
+        else if(armorCaptureStage+1<ShipSurfaceDamageCapture.KEYS.length)
+            selectArmorCapture(armorCaptureStage+1);
+        else Gdx.app.exit();
     }
 
     private int visibleSpriteShips(){

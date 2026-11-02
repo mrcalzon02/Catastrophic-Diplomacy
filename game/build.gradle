@@ -337,3 +337,13 @@ tasks.register('ordnanceLibraryDiagnostic', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.OrdnanceLibrarySpritesTest'
 }
+
+
+// Separate, non-release-gating provenance verification for screenshot scenarios.
+tasks.register('shipDamageCaptureSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify seeded physically fired armor screenshot scenarios and stress labeling.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipSurfaceDamageCaptureTest'
+}

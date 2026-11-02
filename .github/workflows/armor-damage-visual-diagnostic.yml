@@ -14,6 +14,10 @@ on:
       - 'core/build.gradle'
       - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageVisualTest.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageFixture.java'
+      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageCapture.java'
+      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageCaptureTest.java'
+      - 'tools/armor_visual_gallery.py'
+      - 'docs/ARMOR_DAMAGE_STAMPS.md'
       - 'game/src/main/java/diplomacy/client/CatastrophicGame.java'
       - 'desktop/src/main/java/diplomacy/desktop/DesktopLauncher.java'
       - '.github/workflows/armor-damage-visual-diagnostic.yml'
@@ -23,7 +27,7 @@ permissions:
 jobs:
   mask-diagnostic:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -33,6 +37,8 @@ jobs:
       # Independent workflow: failures are visible here, NEVER a release dependency.
       - name: Inspect physical armor masks and cropped GPU updates
         run: gradle --no-daemon :game:shipDamageVisualSmoke
+      - name: Verify deterministic real-weapon screenshot scenarios
+        run: gradle --no-daemon :game:shipDamageCaptureSmoke
       - name: Measure actual time to armor exposure in fitted duels (diagnostic only)
         run: |
           mkdir -p test-output/armor-observation
@@ -42,7 +48,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libgl1 libopenal1
+          sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libgl1 libopenal1 python3-pil
           mkdir -p test-output/armor-observation/framebuffer
           export CD_ARMOR_CAPTURE_DIR="$PWD/test-output/armor-observation/framebuffer"
           export LIBGL_ALWAYS_SOFTWARE=1
@@ -50,19 +56,9 @@ jobs:
           timeout --signal=INT --kill-after=10s 12m \
             xvfb-run -a -s "-screen 0 1280x720x24" gradle --no-daemon :desktop:run \
             2>&1 | tee test-output/armor-observation/framebuffer-run.log
-          python3 - <<'PY'
-          from pathlib import Path
-          import struct
-          root=Path("test-output/armor-observation/framebuffer")
-          names=["01-overview-armor-stages.png","02-intact.png",
-                 "03-armor-scored.png","04-exposed-metal.png","05-penetrated.png"]
-          for name in names:
-              data=(root/name).read_bytes()
-              assert data.startswith(bytes.fromhex("89504e470d0a1a0a")), name
-              width,height=struct.unpack(">II",data[16:24])
-              assert width>=1280 and height>=720 and len(data)>10000, (name,width,height,len(data))
-              print(f"PASS actual framebuffer: {name} ({width}x{height}, {len(data)} bytes)")
-          PY
+          # Fail this optional workflow if actual captured evidence is missing.
+          # Artwork quality observations are report warnings, NEVER release gates.
+          python3 tools/armor_visual_gallery.py
       - name: Preserve optional armor-readability measurements and framebuffer PNGs
         if: always()
         uses: actions/upload-artifact@v4
