@@ -13,6 +13,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.DeceptionProjection;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.SensorLeadProjection;
+import diplomacy.sim.GuidedTrajectoryPrediction;
 import diplomacy.sim.RocketBarrage;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -237,6 +238,38 @@ final class SensorContactOverlay {
                             (float)pip.trajectoryX(1),(float)pip.trajectoryY(1));
                 }
                 count++;
+            }
+        }
+        // Up to three friendly, actually launched guided bodies. These
+        // trajectories use each body's last measured/noisy photon fix and
+        // paid propulsion. They NEVER reveal target truth or promise impact.
+        if(captain!=null&&world.zoom<=3.0f){
+            int guided=0;
+            for(Battle.Missile body:battle.missiles()){
+                if(guided>=3)break;
+                if(body.team!=team||body.sourceId!=captain.id||
+                        !view.circle((float)body.x,(float)body.y,100))
+                    continue;
+                GuidedTrajectoryPrediction.Forecast forecast=
+                        GuidedTrajectoryPrediction.predict(body,battle.tick);
+                if(forecast.path().size()<2)continue;
+                if(forecast.plausible())shapes.setColor(.52f,.80f,1f,.26f);
+                else shapes.setColor(.86f,.52f,.52f,.23f);
+                var route=forecast.path();
+                for(int p=1;p<route.size();p++){
+                    var from=route.get(p-1);var to=route.get(p);
+                    shapes.line((float)from.x(),(float)from.y(),
+                            (float)to.x(),(float)to.y());
+                }
+                float px=(float)forecast.estimatedTargetX();
+                float py=(float)forecast.estimatedTargetY();
+                if(view.circle(px,py,90)){
+                    float sigma=(float)StrictMath.min(90,forecast.uncertaintyRadius());
+                    shapes.circle(px,py,StrictMath.max(5f,sigma),24);
+                    shapes.line(px-4,py,px+4,py);
+                    shapes.line(px,py-4,px,py+4);
+                }
+                guided++;
             }
         }
         shapes.end();

@@ -542,9 +542,22 @@ Onboard multiple competing hypotheses, stochastic belief filters and
 moving-receiver light-cone history are not yet implemented.
 These limitations should not be reported as solved.
 
+**Guided trajectory forecast integration:** `GuidedTrajectoryPrediction`
+now numerically advances the actual friendly missile's current velocity
+through the same `OrdnancePropulsion` motor phases, steering laws, finite
+remaining delta-V and lifetime as its flight body, but only toward its last
+photon-delayed and noisy target hypothesis. A read-only closest-approach ETA,
+uncertainty envelope and at most 13 route points feed a maximum of three
+launching-ship guided trajectories on the battle HUD. These are hypothetical
+no-future-update paths, NOT enemy future truth, guaranteed hits or remote
+sensor permissions. Coasting/empty-fuel bodies receive no fictitious turns.
+Focused `guidedTrajectoryPredictionSmoke` is a required part of
+`sensorNetworkSmoke`; visual layout/balance remains advisory.
+
 **Still pending:** full fleet-visible timestamped false-contact packet dissemination,
 measured receiver-position histories, probabilistic multi-hypothesis
-seeker filtering and compute arbitration, actual guided trajectory envelopes/ETA pips, complete
+seeker filtering and compute arbitration, higher-fidelity guided trajectory
+envelopes with future onboard scan updates, complete
 200v200 balance/performance, maneuver covariance, fleet FCM shared-compute
 arbitration, beam light-time damage delivery and persisted scan doctrine
 controls. The rocket prediction is a constant-velocity TARGET hypothesis

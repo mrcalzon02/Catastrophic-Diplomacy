@@ -193,7 +193,15 @@ tasks.register('guidedSalvoCausalitySmoke', JavaExec) {
     mainClass = 'diplomacy.sim.GuidedSalvoCausalityTest'
     dependsOn testClasses
 }
+tasks.register('guidedTrajectoryPredictionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify measured-fix guided missile forecast, finite motor/fuel ETA, deception and no current-target oracle.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.GuidedTrajectoryPredictionTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
     dependsOn(tasks.named('guidedSalvoCausalitySmoke'))
     dependsOn(tasks.named('ordnanceSeekerPhotonSmoke'))
     dependsOn('ordnanceSeekerSmoke')
