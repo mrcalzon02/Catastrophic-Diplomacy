@@ -65,6 +65,15 @@ public final class SensorComputeBudget {
                 StrictMath.max(0,StrictMath.min(1,ship.sensorsCondition))*
                 ship.crewReadiness();
     }
+    /** A physically arrived hologram is NOT a separately targetable hull,
+     * but correlating its alternatives costs actual processor cycles.
+     * The target's own stored track occupies one normal slot; false contacts
+     * occupy additional hypotheses. No invented future ghost data enters. */
+    public static int competingHypotheses(int rememberedTracks,int emittedGhosts){
+        if(rememberedTracks<0||emittedGhosts<0)
+            throw new IllegalArgumentException("Invalid track/hypothesis count");
+        return StrictMath.min(32,StrictMath.max(0,rememberedTracks-1)+emittedGhosts);
+    }
     /** Age is received track age in simulation seconds (60 physical seconds
      * per combat second). Farther and older targets and competing remembered
      * hypotheses have a real, non-linear compute burden. */

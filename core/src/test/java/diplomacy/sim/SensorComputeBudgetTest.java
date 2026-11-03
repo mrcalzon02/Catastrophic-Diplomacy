@@ -76,8 +76,54 @@ public final class SensorComputeBudgetTest {
                 "Old distant multi-hypothesis contact is not computationally expensive");
         System.out.println("PASS RES/TRK/ACU compute throughput, CAP-only parallel slots and nonlinear age/range load");
     }
+    private static void historicalFalseComputeBudget(){
+        Battle battle=new Battle(93781);
+        Battle.Ship gun=battle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship ghost=battle.addShip(1,Battle.Faction.DRAXIAN,600,100);
+        battle.registerDiagnosticStationaryTarget(gun.id);
+        battle.registerDiagnosticStationaryTarget(ghost.id);
+        gun.sensorRange=800;gun.power=100;
+        ghost.ecmCondition=1;ghost.hologramNoise=.75;
+        ghost.maxPower=ghost.power=500;
+        for(int i=0;i<8;i++)battle.step();
+        var photons=SensorLightTimeHistory.receive(gun,ghost,battle.tick,
+                Battle.CONTACT_OPTICAL|Battle.CONTACT_RADAR,0);
+        require(photons!=null,"No historical observations for false-work test");
+        int extra=battle.targetingHypothesisLoad(gun,ghost,photons);
+        require(extra==3,"Three physically emitted phantoms must consume three hypothesis slots");
+        var quiet=SensorComputeBudget.solve(new SensorComputeBudget.State(),
+                gun,photons,battle.tick,500,1,0);
+        var crowded=SensorComputeBudget.solve(new SensorComputeBudget.State(),
+                gun,photons,battle.tick,500,1,extra);
+        require(crowded.requestedCost()>quiet.requestedCost()&&
+                        crowded.precision()<quiet.precision(),
+                "Arrived false contacts did not cost real finite compute");
+        require(SensorComputeBudget.competingHypotheses(35,3)==32,
+                "Competing hypotheses exceeded fixed compute bound");
+        ghost.power=0;ghost.hologramNoise=0;
+        battle.step();
+        var delayed=SensorLightTimeHistory.receive(gun,ghost,battle.tick,
+                Battle.CONTACT_OPTICAL|Battle.CONTACT_RADAR,0);
+        require(delayed!=null&&
+                battle.targetingHypothesisLoad(gun,ghost,delayed)==extra,
+                "Present emitter shutdown retroactively refunded historic compute");
+        boolean receivedShutdown=false;
+        for(int i=0;i<18;i++){
+            battle.step();
+            var report=SensorLightTimeHistory.receive(gun,ghost,battle.tick,
+                    Battle.CONTACT_OPTICAL|Battle.CONTACT_RADAR,0);
+            if(report!=null&&report.measuredTick()>8){
+                require(battle.targetingHypothesisLoad(gun,ghost,report)==0,
+                        "Newly arrived inactive emitter retained imaginary hypotheses");
+                receivedShutdown=true;break;
+            }
+        }
+        require(receivedShutdown,"Shutdown photons never entered fire-control workload");
+        System.out.println("PASS historical ghost hypotheses spend finite processing and shutdown refunds only after light delay");
+    }
     public static void main(String[] args){
         finiteOneTick();
         hardwareDifferentiation();
+        historicalFalseComputeBudget();
     }
 }

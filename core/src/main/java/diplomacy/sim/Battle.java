@@ -3116,6 +3116,21 @@ public final class Battle {
         double bow=point.x()*25.0,port=point.y()*19.0;
         return new SurfaceAim(target.x+bow*c-port*s,target.y+bow*s+port*c);
     }
+    /** Count alternative hypotheses from the ACTUALLY MEASURED emission
+     * epoch. Present emitter power/ECM cannot adjust earlier solve cost.
+     * The generated workload is capped independently of CAP engagement slots. */
+    int targetingHypothesisLoad(Ship observer,Ship intended,
+                                SensorLightTimeHistory.Observation measured){
+        if(observer==null||intended==null||measured==null||
+                measured.receivedTick()>tick)
+            throw new IllegalArgumentException("Targeting requires received photons");
+        SensorLightTimeHistory.Profile profile=
+                intended.sensorHistory.profileAt(measured.measuredTick());
+        if(profile==null)throw new IllegalArgumentException("Expired emitter epoch");
+        return SensorComputeBudget.competingHypotheses(
+                observer.knownTracks.size(),DeceptionProjection.falseContacts(profile));
+    }
+
     /** Historical aiming fixes an immutable ray; only a LATER physically
      * arriving photon front can intersect actual moving hull geometry. */
     private void emitMainBeam(Ship shooter,Ship intended,
@@ -3126,7 +3141,7 @@ public final class Battle {
         SensorComputeBudget.Allocation allocation=SensorComputeBudget.solve(
                 shooter.targetCompute,shooter,track,tick,observedRange,
                 tacticalPrecision(shooter),
-                StrictMath.max(0,shooter.knownTracks.size()-1));
+                targetingHypothesisLoad(shooter,intended,track));
         SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                 track,tick,muzzle.x(),muzzle.y(),
                 1_000_000_000.0,allocation.precision(),shotId);
@@ -3363,7 +3378,7 @@ public final class Battle {
             SensorComputeBudget.Allocation work=SensorComputeBudget.solve(
                     s.targetCompute,s,firingFix,tick,distance,
                     tacticalPrecision(s),
-                    StrictMath.max(0,s.knownTracks.size()-1));
+                    targetingHypothesisLoad(s,target,firingFix));
             SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                     firingFix,tick,muzzle.x(),muzzle.y(),body.speed(),
                     work.precision(),shotId);
@@ -3468,7 +3483,7 @@ public final class Battle {
             SensorComputeBudget.Allocation budget=SensorComputeBudget.solve(
                     ship.targetCompute,ship,firingFix,tick,distance,
                     tacticalPrecision(ship),
-                    StrictMath.max(0,ship.knownTracks.size()-1));
+                    targetingHypothesisLoad(ship,target,firingFix));
             long solutionId=1L+ship.id*1_000_003L+
                     ((long)rack.slot)*137L+tick*31L;
             SensorTargetingSolution.Solution estimate=

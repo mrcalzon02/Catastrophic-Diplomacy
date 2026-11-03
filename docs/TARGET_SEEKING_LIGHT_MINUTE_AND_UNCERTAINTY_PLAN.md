@@ -592,6 +592,15 @@ causality leak following the timestamped false-contact and finite photon-beam
 changes. Lock scoring remains a balance law rather than a full probabilistic
 hypothesis fusion solver.
 
+**Observed false hypotheses now impose physical compute cost:** The existing
+finite target-solution processor receives additional competition from
+historically emitted holographic alternatives, not the opponent's present
+hologram state. Main-beam, kinetic and unguided rocket solutions all pay
+for extra observed alternatives and lose precision when overloaded.
+Shutdown information only removes that burden after its photons arrive.
+This stage does not claim probability-weighted hypothesis fusion or
+remote false-report deduplication.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 measured receiver-position histories, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
