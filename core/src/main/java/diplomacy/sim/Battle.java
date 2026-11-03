@@ -757,12 +757,14 @@ public final class Battle {
     private double diagnosticRocketPdPressure;
     /** Laboratory-only propulsion sensitivity; production stays neutral. */
     private double diagnosticSustainedRocketThrustMultiplier=1.0;
-    /** Zero keeps normal per-socket tracking unchanged; diagnostics can
-     * measure finite track-processing capacity without altering hit RNG. */
-    private int diagnosticPrecisionTracksPerMount;
-    /** Laboratory-only routing efficiency between parallel (0.5) and
-     * serial (1.0) optical-track service. */
-    private double diagnosticPrecisionTrackExponent=.5;
+    /** Four simultaneously serviced incoming physical tracks per fitted
+     * precision emitter. Crowded fire control spends more time acquiring
+     * targets; it never forces a miss or grants a free interception. A
+     * laboratory override may set zero for the pre-overload control. */
+    private int diagnosticPrecisionTracksPerMount=4;
+    /** Measured intermediate parallel/serial scheduling under saturation;
+     * laboratory trials can override, all multipliers remain <=4x. */
+    private double diagnosticPrecisionTrackExponent=.90;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
