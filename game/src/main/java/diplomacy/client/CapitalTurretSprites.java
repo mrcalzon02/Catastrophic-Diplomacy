@@ -48,6 +48,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case FLAK -> 5; // Existing dedicated fitted flak turret art cell.
             case ROTARY_CIWS -> 10; // Actual authored small kinetic rotary turret cell.
             case RAIL_PD -> 11; // Heavy authored rail cannon, not a laser barrel.
+            case PARTICLE_PD -> 3; // Existing authored particle-beam projector barrel.
         };
     }
     /** Actual fitted component suffix distinguishes flak from rotary PD.
@@ -58,6 +59,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
         if(id.endsWith("-FLK"))return 5;
         if(id.endsWith("-RCW"))return 10;
         if(id.endsWith("-RPD"))return 11;
+        if(id.endsWith("-PPD"))return 3;
         if(id.endsWith("-PD"))return 6;
         if(emitter.family()==WeaponMuzzles.Family.KINETIC && hull!=null)
             return switch(hull.spriteHull()){
@@ -77,6 +79,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
         float value=(6.4f/3f)*shipScale;
         if(family==WeaponMuzzles.Family.POINT_DEFENSE)value*=.75f;
         if(family==WeaponMuzzles.Family.ROTARY_CIWS)value*=.82f;
+        if(family==WeaponMuzzles.Family.PARTICLE_PD)value*=.85f;
         if(family==WeaponMuzzles.Family.RAIL_PD)value*=1.02f;
         if(family==WeaponMuzzles.Family.TORPEDO)value*=1.14f;
         return value;
@@ -140,6 +143,12 @@ public final class CapitalTurretSprites implements AutoCloseable {
                     for(diplomacy.sim.RotaryPointDefense.Mount rcw:ship.rotaryMounts)
                         if(rcw.slotId==mount.slotId()&&Double.isFinite(rcw.bearing)){
                             turretAngle=spriteAngle((float)StrictMath.toDegrees(rcw.bearing));
+                            break;
+                        }
+                if(mount.family()==WeaponMuzzles.Family.PARTICLE_PD)
+                    for(diplomacy.sim.ParticlePointDefense.Mount particle:ship.particlePdMounts)
+                        if(particle.slotId==mount.slotId()&&Double.isFinite(particle.bearing)){
+                            turretAngle=spriteAngle((float)StrictMath.toDegrees(particle.bearing));
                             break;
                         }
                 if(mount.family()==WeaponMuzzles.Family.RAIL_PD)
