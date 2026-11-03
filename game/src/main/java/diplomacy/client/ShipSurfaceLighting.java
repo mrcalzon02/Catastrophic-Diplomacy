@@ -127,9 +127,13 @@ final class ShipSurfaceLighting implements Disposable {
         " vec4 albedo=texture2D(u_texture,v_uv);\n"+
         " vec4 peel=texture2D(u_damage,v_uv);\n"+
         " if(u_underlayPass>0.5){\n"+
-        "  // Exact inverse of the armor alpha: no second transparent hull\n"+
-        "  // silhouette and therefore no doubled exterior antialiasing.\n"+
-        "  albedo.a*=(1.0-peel.a)*v_color.a;\n"+
+        "  // Porter-Duff source-over solve: upper + lower*(1-upper)\n"+
+        "  // equals the ORIGINAL silhouette alpha at every wound edge.\n"+
+        "  // In particular, opaque hull pixels NEVER reveal background sky.\n"+
+        "  float sourceAlpha=albedo.a*v_color.a;\n"+
+        "  float upperAlpha=sourceAlpha*peel.a;\n"+
+        "  albedo.a=clamp(sourceAlpha*(1.0-peel.a)/\n"+
+        "    max(0.0001,1.0-upperAlpha),0.0,1.0);\n"+
         " }else{\n"+
         "  albedo.rgb*=1.0-0.54*peel.r;\n"+
         "  albedo.a*=peel.a*v_color.a;\n"+
