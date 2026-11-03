@@ -29,7 +29,8 @@ final class FogOfWarRenderer implements AutoCloseable {
         texture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
     }
     void render(Battle battle,OrthographicCamera world,OrthographicCamera hud,
-                SpriteBatch batch,BattleRenderPoses poses,int team){
+                SpriteBatch batch,BattleRenderPoses poses,int team,
+                SensorContactOverlay known){
         if(battle==null)return;
         boolean moved=!Float.isFinite(lastX)
                 ||Math.abs(world.position.x-lastX)>world.zoom*3
@@ -37,7 +38,7 @@ final class FogOfWarRenderer implements AutoCloseable {
                 ||Math.abs(world.zoom-lastZoom)>.005f;
         if(battle!=lastBattle || lastTick==Long.MIN_VALUE
                 ||battle.tick<lastTick ||battle.tick-lastTick>=6 ||moved){
-            updateMask(battle,world,poses,team);
+            updateMask(battle,world,poses,team,known);
             lastBattle=battle;lastTick=battle.tick;
             lastX=world.position.x;lastY=world.position.y;lastZoom=world.zoom;
         }
@@ -48,7 +49,7 @@ final class FogOfWarRenderer implements AutoCloseable {
         batch.end();
     }
     private void updateMask(Battle battle,OrthographicCamera camera,
-                            BattleRenderPoses poses,int team){
+                            BattleRenderPoses poses,int team,SensorContactOverlay known){
         Arrays.fill(revealed,0f);
         double range=FogOfWarModel.opticalRange(battle.weather());
         double inner=range*.84,outer=range*1.14;
@@ -80,6 +81,38 @@ final class FogOfWarRenderer implements AutoCloseable {
                     if(d2>=outer2)continue;
                     float v=d2<=inner2?1f:FogOfWarModel.visible(Math.sqrt(d2),range);
                     if(v>revealed[offset])revealed[offset]=v;
+                }
+            }
+        }
+        // Very large optically discernible silhouettes can exceed the generic
+        // visibility radius. Reveal their REAL hull pixels with a local soft
+        // optical patch, never a fabricated replacement silhouette.
+        for(Battle.Ship target:battle.ships()){
+            if(!target.alive()||target.team==team||!known.opticallyVisible(target.id))
+                continue;
+            BattleRenderPoses.Pose pose=poses.ship(target);
+            double radius=Math.max(22,30*target.visualScale());
+            double outerRadius=radius*1.35;
+            double outerSq=outerRadius*outerRadius;
+            int x0=Math.max(0,(int)Math.floor((pose.x()-outerRadius-camera.position.x)
+                    /pxWorld+MASK_W*.5));
+            int x1=Math.min(MASK_W-1,(int)Math.ceil((pose.x()+outerRadius-camera.position.x)
+                    /pxWorld+MASK_W*.5));
+            int y0=Math.max(0,(int)Math.floor(MASK_H*.5-
+                    (pose.y()+outerRadius-camera.position.y)/pyWorld));
+            int y1=Math.min(MASK_H-1,(int)Math.ceil(MASK_H*.5-
+                    (pose.y()-outerRadius-camera.position.y)/pyWorld));
+            for(int y=y0;y<=y1;y++){
+                double dy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld-pose.y();
+                for(int x=x0;x<=x1;x++){
+                    int index=y*MASK_W+x;
+                    if(revealed[index]>=1f)continue;
+                    double dx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld-pose.x();
+                    double d2=dx*dx+dy*dy;
+                    if(d2>outerSq)continue;
+                    float value=d2<=radius*radius?1f:
+                            FogOfWarModel.visible(Math.sqrt(d2),outerRadius/1.14);
+                    if(value>revealed[index])revealed[index]=value;
                 }
             }
         }
