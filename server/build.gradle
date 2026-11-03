@@ -3,7 +3,16 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
 tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
 dependencies { implementation project(':core') }
 application { mainClass = 'diplomacy.server.OpenLanBattleServer' }
+tasks.register('terminalProtocolSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify real LAN stalemate, time-limit, winner and late spectator terminal messages.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.server.BattleTerminalProtocolTest'
+}
+
 tasks.register('networkSmoke', JavaExec) {
+    dependsOn(tasks.named('terminalProtocolSmoke'))
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.server.BattleServerTest'
