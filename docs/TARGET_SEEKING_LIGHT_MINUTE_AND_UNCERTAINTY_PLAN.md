@@ -560,7 +560,7 @@ observation, transmission and light-limited arrival timestamps. Every phantom
 competes with genuine contacts for the SAME limited SHR transmission slots,
 rather than receiving a free infinite broadcast. Inactive historical emitter
 returns produce delayed shutdown tombstones; old photons remain visible
-until the newer information arrives. A 32-hypothesis, eight-report per-key
+until the newer information arrives. A 32-hypothesis, 32-report per-key
 ring bounds memory; packet expiration prevents an abandoned phantom from
 persisting indefinitely. `tacticalFalseContacts` is independent of true
 `TacticalContact` and weapon authorization, and the battle HUD's false
@@ -569,12 +569,26 @@ of present-time enemy ghost geometry. This stage adds an actual, finite
 fleet-wide false-contact picture and regressions, but NOT multi-hypothesis
 weapon fire-control or target-ID substitution. Visual fidelity is diagnostic.
 
+**Main mounted LAS/PLA/PAR photon travel (2026-11-03):**
+Actual main-ship beam shots now retain immutable historical aimed bearings and
+advance their physical photon fronts one finite light-speed step per combat
+tick. Damage resolves only where the wavefront intersects a real living hull
+at the later arrival time; moving ships can dodge and a mistaken bearing can
+still graze a ship. Existing power, heat, selected laser subtype, module
+muzzle, projectile ID and directional armor remain intact. Wavefronts are
+replay-fingerprinted, visible beam endpoints progress instead of teleporting,
+and unresolved-battle accounting includes pending energy. Headless temporal
+collision and deterministic replay checks are required through
+`beamRaySmoke`. Point-defense/fighter energy remains separate and has NOT
+yet been migrated to this photon model. Finite 30-Hz segment collision is
+not a complete relativistic moving-body light-cone calculation.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 measured receiver-position histories, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
 envelopes with future onboard scan updates, complete
 200v200 balance/performance, maneuver covariance, fleet FCM shared-compute
-arbitration, beam light-time damage delivery and persisted scan doctrine
-controls. The rocket prediction is a constant-velocity TARGET hypothesis
+arbitration, point-defense/fighter beam travel delay and persisted scan
+doctrine controls. The rocket prediction is a constant-velocity TARGET hypothesis
 over the real rocket thrust schedule, not a guarantee against maneuver.
 Visual presentation and balance tuning remain diagnostic.

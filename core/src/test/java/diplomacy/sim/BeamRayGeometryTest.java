@@ -68,8 +68,17 @@ public final class BeamRayGeometryTest {
                     !event.weapon().startsWith(type.name()))continue;
             var fire=fires.get(event.shotId());
             require(fire!=null,"Beam impact was not caused by an actual fired ray");
-            near(fire.targetX(),event.x(),"Beam damage differs from drawn physical impact X");
-            near(fire.targetY(),event.y(),"Beam damage differs from drawn physical impact Y");
+            require(event.tick()>fire.tick(),
+                    "Main beam hit before light could leave its muzzle");
+            // FIRE endpoint defines fixed finite-range bearing, not a
+            // prophetic collision coordinate for the later moving target.
+            double dx=fire.targetX()-fire.x();
+            double dy=fire.targetY()-fire.y();
+            double u=((event.x()-fire.x())*dx+
+                    (event.y()-fire.y())*dy)/(dx*dx+dy*dy);
+            require(u>=0&&u<=1,"Beam struck beyond mounted ray range");
+            near(fire.x()+u*dx,event.x(),"Delayed impact left ray X");
+            near(fire.y()+u*dy,event.y(),"Delayed impact left ray Y");
             double radius=12*victim.visualScale();
             require(StrictMath.hypot(event.x()-victim.x,event.y()-victim.y)<=radius+1e-4,
                     "Real beam impact fell outside the struck hull silhouette");

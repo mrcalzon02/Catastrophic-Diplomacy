@@ -632,7 +632,10 @@ public final class Battle {
 
     public static final class Beam {
         public final long visualId, spawnTick;
-        public final double x1, y1, x2, y2;
+        public final double x1, y1;
+        /** Mutable visible photon front for main weapons only. */
+        public double x2,y2;
+        public boolean inFlight;
         public final int team;
         public final DamageType type;
         /** A distinct defensive emitter, not another full-sized main laser. */
@@ -776,6 +779,26 @@ public final class Battle {
     private final List<Craft> crafts = new ArrayList<>();
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
+    /** Real wavefronts; never store future hull hit decisions. */
+    private static final class BeamPhoton {
+        final long shotId,spawnTick;
+        final int sourceId,team;
+        final DamageType family;
+        final BeamRayGeometry.Ray ray;
+        final double range,damage;
+        final String label;
+        final Beam visual;
+        double travelled;
+        BeamPhoton(long id,long at,Ship source,DamageType type,
+                   BeamRayGeometry.Ray direction,double raw,String weapon,Beam display){
+            shotId=id;spawnTick=at;sourceId=source.id;team=source.team;
+            family=type;ray=direction;
+            range=StrictMath.hypot(ray.x2()-ray.x1(),ray.y2()-ray.y1());
+            damage=raw;label=weapon;visual=display;
+        }
+    }
+    private final List<BeamPhoton> pendingBeamPhotons=new ArrayList<>();
+    public int pendingBeamPhotonCount(){return pendingBeamPhotons.size();}
     private final List<SupportLink> supportLinks=new ArrayList<>();
     private final List<String> events = new ArrayList<>();
     private final List<Integer> eventSourceIds = new ArrayList<>();
@@ -1537,7 +1560,8 @@ public final class Battle {
         for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0)
             focusCounts.merge(ship.lastTargetId,1,Integer::sum);
         for (int i = beams.size() - 1; i >= 0; i--) {
-            if ((beams.get(i).lifetime -= DT) <= 0) beams.remove(i);
+            Beam visual=beams.get(i);
+            if ((visual.lifetime-=DT)<=0&&!visual.inFlight)beams.remove(i);
         }
         for(int i=supportLinks.size()-1;i>=0;i--)
             if((supportLinks.get(i).life-=DT)<=0)supportLinks.remove(i);
@@ -1641,6 +1665,7 @@ public final class Battle {
         for(Craft craft:crafts)BattleArena.contain(craft);
         advanceRotaryRounds();
         advanceRailPenetrators();
+        advanceBeamPhotons();
         for(Craft craft:crafts){
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
@@ -1673,7 +1698,7 @@ public final class Battle {
         boolean inFlight=!missiles.isEmpty()||!rockets.isEmpty()
                 ||!ballistics.isEmpty()||!crafts.isEmpty()||!launchQueue.isEmpty()
                 ||!pendingFlak.isEmpty()||!rotaryRounds.isEmpty()
-                ||!railPenetrators.isEmpty();
+                ||!railPenetrators.isEmpty()||!pendingBeamPhotons.isEmpty();
         terminationReason=BattleTermination.evaluate(tick,lastCombatProgressTick,
                 !anyOffense,inFlight,movingExtraction);
         if(unresolved())log("Engagement unresolved: "+
@@ -3039,11 +3064,8 @@ public final class Battle {
         double bow=point.x()*25.0,port=point.y()*19.0;
         return new SurfaceAim(target.x+bow*c-port*s,target.y+bow*s+port*c);
     }
-    /** A historical target track produces a ray, then CURRENT hull geometry
-     * alone determines whether it physically intersects anything.
-     * No independently rolled "hit=true" flag can bypass the real ray.
-     * This first pass retains instant beam delivery; time-of-flight effects
-     * and full relativistic propagation remain separate future work. */
+    /** Historical aiming fixes an immutable ray; only a LATER physically
+     * arriving photon front can intersect actual moving hull geometry. */
     private void emitMainBeam(Ship shooter,Ship intended,
             SensorLightTimeHistory.Observation track,double observedRange,
             long shotId,WeaponMuzzles.Origin muzzle,DamageType family,
@@ -3059,12 +3081,15 @@ public final class Battle {
         double aimX=solution.aimX(),aimY=solution.aimY();
         boolean goodLock=random.nextDouble()<lockChance;
         if(!goodLock){
-            int phantoms=DeceptionProjection.falseContacts(intended);
+            var historical=intended.sensorHistory.profileAt(track.measuredTick());
+            int phantoms=DeceptionProjection.falseContacts(historical);
             if(phantoms>0){
                 intended.holoShotsDiverted++;
                 int phantom=(int)Math.floorMod(shotId,phantoms);
-                aimX=DeceptionProjection.ghostX(intended,phantom,tick);
-                aimY=DeceptionProjection.ghostY(intended,phantom,tick);
+                aimX=DeceptionProjection.ghostX(intended.id,track.sample(),
+                        intended.visualScale(),phantom);
+                aimY=DeceptionProjection.ghostY(intended.id,track.sample(),
+                        intended.visualScale(),phantom);
             }else{
                 double dx=aimX-muzzle.x(),dy=aimY-muzzle.y();
                 double angle=StrictMath.atan2(dy,dx)+
@@ -3076,32 +3101,71 @@ public final class Battle {
         }
         BeamRayGeometry.Ray ray=BeamRayGeometry.aim(
                 muzzle.x(),muzzle.y(),aimX,aimY,maximumRange);
-        Ship struck=null;
-        BeamRayGeometry.Intersection closest=null;
-        for(Ship candidate:ships){
-            if(!candidate.alive()||candidate.team==shooter.team)continue;
-            BeamRayGeometry.Intersection impact=BeamRayGeometry.intersect(
-                    ray,candidate.x,candidate.y,12*candidate.visualScale());
-            if(impact==null)continue;
-            if(closest==null||impact.fraction()<closest.fraction()||
-                    (impact.fraction()==closest.fraction()&&candidate.id<struck.id)){
-                closest=impact;struck=candidate;
-            }
-        }
-        double endX=closest==null?ray.x2():closest.x();
-        double endY=closest==null?ray.y2():closest.y();
-        if(family==DamageType.LASER)
-            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),
-                    endX,endY,shooter.team,family,false,laserType));
-        else
-            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),
-                    endX,endY,shooter.team,family));
+        Beam display=family==DamageType.LASER?
+                new Beam(shotId,tick,muzzle.x(),muzzle.y(),muzzle.x(),muzzle.y(),
+                        shooter.team,family,false,laserType):
+                new Beam(shotId,tick,muzzle.x(),muzzle.y(),muzzle.x(),muzzle.y(),
+                        shooter.team,family);
+        display.inFlight=true;
+        beams.add(display);
+        pendingBeamPhotons.add(new BeamPhoton(shotId,tick,shooter,
+                family,ray,rawDamage,label,display));
+        // Record an immutable heading and maximum reach, not a future impact.
         visual(shotId,VisualPhase.FIRE,label,shooter.team,shooter.id,intended.id,
-                muzzle.x(),muzzle.y(),endX,endY);
-        if(struck!=null){
-            if(family==DamageType.LASER)
-                hitLaser(struck,rawDamage,shooter,shotId,endX,endY,label);
-            else hit(struck,rawDamage,shooter,family,shotId,endX,endY);
+                muzzle.x(),muzzle.y(),ray.x2(),ray.y2());
+    }
+
+    /** Propagate at physical light speed; each step tests ONLY the part of
+     * the ray that actually arrives this tick against CURRENT enemy geometry.
+     * Point-defense/fighter beams retain their separate combat semantics. */
+    private void advanceBeamPhotons(){
+        final double lightStep=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*DT;
+        for(int i=pendingBeamPhotons.size()-1;i>=0;i--){
+            BeamPhoton photon=pendingBeamPhotons.get(i);
+            if(photon.spawnTick>=tick)continue;
+            double begin=photon.travelled;
+            double end=StrictMath.min(photon.range,begin+lightStep);
+            double ux=(photon.ray.x2()-photon.ray.x1())/photon.range;
+            double uy=(photon.ray.y2()-photon.ray.y1())/photon.range;
+            BeamRayGeometry.Ray segment=new BeamRayGeometry.Ray(
+                    photon.ray.x1()+ux*begin,photon.ray.y1()+uy*begin,
+                    photon.ray.x1()+ux*end,photon.ray.y1()+uy*end);
+            BeamRayGeometry.Intersection first=null;
+            Ship struck=null;
+            for(Ship candidate:ships){
+                if(!candidate.alive()||candidate.team==photon.team)continue;
+                double radius=12*candidate.visualScale();
+                if(candidate.x<StrictMath.min(segment.x1(),segment.x2())-radius||
+                        candidate.x>StrictMath.max(segment.x1(),segment.x2())+radius||
+                        candidate.y<StrictMath.min(segment.y1(),segment.y2())-radius||
+                        candidate.y>StrictMath.max(segment.y1(),segment.y2())+radius)
+                    continue;
+                BeamRayGeometry.Intersection found=BeamRayGeometry.intersect(
+                        segment,candidate.x,candidate.y,radius);
+                if(found!=null&&(first==null||found.fraction()<first.fraction()||
+                        (found.fraction()==first.fraction()&&candidate.id<struck.id))){
+                    first=found;struck=candidate;
+                }
+            }
+            photon.travelled=end;
+            photon.visual.x2=first==null?segment.x2():first.x();
+            photon.visual.y2=first==null?segment.y2():first.y();
+            if(struck!=null){
+                Ship attacker=findShip(photon.sourceId);
+                double impactX=first.x(),impactY=first.y();
+                struck.lastAttackerId=photon.sourceId;
+                visual(photon.shotId,VisualPhase.IMPACT,photon.label,
+                        photon.team,photon.sourceId,struck.id,
+                        impactX,impactY,struck.x,struck.y);
+                hitAt(struck,photon.damage,attacker,photon.family,
+                        photon.ray.x1()-struck.x,
+                        photon.ray.y1()-struck.y,0,impactX,impactY);
+            }
+            if(struck!=null||end>=photon.range-1e-9){
+                photon.visual.inFlight=false;
+                photon.visual.lifetime=StrictMath.max(.13,photon.visual.lifetime);
+                pendingBeamPhotons.remove(i);
+            }
         }
     }
 
@@ -6283,6 +6347,16 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(r.vx));
             hash=mix(hash,Double.doubleToLongBits(r.vy));
             hash=mix(hash,Double.doubleToLongBits(r.integrity));
+        }
+        for(BeamPhoton photon:pendingBeamPhotons){
+            hash=mix(hash,photon.shotId);hash=mix(hash,photon.spawnTick);
+            hash=mix(hash,photon.sourceId);hash=mix(hash,photon.family.ordinal());
+            hash=mix(hash,Double.doubleToLongBits(photon.travelled));
+            hash=mix(hash,Double.doubleToLongBits(photon.damage));
+            hash=mix(hash,Double.doubleToLongBits(photon.ray.x1()));
+            hash=mix(hash,Double.doubleToLongBits(photon.ray.y1()));
+            hash=mix(hash,Double.doubleToLongBits(photon.ray.x2()));
+            hash=mix(hash,Double.doubleToLongBits(photon.ray.y2()));
         }
         for (Missile m : missiles) {
             hash=mix(hash,m.payload.ordinal());

@@ -165,7 +165,15 @@ tasks.register('sensorLeadProjectionSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorLeadProjectionTest'
     dependsOn testClasses
 }
+tasks.register('beamPhotonFlightSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Finite main beam photons, real hull dodge and deterministic replay.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BeamPhotonFlightTest'
+    dependsOn testClasses
+}
 tasks.register('beamRaySmoke', JavaExec) {
+    dependsOn(tasks.named('beamPhotonFlightSmoke'))
     group = 'verification'
     description = 'Real laser/plasma/particle firing rays, near-grazes, misses, range and impact alignment.'
     classpath = sourceSets.test.runtimeClasspath

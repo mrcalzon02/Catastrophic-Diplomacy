@@ -1,8 +1,7 @@
 package diplomacy.sim;
 
-/** Physical, zero-duration beam/ray intersection with the CURRENT hull surface.
- * The aim direction comes from a historical target solution; only collision
- * uses physical present positions. Flight-time delivery is a later migration.
+/** Physical ray intersection with the CURRENT hull silhouette.
+ * Battle advances finite photon-front segments through this same geometry.
  */
 public final class BeamRayGeometry {
     private BeamRayGeometry(){}
