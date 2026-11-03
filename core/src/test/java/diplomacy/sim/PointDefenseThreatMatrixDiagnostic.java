@@ -133,6 +133,13 @@ public final class PointDefenseThreatMatrixDiagnostic {
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
                               int separation,String pdFamily,boolean radialFalloff){
+        return run(catalog,threat,tier,mounts,seed,pdMode,separation,
+                pdFamily,radialFalloff,null);
+    }
+    private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
+                              int mounts,int seed,BattleOrders.PointDefense pdMode,
+                              int separation,String pdFamily,boolean radialFalloff,
+                              ShipTacticalDirectives.InterceptStrategy interception){
         if(separation!=95&&separation!=220&&separation!=390)
             throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
@@ -152,6 +159,10 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Battle.Ship defender=battle.ships().get(1);
         battle.registerDiagnosticStationaryTarget(defender.id);
         battle.setShipOrders(defender.id,BattleOrders.DEFAULT.withPointDefense(pdMode));
+        if(interception!=null)
+            battle.setShipStandingOrders(defender.id,new ShipStandingOrders(
+                    BattleOrders.DEFAULT.withPointDefense(pdMode),50,50,0,
+                    ShipTacticalDirectives.DEFAULT.withStrategy(interception)));
         // Isolation: only the selected threat may launch. The defender has
         // real fitted sensors, reload, power, heat, damage and PD condition.
         attacker.speed=0;attacker.vx=0;attacker.vy=0;attacker.pdRange=0;
@@ -429,6 +440,88 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 " behavior; the original full-strength rim is an explicit"+
                 " pre-battle A/B control. Measurements use real physical"+
                 " vessel and aircraft combat, not synthetic accuracy rolls.\n");
+        // Verify the three existing doctrine orderings mechanically before
+        // interpreting seed outcomes. FLK now uses defensiveScore for ordnance,
+        // while aerial targets remain its naturally preferred assignment.
+        Battle doctrineFixture=new Battle(118733L);
+        Battle.Ship doctrineShip=doctrineFixture.addShip(1,
+                Battle.Faction.TERRAN,600,300);
+        doctrineFixture.setShipStandingOrders(doctrineShip.id,
+                new ShipStandingOrders(BattleOrders.DEFAULT,50,50,0,
+                        ShipTacticalDirectives.DEFAULT.withStrategy(
+                                ShipTacticalDirectives.InterceptStrategy.EARLY_INTERCEPT)));
+        require(doctrineFixture.defensiveScore(doctrineShip,300,3)<
+                doctrineFixture.defensiveScore(doctrineShip,100,1),
+                "EARLY_INTERCEPT fails to prefer distant physical contact");
+        doctrineFixture.setShipStandingOrders(doctrineShip.id,
+                new ShipStandingOrders(BattleOrders.DEFAULT,50,50,0,
+                        ShipTacticalDirectives.DEFAULT.withStrategy(
+                                ShipTacticalDirectives.InterceptStrategy.CLOSE_IN)));
+        require(doctrineFixture.defensiveScore(doctrineShip,100,3)<
+                doctrineFixture.defensiveScore(doctrineShip,300,1),
+                "CLOSE_IN fails to prefer closest physical contact");
+        doctrineFixture.setShipStandingOrders(doctrineShip.id,
+                new ShipStandingOrders(BattleOrders.DEFAULT,50,50,0,
+                        ShipTacticalDirectives.DEFAULT.withStrategy(
+                                ShipTacticalDirectives.InterceptStrategy.FASTEST_IMPACT)));
+        require(doctrineFixture.defensiveScore(doctrineShip,300,1)<
+                doctrineFixture.defensiveScore(doctrineShip,100,3),
+                "FASTEST_IMPACT fails to prefer earliest approaching body");
+
+        List<String> doctrineCsv=new ArrayList<>();
+        doctrineCsv.add("family,threat,tier,mounts,distance,strategy,seeds,"+
+                "launched,killed,actual_impacts,shots,defender_damage,role");
+        summary.append("\n## Three live fire-control doctrines: physical target-role matrix\n\n");
+        summary.append("Tests preserve independent equipped guns and their real"+
+                " stock/reload/thermal constraints. EARLY_INTERCEPT chooses the"+
+                " farthest detected ordnance, CLOSE_IN the nearest, and"+
+                " FASTEST_IMPACT the shortest closing-time estimate."+
+                " FLK prefers hostile aircraft when craft engagement is enabled."+
+                " Values from four identical attack seeds per strategy.\n\n");
+        summary.append("|Threat|Defense|Rank|Mounts|Doctrine|Launched|Destroyed|"+
+                "Threat impacts|Defense shots|Damage incurred|\n");
+        summary.append("|---|---|---:|---:|---|---:|---:|---:|---:|---:|\n");
+        for(Threat threat:new Threat[]{Threat.KINETIC_STANDARD,
+                Threat.MISSILE_MICRO_SWARM,Threat.MISSILE_CASCADE_SWARM,
+                Threat.TORPEDO_HEAVY_STRIKE,Threat.FIGHTER_INTERCEPTOR,
+                Threat.FIGHTER_TORPEDO_BOMBER})
+            for(String family:new String[]{"PD","FLK"})
+                for(int rank:new int[]{0,9})
+                    for(int mounts:new int[]{1,4})
+                        for(var doctrine:ShipTacticalDirectives.InterceptStrategy.values()){
+                            int launches=0,kills=0,impacts=0,shots=0;
+                            double damage=0;
+                            for(int seed=0;seed<4;seed++){
+                                Result result=run(catalog,threat,rank,mounts,seed,
+                                        BattleOrders.PointDefense.BALANCED,
+                                        threat.craft()?220:390,family,true,doctrine);
+                                launches+=result.primaryLaunched();
+                                kills+=threat.craft()?result.craftLost():
+                                        result.primaryIntercepted();
+                                impacts+=threat.craft()?result.secondaryHits():
+                                        result.primaryHits();
+                                shots+=result.shots();
+                                damage+=result.shieldArmorHullLoss();
+                            }
+                            String role=threat.craft()?"ANTI_AIR":
+                                    threat.kinetic()?"SHELL":
+                                    threat.heavy()?"HARDENED":"SWARM";
+                            doctrineCsv.add(String.format(Locale.ROOT,
+                                    "%s,%s,%d,%d,%d,%s,4,%d,%d,%d,%d,%.4f,%s",
+                                    family,threat,rank,mounts,
+                                    threat.craft()?220:390,doctrine,
+                                    launches,kills,impacts,shots,damage,role));
+                            summary.append(String.format(Locale.ROOT,
+                                    "|%s|%s|%d|%d|%s|%d|%d|%d|%d|%.1f|\n",
+                                    threat,family,rank,mounts,doctrine,launches,
+                                    kills,impacts,shots,damage));
+                        }
+        Files.write(output.resolve("fire-control-doctrine-matrix.csv"),
+                doctrineCsv,StandardCharsets.UTF_8);
+        summary.append("\nDoctrines are actual ship captain orders, not invented"+
+                " simulated probabilities. High interceptions and high shots"+
+                " do not alone indicate damage prevention or cost efficiency."+
+                " These are diagnostic-only balance comparisons, not release gates.\n");
         Files.write(output.resolve("p0.csv"),csv,StandardCharsets.UTF_8);
         Files.writeString(output.resolve("summary.md"),summary.toString(),StandardCharsets.UTF_8);
         System.out.print(summary);
