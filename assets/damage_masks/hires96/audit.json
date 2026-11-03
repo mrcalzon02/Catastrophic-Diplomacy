@@ -1,0 +1,226 @@
+{
+  "laser": [
+    {
+      "variant": 1,
+      "coloredPixels": 426,
+      "cutPixels": 42
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 443,
+      "cutPixels": 43
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 571,
+      "cutPixels": 61
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 514,
+      "cutPixels": 65
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 299,
+      "cutPixels": 70
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 447,
+      "cutPixels": 43
+    }
+  ],
+  "kinetic": [
+    {
+      "variant": 1,
+      "coloredPixels": 963,
+      "cutPixels": 248
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 1014,
+      "cutPixels": 511
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 1269,
+      "cutPixels": 256
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 969,
+      "cutPixels": 505
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 925,
+      "cutPixels": 136
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 721,
+      "cutPixels": 82
+    }
+  ],
+  "plasma": [
+    {
+      "variant": 1,
+      "coloredPixels": 761,
+      "cutPixels": 215
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 916,
+      "cutPixels": 212
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 728,
+      "cutPixels": 194
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 957,
+      "cutPixels": 250
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 852,
+      "cutPixels": 286
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 1104,
+      "cutPixels": 315
+    }
+  ],
+  "particle": [
+    {
+      "variant": 1,
+      "coloredPixels": 307,
+      "cutPixels": 88
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 447,
+      "cutPixels": 124
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 359,
+      "cutPixels": 101
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 370,
+      "cutPixels": 122
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 345,
+      "cutPixels": 80
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 398,
+      "cutPixels": 127
+    }
+  ],
+  "missile": [
+    {
+      "variant": 1,
+      "coloredPixels": 853,
+      "cutPixels": 254
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 981,
+      "cutPixels": 206
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 1038,
+      "cutPixels": 489
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 952,
+      "cutPixels": 192
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 830,
+      "cutPixels": 423
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 949,
+      "cutPixels": 119
+    }
+  ],
+  "torpedo": [
+    {
+      "variant": 1,
+      "coloredPixels": 1520,
+      "cutPixels": 761
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 1539,
+      "cutPixels": 716
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 1796,
+      "cutPixels": 856
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 1659,
+      "cutPixels": 717
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 1850,
+      "cutPixels": 923
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 1609,
+      "cutPixels": 751
+    }
+  ],
+  "fighter": [
+    {
+      "variant": 1,
+      "coloredPixels": 220,
+      "cutPixels": 21
+    },
+    {
+      "variant": 2,
+      "coloredPixels": 287,
+      "cutPixels": 42
+    },
+    {
+      "variant": 3,
+      "coloredPixels": 592,
+      "cutPixels": 63
+    },
+    {
+      "variant": 4,
+      "coloredPixels": 319,
+      "cutPixels": 42
+    },
+    {
+      "variant": 5,
+      "coloredPixels": 500,
+      "cutPixels": 42
+    },
+    {
+      "variant": 6,
+      "coloredPixels": 372,
+      "cutPixels": 63
+    }
+  ]
+}
