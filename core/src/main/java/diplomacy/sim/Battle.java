@@ -3525,6 +3525,10 @@ public final class Battle {
                         }
                     }
                 }
+                // Ordnance fire-control follows the captain's ACTUAL PD
+                // doctrine: earliest collision, longest-range interception
+                // or close-in last-ditch screening. Aircraft remain preferred
+                // when craft engagement is enabled, matching flak's role.
                 if(best==null&&defender.orders.pointDefense().ordnance()){
                     for(Missile m:missiles){
                         if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
@@ -3536,8 +3540,9 @@ public final class Battle {
                             continue;
                         double eta=approachEta(defender.x,defender.y,
                                 m.x,m.y,m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
-                        if(eta<bestPriority){bestPriority=eta;
-                            best=new FlakAim(m.x,m.y,m.vx,m.vy,m.sourceId,m.targetId,eta);}
+                        double priority=defensiveScore(defender,d,eta);
+                        if(priority<bestPriority){bestPriority=priority;
+                            best=new FlakAim(m.x,m.y,m.vx,m.vy,m.sourceId,m.targetId,priority);}
                     }
                     for(Rocket r:rockets){
                         if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
@@ -3549,8 +3554,9 @@ public final class Battle {
                             continue;
                         double eta=approachEta(defender.x,defender.y,
                                 r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
-                        if(eta<bestPriority){bestPriority=eta;
-                            best=new FlakAim(r.x,r.y,r.vx,r.vy,r.sourceId,r.targetId,eta);}
+                        double priority=defensiveScore(defender,d,eta);
+                        if(priority<bestPriority){bestPriority=priority;
+                            best=new FlakAim(r.x,r.y,r.vx,r.vy,r.sourceId,r.targetId,priority);}
                     }
                     for(Ballistic p:ballistics){
                         if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
@@ -3561,8 +3567,9 @@ public final class Battle {
                             continue;
                         double eta=approachEta(defender.x,defender.y,
                                 p.x,p.y,p.vx,p.vy,p.spec.speed());
-                        if(eta<bestPriority){bestPriority=eta;
-                            best=new FlakAim(p.x,p.y,p.vx,p.vy,p.sourceId,p.targetId,eta);}
+                        double priority=defensiveScore(defender,d,eta);
+                        if(priority<bestPriority){bestPriority=priority;
+                            best=new FlakAim(p.x,p.y,p.vx,p.vy,p.sourceId,p.targetId,priority);}
                     }
                 }
                 if(best==null)continue;
