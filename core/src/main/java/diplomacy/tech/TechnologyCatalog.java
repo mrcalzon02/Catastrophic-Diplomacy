@@ -81,6 +81,7 @@ public final class TechnologyCatalog {
     private static final List<String> VARIANT_TRACKS=List.of(
             "OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST");
     private static final int VIRTUAL_SURVIVAL_NODES=48*11*4*9;
+    private static final int VIRTUAL_NETWORK_NODES=24*11*4*9;
     private final int upgradeTotal;
     private final Set<String> components;
     private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base,
@@ -99,7 +100,7 @@ public final class TechnologyCatalog {
                 finalBranches++;
             }
         upgradeTotal=Math.addExact(Math.addExact(map.size(),Math.multiplyExact(finalBranches,3)),
-                generateHigherStages?VIRTUAL_SURVIVAL_NODES:0);
+                generateHigherStages?VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES:0);
         upgrades=generateHigherStages?Collections.unmodifiableMap(new LazyUpgrades()):
                 sixStages;
         baseComponents=Collections.unmodifiableMap(base);
@@ -109,6 +110,8 @@ public final class TechnologyCatalog {
     public int componentCount() { return components.size(); }
     public Upgrade get(String id) {
         Upgrade virtual=survivalVariantUpgrade(id);
+        if(virtual!=null)return virtual;
+        virtual=networkVariantUpgrade(id);
         if(virtual!=null)return virtual;
         Upgrade found=sixStages.get(id);
         if(found!=null||!deferredHigherStages||id==null||id.length()<4)return found;
@@ -178,6 +181,41 @@ public final class TechnologyCatalog {
         return new Upgrade(cells);
     }
 
+    /** Network hardware generations have their own independent IX-rank
+     * research paths, resolved lazily to protect small Android heaps. */
+    private Upgrade networkVariantUpgrade(String id){
+        if(!deferredHigherStages||id==null)return null;
+        String[] parts=id.split("-",5);
+        if(parts.length!=5||!"TECH".equals(parts[0])||
+                !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
+                !parts[4].matches("0[1-9]"))return null;
+        SensorNetworkCatalog.Model v=SensorNetworkCatalog.variant(parts[2]);
+        if(v==null||!baseComponents.containsKey("BASE-"+parts[1]+"-"+v.code()))
+            return null;
+        int stage=parts[4].charAt(1)-'0';
+        Upgrade source=get("TECH-"+parts[1]+"-"+v.root()+"-"+
+                parts[3]+"-"+parts[4]);
+        if(source==null)return null;
+        String predecessor=stage==1?"BASE-"+parts[1]+"-"+v.code():
+                "TECH-"+parts[1]+"-"+v.code()+"-"+parts[3]+"-"+
+                        String.format(Locale.ROOT,"%02d",stage-1);
+        long research=Math.round(source.researchCost*v.price());
+        long industry=Math.round(source.industryCost*v.price());
+        if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
+            throw new IllegalArgumentException("Network research overflows "+id);
+        ArrayList<String> cells=new ArrayList<>(COLS);
+        Collections.addAll(cells,id,parts[1],v.code(),parts[3],
+                Integer.toString(stage),v.name()+" / "+parts[3]+" "+stage,
+                predecessor,Long.toString(Math.max(1,research)),
+                Long.toString(Math.max(1,industry)));
+        for(double multiplier:new double[]{source.mass,source.power,source.heat,
+                source.output,source.accuracy,source.integrity,source.shield,
+                source.thrust,source.cooling,source.maintenance})
+            cells.add(ratio(multiplier,1));
+        cells.add(v.name()+": "+source.tradeoff);
+        return new Upgrade(cells);
+    }
+
     public boolean hasBase(String id) { return components.contains(id); }
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
@@ -195,6 +233,13 @@ public final class TechnologyCatalog {
         if(deferredHigherStages)
             for(String faction:VARIANT_FACTIONS)
                 for(SurvivalHardwareCatalog.Variant variant:SurvivalHardwareCatalog.VARIANTS)
+                    for(String track:VARIANT_TRACKS)
+                        for(int rank=1;rank<=9;rank++)
+                            ids.add("TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
+                                    String.format(Locale.ROOT,"%02d",rank));
+        if(deferredHigherStages)
+            for(String faction:VARIANT_FACTIONS)
+                for(SensorNetworkCatalog.Model variant:SensorNetworkCatalog.VARIANTS)
                     for(String track:VARIANT_TRACKS)
                         for(int rank=1;rank<=9;rank++)
                             ids.add("TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
@@ -229,7 +274,7 @@ public final class TechnologyCatalog {
                                 Upgrade test=branch.next();
                                 if(test.stage==6){nextBranch=test;higher=7;return true;}
                             }
-                            return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES;
+                            return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES;
                         }
                         @Override public Entry<String,Upgrade> next(){
                             if(early.hasNext())return early.next();
@@ -240,13 +285,23 @@ public final class TechnologyCatalog {
                                         "0"+higher++);
                                 return new SimpleImmutableEntry<>(value.id,value);
                             }
-                            int n=virtualIndex++,stage=n%9+1;
+                            int index=virtualIndex++;
+                            boolean survival=index<VIRTUAL_SURVIVAL_NODES;
+                            int n=survival?index:index-VIRTUAL_SURVIVAL_NODES;
+                            int stage=n%9+1;
                             n/=9;
                             String track=VARIANT_TRACKS.get(n%4);
                             n/=4;
-                            String code=SurvivalHardwareCatalog.VARIANTS.get(
-                                    n%SurvivalHardwareCatalog.VARIANTS.size()).code();
-                            n/=SurvivalHardwareCatalog.VARIANTS.size();
+                            String code;
+                            if(survival){
+                                code=SurvivalHardwareCatalog.VARIANTS.get(
+                                        n%SurvivalHardwareCatalog.VARIANTS.size()).code();
+                                n/=SurvivalHardwareCatalog.VARIANTS.size();
+                            }else{
+                                code=SensorNetworkCatalog.VARIANTS.get(
+                                        n%SensorNetworkCatalog.VARIANTS.size()).code();
+                                n/=SensorNetworkCatalog.VARIANTS.size();
+                            }
                             String id="TECH-"+VARIANT_FACTIONS.get(n)+"-"+code+"-"+
                                     track+"-"+String.format(Locale.ROOT,"%02d",stage);
                             Upgrade value=TechnologyCatalog.this.get(id);
@@ -282,6 +337,8 @@ public final class TechnologyCatalog {
             addArmorAndBulkheadFamilies(bases,rows);
             addSensingFamilies(bases,rows);
             addSensingHardwareVariants(bases,rows);
+            addSensorNetworkFamilies(bases,rows);
+            addSensorNetworkVariants(bases);
             addSurvivalAndUnsafeFamilies(bases,rows);
             addSurvivalHardwareVariants(bases);
             addDumbfireRocketFamilies(bases,rows);
@@ -795,6 +852,70 @@ public final class TechnologyCatalog {
         }
     }
 
+
+    /** Native faction modules based on the paid SEN engineering budget.
+     * Each root owns independent research; no replacement of existing SEN. */
+    private static void addSensorNetworkFamilies(List<List<String>> bases,
+                                                 List<List<String>> upgrades){
+        List<List<String>> originals=List.copyOf(bases);
+        List<List<String>> research=List.copyOf(upgrades);
+        for(SensorNetworkCatalog.Family family:SensorNetworkCatalog.FAMILIES){
+            for(int i=1;i<originals.size();i++){
+                List<String> source=originals.get(i);
+                if(!"SEN".equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-SEN","-"+family.code()));
+                row.set(2,family.code());row.set(3,family.name());
+                row.set(4,family.category());
+                row.set(5,"Standard fleet sensor-network equipment; tier I");
+                row.set(6,ratio(Double.parseDouble(row.get(6)),family.mass()));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),family.power()));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),family.heat()));
+                row.set(9,ratio(Double.parseDouble(row.get(9)),family.integrity()));
+                row.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(row.get(10))*family.price()))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),family.output()));
+                row.set(12,"Physical information equipment; requires actual sensor contacts");
+                bases.add(row);
+            }
+            for(int i=1;i<research.size();i++){
+                List<String> source=research.get(i);
+                if(!"SEN".equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-SEN-","-"+family.code()+"-"));
+                row.set(2,family.code());
+                row.set(5,family.name()+" "+row.get(3)+" "+row.get(4));
+                row.set(6,row.get(6).replace("-SEN-","-"+family.code()+"-")
+                        .replace("-SEN","-"+family.code()));
+                row.set(19,family.name()+": "+row.get(19));
+                upgrades.add(row);
+            }
+        }
+    }
+
+    /** 264 fitted variants; IX-rank research instantiated only when requested. */
+    private static void addSensorNetworkVariants(List<List<String>> bases){
+        List<List<String>> originals=List.copyOf(bases);
+        for(SensorNetworkCatalog.Model model:SensorNetworkCatalog.VARIANTS){
+            for(int i=1;i<originals.size();i++){
+                List<String> source=originals.get(i);
+                if(!model.root().equals(source.get(2)))continue;
+                List<String> row=new ArrayList<>(source);
+                row.set(0,row.get(0).replace("-"+model.root(),"-"+model.code()));
+                row.set(2,model.code());row.set(3,model.name());
+                row.set(5,model.name()+"; tier "+model.requiredTier());
+                row.set(6,ratio(Double.parseDouble(row.get(6)),model.mass()));
+                row.set(7,ratio(Double.parseDouble(row.get(7)),model.power()));
+                row.set(8,ratio(Double.parseDouble(row.get(8)),model.heat()));
+                row.set(9,ratio(Double.parseDouble(row.get(9)),model.integrity()));
+                row.set(10,Long.toString(Math.max(1,Math.round(
+                        Long.parseLong(row.get(10))*model.price()))));
+                row.set(11,ratio(Double.parseDouble(row.get(11)),model.performance()));
+                row.set(12,"Independent fleet-information hardware; no fictitious sensor channel");
+                bases.add(row);
+            }
+        }
+    }
 
     /** Native, socket-bound damage control and unsafe retrofit families.
      * Clone root equipment and its independent four engineering tracks.
