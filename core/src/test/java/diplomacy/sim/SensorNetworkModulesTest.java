@@ -155,9 +155,72 @@ public final class SensorNetworkModulesTest {
         require(!relay.hasTargetContact(receiver,opponent,700),
                 "Dead transmitter must not continue a ghost datalink");
 
-        require(Shipyard.fit(fit(bare,"CAP"),catalog).network().targetCapacity()>1,
-                "CAP must unlock physical parallel target processing");
+        Battle.Ship capacityShip=duel.addShip(0,Battle.Faction.TERRAN,100,100);
+        capacityShip.network=Shipyard.fit(fit(bare,"CAP"),catalog).network();
+        capacityShip.power=100;
+        require(Battle.operationalTargetCapacity(capacityShip)>1,
+                "Fitted CAP must physically schedule multiple tracks");
+        capacityShip.sensorsCondition=0;
+        require(Battle.operationalTargetCapacity(capacityShip)==1,
+                "Destroyed sensor circuitry must disable extra CAP capacity");
+        capacityShip.sensorsCondition=1;
+        capacityShip.power=0;
+        require(Battle.operationalTargetCapacity(capacityShip)==1,
+                "Unpowered CAP must not grant parallel fire-control slots");
+
+        Battle command=new Battle(277L);
+        Battle.Ship flagship=command.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship friend=command.addShip(0,Battle.Faction.TERRAN,340,100);
+        Battle.Ship opposition=command.addShip(1,Battle.Faction.DRAXIAN,900,100);
+        for(Battle.Ship ship:command.ships()){
+            ship.power=100;
+            command.registerDiagnosticStationaryTarget(ship.id);
+        }
+        flagship.network=Shipyard.fit(fit(bare,"FCM"),catalog).network();
+        command.step();
+        require(friend.commandAssist>0 && opposition.commandAssist==0,
+                "Fleet command fusion must assist nearby allies only");
+        flagship.power=0;
+        command.step();
+        require(friend.commandAssist==0,
+                "Destroyed command power must break tactical correlation");
+
+        // Track sharing is a genuine last-known position report, never a lock
+        // on a currently invisible vessel. Ordinary CLEAR weather is supported.
+        Battle trackBattle=new Battle(279L);
+        Battle.Ship tracker=trackBattle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship listener=trackBattle.addShip(0,Battle.Faction.TERRAN,-250,100);
+        Battle.Ship fugitive=trackBattle.addShip(1,Battle.Faction.DRAXIAN,650,100);
+        for(Battle.Ship ship:trackBattle.ships()){
+            ship.power=100;
+            trackBattle.registerDiagnosticStationaryTarget(ship.id);
+        }
+        String prefix="BASE-"+Shipyard.factionId(bare.faction)+"-";
+        Shipyard.Design combined=fit(bare,"TRK").install(
+                socket(bare.hull,Shipyard.Mount.SYSTEM,1),prefix+"LNK");
+        require(Shipyard.inspect(combined,catalog).valid(),
+                "Track processor plus datalink must coexist on physical sockets");
+        tracker.network=Shipyard.fit(combined,catalog).network();
+        listener.network=Shipyard.fit(fit(bare,"LNK"),catalog).network();
+        tracker.sensorRange=700;listener.sensorRange=0;
+        trackBattle.step();
+        require(tracker.knownTracks.containsKey(fugitive.id),
+                "TRK must remember an actual previously observed contact");
+        Battle.ContactTrack passed=trackBattle.newestValidTrack(listener);
+        require(passed!=null && passed.x==650,
+                "LNK must deliver a true recorded fix to a nearby linked ally");
+        fugitive.x=1650;
+        trackBattle.step();
+        passed=trackBattle.newestValidTrack(listener);
+        require(passed!=null && passed.x==650,
+                "Track memory must not update from a currently concealed hull");
+        require(!trackBattle.hasTargetContact(listener,fugitive,1900),
+                "Stale shared track must not authorize omniscient weapon fire");
+        tracker.power=0;
+        require(trackBattle.newestValidTrack(listener)==null,
+                "Unpowered track transmitter must stop supplying sensor memory");
+
         System.out.println("PASS six fleet sensor-network modules, 24 variants, research, "+
-                "amplification, relay range, fitting and power failure");
+                "amplification, finite relay, command fusion, track memory and CAP");
     }
 }
