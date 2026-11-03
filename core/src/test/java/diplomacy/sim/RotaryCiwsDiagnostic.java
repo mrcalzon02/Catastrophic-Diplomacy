@@ -196,13 +196,22 @@ public final class RotaryCiwsDiagnostic {
         double startPower=defender.power;
         int ammo=defender.kineticAmmo,seen=0;
         double closestCraft=Double.POSITIVE_INFINITY,largestCraftDetection=0;
-        int craftVisibleFrames=0,craftTotalFrames=0;
+        int craftVisibleFrames=0,craftTotalFrames=0,aliveFrames=0;
+        int eligibleFrames=0,retiredFrames=0;
+        double minHull=Double.POSITIVE_INFINITY;
         long first=-1;
         // Physical rounds only have ~0.1s flight time. Sampling EACH 30Hz
         // frame matters: never reconstruct a synthetic path from hit logs.
         for(int frame=0;frame<420;frame++){
             battle.step();
             seen+=battle.rotaryRounds().size();
+            if(defender.alive())aliveFrames++;
+            if(defender.retired)retiredFrames++;
+            if(defender.alive()&&defender.kineticAmmo>0&&defender.power>4&&
+                    defender.heat<defender.maxHeat*.93&&
+                    defender.pointDefenseCondition>.2&&defender.crewReadiness()>=.05)
+                eligibleFrames++;
+            minHull=StrictMath.min(minHull,defender.hull);
             if(threat==Threat.FIGHTER_INTERCEPTOR||threat==Threat.DRONE)
                 for(Battle.Craft craft:battle.crafts())if(craft.team==0){
                     craftTotalFrames++;
@@ -279,6 +288,11 @@ public final class RotaryCiwsDiagnostic {
                 " standing="+(defender.standingOrders!=null)+
                 " heat="+defender.heat+" maxHeat="+defender.maxHeat+
                 " crew="+defender.crewReadiness()+
+                " alive="+defender.alive()+
+                " aliveFrames="+aliveFrames+" eligibleFrames="+eligibleFrames+
+                " retiredFrames="+retiredFrames+" minHull="+minHull+
+                " defenderId="+defender.id+
+                " rotaryMountCount="+defender.rotaryMounts.size()+
                 " orders="+defender.orders.pointDefense()+
                 " spool="+defender.rotaryMounts.get(0).spin+
                 " bearing="+defender.rotaryMounts.get(0).bearing+
