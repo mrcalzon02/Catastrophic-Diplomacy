@@ -182,7 +182,12 @@ public final class BattleServer implements AutoCloseable {
                 if(seat.active)throw Hbnet.failure();seat.active=true;peer=new Peer(socket,seat);
                 Hbnet.write(socket.getOutputStream(),"WELCOME|1|"+session+"|"+seat.team+"|"+matchSeed+"|"+seat.sequence+
                         (matchRulesWire==null?"":"|"+matchRulesWire));
-                peers.add(peer);peer.send(snapshot());
+                peers.add(peer);
+                peer.send(snapshot());
+                // Late spectators must receive the same terminal status as
+                // peers who watched the actual final tick.
+                if(battle!=null&&battle.finished())
+                    peer.send(List.of(terminalResultFrame()));
             }
             final Peer current=peer;
             workers.execute(()->{try{while(!closed&&!socket.isClosed())for(String frame:current.output.take())Hbnet.write(socket.getOutputStream(),frame);}catch(IOException|InterruptedException e){try{socket.close();}catch(IOException ignored){}}});
@@ -199,7 +204,12 @@ public final class BattleServer implements AutoCloseable {
     }
     private void handle(Peer peer,String frame)throws IOException{
         String[] p=frame.split("\\|",-1);
-        if(p.length==1&&p[0].equals("SNAPSHOT")){peer.send(snapshot());return;}
+        if(p.length==1&&p[0].equals("SNAPSHOT")){
+            peer.send(snapshot());
+            if(battle!=null&&battle.finished())
+                peer.send(List.of(terminalResultFrame()));
+            return;
+        }
         if(p[0].startsWith("FLEET_")){receiveFleet(peer,p);return;}
         if(battle==null){peer.send(List.of("REJECT|NOT_READY"));return;}
         if(p.length!=6||!p[0].equals("ORDER")||!p[1].matches("[0-9]{1,15}")||!p[2].matches("[0-9]{1,15}")||!p[3].matches("[01]"))throw Hbnet.failure();
@@ -291,12 +301,18 @@ public final class BattleServer implements AutoCloseable {
     }
     /** A distinct wire notification, never a fake fatal snapshot or victory.
      * All actual survivors are preserved in the preceding terminal frame. */
-    private void sendTerminalResult(){
-        if(terminalSent||battle==null||!battle.finished())return;
+    private String terminalResultFrame(){
+        if(battle==null||!battle.finished())
+            throw new IllegalStateException("Not a finished authoritative battle");
         String status=battle.unresolved()?battle.terminationReason().name():
                 battle.alive(0)>0?"LEFT_VICTORY":
                 battle.alive(1)>0?"RIGHT_VICTORY":"MUTUAL_DESTRUCTION";
-        for(Peer peer:peers)peer.send(List.of("RESULT|"+status+"|"+battle.tick));
+        return "RESULT|"+status+"|"+battle.tick;
+    }
+    private void sendTerminalResult(){
+        if(terminalSent||battle==null||!battle.finished())return;
+        String result=terminalResultFrame();
+        for(Peer peer:peers)peer.send(List.of(result));
         terminalSent=true;
     }
     private List<String> snapshot(){
