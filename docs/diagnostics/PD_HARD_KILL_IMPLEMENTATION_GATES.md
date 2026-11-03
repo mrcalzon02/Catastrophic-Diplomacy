@@ -376,3 +376,27 @@ friendly/neutral blast exclusion if the rules require it, moving-ship
 relative aim and more equal-cost off-axis wave geometry. Preserve the
 existing real fragment-density physics. Numeric balance, visual finish
 and economic goals remain advisory; only real functionality may block.
+
+### Corrected live-flak population accounting
+
+[Focused rail + corrected fleet telemetry 41613927278](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41613927278)
+now includes actual **in-flight flak shells** in peak projectile population;
+older fleet reports counted the other five ordnance/interceptor families
+but omitted moving FLK shells. This corrects the diagnostic, not the
+production battle size or a weapon balance parameter.
+
+| 200v200 mode | Peak ALL moving bodies (including FLK) | Peak concurrent FLK shells | Physical fuze bursts | Flak timeouts | FLK shells launched |
+|---|---:|---:|---:|---:|---:|
+| MIXED ACTIVE | 1082 | 49 | 1675 | 0 | 1704 |
+| MIXED HOLD_FIRE | 1056 | 0 | 0 | 0 | 0 |
+| ORDNANCE_ONLY ACTIVE | 910 | 43 | 1836 | 0 | 1861 |
+| ORDNANCE_ONLY HOLD_FIRE | 881 | 0 | 0 | 0 | 0 |
+
+The launch-minus-resolved differences (29 mixed and 25 ordnance-only)
+are permitted in-flight shells still present when the 600-tick sampling
+window ends, not phantom hits or a lifetime leak. All six projectile
+families still obey the fixed arena and timeouts; the linked headless
+suite passed mechanics, world smoke, load measurement and game-client
+renderer compilation. No full release/APK build was triggered for this
+point-defense change. Timing and memory differences remain diagnostic,
+not release gates.
