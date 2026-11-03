@@ -1752,7 +1752,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_BATTLE "+activeMission+" "+deployment.ships()+" "+deployment.formation());
     }
     private void finishEngagement(){
-        lastWon=battle.engaged(0)>0&&battle.alive(1)==0;
+        lastWon=!battle.unresolved()&&battle.engaged(0)>0&&battle.alive(1)==0;
         if(audio!=null)audio.announcePriority(lastWon?AnnouncerAudio.Cue.VICTORY:AnnouncerAudio.Cue.MISSION_FAILED);
         survivorsAtEnd=battle.engaged(0);
         withdrawingAtEnd=battle.withdrawing(0);
@@ -2521,7 +2521,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(playedCampaign && campaignEncounter!=null) {
                 CampaignEncounter.Advance advance=campaignEncounter.advance();
                 if(advance==CampaignEncounter.Advance.VICTORY ||
-                        advance==CampaignEncounter.Advance.DEFEAT)finishEngagement();
+                        advance==CampaignEncounter.Advance.DEFEAT ||
+                        advance==CampaignEncounter.Advance.DRAW)finishEngagement();
             }else finishEngagement();
         }
         if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE){
@@ -2551,7 +2552,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     screen==GameMenuPanel.Screen.RESEARCH?researchNotice:
                             screen==GameMenuPanel.Screen.SKIRMISH?skirmishNotice:dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,
-                    audio.voiceVolume(),lastWon,lastReward,
+                    audio.voiceVolume(),lastWon,
+                    battle==null?diplomacy.sim.BattleTermination.Reason.NONE:
+                            battle.terminationReason(),lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
                     afterActionPage,themePage,themeCandidate,
@@ -2900,9 +2903,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     +"  /  "+battle.alive(1)+" ships",720,670);
             if(battle.finished()){
                 font.setColor(Color.GOLD);
-                String winner=battle.alive(0)>0?screensaverRound.left().displayName:
-                        battle.alive(1)>0?screensaverRound.right().displayName:"DRAW";
-                font.draw(batch,"VICTORY: "+winner+"  /  NEXT BATTLE SOON",355,370);
+                String outcome=battle.unresolved()?
+                        "UNRESOLVED: "+battle.terminationReason():
+                        battle.alive(0)>0 && battle.alive(1)==0?
+                                "VICTORY: "+screensaverRound.left().displayName:
+                        battle.alive(1)>0 && battle.alive(0)==0?
+                                "VICTORY: "+screensaverRound.right().displayName:
+                                "DRAW: MUTUAL DESTRUCTION";
+                font.draw(batch,outcome+"  /  NEXT BATTLE SOON",355,370);
             }
             font.setColor(Color.LIGHT_GRAY);
             if(!screensaverControlsVisible)
@@ -3077,8 +3085,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
                   "   " + saveState, 22, 38);
         if (battle.finished()) {
             font.setColor(Color.GOLD);
-            font.draw(batch, "ENGAGEMENT COMPLETE  —  " + (battle.engaged(0) > 0 ? left.displayName : right.displayName)
-                    + " HOLDS THE FIELD", 330, 617);
+            String outcome=battle.unresolved()?
+                    "ENGAGEMENT UNRESOLVED / "+battle.terminationReason():
+                    battle.engaged(0)>0&&battle.alive(1)==0?
+                            left.displayName+" HOLDS THE FIELD":
+                    battle.engaged(1)>0&&battle.alive(0)==0?
+                            right.displayName+" HOLDS THE FIELD":
+                            "NO FLEET HOLDS THE FIELD";
+            font.draw(batch,"ENGAGEMENT COMPLETE / "+outcome,330,617);
         }
         batch.end();
         if(shipInspector.selected(battle)!=null&&!shipyard.open()&&!tacticalMenuOpen){
