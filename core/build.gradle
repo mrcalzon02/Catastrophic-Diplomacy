@@ -116,7 +116,15 @@ tasks.register('sensorActiveScanSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorActiveScanTest'
     dependsOn testClasses
 }
+tasks.register('sensorCausalAcquisitionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Physical one-way optics and round-trip STANDARD radar lock authorization.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorCausalAcquisitionTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorCausalAcquisitionSmoke'))
     dependsOn(tasks.named('sensorActiveScanSmoke'))
     dependsOn(tasks.named('sensorTacticalPictureSmoke'))
     group = 'verification'
