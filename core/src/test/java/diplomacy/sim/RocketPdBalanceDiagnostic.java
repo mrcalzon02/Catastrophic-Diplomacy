@@ -228,8 +228,36 @@ public final class RocketPdBalanceDiagnostic {
                 defender.pdCycle,first.reloadSeconds(),first.damage,
                 acquisitions,slew,lockWait);
     }
+    /** Verify actual installed research, cloned live racks and immutable
+     * propulsion factor remain aligned, independent of accuracy/reload stats. */
+    private static void verifyFittedMotorResearch(TechnologyCatalog tech){
+        double previous=0;
+        for(int tier:new int[]{0,3,6,9}){
+            Shipyard.Design design=fitting(tech,"RKG",4,tier,false);
+            RocketBarrage.Rack fitted=Shipyard.rocketRacks(design,tech).get(0);
+            double expected=1.0+tier/9.0;
+            require(fitted.researchTier==tier,
+                    "Rocket rack discarded purchased propulsion research stage");
+            require(StrictMath.abs(fitted.sustainedThrustFactor-expected)<1e-10,
+                    "Rocket thrust did not scale with installed module research");
+            require(fitted.sustainedThrustFactor>=previous,
+                    "Rocket research degraded sustained motor thrust");
+            RocketBarrage.Rack cloned=new RocketBarrage.Rack(fitted);
+            require(cloned.researchTier==tier&&
+                    cloned.sustainedThrustFactor==fitted.sustainedThrustFactor,
+                    "Rocket rack clone lost researched drive performance");
+            Battle test=new Battle(503003L+tier);
+            test.spawnWing(0,design,tech,1,200,300);
+            RocketBarrage.Rack live=test.ships().get(0).rocketRacks.get(0);
+            require(live.researchTier==tier&&
+                    live.sustainedThrustFactor==fitted.sustainedThrustFactor,
+                    "Real commissioned ship lost researched rocket drive");
+            previous=fitted.sustainedThrustFactor;
+        }
+    }
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
+        verifyFittedMotorResearch(tech);
         Path output=Path.of("test-output","rocket-pd-balance");
         Files.createDirectories(output);
         List<String> rows=new ArrayList<>();
@@ -525,9 +553,13 @@ public final class RocketPdBalanceDiagnostic {
                     }
         Files.write(output.resolve("motor-thrust-physical-ab.csv"),
                 motorRows,StandardCharsets.UTF_8);
-        detail.append("\nAll sensitivity rows retain fixed unguided headings, "+
-                "research-derived speed caps, finite rocket ammunition and "+
-                "real collision physics. Increased thrust is laboratory-only. "+
+        detail.append("\nIn ordinary play, the installed rocket module's research "+
+                "tier now supplies a real sustained-thrust factor from 1x (base) "+
+                "to 2x (stage IX), while the boost/coast motor is unchanged. "+
+                "The displayed Thrust x values are EXTRA laboratory-only factors "+
+                "above the researched drive; the 1.00 row measures ordinary play. "+
+                "All runs retain fixed unguided headings, research-derived speed "+
+                "caps, finite rocket ammunition and real collision physics. "+
                 "Compare genuine impacts against each matched PD-off control; "+
                 "no interception percentage is a release gate.\n");
         summary=detail.toString();
