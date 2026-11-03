@@ -100,6 +100,12 @@ public final class WeaponFxProfile {
             return new Profile("point_defense",Motion.HITSCAN,
                     new Clip("effects/weapon_fx/laser/firing_%02d.png",8,1,false,14,14),
                     NONE,NONE,NONE);
+        // Continuous PPD reports one actually powered beam tick at a time.
+        // Use two compact source-art frames, never a huge pulse flash per
+        // tick or unbounded accumulated decorative emitter glow.
+        if(weapon.equals("PARTICLE_PD"))
+            return new Profile("particle_pd",Motion.HITSCAN,
+                    seq("particle","firing",2,1,10,10),NONE,NONE,NONE);
         if(weapon.equals("RAIL_PD"))
             return new Profile("rail_point_defense",Motion.BALLISTIC,
                     seq("kinetic","firing",8,1,18,18),NONE,
