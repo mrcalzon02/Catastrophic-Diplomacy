@@ -3640,9 +3640,21 @@ public final class Battle {
                 beams.add(new Beam(defensiveShot,tick,pdMuzzle.x(),pdMuzzle.y(),
                         craft.x,craft.y,defender.team,DamageType.LASER,true));
                 ProjectileModel.Spec signature=craft.radarProfile();
-                if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
+                double aircraftChance=ProjectileModel.interceptionChance(signature,
                         defender.pointDefenseProfile,defender.pointDefenseCondition,
-                        weather.accuracyFactor())) {
+                        weather.accuracyFactor());
+                if(!defender.weaponEmitters.isEmpty()){
+                    // Aircraft are maneuvering large bodies, unlike point-like
+                    // rockets. A tiny precision-beam spot is harder to hold as
+                    // transverse speed increases and cross-section decreases.
+                    double size=StrictMath.sqrt(signature.crossSection());
+                    double velocity=StrictMath.max(60,
+                            StrictMath.hypot(craft.observedVx,craft.observedVy));
+                    double spotHold=StrictMath.max(.10,StrictMath.min(.65,
+                            .70*size/(1+velocity/95)));
+                    aircraftChance*=spotHold;
+                }
+                if(random.nextDouble()<aircraftChance) {
                     // Precision CIWS pulses ablate tiny ordnance very well,
                     // but their narrow single-body spot does not transfer the
                     // same damage into a large aircraft frame. Unfitted legacy

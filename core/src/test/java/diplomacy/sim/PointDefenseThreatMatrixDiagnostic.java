@@ -127,7 +127,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
                               int separation,String pdFamily){
-        if(separation!=220&&separation!=390)
+        if(separation!=95&&separation!=220&&separation!=390)
             throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
                 threat.ordinal()*193L);
@@ -304,15 +304,15 @@ public final class PointDefenseThreatMatrixDiagnostic {
         summary.append("All defender modules are genuine equipped Terran weapon hardpoints; PD and FLK use their actual existing combat paths. ")
                 .append("The attacker is an unupgraded real physical launcher fixture, not a stage-IX fitted attacker. ")
                 .append("All balance readings are advisory. No other PD families are fabricated.\n\n");
-        summary.append("|Threat|Defense|Def tier|Mounts|Launched|Intercepted|Kill %|Terminal|Impacts|Hold-fire impacts|PD shots|\n");
-        summary.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        summary.append("|Threat|Range|Defense|Def tier|Mounts|Launched|Intercepted|Kill %|Terminal|Impacts|Hold-fire impacts|PD shots|\n");
+        summary.append("|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         Threat[] threats={Threat.KINETIC_STANDARD,Threat.KINETIC_RELATIVISTIC,
                 Threat.MISSILE_MICRO_SWARM,Threat.MISSILE_CASCADE_SWARM,
                 Threat.TORPEDO_HEAVY_STRIKE,Threat.FIGHTER_INTERCEPTOR,
                 Threat.FIGHTER_TORPEDO_BOMBER};
         final int measurementSeeds=8;
-        for(Threat threat:threats){
-            int range=threat.craft()?220:390;
+        for(Threat threat:threats)
+            for(int range:threat.craft()?new int[]{95,220,390}:new int[]{390})
             for(String family:new String[]{"PD","FLK"})
                 for(int rank:new int[]{0,9})
                     for(int mounts:new int[]{1,4}){
@@ -340,11 +340,10 @@ public final class PointDefenseThreatMatrixDiagnostic {
                                 fired,killed,rate,
                                 entries,impacts,controlImpacts,shots,damage,controlDamage));
                         summary.append(String.format(Locale.ROOT,
-                                "|%s|%s|%d|%d|%d|%d|%.1f%%|%d|%d|%d|%d|\n",
-                                threat,family,rank,mounts,fired,killed,rate,
+                                "|%s|%d|%s|%d|%d|%d|%d|%.1f%%|%d|%d|%d|%d|\n",
+                                threat,range,family,rank,mounts,fired,killed,rate,
                                 entries,impacts,controlImpacts,shots));
                     }
-        }
         Files.write(output.resolve("p0.csv"),csv,StandardCharsets.UTF_8);
         Files.writeString(output.resolve("summary.md"),summary.toString(),StandardCharsets.UTF_8);
         System.out.print(summary);
