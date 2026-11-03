@@ -3960,6 +3960,213 @@ public final class Battle {
         }
     }
 
+    private record RailTrack(long bodyId,double x,double y,double vx,double vy,
+                             int targetId,int sourceId,ProjectileModel.Spec profile,
+                             double emission) {}
+    /** Physically visible ordnance tracks only: charged railguns should not
+     * consume a three-cartridge penetrator against a fighter-sized target
+     * unless the target physically crosses a shot's inertial path. */
+    private RailTrack chooseRailContact(Ship defender,RailPointDefense.Mount gun){
+        RailTrack best=null;
+        double bestPriority=Double.POSITIVE_INFINITY;
+        if(!defender.orders.pointDefense().ordnance())return null;
+        for(Missile m:missiles){
+            if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
+            double emission=OrdnancePropulsion.emissionMultiplier(m.thrustPhase);
+            if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
+                    d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
+                            weather.sensorFactor(),emission))continue;
+            double eta=approachEta(defender.x,defender.y,m.x,m.y,
+                    m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
+            double score=defensiveScore(defender,d,
+                    Double.isFinite(eta)?eta:1000+d/100);
+            score-=StrictMath.min(15,m.spec.health()*2.5);
+            if(score<bestPriority){
+                bestPriority=score;
+                best=new RailTrack(m.visualId,m.x,m.y,m.vx,m.vy,
+                        m.targetId,m.sourceId,m.spec,emission);
+            }
+        }
+        for(Rocket m:rockets){
+            if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
+            double emission=RocketBarrage.hotEmission(m.motor,m.burning());
+            if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
+                    d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
+                            weather.sensorFactor(),emission))continue;
+            double eta=approachEta(defender.x,defender.y,m.x,m.y,
+                    m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
+            double score=defensiveScore(defender,d,
+                    Double.isFinite(eta)?eta:1000+d/100);
+            score-=StrictMath.min(15,m.spec.health()*2.5);
+            if(score<bestPriority){
+                bestPriority=score;
+                best=new RailTrack(m.visualId,m.x,m.y,m.vx,m.vy,
+                        m.targetId,m.sourceId,m.spec,emission);
+            }
+        }
+        for(Ballistic m:ballistics){
+            if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
+            if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
+                    d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
+                            weather.sensorFactor(),1))continue;
+            double eta=approachEta(defender.x,defender.y,m.x,m.y,m.vx,m.vy,
+                    StrictMath.hypot(m.vx,m.vy));
+            double score=defensiveScore(defender,d,
+                    Double.isFinite(eta)?eta:1000+d/100);
+            score-=StrictMath.min(15,m.spec.health()*2.5);
+            if(score<bestPriority){
+                bestPriority=score;
+                best=new RailTrack(m.visualId,m.x,m.y,m.vx,m.vy,
+                        m.targetId,m.sourceId,m.spec,1);
+            }
+        }
+        return best;
+    }
+    /** Charge the real fitted electromagnetic rails, mechanically track the
+     * current physical body, then release a single unguided narrow projectile
+     * with a long cooldown. No instant kill and no laser/rotary shared reload. */
+    private void fireRailPointDefense(){
+        for(Ship defender:ships){
+            if(!defender.alive()||defender.railMounts.isEmpty()||
+                    defender.crewReadiness()<.05||
+                    defender.pointDefenseCondition<=.2)continue;
+            for(RailPointDefense.Mount gun:defender.railMounts){
+                if(defender.power<8||defender.heat>=defender.maxHeat*.88||
+                        defender.kineticAmmo<RailPointDefense.CARTRIDGES_PER_SHOT||
+                        railPenetrators.size()>=RailPointDefense.MAX_ACTIVE_PENETRATORS)
+                    continue;
+                gun.scans++;
+                RailTrack target=chooseRailContact(defender,gun);
+                if(target==null)continue;
+                gun.track(target.bodyId,DT);
+                WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(defender,
+                        WeaponMuzzles.Family.RAIL_PD,gun.slotId);
+                double desired=RailPointDefense.leadAngle(muzzle.x(),muzzle.y(),
+                        target.x,target.y,target.vx,target.vy);
+                if(!Double.isFinite(gun.bearing))gun.bearing=defender.facing;
+                double error=StrictMath.atan2(StrictMath.sin(desired-gun.bearing),
+                        StrictMath.cos(desired-gun.bearing));
+                double slew=StrictMath.max(.6,StrictMath.min(7.5,
+                        3.5*gun.profile.tracking()*defender.pointDefenseCondition))*DT;
+                gun.bearing+=StrictMath.max(-slew,StrictMath.min(slew,error));
+                // Tracking the incoming body's trajectory and charging the
+                // capacitor costs power even before a projectile can launch.
+                defender.power-=.22*DT;defender.heat+=.14*DT;
+                double remaining=StrictMath.atan2(StrictMath.sin(desired-gun.bearing),
+                        StrictMath.cos(desired-gun.bearing));
+                if(StrictMath.abs(remaining)>.038||!gun.ready())continue;
+                double dispersion=(random.nextDouble()-.5)*.016/
+                        StrictMath.max(.35,gun.profile.tracking());
+                long id=nextVisualShotId++;
+                railPenetrators.add(new RailPointDefense.Penetrator(id,tick,
+                        defender.team,defender.id,gun.slotId,
+                        muzzle.x(),muzzle.y(),gun.bearing+dispersion,
+                        gun.nominalRange,gun.profile.damage()));
+                gun.fire(defender.pointDefenseCondition);
+                defender.kineticAmmo-=RailPointDefense.CARTRIDGES_PER_SHOT;
+                defender.power-=5.2;defender.heat+=5.4;
+                visual(id,VisualPhase.FIRE,"RAIL_PD",defender.team,defender.id,
+                        target.sourceId,muzzle.x(),muzzle.y(),target.x,target.y);
+            }
+        }
+    }
+    /** Exact swept solid-penetrator collision with moving actual bodies.
+     * The first world-space intersection absorbs the shot; an unhit projectile
+     * remains on its fixed ballistic trajectory until physically out of range. */
+    private void advanceRailPenetrators(){
+        for(int i=railPenetrators.size()-1;i>=0;i--){
+            RailPointDefense.Penetrator shot=railPenetrators.get(i);
+            double dt=StrictMath.min(DT,shot.life);
+            double nx=shot.x+shot.vx*dt,ny=shot.y+shot.vy*dt;
+            double first=Double.POSITIVE_INFINITY;
+            Missile missileHit=null;Rocket rocketHit=null;
+            Ballistic shellHit=null;Craft craftHit=null;
+            for(Missile target:missiles){
+                if(target.team==shot.team)continue;
+                double radius=.75+1.65*StrictMath.sqrt(target.spec.crossSection());
+                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                if(at<first){first=at;missileHit=target;
+                    rocketHit=null;shellHit=null;craftHit=null;}
+            }
+            for(Rocket target:rockets){
+                if(target.team==shot.team)continue;
+                double radius=.75+1.65*StrictMath.sqrt(target.spec.crossSection());
+                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                if(at<first){first=at;rocketHit=target;
+                    missileHit=null;shellHit=null;craftHit=null;}
+            }
+            for(Ballistic target:ballistics){
+                if(target.team==shot.team)continue;
+                double radius=.55+1.15*StrictMath.sqrt(target.spec.crossSection());
+                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                if(at<first){first=at;shellHit=target;
+                    missileHit=null;rocketHit=null;craftHit=null;}
+            }
+            for(Craft target:crafts){
+                if(target.team==shot.team)continue;
+                double radius=3.5+2.5*StrictMath.sqrt(target.radarProfile().crossSection());
+                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                if(at<first){first=at;craftHit=target;
+                    missileHit=null;rocketHit=null;shellHit=null;}
+            }
+            shot.life-=DT;
+            if(Double.isFinite(first)){
+                shot.x+=(nx-shot.x)*first;shot.y+=(ny-shot.y)*first;
+                Ship shooter=findShip(shot.sourceId);
+                if(craftHit!=null){
+                    hitCraft(craftHit,shot.damage*2.4,shooter,shot.visualId,"RAIL_PD");
+                    pointDefenseCraftHits++;
+                    if(craftHit.integrity<=0){
+                        crafts.remove(craftHit);
+                        pointDefenseCraftKills++;craftLosses++;
+                    }
+                }else{
+                    ProjectileModel.Spec signature=missileHit!=null?missileHit.spec:
+                            rocketHit!=null?rocketHit.spec:shellHit.spec;
+                    double depth=shot.damage*3.2*
+                            (1+.15*StrictMath.min(8,signature.health()));
+                    if(missileHit!=null){
+                        missileHit.integrity-=depth;
+                        if(missileHit.integrity<=0&&missiles.remove(missileHit)){
+                            missileIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            if(missileHit.decoy)decoysIntercepted++;
+                            visual(missileHit.visualId,VisualPhase.INTERCEPT,
+                                    missileHit.decoy?"DECOY":
+                                            missileHit.torpedo?"TORPEDO":"MISSILE",
+                                    missileHit.team,missileHit.sourceId,missileHit.targetId,
+                                    missileHit.x,missileHit.y,missileHit.x,missileHit.y);
+                        }
+                    }else if(rocketHit!=null){
+                        rocketHit.integrity-=depth;
+                        if(rocketHit.integrity<=0&&rockets.remove(rocketHit)){
+                            rocketIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            visual(rocketHit.visualId,VisualPhase.INTERCEPT,"ROCKET",
+                                    rocketHit.team,rocketHit.sourceId,rocketHit.targetId,
+                                    rocketHit.x,rocketHit.y,rocketHit.x,rocketHit.y);
+                        }
+                    }else{
+                        shellHit.integrity-=depth;
+                        if(shellHit.integrity<=0&&ballistics.remove(shellHit)){
+                            ballisticIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            visual(shellHit.visualId,VisualPhase.INTERCEPT,"KINETIC",
+                                    shellHit.team,shellHit.sourceId,shellHit.targetId,
+                                    shellHit.x,shellHit.y,shellHit.x,shellHit.y);
+                        }
+                    }
+                }
+                visual(shot.visualId,VisualPhase.IMPACT,"RAIL_PD",shot.team,
+                        shot.sourceId,0,shot.x,shot.y,shot.x,shot.y);
+                railPenetrators.remove(i);
+            }else{
+                shot.x=nx;shot.y=ny;
+                if(shot.life<=0)railPenetrators.remove(i);
+            }
+        }
+    }
+
     private record RotaryTrack(long bodyId,double x,double y,double vx,double vy,
                                int targetId,int sourceId,ProjectileModel.Spec profile,
                                double emission) { }
