@@ -19,6 +19,12 @@ final class ShipLightProbes {
             score=new float[COUNT];
     private CombatViewBounds bounds;
     private static final int MAX_EVENTS=96,MAX_BEAMS=128,MAX_MISSILES=128;
+    // Weapon-light influence is a small patch near the hit. The enormous
+    // legacy 108-150 world-unit probes tinted whole ship sprites cyan/red.
+    // Broad laser annealing belongs in the damage MATERIAL mask, never here.
+    static final float IMPACT_LIGHT_RADIUS=18f;
+    static final float BEAM_HIT_LIGHT_RADIUS=19f;
+    static final float MAX_WEAPON_LIGHT_GAIN=.13f;
     private static final int CELLS_X=32,CELLS_Y=20;
     private final boolean[] receiverCells=new boolean[CELLS_X*CELLS_Y];
     private boolean requireReceivers;
@@ -119,31 +125,33 @@ final class ShipLightProbes {
             if(age<0)continue;
             if(age>9)break;
             if(event.phase()==Battle.VisualPhase.TIMEOUT)continue;
-            float strength=event.phase()==Battle.VisualPhase.IMPACT?.75f:
-                    event.phase()==Battle.VisualPhase.INTERCEPT?.56f:.39f;
+            float strength=event.phase()==Battle.VisualPhase.IMPACT?
+                    MAX_WEAPON_LIGHT_GAIN:
+                    event.phase()==Battle.VisualPhase.INTERCEPT?.085f:.055f;
             strength*=Math.max(0f,1f-age/10f);
-            float reach=event.phase()==Battle.VisualPhase.IMPACT?145f:108f;
+            float reach=event.phase()==Battle.VisualPhase.IMPACT?
+                    IMPACT_LIGHT_RADIUS:12f;
             offerWeapon(event.x(),event.y(),reach,strength,event.weapon());
         }
         int counted=0;
         for(Battle.Beam beam:battle.beams()) {
             if(++counted>MAX_BEAMS)break;
             if(beam.pointDefense){
-                offer(beam.x1,beam.y1,70f,.17f,.36f,.85f,.34f);
-                offer(beam.x2,beam.y2,88f,.22f,.36f,.85f,.34f);
+                offer(beam.x1,beam.y1,11f,.035f,.36f,.85f,.34f);
+                offer(beam.x2,beam.y2,14f,.055f,.36f,.85f,.34f);
             }else{
                 String type=beam.type==Battle.DamageType.LASER
                         ?LaserFamilies.eventWeapon(beam.laserType):beam.type.name();
-                offerWeapon(beam.x1,beam.y1,110f,.43f,type);
-                offerWeapon(beam.x2,beam.y2,150f,.55f,type);
+                offerWeapon(beam.x1,beam.y1,14f,.065f,type);
+                offerWeapon(beam.x2,beam.y2,BEAM_HIT_LIGHT_RADIUS,.09f,type);
             }
         }
         counted=0;
         for(Battle.Missile missile:battle.missiles()) {
             if(++counted>MAX_MISSILES)break;
             if(missile.ignitionDelayTicks>0||missile.fuel<=0)continue;
-            offerWeapon(missile.x,missile.y,missile.torpedo?108f:74f,
-                    missile.torpedo?.50f:.37f,missile.torpedo?"TORPEDO":"MISSILE");
+            offerWeapon(missile.x,missile.y,missile.torpedo?18f:12f,
+                    missile.torpedo?.085f:.065f,missile.torpedo?"TORPEDO":"MISSILE");
         }
     }
     /** Authoritative weapon palette also drives beam/impact art and bloom. */
