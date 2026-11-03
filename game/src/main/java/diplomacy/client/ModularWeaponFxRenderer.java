@@ -311,6 +311,25 @@ final class ModularWeaponFxRenderer implements Disposable {
             else drawCentered(batch,fallback,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
         }
+        // Fitted flak now sends an honest, inertial proximity-fuze shell.
+        // Render the live shell's coordinates from Battle, not an old
+        // FIRE-to-IMPACT interpolation or a stationary future explosion.
+        // Share the original kinetic atlas; do not allocate new textures.
+        for(Battle.FlakRound shot:battle.flakRounds()){
+            if(view!=null&&!view.circle((float)shot.x,(float)shot.y,6))continue;
+            Texture fallback=shells==null?frame(kinetic.payload(),
+                    battle.tick-shot.spawnTick):null;
+            if(shells==null&&fallback==null)continue;
+            float angle=(float)StrictMath.toDegrees(
+                    StrictMath.atan2(shot.vy,shot.vx));
+            batch.setColor(.90f,.80f,.58f,1f);
+            if(shells!=null)
+                drawCentered(batch,shells[0],(float)shot.x,(float)shot.y,
+                        9,4,angle);
+            else drawCentered(batch,fallback,(float)shot.x,(float)shot.y,
+                    9,4,angle);
+            batch.setColor(1,1,1,1);
+        }
         // RCW rounds are not beams or fake muzzle-to-target tweens. Render
         // each ACTUAL in-flight kinetic tracer at its physical simulation
         // coordinates using the existing authored kinetic-shell atlas.
