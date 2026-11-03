@@ -6,6 +6,7 @@ import diplomacy.sim.CampaignProgress;
 import diplomacy.sim.CampaignTechnology;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SensorNetworkCatalog;
 import diplomacy.tech.SurvivalHardwareCatalog;
 import java.util.Locale;
 
@@ -30,8 +31,10 @@ public final class CampaignShipyardRules {
             Shipyard.Installed installed=design.at(i);
             if(installed==null)continue;
             String subsystem=installed.component.substring(installed.component.lastIndexOf('-')+1);
-            int hardwareTier=Math.max(SensingVariantCatalog.requiredTier(subsystem),
-                    SurvivalHardwareCatalog.requiredTier(subsystem));
+            int hardwareTier=Math.max(
+                    SensorNetworkCatalog.requiredTier(subsystem),
+                    Math.max(SensingVariantCatalog.requiredTier(subsystem),
+                            SurvivalHardwareCatalog.requiredTier(subsystem)));
             if(researchRank<hardwareTier)
                 throw new IllegalArgumentException("Hardware "+subsystem+
                         " requires engineering tier "+hardwareTier);
