@@ -83,7 +83,16 @@ tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
     dependsOn(tasks.named('battleArenaSmoke'))
 }
 
+tasks.register('sensorTacticalPictureSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Actual commander SHR/TRK/LNK/FCM picture, stale coordinates and no invisible weapon locks.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorTacticalPictureTest'
+    dependsOn testClasses
+}
+
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorTacticalPictureSmoke'))
     group = 'verification'
     description = 'Verify six physical sensor-network families and 24 variants, nine-rank research, power-loss counterplay and real shared contacts.'
     classpath = sourceSets.test.runtimeClasspath
