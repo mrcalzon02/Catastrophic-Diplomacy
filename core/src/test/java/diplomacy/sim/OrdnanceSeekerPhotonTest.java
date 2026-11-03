@@ -70,7 +70,59 @@ public final class OrdnanceSeekerPhotonTest {
         }
         System.out.println("PASS deterministic seeker observations without current-target oracle");
     }
+    private static void emittedHologramCannotChangeInFlight(){
+        Battle b=new Battle(461232);
+        Battle.Ship observer=b.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship emitter=b.addShip(1,Battle.Faction.DRAXIAN,760,100);
+        b.registerDiagnosticStationaryTarget(observer.id);
+        b.registerDiagnosticStationaryTarget(emitter.id);
+        emitter.ecmCondition=1;emitter.hologramNoise=.75;
+        emitter.power=500;emitter.maxPower=500;
+        int light=SensorLightTimeHistory.propagationTicks(660);
+        for(int i=0;i<light;i++)b.step();
+        var first=OrdnanceSeeker.passiveReturn(emitter,100,100,b.tick);
+        require(first!=null&&DeceptionProjection.falseContacts(first.profile())==3,
+                "Powered hologram must be observable only after photons arrive");
+        int missileId=0,phantom=-1;
+        for(int i=1;i<=512;i++){
+            int candidate=DeceptionProjection.seekerGhostIndex(
+                    emitter.id,first.profile(),i,1,1);
+            if(candidate>=0){missileId=i;phantom=candidate;break;}
+        }
+        require(missileId>0,"Historical powered emitter never generated a false contact");
+        double oldX=DeceptionProjection.ghostX(emitter.id,first.sample(),
+                emitter.visualScale(),phantom);
+        emitter.y=430;emitter.power=0;
+        b.step();
+        var stillArriving=OrdnanceSeeker.passiveReturn(emitter,100,100,b.tick);
+        require(stillArriving!=null&&
+                DeceptionProjection.falseContacts(stillArriving.profile())==3,
+                "Present-time emitter shutdown rewrote already emitted ghost history");
+        require(DeceptionProjection.seekerGhostIndex(emitter.id,
+                stillArriving.profile(),missileId,1,1)>=0,
+                "Seeker phantom vanished before shutdown photons arrived");
+        require(StrictMath.abs(oldX-
+                DeceptionProjection.ghostX(emitter.id,first.sample(),
+                        emitter.visualScale(),phantom))<1e-9,
+                "Historical phantom position was retroactively modified");
+        boolean arrived=false;
+        for(int i=0;i<28;i++){
+            b.step();
+            var later=OrdnanceSeeker.passiveReturn(emitter,100,100,b.tick);
+            if(later!=null&&later.sample().y()==430){
+                require(DeceptionProjection.falseContacts(later.profile())==0,
+                        "Historical inactive emitter still produced false contacts");
+                require(DeceptionProjection.seekerGhostIndex(emitter.id,
+                        later.profile(),missileId,1,1)==-1,
+                        "Delayed shutdown was not applied to seeker spoof selection");
+                arrived=true;break;
+            }
+        }
+        require(arrived,"No delayed shutdown photons reached the observer");
+        System.out.println("PASS historical hologram emission, movement and power-loss delay");
+    }
     public static void main(String[] args){
-        delayedPositionAndEcm();deterministicCausalReplay();
+        delayedPositionAndEcm();emittedHologramCannotChangeInFlight();
+        deterministicCausalReplay();
     }
 }

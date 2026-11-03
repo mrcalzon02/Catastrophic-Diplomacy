@@ -5786,19 +5786,24 @@ public final class Battle {
                     &&OrdnanceSeeker.scanDue(m.flightTicks,m.visualId))
                 m.seekerLocked=true;
             if(m.seekerLocked){
-                int phantom=DeceptionProjection.seekerGhostIndex(
-                        target,m.visualId,m.flightTicks,m.guidanceQuality);
+                int phantom=sensed==null?-1:DeceptionProjection.seekerGhostIndex(
+                        target.id,sensed.profile(),m.visualId,
+                        m.flightTicks,m.guidanceQuality);
                 if(phantom>=0&&phantom!=m.falseContactIndex)
                     target.holoSeekersDiverted++;
                 m.falseContactIndex=phantom;
                 if(phantom>=0){
-                    // The same physical decoy world-position the renderer
-                    // displays also steers the *real* missile. No false damage
-                    // event is created: only a collision with an actual hull
-                    // can apply payload damage.
-                    m.lastKnownX=DeceptionProjection.ghostX(target,phantom,tick);
-                    m.lastKnownY=DeceptionProjection.ghostY(target,phantom,tick);
-                    m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
+                    // This ghost was physically emitted at the sensed tick.
+                    // The present emitter can move or power down; only the
+                    // arrived false-contact position/velocity guides the body.
+                    // Real collision/hull damage remains independent.
+                    var fix=sensed.sample();
+                    m.lastKnownX=DeceptionProjection.ghostX(target.id,fix,
+                            target.visualScale(),phantom);
+                    m.lastKnownY=DeceptionProjection.ghostY(target.id,fix,
+                            target.visualScale(),phantom);
+                    m.lastKnownVX=fix.vx();m.lastKnownVY=fix.vy();
+                    m.lastObservationTick=fix.tick();
                 }else if(sensed!=null){
                     var fix=sensed.sample();
                     m.lastKnownX=fix.x();m.lastKnownY=fix.y();

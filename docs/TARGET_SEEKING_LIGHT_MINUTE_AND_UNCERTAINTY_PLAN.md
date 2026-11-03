@@ -527,15 +527,18 @@ also returning `BUILD SUCCESSFUL`.
 **Important first-pass limitations:** the on-body passive receive solver
 uses the missile's current own pose, rather than a recorded historical
 moving-receiver trajectory; it is not yet an exact relativistic light-cone
-solution for fast moving receivers. Hologram decoy world geometry and
-spoof-selection are still computed using the present emitter state rather
-than a full timestamped false-contact stream. Targeting uncertainty
+solution for fast moving receivers. Hologram seeker spoof selection and ghost coordinates now consume the
+same historical light-delayed emitter profile and measured pose as the seeker
+return; live emitter movement or shutdown cannot edit already travelling
+ghost evidence. Visual phantom rendering remains current-time for spectators;
+a separate timestamped fleet-wide false-contact transmission stream has NOT
+yet been implemented. Targeting uncertainty
 and ECM influence are not yet probabilistic multi-hypothesis seeker tracks;
 the basic delayed sample still provides exact historical coordinates.
 These limitations should not be reported as solved.
 
-**Still pending:** fully timestamped false-contact emission and guided
-reacquisition, measured receiver-position histories, per-seeker noise and
+**Still pending:** full fleet-visible timestamped false-contact packet dissemination,
+measured receiver-position histories, per-seeker noise and
 uncertainty budgets, actual guided trajectory envelopes/ETA pips, complete
 200v200 balance/performance, maneuver covariance, fleet FCM shared-compute
 arbitration, beam light-time damage delivery and persisted scan doctrine

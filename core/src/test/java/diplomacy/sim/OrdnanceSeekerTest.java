@@ -124,15 +124,32 @@ public final class OrdnanceSeekerTest {
         check(StrictMath.hypot(diverted.lastKnownX-target.x,
                 diverted.lastKnownY-target.y)>25,
                 "Real projectile guidance must be fed the hologram's world position");
-        double ghostX=DeceptionProjection.ghostX(target,diverted.falseContactIndex,battle.tick);
-        double ghostY=DeceptionProjection.ghostY(target,diverted.falseContactIndex,battle.tick);
+        var arriving=OrdnanceSeeker.passiveReturn(target,
+                diverted.previousX,diverted.previousY,battle.tick);
+        check(arriving!=null&&diverted.lastObservationTick==arriving.measuredTick(),
+                "Deceived seeker must record the actual delayed emitter epoch");
+        double ghostX=DeceptionProjection.ghostX(target.id,arriving.sample(),
+                target.visualScale(),diverted.falseContactIndex);
+        double ghostY=DeceptionProjection.ghostY(target.id,arriving.sample(),
+                target.visualScale(),diverted.falseContactIndex);
         check(diverted.lastKnownX==ghostX&&diverted.lastKnownY==ghostY,
-                "Live seeker coordinates must match the very same visible decoy sprite");
+                "Missile must guide to the emitted ghost, not today's sprite");
         target.power=0;
         battle.step();
-        check(diverted.falseContactIndex==-1
-                &&diverted.lastKnownX==target.x&&diverted.lastKnownY==target.y,
-                "Shutting down the holo emitter must restore live missile guidance");
+        check(diverted.falseContactIndex>=0,
+                "Emitter power loss cannot erase already travelling ghost photons");
+        boolean extinguished=false;
+        for(int i=0;i<20&&battle.missiles().contains(diverted);i++){
+            battle.step();
+            if(diverted.falseContactIndex==-1){
+                extinguished=true;
+                check(diverted.lastObservationTick<battle.tick,
+                        "Seeker shutdown used forbidden current enemy truth");
+                break;
+            }
+        }
+        check(extinguished,
+                "Emitter shutdown must eventually arrive and remove the decoy");
     }
     private static void pointDefenseStillWorks(){
         Battle b=scene(7711L);
