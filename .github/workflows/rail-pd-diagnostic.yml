@@ -11,6 +11,7 @@ on:
       - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
       - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
       - 'core/src/test/java/diplomacy/sim/RailPointDefenseDiagnostic.java'
+      - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
       - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
       - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
@@ -35,6 +36,9 @@ jobs:
       - name: Validate researched railgun hardpoints and real travelling penetrators
         id: mechanics
         run: gradle --no-daemon :core:railPdDiagnostic
+      - name: Verify rail projectile lifetime and 200v200 arena limits
+        id: world
+        run: gradle --no-daemon :core:battleArenaSmoke
       - name: Compile authored railgun turret and moving penetrator art
         id: renderer
         run: gradle --no-daemon :game:compileJava
@@ -42,7 +46,7 @@ jobs:
         if: always()
         run: |
           echo "## Physically installed charged rail interceptors" >> "$GITHUB_STEP_SUMMARY"
-          echo "Core mechanics: ${{ steps.mechanics.outcome }}; visual path compilation: ${{ steps.renderer.outcome }}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Core mechanics: ${{ steps.mechanics.outcome }}; arena bounds: ${{ steps.world.outcome }}; visual compilation: ${{ steps.renderer.outcome }}." >> "$GITHUB_STEP_SUMMARY"
           echo "Physical results are measured, numerical balance targets are advisory, no APK was built." >> "$GITHUB_STEP_SUMMARY"
           if [ -f core/test-output/rail-pd/summary.md ]; then
             cat core/test-output/rail-pd/summary.md >> "$GITHUB_STEP_SUMMARY"
