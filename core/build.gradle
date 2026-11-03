@@ -90,7 +90,16 @@ tasks.named('processResources') {
     from rootProject.layout.buildDirectory.dir('generated/cd-hardpoints')
 }
 
+tasks.register('approvedHardpointsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify original-sprite baked hardpoints on every faction and variant, including exact projectile origins.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ApprovedHardpointsTest'
+    dependsOn testClasses
+}
+
 tasks.register('hullLayoutsSmoke', JavaExec) {
+    dependsOn(tasks.named('approvedHardpointsSmoke'))
     group = 'verification'
     description = 'All 11 hull classes x six factions: hardpoint positions, selection and legacy blueprint schema.'
     classpath = sourceSets.test.runtimeClasspath
