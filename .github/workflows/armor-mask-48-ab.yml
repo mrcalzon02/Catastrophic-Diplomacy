@@ -1,74 +1,87 @@
-name: Optional 48px damage-mask A/B original-ship framebuffer comparison
+name: Optional native 96px armor-mask authoring and inspection
 on:
   push:
     branches: [main]
     paths:
-      - 'assets/damage_masks/ab/*.png'
-      - 'game/src/main/java/diplomacy/client/ShipDamageImageMasks.java'
-      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
-      - 'tools/armor_48_ab_compare.py'
+      - 'tools/generate_damage_masks_96.py'
       - '.github/workflows/armor-mask-48-ab.yml'
   workflow_dispatch:
+
+# Artwork generation is independent of release and never gates packages.
 permissions:
-  contents: read
-# Distinct diagnostic, never connected to release workflows.
+  contents: write
+
 concurrency:
-  group: cd-armor48-ab-${{ github.ref }}
+  group: cd-armor96-authoring-${{ github.ref }}
   cancel-in-progress: false
+
 jobs:
-  compare-real-masks:
+  author-native-masks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: {distribution: temurin, java-version: '17'}
-      - uses: gradle/actions/setup-gradle@v4
-        with: {gradle-version: '8.11.1'}
-      - name: Confirm same physically fired combat capture scenario
-        run: gradle --no-daemon :game:shipDamageCaptureSmoke
-      - name: Install headless GPU and image inspection dependencies
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image authoring dependency
+        run: python -m pip install Pillow==11.3.0
+      - name: Produce all 42 authentic native-resolution RGBA masks
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libgl1 libopenal1 python3-pil
-      - name: Capture A and B from real Battle.step OpenGL game
+          python tools/generate_damage_masks_96.py \
+            --preview test-output/armor96/armor-96-variants.png
+      - name: Audit asset dimensions and frame variety without cosmetic blocking
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageChops
+          root=Path('assets/damage_masks/hires96')
+          families=('laser','kinetic','plasma','particle','missile','torpedo','fighter')
+          for family in families:
+              with Image.open(root/(family+'.png')) as atlas:
+                  assert atlas.size == (576,96) and atlas.mode == 'RGBA'
+                  frames=[atlas.crop((i*96,0,(i+1)*96,96)) for i in range(6)]
+                  assert len(set(frame.tobytes() for frame in frames))==6
+                  for i,frame in enumerate(frames):
+                      assert frame.getpixel((0,0))==(0,0,0,255), (family,i)
+                  print('VALID',family,'96x96 x6')
+          PY
+      - name: Commit regenerated artwork without rewriting other development
         shell: bash
         run: |
           set -euo pipefail
-          export LIBGL_ALWAYS_SOFTWARE=1
-          export ALSOFT_DRIVERS=null
-          for MODE in upscaled48 authored48; do
-            export CD_ARMOR_MASK_SET="$MODE"
-            export CD_ARMOR_CAPTURE_DIR="$PWD/test-output/armor-ab/$MODE/framebuffer"
-            mkdir -p "$CD_ARMOR_CAPTURE_DIR"
-            echo "=== REAL SOURCE ART GAME CAPTURE: $MODE ==="
-            timeout --signal=INT --kill-after=10s 13m \
-              xvfb-run -a -s "-screen 0 1280x720x24" gradle --no-daemon :desktop:run \
-              2>&1 | tee "test-output/armor-ab/$MODE/framebuffer-run.log"
-            python3 tools/armor_visual_gallery.py
-          done
-          python3 tools/armor_48_ab_compare.py
-      - name: Real 48px A/B side-by-side screenshot comparisons
+          git add assets/damage_masks/hires96/*.png assets/damage_masks/hires96/audit.json
+          if git diff --cached --quiet; then
+            echo 'Native 96px atlases unchanged'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Store seven approved-size native 96px six-variant damage atlases'
+          git fetch origin main
+          # Never overwrite or automatically rebase another author's main work.
+          if [ "$(git rev-parse HEAD^)" != "$(git rev-parse origin/main)" ]; then
+            echo 'BLOCKED: main advanced during artwork generation; manual retry needed'
+            exit 1
+          fi
+          git push origin HEAD:main
+          HEAD_SHA="$(git rev-parse HEAD)"
+          REMOTE_SHA="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$HEAD_SHA" = "$REMOTE_SHA" || {
+            echo 'BLOCKED: remote main does not contain art generation commit'
+            exit 1
+          }
+          echo "VERIFIED main=$REMOTE_SHA"
+      - name: Keep original authored masks and the actual 96px preview
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cd-armor48-actual-game-comparisons-${{ github.run_id }}
-          path: test-output/armor-ab/comparisons/
-          if-no-files-found: warn
-          retention-days: 30
-      - name: Actual OpenGL screenshots - upscaled old masks at 48px
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cd-armor48-upscaled48-real-framebuffer-${{ github.run_id }}
-          path: test-output/armor-ab/upscaled48/
-          if-no-files-found: warn
-          retention-days: 30
-      - name: Actual OpenGL screenshots - newly authored native 48px
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: cd-armor48-authored48-real-framebuffer-${{ github.run_id }}
-          path: test-output/armor-ab/authored48/
+          name: cd-armor96-authored-${{ github.run_id }}
+          path: |
+            assets/damage_masks/hires96/
+            test-output/armor96/armor-96-variants.png
           if-no-files-found: warn
           retention-days: 30
