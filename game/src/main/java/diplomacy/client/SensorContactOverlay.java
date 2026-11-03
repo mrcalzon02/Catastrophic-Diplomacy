@@ -24,6 +24,7 @@ import java.util.Map;
  */
 final class SensorContactOverlay {
     private final Map<Integer,Integer> contacts=new HashMap<>();
+    private final Map<Integer,Float> classification=new HashMap<>();
     private Battle source;
     private long scannedTick=Long.MIN_VALUE;
     private int scannedTeam=-1;
@@ -32,16 +33,34 @@ final class SensorContactOverlay {
                 &&battle.tick>=scannedTick&&battle.tick-scannedTick<6)return;
         source=battle;scannedTeam=team;scannedTick=battle.tick;
         contacts.clear();
+        classification.clear();
         for(Battle.Ship target:battle.ships()){
             if(!target.alive()||target.team==team)continue;
             int found=0;
+            float bestQuality=0;
             for(Battle.Ship spotter:battle.ships()){
                 if(!spotter.alive()||spotter.team!=team)continue;
                 double range=Math.hypot(target.x-spotter.x,target.y-spotter.y);
-                found|=battle.directSensorChannels(spotter,target,range);
+                int channels=battle.directSensorChannels(spotter,target,range);
+                found|=channels;
+                if(channels!=0){
+                    // RES improves classification through actual live channels.
+                    // Several independent returns are easier to correlate;
+                    // a fleet command core supplies additional correlation.
+                    float live=spotter.power>3 && spotter.sensorsCondition>.05
+                            ?(float)Math.min(1,spotter.sensorsCondition):0;
+                    float quality=(float)(.20+.50*
+                            (spotter.network.resolutionGain()-1)*live
+                            +.09*Math.max(0,Integer.bitCount(channels)-1)
+                            +.20*spotter.commandAssist);
+                    bestQuality=Math.max(bestQuality,Math.min(1,quality));
+                }
                 if((found & Battle.CONTACT_OPTICAL)!=0)break;
             }
-            if(found!=0)contacts.put(target.id,found);
+            if(found!=0){
+                contacts.put(target.id,found);
+                classification.put(target.id,bestQuality);
+            }
         }
     }
     boolean opticallyVisible(int id){
@@ -160,7 +179,15 @@ final class SensorContactOverlay {
             float sy=(pose.y()-world.position.y)/world.zoom+360f;
             if(sx<16||sx>1180||sy<75||sy>600)continue;
             font.setColor(Color.LIGHT_GRAY);
-            font.draw(batch,label(mask),sx+12,sy+20);
+            String description=label(mask);
+            // An IR point is not automatically identified as a dreadnought.
+            // Dedicated resolution or consistent multispectral correlation
+            // permits a class label without revealing source hull textures.
+            float quality=classification.getOrDefault(target.id,0f);
+            if(quality>=.35f && target.hullClass!=null &&
+                    (mask&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY))!=0)
+                description+=" "+target.hullClass.spriteHull().name().replace('_',' ');
+            font.draw(batch,description,sx+12,sy+20);
         }
         font.setColor(Color.WHITE);
         batch.end();
