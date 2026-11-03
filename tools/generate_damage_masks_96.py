@@ -99,7 +99,7 @@ def enrich_materials(fields, family, variant):
                                             middle * .42)
                         # Bright, surviving incised edges (B > .9) can glow
                         # in the material shader; no light in empty alpha.
-                        b = max(b, 173 + .31 * rim_soft[x,y])
+                        b = max(b, 173 + .31 * soft_lip)
                         dark = max(dark, r * .92)
                     else:
                         b = 0
