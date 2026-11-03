@@ -233,7 +233,7 @@ final class ShipSurfaceLighting implements Disposable {
         binds++;
     }
     /**
-     * Binds one tiny 96x144 per-ship peel mask; original full-resolution
+     * Binds one cached 192x288 per-ship peel mask; original full-resolution
      * albedo, normals, and emissive material stay bound as the source artwork.
      */
     void damage(SpriteBatch batch,Texture mask){
