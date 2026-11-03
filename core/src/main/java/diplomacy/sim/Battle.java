@@ -477,8 +477,9 @@ public final class Battle {
             // schemes then set the appropriate ejection/boost impulse.
             vx*=spec.speed();vy*=spec.speed();
             propellant=spec.speed()*2.6;
-            fuel=WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE).flightSeconds()
-                    +ignitionTicks*DT;
+            fuel=StrictMath.min(BattleArena.MAX_GUIDED_SECONDS,
+                    WeaponBehaviorTable.gun(heavy?DamageType.TORPEDO:DamageType.MISSILE)
+                            .flightSeconds()+ignitionTicks*DT);
             damage=amount;integrity=profile.health();
         }
     }
@@ -511,7 +512,9 @@ public final class Battle {
             visualId=id;spawnTick=firedAt;sourceId=source;team=side;targetId=target;
             x=px;y=py;vx=profile.speed()*StrictMath.cos(heading);
             vy=profile.speed()*StrictMath.sin(heading);
-            life=Math.max(1.5,760.0/profile.speed());integrity=profile.health();damage=amount;
+            life=StrictMath.min(BattleArena.MAX_BALLISTIC_SECONDS,
+                    StrictMath.max(1.5,760.0/profile.speed()));
+            integrity=profile.health();damage=amount;
         }
     }
 
@@ -1048,6 +1051,12 @@ public final class Battle {
 
     public Ship addShip(int team, Faction faction, double x, double y) {
         if (team != 0 && team != 1) throw new IllegalArgumentException("Only two teams in the skirmish mode");
+        if(!BattleArena.contains(x,y))
+            throw new IllegalArgumentException("Ship outside fixed combat arena");
+        int deployed=0;
+        for(Ship existing:ships)if(existing.team==team)deployed++;
+        if(deployed>=BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
         Ship ship = new Ship(nextId++, team, faction, faction.name().substring(0, 3) + "-" + nextId);
         ship.x = x; ship.y = y; ship.facing = team == 0 ? 0 : Math.PI;
         ship.orders=teamOrders[team];
@@ -1249,7 +1258,8 @@ public final class Battle {
     }
     public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
                           int count, double centerX, double centerY) {
-        if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
+        if (count < 0 || count > BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
         Shipyard.Fitted machinery = Shipyard.fit(design, catalog);
         SupportDoctrine doctrine=Shipyard.supportDoctrine(design,catalog);
         List<RocketBarrage.Rack> rocketTemplates=Shipyard.rocketRacks(design,catalog);
@@ -1264,7 +1274,8 @@ public final class Battle {
      * individual technology, ammunition, hull class or installed systems. */
     public void spawnFleet(int team,List<Shipyard.Design> designs,TechnologyCatalog catalog,
                            double centerX,double centerY){
-        if(designs==null||designs.isEmpty()||designs.size()>200||catalog==null||
+        if(designs==null||designs.isEmpty()||
+                designs.size()>BattleArena.MAX_SHIPS_PER_SIDE||catalog==null||
                 designs.stream().anyMatch(d->d==null))
             throw new IllegalArgumentException("Invalid custom fleet");
         List<Shipyard.Fitted> fittings=new ArrayList<>(designs.size());
@@ -1285,7 +1296,8 @@ public final class Battle {
     public static Battle duel(long seed,List<Shipyard.Design> left,
                               List<Shipyard.Design> right,TechnologyCatalog catalog){
         if(left==null||right==null||left.isEmpty()||right.isEmpty()||
-                left.size()>200||right.size()>200)
+                left.size()>BattleArena.MAX_SHIPS_PER_SIDE||
+                right.size()>BattleArena.MAX_SHIPS_PER_SIDE)
             throw new IllegalArgumentException("Both custom fleets must contain 1-200 vessels");
         Battle battle=new Battle(seed);
         battle.spawnFleet(0,left,catalog,310,335);
@@ -1294,13 +1306,16 @@ public final class Battle {
     }
     public static Battle duel(long seed, int shipsPerSide, Shipyard.Design left,
                               Shipyard.Design right, TechnologyCatalog catalog) {
+        if(shipsPerSide<0||shipsPerSide>BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
         Battle battle = new Battle(seed);
         battle.spawnWing(0,left,catalog,shipsPerSide,310,335);
         battle.spawnWing(1,right,catalog,shipsPerSide,970,335);
         return battle;
     }
     public void spawnWing(int team, Faction faction, int count, double centerX, double centerY) {
-        if (count < 0 || count > 1000) throw new IllegalArgumentException("Invalid fleet size");
+        if (count < 0 || count > BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
         for (int i = 0; i < count; i++) {
             double[] point = formationPosition(i,count,centerX,centerY,random);
             addShip(team, faction, point[0], point[1]);
@@ -1308,6 +1323,8 @@ public final class Battle {
         log(faction.displayName + " deployed " + count + " combatants");
     }
     public static Battle duel(long seed, int shipsPerSide, Faction left, Faction right) {
+        if(shipsPerSide<0||shipsPerSide>BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
         Battle battle = new Battle(seed);
         battle.spawnWing(0, left, shipsPerSide, 310, 335);
         battle.spawnWing(1, right, shipsPerSide, 970, 335);
@@ -1364,6 +1381,9 @@ public final class Battle {
 
     public void step() {
         tick++;
+        // All active vessels enter contact and environmental simulation in
+        // the same immutable world, including externally issued coordinates.
+        containFleet();
         focusCounts.clear();
         for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0)
             focusCounts.merge(ship.lastTargetId,1,Integer::sum);
@@ -1444,6 +1464,9 @@ public final class Battle {
             }
             launchAuxiliary(s,target);
         }
+        // Pursuit, inertia, patrol and queued waypoint movement never grow
+        // the simulation; preserve existing rear-line extraction behavior.
+        containFleet();
         updateSupport();
         updateTenderSupport();
         updateQueuedLaunches();
@@ -1456,12 +1479,17 @@ public final class Battle {
             craft.lastObservedY=craft.y;
         }
         updateCraft();
+        for(Craft craft:crafts)BattleArena.contain(craft);
         advanceRotaryRounds();
         advanceRailPenetrators();
         for(Craft craft:crafts){
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
         }
+    }
+
+    private void containFleet(){
+        for(Ship ship:ships)BattleArena.contain(ship);
     }
 
     /** Voluntary disengagement is limited to a last armed-force survivor of a
