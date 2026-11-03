@@ -126,7 +126,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
     }
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
-                              int separation,String family){
+                              int separation,String pdFamily){
         if(separation!=220&&separation!=390)
             throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
@@ -138,7 +138,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         }else{
             attacker=battle.addShip(0,Battle.Faction.TERRAN,180,330);
         }
-        battle.spawnWing(1,pdFitting(catalog,tier,mounts,family),catalog,1,
+        battle.spawnWing(1,pdFitting(catalog,tier,mounts,pdFamily),catalog,1,
                 180+separation,330);
         Battle.Ship defender=battle.ships().get(1);
         battle.registerDiagnosticStationaryTarget(defender.id);
