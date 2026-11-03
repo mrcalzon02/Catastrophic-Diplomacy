@@ -85,6 +85,9 @@ public final class Battle {
             }
         }
         public List<FlakMount> flakMounts=List.of();
+        /** RCW is a separate, paid rotary kinetic hardpoint with its own
+         * spin-up, finite feed and researched short-range radar profile. */
+        public List<RotaryPointDefense.Mount> rotaryMounts=List.of();
         /** Each fitted precision CIWS module owns its socket, research and timer.
          * Legacy unfitted fixtures retain the original shared PD controller. */
         public static final class PrecisionMount {
@@ -659,6 +662,8 @@ public final class Battle {
         }
     }
     private final List<FlakRound> pendingFlak=new ArrayList<>();
+    /** Travelling, collision-tested defensive machine-cannon rounds. */
+    private final List<RotaryPointDefense.Round> rotaryRounds=new ArrayList<>();
     private static final int MAX_ROCKET_BODIES=8000;
     /** Queued physical salvo is owned by one socket, or -1 for legacy fleets. */
     private static final class PendingLaunch {
@@ -888,6 +893,9 @@ public final class Battle {
         ship.setGuidanceMode(family,mode);
     }
     public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
+    public List<RotaryPointDefense.Round> rotaryRounds(){
+        return Collections.unmodifiableList(rotaryRounds);
+    }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
     public List<SupportLink> supportLinks(){return Collections.unmodifiableList(supportLinks);}
@@ -1061,6 +1069,7 @@ public final class Battle {
         // The existing module IDs and fitted save data are unchanged.
         List<Ship.FlakMount> fittedFlak=new ArrayList<>();
         List<Ship.PrecisionMount> fittedPrecision=new ArrayList<>();
+        List<RotaryPointDefense.Mount> fittedRotary=new ArrayList<>();
         s.laserPointDefenseEnabled=false;
         for(WeaponMuzzles.Emitter emitter:s.weaponEmitters){
             if(emitter.component().endsWith("-PD")){
@@ -1076,9 +1085,19 @@ public final class Battle {
                         Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
                         Shipyard.defenseAt(design,catalog,emitter.slotId()),
                         Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
+            if(emitter.family()==WeaponMuzzles.Family.ROTARY_CIWS){
+                Shipyard.Installed installed=design.at(emitter.slotId());
+                int tier=installed.branch()==null?0:
+                        installed.stage(installed.branch());
+                fittedRotary.add(new RotaryPointDefense.Mount(emitter.slotId(),tier,
+                        Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
+                        Shipyard.defenseAt(design,catalog,emitter.slotId()),
+                        Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
+            }
         }
         s.flakMounts=List.copyOf(fittedFlak);
         s.precisionMounts=List.copyOf(fittedPrecision);
+        s.rotaryMounts=List.copyOf(fittedRotary);
         if(!rocketTemplates.isEmpty()){
             List<RocketBarrage.Rack> fittedRacks=new ArrayList<>(rocketTemplates.size());
             for(RocketBarrage.Rack prototype:rocketTemplates)
@@ -1420,6 +1439,7 @@ public final class Battle {
             craft.lastObservedY=craft.y;
         }
         updateCraft();
+        advanceRotaryRounds();
         for(Craft craft:crafts){
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
@@ -1688,6 +1708,8 @@ public final class Battle {
             mount.reload=Math.max(0,mount.reload-DT);
         for(Ship.FlakMount mount:s.flakMounts)
             mount.reload=Math.max(0,mount.reload-DT);
+        for(RotaryPointDefense.Mount gun:s.rotaryMounts)
+            gun.tick(DT);
         s.kineticReload=Math.max(0,s.kineticReload-DT);
         s.plasmaReload=Math.max(0,s.plasmaReload-DT);
         s.particleReload=Math.max(0,s.particleReload-DT);
@@ -3744,6 +3766,7 @@ public final class Battle {
     private void updateMissiles() {
         resolveFlakBursts();
         firePhysicalFlak();
+        fireRotaryCiws();
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
