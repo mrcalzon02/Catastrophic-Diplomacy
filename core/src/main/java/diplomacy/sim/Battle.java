@@ -2130,6 +2130,90 @@ public final class Battle {
         return channels;
     }
 
+    /** Equipment and signature eligibility at the moment of observation,
+     * not the hostile ship's current RCS, thermal output, cloak or armor.
+     * Leave public directSensorChannels as an immediate HARDWARE diagnostics
+     * API; fire control and the tactical picture use this historical version. */
+    private int historicalSensorChannels(Ship source,Ship target,
+            SensorLightTimeHistory.Observation fix){
+        SensorLightTimeHistory.Profile targetProfile=
+                target.sensorHistory.profileAt(fix.measuredTick());
+        SensorLightTimeHistory.Profile sourceProfile=
+                source.sensorHistory.profileAt(fix.receivedTick());
+        SensorLightTimeHistory.Sample sourceState=
+                source.sensorHistory.at(fix.receivedTick());
+        if(sourceProfile==null&&fix.receivedTick()>0){
+            sourceProfile=source.sensorHistory.profileAt(fix.receivedTick()-1);
+            sourceState=source.sensorHistory.at(fix.receivedTick()-1);
+        }
+        if(sourceProfile==null||sourceState==null||targetProfile==null)
+            return 0;
+        double distance=StrictMath.hypot(
+                fix.sample().x()-sourceState.x(),
+                fix.sample().y()-sourceState.y());
+        double condition=sourceProfile.power()>3&&
+                sourceProfile.crewReadiness()>=.05
+                ?StrictMath.max(0,sourceProfile.sensorsCondition()):0;
+        double weatherRange=weather.sensorFactor();
+        double acuity=sourceProfile.sensorAcuity();
+        double resolution=condition>0
+                ?StrictMath.min(2.2,sourceProfile.resolutionGain()*
+                        (1+.30*sourceProfile.commandAssist())):1;
+        double rcs=StrictMath.max(.06,StrictMath.min(4,targetProfile.radarCrossSection()));
+        double radarFactor=switch(sourceProfile.scanMode()){
+            case STANDARD -> 1;
+            case BOOSTED_RADAR -> 1.55;
+            case FOCUSED_RADAR -> sourceProfile.focusId()==target.id?1.28:0;
+            default -> 0;
+        };
+        double xrayFactor=sourceProfile.scanMode()==SensorActiveScan.Mode.STANDARD?1:
+                (sourceProfile.scanMode()==SensorActiveScan.Mode.XRAY_BURST&&
+                 sourceProfile.focusId()==target.id?1.45:0);
+        double radar=sourceProfile.sensorRange()*condition*weatherRange*resolution
+                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1))
+                *radarFactor;
+        double cloak=targetProfile.power()>4&&targetProfile.ecmCondition()>.15
+                ?targetProfile.opticalSignature():1;
+        double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
+                StrictMath.sqrt(StrictMath.max(1,targetProfile.maxHull())/550)));
+        double optical=(weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390)
+                *cloak*silhouette;
+        double damp=1-(1-targetProfile.thermalSignature())
+                *StrictMath.max(0,targetProfile.coolingCondition());
+        double infrared=sourceProfile.infraredRange()*condition*weatherRange*resolution
+                *StrictMath.sqrt(StrictMath.max(.10,damp))*(1+.08*(acuity-1));
+        double xray=sourceProfile.xrayRange()*condition*weatherRange*resolution
+                *(1+.10*(acuity-1))/(1+.16*StrictMath.min(
+                        2,targetProfile.maxArmor()/650))*xrayFactor;
+        double mass=StrictMath.max(.45,StrictMath.min(
+                2.4,targetProfile.maxHull()/550));
+        double gravitic=sourceProfile.graviticRange()*condition*weatherRange*resolution
+                *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
+        int channels=0;
+        if(distance<=optical)channels|=CONTACT_OPTICAL;
+        if(radar>0&&distance<=radar)channels|=CONTACT_RADAR;
+        if(infrared>0&&distance<=infrared)channels|=CONTACT_INFRARED;
+        if(xray>0&&distance<=xray)channels|=CONTACT_XRAY;
+        if(gravitic>0&&distance<=gravitic)channels|=CONTACT_GRAVITIC;
+        // Current receiver electronics still have to be functional, even
+        // if they emitted photons earlier. Optical sight works without power.
+        if(source.power<=3||source.sensorsCondition<=.05||
+                source.crewReadiness()<.05)
+            channels&=CONTACT_OPTICAL;
+        // No retrospective hardware installs: the outward pulse itself
+        // must have been possible using equipment available when emitted.
+        SensorLightTimeHistory.Profile emitted=
+                source.sensorHistory.profileAt(fix.emittedTick());
+        if(emitted==null || emitted.power()<=3 ||
+                emitted.sensorsCondition()<=.05){
+            channels&=~(CONTACT_RADAR|CONTACT_XRAY);
+        }else{
+            if(emitted.sensorRange()<=0)channels&=~CONTACT_RADAR;
+            if(emitted.xrayRange()<=0)channels&=~CONTACT_XRAY;
+        }
+        return channels;
+    }
+
     /** One fixed-capacity historical snapshot per ship each simulation tick. */
     private void captureSensorHistory(long observedTick){
         for(Ship ship:ships)ship.sensorHistory.capture(observedTick,ship);
@@ -2153,10 +2237,21 @@ public final class Battle {
                     StrictMath.hypot(viewer.x-source.x,viewer.y-source.y));
             return source.relayPackets.delivered(target.id,tick,linkTicks,capacity);
         }
-        double distance=StrictMath.hypot(source.x-target.x,source.y-target.y);
-        int channels=directSensorChannels(source,target,distance);
-        if(channels==0)return null;
-        return SensorLightTimeHistory.receive(source,target,tick,channels,0);
+        // All five historical candidates are evaluated independently against
+        // the actual reflected/received profiles after photon delay is solved.
+        // Current enemy signature and position are not an eligibility gate.
+        SensorLightTimeHistory.Observation candidate=SensorLightTimeHistory.receive(
+                source,target,tick,CONTACT_OPTICAL|CONTACT_RADAR|
+                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0);
+        if(candidate==null)return null;
+        int valid=candidate.channels()&historicalSensorChannels(
+                source,target,candidate);
+        if(valid==0)return null;
+        long emitted=(valid&(CONTACT_RADAR|CONTACT_XRAY))!=0
+                ?candidate.emittedTick():candidate.measuredTick();
+        return new SensorLightTimeHistory.Observation(emitted,
+                candidate.measuredTick(),candidate.receivedTick(),
+                valid,candidate.sample());
     }
 
     /** Paid tracking retains measured-state history; a relayed fix must
