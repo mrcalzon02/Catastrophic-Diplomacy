@@ -16,7 +16,7 @@ public final class RailPointDefenseDiagnostic {
     private enum Threat { MISSILE, TORPEDO, KINETIC }
     private record Trial(int launched,int fired,int visualFrames,int impacts,
                          int intercepted,int stockSpent,int powerPaid,
-                         long firstShot,int railHits) {}
+                         long firstShot,int railHits,double netLoss) {}
     private static void require(boolean ok,String why){
         if(!ok)throw new IllegalStateException(why);
     }
@@ -89,9 +89,17 @@ public final class RailPointDefenseDiagnostic {
     }
     private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
                                int mounts,int seed,boolean enabled){
+        return trial(tech,threat,tier,mounts,seed,enabled,300,0);
+    }
+    /** Fixed-seed real battle controls; geometry changes only attacker
+     * placement, never damage rolls or defender research. */
+    private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
+                               int mounts,int seed,boolean enabled,
+                               double separation,double offset){
         Battle battle=new Battle(190031L+seed*127L+tier*29L+mounts*43L+
                 threat.ordinal()*307L);
-        Battle.Ship attacker=battle.addShip(0,Battle.Faction.TERRAN,65,300);
+        Battle.Ship attacker=battle.addShip(0,Battle.Faction.TERRAN,
+                365-separation,300+offset);
         battle.spawnWing(1,fitted(tech,tier,mounts),tech,1,365,300);
         Battle.Ship defender=battle.ships().get(1);
         battle.registerDiagnosticStationaryTarget(defender.id);
@@ -115,6 +123,8 @@ public final class RailPointDefenseDiagnostic {
                         BattleOrders.PointDefense.HOLD_FIRE));
         int initialAmmo=defender.kineticAmmo;
         double initialPower=defender.power;
+        double initialShields=defender.shields,initialArmor=defender.armor,
+                initialHull=defender.hull;
         int liveFrames=0;
         long first=-1;
         for(int frame=0;frame<420;frame++){
@@ -168,9 +178,13 @@ public final class RailPointDefenseDiagnostic {
         // barrel slew and recoil remain live per-mount physical delays.
         require(!enabled||fire==0||liveFrames>0||physicalHits>0,
                 "Railgun fired but its penetrator had no world-space flight or hit");
+        double netLoss=StrictMath.max(0,initialShields-defender.shields)+
+                StrictMath.max(0,initialArmor-defender.armor)+
+                StrictMath.max(0,initialHull-defender.hull);
         return new Trial(launched,fire,liveFrames,impacts,defender.intercepted,
                 initialAmmo-defender.kineticAmmo,
-                (int)StrictMath.ceil(initialPower-defender.power),first,physicalHits);
+                (int)StrictMath.ceil(initialPower-defender.power),first,
+                physicalHits,netLoss);
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
@@ -220,9 +234,74 @@ public final class RailPointDefenseDiagnostic {
                             threat,tier,count,launched,fired,intercepted,
                             impacts,control,spent));
                 }
+        // Advisory sweep of underserved mid-tier and flank scenarios:
+        // actual incoming bodies, same attack seeds per ON/HOLD_FIRE pair.
+        // Numerical kill ratios must never gate release builds.
+        List<String> geometryRows=new ArrayList<>();
+        geometryRows.add("threat,defense_tier,mounts,range,lateral_offset,seeds,"+
+                "on_launched,off_launched,physical_rail_shots,physical_rail_hits,"+
+                "actual_intercepts,on_impacts,off_impacts,impacts_prevented,"+
+                "on_net_protection_loss,off_net_protection_loss,net_damage_prevented,"+
+                "kinetic_stock_depletion,reactor_delta,live_penetrator_frames");
+        report.append("\n## Mid-tier and off-axis rail effectiveness (4 paired seeds)\n\n");
+        report.append("Each ON/HOLD_FIRE trial simulates full real physical bodies"+
+                " and one or four purchased rail mounts. Impact counts and"+
+                " net protection loss are reported separately; research tiers"+
+                " and formations use their own deterministic seeds.\n\n");
+        report.append("|Threat|Tier|Mounts|Distance|Offset|Shots|Interceptions|"+
+                "Hits ON|Hits OFF|Shots per intercept|Damage prevented|\n");
+        report.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        int extendedPairs=0;
+        for(Threat threat:Threat.values())
+            for(int tier:new int[]{3,6})
+                for(int count:new int[]{1,4})
+                    for(int distance:new int[]{210,440})
+                        for(int offset:new int[]{0,90}){
+                            int onLaunched=0,offLaunched=0,shots=0,
+                                    railHits=0,intercepts=0,onImpacts=0,
+                                    offImpacts=0,stock=0,power=0,flightFrames=0;
+                            double damageOn=0,damageOff=0;
+                            for(int seed=0;seed<4;seed++){
+                                Trial on=trial(tech,threat,tier,count,seed,true,
+                                        distance,offset);
+                                Trial off=trial(tech,threat,tier,count,seed,false,
+                                        distance,offset);
+                                onLaunched+=on.launched;offLaunched+=off.launched;
+                                shots+=on.fired;railHits+=on.railHits;
+                                intercepts+=on.intercepted;
+                                onImpacts+=on.impacts;offImpacts+=off.impacts;
+                                damageOn+=on.netLoss;damageOff+=off.netLoss;
+                                stock+=on.stockSpent;power+=on.powerPaid;
+                                flightFrames+=on.visualFrames;
+                                extendedPairs++;
+                            }
+                            geometryRows.add(String.format(Locale.ROOT,
+                                    "%s,%d,%d,%d,%d,4,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%d,%d,%d",
+                                    threat,tier,count,distance,offset,
+                                    onLaunched,offLaunched,shots,railHits,
+                                    intercepts,onImpacts,offImpacts,
+                                    offImpacts-onImpacts,damageOn,damageOff,
+                                    damageOff-damageOn,stock,power,flightFrames));
+                            String efficiency=intercepts==0?"N/A":
+                                    String.format(Locale.ROOT,"%.2f",
+                                            (double)shots/intercepts);
+                            report.append(String.format(Locale.ROOT,
+                                    "|%s|%d|%d|%d|%d|%d|%d|%d|%d|%s|%.1f|\n",
+                                    threat,tier,count,distance,offset,shots,
+                                    intercepts,onImpacts,offImpacts,efficiency,
+                                    damageOff-damageOn));
+                        }
+        Files.write(root.resolve("rail-role-geometry.csv"),geometryRows,
+                StandardCharsets.UTF_8);
+        report.append("\nMeasured mid-tier geometry pairs: "+extendedPairs+
+                ". A positive damage-prevention figure is protection retained;"+
+                " nonpositive figures are diagnostically important, not test"+
+                " failures. Physical aim, detection, ammo, power and thermal"+
+                " constraints remain enabled.\n\n");
         Files.write(root.resolve("rail-trials.csv"),rows,StandardCharsets.UTF_8);
         Files.writeString(root.resolve("summary.md"),report);
         System.out.print(report);
         System.out.println("RAIL_PD_PAIRED_TRIALS="+paired);
+        System.out.println("RAIL_PD_GEOMETRY_PAIRS="+extendedPairs);
     }
 }
