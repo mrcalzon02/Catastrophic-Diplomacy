@@ -214,7 +214,11 @@ public final class RotaryCiwsDiagnostic {
         require(!on||fired>0,"Powered rotary CIWS failed to fire at "+threat);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
         require(launched>0,"Attacker produced no physical "+threat);
-        require(!on||seen>0,"No actual rotary projectile ever crossed a simulation frame");
+        require(!on||seen>0,"No in-flight RCW round at end of tick: "+threat+
+                " rank="+tier+" mounts="+mounts+" seed="+seed+" fired="+fired+
+                " first="+first+" ammoSpent="+(ammo-defender.kineticAmmo)+
+                " missilesRemaining="+battle.missiles().size()+
+                " rocketsRemaining="+battle.rockets().size());
         double loss=StrictMath.max(0,armor-defender.armor)+
                 StrictMath.max(0,shield-defender.shields)+
                 StrictMath.max(0,hull-defender.hull);
