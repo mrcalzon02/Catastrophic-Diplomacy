@@ -135,7 +135,7 @@ single-aircraft kills**.
 **Release discipline:** Never run a full APK/desktop package build just to
 adjust balance. No balance percentage or art test may block publication.
 
-## Current precision-emitter change awaiting diagnostic acceptance
+## Current precision-emitter change: runner-verified subset
 
 Fitted precision CIWS now has independently ticking, socket-bound cooldowns, researched
 profiles and weapon muzzle locations for both physical ordnance and hostile craft.
@@ -150,3 +150,5 @@ per-target predicted damage, true saturation throughput measurement against
 kinetic/rocket/missile salvos, and optional 200v200 load profiling. The existing
 wave diagnostic remains advisory and does not build an APK. Do not assert new
 interception percentages or stage parity until GitHub runner artifacts are read.
+
+**Runner readback:** [wave 41562569048](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41562569048) completed 528 valid pairs and zero errors; [comprehensive 41562569060](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41562569060) completed 768 rocket configurations, 736 additional physical-threat configurations and 256 timed-load valid pairs. The same-stage late-game 4v4 barrage is now nearly erased, so physical tracking/slew and early terminal-ring leakage need study **before numerical tuning**. See [the measured precision-mount review](PD_PRECISION_MOUNT_REVIEW_2026-11-02.md). Keep all balance advisory.
