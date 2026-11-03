@@ -84,6 +84,12 @@ tasks.register('sensorNetworkSmoke', JavaExec) {
 tasks.named('sensingModulesSmoke') { dependsOn(tasks.named('sensorNetworkSmoke')) }
 
 
+// The baker runs after core Java compilation and before resource packaging.
+tasks.named('processResources') {
+    dependsOn rootProject.tasks.named('bakeApprovedHardpoints')
+    from rootProject.layout.buildDirectory.dir('generated/cd-hardpoints')
+}
+
 tasks.register('hullLayoutsSmoke', JavaExec) {
     group = 'verification'
     description = 'All 11 hull classes x six factions: hardpoint positions, selection and legacy blueprint schema.'
