@@ -861,12 +861,18 @@ public final class Shipyard {
                             ProjectileModel.Kind.TORPEDO,p.effect/p.base.effect,
                             p.accuracy,p.integrity/p.base.integrity));
                 }
-                case "PD", "FLK" -> {
+                case "PD" -> {
+                    // Precision-laser gains only from genuinely equipped PD.
                     pd+=p.effect*2.8*tuning.reach();
                     pdWeight++;
                     pdOutput+=p.effect/p.base.effect*tuning.damage();
                     pdTracking+=p.accuracy*tuning.tracking();
                     pdCycle+=tuning.cycle();
+                }
+                case "FLK" -> {
+                    // Physically fitted FLK already contributes engineering
+                    // costs and gets its own per-socket sensor and reload.
+                    // Do NOT lend flak output/tracking/cycle to laser PD.
                 }
                 case "SEN" -> {
                     accuracy+=0.12*p.accuracy;
@@ -1187,6 +1193,15 @@ public final class Shipyard {
         Part p=evaluate(current,catalog,design.faction);
         return p.base.subsystem.equals("PD")||p.base.subsystem.equals("FLK")
                 ?70+p.effect*2.8*p.tuning().reach():0;
+    }
+    /** Per-socket PD/FLK reload, independent of the other weapon family's
+     * mounted count and firing technology. */
+    public static double pointDefenseCycleAt(Design design,TechnologyCatalog catalog,int slot){
+        Installed current=design.at(slot);
+        if(current==null)return 0;
+        Part part=evaluate(current,catalog,design.faction);
+        return part.base.subsystem.equals("PD")||part.base.subsystem.equals("FLK")
+                ?part.tuning().cycle():0;
     }
     /** Individual PD module profile before fleet sensors and stacked batteries contribute. */
     public static ProjectileModel.Defense defenseAt(Design design,TechnologyCatalog catalog,int slot) {

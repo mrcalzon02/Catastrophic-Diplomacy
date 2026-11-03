@@ -47,7 +47,8 @@ public final class WeaponMuzzlesTest {
         check(WeaponMuzzles.at(ship,WeaponMuzzles.Family.MISSILE,0).slotId()==-1,
                 "missing missile module never borrows a laser mount");
         check(WeaponMuzzles.family("BASE-TER-LAS")==WeaponMuzzles.Family.LASER,"laser code");
-        check(WeaponMuzzles.family("BASE-TER-FLK")==WeaponMuzzles.Family.POINT_DEFENSE,"flak code");
+        check(WeaponMuzzles.family("BASE-TER-PD")==WeaponMuzzles.Family.POINT_DEFENSE,"laser CIWS code");
+        check(WeaponMuzzles.family("BASE-TER-FLK")==WeaponMuzzles.Family.FLAK,"flak code");
         check(WeaponMuzzles.family("BASE-TER-MSL")==WeaponMuzzles.Family.MISSILE,"missile code");
         check(WeaponMuzzles.family("BASE-TER-TOR")==WeaponMuzzles.Family.TORPEDO,"torpedo code");
         check(WeaponMuzzles.family("BASE-TER-REA")==null,"no firing from reactor");

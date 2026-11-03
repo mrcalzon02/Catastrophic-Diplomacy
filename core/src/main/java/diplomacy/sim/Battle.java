@@ -75,11 +75,13 @@ public final class Battle {
         /** Fitted flak is physical timed fragmentation with its own mount cycle. */
         public static final class FlakMount {
             public final int slotId;
-            public final double nominalRange;
+            public final double nominalRange,cycle;
             public final ProjectileModel.Defense profile;
             public double reload;
-            public FlakMount(int slot,double range,ProjectileModel.Defense spec){
-                slotId=slot;nominalRange=range;profile=spec;
+            public FlakMount(int slot,double range,ProjectileModel.Defense spec,double firingCycle){
+                if(slot<0||range<=0||spec==null||!Double.isFinite(firingCycle)||firingCycle<=0)
+                    throw new IllegalArgumentException("Invalid flak hardware");
+                slotId=slot;nominalRange=range;profile=spec;cycle=firingCycle;
             }
         }
         public List<FlakMount> flakMounts=List.of();
@@ -959,7 +961,8 @@ public final class Battle {
             if(emitter.component().endsWith("-FLK"))
                 fittedFlak.add(new Ship.FlakMount(emitter.slotId(),
                         Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
-                        Shipyard.defenseAt(design,catalog,emitter.slotId())));
+                        Shipyard.defenseAt(design,catalog,emitter.slotId()),
+                        Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
         }
         s.flakMounts=List.copyOf(fittedFlak);
         if(!rocketTemplates.isEmpty()){
@@ -3449,7 +3452,7 @@ public final class Battle {
                 double aimY=best.y+best.vy*flight+StrictMath.sin(angle)*error;
                 long shot=nextVisualShotId++;
                 WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
-                        defender,WeaponMuzzles.Family.POINT_DEFENSE,mount.slotId);
+                        defender,WeaponMuzzles.Family.FLAK,mount.slotId);
                 visual(shot,VisualPhase.FIRE,"FLAK",defender.team,defender.id,
                        best.sourceId,muzzle.x(),muzzle.y(),aimX,aimY);
                 // A physical shell consumes a real kinetic ammunition unit.
@@ -3457,8 +3460,7 @@ public final class Battle {
                 defender.power-=law.powerPerShot()*1.25;
                 defender.heat+=law.heatPerShot()*2;
                 mount.reload=law.reload(false,
-                        defender.pdCycle*StrictMath.max(1,defender.flakMounts.size())*1.8,
-                        defender.pointDefenseCondition);
+                        mount.cycle*1.8,defender.pointDefenseCondition);
                 pendingFlak.add(new FlakRound(defender.team,defender.id,
                         mount.slotId,shot,tick+Math.max(1,(int)StrictMath.ceil(flight/DT)),
                         aimX,aimY,18+mount.profile.tracking()*2,

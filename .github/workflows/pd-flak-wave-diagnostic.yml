@@ -5,6 +5,7 @@ on:
     paths:
       - 'core/src/test/java/diplomacy/sim/PointDefenseWaveDiagnostic.java'
       - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
       - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
       - '.github/workflows/pd-flak-wave-diagnostic.yml'
   workflow_dispatch:

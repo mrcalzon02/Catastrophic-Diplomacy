@@ -19,9 +19,9 @@ import java.util.Set;
 public final class PointDefenseWaveDiagnostic {
     private PointDefenseWaveDiagnostic(){}
     private enum Battery {
-        PD_ONE, FLK_ONE, PD_FOUR, FLK_FOUR, MIXED_TWO_TWO;
+        PD_ONE, PD_TWO, FLK_ONE, PD_FOUR, FLK_FOUR, MIXED_TWO_TWO;
         int pd(){return switch(this){
-            case PD_ONE -> 1;case PD_FOUR -> 4;case MIXED_TWO_TWO -> 2;
+            case PD_ONE -> 1;case PD_TWO, MIXED_TWO_TWO -> 2;case PD_FOUR -> 4;
             default -> 0;};}
         int flak(){return switch(this){
             case FLK_ONE -> 1;case FLK_FOUR -> 4;case MIXED_TWO_TWO -> 2;
@@ -67,6 +67,63 @@ public final class PointDefenseWaveDiagnostic {
         require(Shipyard.inspect(d,c).valid(),
                 "Invalid real fitted "+battery+" rank "+rank);
         return d;
+    }
+    /** Functional invariants: two lasers + two flak cannot exceed the
+     * exact same two lasers' precision reach, tracking, penetration or cycle. */
+    private static void verifyHardwareIsolation(TechnologyCatalog catalog){
+        for(int rank:new int[]{0,9}){
+            var pdDesign=defenseFit(catalog,Battery.PD_TWO,rank);
+            var mixedDesign=defenseFit(catalog,Battery.MIXED_TWO_TWO,rank);
+            var flakDesign=defenseFit(catalog,Battery.FLK_FOUR,rank);
+            var pd=Shipyard.fit(pdDesign,catalog);
+            var mixed=Shipyard.fit(mixedDesign,catalog);
+            var flak=Shipyard.fit(flakDesign,catalog);
+            require(Math.abs(pd.pdRange()-mixed.pdRange())<1e-8,
+                    "Flak falsely increased mounted laser reach");
+            require(Math.abs(pd.pdCycle()-mixed.pdCycle())<1e-8,
+                    "Flak falsely accelerated laser fire control");
+            require(Math.abs(pd.pointDefense().damage()-mixed.pointDefense().damage())<1e-8,
+                    "Flak falsely boosted laser penetration");
+            require(Math.abs(pd.pointDefense().tracking()-mixed.pointDefense().tracking())<1e-8,
+                    "Flak falsely boosted laser tracking");
+            require(Math.abs(pd.pointDefense().detectionMultiplier()-
+                    mixed.pointDefense().detectionMultiplier())<1e-8,
+                    "Flak falsely increased laser sensing");
+            require(flak.pdRange()==0,"Pure flak generated a fictitious laser weapon");
+            Battle battle=new Battle(790901L+rank);
+            battle.spawnWing(1,mixedDesign,catalog,1,600,300);
+            Battle.Ship ship=battle.ships().get(0);
+            int lasers=0,flaks=0;
+            for(WeaponMuzzles.Emitter emitter:ship.weaponEmitters){
+                if(emitter.family()==WeaponMuzzles.Family.POINT_DEFENSE){
+                    lasers++;
+                    require(WeaponMuzzles.atSlot(ship,WeaponMuzzles.Family.POINT_DEFENSE,
+                            emitter.slotId()).slotId()==emitter.slotId(),
+                            "Laser did not use its fitted physical hardpoint");
+                }
+                if(emitter.family()==WeaponMuzzles.Family.FLAK){
+                    flaks++;
+                    require(WeaponMuzzles.atSlot(ship,WeaponMuzzles.Family.FLAK,
+                            emitter.slotId()).slotId()==emitter.slotId(),
+                            "Flak did not use its fitted physical hardpoint");
+                    boolean borrowed=false;
+                    try{
+                        WeaponMuzzles.atSlot(ship,WeaponMuzzles.Family.POINT_DEFENSE,
+                                emitter.slotId());
+                        borrowed=true;
+                    }catch(IllegalArgumentException expected){}
+                    require(!borrowed,"Precision CIWS borrowed the flak socket");
+                }
+            }
+            require(lasers==2&&flaks==2&&ship.flakMounts.size()==2,
+                    "Mixed fitted defenses failed hardware inventory");
+            for(long shot=0;shot<8;shot++){
+                int slot=WeaponMuzzles.at(ship,
+                        WeaponMuzzles.Family.POINT_DEFENSE,shot).slotId();
+                require(mixedDesign.at(slot).component.endsWith("-PD"),
+                        "Precision laser round robin borrowed a flak hardpoint");
+            }
+        }
     }
     private static Shipyard.Design carrier(TechnologyCatalog c,Threat threat){
         Shipyard.Design d=Shipyard.starter(Battle.Faction.TERRAN,
@@ -183,6 +240,7 @@ public final class PointDefenseWaveDiagnostic {
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog cat=TechnologyCatalog.loadDefault();
+        verifyHardwareIsolation(cat);
         Path output=Path.of("test-output","pd-wave-diagnostic");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
