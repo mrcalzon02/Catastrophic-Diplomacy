@@ -79,9 +79,30 @@ public final class RailPointDefense {
     }
     /** Larger hard targets resolve more strongly on active radar. Tiny kinetic
      * slugs remain legal but have a very small collision aperture. */
+    /** A fast body produces useful Doppler shift only when its actual
+     * velocity closes toward this detector. High lateral or outbound speed
+     * cannot magically extend acquisition merely from its rated top speed. */
+    public static double radialClosing(Battle.Ship observer,double x,double y,
+                                       double vx,double vy){
+        if(observer==null)return 0;
+        double dx=observer.x-x,dy=observer.y-y;
+        double d=StrictMath.hypot(dx,dy);
+        if(d<.001)return 0;
+        return StrictMath.max(0,(dx*(vx-observer.vx)+
+                dy*(vy-observer.vy))/d);
+    }
     public static double acquisitionRange(Battle.Ship ship,Mount mount,
                                           ProjectileModel.Spec target,
                                           double weather,double emission){
+        return acquisitionRange(ship,mount,target,weather,emission,
+                target==null?0:target.speed());
+    }
+    /** Production sensors receive ACTUAL radial closing speed from the
+     * observed velocity vector, not a nominal motor specification. */
+    public static double acquisitionRange(Battle.Ship ship,Mount mount,
+                                          ProjectileModel.Spec target,
+                                          double weather,double emission,
+                                          double radialSpeed){
         if(ship==null||mount==null||target==null)return 0;
         if(ship.power<=6||ship.crewReadiness()<.05)return 0;
         double radarHorizon=StrictMath.min(mount.nominalRange,
@@ -92,7 +113,7 @@ public final class RailPointDefense {
         // shifts; finite coherent processing recovers part of that signal.
         // Never evade current sensor damage, interference or emitter limits.
         double doppler=1+.75*StrictMath.max(0,StrictMath.min(1,
-                (target.speed()-180)/100.0));
+                (StrictMath.max(0,radialSpeed)-180)/100.0));
         double echo=ProjectileModel.acquisitionRange(radarHorizon,
                 ship.sensorsCondition,weather,mount.profile,target,emission);
         double hardwareLimit=radarHorizon*
