@@ -887,7 +887,7 @@ public final class Shipyard {
                     pdTracking+=p.accuracy*tuning.tracking();
                     pdCycle+=tuning.cycle();
                 }
-                case "FLK", "RCW", "RPD" -> {
+                case "FLK", "RCW", "RPD", "PPD" -> {
                     // Both are independent fitted kinetic hard-kill weapons.
                     // Neither lends reach, damage, lock or fire rate to PD lasers.
                 }
@@ -1249,6 +1249,8 @@ public final class Shipyard {
             return StrictMath.min(155.0,35.0+p.effect*2.7*p.tuning().reach());
         if(p.base.subsystem.equals("RPD"))
             return StrictMath.min(335.0,120.0+p.effect*3.0*p.tuning().reach());
+        if(p.base.subsystem.equals("PPD"))
+            return StrictMath.min(275.0,90.0+p.effect*3.1*p.tuning().reach());
         return p.base.subsystem.equals("PD")||p.base.subsystem.equals("FLK")
                 ?70+p.effect*2.8*p.tuning().reach():0;
     }
@@ -1261,6 +1263,7 @@ public final class Shipyard {
         return part.base.subsystem.equals("PD")||part.base.subsystem.equals("FLK")
                 ||part.base.subsystem.equals("RCW")
                 ||part.base.subsystem.equals("RPD")
+                ||part.base.subsystem.equals("PPD")
                 ?part.tuning().cycle():0;
     }
     /** Individual PD module profile before fleet sensors and stacked batteries contribute. */
@@ -1270,7 +1273,8 @@ public final class Shipyard {
         Part p=evaluate(current,catalog,design.faction);
         if(!p.base.subsystem.equals("PD")&&!p.base.subsystem.equals("FLK")
                 &&!p.base.subsystem.equals("RCW")
-                &&!p.base.subsystem.equals("RPD"))return null;
+                &&!p.base.subsystem.equals("RPD")
+                &&!p.base.subsystem.equals("PPD"))return null;
         return ProjectileModel.defense(p.effect/p.base.effect*p.tuning().damage(),
                 p.accuracy*p.tuning().tracking(),p.tuning().reach());
     }
