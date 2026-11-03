@@ -122,11 +122,18 @@ final class ShipSurfaceLighting implements Disposable {
         "varying vec2 v_uv;\n"+
         "uniform sampler2D u_texture;\n"+
         "uniform sampler2D u_damage;\n"+
+        "uniform float u_underlayPass;\n"+
         "void main(){\n"+
         " vec4 albedo=texture2D(u_texture,v_uv);\n"+
         " vec4 peel=texture2D(u_damage,v_uv);\n"+
-        " albedo.rgb*=1.0-0.54*peel.r;\n"+
-        " albedo.a*=peel.a*v_color.a;\n"+
+        " if(u_underlayPass>0.5){\n"+
+        "  // Exact inverse of the armor alpha: no second transparent hull\n"+
+        "  // silhouette and therefore no doubled exterior antialiasing.\n"+
+        "  albedo.a*=(1.0-peel.a)*v_color.a;\n"+
+        " }else{\n"+
+        "  albedo.rgb*=1.0-0.54*peel.r;\n"+
+        "  albedo.a*=peel.a*v_color.a;\n"+
+        " }\n"+
         " gl_FragColor=albedo;\n"+
         "}\n";
     private static final class Pair {
@@ -138,6 +145,7 @@ final class ShipSurfaceLighting implements Disposable {
     private final ShaderProgram shader;
     private ShaderProgram flatDamageShader;
     private boolean flatDamageShaderUnavailable;
+    private boolean underlayPass;
     private final ShipLightProbes probes=new ShipLightProbes();
     private Texture active;
     private Texture activeDamage;
@@ -219,7 +227,7 @@ final class ShipSurfaceLighting implements Disposable {
     void color(SpriteBatch batch,float rotation){color(batch,rotation,1f);}
     void begin(SpriteBatch batch){begin(batch,null,null);}
     void begin(SpriteBatch batch,Battle battle,CombatViewBounds view){
-        active=null;activeDamage=null;binds=0;started=true;
+        active=null;activeDamage=null;underlayPass=false;binds=0;started=true;
         flat=flatAt(view);
         if(flat){
             batch.setShader(null);
@@ -253,6 +261,32 @@ final class ShipSurfaceLighting implements Disposable {
         }
         flatDamageShader=program;
         return program;
+    }
+    /**
+     * Render structural metal ONLY where the mask removed upper plating.
+     * The underlay is dark, unlit, UV-matched source art: it never inherits
+     * the intact hull's emissive map and cannot double exterior-edge alpha.
+     * Failure of this OPTIONAL cosmetic shader never aborts the battle.
+     */
+    boolean underlay(SpriteBatch batch,Texture mask){
+        if(mask==null)return false;
+        ShaderProgram simple=flatDamageShader();
+        if(simple==null)return false;
+        if(batch.getShader()!=simple){
+            batch.setShader(simple);
+            simple.setUniformi("u_damage",1);
+            activeDamage=null;
+        }
+        batch.flush();
+        if(activeDamage!=mask){
+            mask.bind(1);
+            Gdx.gl.glActiveTexture(GL20.GL_TEXTURE0);
+            activeDamage=mask;
+        }
+        simple.setUniformf("u_underlayPass",1f);
+        underlayPass=true;
+        active=null;
+        return true;
     }
     /** In the hot draw loop: only flush when the *source sprite* changes. */
     void bind(SpriteBatch batch,Texture original){
@@ -292,12 +326,17 @@ final class ShipSurfaceLighting implements Disposable {
                 batch.setShader(simple);
                 simple.setUniformi("u_damage",1);
                 activeDamage=null;
+                underlayPass=false;
             }
-            if(activeDamage!=mask){
+            if(activeDamage!=mask||underlayPass){
                 batch.flush();
-                mask.bind(1);
-                Gdx.gl.glActiveTexture(GL20.GL_TEXTURE0);
-                activeDamage=mask;
+                if(activeDamage!=mask){
+                    mask.bind(1);
+                    Gdx.gl.glActiveTexture(GL20.GL_TEXTURE0);
+                    activeDamage=mask;
+                }
+                simple.setUniformf("u_underlayPass",0f);
+                underlayPass=false;
             }
             return;
         }
@@ -319,7 +358,7 @@ final class ShipSurfaceLighting implements Disposable {
         if(!started)return;
         batch.end();
         batch.setShader(null);
-        active=null;activeDamage=null;started=false;flat=false;
+        active=null;activeDamage=null;underlayPass=false;started=false;flat=false;
     }
     /** Release an inactive original and its GPU materials after a completed frame. */
     void forget(Texture original){
