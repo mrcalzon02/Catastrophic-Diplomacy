@@ -102,35 +102,87 @@ public final class ParticlePointDefenseDiagnostic {
                 "Switched target inherited another projectile's armor exposure");
         for(int i=0;i<90;i++)mount.illuminate(1.0/30);
         require(!mount.available(),"Particle projector never overheated under continuous duty");
-        for(int i=0;i<110;i++)mount.cool(1.0/30,1);
+        for(int i=0;i<10;i++)mount.cool(1.0/30,1);
+        require(!mount.available(),
+                "Thermal trip flickered off after only a few cooled frames");
+        for(int i=10;i<110;i++)mount.cool(1.0/30,1);
         require(mount.available(),"Cooled particle projector remained falsely locked out");
         double hardened=mount.ablationPerSecond(
                 ProjectileModel.standard(ProjectileModel.Kind.TORPEDO));
         require(hardened>0&&Double.isFinite(hardened),
                 "Sustained particle ablation never damages intact armored targets");
     }
+    /** Real launcher module for equal-research attacker tests. All shots
+     * still originate from installed weapon sockets and use actual physical
+     * projectile health, speed, motor and ammunition access. */
+    private static Shipyard.Design armedAttacker(TechnologyCatalog tech,
+                                                 Threat threat,int rank){
+        Shipyard.Design design=Shipyard.bareHull(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        String type=switch(threat){
+            case MISSILE -> "MSL";
+            case TORPEDO -> "TOR";
+            case KINETIC -> "KIN";
+        };
+        for(Shipyard.Slot slot:design.hull.slots)
+            if(slot.mount()==Shipyard.Mount.WEAPON){
+                design=design.install(slot.index(),"BASE-TER-"+type);
+                if(rank>0)design=design.stage(slot.index(),
+                        Shipyard.Track.SPECIALIST,rank);
+                require(Shipyard.inspect(design,tech).valid(),
+                        "Rank-matched attacker has an invalid real weapon");
+                return design;
+            }
+        throw new IllegalStateException("No physical launcher hardpoint");
+    }
     private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
                                int count,int seed,boolean on){
+        return trial(tech,threat,tier,count,seed,on,-1,0,false);
+    }
+    private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
+                               int count,int seed,boolean on,
+                               int attackingTier,double lateralOffset,boolean moving){
         Battle b=new Battle(73107L+seed*17L+tier*73L+
-                threat.ordinal()*991L+count*109L);
-        Battle.Ship attacker=b.addShip(0,Battle.Faction.TERRAN,325,300);
+                threat.ordinal()*991L+count*109L+
+                attackingTier*5003L+(long)(lateralOffset*7));
+        Battle.Ship attacker;
+        if(attackingTier<0)
+            attacker=b.addShip(0,Battle.Faction.TERRAN,325,300+lateralOffset);
+        else{
+            b.spawnWing(0,armedAttacker(tech,threat,attackingTier),tech,
+                    1,325,300+lateralOffset);
+            attacker=b.ships().get(0);
+        }
         b.spawnWing(1,battery(tech,tier,count),tech,1,550,300);
         Battle.Ship defender=b.ships().get(1);
-        b.registerDiagnosticStationaryTarget(defender.id);
-        defender.speed=defender.vx=defender.vy=0;
-        attacker.speed=attacker.vx=attacker.vy=0;
+        if(!moving){
+            b.registerDiagnosticStationaryTarget(defender.id);
+            defender.speed=defender.vx=defender.vy=0;
+            attacker.speed=attacker.vx=attacker.vy=0;
+        }
         attacker.maxHull=attacker.hull=300000;
         attacker.maxPower=attacker.power=10000;
         attacker.maxHeat=10000;
-        attacker.laserDamage=attacker.plasmaDamage=attacker.particleDamage=0;
-        attacker.kineticDamage=attacker.missileDamage=attacker.torpedoDamage=0;
-        attacker.kineticAmmo=attacker.missileAmmo=attacker.torpedoAmmo=0;
         attacker.fighterReserve=attacker.droneReserve=attacker.repairDroneReserve=0;
         attacker.pdRange=0;
-        switch(threat){
-            case MISSILE -> {attacker.missileDamage=28;attacker.missileAmmo=60;}
-            case TORPEDO -> {attacker.torpedoDamage=46;attacker.torpedoAmmo=50;}
-            case KINETIC -> {attacker.kineticDamage=22;attacker.kineticAmmo=80;}
+        if(attackingTier<0){
+            // Historical baseline from the first verified 24 A/B cases.
+            attacker.laserDamage=attacker.plasmaDamage=attacker.particleDamage=0;
+            attacker.kineticDamage=attacker.missileDamage=attacker.torpedoDamage=0;
+            attacker.kineticAmmo=attacker.missileAmmo=attacker.torpedoAmmo=0;
+            switch(threat){
+                case MISSILE -> {attacker.missileDamage=28;attacker.missileAmmo=60;}
+                case TORPEDO -> {attacker.torpedoDamage=46;attacker.torpedoAmmo=50;}
+                case KINETIC -> {attacker.kineticDamage=22;attacker.kineticAmmo=80;}
+            }
+        }else{
+            // Don't overwrite actual fitted damage or projectile properties.
+            double output=switch(threat){
+                case MISSILE -> attacker.missileDamage;
+                case TORPEDO -> attacker.torpedoDamage;
+                case KINETIC -> attacker.kineticDamage;
+            };
+            require(output>0,"Physically fitted research weapon had no offensive output");
         }
         defender.kineticAmmo=0;
         b.setShipOrders(defender.id,BattleOrders.DEFAULT.withPointDefense(
@@ -233,6 +285,43 @@ public final class ParticlePointDefenseDiagnostic {
                             "|%s|%d|%d|%d|%d|%d|%d|%d|\n",
                             threat,tier,count,launched,fired,kills,hit,holdHits));
                 }
+        // Equal-rank versus equal-rank is not interchangeable with IX PD
+        // against a stock launcher. Exercise real research-matched sockets,
+        // including a mobile flanking target instead of only static fixtures.
+        List<String> equalTier=new ArrayList<>();
+        equalTier.add("threat,attacker_rank,defender_rank,mounts,formation,seed,"+
+                "enabled,launched,beam_ticks,physical_kills,ship_impacts,"+
+                "thermal_lockouts,power_lockouts,net_protection_loss");
+        int equalPairs=0;
+        for(Threat threat:Threat.values())
+            for(int rank:new int[]{0,9})
+                for(int mounts:new int[]{1,4})
+                    for(boolean moving:new boolean[]{false,true}){
+                        String formation=moving?"MOBILE_FLANK":"FIXED_APPROACH";
+                        double lateral=moving?72:0;
+                        for(int seed=0;seed<2;seed++){
+                            Trial live=trial(tech,threat,rank,mounts,seed,true,
+                                    rank,lateral,moving);
+                            Trial hold=trial(tech,threat,rank,mounts,seed,false,
+                                    rank,lateral,moving);
+                            for(boolean enabled:new boolean[]{true,false}){
+                                Trial a=enabled?live:hold;
+                                equalTier.add(String.format(Locale.ROOT,
+                                        "%s,%d,%d,%d,%s,%d,%s,%d,%d,%d,%d,%d,%d,%.2f",
+                                        threat,rank,rank,mounts,formation,seed,
+                                        enabled,a.launched,a.fired,a.killed,
+                                        a.impacts,a.peakHeatLockouts,
+                                        a.peakPowerLockouts,a.damage));
+                            }
+                            equalPairs++;
+                        }
+                    }
+        Files.write(root.resolve("equal-tier-moving-geometry.csv"),equalTier,
+                StandardCharsets.UTF_8);
+        report.append("\\nAdditional equal-tier physically fitted launcher/PPD pairs: "+
+                equalPairs+". Each same-seed approach includes real engine "+
+                "movement and offset geometry; numerical interception rates "+
+                "remain diagnostic only.\\n");
         require(totalRealBeams>0,
                 "No installed particle gun ever produced a real continuous beam");
         report.append("\nVerified paired conditions: "+totalPaired+
