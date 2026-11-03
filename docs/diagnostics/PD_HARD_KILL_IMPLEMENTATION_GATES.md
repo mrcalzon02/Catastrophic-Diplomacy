@@ -152,3 +152,43 @@ wave diagnostic remains advisory and does not build an APK. Do not assert new
 interception percentages or stage parity until GitHub runner artifacts are read.
 
 **Runner readback:** [wave 41562569048](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41562569048) completed 528 valid pairs and zero errors; [comprehensive 41562569060](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41562569060) completed 768 rocket configurations, 736 additional physical-threat configurations and 256 timed-load valid pairs. The same-stage late-game 4v4 barrage is now nearly erased, so physical tracking/slew and early terminal-ring leakage need study **before numerical tuning**. See [the measured precision-mount review](PD_PRECISION_MOUNT_REVIEW_2026-11-02.md). Keep all balance advisory.
+
+## Gate C update: researched RCW now a verified third hard-kill family
+
+**This section supersedes the earlier historical "RCW next" status.**
+The previous Gate A separate PD mount identities, optical tracking/slew,
+four-channel scheduling and expected-damage deconfliction are operating.
+The hull-wide cached hostile sensor scan is **still pending**. Gate B's
+real radial fragment-density model is active, while flak's continuous
+individual shell flight remains unfinished.
+
+- **RCW installed and firing:** all eleven native factions have genuine
+  base `RCW` weapon modules and exclusive nine-stage OUTPUT/EFFICIENCY/
+  RESILIENCE/SPECIALIST research, without rewriting old IDs. Shipyard
+  sockets and Battle contain separate `ROTARY_CIWS` emitters, not laser or
+  FLK aliases. An installed RCW has its own nominal close-in sensor range,
+  radar/signature/weather/condition gate, tracking profile, spin-up, servo
+  bearing, discrete ammo feed and short firing cycle.
+- **RCW actual physics:** each 705-units/s bullet is an inertial projectile
+  drawn at its world-space position. Swept 30-Hz collision chooses its first
+  actual hostile rocket, guided missile, physical shell or craft intersect.
+  One spent cartridge, power and heat are charged per firing. Armored
+  torpedoes absorb more small-kinetic damage; aircraft armor goes through the
+  real `hitCraft` path. Neither a synthetic laser beam nor an instant
+  fragmentation pulse can count as an RCW interception.
+- **Visual integration:** using authored turret/kinetic atlas art, the fitted
+  turret pivots on its own servo bearing and the projectile is rendered at
+  its live position. No placeholder or reconstructed hit tween is added.
+- **Runner evidence:** [focused RCW 41578652780](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41578652780)
+  completed with BOTH `:core:rotaryCiwsDiagnostic` (60 live/HOLD_FIRE
+  trial pairs) and `:game:compileJava` passing. The machine-report artifact
+  contains true physical launches, paid shots, interceptions, incoming
+  impacts, and ammunition-store depletion. The optional workflow now
+  correctly fails on a functional compile or gun-test error; numerical
+  balancing remains advisory. No APK or desktop release packaging.
+- **Next Gate C milestone: RPD**, a separately mounted charged rail
+  interceptor and its own solid penetrator, long-range detection, arc and
+  minimum-safe separation. Its functionality and visuals must pass before
+  calling it implemented. PPD/PLS/IMD are all still unimplemented.
+
+[Complete RCW engineering and measured target report](PD_ROTARY_CIWS_PHYSICAL_IMPLEMENTATION_AND_TARGET_EFFECTIVENESS_2026-11-02.md).
