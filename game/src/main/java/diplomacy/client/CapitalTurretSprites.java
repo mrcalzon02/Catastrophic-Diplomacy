@@ -46,6 +46,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case TORPEDO -> 8;
             case POINT_DEFENSE -> (slot&1)==0?6:5;
             case FLAK -> 5; // Existing dedicated fitted flak turret art cell.
+            case ROTARY_CIWS -> 10; // Actual authored small kinetic rotary turret cell.
         };
     }
     /** Actual fitted component suffix distinguishes flak from rotary PD.
@@ -54,6 +55,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
         if(emitter==null)throw new IllegalArgumentException("Missing fitted turret");
         String id=emitter.component();
         if(id.endsWith("-FLK"))return 5;
+        if(id.endsWith("-RCW"))return 10;
         if(id.endsWith("-PD"))return 6;
         if(emitter.family()==WeaponMuzzles.Family.KINETIC && hull!=null)
             return switch(hull.spriteHull()){
@@ -72,6 +74,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             throw new IllegalArgumentException("Invalid turret scale");
         float value=(6.4f/3f)*shipScale;
         if(family==WeaponMuzzles.Family.POINT_DEFENSE)value*=.75f;
+        if(family==WeaponMuzzles.Family.ROTARY_CIWS)value*=.82f;
         if(family==WeaponMuzzles.Family.TORPEDO)value*=1.14f;
         return value;
     }
@@ -126,12 +129,21 @@ public final class CapitalTurretSprites implements AutoCloseable {
                 float x=pose.x()+forward*c+right*s;
                 float y=pose.y()+forward*s-right*c;
                 float diameter=diameter(mount.family(),scale);
-                // Only mounted physical emitters; rotation pivots at the base
-                // centre of the 256-pixel sprite, not at the muzzle tip.
+                // RCW physically tracks its own selected body. The turret art
+                // faces the real per-socket mechanical bearing, not the
+                // owning ship's last offensive target direction.
+                float turretAngle=angle;
+                if(mount.family()==WeaponMuzzles.Family.ROTARY_CIWS)
+                    for(diplomacy.sim.RotaryPointDefense.Mount rcw:ship.rotaryMounts)
+                        if(rcw.slotId==mount.slotId()&&Double.isFinite(rcw.bearing)){
+                            turretAngle=spriteAngle((float)StrictMath.toDegrees(rcw.bearing));
+                            break;
+                        }
+                // The world-space muzzle coordinates and turret socket agree.
                 batch.draw(tiles[tile(mount,ship.hullClass)],
                         x-diameter*0.5f,y-diameter*0.5f,
                         diameter*0.5f,diameter*0.5f,
-                        diameter,diameter,1f,1f,angle);
+                        diameter,diameter,1f,1f,turretAngle);
             }
         }
         batch.end();
