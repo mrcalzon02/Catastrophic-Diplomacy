@@ -32,11 +32,9 @@ jobs:
         with: { gradle-version: '8.11.1' }
       - name: Verify mounted rotary gun, finite projectiles, research and sensors
         id: physical
-        continue-on-error: true
         run: gradle --no-daemon :core:rotaryCiwsDiagnostic
       - name: Compile live tracer render path without packaging game
         id: render
-        continue-on-error: true
         run: gradle --no-daemon :game:compileJava
       - name: Publish physical tracking and target effectiveness report
         if: always()
