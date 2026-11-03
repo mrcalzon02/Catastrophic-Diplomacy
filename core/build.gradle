@@ -826,6 +826,18 @@ tasks.register('rotaryCiwsDiagnostic', JavaExec) {
     maxHeapSize = '512m'
 }
 
+// Charged RPD mechanic and actual penetrator trials. Mechanical compilation,
+// stock integrity and hardpoint legitimacy are functional; target balance is
+// advisory and cannot gate release packaging or require an APK.
+tasks.register('railPdDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Verify real mounted charged rail PD, physical slug flight, 9-rank sensors and paid ammunition.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.RailPointDefenseDiagnostic'
+    maxHeapSize = '512m'
+}
+
 // Standalone advisory fighter-wave diagnostics: testClasses ONLY.
 // No APK, desktop packaging, render/sprite checks, or release thresholds.
 tasks.register('pdFlakWaveDiagnostic', JavaExec) {
