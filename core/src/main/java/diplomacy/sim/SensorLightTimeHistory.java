@@ -11,6 +11,7 @@ public final class SensorLightTimeHistory {
     public record Profile(long tick,double radarCrossSection,
             double thermalSignature,double opticalSignature,
             double maxHull,double maxArmor,double power,double ecmCondition,
+            double ecmStrength,double hologramNoise,
             double coolingCondition,double sensorRange,double infraredRange,
             double xrayRange,double graviticRange,double sensorsCondition,
             double crewReadiness,double sensorAcuity,double resolutionGain,
@@ -46,7 +47,8 @@ public final class SensorLightTimeHistory {
                 ship.vy,ship.alive(),activeReady);
         profiles[slot]=new Profile(tick,ship.radarCrossSection,
                 ship.thermalSignature,ship.opticalSignature,ship.maxHull,
-                ship.maxArmor,ship.power,ship.ecmCondition,ship.coolingCondition,
+                ship.maxArmor,ship.power,ship.ecmCondition,
+                ship.ecmStrength,ship.hologramNoise,ship.coolingCondition,
                 ship.sensorRange,ship.infraredRange,ship.xrayRange,
                 ship.graviticRange,ship.sensorsCondition,ship.crewReadiness(),
                 ship.sensorAcuity,ship.network.resolutionGain(),
