@@ -749,7 +749,7 @@ public final class Battle {
      * ammo, target acquisition, burst timing or number of physical bodies. */
     public void configureFlakFragmentFalloffForDiagnostic(boolean enabled){
         if(tick!=0)throw new IllegalStateException("Configure flak before combat");
-        diagnosticFlakFragmentFalloff=enabled;
+        flakFragmentFalloff=enabled;
     }
     /** Compare per-socket optical allocations to the old duplicate targeting.
      * This opt-in switch is only legal before the first simulation tick. */
@@ -772,9 +772,10 @@ public final class Battle {
     /** Measured intermediate parallel/serial scheduling under saturation;
      * laboratory trials can override, all multipliers remain <=4x. */
     private double diagnosticPrecisionTrackExponent=.90;
-    /** Alternative spatial frag falloff in controlled tests only. Default
-     * preserves existing physical flak until matched damage results justify it. */
-    private boolean diagnosticFlakFragmentFalloff;
+    /** Physical burst density decreases smoothly toward the outer edge.
+     * Verified against aircraft, swarms, fast shells and armored torpedoes;
+     * a pre-battle laboratory override retains the old uniform-density A/B. */
+    private boolean flakFragmentFalloff=true;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -3411,7 +3412,7 @@ public final class Battle {
                 // A flak fragment spreads kinetic energy over an increasingly
                 // hardened warhead casing; intact heavy torpedoes shrug off
                 // individual fragments much more readily than micro-missiles.
-                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                double fragmentFactor=flakFragmentFalloff?
                         flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
                                 target.y-burst.aimY),burst.radius,0):1.0;
                 target.integrity-=fragmentFactor*ProjectileModel.fragmentationPdDamage(
@@ -3430,7 +3431,7 @@ public final class Battle {
                 if(target.team==burst.team ||
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
                     continue;
-                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                double fragmentFactor=flakFragmentFalloff?
                         flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
                                 target.y-burst.aimY),burst.radius,0):1.0;
                 target.integrity-=fragmentFactor*ProjectileModel.fragmentationPdDamage(
@@ -3450,7 +3451,7 @@ public final class Battle {
                 // Dense inert metallic bullets have little exposed surface
                 // for fragment impacts; shells should be handled by precision
                 // CIWS or an actual rail interceptor, not flak shrapnel.
-                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                double fragmentFactor=flakFragmentFalloff?
                         flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
                                 target.y-burst.aimY),burst.radius,0):1.0;
                 target.integrity-=fragmentFactor*ProjectileModel.fragmentationPdDamage(
@@ -3472,7 +3473,7 @@ public final class Battle {
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>hitRadius)
                     continue;
                 double fragments=StrictMath.max(.65,StrictMath.min(2.4,area*2.2));
-                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                double fragmentFactor=flakFragmentFalloff?
                         flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
                                 target.y-burst.aimY),burst.radius,22*area):1.0;
                 if(fragmentFactor<=0)continue;
