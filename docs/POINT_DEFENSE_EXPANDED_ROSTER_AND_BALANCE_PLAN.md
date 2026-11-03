@@ -39,16 +39,19 @@ are separate outcomes in telemetry and gameplay.
 
 ## Point-defense weapon roster — seven hard-kill families
 
-PD and FLK already exist. The remaining five codes are proposed **point-defense
-weapons**; do not add a purchasable component before its own physical
-interception mechanism is functional. This section excludes ECM, fighter
+PD, FLK, and **RCW** are now live fitted **point-defense** weapon families.
+The remaining four (RPD, PPD, PLS, IMD) are proposed, **not yet working**.
+Never add a purchasable component before its own physical combat and
+renderer mechanisms function. RCW was added only after its researched,
+paid-ammunition travelling projectile, mounted sensor, live collision and
+client compile were tested. This section excludes ECM, fighter
 craft, decoys and ship armor.
 
 | Code | Type | Mechanics that must genuinely differ | Primary jobs | Vulnerabilities |
 |---|---|---|---|---|
 | PD | Pulse laser CIWS (existing) | Ultra-fast aim; instant single-body beam; low pulse damage; per-mount retarget/thermal recovery | Fast kinetic shells, small rockets, micro missiles | Thick armor, fighter hull integrity, large continuous waves that exhaust aim windows |
 | FLK | Flak projector (existing) | Physical timed/proximity bursts with local fragmentation volume, finite shell travel and dispersion | Fighter groups, assault drones, tightly packed missile formations | Relativistic shells, single tiny evasive bodies, friendly-fire/exclusion arcs |
-| RCW | Rotary kinetic CIWS | Tracer/projectile streams, per-round ammunition, sweep tracking, spin-up and lead | Close rockets, drones, conventional guided weapons | Ultra-fast rounds, hard torpedoes, ammunition depletion |
+| RCW | Rotary kinetic CIWS (**implemented**) | Independently fitted spin-up turret; genuine inertial 705-unit/s tracer bodies; swept collision, paid kinetic ammunition, separate short-range radar signature and tracking | Close rockets, drones, conventional guided weapons | Ultra-fast rounds, hard torpedoes, ammunition depletion |
 | RPD | Railgun interceptor | Very fast small solid penetrator, prediction/lead and long charge cycle | Fast large shells, tough torpedoes, large missiles | Small swarms and lateral juking; low shots per second |
 | PPD | Particle-beam PD | Accurate armor-ablation beam with longer dwell and expensive continuous energy | Armored torpedoes, hardened missiles, medium craft | Micro swarms, heat/continuous power, rapid target switching |
 | PLS | Plasma burst projector | Short-range expanding, dispersing plasma cone; decaying energy volume | Dense rocket salvo, slow close clusters, near-range craft | Fast tiny shells, distant threats, heavy shielding; severe heat |
@@ -179,9 +182,12 @@ Use physical constraints for anti-universality:
    firing states, targeting, valid targets, hit/damage logic, ranges and
    proper flak burst/fragmentation. No damage model swap for unrelated
    campaign weapons.
-3. **Add RCW and RPD**, including real projectiles, ammunition budgets and
-   multi-target selection. Add new technology components only when
-   gameplay and rendering are functional.
+3. **RCW now implemented** with actual fitted research and physics; finish
+   defensive drone/aircraft and fleet-scale role testing. Add **RPD** next:
+   a separate expensive charged fast penetrator with minimum bore range,
+   lead, physical flight, limited shots/heat and real hard-target intercepts.
+   Add RPD technology components only with functional live firing and
+   correct client rendering.
 4. **Add PPD and PLS** with real energy/volume interaction and thermal constraints.
 5. **Add IMD**: guided counter-missiles, physical magazine, reload and arming,
    target acquisition, and per-projectile intercept accounting.
@@ -202,7 +208,12 @@ advisory diagnostics only. Objective build/install/launch/run, save
 compatibility and required multiplayer/update failures can block releases.
 Do not convert a proposed target band into a release gate.
 
-**Immediate practical step:** implement distinct PD-versus-FLK behavior
-and verify it with matched *actual installed* PD/FLK fittings before
-declaring any of the five newly proposed weapon concepts operational. The catalogue entries
-alone do not count as a working weapon.
+**Current verified continuation:** PD and FLK have independent physical
+fitted combat paths and measured anti-ordnance/anti-aircraft roles. RCW is
+also physically implemented, rendered and tested through 60 matched
+HOLD_FIRE/live-fire trials (see
+`docs/diagnostics/PD_ROTARY_CIWS_PHYSICAL_IMPLEMENTATION_AND_TARGET_EFFECTIVENESS_2026-11-02.md`).
+Its native sensor envelope, contact spin-up, separate muzzle, physically
+moving bullets, finite paid ammo and sensor/servo degradation are in use.
+Do not claim the unimplemented RPD, PPD, PLS or IMD families are operational;
+a technology catalogue entry by itself has never counted as completion.
