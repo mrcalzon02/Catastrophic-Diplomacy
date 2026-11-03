@@ -62,16 +62,24 @@ public final class RailPointDefense {
     public static final class Penetrator {
         public final long visualId,spawnTick;
         public final int team,sourceId,slotId;
+        public final long assignedBodyId;
+        /** Expected solid-penetrator damage reservation expires with THIS
+         * actual in-flight projectile; it is not a guaranteed hit. */
+        public final double reservedDamage;
         public final double vx,vy,damage;
         public double x,y,life;
         public Penetrator(long shot,long tick,int team,int source,int slot,
                           double x,double y,double bearing,
-                          double reach,double damage){
-            if(shot<=0||slot<0||!Double.isFinite(bearing)||damage<=0||
-                    !Double.isFinite(reach)||reach<MIN_ENGAGEMENT_RANGE)
+                          double reach,double damage,long assignedBody,
+                          double reservedDamage){
+            if(shot<=0||slot<0||assignedBody<=0||!Double.isFinite(bearing)||
+                    damage<=0||!Double.isFinite(reservedDamage)||
+                    reservedDamage<=0||!Double.isFinite(reach)||
+                    reach<MIN_ENGAGEMENT_RANGE)
                 throw new IllegalArgumentException("Invalid rail penetrator");
             visualId=shot;spawnTick=tick;this.team=team;sourceId=source;
             slotId=slot;this.x=x;this.y=y;this.damage=damage;
+            assignedBodyId=assignedBody;this.reservedDamage=reservedDamage;
             vx=PENETRATOR_SPEED*StrictMath.cos(bearing);
             vy=PENETRATOR_SPEED*StrictMath.sin(bearing);
             life=reach/PENETRATOR_SPEED;
