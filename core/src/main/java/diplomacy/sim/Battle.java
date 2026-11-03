@@ -717,6 +717,12 @@ public final class Battle {
             throw new IllegalArgumentException("Invalid laboratory CIWS lock duration");
         diagnosticPrecisionLockMultiplier=multiplier;
     }
+    /** Compare per-socket optical allocations to the old duplicate targeting.
+     * This opt-in switch is only legal before the first simulation tick. */
+    public void configurePrecisionReservationsForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException("Configure CIWS reservation before combat");
+        diagnosticDisablePrecisionReservations=!enabled;
+    }
     /** Opt-in screensaver policy only. Player/campaign battles never make
      * autonomous extraction decisions for the player's surviving ships. */
     private boolean unattendedExhibition;
@@ -724,6 +730,8 @@ public final class Battle {
     private double diagnosticRocketPdPressure;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
+    /** Laboratory A/B against duplicate optical allocations. */
+    private boolean diagnosticDisablePrecisionReservations;
     /**
      * Strictly opt-in stationary target vessels for local development firing
      * ranges. The vessel remains a regular damageable fitted Ship: only captain
@@ -3561,6 +3569,10 @@ public final class Battle {
                 &&defender.orders.pointDefense().ordnance()) {
             List<Ship.PrecisionMount> sockets=defender.precisionMounts.isEmpty()
                     ?java.util.Collections.singletonList(null):defender.precisionMounts;
+            // Reserve expected laser damage while each turret is still
+            // acquiring its target. Prevent duplicate fragile-rocket locks,
+            // but allow multiple lasers to suppress hardened torpedoes.
+            java.util.Map<Long,Double> reservedDamage=new java.util.HashMap<>();
             for(Ship.PrecisionMount pdSocket:sockets){
                 if(defender.power<pdLaw.minimumPower())continue;
                 double pdRange=pdSocket==null?defender.pdRange:pdSocket.nominalRange;
@@ -3579,6 +3591,9 @@ public final class Battle {
                         pdProfile,m.spec,
                         OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
                 if(distance>detection)continue;
+                if(!diagnosticDisablePrecisionReservations&&
+                        reservedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
+                    continue;
                 double eta=approachEta(defender.x,defender.y,
                         m.x,m.y,m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
                 if(defender.standingOrders!=null&&eta>=1000 &&
@@ -3598,6 +3613,9 @@ public final class Battle {
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,p.spec);
                 if(distance>detection)continue;
+                if(!diagnosticDisablePrecisionReservations&&
+                        reservedDamage.getOrDefault(p.visualId,0.0)>=p.integrity)
+                    continue;
                 double eta=approachEta(defender.x,defender.y,
                         p.x,p.y,p.vx,p.vy,p.spec.speed());
                 if(defender.standingOrders!=null&&eta>=1000 &&
@@ -3620,6 +3638,9 @@ public final class Battle {
                         pdProfile,r.spec,
                         RocketBarrage.hotEmission(r.motor,r.burning()));
                 if(distance>detection)continue;
+                if(!diagnosticDisablePrecisionReservations&&
+                        reservedDamage.getOrDefault(r.visualId,0.0)>=r.integrity)
+                    continue;
                 acquiredRockets++;
                 double eta=approachEta(defender.x,defender.y,
                         r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
@@ -3642,6 +3663,22 @@ public final class Battle {
                     chosenShell!=null?chosenShell.visualId:chosenRocket.visualId;
             if(pdSocket!=null){
                 pdSocket.reservedOrdnanceTick=tick;
+                // A fractional reservation reflects real target hardness and
+                // fitted hit probability; it is NOT a free intercept/kill.
+                if(!diagnosticDisablePrecisionReservations&&pdSocket.reload<.6){
+                    ProjectileModel.Spec planned=chosenMissile!=null?chosenMissile.spec:
+                            chosenShell!=null?chosenShell.spec:chosenRocket.spec;
+                    double velocity=chosenMissile!=null?
+                            StrictMath.hypot(chosenMissile.vx,chosenMissile.vy):
+                            chosenRocket!=null?StrictMath.hypot(chosenRocket.vx,chosenRocket.vy):
+                            planned.speed();
+                    double probability=ProjectileModel.interceptionChance(planned,
+                            pdProfile,defender.pointDefenseCondition,
+                            weather.accuracyFactor(),velocity);
+                    double promised=probability*
+                            ProjectileModel.precisionPdDamage(planned,pdProfile);
+                    reservedDamage.merge(physicalId,promised,Double::sum);
+                }
                 if(!acquirePrecisionTarget(defender,pdSocket,physicalId,tx,ty,tick))
                     continue;
             }

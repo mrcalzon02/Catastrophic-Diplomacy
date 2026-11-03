@@ -89,12 +89,21 @@ public final class RocketPdBalanceDiagnostic {
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
                               boolean evasive,boolean pdOnline,int seed,double pressure,
                               double acquisitionScale) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,
+                seed,pressure,acquisitionScale,true);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure,
+                              double acquisitionScale,boolean coordinated) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
         if(pdOnline&&pressure>0)battle.configureRocketPdCrowdingForDiagnostic(pressure);
         if(pdOnline&&acquisitionScale!=1.0)
             battle.configurePrecisionLockForDiagnostic(acquisitionScale);
+        if(pdOnline&&!coordinated)
+            battle.configurePrecisionReservationsForDiagnostic(false);
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,tier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
@@ -368,6 +377,45 @@ public final class RocketPdBalanceDiagnostic {
                 "probability of missing. This sweep does not change normal battles. "+
                 "The ~33% siege escape goal is advisory and must be weighed "+
                 "against inner-zone breaches, true impacts, and power/thermal costs.\n");
+        // Same-seed physical A/B keeps the turret mechanics identical,
+        // changing only whether the hull avoids duplicated optical targets.
+        detail.append("\n## Physical multi-mount reservation A/B (diagnostic only)\n\n");
+        detail.append("|Motor|Moving|Lock scale|Coordinated|Rockets|Intercepted|Escape %|"+
+                "Terminal %|Impacts|Acquisitions|Lock-wait ticks|\n");
+        detail.append("|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|\n");
+        List<String> reservationRows=new ArrayList<>();
+        reservationRows.add("motor,evasive,lock_scale,coordinated,rockets,intercepted,"+
+                "escaped,escape_fraction,terminal_entries,terminal_fraction,impacts,"+
+                "acquisitions,lock_wait_ticks");
+        for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+            for(boolean moving:new boolean[]{false,true})
+                for(double dwell:new double[]{.65,1.0})
+                    for(boolean coordinated:new boolean[]{false,true}){
+                        int launched=0,killed=0,terminal=0,impacts=0,acquisitions=0,wait=0;
+                        for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                            Sample trial=run(tech,RocketBarrage.Size.SIEGE,9,4,16,
+                                    motor,moving,true,seed,0,dwell,coordinated);
+                            launched+=trial.launched();killed+=trial.intercepted();
+                            terminal+=trial.terminalEntries();impacts+=trial.collided();
+                            acquisitions+=trial.acquisitions();wait+=trial.lockWaitTicks();
+                        }
+                        double escaped=launched==0?0:(launched-killed)/(double)launched;
+                        double entry=launched==0?0:terminal/(double)launched;
+                        reservationRows.add(String.format(Locale.ROOT,
+                                "%s,%s,%.2f,%s,%d,%d,%d,%.6f,%d,%.6f,%d,%d,%d",
+                                motor,moving,dwell,coordinated,launched,killed,
+                                launched-killed,escaped,terminal,entry,impacts,acquisitions,wait));
+                        detail.append(String.format(Locale.ROOT,
+                                "|%s|%s|%.2f|%s|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|\n",
+                                motor,moving,dwell,coordinated,launched,killed,
+                                escaped*100,entry*100,impacts,acquisitions,wait));
+                    }
+        Files.write(output.resolve("precision-reservation-ab.csv"),
+                reservationRows,StandardCharsets.UTF_8);
+        detail.append("\nCoordinated turrets reserve expected damage from real aiming "+
+                "mounts, without modifying accuracy, firing cycles or armor. "+
+                "The A/B rows are paired seeded physical battles; interpret "+
+                "terminal-zone leakage and impacts separately from kills.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
