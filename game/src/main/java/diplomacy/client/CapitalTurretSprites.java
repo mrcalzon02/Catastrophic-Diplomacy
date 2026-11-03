@@ -47,6 +47,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case POINT_DEFENSE -> (slot&1)==0?6:5;
             case FLAK -> 5; // Existing dedicated fitted flak turret art cell.
             case ROTARY_CIWS -> 10; // Actual authored small kinetic rotary turret cell.
+            case RAIL_PD -> 10; // Reuse approved compact kinetic rail turret art; no new placeholder.
             case RAIL_PD -> 11; // Heavy authored rail cannon, not a laser barrel.
         };
     }
