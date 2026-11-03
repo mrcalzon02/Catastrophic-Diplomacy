@@ -296,6 +296,9 @@ public final class RotaryCiwsDiagnostic {
                 " orders="+defender.orders.pointDefense()+
                 " spool="+defender.rotaryMounts.get(0).spin+
                 " bearing="+defender.rotaryMounts.get(0).bearing+
+                " scanFrames="+defender.rotaryMounts.get(0).eligibleScanFrames+
+                " candidates="+defender.rotaryMounts.get(0).aircraftVisibleFrames+
+                " contactFrames="+defender.rotaryMounts.get(0).contactFrames+
                 " acquired="+defender.rotaryMounts.get(0).acquisitions+
                 " trackId="+defender.rotaryMounts.get(0).trackedId);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
