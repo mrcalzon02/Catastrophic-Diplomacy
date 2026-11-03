@@ -154,8 +154,10 @@ public final class RailPointDefenseDiagnostic {
         require(initialAmmo-defender.kineticAmmo>=
                 fire*RailPointDefense.CARTRIDGES_PER_SHOT,
                 "Railgun fired unpaid cartridges");
-        require(!enabled||fire==0||first>=30,
-                "Charged rail gun skipped its physical capacitor warmup");
+        require(!enabled||fire==0||first>=6,
+                "Charged rail gun skipped the real >=0.20s target lock");
+        // Warship capacitors were paid and energized at deployment; lock,
+        // barrel slew and recoil remain live per-mount physical delays.
         require(!enabled||fire==0||liveFrames>0||physicalHits>0,
                 "Railgun fired but its penetrator had no world-space flight or hit");
         return new Trial(launched,fire,liveFrames,impacts,defender.intercepted,
