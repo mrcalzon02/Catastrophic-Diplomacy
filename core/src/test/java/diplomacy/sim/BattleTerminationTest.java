@@ -1,6 +1,8 @@
 package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.SupportDoctrine;
+import diplomacy.shipyard.TenderDoctrine;
 import diplomacy.tech.TechnologyCatalog;
 
 /** Genuine finite auto-battles, no synthetic damage or fabricated victories. */
