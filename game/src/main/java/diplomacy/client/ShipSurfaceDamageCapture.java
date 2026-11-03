@@ -34,7 +34,7 @@ final class ShipSurfaceDamageCapture {
                     int targetId,int ticks,int hits,double armorExposure,
                     double internalExposure,int wornCells,int exposedCells,
                     boolean milestoneReached,boolean syntheticStress,
-                    boolean axialAtSpawn) {
+                    boolean axialAtSpawn,CombatHitFeedback capturedEffects) {
         Battle.Ship target(){
             for(Battle.Ship ship:battle.ships())
                 if(ship.id==targetId)return ship;
@@ -67,7 +67,7 @@ final class ShipSurfaceDamageCapture {
     private static Snapshot record(String key,String weapon,long seed,
                                    Battle battle,Battle.Ship ship,
                                    boolean reached,boolean stress,
-                                   boolean axialAtSpawn) {
+                                   boolean axialAtSpawn,CombatHitFeedback effects) {
         int worn=0,exposed=0;
         for(int r=0;r<DirectionalDefense.GRID;r++)
             for(int c=0;c<DirectionalDefense.GRID;c++){
@@ -78,16 +78,20 @@ final class ShipSurfaceDamageCapture {
             }
         return new Snapshot(key,weapon,ship.hullClass.name(),seed,battle,ship.id,
                 (int)battle.tick,battle.hitCount,maxArmor(ship),maxInterior(ship),
-                worn,exposed,reached,stress,axialAtSpawn);
+                worn,exposed,reached,stress,axialAtSpawn,effects);
     }
     static Snapshot create(TechnologyCatalog technology,int index){
+        return create(technology,index,false);
+    }
+    /** Optional real-hit feedback for authentic OpenGL emission/spark photos. */
+    static Snapshot create(TechnologyCatalog technology,int index,boolean captureEffects){
         if(index<0||index>=KEYS.length)throw new IllegalArgumentException("Unknown armor case "+index);
         if(index==8){
             // The former 6x6-cell image is a deliberately artificial STRESS test.
             // Retain it so the workflow catches blocky-grid regressions.
             Battle stress=ShipSurfaceDamageFixture.create(technology);
             return record(KEYS[index],"KINETIC_GRID_STRESS",SEED,stress,
-                    stress.ships().get(2),true,true,false);
+                    stress.ships().get(2),true,true,false,null);
         }
         final String weapon=switch(index){
             case 3,7,12,13,14,15,16,17,18,19,20,21,22 -> "KINETIC";
@@ -194,14 +198,21 @@ final class ShipSurfaceDamageCapture {
         // Identical target pose across every deterministic screenshot. The
         // attacker remains autonomous and still hits with genuine projectiles.
         final double fixedX=victim.x,fixedY=victim.y,fixedFacing=victim.facing;
+        CombatHitFeedback impactEvidence=captureEffects?new CombatHitFeedback():null;
         if(index==0||index==13||index==14||index==16||index==18||
                 index==20||index==22||index==24||index==26||
                 index==28||index==30||index==32)
-            return record(KEYS[index],weapon,seed,battle,victim,true,false,axialAtSpawn);
+            return record(KEYS[index],weapon,seed,battle,victim,true,false,axialAtSpawn,
+                    impactEvidence);
         boolean reached=false;
         int maxSteps=(index>=6?1500:600);
         for(int i=0;i<maxSteps&&!battle.finished();i++){
+            if(impactEvidence!=null)impactEvidence.beforeStep(battle);
             battle.step();
+            if(impactEvidence!=null){
+                impactEvidence.afterStep(battle);
+                impactEvidence.advance(battle,(float)Battle.DT,true);
+            }
             if(Double.compare(victim.x,fixedX)!=0||
                     Double.compare(victim.y,fixedY)!=0||
                     Double.compare(victim.facing,fixedFacing)!=0)
@@ -231,6 +242,7 @@ final class ShipSurfaceDamageCapture {
         }
         victim.shields=victim.defense.totalShields();
         victim.armor=victim.defense.totalArmor();
-        return record(KEYS[index],weapon,seed,battle,victim,reached,false,axialAtSpawn);
+        return record(KEYS[index],weapon,seed,battle,victim,reached,false,axialAtSpawn,
+                impactEvidence);
     }
 }
