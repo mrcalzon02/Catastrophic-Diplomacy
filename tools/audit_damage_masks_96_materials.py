@@ -26,6 +26,7 @@ def stats(frame,family):
     marked=set()
     phase_values=set()
     hot_values=set()
+    outer_oxide_as_heat=0
     for y in range(SIZE):
         for x in range(SIZE):
             r,g,b,a=px[x,y]
@@ -36,6 +37,11 @@ def stats(frame,family):
                 thermal.append(math.hypot(x-47.5,y-47.5)/
                                PIXELS_PER_ARMOR_CELL)
             if family=="laser" and b>170:phase_values.add(g)
+            if family=="laser" and 164<=b<=177 and g>80:
+                # The outer oxide edge used to become an orange outline when
+                # shader bilinear filtering crossed from B-tagged hue to
+                # ordinary G thermal intensity; this should now be tapered.
+                outer_oxide_as_heat+=1
             if family!="laser" and g>45:hot_values.add(g)
     return {
         "cutPixels":len(cut),
@@ -44,6 +50,7 @@ def stats(frame,family):
         "heatReachArmorCells":round(max(thermal),3) if thermal else 0,
         "oxidePhaseLevels":len(phase_values),
         "thermalGradientLevels":len(hot_values),
+        "oxideFringeHueLeakPixels":outer_oxide_as_heat,
     },cut
 
 def audit():
@@ -70,6 +77,9 @@ def audit():
                     family+" variant "+str(v+1)+" material exceeds 1.32 cells")
             if family=="kinetic" and one["heatOrAnnealPixels"]:
                 report["styleWarnings"].append("Kinetic mask contains thermal glow")
+            if family=="laser" and one["oxideFringeHueLeakPixels"]:
+                report["styleWarnings"].append(
+                    "Laser oxide fringe may turn into heat at tag boundary")
         overlap=[]
         for a,b in itertools.combinations(range(COUNT),2):
             union=len(cutsets[a]|cutsets[b])
