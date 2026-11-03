@@ -70,7 +70,16 @@ tasks.register('battleTerminationSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+tasks.register('worldScaleAndPropulsionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify 1 light-minute physical mapping, fitted sublight drive tiers and 50-percent physical hull/hardpoint geometry.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WorldScaleAndPropulsionTest'
+    dependsOn testClasses
+}
+
 tasks.register('battleArenaSmoke', JavaExec) {
+    dependsOn(tasks.named('worldScaleAndPropulsionSmoke'))
     dependsOn(tasks.named('battleTerminationSmoke'))
     group = 'verification'
     description = 'Headless 200v200 limit, fixed world boundaries, projectile age and arena-edge expiration.'
