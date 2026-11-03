@@ -7,6 +7,8 @@ on:
       - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageVisual.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
       - 'game/src/main/java/diplomacy/client/ShipImpactProfiles.java'
+      - 'assets/damage_masks/*.png'
+      - 'tools/audit_damage_mask_assets.py'
       - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
       - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
@@ -67,6 +69,11 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends xvfb xauth libgl1-mesa-dri libgl1 libopenal1 python3-pil
+          # Audit the literal 42 PNG frames, never synthesize placeholder wounds.
+          # Aesthetic similarity is reported, not a build/release gate.
+          python3 tools/audit_damage_mask_assets.py \
+            --report test-output/armor-observation/mask-library-audit.json \
+            --export-frames test-output/armor-observation/native-masks
           mkdir -p test-output/armor-observation/framebuffer
           export CD_ARMOR_CAPTURE_DIR="$PWD/test-output/armor-observation/framebuffer"
           export LIBGL_ALWAYS_SOFTWARE=1
