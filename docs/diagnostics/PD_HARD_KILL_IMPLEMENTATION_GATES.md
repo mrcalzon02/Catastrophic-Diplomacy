@@ -39,7 +39,7 @@ reactive armor are independent equipment categories.
 | **FLK** fragmentation | Independent mounted 390-unit/s inertial shell, actual world-space muzzle-to-fuze flight, finite world/lifetime bounds, paid physical ammunition, and radial fragment-density damage against current hostile ordnance/craft at true arrival. Fitted FLK does not contribute precision-laser range, damage, or firing rate. | **Travel and burst physics verified November 3.** In-flight shells have independent positions and authored kinetic sprite rendering. Enemy interception of flying flak shells and distinct on-mount magazines remain open. |
 | **RCW** rotary kinetic CIWS | Physical small solid rounds, rotational spin-up, point-target lead, finite magazine and heat; strong short-range anti-rocket/drone with a weak answer to armored torpedoes. | **Implemented; 84 paired physical live/HOLD_FIRE trials and renderer compile verified.** |
 | **RPD** rail interceptor | A distinct paid precharged capacitor, physical 1210-unit/s solid body, 120-unit blind zone, Doppler radar on actual closing velocity, independent target lock and 3 cartridges per shot; correct two-body swept interception in production. | **Implemented; 36 baseline and 192 geometry pairs plus 192 A/B measurements; headless combat, arena and client compile verified.** |
-| **PPD** particle-beam PD | Per-target armor ablation with actual dwell and thermal saturation rather than laser-like instant damage. | **Specified; not implemented.** |
+| **PPD** particle-beam PD | Real, separately purchased optical mount with 90–275-unit sensor envelope, servo and continuous target lock, frame-by-frame energy-backed armor ablation, per-hull power/heat and mount-local thermal quenching. Target loss resets dwell; physical missiles, torpedoes, rockets, shells and aircraft can be damaged. | **Implemented and tested November 3.** Base plus four researched branches through stage IX in all eleven factions. Same-seed HOLD_FIRE, direct launcher fixtures, equal-tier mounted attackers and moving geometry verified; authored particle muzzle and independent turret render paths. |
 | **PLS** plasma burst | Short-range physically expanding/decaying thermal volume; strongly range-limited and susceptible to fast objects. | **Specified; not implemented.** |
 | **IMD** guided counter-missile | Costed ammunition, finite-launch weapon and genuine seeker/arming/propulsion/flight stages; heavy incoming guided bodies are its intended focus. | **Approved and specified; not implemented.** |
 
@@ -198,9 +198,10 @@ individual shell flight remains unfinished.
 
 The historical statements above describe intermediate states. As of the
 [latest production RPD validation](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41604234413),
-**four** hard-kill families are operating: precision laser PD, area FLK,
-finite-kinetic-stream RCW and charged sabot RPD. PPD, PLS and IMD are still
-planned and must not be counted as installed guns.
+**four** hard-kill families were operating at that historical checkpoint:
+precision laser PD, area FLK, finite-kinetic-stream RCW and charged sabot RPD.
+**Subsequent November 3 validation adds PPD as the fifth implemented family.**
+PLS and IMD are still planned and must not be counted as installed guns.
 
 - RPD has its own paid fitted technology and high-speed 1210-unit/s narrow
   projectile; independent rank-aware long-range sensor, pulse-Doppler gate
@@ -299,9 +300,9 @@ flight, and requires at least one real shot across the full threat
 matrix. This preserves the documented intention that RCW is weaker
 against fast tiny solid shells without concealing actual failures.
 
-Next implementation work remains distinct PPD continuous beam dwell/
-charging, then PLS short-range thermal area denial, then IMD
-paid guided counter-missiles. Flak shell **flight** is now implemented;
+The next unimplemented hard-kill families are **PLS** short-range thermal
+area denial and **IMD** paid guided counter-missiles; PPD's separate
+powered sustained-beam path is implemented and documented below. Flak shell **flight** is now implemented;
 hostile interception of flying flak bodies, per-mount magazines and
 off-axis lead analysis remain separate open work. Fleet sensor
 sharing/fusion/capacity is an independent module concern, not automatically
@@ -400,3 +401,74 @@ suite passed mechanics, world smoke, load measurement and game-client
 renderer compilation. No full release/APK build was triggered for this
 point-defense change. Timing and memory differences remain diagnostic,
 not release gates.
+
+
+## Gate C follow-up: independently purchased particle ablation (Nov 3, 2026)
+
+**PPD is the fifth implemented defensive gun family, not the existing
+offensive `PAR` weapon and not a rebranded pulse laser.**
+
+- Eleven independently purchasable `BASE-<faction>-PPD` modules,
+  each with OUTPUT / EFFICIENCY / RESILIENCE / SPECIALIST research
+  through stage IX (upgrades VII–IX remain lazily synthesized).
+  The old installed module IDs are preserved.
+- `Shipyard.defenseAt/pointDefenseRangeAt/pointDefenseCycleAt` recognize
+  PPD independently without adding any pulse-laser PD range, rate or damage.
+  Each fitted PPD owns its exact physical `PARTICLE_PD` hardpoint and its
+  own observed target identity, traverse bearing, acquisition lock,
+  uninterrupted dwell and local thermal reservoir.
+- A contact must remain optically acquired across successive real ticks.
+  Switching to another incoming physical body, losing sight or losing power
+  removes accumulated target exposure. No percentage-based forced miss or
+  instant-kill event is substituted for physical elapsed beam time.
+- While emitting, **each turret spends 9 power units/sec and produces 11
+  hull-heat units/sec** as well as its independent local heat. Hardened
+  target casings, accumulated dwell and mount temperature determine actual
+  per-second ablation. The mount's heat trip now has hysteresis:
+  it must physically cool before firing again, rather than oscillating
+  on/off every tick at the overheat threshold.
+- True missiles, torpedoes, rockets, kinetic rounds and aircraft lose
+  their persisted integrity only for actually powered beam frames.
+  Destruction increments the appropriate real-body interception counter
+  once. `HOLD_FIRE` produces no beam, expenditure or defensive kills.
+  Kinetic ammunition is not borrowed from RCW/RPD/FLK magazines.
+- `Battle.Beam` carries the genuine particle type and muzzle/target
+  endpoints. The original particle projector turret art rotates with
+  its own live bearing; the render path uses compact authored particle
+  muzzle artwork and the existing violet particle beam. Cosmetic
+  brightness and balance observations are never release gates.
+
+**Mechanical and UI compilation verification:**
+
+- [Initial 24 A/B physical trials and Java17 graphical compilation
+  succeeded](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41680272989).
+- [Expanded 24 initial + 48 rank-matched approach A/B pairs passed](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41680995537),
+  including a physical radiator cooldown lockout, real stage-matched fitted
+  attacking launcher families and moving 72-unit flank geometry.
+  A/B means a deterministic ACTIVE and `HOLD_FIRE` pair.
+- [Dedicated focused workflow](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/main/.github/workflows/particle-pd-diagnostic.yml)
+  uses only `:core:particlePdDiagnostic`, `:game:compileJava`,
+  machine-readable CSV and advisory numerical reports. No full APK or
+  desktop package is part of the PPD regression.
+
+**Initial baseline (not research parity):**
+
+| Incoming | PPD stage 0, one mount | PPD stage IX, one mount |
+|---|---:|---:|
+| Stock missiles removed | 10 / 10 | 10 / 10 |
+| Stock torpedoes removed | 4 / 6 | 6 / 6 |
+| Stock kinetic shells removed | 0 / 38 | 29 / 38 |
+
+These baseline numbers are aggregates over two deterministic seeds per
+condition and deliberately contrast IX defense against **stock**
+projectiles, not IX vs IX. Such results do not imply universal PPD
+dominance or justify a blanket nerf. The separate rank-matched moving
+scenario CSV is needed before counterbalance tuning. PPD remains an
+optical single-target beam rather than area fragmentation or guided
+interceptor ammunition; saturation, side angles, power exhaustion,
+fitted cooling/electronics costs and equal-tier target hardness remain
+the principal next balance evaluations. Fleet sensor-network modules
+continue to be a separate system, not free implicit PPD upgrades.
+
+**Remaining hard-kill families:** PLS expanding/decaying plasma volume,
+then IMD guided, physically launched and properly costed counter-missiles.
