@@ -127,10 +127,17 @@ public final class PointDefenseThreatMatrixDiagnostic {
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
                               int separation,String pdFamily){
+        return run(catalog,threat,tier,mounts,seed,pdMode,
+                separation,pdFamily,false);
+    }
+    private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
+                              int mounts,int seed,BattleOrders.PointDefense pdMode,
+                              int separation,String pdFamily,boolean radialFalloff){
         if(separation!=95&&separation!=220&&separation!=390)
             throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
                 threat.ordinal()*193L);
+        if(radialFalloff)battle.configureFlakFragmentFalloffForDiagnostic(true);
         Battle.Ship attacker;
         if(threat.name().startsWith("FIGHTER_")){
             battle.spawnWing(0,fighterFitting(threat.fighter(),catalog),catalog,1,180,330);
@@ -296,6 +303,15 @@ public final class PointDefenseThreatMatrixDiagnostic {
      * Attackers remain legacy base-tier physical launch fixtures, so these
      * results are NOT IX attacker versus IX defender parity measurements. */
     private static void familyP0(TechnologyCatalog catalog)throws IOException{
+        require(Battle.flakFragmentCoverage(0,20,0)==1,
+                "Flak core lost full physical fragment density");
+        require(Battle.flakFragmentCoverage(20,20,0)==0,
+                "Flak outside edge created free damage");
+        require(Battle.flakFragmentCoverage(10,20,0)>.5&&
+                Battle.flakFragmentCoverage(10,20,0)<1,
+                "Flak radial fragment field has no spatial gradient");
+        require(Battle.flakFragmentCoverage(25,20,10)>0,
+                "Physically extended aircraft do not overlap flak rim");
         Path output=Path.of("test-output","pd-family-p0");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
@@ -344,6 +360,70 @@ public final class PointDefenseThreatMatrixDiagnostic {
                                 threat,range,family,rank,mounts,fired,killed,rate,
                                 entries,impacts,controlImpacts,shots));
                     }
+        // Directly measured radial-fragment cloud behavior against legacy
+        // same-seed full-density bursts. Actual FLK hardware and ammunition
+        // are identical between arms. One batch per research tier, mount count
+        // and weapon role; fighter ranges use the real 220-unit carrier run.
+        List<String> radialCsv=new ArrayList<>();
+        radialCsv.add("threat,defense_stage,flak_mounts,separation,seeds,"+
+                "launched,legacy_kills,radial_kills,legacy_actual_impacts,"+
+                "radial_actual_impacts,legacy_pd_shots,radial_pd_shots,"+
+                "legacy_damage,radial_damage,role");
+        summary.append("\n## Measured FLK burst falloff A/B (8 paired attack seeds)\n\n");
+        summary.append("Both configurations fire real timed FLK shells and consume"+
+                " normal kinetic ammunition. Only spatial fragmentation energy"+
+                " varies. Laser PD, rockets and ECM are not modified.\n\n");
+        summary.append("|Threat|Range|Tier|FLK mounts|Launched|Legacy killed|"+
+                "Falloff killed|Legacy impacts|Falloff impacts|"+
+                "Legacy FLK shots|Falloff FLK shots|\n");
+        summary.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        for(Threat threat:new Threat[]{Threat.KINETIC_STANDARD,
+                Threat.KINETIC_RELATIVISTIC,Threat.MISSILE_MICRO_SWARM,
+                Threat.MISSILE_CASCADE_SWARM,Threat.TORPEDO_HEAVY_STRIKE,
+                Threat.FIGHTER_INTERCEPTOR,Threat.FIGHTER_TORPEDO_BOMBER}){
+            int range=threat.craft()?220:390;
+            for(int rank:new int[]{0,9})for(int mounts:new int[]{1,4}){
+                int launched=0,oldKills=0,newKills=0,oldImpacts=0,
+                        newImpacts=0,oldShots=0,newShots=0;
+                double oldDamage=0,newDamage=0;
+                for(int seed=0;seed<measurementSeeds;seed++){
+                    Result legacy=run(catalog,threat,rank,mounts,seed,
+                            BattleOrders.PointDefense.BALANCED,range,"FLK",false);
+                    Result radial=run(catalog,threat,rank,mounts,seed,
+                            BattleOrders.PointDefense.BALANCED,range,"FLK",true);
+                    require(legacy.primaryLaunched()==radial.primaryLaunched(),
+                            "Flak spatial model changed actual attacking launches");
+                    launched+=legacy.primaryLaunched();
+                    oldKills+=threat.craft()?legacy.craftLost():
+                            legacy.primaryIntercepted();
+                    newKills+=threat.craft()?radial.craftLost():
+                            radial.primaryIntercepted();
+                    oldImpacts+=threat.craft()?legacy.secondaryHits():
+                            legacy.primaryHits();
+                    newImpacts+=threat.craft()?radial.secondaryHits():
+                            radial.primaryHits();
+                    oldShots+=legacy.shots();newShots+=radial.shots();
+                    oldDamage+=legacy.shieldArmorHullLoss();
+                    newDamage+=radial.shieldArmorHullLoss();
+                }
+                String role=threat.craft()?"AIRCRAFT":threat.kinetic()?
+                        "KINETIC":threat.heavy()?"ARMORED_ORDNANCE":"SWARM";
+                radialCsv.add(String.format(Locale.ROOT,
+                        "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%s",
+                        threat,rank,mounts,range,measurementSeeds,
+                        launched,oldKills,newKills,oldImpacts,newImpacts,
+                        oldShots,newShots,oldDamage,newDamage,role));
+                summary.append(String.format(Locale.ROOT,
+                        "|%s|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|\n",
+                        threat,range,rank,mounts,launched,oldKills,newKills,
+                        oldImpacts,newImpacts,oldShots,newShots));
+            }
+        }
+        Files.write(output.resolve("flak-radial-ab.csv"),radialCsv,
+                StandardCharsets.UTF_8);
+        summary.append("\nFLK falloff is opt-in, not production balance."+
+                " Values indicate actual physical vessel and aircraft combat"+
+                " at eight seeds, not synthetic accuracy changes.\n");
         Files.write(output.resolve("p0.csv"),csv,StandardCharsets.UTF_8);
         Files.writeString(output.resolve("summary.md"),summary.toString(),StandardCharsets.UTF_8);
         System.out.print(summary);
