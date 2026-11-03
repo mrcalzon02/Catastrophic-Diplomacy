@@ -1715,6 +1715,45 @@ public final class Battle {
         return StrictMath.max(optical,StrictMath.max(radar,
                 StrictMath.max(infrared,StrictMath.max(xray,gravitic))));
     }
+    /** Render/UI classification of DIRECT detections, without granting locks or
+     * introducing a fleet-wide sensor datalink. Multiple bits can be present.
+     * Keep channel thresholds identical to targetAcquisitionRange above. */
+    public static final int CONTACT_OPTICAL=1,CONTACT_RADAR=2,CONTACT_INFRARED=4,
+            CONTACT_XRAY=8,CONTACT_GRAVITIC=16;
+    public int directSensorChannels(Ship observer,Ship target,double distance){
+        if(observer==null||target==null||!observer.alive()||!target.alive()
+                ||!Double.isFinite(distance)||distance<0)return 0;
+        double condition=(observer.power>3&&observer.crewReadiness()>=.05)
+                ?StrictMath.max(0,observer.sensorsCondition):0;
+        double weatherRange=weather.sensorFactor();
+        double acuity=observer.sensorAcuity;
+        double rcs=StrictMath.max(.06,StrictMath.min(4,target.radarCrossSection));
+        double radar=observer.sensorRange*condition*weatherRange
+                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1));
+        double cloak=target.power>4&&target.ecmCondition>.15
+                ?target.opticalSignature:1;
+        double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
+                StrictMath.sqrt(StrictMath.max(1,target.maxHull)/550)));
+        double optical=(weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390)
+                *cloak*silhouette;
+        double damping=1-(1-target.thermalSignature)
+                *StrictMath.max(0,target.coolingCondition);
+        double infrared=observer.infraredRange*condition*weatherRange
+                *StrictMath.sqrt(StrictMath.max(.10,damping))*(1+.08*(acuity-1));
+        double xray=observer.xrayRange*condition*weatherRange
+                *(1+.10*(acuity-1))/(1+.16*StrictMath.min(2,target.maxArmor/650));
+        double mass=StrictMath.max(.45,StrictMath.min(2.4,target.maxHull/550));
+        double gravity=observer.graviticRange*condition*weatherRange
+                *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
+        int channels=0;
+        if(distance<=optical)channels|=CONTACT_OPTICAL;
+        if(distance<=radar)channels|=CONTACT_RADAR;
+        if(distance<=infrared)channels|=CONTACT_INFRARED;
+        if(distance<=xray)channels|=CONTACT_XRAY;
+        if(distance<=gravity)channels|=CONTACT_GRAVITIC;
+        return channels;
+    }
+
     /** Independent optical/radar acquisition precedes any fleet datalink.
      * A relay is a detected enemy, not an omniscient target list: the spotter
      * must be alive, powered and within local formation radio range, and the
