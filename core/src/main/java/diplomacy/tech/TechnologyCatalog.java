@@ -342,6 +342,7 @@ public final class TechnologyCatalog {
             addSurvivalAndUnsafeFamilies(bases,rows);
             addSurvivalHardwareVariants(bases);
             addDumbfireRocketFamilies(bases,rows);
+            addRotaryPointDefenseFamilies(bases,rows);
             // Ranks VII-IX are synthesized on demand. No 13,200 extra
             // temporary CSV arrays/strings retained at Android startup.
         }
@@ -1027,6 +1028,47 @@ public final class TechnologyCatalog {
                 rank.set(19,spec[1]+": "+root.get(19));
                 upgrades.add(rank);
             }
+        }
+    }
+
+    /** A distinct, mounted rotary kinetic CIWS for every supported faction.
+     * Clone only economic/research lineage from the FLK fabrication plant:
+     * the actual weapon is a travelling single-round kinetic stream, never
+     * a timed fragmentation cloud or a hidden precision laser. Each of its
+     * four independent research branches remains separately upgradeable.
+     * The initial source CSV and old blueprint IDs are preserved untouched. */
+    private static void addRotaryPointDefenseFamilies(List<List<String>> bases,
+                                                        List<List<String>> upgrades){
+        List<List<String>> originals=List.copyOf(bases);
+        List<List<String>> research=List.copyOf(upgrades);
+        for(int i=1;i<originals.size();i++){
+            List<String> source=originals.get(i);
+            if(!"FLK".equals(source.get(2)))continue;
+            List<String> row=new ArrayList<>(source);
+            row.set(0,source.get(0).replace("-FLK","-RCW"));
+            row.set(2,"RCW");
+            row.set(3,"Rotary Kinetic CIWS");
+            row.set(5,"Physical spin-up, tracked ballistic bullet stream, short radar/IR gate");
+            row.set(6,ratio(Double.parseDouble(source.get(6)),.88));
+            row.set(7,ratio(Double.parseDouble(source.get(7)),.83));
+            row.set(8,ratio(Double.parseDouble(source.get(8)),1.02));
+            row.set(9,ratio(Double.parseDouble(source.get(9)),.94));
+            row.set(10,Integer.toString(Math.max(1,(int)StrictMath.ceil(
+                    Integer.parseInt(source.get(10))*.90))));
+            row.set(11,ratio(Double.parseDouble(source.get(11)),.74));
+            row.set(12,"Finite per-round kinetic stock; close-in lead, spool, recoil and tracers");
+            bases.add(row);
+        }
+        for(int i=1;i<research.size();i++){
+            List<String> source=research.get(i);
+            if(!"FLK".equals(source.get(2)))continue;
+            List<String> row=new ArrayList<>(source);
+            row.set(0,source.get(0).replace("-FLK-","-RCW-"));
+            row.set(2,"RCW");
+            row.set(5,"Rotary kinetic CIWS "+row.get(3)+" stage "+row.get(4));
+            row.set(6,source.get(6).replace("-FLK-","-RCW-").replace("-FLK","-RCW"));
+            row.set(19,"Rotary CIWS: "+row.get(19)+"; paid cartridges and sustained spin");
+            upgrades.add(row);
         }
     }
 
