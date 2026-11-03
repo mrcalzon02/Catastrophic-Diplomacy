@@ -1,0 +1,79 @@
+package diplomacy.sim;
+
+/**
+ * Bounded sender-owned contact transmissions. Allied ships never synthesize
+ * past scouting events from target world history. A packet can be read only
+ * after its genuine scout-receipt timestamp plus physical link delay.
+ *
+ * At most 32 distinct targets with 32 immutable successive reports each.
+ * This is a fixed per-hull memory ceiling, not a per-viewer enemy roster.
+ */
+public final class SensorRelayBuffer {
+    public static final int MAX_TARGETS=32;
+    public static final int REPORTS_PER_TARGET=32;
+    private final Track[] tracks=new Track[MAX_TARGETS];
+    private static final class Track {
+        final int targetId;
+        final long[] sentTicks=new long[REPORTS_PER_TARGET];
+        final SensorLightTimeHistory.Observation[] data=
+                new SensorLightTimeHistory.Observation[REPORTS_PER_TARGET];
+        int next,size;
+        long newestTick;
+        Track(int id){targetId=id;}
+        void append(long at,SensorLightTimeHistory.Observation report){
+            sentTicks[next]=at;data[next]=report;
+            next=(next+1)%REPORTS_PER_TARGET;
+            size=StrictMath.min(REPORTS_PER_TARGET,size+1);
+            newestTick=at;
+        }
+        SensorLightTimeHistory.Observation delivered(long now,int delay){
+            for(int i=0;i<size;i++){
+                int index=(next-1-i+REPORTS_PER_TARGET)%REPORTS_PER_TARGET;
+                if(sentTicks[index]+(long)delay<=now){
+                    var packet=data[index];
+                    return new SensorLightTimeHistory.Observation(
+                            packet.emittedTick(),packet.measuredTick(),now,
+                            packet.channels(),packet.sample());
+                }
+            }
+            return null;
+        }
+    }
+    /** Only actual arrived observations can enter a fitted scout transmitter. */
+    public void transmit(int targetId,long sentTick,
+            SensorLightTimeHistory.Observation received,int capacity){
+        if(targetId<=0||sentTick<0||received==null||
+                received.receivedTick()>sentTick||
+                capacity<1||capacity>MAX_TARGETS)
+            throw new IllegalArgumentException("Invalid physical sensor transmission");
+        int chosen=-1,empty=-1,oldest=-1;
+        long oldestTick=Long.MAX_VALUE;
+        for(int i=0;i<capacity;i++){
+            Track t=tracks[i];
+            if(t==null){if(empty==-1)empty=i;continue;}
+            if(t.targetId==targetId){chosen=i;break;}
+            if(t.newestTick<oldestTick){
+                oldestTick=t.newestTick;oldest=i;
+            }
+        }
+        if(chosen<0)chosen=empty>=0?empty:oldest;
+        if(chosen<0)throw new IllegalStateException("No bounded relay slot");
+        Track ring=tracks[chosen];
+        if(ring==null||ring.targetId!=targetId)
+            tracks[chosen]=ring=new Track(targetId);
+        ring.append(sentTick,received);
+    }
+    /** Read-only physical delivery, never a weapon lock by itself. */
+    public SensorLightTimeHistory.Observation delivered(
+            int targetId,long now,int physicalDelay,int capacity){
+        if(targetId<=0||now<0||physicalDelay<0||
+                capacity<0||capacity>MAX_TARGETS)
+            throw new IllegalArgumentException("Invalid datalink route");
+        for(int i=0;i<capacity;i++){
+            Track ring=tracks[i];
+            if(ring!=null&&ring.targetId==targetId)
+                return ring.delivered(now,physicalDelay);
+        }
+        return null;
+    }
+}
