@@ -148,8 +148,11 @@ public final class SensorNetworkModulesTest {
                 "Original unmodified formation radio must remain range limited");
         scout.network=Shipyard.fit(fit(bare,"SHR"),catalog).network();
         relay.step();
+        require(!relay.hasTargetContact(receiver,opponent,700),
+                "Freshly installed transceiver bypassed photon and relay travel");
+        for(int light=0;light<20;light++)relay.step();
         require(relay.hasTargetContact(receiver,opponent,700),
-                "Fitted sharing transmitter must relay a real distant contact");
+                "Fitted sharing transmitter failed after physical echo and relay delay");
         scout.power=0;
         relay.step();
         require(!relay.hasTargetContact(receiver,opponent,700),
