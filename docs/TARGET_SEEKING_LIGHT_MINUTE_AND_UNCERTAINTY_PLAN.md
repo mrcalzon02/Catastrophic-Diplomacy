@@ -69,12 +69,49 @@ the 50% geometry factor and aligned original-art muzzle transforms.
 **Stage 2 partial implementation:** each ship now records 128 immutable
 position/velocity/alive snapshots. Tactical contacts are derived from a
 timestamped physical target sample instead of present-time coordinates.
+Photon delay estimation now uses recorded sensor and target positions, not
+the target's present hidden world coordinates. Each independently rounded
+radar/X-ray leg consumes its own arrival interval.
 Passive optical/IR/gravitic observations require one-way propagation;
 continuously active radar/X-ray echoes require round-trip transit before
 the reflected sample is revealed. Relayed tactical reports incur another
 one-way propagation hop. Paid TRK contact memory stores the arrived
 measurement, not hidden target truth. The focused
 `:core:sensorTacticalPictureSmoke` invokes `:core:sensorLightTimeSmoke`.
+
+**Stage 3 initial operational scan doctrines:** `SensorActiveScan`
+is now wired into the authoritative battle tick, sensor-channel range,
+read-only tactical display and pulse-mode weapon contact authorization.
+`Battle.configureSensorScan(shipId,mode,focusId)` accepts pre-engage
+runtime orders. Existing equipment and hardware IDs remain unchanged:
+
+- `STANDARD`: original always-on default, intentionally retained until
+  the baseline full causal fire-control migration passes regressions.
+- `PASSIVE`: radar and X-ray shut off; optical/IR/gravitic capabilities
+  remain independently determined by existing equipment and visibility.
+- `BOOSTED_RADAR`: 1.55× RDR range, a paid pulse every 18 combat ticks.
+- `FOCUSED_RADAR`: 1.28× RDR range only against a designated target,
+  with an individually recorded pulse every 12 combat ticks.
+- `XRAY_BURST`: 1.45× XRY range only against a designated target,
+  expensive emission every 60 combat ticks; absent XRY cannot emit.
+
+Scan pulses spend real ship power, generate heat, obey damaged sensors,
+crew/reactor restrictions and thermal ceilings. A selected active mode
+cannot supply a channel until its actual archived emission could return
+as a physical echo. The deterministic battle fingerprint includes the
+scan doctrine, finite pulse history and heat state. These numerical
+multipliers and costs are provisional gameplay balance. A nominal range
+bonus is not an instant lock or extra omniscient data.
+
+`:core:sensorNetworkSmoke` now includes `:core:sensorActiveScanSmoke`,
+`:core:sensorLightTimeSmoke` and `:core:sensorTacticalPictureSmoke`.
+The focused existing headless diagnostic runs these without a full
+Windows/Linux/Android package build.
+
+**Stage 3 remaining scope:** scan doctrine UI and persistent order encoding,
+physical sector geometry, enemy passive detection of emissions, asynchronous
+LNK message queues, precise per-channel historical detection constraints,
+and power/heat balance analysis over complete 200v200 battles.
 
 **Important limitations:** channel detection and weapon lock eligibility
 still consult current positions, and LNK/SHR routing still needs
@@ -372,8 +409,13 @@ visual overlays and balance tables are diagnostics.
    but every hit must derive from a real path through a target; stale
    contacts alone still must not silently grant automatic lock authorization.
 
-**Implementation status:** 50% hull geometry, world/time conversion,
-engine thrust and first light-time historical tactical samples are in code.
-This is not yet physically causal detection/weapon authorization.
-Real network message queues, active scans, compute budgeting, error
-ellipses and physical aiming must be implemented and verified next.
+**Implementation status:** Stages 0 and 1 and the first Stage 2
+historical observations are committed. Stage 3 preordered operational
+acquisition modes and their delayed emitted probes now have functional
+tests. Only non-legacy pulsed channels are causally gated for weapon
+contact; the baseline STANDARD acquisition/target selection remains
+legacy, and all contact eligibility still needs true historical sensor
+signature checks. Real delayed fleet message delivery, computation and
+capacity budgets, error ellipses and physical impact paths are next.
+Keep cosmetic and balance trials diagnostic; objective core failures
+are the only build/launch gates.
