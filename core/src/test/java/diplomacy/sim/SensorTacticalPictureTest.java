@@ -123,9 +123,17 @@ public final class SensorTacticalPictureTest {
         scout.network=network(catalog,"TRK","LNK");
         viewer.network=network(catalog,"LNK");
         scout.sensorRange=700;viewer.sensorRange=0;
-        for(int i=0;i<12;i++)b.step(); // Wait for physical scout sensor echoes.
-        require(report(b,viewer.id,target.id)!=null,
-                "LNK viewer did not receive tracked observation");
+        int roundTrip=2*SensorLightTimeHistory.propagationTicks(550);
+        int link=SensorLightTimeHistory.propagationTicks(350);
+        for(int i=0;i<roundTrip+link-1;i++)b.step();
+        require(report(b,viewer.id,target.id)==null,
+                "Unreceived LNK history teleported through the fleet");
+        require(b.newestValidTrack(viewer)==null,
+                "A remote captain navigated on a track packet still in flight");
+        b.step();
+        require(report(b,viewer.id,target.id)!=null&&
+                        b.newestValidTrack(viewer)!=null,
+                "LNK viewer did not receive actual tracking packet after transit");
         target.x=1650;
         b.step();
         Battle.TacticalContact historical=report(b,viewer.id,target.id);
