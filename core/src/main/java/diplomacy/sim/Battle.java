@@ -1186,6 +1186,16 @@ public final class Battle {
                                 +machinery.shieldRechargeBoost()/4,2);
         s.maxPower = machinery.maxPower(); s.power = s.maxPower;
         s.maxHeat = machinery.maxHeat();
+        // Defensive rail capacitors are charged before a warship deploys:
+        // their energy and startup heat are debited from the real ship
+        // stores ONCE, as ammunition is preloaded before launch. If the
+        // reactor reserve cannot support a full charge, do not invent one.
+        for(RailPointDefense.Mount gun:s.railMounts){
+            double loaded=StrictMath.min(1,StrictMath.max(0,s.power)/1.8);
+            gun.charge=loaded;
+            s.power-=loaded*1.8;
+            s.heat+=loaded*.45;
+        }
         s.powerRegen = machinery.powerRegen();
         s.coolingRate = machinery.coolingRate(); s.passiveHeat = machinery.passiveHeat();
         s.speed = machinery.speed(); s.accuracy = machinery.accuracy();
