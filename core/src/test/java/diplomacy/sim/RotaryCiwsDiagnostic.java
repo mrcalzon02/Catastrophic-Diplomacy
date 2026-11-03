@@ -210,8 +210,13 @@ public final class RotaryCiwsDiagnostic {
         for(RotaryPointDefense.Mount gun:defender.rotaryMounts)
             total+=gun.roundsFired;
         require(total==fired,"Fitted RCW muzzle shots and physical rounds disagree");
-        require(ammo-defender.kineticAmmo==fired,
-                "Rotary rounds did not consume one actual kinetic cartridge each");
+        // Incoming hits can also destroy the defender's loaded magazine.
+        // Do not count that loss as additional RCW shots, but verify every
+        // emitted tracer has at least one paid kinetic cartridge behind it.
+        require(ammo-defender.kineticAmmo>=fired,
+                "Rotary shots exceeded paid kinetic stock: "+threat+
+                " rank="+tier+" mounts="+mounts+" fired="+fired+
+                " storeDepletion="+(ammo-defender.kineticAmmo));
         require(on||fired==0,"HOLD_FIRE launched unapproved rotary rounds");
         require(!on||fired>0,"Powered rotary CIWS failed to fire at "+threat);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
@@ -238,7 +243,7 @@ public final class RotaryCiwsDiagnostic {
         Files.createDirectories(root);
         List<String> rows=new ArrayList<>();
         rows.add("threat,defense_stage,rcw_mounts,seed,pd_enabled,launched,"+
-                "physical_rcw_shots,live_round_frame_samples,kinetic_ammo_paid,"+
+                "physical_rcw_shots,live_round_frame_samples,total_kinetic_stock_depletion,"+
                 "intercepts,impacts,defender_damage,power_spent,first_fire_tick");
         StringBuilder summary=new StringBuilder(
                 "# Physical rotary CIWS firing and detection comparison\n\n");
