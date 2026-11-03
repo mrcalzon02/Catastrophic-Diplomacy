@@ -144,7 +144,15 @@ tasks.register('sensorHistoricalSignaturesSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorHistoricalSignaturesTest'
     dependsOn testClasses
 }
+tasks.register('sensorTrackRelayBufferSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify bounded transmitter-origin TRK/LNK delayed packet transport and finite track memory.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorTrackRelayBufferTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorTrackRelayBufferSmoke'))
     dependsOn(tasks.named('sensorHistoricalSignaturesSmoke'))
     dependsOn(tasks.named('sensorRelayBufferSmoke'))
     dependsOn(tasks.named('sensorTargetingSolutionSmoke'))
