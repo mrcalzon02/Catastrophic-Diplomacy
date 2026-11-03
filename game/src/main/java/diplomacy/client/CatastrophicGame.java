@@ -2859,7 +2859,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // pixels as well as space around real weapon and engine light sources.
         if(lighting!=null){
             long beforeLight=System.nanoTime();
-            lighting.renderGlow(battle,batch,battleCamera,renderPoses,shieldFx);
+            lighting.renderGlow(battle,batch,battleCamera,renderPoses,shieldFx,hitFeedback);
             lightingOverlayNs+=System.nanoTime()-beforeLight;
         }
         // Fog conceals the completed physical framebuffer, including unseen

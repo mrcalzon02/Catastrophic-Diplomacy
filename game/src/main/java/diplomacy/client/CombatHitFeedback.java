@@ -14,6 +14,8 @@ import java.util.Map;
 final class CombatHitFeedback {
     static final int MAX_PULSES=160;
     static final float LIFETIME=.42f;
+    static final float AFTERGLOW_LIFETIME=2.8f;
+    static final int MAX_AFTERGLOWS=96;
     enum Layer { SHIELD, ARMOR, HULL }
     record Defense(float shields,float armor,float hull,float x,float y,
                    float facing,float scale) {}
@@ -21,22 +23,55 @@ final class CombatHitFeedback {
         final Layer layer;
         final float x,y,normalX,normalY,shipX,shipY,scale;
         final long tick,sequence;
+        final Battle.DamageType weapon;
+        final int visualSeed;
         float age;
         Pulse(Layer layer,float x,float y,float normalX,float normalY,
-              float shipX,float shipY,float scale,long tick,long sequence){
+              float shipX,float shipY,float scale,long tick,long sequence,
+              Battle.DamageType weapon,int visualSeed){
             this.layer=layer;this.x=x;this.y=y;this.normalX=normalX;
             this.normalY=normalY;this.shipX=shipX;this.shipY=shipY;
             this.scale=scale;this.tick=tick;this.sequence=sequence;
+            this.weapon=weapon;this.visualSeed=visualSeed;
         }
+    }
+    /** Short-lived light/smoke over a REAL lost armor or hull resource. */
+    static final class Afterglow {
+        final Layer layer;
+        final Battle.DamageType weapon;
+        final float x,y,nx,ny,scale;
+        final int visualSeed;
+        float age;
+        Afterglow(Pulse pulse){
+            layer=pulse.layer;weapon=pulse.weapon;visualSeed=pulse.visualSeed;
+            x=pulse.x;y=pulse.y;nx=pulse.normalX;ny=pulse.normalY;
+            scale=pulse.scale;
+        }
+    }
+    static Battle.DamageType weaponKind(String weapon){
+        if(weapon==null)return null;
+        if(weapon.startsWith("LASER")||diplomacy.sim.LaserFamilies.fromWeapon(weapon)!=null)
+            return Battle.DamageType.LASER;
+        return switch(weapon){
+            case "KINETIC", "FLAK" -> Battle.DamageType.KINETIC;
+            case "PLASMA" -> Battle.DamageType.PLASMA;
+            case "PARTICLE" -> Battle.DamageType.PARTICLE;
+            case "MISSILE", "ROCKET" -> Battle.DamageType.MISSILE;
+            case "TORPEDO" -> Battle.DamageType.TORPEDO;
+            case "FIGHTER" -> Battle.DamageType.FIGHTER;
+            default -> null;
+        };
     }
     private Battle tracked;
     private long sequence;
     private final Map<Integer,Defense> before=new HashMap<>();
     private final ArrayDeque<Pulse> active=new ArrayDeque<>();
+    private final ArrayDeque<Afterglow> aftermath=new ArrayDeque<>();
 
     void sync(Battle battle){
         if(tracked==battle)return;
         tracked=battle;sequence=0;before.clear();active.clear();
+        aftermath.clear();
     }
     void beforeStep(Battle battle){
         sync(battle);before.clear();
@@ -75,8 +110,16 @@ final class CombatHitFeedback {
             float x=prior.x()+nx*Math.min(ring,distance);
             float y=prior.y()+ny*Math.min(ring,distance);
             if(active.size()>=MAX_PULSES)active.removeFirst();
-            active.addLast(new Pulse(layer,x,y,nx,ny,prior.x(),prior.y(),
-                    prior.scale(),event.tick(),event.sequence()));
+            int visualSeed=(int)(event.sequence()^(event.sequence()>>>32))
+                    ^event.targetId()*0x45d9f3b^(int)event.tick();
+            Pulse pulse=new Pulse(layer,x,y,nx,ny,prior.x(),prior.y(),
+                    prior.scale(),event.tick(),event.sequence(),
+                    weaponKind(event.weapon()),visualSeed);
+            active.addLast(pulse);
+            if(layer!=Layer.SHIELD){
+                if(aftermath.size()>=MAX_AFTERGLOWS)aftermath.removeFirst();
+                aftermath.addLast(new Afterglow(pulse));
+            }
         }
         before.clear();
     }
@@ -94,9 +137,14 @@ final class CombatHitFeedback {
         if(!running||!Float.isFinite(delta))return;
         float dt=Math.max(0,Math.min(.08f,delta));
         for(Pulse pulse:active)pulse.age+=dt;
+        for(Afterglow hot:aftermath)hot.age+=dt;
         while(!active.isEmpty()&&active.peekFirst().age>=LIFETIME)
             active.removeFirst();
+        while(!aftermath.isEmpty()&&aftermath.peekFirst().age>=AFTERGLOW_LIFETIME)
+            aftermath.removeFirst();
     }
     List<Pulse> pulses(){return List.copyOf(active);}
+    List<Afterglow> afterglows(){return List.copyOf(aftermath);}
     int count(){return active.size();}
+    int afterglowCount(){return aftermath.size();}
 }

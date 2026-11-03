@@ -37,6 +37,20 @@ public final class CombatHitFeedbackTest {
         feedback.afterStep(battle,List.of(hit(3,battle.tick,ship.id,100,195)));
         check(feedback.pulses().get(2).layer==CombatHitFeedback.Layer.HULL,
                 "penetration yields hull sparks");
+        check(feedback.afterglowCount()==2,
+                "Shield hits must never create hot metal or puncture smoke");
+        check(feedback.pulses().get(2).weapon==Battle.DamageType.KINETIC,
+                "Visual spark family must derive from the authoritative weapon");
+        check(CombatHitFeedback.weaponKind("LASER")==Battle.DamageType.LASER&&
+                CombatHitFeedback.weaponKind("TORPEDO")==Battle.DamageType.TORPEDO,
+                "Real weapon event classification must preserve emissive family");
+        check(CombatLightingRenderer.emissionStrength(Battle.DamageType.KINETIC)==0f&&
+                CombatLightingRenderer.emissionStrength(Battle.DamageType.PLASMA)>
+                CombatLightingRenderer.emissionStrength(Battle.DamageType.LASER),
+                "Kinetic stays cold; plasma emits stronger than laser");
+        check(CombatHitRenderer.sparkCount(Battle.DamageType.PARTICLE,true)<=4&&
+                CombatLightingRenderer.smokeWisps(Battle.DamageType.TORPEDO)<=2,
+                "Per-hit spark and smoke budgets must be compact");
         feedback.beforeStep(battle);
         battle.tick++;
         feedback.afterStep(battle,List.of(hit(4,battle.tick,ship.id,105,200)));
@@ -48,6 +62,11 @@ public final class CombatHitFeedbackTest {
         check(feedback.count()==3,"pausing holds effects");
         for(int i=0;i<8;i++)feedback.advance(battle,.08f,true);
         check(feedback.count()==0,"feedback expires in bounded time");
+        check(feedback.afterglowCount()==2,
+                "Thermal and breach aftereffects must outlive instant sparks");
+        for(int i=0;i<40;i++)feedback.advance(battle,.08f,true);
+        check(feedback.afterglowCount()==0,
+                "Every hot-metal/smoke aftermath must expire at its upper bound");
         check(ship.hull==originalHull,"presentation does not modify damage");
         var mixed=new CombatHitFeedback.Defense(100,100,100,0,0,0,1);
         check(CombatHitFeedback.changedLayer(mixed,90,95,97)==CombatHitFeedback.Layer.HULL,
@@ -71,8 +90,11 @@ public final class CombatHitFeedbackTest {
         feedback.afterStep(mass,events);
         check(feedback.count()==CombatHitFeedback.MAX_PULSES,
                 "200v200 damage effects remain capped");
+        check(feedback.afterglowCount()<=CombatHitFeedback.MAX_AFTERGLOWS,
+                "400-ship aftereffects remain capped");
         feedback.sync(battle);
-        check(feedback.count()==0,"new battle removes stale hit feedback");
+        check(feedback.count()==0&&feedback.afterglowCount()==0,
+                "New battle removes all stale visual effects");
         System.out.println("PASS shield/armor/hull hit layers, location, no phantom hits, 400-ship cap");
     }
 }

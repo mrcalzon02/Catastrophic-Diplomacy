@@ -13,6 +13,15 @@ final class ShipDamageVariants {
                                      -.70710677f,0f,.70710677f};
     private static final float[] AY={0f,.70710677f,1f,.70710677f,0f,
                                      -.70710677f,-1f,-.70710677f};
+    // Precomputed one-degree sin/cos avoid expensive per-texel trigonometry.
+    // Authoritative ship physics/impact positions never use these tables.
+    private static final float[] COS=new float[360],SIN=new float[360];
+    static {
+        for(int degree=0;degree<360;degree++){
+            COS[degree]=(float)StrictMath.cos(StrictMath.toRadians(degree));
+            SIN[degree]=(float)StrictMath.sin(StrictMath.toRadians(degree));
+        }
+    }
     static int tileSeed(int shipId,int row,int col){
         return shipId*31+row*17+col*7;
     }
@@ -27,6 +36,30 @@ final class ShipDamageVariants {
     static int direction(int seed,Battle.DamageType kind){
         return (hash(seed,kind)>>>9)&7;
     }
+    /** Seeded micro-rotation of an authored mask, NOT the actual hit heading. */
+    static int maskAngleDegrees(int seed,Battle.DamageType kind){
+        int spread=switch(kind){
+            case LASER -> 12;
+            case PARTICLE -> 16;
+            case PLASMA -> 22;
+            case TORPEDO -> 35;
+            case MISSILE, KINETIC -> 30;
+            case FIGHTER -> 25;
+        };
+        int salt=hash(seed^0x5aa5c393,kind);
+        int offset=Math.floorMod(salt,spread*2+1)-spread;
+        return Math.floorMod(direction(seed,kind)*45+offset,360);
+    }
+    /** Minor variation, with an unchanged global 2.667-cell bounding box. */
+    static float maskScale(int seed,Battle.DamageType kind){
+        int salt=hash(seed^0x2e73b48d,kind);
+        float unit=(salt>>>8&65535)/65535f;
+        float minimum=kind==Battle.DamageType.LASER?.94f:.91f;
+        float maximum=kind==Battle.DamageType.LASER?1.06f:1.10f;
+        return minimum+(maximum-minimum)*unit;
+    }
+    static float maskCos(int angle){return COS[Math.floorMod(angle,360)];}
+    static float maskSin(int angle){return SIN[Math.floorMod(angle,360)];}
     static float localX(float dx,float dy,int seed,Battle.DamageType kind){
         int d=direction(seed,kind);
         return dx*AX[d]+dy*AY[d];

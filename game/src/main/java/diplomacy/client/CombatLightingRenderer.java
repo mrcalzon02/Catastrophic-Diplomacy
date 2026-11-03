@@ -180,18 +180,30 @@ final class CombatLightingRenderer implements Disposable {
                     radius * 2, radius * 2);
             lastSmokeQuads++;
         }
-        if(impacts!=null)for(CombatHitFeedback.Pulse impact:impacts.pulses()){
-            if(impact.layer!=CombatHitFeedback.Layer.HULL)continue;
-            float age=impact.age/CombatHitFeedback.LIFETIME;
-            if(age<0 || age>=1)continue;
-            float radius=CombatEffectScale.of(4.0f+age*5.0f)*impact.scale;
-            float x=impact.x-impact.normalX*radius*.2f;
-            float y=impact.y-impact.normalY*radius*.2f;
-            if(radius*2f/camera.zoom<1f || !visible(camera,x,y,radius))continue;
-            float fade=1f-age;
-            batch.setColor(.51f,.48f,.44f,.31f*fade*fade);
-            batch.draw(smokeMask,x-radius,y-radius,radius*2,radius*2);
-            lastSmokeQuads++;
+        // Local smoke only from actual HULL penetration, not impacts
+        // absorbed by shields or superficial plating. An individual puncture
+        // emits at most two wisps and expires without per-pixel allocations.
+        int breachWisps=0;
+        if(impacts!=null)for(CombatHitFeedback.Afterglow wound:impacts.afterglows()){
+            if(wound.layer!=CombatHitFeedback.Layer.HULL || breachWisps>=64)continue;
+            float age=wound.age/CombatHitFeedback.AFTERGLOW_LIFETIME;
+            if(age<0||age>=1)continue;
+            int count=smokeWisps(wound.weapon);
+            for(int i=0;i<count && breachWisps<64;i++){
+                int seed=ShipDamageVariants.hash(wound.visualSeed+i*1039,wound.weapon);
+                float tangent=(seed>>>8&255)/255f-.5f;
+                float drift=(2.1f+age*6f)*wound.scale;
+                float x=wound.x+wound.nx*drift*.29f-wound.ny*tangent*drift*.62f;
+                float y=wound.y+wound.ny*drift*.29f+wound.nx*tangent*drift*.62f;
+                float radius=CombatEffectScale.of(2.6f+age*5.6f)*wound.scale;
+                if(radius*2f/camera.zoom<1f||!visible(camera,x,y,radius))continue;
+                float fade=(1f-age)*(1f-age);
+                float opacity=(wound.weapon==Battle.DamageType.TORPEDO?.28f:
+                        wound.weapon==Battle.DamageType.PLASMA?.24f:.13f)*fade;
+                batch.setColor(.46f,.45f,.48f,opacity);
+                batch.draw(smokeMask,x-radius,y-radius,radius*2,radius*2);
+                lastSmokeQuads++;breachWisps++;
+            }
         }
         batch.setColor(Color.WHITE);
         batch.end();
@@ -210,6 +222,11 @@ final class CombatLightingRenderer implements Disposable {
     }
     void renderGlow(Battle battle, SpriteBatch batch, OrthographicCamera camera,
                     BattleRenderPoses poses, ShieldFxTimeline shields) {
+        renderGlow(battle,batch,camera,poses,shields,null);
+    }
+    void renderGlow(Battle battle, SpriteBatch batch, OrthographicCamera camera,
+                    BattleRenderPoses poses, ShieldFxTimeline shields,
+                    CombatHitFeedback impactsForGlow) {
         timeline.update(battle);
         lastGlowQuads = 0;
         batch.setProjectionMatrix(camera.combined);
@@ -335,6 +352,31 @@ final class CombatLightingRenderer implements Disposable {
             spot(batch,camera,e.x(),e.y(),baseRadius*.37f,
                     Color.WHITE,(intercepted?.28f:.67f)*intensity*intensity);
         }
+        // Fresh hot metal glows at the actual lost-armor or breached-hull
+        // impact site. The broad LASER anneal stays permanent *oxide color*,
+        // never a world-space halo. Cold kinetic damage emits no persistent light.
+        int hotLights=0;
+        if(impactsForGlow!=null)for(CombatHitFeedback.Afterglow wound:
+                impactsForGlow.afterglows()){
+            if(hotLights>=96)break;
+            if(wound.weapon==null||wound.weapon==Battle.DamageType.KINETIC||
+                    wound.weapon==Battle.DamageType.FIGHTER)continue;
+            float age=wound.age/CombatHitFeedback.AFTERGLOW_LIFETIME;
+            if(age<0||age>=1)continue;
+            float fade=(1f-age)*(1f-age);
+            float strength=emissionStrength(wound.weapon);
+            float radius=CombatEffectScale.of(
+                    wound.weapon==Battle.DamageType.PLASMA?6f:
+                    wound.weapon==Battle.DamageType.TORPEDO?5.2f:3.6f)*wound.scale;
+            Color color=wound.weapon==Battle.DamageType.PARTICLE?Color.VIOLET:
+                    wound.weapon==Battle.DamageType.PLASMA?Color.ORANGE:Color.GOLD;
+            spot(batch,camera,wound.x,wound.y,radius,color,
+                    strength*fade);
+            // White-hot puncture core only while the impact is genuinely fresh.
+            if(age<.17f)spot(batch,camera,wound.x,wound.y,
+                    radius*.34f,Color.WHITE,strength*.35f*(1f-age/.17f));
+            hotLights++;
+        }
         // Tiny additive shield spill follows the same authoritative per-facing
         // timeline as the art overlay. Capped, camera-culled and mobile-friendly.
         if(shields!=null){
@@ -365,6 +407,22 @@ final class CombatLightingRenderer implements Disposable {
         batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
     }
 
+    static int smokeWisps(Battle.DamageType family){
+        return family==Battle.DamageType.TORPEDO||
+                family==Battle.DamageType.PLASMA||
+                family==Battle.DamageType.MISSILE?2:1;
+    }
+    static float emissionStrength(Battle.DamageType family){
+        if(family==null)return 0f;
+        return switch(family){
+            case PLASMA -> .48f;
+            case LASER -> .32f;
+            case PARTICLE -> .28f;
+            case TORPEDO -> .38f;
+            case MISSILE -> .31f;
+            case FIGHTER, KINETIC -> 0f;
+        };
+    }
     int glowQuads() { return lastGlowQuads; }
     int smokeQuads() { return lastSmokeQuads; }
     int smokeParticles() { return timeline.smokeCount(); }

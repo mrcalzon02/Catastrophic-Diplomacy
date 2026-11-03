@@ -11,8 +11,9 @@ import java.util.Locale;
  * Diagnostic CD_ARMOR_MASK_SET=legacy24, upscaled48 or authored48
  * selects previously committed comparison images. All resolutions span
  * exactly the same 2.667 defense-cell diameter and do not grow the wound.
- * No shape synthesis, rotation, per-pixel
- * noise, or stand-in sprite is used in the live renderer.
+ * No per-frame randomness, shape synthesis, procedural texture noise,
+ * or stand-in sprite. Seeded micro-rotation/scale samples the same authored
+ * frame and remains clipped to the legacy 2.667-cell physical extent.
  *
  * Channels: R soot, G residual heat, B exposed metal/laser oxide;
  * A is the intact exterior coefficient (255 intact, 0 fully missing).
@@ -76,6 +77,20 @@ final class ShipDamageImageMasks {
     }
 
     private int lookup(Battle.DamageType kind,float dx,float dy,int seed){
+        // Hard clip to the approved physical footprint, independently of
+        // small rotation/scale variations. Legacy comparison assets keep
+        // their original untransformed sampling behavior.
+        float bound=sampleSize*.5f/pixelsPerCell;
+        if(Math.abs(dx)>=bound||Math.abs(dy)>=bound)return 0x000000ff;
+        if(!use24&&!use48){
+            int angle=ShipDamageVariants.maskAngleDegrees(seed,kind);
+            float cosine=ShipDamageVariants.maskCos(angle);
+            float sine=ShipDamageVariants.maskSin(angle);
+            float inv=1f/ShipDamageVariants.maskScale(seed,kind);
+            float x=dx,y=dy;
+            dx=(x*cosine+y*sine)*inv;
+            dy=(y*cosine-x*sine)*inv;
+        }
         int x=(int)StrictMath.floor(sampleSize*.5f+dx*pixelsPerCell);
         int y=(int)StrictMath.floor(sampleSize*.5f+dy*pixelsPerCell);
         if(x<0||x>=sampleSize||y<0||y>=sampleSize)return 0x000000ff;

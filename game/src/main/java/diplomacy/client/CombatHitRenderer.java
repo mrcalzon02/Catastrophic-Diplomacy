@@ -35,34 +35,57 @@ final class CombatHitRenderer {
                         angle-22,44,9);
             }else{
                 boolean armor=hit.layer==CombatHitFeedback.Layer.ARMOR;
-                // No per-spark Color allocations in a 200v200 firefight.
-                if(armor)shapes.setColor(1f,.72f,.31f,.95f*fade);
-                else shapes.setColor(1f,.38f,.31f,.72f*fade);
                 float centerX=hit.x,centerY=hit.y;
-                if(!armor){
-                    // Only real hull injury earns a short heated breach outline.
-                    shapes.setColor(1f,.51f,.19f,.70f*fade);
-                    shapes.circle(centerX,centerY,(2.0f+2.2f*t)*hit.scale,12);
-                    shapes.setColor(1f,.38f,.31f,.72f*fade);
+                // No generic crater circle: the actual authored alpha/melt
+                // mask owns the shape and the laser anneal's smooth outer edge.
+                // Seeded fan scatter is stable across frames and replays.
+                int sparks=sparkCount(hit.weapon,armor);
+                float lengthScale=hit.weapon==diplomacy.sim.Battle.DamageType.PARTICLE?.68f:
+                        hit.weapon==diplomacy.sim.Battle.DamageType.TORPEDO?1.12f:1f;
+                float rr=1f,gg=.72f,bb=.31f;
+                if(hit.weapon==diplomacy.sim.Battle.DamageType.KINETIC){
+                    rr=.82f;gg=.87f;bb=.95f;
+                }else if(hit.weapon==diplomacy.sim.Battle.DamageType.PLASMA){
+                    rr=1f;gg=.43f;bb=.17f;
+                }else if(hit.weapon==diplomacy.sim.Battle.DamageType.PARTICLE){
+                    rr=.85f;gg=.58f;bb=1f;
+                }else if(hit.weapon==diplomacy.sim.Battle.DamageType.LASER){
+                    rr=1f;gg=.87f;bb=.64f;
                 }
-                // Four coherent sparks emanate from the real impact position;
-                // directional normal prevents the visual from bursting across
-                // the opposite, unstruck side of the hull.
-                for(int i=-2;i<=1;i++){
-                    float deviation=i*.39f;
-                    float dx=(float)(hit.normalX*Math.cos(deviation)-
-                            hit.normalY*Math.sin(deviation));
-                    float dy=(float)(hit.normalX*Math.sin(deviation)+
-                            hit.normalY*Math.cos(deviation));
-                    float length=(armor?6.2f:4.2f)*hit.scale*(1+.35f*t);
-                    shapes.line(centerX,centerY,
-                            centerX+dx*length,centerY+dy*length);
+                float fade=(1-t)*(1-t);
+                shapes.setColor(rr,gg,bb,(armor?.82f:.94f)*fade);
+                for(int i=0;i<sparks;i++){
+                    int h=ShipDamageVariants.hash(hit.visualSeed+i*719,
+                            hit.weapon);
+                    float spread=((h>>>9&1023)/1023f-.5f)*1.8f;
+                    float cosine=(float)StrictMath.cos(spread);
+                    float sine=(float)StrictMath.sin(spread);
+                    float dx=hit.normalX*cosine-hit.normalY*sine;
+                    float dy=hit.normalX*sine+hit.normalY*cosine;
+                    float distance=(.34f+(h>>>20&255)/255f*.66f)*
+                            (armor?6f:5.2f)*hit.scale*lengthScale;
+                    // Sparks LEAVE the puncture, never fan across the entire hull.
+                    float drift=distance*(.2f+.75f*t);
+                    float startX=centerX+dx*drift;
+                    float startY=centerY+dy*drift;
+                    shapes.line(startX,startY,
+                            startX+dx*distance*(.16f+.14f*(1f-t)),
+                            startY+dy*distance*(.16f+.14f*(1f-t)));
                 }
             }
             drawn++;
         }
         shapes.setColor(Color.WHITE);
         shapes.end();
+    }
+    static int sparkCount(diplomacy.sim.Battle.DamageType weapon,boolean armor){
+        return switch(weapon==null?diplomacy.sim.Battle.DamageType.KINETIC:weapon){
+            case PARTICLE, FIGHTER -> armor?3:4;
+            case TORPEDO, MISSILE -> armor?5:6;
+            case PLASMA -> armor?4:5;
+            case LASER -> armor?3:4;
+            default -> armor?4:5;
+        };
     }
     int rendered(){return drawn;}
 }

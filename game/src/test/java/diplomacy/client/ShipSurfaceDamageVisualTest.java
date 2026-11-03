@@ -22,6 +22,27 @@ public final class ShipSurfaceDamageVisualTest {
                 "Native-96 wound runtime overlay must report correct 2x-axis memory");
         check(ShipDamageImageMasks.SIZE==96 && ShipDamageImageMasks.COUNT==6,
                 "Live authored wound source must provide six 96px frames per family");
+        java.util.HashSet<Integer> angles=new java.util.HashSet<>();
+        java.util.HashSet<Integer> sizes=new java.util.HashSet<>();
+        for(int seed=0;seed<128;seed++){
+            for(diplomacy.sim.Battle.DamageType family:
+                    diplomacy.sim.Battle.DamageType.values()){
+                int angle=ShipDamageVariants.maskAngleDegrees(seed,family);
+                float scale=ShipDamageVariants.maskScale(seed,family);
+                check(angle>=0&&angle<360&&scale>=.91f&&scale<=1.10f,
+                        "Seeded stamp transform escaped minor scale/rotation range");
+                check(angle==ShipDamageVariants.maskAngleDegrees(seed,family)&&
+                        scale==ShipDamageVariants.maskScale(seed,family),
+                        "Damage stamp transform changed between identical frames");
+                float co=ShipDamageVariants.maskCos(angle);
+                float si=ShipDamageVariants.maskSin(angle);
+                check(Math.abs(co*co+si*si-1f)<.00002f,
+                        "Damage micro-rotation must not stretch mask geometry");
+                angles.add(angle);sizes.add(Float.floatToIntBits(scale));
+            }
+        }
+        check(angles.size()>20&&sizes.size()>30,
+                "Real damage mask variants need both seeded angle and size diversity");
         check(ShipSurfaceSampleGrid.originalBytes(1024,1536)>
                 ShipSurfaceSampleGrid.maskBytes(96,144)*100,
                 "The source-pixel cache must reduce retained decoded memory by over 100x for large PNGs");
