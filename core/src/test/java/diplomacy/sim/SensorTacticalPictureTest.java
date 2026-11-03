@@ -65,13 +65,21 @@ public final class SensorTacticalPictureTest {
                         &&(observed.channels()&Battle.CONTACT_RADAR)!=0,
                 "Powered SHR must supply a real originating radar report");
         require(observed.x()==target.x&&observed.y()==target.y&&
-                        observed.observedTick()<b.tick,
-                "Radar echo reported instantaneous present-time truth");
+                        observed.observedTick()<b.tick&&
+                        observed.emittedTick()<observed.observedTick()&&
+                        observed.receivedTick()==b.tick,
+                "Radar echo omitted physical emission/reflection/receipt timestamps");
         long signature=b.fingerprint();
         int known=viewer.knownTracks.size();
         b.tacticalPicture(0,viewer.id);
         require(b.fingerprint()==signature&&viewer.knownTracks.size()==known,
                 "Tactical UI mutated authoritative weapon state or history");
+        target.x+=8; // Fresh hidden target location is NOT the reflected fix.
+        b.step();
+        Battle.TacticalContact delayed=report(b,viewer.id,target.id);
+        require(delayed!=null&&delayed.x()==600&&delayed.x()!=target.x&&
+                        delayed.observedTick()<b.tick,
+                "Moving enemy's current physics state leaked into a distant radar report");
         scout.power=0;
         require(report(b,viewer.id,target.id)==null,
                 "Unpowered sender continued supplying a live track");
