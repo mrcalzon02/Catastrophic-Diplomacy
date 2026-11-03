@@ -292,6 +292,9 @@ public final class ParticlePointDefenseDiagnostic {
         equalTier.add("threat,attacker_rank,defender_rank,mounts,formation,seed,"+
                 "enabled,launched,beam_ticks,physical_kills,ship_impacts,"+
                 "thermal_lockouts,power_lockouts,net_protection_loss");
+        report.append("\n## Real rank-matched attacker batteries and moving approaches\n\n");
+        report.append("|Threat|Ranks attack/defend|PPD mounts|Geometry|Launched|Powered beam ticks|Kills|Impacts|HOLD impacts|\n");
+        report.append("|---|---|---:|---|---:|---:|---:|---:|---:|\n");
         int equalPairs=0;
         for(Threat threat:Threat.values())
             for(int rank:new int[]{0,9})
@@ -299,6 +302,7 @@ public final class ParticlePointDefenseDiagnostic {
                     for(boolean moving:new boolean[]{false,true}){
                         String formation=moving?"MOBILE_FLANK":"FIXED_APPROACH";
                         double lateral=moving?72:0;
+                        int allLaunched=0,allBeams=0,allKills=0,allHits=0,allHoldHits=0;
                         for(int seed=0;seed<2;seed++){
                             Trial live=trial(tech,threat,rank,mounts,seed,true,
                                     rank,lateral,moving);
@@ -313,15 +317,24 @@ public final class ParticlePointDefenseDiagnostic {
                                         a.impacts,a.peakHeatLockouts,
                                         a.peakPowerLockouts,a.damage));
                             }
+                            allLaunched+=live.launched;
+                            allBeams+=live.fired;
+                            allKills+=live.killed;
+                            allHits+=live.impacts;
+                            allHoldHits+=hold.impacts;
                             equalPairs++;
                         }
+                        report.append(String.format(Locale.ROOT,
+                                "|%s|%d/%d|%d|%s|%d|%d|%d|%d|%d|\n",
+                                threat,rank,rank,mounts,formation,
+                                allLaunched,allBeams,allKills,allHits,allHoldHits));
                     }
         Files.write(root.resolve("equal-tier-moving-geometry.csv"),equalTier,
                 StandardCharsets.UTF_8);
-        report.append("\\nAdditional equal-tier physically fitted launcher/PPD pairs: "+
+        report.append("\nAdditional equal-tier physically fitted launcher/PPD pairs: "+
                 equalPairs+". Each same-seed approach includes real engine "+
                 "movement and offset geometry; numerical interception rates "+
-                "remain diagnostic only.\\n");
+                "remain diagnostic only.\n");
         require(totalRealBeams>0,
                 "No installed particle gun ever produced a real continuous beam");
         report.append("\nVerified paired conditions: "+totalPaired+
