@@ -1,6 +1,6 @@
 # Light-minute battlefield, probabilistic target seeking and physical aim error
 
-**Implementation started • 2026-11-03 • Stage 0 shared half-size geometry and Stage 1 sublight thrust are live. Delayed sensor observations and uncertainty-based firing remain planned.**
+**Implementation underway • 2026-11-03 • Stages 0 and 1 integrated, initial Stage 2 bounded historical sensor sampling and delayed tactical display committed. Combat lock authorization and physical network delivery remain pending.**
 
 ## Design intent
 
@@ -66,9 +66,23 @@ velocity to detect state mismatch.
 installed engine count and research tiers, real delta-V/fuel and coast,
 the 50% geometry factor and aligned original-art muzzle transforms.
 
-**Still pending:** history-delayed live sensors, predictive covariance,
-active radar/X-ray pulses, distinction of near-miss and graze for
-instant-beam families, and thorough 200v200 performance tuning.
+**Stage 2 partial implementation:** each ship now records 128 immutable
+position/velocity/alive snapshots. Tactical contacts are derived from a
+timestamped physical target sample instead of present-time coordinates.
+Passive optical/IR/gravitic observations require one-way propagation;
+continuously active radar/X-ray echoes require round-trip transit before
+the reflected sample is revealed. Relayed tactical reports incur another
+one-way propagation hop. Paid TRK contact memory stores the arrived
+measurement, not hidden target truth. The focused
+`:core:sensorTacticalPictureSmoke` invokes `:core:sensorLightTimeSmoke`.
+
+**Important limitations:** channel detection and weapon lock eligibility
+still consult current positions, and LNK/SHR routing still needs
+a timestamped delayed-delivery queue. The current active radar/X-ray
+treatment is only a continuous-echo timing foundation; powered directed
+bursts, heat, signature exposure, cooldown and uncertainty resolution
+remain separate later stages. Real ballistic aim errors, near misses,
+grazes and Android/200v200 performance validation also remain pending.
 Projectile weapon velocities retain their existing data for now;
 do not call every ammunition type fully relativistic-calibrated.
 
@@ -358,7 +372,8 @@ visual overlays and balance tables are diagnostics.
    but every hit must derive from a real path through a target; stale
    contacts alone still must not silently grant automatic lock authorization.
 
-**Implementation status:** real shared 50% ship scale, physical
-world/light/time constants and engine-thrust migration are committed.
-The remaining sensor delay, active scan, probability-cloud and aiming
-phases in this design are NOT implemented yet.
+**Implementation status:** 50% hull geometry, world/time conversion,
+engine thrust and first light-time historical tactical samples are in code.
+This is not yet physically causal detection/weapon authorization.
+Real network message queues, active scans, compute budgeting, error
+ellipses and physical aiming must be implemented and verified next.
