@@ -72,6 +72,9 @@ public final class BattleArenaLimitsTest {
                     "Large fleet spawned outside the fixed world");
         rejected(()->large.addShip(0,Battle.Faction.TERRAN,100,300),
                 "201st ship accepted");
+        rejected(()->large.spawnWing(0,Battle.Faction.TERRAN,1,100,300),
+                "Oversized wing request must fail atomically");
+        ok(large.ships().size()==400,"Invalid wing partially created ships");
         rejected(()->Battle.duel(816L,201,Battle.Faction.TERRAN,
                 Battle.Faction.DRAXIAN),"Oversized duel accepted");
         rejected(()->new Battle(817).addShip(0,Battle.Faction.TERRAN,
