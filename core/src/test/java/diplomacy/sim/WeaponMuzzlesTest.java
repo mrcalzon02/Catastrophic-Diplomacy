@@ -69,7 +69,25 @@ public final class WeaponMuzzlesTest {
         check(liveShip.weaponEmitters.stream().anyMatch(x->x.family()==WeaponMuzzles.Family.MISSILE),
                 "real fitted ship loads missile emitter from exact design");
         int laserEvents=0,missileEvents=0;
-        for(int step=0;step<12;step++)live.step();
+        // Launch events contain immutable shot tick and world-space muzzle,
+        // but the ship may steer/coast between emission and inspection.
+        // Snapshot each fitted hardpoint at its ACTUAL launch tick rather
+        // than erroneously comparing historical fire with the final pose.
+        java.util.Map<Long,WeaponMuzzles.Origin> muzzleAtFire=new java.util.HashMap<>();
+        for(int step=0;step<12;step++){
+            live.step();
+            for(Battle.VisualEvent event:live.visualEvents()){
+                if(event.tick()!=live.tick||event.phase()!=Battle.VisualPhase.FIRE
+                        ||event.sourceId()!=liveShip.id)continue;
+                WeaponMuzzles.Family family=switch(event.weapon()){
+                    case "LASER" -> WeaponMuzzles.Family.LASER;
+                    case "MISSILE" -> WeaponMuzzles.Family.MISSILE;
+                    default -> null;
+                };
+                if(family!=null)muzzleAtFire.put(event.shotId(),
+                        WeaponMuzzles.at(liveShip,family,event.shotId()));
+            }
+        }
         for(Battle.VisualEvent e:live.visualEvents()){
             if(e.phase()!=Battle.VisualPhase.FIRE || e.sourceId()!=liveShip.id)continue;
             WeaponMuzzles.Family type=switch(e.weapon()){
@@ -78,8 +96,9 @@ public final class WeaponMuzzlesTest {
                 default -> null;
             };
             if(type==null)continue;
-            var actual=WeaponMuzzles.at(liveShip,type,e.shotId());
-            near(e.x(),actual.x(),"firing event X must equal equipped module muzzle");
+            var actual=muzzleAtFire.get(e.shotId());
+            check(actual!=null,"No physical muzzle snapshot at exact firing tick "+e.tick());
+            near(e.x(),actual.x(),"firing event X must equal equipped module muzzle at shot tick");
             near(e.y(),actual.y(),"firing event Y must equal equipped module muzzle");
             check(actual.slotId()>=0,"cannot fake fitted muzzle at ship center");
             if(type==WeaponMuzzles.Family.LASER){
