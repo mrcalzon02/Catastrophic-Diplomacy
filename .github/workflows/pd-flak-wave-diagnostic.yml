@@ -32,6 +32,7 @@ on:
       - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
       - 'core/src/main/java/diplomacy/sim/SensorFalseContactRelay.java'
       - 'core/src/test/java/diplomacy/sim/SensorFalseContactRelayTest.java'
+      - 'core/src/test/java/diplomacy/sim/FleetSensorPhotonScaleDiagnostic.java'
       - 'core/src/test/java/diplomacy/sim/SensorRelayBufferTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTrackRelayBuffer.java'
       - 'core/src/main/java/diplomacy/sim/SensorComputeBudget.java'
@@ -68,17 +69,35 @@ jobs:
         id: wave
         continue-on-error: true
         run: gradle --no-daemon :core:pdFlakWaveDiagnostic
+      - name: Profile optional full-scale sensor and photon integration
+        id: fleet_sensor
+        if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[sensor-scale]') }}
+        timeout-minutes: 8
+        continue-on-error: true
+        run: gradle --no-daemon :core:fleetSensorPhotonScaleDiagnostic
       - name: Report functional gate and advisory diagnostic independently
         if: always()
         run: |
           echo "## Physical combat functional verification and PD/flak balance" >> "$GITHUB_STEP_SUMMARY"
           echo "Java functional tests and client compile: ${{ steps.mechanics.outcome }} (required)" >> "$GITHUB_STEP_SUMMARY"
           echo "PD/flak fighter-wave balance: ${{ steps.wave.outcome }} (advisory)" >> "$GITHUB_STEP_SUMMARY"
+          echo "16v16/200v200 sensor-photon profile: ${{ steps.fleet_sensor.outcome }} (advisory)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/fleet-sensor-photon-scale/summary.md ]; then
+            cat core/test-output/fleet-sensor-photon-scale/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ -f core/test-output/pd-wave-diagnostic/summary.md ]; then
             cat core/test-output/pd-wave-diagnostic/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No wave metrics created. Inspect compilation and test logs." >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Preserve optional fleet sensor profile CSV and summary
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[sensor-scale]')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fitted-16v16-200v200-sensor-photon-profile
+          path: core/test-output/fleet-sensor-photon-scale/
+          if-no-files-found: warn
+          retention-days: 30
       - name: Preserve headless machine-readable test CSV and summary
         if: always()
         uses: actions/upload-artifact@v4

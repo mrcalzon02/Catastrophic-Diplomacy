@@ -601,6 +601,18 @@ Shutdown information only removes that burden after its photons arrive.
 This stage does not claim probability-weighted hypothesis fusion or
 remote false-report deduplication.
 
+**Scale measurement plan:** A new optional real fitted
+`FleetSensorPhotonScaleDiagnostic` runs independently repeated 16v16 and
+200v200 engagements with real SHR/RES/TRK/LNK/FCM/CAP, RDR, LAS/MSL and HLP
+installations. It measures direct/relayed/stale/false historical observations,
+in-flight beams, guided ordnance, finite compute allocations, genuine combat
+events, heap and wall clock. Seeded replay fingerprints and physical-state
+sanity are checked. No absolute CPU speed, hit rate, device frame rate,
+visual quality or memory budget blocks builds. The existing focused
+PD/flak workflow performs this heavy test only on explicit
+`[sensor-scale]` integration commits or manual dispatch; outputs are
+CSV/Markdown artifacts, not packaged applications.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 measured receiver-position histories, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
