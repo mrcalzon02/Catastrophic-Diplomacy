@@ -39,8 +39,8 @@ are separate outcomes in telemetry and gameplay.
 
 ## Point-defense weapon roster — seven hard-kill families
 
-PD, FLK, and **RCW** are now live fitted **point-defense** weapon families.
-The remaining four (RPD, PPD, PLS, IMD) are proposed, **not yet working**.
+**PD, FLK, RCW and RPD** are operational and fitted hard-kill families.
+**PPD, PLS and IMD** remain proposed, not yet working.
 Never add a purchasable component before its own physical combat and
 renderer mechanisms function. RCW was added only after its researched,
 paid-ammunition travelling projectile, mounted sensor, live collision and
@@ -52,7 +52,7 @@ craft, decoys and ship armor.
 | PD | Pulse laser CIWS (existing) | Ultra-fast aim; instant single-body beam; low pulse damage; per-mount retarget/thermal recovery | Fast kinetic shells, small rockets, micro missiles | Thick armor, fighter hull integrity, large continuous waves that exhaust aim windows |
 | FLK | Flak projector (existing) | Physical timed/proximity bursts with local fragmentation volume, finite shell travel and dispersion | Fighter groups, assault drones, tightly packed missile formations | Relativistic shells, single tiny evasive bodies, friendly-fire/exclusion arcs |
 | RCW | Rotary kinetic CIWS (**implemented**) | Independently fitted spin-up turret; genuine inertial 705-unit/s tracer bodies; swept collision, paid kinetic ammunition, separate short-range radar signature and tracking | Close rockets, drones, conventional guided weapons | Ultra-fast rounds, hard torpedoes, ammunition depletion |
-| RPD | Railgun interceptor | Very fast small solid penetrator, prediction/lead and long charge cycle | Fast large shells, tough torpedoes, large missiles | Small swarms and lateral juking; low shots per second |
+| RPD | Railgun interceptor (**implemented**) | Paid precharged capacitor, independent target lock and servo, narrow 1210-unit/s physical solid sabot; actual relative-body swept hit, three kinetic cartridges per shot, long cooldown and pulse-Doppler sensor on measured radial closing | Hardened torpedoes, sufficiently tracked fast large shells, large missiles | Weak base-tier small-missile tracking, limited shots per second, expensive stock and thermal consumption |
 | PPD | Particle-beam PD | Accurate armor-ablation beam with longer dwell and expensive continuous energy | Armored torpedoes, hardened missiles, medium craft | Micro swarms, heat/continuous power, rapid target switching |
 | PLS | Plasma burst projector | Short-range expanding, dispersing plasma cone; decaying energy volume | Dense rocket salvo, slow close clusters, near-range craft | Fast tiny shells, distant threats, heavy shielding; severe heat |
 | IMD | Guided interceptor missile cell | Genuine long-range counter-missile; launch/reload ammo, guidance, warhead and minimum arming distance | Heavy torpedoes, big guided missiles, distant high-value tracks | Micro missiles, decoys, short-range rockets, repeated cheap barrages |
@@ -182,12 +182,12 @@ Use physical constraints for anti-universality:
    firing states, targeting, valid targets, hit/damage logic, ranges and
    proper flak burst/fragmentation. No damage model swap for unrelated
    campaign weapons.
-3. **RCW now implemented** with actual fitted research and physics; finish
-   defensive drone/aircraft and fleet-scale role testing. Add **RPD** next:
-   a separate expensive charged fast penetrator with minimum bore range,
-   lead, physical flight, limited shots/heat and real hard-target intercepts.
-   Add RPD technology components only with functional live firing and
-   correct client rendering.
+3. **RCW and RPD implemented.** RCW has its own spinning kinetics, 705-unit/s
+   bullets and close-range radar head; RPD has its own charged 1210-unit/s
+   solid sabot, 120–335-unit fitted bore/sensor reach, real per-socket
+   Doppler/servo tracking, impact-first collision and prolonged reload.
+   Both have paid stocks and compiled authored moving renderers. Continue
+   unequal-tier, mixed-defense and fleet-load testing before balance sign-off.
 4. **Add PPD and PLS** with real energy/volume interaction and thermal constraints.
 5. **Add IMD**: guided counter-missiles, physical magazine, reload and arming,
    target acquisition, and per-projectile intercept accounting.
@@ -208,12 +208,15 @@ advisory diagnostics only. Objective build/install/launch/run, save
 compatibility and required multiplayer/update failures can block releases.
 Do not convert a proposed target band into a release gate.
 
-**Current verified continuation:** PD and FLK have independent physical
-fitted combat paths and measured anti-ordnance/anti-aircraft roles. RCW is
-also physically implemented, rendered and tested through 60 matched
-HOLD_FIRE/live-fire trials (see
-`docs/diagnostics/PD_ROTARY_CIWS_PHYSICAL_IMPLEMENTATION_AND_TARGET_EFFECTIVENESS_2026-11-02.md`).
-Its native sensor envelope, contact spin-up, separate muzzle, physically
-moving bullets, finite paid ammo and sensor/servo degradation are in use.
-Do not claim the unimplemented RPD, PPD, PLS or IMD families are operational;
-a technology catalogue entry by itself has never counted as completion.
+**Latest verified continuation (November 2, 2026):** Four of seven
+physical hard-kill families are live. RCW's [84-pair firing/aircraft report]
+(docs/diagnostics/PD_ROTARY_CIWS_PHYSICAL_IMPLEMENTATION_AND_TARGET_EFFECTIVENESS_2026-11-02.md)
+is verified with client compilation. RPD completed 36 base pairs,
+192 intermediate-tier geometry pairs, and 192 controlled actual moving-body
+collision A/B pairs, and the correction is active in normal battles; see
+[the rail implementation and balance report]
+(docs/diagnostics/PD_RAIL_INTERCEPTOR_MOVING_BODY_BALANCE_2026-11-02.md).
+Full release packaging was intentionally skipped. **PPD, PLS, IMD have no
+working installed combat path yet.** Future fleet sensors, tracks and command
+fusion remain separate modules, and physical 200-vs-200 sustained workload
+validation remains open.

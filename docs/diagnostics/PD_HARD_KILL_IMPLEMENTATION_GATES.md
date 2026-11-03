@@ -37,8 +37,8 @@ reactive armor are independent equipment categories.
 |---|---|---|
 | **PD** precision laser | Real installed PD emitter family, immediate single-target beam hit attempt; projectile-specific kinetic/armor ablation; weak air-target tracking/dwell. PD-only stats are now isolated from flak modules, with genuine PD-only muzzle selection. | **Independent socket controller committed; diagnostic runner pending.** Per-socket research range, hit profile, dwell and reload replace the pooled fitted laser controller; legacy unfitted fixtures keep `pdReload`. Shared track caching and throughput measurement remain open. |
 | **FLK** fragmentation | Real installed FLK emitter family; per-socket researched cooldown, physical kinetic-ammo charge, future `burstTick`, predicted point and finite-radius fragmentation that intersects real ordnance/craft bodies on burst. Fitted FLK no longer contributes precision laser range/accuracy/damage or fire rate. | **Working first physical differentiation**. A flak shell is currently a **deferred burst**, not yet a continuously moving/interceptable artillery body. Blast damage uses an inside-radius rule; radial fragmentation falloff and separate magazine controls remain unimplemented. |
-| **RCW** rotary kinetic CIWS | Physical small solid rounds, rotational spin-up, point-target lead, finite magazine and heat; strong short-range anti-rocket/drone with a weak answer to armored torpedoes. | **Specified; not implemented.** |
-| **RPD** rail interceptor | Charged high-velocity solid body, low volume of fire, projectile lead, high energy/thermal cost, armor penetration. | **Specified; not implemented.** |
+| **RCW** rotary kinetic CIWS | Physical small solid rounds, rotational spin-up, point-target lead, finite magazine and heat; strong short-range anti-rocket/drone with a weak answer to armored torpedoes. | **Implemented; 84 paired physical live/HOLD_FIRE trials and renderer compile verified.** |
+| **RPD** rail interceptor | A distinct paid precharged capacitor, physical 1210-unit/s solid body, 120-unit blind zone, Doppler radar on actual closing velocity, independent target lock and 3 cartridges per shot; correct two-body swept interception in production. | **Implemented; 36 baseline and 192 geometry pairs plus 192 A/B measurements; headless combat, arena and client compile verified.** |
 | **PPD** particle-beam PD | Per-target armor ablation with actual dwell and thermal saturation rather than laser-like instant damage. | **Specified; not implemented.** |
 | **PLS** plasma burst | Short-range physically expanding/decaying thermal volume; strongly range-limited and susceptible to fast objects. | **Specified; not implemented.** |
 | **IMD** guided counter-missile | Costed ammunition, finite-launch weapon and genuine seeker/arming/propulsion/flight stages; heavy incoming guided bodies are its intended focus. | **Approved and specified; not implemented.** |
@@ -186,9 +186,43 @@ individual shell flight remains unfinished.
   impacts, and ammunition-store depletion. The optional workflow now
   correctly fails on a functional compile or gun-test error; numerical
   balancing remains advisory. No APK or desktop release packaging.
-- **Next Gate C milestone: RPD**, a separately mounted charged rail
-  interceptor and its own solid penetrator, long-range detection, arc and
-  minimum-safe separation. Its functionality and visuals must pass before
-  calling it implemented. PPD/PLS/IMD are all still unimplemented.
+- **RPD milestone completed**: real separate charged railgun, three paid
+  cartridges, mechanical lead, physical projectile and meaningful pulse-
+  Doppler detection are verified. Keep the same target-class/fleet-scale
+  scrutiny for the next **PPD** sustained particle ablation method.
+  PLS/IMD remain unimplemented.
 
 [Complete RCW engineering and measured target report](PD_ROTARY_CIWS_PHYSICAL_IMPLEMENTATION_AND_TARGET_EFFECTIVENESS_2026-11-02.md).
+
+## Gate C verification update: physically correct moving-body rail interception
+
+The historical statements above describe intermediate states. As of the
+[latest production RPD validation](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41604234413),
+**four** hard-kill families are operating: precision laser PD, area FLK,
+finite-kinetic-stream RCW and charged sabot RPD. PPD, PLS and IMD are still
+planned and must not be counted as installed guns.
+
+- RPD has its own paid fitted technology and high-speed 1210-unit/s narrow
+  projectile; independent rank-aware long-range sensor, pulse-Doppler gate
+  from **actual radial approach**, capacitor/target lock, servo traverse,
+  minimum 120-unit engage distance, 3 paid kinetic rounds per launch, heat
+  and lengthy reload.
+- Real penetrators persist until impact, world edge or timeout; predicted
+  target damage is reserved until that actual projectile exits, rather than
+  simultaneously wasting four charged sabots on one light target.
+- Incoming missiles, rockets and shells now record physical start-of-tick
+  coordinates; production RPD compares both true world-space movement
+  segments. Laboratory-only legacy end-tick intersection remains an
+  explicit A/B control. This resolves a reproducible **0/4 to 4/4**
+  research-VI head-on missile interception defect without any damage,
+  chance-to-hit, ammunition, range or sensor bonus.
+- Verified [initial 36 paired physical RPD trials](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41600726201),
+  [192 mid-tier range/off-axis pairs](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41603400426),
+  [192 same-seed moving-vs-endpoint A/B pairs](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41603953046),
+  [production RPD plus fixed-arena and visual compilation](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41604234413).
+- These tests confirm physical role fidelity and measured contact geometry,
+  not fully balanced production costs. Sustained **200v200** CPU/heap profiling
+  with all four installed hard-kill families remains to do; the static
+  arena-limit check is not that sustained benchmark.
+
+[Full real-battle railgun balance report](PD_RAIL_INTERCEPTOR_MOVING_BODY_BALANCE_2026-11-02.md).
