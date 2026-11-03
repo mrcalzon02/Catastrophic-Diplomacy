@@ -12,6 +12,8 @@ on:
       - 'core/src/test/java/diplomacy/sim/SensorCausalAcquisitionTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorTargetingSolutionTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTargetingSolution.java'
+      - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
+      - 'core/src/test/java/diplomacy/sim/SensorRelayBufferTest.java'
       - 'core/src/test/java/diplomacy/sim/WeaponMuzzlesTest.java'
       - 'core/src/test/java/diplomacy/sim/SensingModulesTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorNetworkModulesTest.java'
