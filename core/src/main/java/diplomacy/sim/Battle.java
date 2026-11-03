@@ -2257,6 +2257,132 @@ public final class Battle {
         return true;
     }
 
+    /** Read-only instrument display fix. Historical coordinates are recorded
+     * observations, never the hidden current world position. Relayed optical
+     * contacts are NOT line-of-sight for the receiving camera. */
+    public record TacticalContact(int targetId,int sourceId,int channels,
+                                  double x,double y,double vx,double vy,
+                                  long observedTick,float confidence,
+                                  boolean relayed,boolean stale){
+        public TacticalContact{
+            if(targetId<=0||sourceId<=0||observedTick<0||channels<0||
+                    !Double.isFinite(x)||!Double.isFinite(y)||
+                    !Double.isFinite(vx)||!Double.isFinite(vy)||
+                    !Float.isFinite(confidence)||confidence<0||confidence>1)
+                throw new IllegalArgumentException("Invalid physical sensor observation");
+            if(stale&&channels!=0)
+                throw new IllegalArgumentException("Historical memory is not a live sensor");
+        }
+    }
+
+    /** A commander without a powered FCM receives only the first alive
+     * designated ship's local scope and actual routed contacts. Prefer an
+     * equipped functioning command core, but never make it a free sensor. */
+    public List<TacticalContact> tacticalPicture(int team){
+        checkTeam(team);
+        Ship viewer=null;
+        int priority=-1;
+        for(Ship candidate:ships){
+            if(candidate.team!=team||!candidate.alive())continue;
+            int eligible=candidate.power>3&&candidate.commandCondition>.15
+                    &&candidate.sensorsCondition>.15&&candidate.crewReadiness()>.05
+                    ?candidate.network.commandCapacity():0;
+            if(viewer==null||eligible>priority){
+                viewer=candidate;
+                priority=eligible;
+            }
+        }
+        return viewer==null?List.of():tacticalPicture(team,viewer.id);
+    }
+
+    /** The same direct/SHR route that controls weapons supplies the command
+     * picture, without invoking the mutating hasTargetContact() method.
+     * TRK and LNK provide finitely retained historical fixes, not locks. */
+    public List<TacticalContact> tacticalPicture(int team,int viewerId){
+        checkTeam(team);
+        Ship viewer=findShip(viewerId);
+        if(viewer==null||!viewer.alive()||viewer.team!=team)
+            throw new IllegalArgumentException("Command view must be a living allied hull");
+        Map<Integer,TacticalContact> picture=new HashMap<>();
+        boolean receiverPowered=viewer.power>3&&viewer.sensorsCondition>.05
+                &&viewer.crewReadiness()>.05;
+        if(receiverPowered){
+            int localWindow=(int)(viewer.network.trackMemoryTicks()
+                    *StrictMath.min(1,viewer.sensorsCondition));
+            if(localWindow>0)for(Map.Entry<Integer,ContactTrack> entry:
+                    viewer.knownTracks.entrySet()){
+                ContactTrack track=entry.getValue();
+                long age=tick-track.tick;
+                if(age<0||age>localWindow)continue;
+                picture.put(entry.getKey(),historicalContact(entry.getKey(),
+                        viewer.id,track,false));
+            }
+            // Independent finite sender/receiver LNK range and transmitter
+            // capacities. The top N freshest sender records only; sorted
+            // ties avoid JVM HashMap iteration-dependent tactical displays.
+            if(viewer.network.trackRelayRange()>0)
+                for(Ship source:ships){
+                    if(source==viewer||source.team!=team||!source.alive()||
+                            source.power<=3||source.sensorsCondition<=.05||
+                            source.crewReadiness()<.05||
+                            source.network.trackRelayCapacity()<=0||
+                            source.network.trackMemoryTicks()<=0)continue;
+                    double range=StrictMath.min(viewer.network.trackRelayRange(),
+                            source.network.trackRelayRange())
+                            *StrictMath.min(viewer.sensorsCondition,
+                                    source.sensorsCondition);
+                    if(range<=0||StrictMath.hypot(viewer.x-source.x,
+                            viewer.y-source.y)>range)continue;
+                    int cap=StrictMath.min(32,source.network.trackRelayCapacity());
+                    int window=(int)(source.network.trackMemoryTicks()
+                            *StrictMath.min(1,source.sensorsCondition));
+                    List<Map.Entry<Integer,ContactTrack>> remembered=
+                            new ArrayList<>(source.knownTracks.entrySet());
+                    remembered.removeIf(e->tick-e.getValue().tick<0||
+                            tick-e.getValue().tick>window);
+                    remembered.sort((a,b)->{
+                        int newer=Long.compare(b.getValue().tick,a.getValue().tick);
+                        return newer!=0?newer:Integer.compare(a.getKey(),b.getKey());
+                    });
+                    for(int k=0;k<StrictMath.min(cap,remembered.size());k++){
+                        Map.Entry<Integer,ContactTrack> entry=remembered.get(k);
+                        TacticalContact previous=picture.get(entry.getKey());
+                        if(previous==null||previous.observedTick()<entry.getValue().tick)
+                            picture.put(entry.getKey(),historicalContact(entry.getKey(),
+                                    source.id,entry.getValue(),true));
+                    }
+                }
+        }
+        for(Ship target:ships){
+            if(target.team==team||!target.alive())continue;
+            double distance=StrictMath.hypot(viewer.x-target.x,viewer.y-target.y);
+            Ship source=liveContactSource(viewer,target,distance);
+            if(source==null)continue;
+            int channels=directSensorChannels(source,target,StrictMath.hypot(
+                    source.x-target.x,source.y-target.y));
+            if(channels==0)continue;
+            boolean relayed=source!=viewer;
+            float working=source.power>3&&source.sensorsCondition>.05
+                    ?(float)StrictMath.min(1,source.sensorsCondition):0;
+            float confidence=(float)StrictMath.max(0,StrictMath.min(1,
+                    .20+.50*(source.network.resolutionGain()-1)*working
+                    +.09*StrictMath.max(0,Integer.bitCount(channels)-1)
+                    +.20*source.commandAssist));
+            picture.put(target.id,new TacticalContact(target.id,source.id,
+                    channels,target.x,target.y,target.vx,target.vy,
+                    tick,confidence,relayed,false));
+        }
+        List<TacticalContact> sorted=new ArrayList<>(picture.values());
+        sorted.sort((a,b)->Integer.compare(a.targetId(),b.targetId()));
+        return List.copyOf(sorted);
+    }
+
+    private static TacticalContact historicalContact(int id,int sourceId,
+            ContactTrack track,boolean relayed){
+        return new TacticalContact(id,sourceId,0,track.x,track.y,track.vx,
+                track.vy,track.tick,0,relayed,true);
+    }
+
     /** Powered tracking and contact resolution reduce estimated position
      * error; broken or unpowered processors grant no phantom precision. */
     private static double tacticalPrecision(Ship actor){
