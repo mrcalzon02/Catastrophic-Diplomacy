@@ -6,9 +6,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -188,6 +190,32 @@ public final class PointDefenseWaveDiagnostic {
         require(mount.targetAcquisitions==2,
                 "Stable target reacquisition counted a fictitious new body");
     }
+    /** Geometry-only proof: one actual fragmentation shell advances at
+     * exactly rated velocity and cannot teleport to its future burst point.
+     * These mechanical assertions never demand a particular hit ratio. */
+    private static void verifyFlakShellKinematics(){
+        Battle.FlakRound shell=new Battle.FlakRound(1,2,0,44,0,
+                100,200,300,200,22,6);
+        require(shell.x==100&&shell.y==200&&shell.remainingDistance==200,
+                "Flak shell spawned at its future explosion position");
+        require(!shell.advance(1.0/30),
+                "Flak proximity fuse detonated on its very first partial step");
+        require(StrictMath.abs(shell.x-113)<.0001&&
+                StrictMath.abs(shell.remainingDistance-187)<.0001,
+                "Flak did not traverse 390 world units per second");
+        boolean arrived=false;
+        for(int t=1;t<25;t++){
+            arrived=shell.advance(1.0/30);
+            if(arrived)break;
+        }
+        require(arrived&&StrictMath.abs(shell.x-300)<.0001&&
+                shell.y==200&&shell.remainingDistance==0,
+                "Flak shell missed its actual fixed fuze position");
+        Battle.FlakRound capped=new Battle.FlakRound(1,2,0,45,0,
+                100,200,2500,200,22,6);
+        require(capped.life<=BattleArena.MAX_POINT_DEFENSE_SECONDS,
+                "Long-distance flak shell outlived fixed projectile limit");
+    }
     private static Shipyard.Design carrier(TechnologyCatalog c,Threat threat){
         Shipyard.Design d=Shipyard.starter(Battle.Faction.TERRAN,
                 Shipyard.Hull.CRUISER);
@@ -242,12 +270,29 @@ public final class PointDefenseWaveDiagnostic {
         final int flakStock=protectedShip.kineticAmmo;
         Set<Integer> innerCraft=new HashSet<>();
         Set<Integer> firedPdSockets=new HashSet<>();
+        Map<Long,Long> actualFlakShots=new HashMap<>();
+        int inFlightFlakSamples=0,realFlakBursts=0;
         long seq=0,firstAttack=-1;
         int attackShots=0,attackImpacts=0,torpedoes=0,torpedoHits=0,
                 lasers=0,flak=0;
         double peakHeat=protectedShip.heat/Math.max(1,protectedShip.maxHeat);
         for(int tick=0;tick<600;tick++){
             b.step();
+            for(Battle.FlakRound shell:b.flakRounds()){
+                inFlightFlakSamples++;
+                require(BattleArena.contains(shell.x,shell.y),
+                        "Live flak shell escaped the fixed battle arena");
+                require(shell.life>-.000001&&shell.life<=BattleArena.MAX_POINT_DEFENSE_SECONDS,
+                        "Live flak shell exceeded finite ammunition lifetime");
+                double travelled=StrictMath.hypot(shell.x-shell.startX,
+                        shell.y-shell.startY);
+                double possible=(b.tick-shell.spawnTick)*(1.0/30)*
+                        Battle.FLAK_SHELL_SPEED;
+                require(travelled<=possible+.001&&
+                        StrictMath.abs(travelled+shell.remainingDistance-
+                                shell.totalDistance)<.001,
+                        "Flak airburst trajectory did not follow finite inertial flight");
+            }
             for(Battle.Craft c:b.crafts())
                 if(c.team==0&&StrictMath.hypot(c.x-protectedShip.x,
                             c.y-protectedShip.y)<=90)
@@ -273,7 +318,22 @@ public final class PointDefenseWaveDiagnostic {
                         }
                         require(found,"Precision PD fired outside a paid physical socket");
                     }
-                    if("FLAK".equals(e.weapon()))flak++;
+                    if("FLAK".equals(e.weapon())){
+                        flak++;
+                        require(actualFlakShots.put(e.shotId(),e.tick())==null,
+                                "Duplicate flak shell launch ID");
+                    }
+                }
+                if(e.team()==1&&e.sourceId()==protectedShip.id&&
+                        e.phase()==Battle.VisualPhase.IMPACT&&
+                        "FLAK_BURST".equals(e.weapon())){
+                    realFlakBursts++;
+                    Long firedAt=actualFlakShots.get(e.shotId());
+                    require(firedAt!=null&&e.tick()>firedAt,
+                            "Flak burst occurred before physical muzzle launch");
+                    require(StrictMath.hypot(e.x()-e.targetX(),
+                            e.y()-e.targetY())<.001,
+                            "Flak airburst coordinates detached from true impact");
                 }
                 if(e.team()!=0)continue;
                 if(e.phase()==Battle.VisualPhase.FIRE&&
@@ -308,6 +368,12 @@ public final class PointDefenseWaveDiagnostic {
                 "PD-only fit emitted free fragmentation shells");
         require(flakStock-protectedShip.kineticAmmo>=flak,
                 "Fitted flak fired without paying physical ammunition");
+        require(flak==actualFlakShots.size(),
+                "Flak fired projectiles without unique physical shell identities");
+        require(flak==0||inFlightFlakSamples>0,
+                "Recorded flak launches never existed in world-space flight");
+        require(realFlakBursts<=flak,
+                "Flak proximity fuse detonated more times than shells were launched");
         double damage=Math.max(0,shields-protectedShip.shields)+
                 Math.max(0,armor-protectedShip.armor)+
                 Math.max(0,hull-protectedShip.hull);
@@ -328,6 +394,7 @@ public final class PointDefenseWaveDiagnostic {
         TechnologyCatalog cat=TechnologyCatalog.loadDefault();
         verifyHardwareIsolation(cat);
         verifyPrecisionTracking(cat);
+        verifyFlakShellKinematics();
         Path output=Path.of("test-output","pd-wave-diagnostic");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
