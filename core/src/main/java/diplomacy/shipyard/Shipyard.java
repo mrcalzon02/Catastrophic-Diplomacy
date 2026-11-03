@@ -887,10 +887,9 @@ public final class Shipyard {
                     pdTracking+=p.accuracy*tuning.tracking();
                     pdCycle+=tuning.cycle();
                 }
-                case "FLK" -> {
-                    // Physically fitted FLK already contributes engineering
-                    // costs and gets its own per-socket sensor and reload.
-                    // Do NOT lend flak output/tracking/cycle to laser PD.
+                case "FLK", "RCW" -> {
+                    // Both are independent fitted kinetic hard-kill weapons.
+                    // Neither lends reach, damage, lock or fire rate to PD lasers.
                 }
                 case "SEN" -> {
                     accuracy+=0.12*p.accuracy;
@@ -1246,6 +1245,8 @@ public final class Shipyard {
         Installed current=design.at(slot);
         if(current==null)return 0;
         Part p=evaluate(current,catalog,design.faction);
+        if(p.base.subsystem.equals("RCW"))
+            return StrictMath.min(155.0,35.0+p.effect*2.7*p.tuning().reach());
         return p.base.subsystem.equals("PD")||p.base.subsystem.equals("FLK")
                 ?70+p.effect*2.8*p.tuning().reach():0;
     }
@@ -1256,6 +1257,7 @@ public final class Shipyard {
         if(current==null)return 0;
         Part part=evaluate(current,catalog,design.faction);
         return part.base.subsystem.equals("PD")||part.base.subsystem.equals("FLK")
+                ||part.base.subsystem.equals("RCW")
                 ?part.tuning().cycle():0;
     }
     /** Individual PD module profile before fleet sensors and stacked batteries contribute. */
@@ -1263,7 +1265,8 @@ public final class Shipyard {
         Installed current=design.at(slot);
         if(current==null)return null;
         Part p=evaluate(current,catalog,design.faction);
-        if(!p.base.subsystem.equals("PD")&&!p.base.subsystem.equals("FLK"))return null;
+        if(!p.base.subsystem.equals("PD")&&!p.base.subsystem.equals("FLK")
+                &&!p.base.subsystem.equals("RCW"))return null;
         return ProjectileModel.defense(p.effect/p.base.effect*p.tuning().damage(),
                 p.accuracy*p.tuning().tracking(),p.tuning().reach());
     }
