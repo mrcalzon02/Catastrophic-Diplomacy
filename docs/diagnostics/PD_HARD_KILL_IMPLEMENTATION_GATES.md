@@ -472,3 +472,39 @@ continue to be a separate system, not free implicit PPD upgrades.
 
 **Remaining hard-kill families:** PLS expanding/decaying plasma volume,
 then IMD guided, physically launched and properly costed counter-missiles.
+
+
+### PPD research-matched moving approach outcomes
+
+[Completed 72 paired ACTIVE/HOLD_FIRE PPD scenarios, run 41681478481](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41681478481)
+produced a complete second `equal-tier-moving-geometry.csv` artifact:
+48 A/B pairs have **genuinely fitted attacker launchers** at the
+same research rank as the defending PPD, with true engine-driven
+movements and 72-unit flank offsets. The other 24 A/B pairs preserve
+the historical baseline attack fixtures for controlled comparison.
+No desired kill-rate or body count threshold blocked CI.
+
+| Incoming physical ordnance and defense (equal research stage) | Fixed, one PPD | Moving flank, one PPD | Moving flank, four PPD |
+|---|---:|---:|---:|
+| Rank 0 missile / PPD | 10/10 | 2/10 | 8/10 |
+| Rank IX missile / PPD | 10/10 | 2/10 | 10/10 |
+| Rank 0 torpedo / PPD | 4/6 | 4/4 | 4/4 |
+| Rank IX torpedo / PPD | 6/6 | 4/4 | 4/4 |
+| Rank 0 kinetic / PPD | 0/38 | 0/38 | 0/38 |
+| Rank IX kinetic / PPD | 6/38 | 2/38 | 25/38 |
+
+Each entry gives **actual intercepted bodies / launched bodies**
+across two deterministic seeds. Fewer torpedoes launch during the
+mobile offset than the fixed approach, so compare within a row and
+formation carefully. Outcomes depend on **real mechanical traverse,
+uninterrupted optical dwell, target hardness, weapon rank, mount
+count and travel paths**, not fabricated probability caps.
+
+This is not economic equality: four PPD modules cost more than one,
+and one research-ranked attacker weapon is not necessarily equal to
+four simultaneously fitted defenses. The next PPD-specific balances
+must therefore add matched industry/power-slot budgets, 4/8/16
+rocket/missile salvo saturation, partial ship-sensor/cooling damage,
+real fighters/drones, multiple independent attackers, and 200v200
+five-defense-family performance/Android diagnostics. Do not merge PPD
+with ECM, offensive PAR, or future PLS plasma area denial.
