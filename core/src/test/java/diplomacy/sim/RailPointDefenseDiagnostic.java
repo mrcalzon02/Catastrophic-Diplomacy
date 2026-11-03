@@ -255,8 +255,12 @@ public final class RailPointDefenseDiagnostic {
         for(Threat threat:Threat.values())
             for(int tier:new int[]{3,6})
                 for(int count:new int[]{1,4})
-                    for(int distance:new int[]{210,440})
-                        for(int offset:new int[]{0,90}){
+                    // All geometry permutations must stay WITHIN the
+                    // installed base kinetic launch envelope. The far/offset
+                    // 440-unit fixture previously generated zero shells and
+                    // was invalid as an interception trial, not a PD failure.
+                    for(int distance:new int[]{205,275})
+                        for(int offset:new int[]{0,60}){
                             int onLaunched=0,offLaunched=0,shots=0,
                                     railHits=0,intercepts=0,onImpacts=0,
                                     offImpacts=0,stock=0,power=0,flightFrames=0;
