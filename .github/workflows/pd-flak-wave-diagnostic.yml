@@ -51,7 +51,7 @@ jobs:
       - name: Verify mounted PD, physical beams, sensor lead prediction and client Java compilation
         id: wave
         continue-on-error: true
-        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic :core:sensorNetworkSmoke :game:compileJava
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic :core:sensorNetworkSmoke :core:rocketBarrageSmoke :game:compileJava
       - name: Report test outcome explicitly (advisory)
         if: always()
         run: |
