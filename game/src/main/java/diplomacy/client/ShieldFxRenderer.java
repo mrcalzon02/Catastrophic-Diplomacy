@@ -15,12 +15,20 @@ final class ShieldFxRenderer {
     void render(ShieldFxTimeline timeline,ShapeRenderer shapes,
                 OrthographicCamera camera,BattleRenderPoses poses,
                 CombatViewBounds visible){
+        render(timeline,shapes,camera,poses,visible,ship -> true);
+    }
+    void render(ShieldFxTimeline timeline,ShapeRenderer shapes,
+                OrthographicCamera camera,BattleRenderPoses poses,
+                CombatViewBounds visible,
+                java.util.function.Predicate<Battle.Ship> hullVisible){
         drawn=0;
         if(timeline.count()==0)return;
         shapes.setProjectionMatrix(camera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for(ShieldFxTimeline.Effect fx:timeline.events()){
-            if(!fx.ship.alive()&&fx.kind!=ShieldFxTimeline.Kind.COLLAPSE)continue;
+            if(!hullVisible.test(fx.ship)
+                    ||(!fx.ship.alive()&&fx.kind!=ShieldFxTimeline.Kind.COLLAPSE))
+                continue;
             BattleRenderPoses.Pose pose=poses.ship(fx.ship);
             float x=pose.x(),y=pose.y();
             float radius=(float)(16*fx.ship.visualScale());
