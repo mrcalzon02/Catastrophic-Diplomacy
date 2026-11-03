@@ -10,9 +10,10 @@ public final class SensorLightTimeHistoryTest {
         Battle.Ship source=b.addShip(0,Battle.Faction.TERRAN,100,100);
         Battle.Ship target=b.addShip(1,Battle.Faction.DRAXIAN,600,100);
         int outward=SensorLightTimeHistory.propagationTicks(500);
-        int echoTime=SensorLightTimeHistory.propagationTicks(1000);
+        int echoTime=outward*2; // Two separately rounded photon legs.
         ok(outward>0&&echoTime>outward,"Active echo bypassed light time");
         int channels=Battle.CONTACT_OPTICAL|Battle.CONTACT_RADAR;
+        source.sensorHistory.capture(0,source);
         target.sensorHistory.capture(0,target);
         ok(SensorLightTimeHistory.receive(source,target,outward-1,channels,0)==null,
                 "Premature passive light observation");
@@ -21,7 +22,13 @@ public final class SensorLightTimeHistoryTest {
                         passive.measuredTick()==0,
                 "Optical record was not one-way-old or radar leaked early");
         target.x=608;target.vx=100;
-        for(long tick=1;tick<=echoTime;tick++)target.sensorHistory.capture(tick,target);
+        for(long tick=1;tick<=echoTime;tick++){
+            source.sensorHistory.capture(tick,source);
+            target.sensorHistory.capture(tick,target);
+        }
+        var premature=SensorLightTimeHistory.receive(source,target,echoTime-1,channels,0);
+        ok(premature!=null&&(premature.channels()&Battle.CONTACT_RADAR)==0,
+                "Radar reflection arrived before two individually rounded legs");
         var active=SensorLightTimeHistory.receive(source,target,echoTime,channels,0);
         ok(active!=null&&(active.channels()&Battle.CONTACT_RADAR)!=0&&
                         active.emittedTick()<active.measuredTick()&&
