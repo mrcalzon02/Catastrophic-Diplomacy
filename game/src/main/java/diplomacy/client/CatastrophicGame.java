@@ -2867,7 +2867,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Exhibition and forensic armor photography remain unobstructed.
         if(!screensaverMode && currentArmorCapture==null && fogOfWar!=null){
             try{
-                fogOfWar.render(battle,battleCamera,camera,batch,renderPoses,0);
+                fogOfWar.render(battle,battleCamera,camera,batch,renderPoses,0,sensorContacts);
                 sensorContacts.render(battle,battleCamera,camera,renderPoses,
                         shapes,batch,font,0);
                 Battle.Ship inspected=shipInspector.selected(battle);
