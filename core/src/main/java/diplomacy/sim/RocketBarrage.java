@@ -118,6 +118,19 @@ public final class RocketBarrage {
         // A coasting ROCKET is not a silent-ghost guided missile.
         return burning?(motor==Motor.BOOST_COAST?2.5:1.85):1.20;
     }
+    /** Higher researched rocket drives permit a higher sustained motor
+     * acceleration, not merely a higher speed cap the rocket cannot reach
+     * before close-in CIWS engages. Base-tier hardware stays at exactly 1x.
+     * A booster retains its own separate short, high-impulse flight envelope.
+     * This changes real velocity over time, never interception hit chance. */
+    public static double researchedSustainedThrustScale(Size size,
+                                                        ProjectileModel.Spec body){
+        if(size==null||body==null)
+            throw new IllegalArgumentException("Rocket body and size required");
+        double speedRatio=body.speed()/size.terminalSpeed;
+        return StrictMath.max(1.0,StrictMath.min(2.0,
+                1.0+2.85*StrictMath.max(0,speedRatio-1.0)));
+    }
     /** No guidance degrees of freedom: acceleration always points along the
      * immutable initial bearing. A moving hull can evade the entire barrage. */
     public static double acceleration(Size size,Motor motor,double age){
