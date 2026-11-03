@@ -90,9 +90,20 @@ final class ShipDamageImageMasks {
                 Math.max(armor,internal*.65f));
         if(intensity<=0)return 0;
         int color=lookup(kind,dx,dy,seed);
+        int rawBlue=color>>>8&255;
         int r=Math.round((color>>>24&255)*intensity);
         int g=Math.round((color>>>16&255)*intensity);
-        int b=Math.round((color>>>8&255)*intensity);
+        int b=Math.round(rawBlue*intensity);
+        // In the native-96 atlas B>=164 is a MATERIAL TAG, not simply a
+        // silver intensity. Preserve that oxide marker even while shallow
+        // laser heating ramps up; G is a hue phase and must not fade toward
+        // a different oxide color when damage severity changes.
+        // Legacy 24/48 A/B frame behavior is deliberately unchanged.
+        if(kind==Battle.DamageType.LASER&&!use24&&!use48
+                &&rawBlue>=164&&intensity>.08f){
+            b=Math.min(255,164+Math.round((rawBlue-164)*intensity));
+            g=color>>>16&255;
+        }
         return (r<<16)|(g<<8)|b;
     }
 
