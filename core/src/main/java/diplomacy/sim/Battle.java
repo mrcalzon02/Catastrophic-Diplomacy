@@ -2526,7 +2526,9 @@ public final class Battle {
     /** A commander without a powered FCM receives only the first alive
      * designated ship's local scope and actual routed contacts. Prefer an
      * equipped functioning command core, but never make it a free sensor. */
-    public List<TacticalContact> tacticalPicture(int team){
+    /** Same authoritative FCM/viewer selection used by the sensor overlay.
+     * No UI may substitute a hidden target ship for the observing captain. */
+    public Ship tacticalViewer(int team){
         checkTeam(team);
         Ship viewer=null;
         int priority=-1;
@@ -2540,6 +2542,10 @@ public final class Battle {
                 priority=eligible;
             }
         }
+        return viewer;
+    }
+    public List<TacticalContact> tacticalPicture(int team){
+        Ship viewer=tacticalViewer(team);
         return viewer==null?List.of():tacticalPicture(team,viewer.id);
     }
 
