@@ -49,9 +49,20 @@ jobs:
         id: load
         continue-on-error: true
         run: gradle --no-daemon :core:pdLoadProfileDiagnostic
+      - name: Compare existing physical laser PD versus flak (focused P0)
+        id: family_p0
+        continue-on-error: true
+        run: gradle --no-daemon :core:pdFamilyP0Diagnostic
       - name: Surface sample metrics and diagnostic outcome
         if: always()
         run: |
+          echo "## Existing PD versus FLK (physical P0)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Focused family diagnostic: ${{ steps.family_p0.outcome }} (advisory only)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/pd-family-p0/summary.md ]; then
+            cat core/test-output/pd-family-p0/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No P0 metrics produced. Inspect the testClasses JavaExec logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "## All physically interceptable threats versus point defense" >> "$GITHUB_STEP_SUMMARY"
           echo "Other threats: ${{ steps.matrix.outcome }} (advisory only)" >> "$GITHUB_STEP_SUMMARY"
           if [ -f core/test-output/pd-interception-matrix/summary.md ]; then
@@ -82,5 +93,6 @@ jobs:
             core/test-output/rocket-pd-balance/
             core/test-output/pd-interception-matrix/
             core/test-output/pd-load-profiles/
+            core/test-output/pd-family-p0/
           if-no-files-found: warn
           retention-days: 30

@@ -791,3 +791,15 @@ tasks.register('randomizedCombatEndurance', JavaExec) {
     jvmArgs '-XX:+HeapDumpOnOutOfMemoryError',
             '-XX:HeapDumpPath=build/reports/combat-endurance'
 }
+
+
+// Fast, nonblocking P0 experiment: real fitted existing laser PD versus flak.
+// Uses testClasses only (no game packaging, Android APK or release job).
+tasks.register('pdFamilyP0Diagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Compare real equipped PD and FLK hardware against seven physical threat types with HOLD_FIRE controls.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PointDefenseThreatMatrixDiagnostic'
+    args '--p0'
+}
