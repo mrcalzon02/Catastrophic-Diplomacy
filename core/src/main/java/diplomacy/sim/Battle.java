@@ -2633,9 +2633,19 @@ public final class Battle {
     /** Paid CAP capacity gives separate guided hardpoints different real
      * targets. A launcher cannot shoot unseen/out-of-range hulls; without
      * CAP all racks retain the original common fleet target. */
+    /** Expensive CAP electronics stop providing parallel tracking when their
+     * actual sensor circuits or reactor are disabled. Baseline stays at one. */
+    private static int operationalTargetCapacity(Ship ship){
+        if(ship.power<=3||ship.sensorsCondition<=.05||
+                ship.crewReadiness()<.05)return 1;
+        int hardware=ship.network.targetCapacity();
+        double condition=StrictMath.max(0,StrictMath.min(1,ship.sensorsCondition));
+        return 1+(int)StrictMath.floor((hardware-1)*condition);
+    }
     private Ship independentRackTarget(Ship source,Ship primary,int lane,double limit){
-        if(lane<=0||source.network.targetCapacity()<=1)return primary;
-        int index=(lane-1)%StrictMath.max(1,source.network.targetCapacity()-1);
+        int capacity=operationalTargetCapacity(source);
+        if(lane<=0||capacity<=1)return primary;
+        int index=(lane-1)%StrictMath.max(1,capacity-1);
         Ship first=null;
         int seen=0;
         for(Ship alternative:ships){
@@ -4332,7 +4342,7 @@ public final class Battle {
                 double trackLoad=precisionTrackLoadMultiplier(acquiredTracks,
                         StrictMath.max(1,defender.precisionMounts.size()),
                         StrictMath.min(16,diagnosticPrecisionTracksPerMount+
-                                StrictMath.max(0,defender.network.targetCapacity()-1)),
+                                StrictMath.max(0,operationalTargetCapacity(defender)-1)),
                         diagnosticPrecisionTrackExponent);
                 if(!acquirePrecisionTarget(defender,pdSocket,physicalId,tx,ty,
                         tick,trackLoad))continue;
