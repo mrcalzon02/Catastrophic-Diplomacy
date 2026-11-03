@@ -63,7 +63,7 @@ public final class BattleTerminationTest {
                 "Unresolved battle invented a kill");
         System.out.println("PASS real disarmed 1v1 stalemate at tick "+tick);
     }
-    private static void campaignDraw() {
+    private static void campaignDraw() throws Exception {
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
         var left=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         var right=Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE);
@@ -89,7 +89,7 @@ public final class BattleTerminationTest {
                 "Actual fleet destruction was mistaken for a draw");
         System.out.println("PASS campaign unresolved time limit, unchanged wave and actual-win distinction");
     }
-    public static void main(String[] args){
+    public static void main(String[] args) throws Exception {
         policy();
         realDisarmedBattle();
         campaignDraw();
