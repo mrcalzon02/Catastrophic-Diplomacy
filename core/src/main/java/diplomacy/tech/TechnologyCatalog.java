@@ -344,6 +344,7 @@ public final class TechnologyCatalog {
             addDumbfireRocketFamilies(bases,rows);
             addRotaryPointDefenseFamilies(bases,rows);
             addRailPointDefenseFamilies(bases,rows);
+            addParticlePointDefenseFamilies(bases,rows);
             // Ranks VII-IX are synthesized on demand. No 13,200 extra
             // temporary CSV arrays/strings retained at Android startup.
         }
@@ -1107,6 +1108,44 @@ public final class TechnologyCatalog {
             row.set(5,"Railgun interceptor "+row.get(3)+" stage "+row.get(4));
             row.set(6,src.get(6).replace("-FLK-","-RPD-").replace("-FLK","-RPD"));
             row.set(19,"Charged rail PD: "+row.get(19)+"; three sabots per shot and long recharge");
+            upgrades.add(row);
+        }
+    }
+
+    /** Each faction gets a genuinely new PPD hardpoint and four original
+     * research branches up through virtual stage IX. Reuse only basic FLK
+     * fabrication cost ancestry; combat is a continuous powered ablative beam
+     * with turret dwell and thermal quenching, never explosive fragmentation. */
+    private static void addParticlePointDefenseFamilies(List<List<String>> bases,
+                                                          List<List<String>> upgrades){
+        List<List<String>> original=List.copyOf(bases),research=List.copyOf(upgrades);
+        for(int i=1;i<original.size();i++){
+            List<String> src=original.get(i);
+            if(!"FLK".equals(src.get(2)))continue;
+            List<String> row=new ArrayList<>(src);
+            row.set(0,src.get(0).replace("-FLK","-PPD"));
+            row.set(2,"PPD");row.set(3,"Particle Ablation PD");
+            row.set(5,"Optical lock, powered continuous armor ablation and local thermal saturation");
+            row.set(6,ratio(Double.parseDouble(src.get(6)),1.18));
+            row.set(7,ratio(Double.parseDouble(src.get(7)),1.42));
+            row.set(8,ratio(Double.parseDouble(src.get(8)),1.22));
+            row.set(9,ratio(Double.parseDouble(src.get(9)),1.09));
+            row.set(10,Integer.toString(Math.max(1,(int)StrictMath.ceil(
+                    Integer.parseInt(src.get(10))*1.19))));
+            row.set(11,ratio(Double.parseDouble(src.get(11)),1.26));
+            row.set(12,"No kinetic cartridges; sustained reactor draw, target dwell and overheating");
+            bases.add(row);
+        }
+        for(int i=1;i<research.size();i++){
+            List<String> src=research.get(i);
+            if(!"FLK".equals(src.get(2)))continue;
+            List<String> row=new ArrayList<>(src);
+            row.set(0,src.get(0).replace("-FLK-","-PPD-"));
+            row.set(2,"PPD");
+            row.set(5,"Particle ablation point defense "+row.get(3)+" stage "+row.get(4));
+            row.set(6,src.get(6).replace("-FLK-","-PPD-").replace("-FLK","-PPD"));
+            row.set(19,"Particle ablation: "+row.get(19)+
+                    "; dwell, beam power and thermal shutdown remain physical");
             upgrades.add(row);
         }
     }
