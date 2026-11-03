@@ -928,7 +928,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 battleCamera.position.x,battleCamera.position.y,battleCamera.zoom);
         // An unidentified radar/thermal return cannot be opened as an
         // omniscient enemy ship inspection panel or selected through the fog.
-        if(!screensaverMode && chosen>=0){
+        if(!screensaverMode && fogOfWar!=null && chosen>=0){
             for(Battle.Ship selected:battle.ships())if(selected.id==chosen && selected.team!=0){
                 sensorContacts.refresh(battle,0);
                 if(!sensorContacts.opticallyVisible(chosen))chosen=-1;
@@ -2647,7 +2647,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         CombatViewBounds view=CombatViewBounds.from(battleCamera);
         // Resolve direct contacts before the hull draw passes. Even a close
         // cloak must not appear as a real sprite from radar/infrared alone.
-        if(!screensaverMode && currentArmorCapture==null)
+        if(!screensaverMode && currentArmorCapture==null && fogOfWar!=null)
             sensorContacts.refresh(battle,0);
         // World-space sky & hazard layers render before tactical grid, weapons and hulls.
         if (starfield != null) starfield.render(batch,camera,battleCamera,W,H);
@@ -3348,8 +3348,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
 
     private boolean hullOpticallyVisible(Battle.Ship ship){
-        return screensaverMode || currentArmorCapture!=null || ship.team==0
-                || sensorContacts.opticallyVisible(ship.id);
+        return fogOfWar==null || screensaverMode || currentArmorCapture!=null
+                || ship.team==0 || sensorContacts.opticallyVisible(ship.id);
     }
     private void drawShipsFallback() { drawShipsFallback(null,true); }
     private void drawShipsFallback(CombatViewBounds view) {
