@@ -2789,7 +2789,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Hulls and physical hardpoint hardware share the interpolated combat
         // camera. Weapon discharge is still emitted by authoritative Battle.
         if(capitalTurrets!=null)
-            capitalTurrets.render(battle,batch,renderPoses,view,battleCamera.zoom);
+            capitalTurrets.render(battle,batch,renderPoses,view,
+                    battleCamera.zoom,this::hullOpticallyVisible);
         // A source-art-only photograph: the real battle surface shader,
         // cached armor peel and fitted hardpoints have already been rendered.
         // Do NOT obscure that evidence with HUD, beams, glow or hit particles.
@@ -2810,7 +2811,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Shield contact arcs and plating sparks are tied to real protection
         // losses; no overlay appears for misses or cosmetic-only weapon events.
         hitRenderer.render(hitFeedback,shapes,battleCamera,view);
-        shieldFxRenderer.render(shieldFx,shapes,battleCamera,renderPoses,view);
+        shieldFxRenderer.render(shieldFx,shapes,battleCamera,renderPoses,
+                view,this::hullOpticallyVisible);
         // Damage is rendered by the ship's irregular alpha peel mask.
         // Do not overlay the obsolete bright orange per-cell diagnostics.
         if (weatherVfx != null) weatherVfx.above(shapes,batch,battleCamera,battle.weather());
