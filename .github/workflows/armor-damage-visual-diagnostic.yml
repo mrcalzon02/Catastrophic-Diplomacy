@@ -14,6 +14,7 @@ on:
       - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
       - 'game/src/main/java/diplomacy/client/CombatHitRenderer.java'
       - 'game/src/main/java/diplomacy/client/CombatLightingRenderer.java'
+      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageImageMasks.java'
       - 'game/src/test/java/diplomacy/client/CombatHitFeedbackTest.java'
       - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageCaptureTest.java'

@@ -180,6 +180,17 @@ final class ModularWeaponFxRenderer implements Disposable {
                 width,height,1f,1f,angle);
     }
 
+    /** The curated IMPACT cells include their own bright spikes. Shrink only
+     * these source-art impact stamps, never the in-flight payload, FIRING stage,
+     * physical collision or permanent 96px armor signature. */
+    static float impactStageScale(String weapon,Battle.VisualPhase phase){
+        if(phase!=Battle.VisualPhase.IMPACT&&
+                phase!=Battle.VisualPhase.INTERCEPT)return 1f;
+        Battle.DamageType family=CombatHitFeedback.weaponKind(weapon);
+        if(family==Battle.DamageType.PLASMA)return .33f;
+        if(family==Battle.DamageType.KINETIC)return .55f;
+        return 1f;
+    }
     /**
      * This stage is driven strictly by simulation tick, including when paused.
      * Rendering multiple frames per tick does not speed up animation.
@@ -217,13 +228,13 @@ final class ModularWeaponFxRenderer implements Disposable {
                     event.targetY()-event.y(),event.targetX()-event.x()));
             diplomacy.sim.LaserFamilies.Type laser=
                     diplomacy.sim.LaserFamilies.fromWeapon(event.weapon());
-            float size=laser==null?1f:switch(laser){
+            float size=(laser==null?1f:switch(laser){
                 case PULSE -> 1f;
                 case RAPID -> .72f;
                 case LANCE -> 1.25f;
                 case OVERDRIVE -> 1.35f;
                 case NEEDLE -> .62f;
-            };
+            })*impactStageScale(event.weapon(),event.phase());
             if(laser!=null){
                 var tint=CombatLightingRenderer.laserColor(laser);
                 batch.setColor(tint.r,tint.g,tint.b,1);

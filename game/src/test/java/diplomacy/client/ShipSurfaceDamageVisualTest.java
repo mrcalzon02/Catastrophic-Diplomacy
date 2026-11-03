@@ -100,6 +100,16 @@ public final class ShipSurfaceDamageVisualTest {
                 CombatHitRenderer.sparkOpacityScale(diplomacy.sim.Battle.DamageType.PLASMA)
                         <=.42f,
                 "Plasma and kinetic spark spokes must not imitate broad emissive halos");
+        check(ModularWeaponFxRenderer.impactStageScale("PLASMA",
+                        diplomacy.sim.Battle.VisualPhase.IMPACT)<=.33f&&
+                ModularWeaponFxRenderer.impactStageScale("KINETIC",
+                        diplomacy.sim.Battle.VisualPhase.IMPACT)<=.55f,
+                "Authored impact-flash sprite must not dwarf the actual puncture");
+        check(ModularWeaponFxRenderer.impactStageScale("PLASMA",
+                        diplomacy.sim.Battle.VisualPhase.FIRE)==1f&&
+                ModularWeaponFxRenderer.impactStageScale("KINETIC",
+                        diplomacy.sim.Battle.VisualPhase.FIRE)==1f,
+                "Localized impact adjustment must never shrink muzzle or projectile art");
         check(ShipSurfaceLighting.FRAGMENT.contains("float peak=max(strikeLight.r,")&&
                 ShipSurfaceLighting.FRAGMENT.contains("0.12/max(peak,0.0001)")&&
                 ShipSurfaceLighting.FRAGMENT.contains("attenuation*attenuation*attenuation"),
