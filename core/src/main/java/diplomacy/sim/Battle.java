@@ -1500,7 +1500,7 @@ public final class Battle {
         double distance=StrictMath.hypot(track.x-observer.x,track.y-observer.y);
         return age*3+distance*.045;
     }
-    private ContactTrack newestValidTrack(Ship observer){
+    ContactTrack newestValidTrack(Ship observer){
         if(observer.power<=3||observer.sensorsCondition<=.05
                 ||observer.crewReadiness()<.05)return null;
         ContactTrack best=null;
@@ -2639,7 +2639,7 @@ public final class Battle {
      * CAP all racks retain the original common fleet target. */
     /** Expensive CAP electronics stop providing parallel tracking when their
      * actual sensor circuits or reactor are disabled. Baseline stays at one. */
-    private static int operationalTargetCapacity(Ship ship){
+    static int operationalTargetCapacity(Ship ship){
         if(ship.power<=3||ship.sensorsCondition<=.05||
                 ship.crewReadiness()<.05)return 1;
         int hardware=ship.network.targetCapacity();
