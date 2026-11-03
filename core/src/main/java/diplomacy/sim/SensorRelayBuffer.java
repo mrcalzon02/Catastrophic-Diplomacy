@@ -12,6 +12,13 @@ public final class SensorRelayBuffer {
     public static final int MAX_TARGETS=32;
     public static final int REPORTS_PER_TARGET=32;
     private final Track[] tracks=new Track[MAX_TARGETS];
+    /** Incremental identity includes real transmissions without rescanning
+     * every queued packet for each LAN replay fingerprint. */
+    private long replayHash=0xcbf29ce484222325L;
+    public long fingerprint(){return replayHash;}
+    private void hash(long part){
+        replayHash=(replayHash^part)*0x100000001b3L;
+    }
     private static final class Track {
         final int targetId;
         final long[] sentTicks=new long[REPORTS_PER_TARGET];
@@ -62,6 +69,12 @@ public final class SensorRelayBuffer {
         if(ring==null||ring.targetId!=targetId)
             tracks[chosen]=ring=new Track(targetId);
         ring.append(sentTick,received);
+        hash(targetId);hash(sentTick);hash(received.emittedTick());
+        hash(received.measuredTick());hash(received.channels());
+        hash(Double.doubleToLongBits(received.sample().x()));
+        hash(Double.doubleToLongBits(received.sample().y()));
+        hash(Double.doubleToLongBits(received.sample().vx()));
+        hash(Double.doubleToLongBits(received.sample().vy()));
     }
     /** Read-only physical delivery, never a weapon lock by itself. */
     public SensorLightTimeHistory.Observation delivered(
