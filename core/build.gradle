@@ -188,7 +188,7 @@ tasks.register('ordnanceSeekerPhotonSmoke', JavaExec) {
 }
 tasks.register('sensorNetworkSmoke', JavaExec) {
     dependsOn(tasks.named('ordnanceSeekerPhotonSmoke'))
-    dependsOn(tasks.named('ordnanceSeekerSmoke'))
+    dependsOn('ordnanceSeekerSmoke')
     dependsOn(tasks.named('rocketTrajectorySmoke'))
     dependsOn(tasks.named('sensorLeadProjectionSmoke'))
     dependsOn(tasks.named('beamRaySmoke'))
