@@ -1,6 +1,6 @@
 # Light-minute battlefield, probabilistic target seeking and physical aim error
 
-**Implementation underway • 2026-11-03 • Stages 0–2 include sublight geometry, light-time history and measured-time signatures. Operational scanning, causal STANDARD targeting, sender-origin SHR/LNK packet delivery and first finite kinetic compute are integrated. Full physical beams, guided-seeker prediction, UI and 200v200 balance remain outstanding.**
+**Implementation underway • 2026-11-03 • Stages 0–2 include sublight geometry, light-time history and measured-time signatures. Operational scanning, causal STANDARD targeting, sender-origin SHR/LNK delivery, finite kinetic compute, target-leading pips and first physically intersecting main beams are integrated. Guided seeker prediction, actual beam photon flight-time, persistent scan UI and 200v200 balance remain outstanding.**
 
 ## Design intent
 
@@ -453,14 +453,35 @@ visual overlays and balance tables are diagnostics.
    contacts alone still must not silently grant automatic lock authorization.
 
 **Implementation status:** Geometry, bounded historical photon arrivals,
-temporal signatures, operating scan doctrines, causal STANDARD contact
-authorization, real SHR and LNK sender-origin packet transport, deterministic
-kinetic prediction and first finite kinetic compute allocation are committed.
-Historical signatures and LNK transport passed focused Java 17 tests.
-The finite compute budget passed `:core:sensorComputeBudgetSmoke` in
-GitHub Actions run 41703851652 (actual Gradle `BUILD SUCCESSFUL`).
-This verifies work limits, CAP separation, power loss and deterministic
-allocation, not final balance or 200v200 performance. Physical beam/rocket/
-guided-target solutions, shared inter-ship compute, controls, persistence
-and large-scale endurance remain unfinished. Only actual functional
-failures should gate builds, not cosmetics or balance measurements.
+temporal signatures, scan doctrines, causal STANDARD contacts, real SHR/LNK
+packets and finite kinetics compute are committed and functional-tested.
+`SensorLeadProjection` now exposes read-only target intercept positions,
+contact-age uncertainty and line-of-flight predictions from measured
+position/velocity. The existing tactical sensor overlay shows up to eight
+lead pips and three unguided trajectories, including stale TRK/LNK fixes;
+beam-only viewers still get a positional prediction, not a fictional
+unguided flight line. These are estimates, NOT enemy future truth or
+guaranteed hit points.
+
+Main-ship LAS/PLA/PAR now emit rays toward deterministic historical
+targeting solutions and damage the first truly intersected enemy hull
+using finite physical collision silhouettes; near misses cannot damage
+and slightly incorrect rays can strike a hull edge. First live tests
+passed 6/6 laser, 4/4 plasma and 3/3 particle ray/impact parity on
+high-acuity stationary-target fixtures (run 41707913126); these are not
+ordinary combat hit-rate figures. Main beam delivery remains instant
+in the current damage engine: photon time-of-flight is NOT yet queued.
+Point-defense and fighter beam timing remain separate. Dumbfire rocket
+salvos now freeze their aim from a delayed track and a finite
+pre-salvo computation allocation rather than the present target state;
+their launch-time regression was updated to wait for photon arrival,
+and final combined tests remain to be verified.
+
+**Still pending:** full 200v200 balance/performance, maneuver covariance,
+FCM shared compute arbitration, guided missile seeker reacquisition,
+beam light-time delivery, detailed rocket boost/coast time-of-flight
+prediction in the HUD, authoritative historical ECM lock factors and
+saved scan doctrine controls. The geometry, pip and beam integration
+tests are functional; visual presentation and hit-rate tuning are
+diagnostic only. Do not treat an advisory CI wrapper's success as proof
+if its underlying Gradle test fails; check test output directly.
