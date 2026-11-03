@@ -401,6 +401,8 @@ public final class Battle {
         public int targetId;
         /** vx/vy are world-units/second, never normalized heading components. */
         public double x, y, vx, vy, fuel, damage, integrity, propellant;
+        /** Physical body position at the start of the current 30Hz step. */
+        public double previousX,previousY;
         public final boolean torpedo;
         public final ProjectileModel.Spec spec;
         public final double guidanceQuality;
@@ -459,7 +461,8 @@ public final class Battle {
                 boolean heavy,ProjectileModel.Spec profile,double launchGuidance,
                 OrdnanceDoctrine.Payload launchPayload,int ignitionTicks,
                 AmmunitionTable.Warhead warheadType) {
-            this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;torpedo=heavy;
+            this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;
+            previousX=sx;previousY=sy;torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
@@ -502,6 +505,7 @@ public final class Battle {
         public final double vx,vy,damage;
         public final AmmunitionTable.Kinetic ammunition;
         public double x,y,life,integrity;
+        public double previousX,previousY;
         Ballistic(long id,long firedAt,int source,int side,int target,
                   double px,double py,double heading,double amount,ProjectileModel.Spec profile){
             this(id,firedAt,source,side,target,px,py,heading,amount,profile,
@@ -514,7 +518,8 @@ public final class Battle {
             AmmunitionTable.kinetic(type);ammunition=type;
             spec=profile;
             visualId=id;spawnTick=firedAt;sourceId=source;team=side;targetId=target;
-            x=px;y=py;vx=profile.speed()*StrictMath.cos(heading);
+            x=px;y=py;previousX=px;previousY=py;
+            vx=profile.speed()*StrictMath.cos(heading);
             vy=profile.speed()*StrictMath.sin(heading);
             life=StrictMath.min(BattleArena.MAX_BALLISTIC_SECONDS,
                     StrictMath.max(1.5,760.0/profile.speed()));
@@ -532,6 +537,7 @@ public final class Battle {
         public final ProjectileModel.Spec spec;
         public final double heading,damage,sustainedThrustFactor;
         public double x,y,vx,vy,life=7.5,integrity;
+        public double previousX,previousY;
         public int flightTicks;
         Rocket(long id,long start,Ship source,RocketBarrage.Rack rack,
                int aimedAt,double px,double py,double bearing){
@@ -539,7 +545,7 @@ public final class Battle {
             targetId=aimedAt;size=rack.size;motor=rack.motor;
             spec=rack.body;damage=rack.damage;
             sustainedThrustFactor=rack.sustainedThrustFactor;
-            x=px;y=py;heading=bearing;
+            x=px;y=py;previousX=px;previousY=py;heading=bearing;
             vx=StrictMath.cos(heading)*78;vy=StrictMath.sin(heading)*78;
             integrity=spec.health();
         }
@@ -790,6 +796,12 @@ public final class Battle {
         if(tick!=0)throw new IllegalStateException("Configure flak before combat");
         flakFragmentFalloff=enabled;
     }
+    /** A/B world-space swept crossing vs current moving-target endpoint.
+     * Opt-in for research ONLY; mechanics are unchanged in production. */
+    public void configureRailRelativeSweepForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException("Configure rail collision before combat");
+        diagnosticRailRelativeSweep=enabled;
+    }
     /** Compare per-socket optical allocations to the old duplicate targeting.
      * This opt-in switch is only legal before the first simulation tick. */
     public void configurePrecisionReservationsForDiagnostic(boolean enabled){
@@ -815,6 +827,8 @@ public final class Battle {
      * Verified against aircraft, swarms, fast shells and armored torpedoes;
      * a pre-battle laboratory override retains the old uniform-density A/B. */
     private boolean flakFragmentFalloff=true;
+    /** Opt-in A/B geometry; changing it never modifies projectile speed. */
+    private boolean diagnosticRailRelativeSweep;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -1492,6 +1506,12 @@ public final class Battle {
         updateTenderSupport();
         updateQueuedLaunches();
         updateRocketLaunches();
+        // Snapshot real physical bodies before advancing all weapons.
+        // Diagnostic swept relative intersections need BOTH endpoints, not
+        // only a fast incoming body's end-of-tick position.
+        for(Missile body:missiles){body.previousX=body.x;body.previousY=body.y;}
+        for(Rocket body:rockets){body.previousX=body.x;body.previousY=body.y;}
+        for(Ballistic body:ballistics){body.previousX=body.x;body.previousY=body.y;}
         updateMissiles();
         updateRockets();
         updateBallistics();
@@ -3623,6 +3643,23 @@ public final class Battle {
         return Math.max(0,Math.min(1,(-(dx*ox+dy*oy)-StrictMath.sqrt(discriminant))/a));
     }
 
+    /** Exact swept relative flight for TWO moving bodies in the same tick.
+     * Translate the projectile by the target's measured linear displacement.
+     * An end-of-tick point-only check misses genuine high-speed crossings. */
+    static double movingProjectileEntry(double shotX,double shotY,
+                                        double nextShotX,double nextShotY,
+                                        double targetOldX,double targetOldY,
+                                        double targetNewX,double targetNewY,
+                                        double tickFraction,double radius){
+        if(!Double.isFinite(tickFraction)||tickFraction<0||tickFraction>1||
+                !Double.isFinite(radius)||radius<=0)
+            throw new IllegalArgumentException("Invalid swept projectile frame");
+        double finishX=targetOldX+(targetNewX-targetOldX)*tickFraction;
+        double finishY=targetOldY+(targetNewY-targetOldY)*tickFraction;
+        return segmentHit(shotX-targetOldX,shotY-targetOldY,
+                nextShotX-finishX,nextShotY-finishY,0,0,radius);
+    }
+
     /** Entirely inertial flight, after straight-line acceleration. No seeker
      * update, target telemetry, retroburn, homing, or impact oracle. */
     private void updateRockets(){
@@ -4202,28 +4239,44 @@ public final class Battle {
             for(Missile target:missiles){
                 if(target.team==shot.team)continue;
                 double radius=.75+1.65*StrictMath.sqrt(target.spec.crossSection());
-                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                double at=diagnosticRailRelativeSweep?
+                        movingProjectileEntry(shot.x,shot.y,nx,ny,
+                                target.previousX,target.previousY,
+                                target.x,target.y,dt/DT,radius):
+                        segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
                 if(at<first){first=at;missileHit=target;
                     rocketHit=null;shellHit=null;craftHit=null;}
             }
             for(Rocket target:rockets){
                 if(target.team==shot.team)continue;
                 double radius=.75+1.65*StrictMath.sqrt(target.spec.crossSection());
-                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                double at=diagnosticRailRelativeSweep?
+                        movingProjectileEntry(shot.x,shot.y,nx,ny,
+                                target.previousX,target.previousY,
+                                target.x,target.y,dt/DT,radius):
+                        segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
                 if(at<first){first=at;rocketHit=target;
                     missileHit=null;shellHit=null;craftHit=null;}
             }
             for(Ballistic target:ballistics){
                 if(target.team==shot.team)continue;
                 double radius=.55+1.15*StrictMath.sqrt(target.spec.crossSection());
-                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                double at=diagnosticRailRelativeSweep?
+                        movingProjectileEntry(shot.x,shot.y,nx,ny,
+                                target.previousX,target.previousY,
+                                target.x,target.y,dt/DT,radius):
+                        segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
                 if(at<first){first=at;shellHit=target;
                     missileHit=null;rocketHit=null;craftHit=null;}
             }
             for(Craft target:crafts){
                 if(target.team==shot.team)continue;
                 double radius=3.5+2.5*StrictMath.sqrt(target.radarProfile().crossSection());
-                double at=segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
+                double at=diagnosticRailRelativeSweep?
+                        movingProjectileEntry(shot.x,shot.y,nx,ny,
+                                target.lastObservedX,target.lastObservedY,
+                                target.x,target.y,dt/DT,radius):
+                        segmentHit(shot.x,shot.y,nx,ny,target.x,target.y,radius);
                 if(at<first){first=at;craftHit=target;
                     missileHit=null;rocketHit=null;shellHit=null;}
             }

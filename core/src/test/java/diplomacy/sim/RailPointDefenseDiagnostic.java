@@ -96,8 +96,14 @@ public final class RailPointDefenseDiagnostic {
     private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
                                int mounts,int seed,boolean enabled,
                                double separation,double offset){
+        return trial(tech,threat,tier,mounts,seed,enabled,separation,offset,false);
+    }
+    private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
+                               int mounts,int seed,boolean enabled,
+                               double separation,double offset,boolean relativeSweep){
         Battle battle=new Battle(190031L+seed*127L+tier*29L+mounts*43L+
                 threat.ordinal()*307L);
+        battle.configureRailRelativeSweepForDiagnostic(relativeSweep);
         Battle.Ship attacker=battle.addShip(0,Battle.Faction.TERRAN,
                 365-separation,300+offset);
         battle.spawnWing(1,fitted(tech,tier,mounts),tech,1,365,300);
@@ -302,10 +308,77 @@ public final class RailPointDefenseDiagnostic {
                 " nonpositive figures are diagnostically important, not test"+
                 " failures. Physical aim, detection, ammo, power and thermal"+
                 " constraints remain enabled.\n\n");
+        // Ground-truth geometry: a projectile moving across a target's path
+        // MUST intersect its real mid-tick trajectory even if the target is
+        // nowhere near the projectile at the end of the tick.
+        require(Double.isFinite(Battle.movingProjectileEntry(
+                0,0,10,0,5,-5,5,5,1,1)),
+                "Swept moving-body collision missed the actual crossing");
+        require(!Double.isFinite(Battle.movingProjectileEntry(
+                0,0,10,0,5,5,5,6,1,1)),
+                "Moving collision fabricated an off-path interception");
+        List<String> movingRows=new ArrayList<>();
+        movingRows.add("threat,rank,mounts,distance,lateral,seeds,"+
+                "legacy_shots,swept_shots,legacy_physical_hits,"+
+                "swept_physical_hits,legacy_kills,swept_kills,"+
+                "legacy_actual_impacts,swept_actual_impacts,"+
+                "legacy_net_damage,swept_net_damage,damage_prevention_delta");
+        report.append("\n## Actual moving-body swept collision A/B, no damage tuning\n\n");
+        report.append("The control checks each incoming body at its end-of-tick"+
+                " position. The alternative intersects BOTH travelled segments"+
+                " in relative world-space, without changing sensor limits,"+
+                " range, research, shot speed, damage, ammunition or thermal"+
+                " rules. All comparisons are seeded physical battles.\n\n");
+        report.append("|Threat|Rank|Mounts|Dist|Offset|Shots old/new|"+
+                "Kill old/new|Impact old/new|Damage avoided by sweep|\n");
+        report.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        int sweepPairs=0;
+        for(Threat threat:Threat.values())
+            for(int tier:new int[]{3,6})
+                for(int mounts:new int[]{1,4})
+                    for(int distance:new int[]{205,275})
+                        for(int offset:new int[]{0,60}){
+                            int oldShots=0,newShots=0,oldHits=0,newHits=0,
+                                    oldKills=0,newKills=0,oldImpacts=0,newImpacts=0;
+                            double oldDamage=0,newDamage=0;
+                            for(int seed=0;seed<4;seed++){
+                                Trial old=trial(tech,threat,tier,mounts,seed,true,
+                                        distance,offset,false);
+                                Trial newer=trial(tech,threat,tier,mounts,seed,true,
+                                        distance,offset,true);
+                                require(old.launched()==newer.launched(),
+                                        "Collision A/B altered physical attacking launches");
+                                oldShots+=old.fired();newShots+=newer.fired();
+                                oldHits+=old.railHits();newHits+=newer.railHits();
+                                oldKills+=old.intercepted();
+                                newKills+=newer.intercepted();
+                                oldImpacts+=old.impacts();newImpacts+=newer.impacts();
+                                oldDamage+=old.netLoss();newDamage+=newer.netLoss();
+                                sweepPairs++;
+                            }
+                            movingRows.add(String.format(Locale.ROOT,
+                                    "%s,%d,%d,%d,%d,4,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f",
+                                    threat,tier,mounts,distance,offset,oldShots,
+                                    newShots,oldHits,newHits,oldKills,newKills,
+                                    oldImpacts,newImpacts,oldDamage,newDamage,
+                                    oldDamage-newDamage));
+                            report.append(String.format(Locale.ROOT,
+                                    "|%s|%d|%d|%d|%d|%d / %d|%d / %d|%d / %d|%.1f|\n",
+                                    threat,tier,mounts,distance,offset,
+                                    oldShots,newShots,oldKills,newKills,
+                                    oldImpacts,newImpacts,oldDamage-newDamage));
+                        }
+        Files.write(root.resolve("rail-moving-body-sweep-ab.csv"),movingRows,
+                StandardCharsets.UTF_8);
+        report.append("\nMatched relative-motion physical A/B comparisons: "+
+                sweepPairs+". Numeric outcomes remain advisory. Production"+
+                " remains on the established collision model until these"+
+                " measured results justify a change.\n\n");
         Files.write(root.resolve("rail-trials.csv"),rows,StandardCharsets.UTF_8);
         Files.writeString(root.resolve("summary.md"),report);
         System.out.print(report);
         System.out.println("RAIL_PD_PAIRED_TRIALS="+paired);
         System.out.println("RAIL_PD_GEOMETRY_PAIRS="+extendedPairs);
+        System.out.println("RAIL_PD_SWEEP_AB_PAIRS="+sweepPairs);
     }
 }
