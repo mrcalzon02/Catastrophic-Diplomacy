@@ -3,6 +3,11 @@
 name: Manual verified three-platform release
 on:
   workflow_dispatch:
+  # Only a deliberate change to this request file can queue a full package build.
+  push:
+    branches: [main]
+    paths:
+      - .github/release-request.json
 
 permissions:
   contents: write
