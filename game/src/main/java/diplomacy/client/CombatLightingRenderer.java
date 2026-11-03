@@ -31,6 +31,7 @@ final class CombatLightingRenderer implements Disposable {
     private final float[] hotX=new float[MAX_HOT_METAL_LIGHTS];
     private final float[] hotY=new float[MAX_HOT_METAL_LIGHTS];
     private final float[] hotRadius=new float[MAX_HOT_METAL_LIGHTS];
+    private final float[] flashX=new float[48],flashY=new float[48],flashR=new float[48];
     private final CombatLightingModel timeline = new CombatLightingModel();
     private final Texture glow;
     /** Steeper falloff only for impact/wound lights, not engines or missiles. */
@@ -393,7 +394,6 @@ final class CombatLightingRenderer implements Disposable {
         // a ship. Use small, steep, low-alpha flashes instead. Multiple hits
         // at the same coordinate share a single visual glow per rendered frame.
         int flashLights=0;
-        final float[] flashX=new float[48],flashY=new float[48],flashR=new float[48];
         for (CombatLightingModel.Flash flash : timeline.flashes()) {
             if(flashLights>=48)break;
             Battle.VisualEvent e=flash.event();
