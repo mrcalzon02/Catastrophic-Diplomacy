@@ -117,18 +117,18 @@ final class ShipSurfaceLighting implements Disposable {
     /** One additional texture read only for damaged ships at tactical LOD.
      * Intact vessels retain the original cheap flat rendering path. */
     static final String FLAT_DAMAGE_FRAGMENT =
-        "#ifdef GL_ES\\nprecision mediump float;\\n#endif\\n"+
-        "varying vec4 v_color;\\n"+
-        "varying vec2 v_uv;\\n"+
-        "uniform sampler2D u_texture;\\n"+
-        "uniform sampler2D u_damage;\\n"+
-        "void main(){\\n"+
-        " vec4 albedo=texture2D(u_texture,v_uv);\\n"+
-        " vec4 peel=texture2D(u_damage,v_uv);\\n"+
-        " albedo.rgb*=1.0-0.54*peel.r;\\n"+
-        " albedo.a*=peel.a*v_color.a;\\n"+
-        " gl_FragColor=albedo;\\n"+
-        "}\\n";
+        "#ifdef GL_ES\nprecision mediump float;\n#endif\n"+
+        "varying vec4 v_color;\n"+
+        "varying vec2 v_uv;\n"+
+        "uniform sampler2D u_texture;\n"+
+        "uniform sampler2D u_damage;\n"+
+        "void main(){\n"+
+        " vec4 albedo=texture2D(u_texture,v_uv);\n"+
+        " vec4 peel=texture2D(u_damage,v_uv);\n"+
+        " albedo.rgb*=1.0-0.54*peel.r;\n"+
+        " albedo.a*=peel.a*v_color.a;\n"+
+        " gl_FragColor=albedo;\n"+
+        "}\n";
     private static final class Pair {
         final Texture normal,emissive;
         Pair(Texture normal,Texture emissive){this.normal=normal;this.emissive=emissive;}
