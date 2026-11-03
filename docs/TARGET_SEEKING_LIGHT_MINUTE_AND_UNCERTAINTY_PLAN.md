@@ -482,11 +482,33 @@ photon arrival. Focused run 41708998332 verified `:core:beamRaySmoke`,
 This proves Java simulation and client compilation, NOT on-device HUD rendering,
 Android package signing, or final combat balance.
 
+**Rocket flight-time prediction integrated:** `RocketBarrage.nextSpeed`
+is now the shared fixed-step motor law for real unguided rocket bodies and
+`RocketTrajectoryPrediction`. Boost/coast, sustained burn, fitted size,
+research-stage thrust and the actual 7.5-second body lifetime drive a
+bounded numerical intercept estimate. A historical contact's age/velocity,
+not current enemy coordinates, determines the proposed rocket bearing;
+the real salvo retains finite compute dispersion and never changes direction
+after trigger. The HUD's rocket-mode pips use the same motor-specific
+prediction, and unreachable targets receive a caution-colored pip with
+no fictitious successful trajectory line. A dedicated smoke trial covers
+16 size/motor/research combinations plus real distance/ETA parity and
+no-intercept behavior.
+
+**Workflow verification policy:** the existing no-package PD/flak workflow
+now separates required Java functional tests and game client compilation
+from optional PD fighter-wave balance reports. Actual Gradle failures in
+`weaponMuzzleSmoke`, `sensorNetworkSmoke`, `rocketBarrageSmoke`
+and `:game:compileJava` are release-significant objective failures,
+not advisory successes. PD/flak balance remains diagnostic only.
+The new focused Java check first ran on commit `c4fdb8f` (Actions
+41710225241); verify the actual task output and full job conclusion
+rather than assuming a green balance wrapper implies functional success.
+
 **Still pending:** full 200v200 balance/performance, maneuver covariance,
 FCM shared compute arbitration, guided missile seeker reacquisition,
-beam light-time delivery, detailed rocket boost/coast time-of-flight
-prediction in the HUD, authoritative historical ECM lock factors and
-saved scan doctrine controls. The geometry, pip and beam integration
-tests are functional; visual presentation and hit-rate tuning are
-diagnostic only. Do not treat an advisory CI wrapper's success as proof
-if its underlying Gradle test fails; check test output directly.
+beam light-time delivery, historical ECM lock factors and
+saved scan doctrine controls. The rocket prediction is a first-order
+constant-velocity TARGET hypothesis over the actual rocket throttle
+schedule, not a guarantee against target maneuvers or a guided-seeker
+future path. Visual presentation and balance tuning remain diagnostic.
