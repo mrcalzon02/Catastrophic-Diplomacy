@@ -3,6 +3,7 @@ package diplomacy.server;
 import hbnet.Hbnet;
 import diplomacy.sim.*;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.SkirmishShipExchange;
 import diplomacy.shipyard.SkirmishFleet;
 import diplomacy.shipyard.SkirmishFleetCodec;
@@ -104,6 +105,7 @@ public final class BattleServer implements AutoCloseable {
     private BattleServer(String bind,int port,long seed,SkirmishTechnologyRules rules,
                          Hbnet.Server tls,boolean trustedLan)throws Exception{
         if(rules==null)throw new IllegalArgumentException("Host match policy required");
+        HullLayouts.requireBakedHardpoints();
         this.transport=tls;this.hostRules=rules;this.matchSeed=seed;
         this.battle=null;
         this.matchRulesWire=Base64.getUrlEncoder().withoutPadding().encodeToString(
@@ -117,6 +119,7 @@ public final class BattleServer implements AutoCloseable {
                          SkirmishTechnologyRules hostRules)throws Exception{
         if(authoritativeMatch==null||hostRules==null)
             throw new IllegalArgumentException("Missing authoritative PvP battle or host rules");
+        HullLayouts.requireBakedHardpoints();
         this.transport=null;
         this.battle=authoritativeMatch;
         this.matchSeed=authoritativeMatch.seed();this.hostRules=hostRules;
@@ -136,6 +139,7 @@ public final class BattleServer implements AutoCloseable {
                          boolean trustedLan,SkirmishShipExchange.Package left,
                          SkirmishShipExchange.Package right)throws Exception{
         if(count<1||count>200)throw new IllegalArgumentException("Fleet size must be 1-200");
+        HullLayouts.requireBakedHardpoints();
         this.transport=transport;
         this.matchSeed=seed;this.hostRules=null;
         this.matchRulesWire=null; // Ordinary battle servers do not claim a PvP lobby policy.
