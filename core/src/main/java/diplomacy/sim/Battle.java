@@ -742,6 +742,9 @@ public final class Battle {
         final OrdnancePropulsion.Mode propulsion;
         final OrdnanceGuidance.Mode guidance;
         final AmmunitionTable.Warhead loadedWarhead;
+        /** Immutable contact captured when this salvo was actually authorized;
+         * subsequent salvo rounds cannot consult hidden target coordinates. */
+        SensorLightTimeHistory.Observation targetFix;
         int nextIndex;
         long nextTick;
         PendingLaunch(int source,int target,DamageType type,
@@ -3102,10 +3105,12 @@ public final class Battle {
                     resourcePermit(s,DamageType.MISSILE,-1,doctrine.ammoNeeded())){
                 s.missileReload=missile.reload(s.weapons.missileCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
-                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.MISSILE,
+                PendingLaunch salvo=new PendingLaunch(s.id,target.id,DamageType.MISSILE,
                         doctrine,tick,s.warhead(DamageType.MISSILE),
                         s.propulsionMode(DamageType.MISSILE),
-                        s.guidanceMode(DamageType.MISSILE)));
+                        s.guidanceMode(DamageType.MISSILE));
+                salvo.targetFix=firingFix;
+                launchQueue.add(salvo);
                 salvosStarted++;
                 recordResourceShot(s,DamageType.MISSILE,-1,s.missileReload);
             }
@@ -3201,10 +3206,12 @@ public final class Battle {
                     resourcePermit(s,DamageType.TORPEDO,-1,doctrine.ammoNeeded())){
                 s.torpedoReload=torpedo.reload(s.weapons.torpedoCycle(),s.weaponsCondition)
                         *doctrine.reloadMultiplier();
-                launchQueue.add(new PendingLaunch(s.id,target.id,DamageType.TORPEDO,
+                PendingLaunch salvo=new PendingLaunch(s.id,target.id,DamageType.TORPEDO,
                         doctrine,tick,s.warhead(DamageType.TORPEDO),
                         s.propulsionMode(DamageType.TORPEDO),
-                        s.guidanceMode(DamageType.TORPEDO)));
+                        s.guidanceMode(DamageType.TORPEDO));
+                salvo.targetFix=firingFix;
+                launchQueue.add(salvo);
                 salvosStarted++;
                 recordResourceShot(s,DamageType.TORPEDO,-1,s.torpedoReload);
             }
@@ -3322,10 +3329,12 @@ public final class Battle {
         for(Ship alternative:ships){
             if(alternative==primary||!alternative.alive()||
                     alternative.team==source.team)continue;
-            double distance=StrictMath.hypot(alternative.x-source.x,
-                    alternative.y-source.y);
-            if(distance>limit||!hasTargetContact(source,alternative,distance))
-                continue;
+            SensorLightTimeHistory.Observation measured=receivedContact(
+                    source,alternative,liveContactSource(source,alternative,0));
+            if(measured==null)continue;
+            double distance=StrictMath.hypot(measured.sample().x()-source.x,
+                    measured.sample().y()-source.y);
+            if(distance>limit)continue;
             if(first==null)first=alternative;
             if(seen++==index)return alternative;
         }
@@ -3345,8 +3354,12 @@ public final class Battle {
             if(rack.family!=family||rack.magazine<=0||rack.reload>0)continue;
             if(hasPendingGuided(source.id,family,rack.slot))continue;
             Ship assigned=independentRackTarget(source,target,lane++,gun.range(reach));
-            double assignedDistance=StrictMath.hypot(assigned.x-source.x,
-                    assigned.y-source.y);
+            SensorLightTimeHistory.Observation assignedFix=receivedContact(
+                    source,assigned,liveContactSource(source,assigned,0));
+            if(assignedFix==null)continue;
+            double assignedDistance=StrictMath.hypot(
+                    assignedFix.sample().x()-source.x,
+                    assignedFix.sample().y()-source.y);
             if(!gun.available(damage,ammo,assignedDistance,reach,rack.reload,
                     source.power,source.heat,source.maxHeat,
                     source.weaponsCondition,source.magazineCondition))continue;
@@ -3356,9 +3369,11 @@ public final class Battle {
             if(ammo<pattern.ammoNeeded()||rack.magazine<pattern.ammoNeeded()||
                     !resourcePermit(source,family,rack.slot,pattern.ammoNeeded()))continue;
             rack.reload=gun.reload(cycle,source.weaponsCondition)*pattern.reloadMultiplier();
-            launchQueue.add(new PendingLaunch(source.id,assigned.id,family,pattern,tick,
+            PendingLaunch salvo=new PendingLaunch(source.id,assigned.id,family,pattern,tick,
                     loaded.warhead(),loaded.guided().motor(),loaded.guided().guidance(),
-                    rack.slot));
+                    rack.slot);
+            salvo.targetFix=assignedFix;
+            launchQueue.add(salvo);
             salvosStarted++;
             recordResourceShot(source,family,rack.slot,rack.reload);
         }
@@ -3416,8 +3431,18 @@ public final class Battle {
             WeaponMuzzles.Origin muzzle=order.slotId>=0?
                     WeaponMuzzles.atSlot(source,family,order.slotId):
                     WeaponMuzzles.at(source,family,nextVisualShotId);
-            double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x())+spread;
-            double distance=StrictMath.hypot(target.y-muzzle.y(),target.x-muzzle.x());
+            // The salvo possesses its *original* received fix. Waiting for
+            // a second or sixteenth round cannot reveal the enemy's current
+            // position, even if its sensor contact has since disappeared.
+            SensorLightTimeHistory.Observation fix=order.targetFix;
+            if(fix==null){launchQueue.remove(i);continue;}
+            double age=StrictMath.max(0,tick-fix.measuredTick())*DT;
+            double predictedX=fix.sample().x()+fix.sample().vx()*age;
+            double predictedY=fix.sample().y()+fix.sample().vy()*age;
+            double angle=StrictMath.atan2(
+                    predictedY-muzzle.y(),predictedX-muzzle.x())+spread;
+            double distance=StrictMath.hypot(
+                    predictedY-muzzle.y(),predictedX-muzzle.x());
             double velocityX=StrictMath.cos(angle)*Math.max(1,distance);
             double velocityY=StrictMath.sin(angle)*Math.max(1,distance);
             double baseDamage=heavy?source.torpedoDamage:source.missileDamage;
@@ -3441,9 +3466,15 @@ public final class Battle {
             body.guidanceMode=order.guidance;
             body.approachSide=index%2==0?1:-1;
             body.setPropulsion(order.propulsion);
+            body.lastKnownX=fix.sample().x();
+            body.lastKnownY=fix.sample().y();
+            body.lastKnownVX=fix.sample().vx();
+            body.lastKnownVY=fix.sample().vy();
+            body.lastObservationTick=fix.measuredTick();
             missiles.add(body);
             visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
-                    source.team,source.id,target.id,muzzle.x(),muzzle.y(),target.x,target.y);
+                    source.team,source.id,target.id,muzzle.x(),muzzle.y(),
+                    predictedX,predictedY);
             if(++order.nextIndex>=order.pattern.count())launchQueue.remove(i);
             else order.nextTick=tick+order.pattern.intervalTicks();
         }
@@ -6104,6 +6135,13 @@ public final class Battle {
             hash=mix(hash,pending.loadedWarhead.ordinal());
             hash=mix(hash,pending.nextIndex);
             hash=mix(hash,pending.nextTick);
+            if(pending.targetFix!=null){
+                hash=mix(hash,pending.targetFix.measuredTick());
+                hash=mix(hash,Double.doubleToLongBits(pending.targetFix.sample().x()));
+                hash=mix(hash,Double.doubleToLongBits(pending.targetFix.sample().y()));
+                hash=mix(hash,Double.doubleToLongBits(pending.targetFix.sample().vx()));
+                hash=mix(hash,Double.doubleToLongBits(pending.targetFix.sample().vy()));
+            }
         }
         hash=mix(hash,decoysLaunched);
         hash=mix(hash,decoysIntercepted);
