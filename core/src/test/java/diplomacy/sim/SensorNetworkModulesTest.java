@@ -203,7 +203,7 @@ public final class SensorNetworkModulesTest {
         tracker.network=Shipyard.fit(combined,catalog).network();
         listener.network=Shipyard.fit(fit(bare,"LNK"),catalog).network();
         tracker.sensorRange=700;listener.sensorRange=0;
-        trackBattle.step();
+        for(int i=0;i<12;i++)trackBattle.step();
         require(tracker.knownTracks.containsKey(fugitive.id),
                 "TRK must remember an actual previously observed contact");
         Battle.ContactTrack passed=trackBattle.newestValidTrack(listener);
