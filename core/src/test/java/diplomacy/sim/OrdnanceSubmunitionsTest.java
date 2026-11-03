@@ -38,10 +38,18 @@ public final class OrdnanceSubmunitionsTest {
         }
         return b;
     }
+    /** Launch requires an actually received original targeting solution.
+     * Stepping exactly once no longer manufactures sensor knowledge. */
+    private static void awaitAuthorizedLaunch(Battle battle,int ticks){
+        for(int i=0;i<ticks&&battle.ships().get(0).launched==0;i++)
+            battle.step();
+        check(battle.ships().get(0).launched>0,
+                "Cluster dispenser never launched after causal sensor contact");
+    }
     private static void deploy(OrdnanceDoctrine.Mode mode,boolean torpedo){
         Battle b=scene(mode,torpedo,false);
         Battle.Ship source=b.ships().get(0);
-        b.step();
+        awaitAuthorizedLaunch(b,80);
         source.missileReload=source.torpedoReload=10000;
         int carrierCount=mode==OrdnanceDoctrine.Mode.CASCADE_SWARM?4:1;
         int expected=carrierCount*6;
@@ -88,7 +96,7 @@ public final class OrdnanceSubmunitionsTest {
     private static void interception(){
         Battle b=scene(OrdnanceDoctrine.Mode.CLUSTER_CARRIER,false,true);
         Battle.Ship source=b.ships().get(0);
-        b.step();
+        awaitAuthorizedLaunch(b,80);
         source.missileReload=10000;
         for(int i=0;i<40;i++)b.step();
         check(b.carriersSplit==0 && b.submunitionsDeployed==0,
