@@ -86,8 +86,20 @@ public final class RailPointDefense {
         if(ship.power<=6||ship.crewReadiness()<.05)return 0;
         double radarHorizon=StrictMath.min(mount.nominalRange,
                 ship.sensorRange*(.25+.035*StrictMath.min(2,ship.sensorAcuity)));
-        return ProjectileModel.acquisitionRange(radarHorizon,
+        // Coherent pulse-Doppler processing is this railgun sensor's
+        // distinguishing high-closing-speed channel. Fast compact solids
+        // have weak cross-sections but produce strong measured frequency
+        // shifts; finite coherent processing recovers part of that signal.
+        // Never evade current sensor damage, interference or emitter limits.
+        double doppler=1+.75*StrictMath.max(0,StrictMath.min(1,
+                (target.speed()-180)/100.0));
+        double echo=ProjectileModel.acquisitionRange(radarHorizon,
                 ship.sensorsCondition,weather,mount.profile,target,emission);
+        double hardwareLimit=radarHorizon*
+                StrictMath.max(0,StrictMath.min(1,ship.sensorsCondition))*
+                StrictMath.max(0,StrictMath.min(2.5,weather))*
+                mount.profile.detectionMultiplier();
+        return StrictMath.min(hardwareLimit,echo*doppler);
     }
     /** Two-step physical lead prediction, not a guaranteed collision.
      * The projectile keeps this launch bearing after electromagnetic exit. */
