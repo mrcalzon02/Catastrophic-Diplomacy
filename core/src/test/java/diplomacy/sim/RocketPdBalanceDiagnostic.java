@@ -96,6 +96,13 @@ public final class RocketPdBalanceDiagnostic {
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
                               boolean evasive,boolean pdOnline,int seed,double pressure,
                               double acquisitionScale,boolean coordinated) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,
+                seed,pressure,acquisitionScale,coordinated,tier);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure,
+                              double acquisitionScale,boolean coordinated,int defenderTier) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
@@ -105,7 +112,7 @@ public final class RocketPdBalanceDiagnostic {
         if(pdOnline&&!coordinated)
             battle.configurePrecisionReservationsForDiagnostic(false);
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
-        Shipyard.Design defensive=fitting(catalog,"PD",modules,tier,true);
+        Shipyard.Design defensive=fitting(catalog,"PD",modules,defenderTier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
         battle.spawnWing(1,defensive,catalog,1,200+LAUNCH_RANGE,300);
         Battle.Ship attacker=battle.ships().get(0),defender=battle.ships().get(1);
@@ -419,6 +426,50 @@ public final class RocketPdBalanceDiagnostic {
                 "mounts, without modifying accuracy, firing cycles or armor. "+
                 "The A/B rows are paired seeded physical battles; interpret "+
                 "terminal-zone leakage and impacts separately from kills.\n");
+        // Attack hardware and defending research must be genuinely installed
+        // at the named levels. No stage-IX PD versus legacy unlicensed
+        // launcher can masquerade as an IX/IX stage parity test.
+        detail.append("\n## Real rocket-versus-PD cross-tier parity (advisory)\n\n");
+        detail.append("|Attacker rank|Defender rank|Motor|Moving|PD lock scale|Rockets|"+
+                "Intercepted|Escaped %|Terminal %|Impacts|PD shots|\n");
+        detail.append("|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|\n");
+        List<String> crossTierRows=new ArrayList<>();
+        crossTierRows.add("attack_stage,defense_stage,motor,moving,lock_scale,launched,"+
+                "intercepted,escaped,escape_fraction,terminal_entries,"+
+                "terminal_fraction,impacts,pd_shots,acquisitions");
+        for(int attacking:new int[]{0,9})
+            for(int defending:new int[]{0,9})
+                for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+                    for(boolean moving:new boolean[]{false,true})
+                        for(double scale:new double[]{1.0,1.60}){
+                            int launched=0,killed=0,inner=0,impacts=0,shots=0,acquisitions=0;
+                            int barrage=attacking==0?4:16;
+                            for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                                Sample trial=run(tech,RocketBarrage.Size.SIEGE,
+                                        attacking,4,barrage,motor,moving,
+                                        true,seed,0,scale,true,defending);
+                                launched+=trial.launched();killed+=trial.intercepted();
+                                inner+=trial.terminalEntries();impacts+=trial.collided();
+                                shots+=trial.pdShots();acquisitions+=trial.acquisitions();
+                            }
+                            double escaped=launched==0?0:(launched-killed)/(double)launched;
+                            double entry=launched==0?0:inner/(double)launched;
+                            crossTierRows.add(String.format(Locale.ROOT,
+                                    "%d,%d,%s,%s,%.2f,%d,%d,%d,%.6f,%d,%.6f,%d,%d,%d",
+                                    attacking,defending,motor,moving,scale,
+                                    launched,killed,launched-killed,escaped,
+                                    inner,entry,impacts,shots,acquisitions));
+                            detail.append(String.format(Locale.ROOT,
+                                    "|%d|%d|%s|%s|%.2f|%d|%d|%.1f%%|%.1f%%|%d|%d|\n",
+                                    attacking,defending,motor,moving,scale,
+                                    launched,killed,escaped*100,entry*100,impacts,shots));
+                        }
+        Files.write(output.resolve("real-cross-tier-rockets.csv"),
+                crossTierRows,StandardCharsets.UTF_8);
+        detail.append("\nThis deliberately tests four actual attacking/defending "+
+                "research pairs (0/0, IX/IX, IX/0, 0/IX), with equal four "+
+                "socket counts, finite real rocket stock and 3 same-attack-seed "+
+                "trials per row. It is NOT a final tuned balance specification.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
