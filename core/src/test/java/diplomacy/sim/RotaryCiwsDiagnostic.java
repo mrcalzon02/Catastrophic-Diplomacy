@@ -147,7 +147,10 @@ public final class RotaryCiwsDiagnostic {
             battle.spawnWing(0,rocketBattery(catalog),catalog,1,180,300);
             attacker=battle.ships().get(0);
         }else if(threat==Threat.FIGHTER_INTERCEPTOR){
-            battle.spawnWing(0,fighterSource(catalog),catalog,1,235,300);
+            // A fighter at its normal standoff distance can remain OUTSIDE
+            // the RCW close-in envelope. For an anti-craft firing mechanic
+            // check, launch within fitted sensor reach, not beyond it.
+            battle.spawnWing(0,fighterSource(catalog),catalog,1,300,300);
             attacker=battle.ships().get(0);
         }else attacker=battle.addShip(0,Battle.Faction.TERRAN,
                 threat==Threat.DRONE?288:180,300);
