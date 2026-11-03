@@ -22,6 +22,32 @@ public final class ShipSurfaceDamageVisualTest {
                 "Native-96 wound runtime overlay must report correct 2x-axis memory");
         check(ShipDamageImageMasks.SIZE==96 && ShipDamageImageMasks.COUNT==6,
                 "Live authored wound source must provide six 96px frames per family");
+        // One pixel of actual cutout in a 96px source used to disappear
+        // when resampled into 192x288 ship coefficient textures.
+        // Recovery must follow the authored hole and MUST NOT cross into
+        // the next variant or edit the underlying 96px material artwork.
+        int width=96*2;
+        int[] sourceCutouts=new int[96*width];
+        java.util.Arrays.fill(sourceCutouts,0x123456ff);
+        int originalIndex=47*width+94;
+        sourceCutouts[originalIndex]=0x12345614;
+        int[] opened=ShipDamageImageMasks.recoverCutoutAlpha(sourceCutouts,96,2,5);
+        check(sourceCutouts[originalIndex]==0x12345614,
+                "Cutout recovery must never mutate the original authored frame");
+        int widened=0;
+        for(int y=0;y<96;y++)for(int x=0;x<96;x++)
+            if(opened[y*width+x]<243)widened++;
+        check(widened>15&&widened<110,
+                "Small authored puncture should reveal visible, bounded structural metal");
+        for(int y=0;y<96;y++)for(int x=96;x<width;x++)
+            check(opened[y*width+x]==255,
+                    "Authored cutout expansion leaked into next mask variant");
+        check(opened[47*width+80]==255,
+                "Cutout recovery must not enlarge the outer damage footprint");
+        check(ShipSurfaceLighting.FLAT_DAMAGE_FRAGMENT.contains("1.0-peel.a")&&
+                ShipSurfaceLighting.FLAT_DAMAGE_FRAGMENT.contains("u_underlayPass"),
+                "The structural layer must be clipped to inverse damage alpha at all LODs");
+
         java.util.HashSet<Integer> angles=new java.util.HashSet<>();
         java.util.HashSet<Integer> sizes=new java.util.HashSet<>();
         for(int seed=0;seed<128;seed++){
