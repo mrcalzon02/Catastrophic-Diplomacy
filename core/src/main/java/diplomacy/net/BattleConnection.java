@@ -95,7 +95,7 @@ public final class BattleConnection implements AutoCloseable {
                 if(snapshot==null||Long.parseLong(p[2])!=snapshot.tick()||
                         !java.util.Set.of("STALEMATE","TIME_LIMIT",
                                 "LEFT_VICTORY","RIGHT_VICTORY",
-                                "MUTUAL_DESTRUCTION").contains(p[1]))
+                                "MUTUAL_DESTRUCTION","NO_FIELD_CONTROL").contains(p[1]))
                     throw Hbnet.failure();
                 terminalOutcome=p[1];
                 continue;
