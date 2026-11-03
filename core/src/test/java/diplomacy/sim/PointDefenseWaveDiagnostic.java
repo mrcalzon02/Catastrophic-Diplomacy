@@ -26,6 +26,15 @@ public final class PointDefenseWaveDiagnostic {
         int flak(){return switch(this){
             case FLK_ONE -> 1;case FLK_FOUR -> 4;case MIXED_TWO_TWO -> 2;
             default -> 0;};}
+        /** Stable fixture identity; enum reordering must never perturb seeds. */
+        int stableSeedCode(){return switch(this){
+            case PD_ONE -> 0;
+            case FLK_ONE -> 1;
+            case PD_FOUR -> 2;
+            case FLK_FOUR -> 3;
+            case MIXED_TWO_TWO -> 4;
+            case PD_TWO -> 5;
+        };}
     }
     private enum Threat { INTERCEPTOR, TORPEDO_BOMBER }
     private record Trial(Battery battery,Threat threat,int wave,int distance,
@@ -71,6 +80,10 @@ public final class PointDefenseWaveDiagnostic {
     /** Functional invariants: two lasers + two flak cannot exceed the
      * exact same two lasers' precision reach, tracking, penetration or cycle. */
     private static void verifyHardwareIsolation(TechnologyCatalog catalog){
+        Set<Integer> codes=new HashSet<>();
+        for(Battery battery:Battery.values())
+            require(codes.add(battery.stableSeedCode()),
+                    "Duplicate immutable wave battery seed code");
         for(int rank:new int[]{0,9}){
             var pdDesign=defenseFit(catalog,Battery.PD_TWO,rank);
             var mixedDesign=defenseFit(catalog,Battery.MIXED_TWO_TWO,rank);
@@ -141,7 +154,7 @@ public final class PointDefenseWaveDiagnostic {
                              int wave,int distance,int rank,int seed,boolean enabled){
         final long randomSeed=70260101L+threat.ordinal()*900003L+
                 wave*10007L+distance*29L+rank*13L+
-                battery.ordinal()*11L+seed*173L;
+                battery.stableSeedCode()*11L+seed*173L;
         Battle b=new Battle(randomSeed);
         Shipyard.Design craftFit=carrier(cat,threat);
         final double defenderX=600,defenderY=300;
