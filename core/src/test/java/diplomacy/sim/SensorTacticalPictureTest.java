@@ -58,15 +58,15 @@ public final class SensorTacticalPictureTest {
         require(report(b,viewer.id,target.id)==null,
                 "Unlinked captain received an arbitrary fleet-wide sensor picture");
         scout.network=network(catalog,"SHR");
-        b.step();
+        for(int i=0;i<20;i++)b.step(); // Echo and 1,200-world-unit relay hop.
         Battle.TacticalContact observed=report(b,viewer.id,target.id);
         require(observed!=null&&!observed.stale()&&observed.relayed()
                         &&observed.sourceId()==scout.id
                         &&(observed.channels()&Battle.CONTACT_RADAR)!=0,
                 "Powered SHR must supply a real originating radar report");
         require(observed.x()==target.x&&observed.y()==target.y&&
-                        observed.observedTick()==b.tick,
-                "Live contact did not report actual observed position/time");
+                        observed.observedTick()<b.tick,
+                "Radar echo reported instantaneous present-time truth");
         long signature=b.fingerprint();
         int known=viewer.knownTracks.size();
         b.tacticalPicture(0,viewer.id);
@@ -86,7 +86,7 @@ public final class SensorTacticalPictureTest {
         scout.network=network(catalog,"TRK","LNK");
         viewer.network=network(catalog,"LNK");
         scout.sensorRange=700;viewer.sensorRange=0;
-        b.step();
+        for(int i=0;i<12;i++)b.step(); // Wait for physical scout sensor echoes.
         require(report(b,viewer.id,target.id)!=null,
                 "LNK viewer did not receive tracked observation");
         target.x=1650;
@@ -123,7 +123,7 @@ public final class SensorTacticalPictureTest {
                 viewer.graviticRange=0;
         scout.sensorRange=0;
         scout.network=network(catalog,"SHR");
-        b.step();
+        for(int i=0;i<9;i++)b.step(); // One-way optical plus link transmission.
         Battle.TacticalContact observation=report(b,viewer.id,target.id);
         require(observation!=null&&!observation.stale()
                         &&observation.relayed()
