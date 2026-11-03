@@ -43,6 +43,14 @@ public final class ShipSurfaceDamageVisualTest {
         }
         check(angles.size()>20&&sizes.size()>30,
                 "Real damage mask variants need both seeded angle and size diversity");
+        check(CombatLightingRenderer.emissionStrength(diplomacy.sim.Battle.DamageType.KINETIC)==0f,
+                "Kinetic breach material must remain cold without persistent glow");
+        check(CombatLightingRenderer.emissionStrength(diplomacy.sim.Battle.DamageType.PLASMA)>
+                CombatLightingRenderer.emissionStrength(diplomacy.sim.Battle.DamageType.LASER),
+                "Plasma molten edges should visibly outshine narrow laser incision");
+        check(CombatLightingRenderer.smokeWisps(diplomacy.sim.Battle.DamageType.TORPEDO)<=2&&
+                CombatHitRenderer.sparkCount(diplomacy.sim.Battle.DamageType.PARTICLE,true)<=4,
+                "Small punctures and torpedo smoke must respect tiny particle budgets");
         check(ShipSurfaceSampleGrid.originalBytes(1024,1536)>
                 ShipSurfaceSampleGrid.maskBytes(96,144)*100,
                 "The source-pixel cache must reduce retained decoded memory by over 100x for large PNGs");
