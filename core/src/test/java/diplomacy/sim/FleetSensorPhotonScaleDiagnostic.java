@@ -46,7 +46,7 @@ public final class FleetSensorPhotonScaleDiagnostic {
         design=design.install(slot(hull,Shipyard.Mount.WEAPON,1),prefix+"MSL");
         design=design.install(slot(hull,Shipyard.Mount.SYSTEM,0),prefix+"RDR");
         String[] electronics=switch(role){
-            case 0 -> new String[]{"SHR","RES","HLP"};
+            case 0 -> new String[]{"SHR","RES"};
             case 1 -> new String[]{"TRK","LNK"};
             case 2 -> new String[]{"SHR"};
             case 3 -> new String[]{"TRK","CAP"};
@@ -55,11 +55,34 @@ public final class FleetSensorPhotonScaleDiagnostic {
         for(int i=0;i<electronics.length;i++)
             design=design.install(slot(hull,Shipyard.Mount.SYSTEM,i+1),
                     prefix+electronics[i]);
+        // HLP is actual SUPPORT hardware, NOT SYSTEM electronics. Command
+        // cores are also SUPPORT modules with a separate installation role.
+        if(role==0)design=design.install(
+                slot(hull,Shipyard.Mount.SUPPORT,0),prefix+"HLP");
         if(role==2)design=design.install(
                 slot(hull,Shipyard.Mount.SUPPORT,0),prefix+"FCM");
-        check(Shipyard.inspect(design,catalog).valid(),
+
+        // The engineering validation is authoritative. Outfitting a fleet
+        // with many systems may require real reactor/radiator components.
+        // Install paid REA/RAD in spare SYSTEM slots until the approved ship
+        // obeys its actual output and thermal budget; never waive the checks.
+        int systemSlot=electronics.length+1;
+        for(int attempt=0;attempt<6;attempt++){
+            Shipyard.Report budget=Shipyard.inspect(design,catalog);
+            if(budget.valid())break;
+            String utility=budget.demand()>budget.generation()+1e-8?
+                    "REA":budget.generatedHeat()>budget.cooling()+1e-8?
+                    "RAD":null;
+            check(utility!=null,
+                    "Invalid real fitted "+faction+"/"+ROLES[role]+": "+
+                            budget.explanation());
+            design=design.install(slot(hull,Shipyard.Mount.SYSTEM,systemSlot++),
+                    prefix+utility);
+        }
+        Shipyard.Report finalReport=Shipyard.inspect(design,catalog);
+        check(finalReport.valid(),
                 "Invalid real fitted "+faction+"/"+ROLES[role]+": "+
-                        Shipyard.inspect(design,catalog).explanation());
+                        finalReport.explanation());
         return design;
     }
     private static Battle create(TechnologyCatalog catalog,int count,long seed){
