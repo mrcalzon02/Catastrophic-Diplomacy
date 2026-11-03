@@ -26,6 +26,7 @@ on:
       - 'game/src/main/java/diplomacy/client/ShipArmorStampAnchors.java'
       - 'game/src/test/java/diplomacy/client/ShipDamageMaskRegionTest.java'
       - 'core/src/test/java/diplomacy/sim/ArmorBreachTelemetry.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
       - 'core/src/main/java/diplomacy/sim/DirectionalDefense.java'
       - 'core/src/test/java/diplomacy/sim/DirectionalDefenseTest.java'
       - 'core/build.gradle'
