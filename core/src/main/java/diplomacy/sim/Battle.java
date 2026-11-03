@@ -90,6 +90,9 @@ public final class Battle {
         public List<RotaryPointDefense.Mount> rotaryMounts=List.of();
         /** Long-charge, long-range physically fitted anti-torpedo rail guns. */
         public List<RailPointDefense.Mount> railMounts=List.of();
+        /** Sustained particle-ablation beams have their own gimbals, dwell
+         * state and thermal reservoirs; not pulse-laser firing cycles. */
+        public List<ParticlePointDefense.Mount> particlePdMounts=List.of();
         /** Each fitted precision CIWS module owns its socket, research and timer.
          * Legacy unfitted fixtures retain the original shared PD controller. */
         public static final class PrecisionMount {
@@ -781,7 +784,7 @@ public final class Battle {
     /** Kill attribution is recorded only after a real hostile body is
      * removed. These counters do not alter fire control, armor, probabilities,
      * ammunition or RNG. Decoys are distinct from damaging guided bodies. */
-    public enum DefensiveGun { LASER_PD, FLAK, ROTARY_CIWS, RAIL_PD }
+    public enum DefensiveGun { LASER_PD, FLAK, ROTARY_CIWS, RAIL_PD, PARTICLE_PD }
     public enum DefensiveTarget { MISSILE, TORPEDO, DECOY, ROCKET, KINETIC, CRAFT }
     private final int[][] defensiveKills=
             new int[DefensiveGun.values().length][DefensiveTarget.values().length];
@@ -1174,6 +1177,7 @@ public final class Battle {
         List<Ship.PrecisionMount> fittedPrecision=new ArrayList<>();
         List<RotaryPointDefense.Mount> fittedRotary=new ArrayList<>();
         List<RailPointDefense.Mount> fittedRail=new ArrayList<>();
+        List<ParticlePointDefense.Mount> fittedParticle=new ArrayList<>();
         s.laserPointDefenseEnabled=false;
         for(WeaponMuzzles.Emitter emitter:s.weaponEmitters){
             if(emitter.component().endsWith("-PD")){
@@ -1198,6 +1202,15 @@ public final class Battle {
                         Shipyard.defenseAt(design,catalog,emitter.slotId()),
                         Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
             }
+            if(emitter.family()==WeaponMuzzles.Family.PARTICLE_PD){
+                Shipyard.Installed particlePart=design.at(emitter.slotId());
+                int tier=particlePart.branch()==null?0:
+                        particlePart.stage(particlePart.branch());
+                fittedParticle.add(new ParticlePointDefense.Mount(emitter.slotId(),tier,
+                        Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
+                        Shipyard.defenseAt(design,catalog,emitter.slotId()),
+                        Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
+            }
             if(emitter.family()==WeaponMuzzles.Family.RAIL_PD){
                 Shipyard.Installed railPart=design.at(emitter.slotId());
                 int tier=railPart.branch()==null?0:
@@ -1212,6 +1225,7 @@ public final class Battle {
         s.precisionMounts=List.copyOf(fittedPrecision);
         s.rotaryMounts=List.copyOf(fittedRotary);
         s.railMounts=List.copyOf(fittedRail);
+        s.particlePdMounts=List.copyOf(fittedParticle);
         if(!rocketTemplates.isEmpty()){
             List<RocketBarrage.Rack> fittedRacks=new ArrayList<>(rocketTemplates.size());
             for(RocketBarrage.Rack prototype:rocketTemplates)
@@ -1990,6 +2004,8 @@ public final class Battle {
             gun.tick(DT);
         for(RailPointDefense.Mount gun:s.railMounts)
             gun.tick(DT);
+        for(ParticlePointDefense.Mount gun:s.particlePdMounts)
+            gun.cool(DT,s.coolingCondition);
         s.kineticReload=Math.max(0,s.kineticReload-DT);
         s.plasmaReload=Math.max(0,s.plasmaReload-DT);
         s.particleReload=Math.max(0,s.particleReload-DT);
@@ -4851,6 +4867,199 @@ public final class Battle {
         }
     }
 
+    /** One real observed point-defense contact, never an anonymous RNG
+     * success roll. A field is nonnull only for the physical body it names. */
+    private record ParticleContact(long bodyId,double x,double y,
+                                   int targetId,int sourceId,
+                                   ProjectileModel.Spec profile,
+                                   Missile missile,Rocket rocket,
+                                   Ballistic shell,Craft craft) {}
+
+    /** Particle optical acquisition depends on physical body area, emission,
+     * weather and current hull sensor damage. Continuous beam dwell cannot
+     * begin through an invisible target or borrow the ship's laser controller. */
+    private ParticleContact particleContact(Ship defender,
+                                             ParticlePointDefense.Mount gun){
+        ParticleContact chosen=null;
+        double best=Double.POSITIVE_INFINITY;
+        if(defender.orders.pointDefense().ordnance()){
+            for(Missile body:missiles){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+                    continue;
+                double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                double reach=ProjectileModel.acquisitionRange(gun.nominalRange,
+                        defender.sensorsCondition,weather.sensorFactor(),gun.profile,
+                        body.spec,OrdnancePropulsion.emissionMultiplier(body.thrustPhase));
+                if(range>reach||range<8)continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.vx,body.vy,
+                        StrictMath.hypot(body.vx,body.vy));
+                double score=defensiveScore(defender,range,eta)-
+                        2.5*body.spec.health();
+                if(body.visualId==gun.trackedBodyId)score-=5;
+                if(score<best){
+                    best=score;
+                    chosen=new ParticleContact(body.visualId,body.x,body.y,
+                            body.targetId,body.sourceId,body.spec,
+                            body,null,null,null);
+                }
+            }
+            for(Rocket body:rockets){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+                    continue;
+                double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                double reach=ProjectileModel.acquisitionRange(gun.nominalRange,
+                        defender.sensorsCondition,weather.sensorFactor(),gun.profile,
+                        body.spec,RocketBarrage.hotEmission(body.motor,body.burning()));
+                if(range>reach||range<8)continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.vx,body.vy,
+                        StrictMath.hypot(body.vx,body.vy));
+                double score=defensiveScore(defender,range,eta)-
+                        2.5*body.spec.health();
+                if(body.visualId==gun.trackedBodyId)score-=5;
+                if(score<best){
+                    best=score;
+                    chosen=new ParticleContact(body.visualId,body.x,body.y,
+                            body.targetId,body.sourceId,body.spec,
+                            null,body,null,null);
+                }
+            }
+            for(Ballistic body:ballistics){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+                    continue;
+                double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                double reach=ProjectileModel.acquisitionRange(gun.nominalRange,
+                        defender.sensorsCondition,weather.sensorFactor(),
+                        gun.profile,body.spec);
+                if(range>reach||range<8)continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.vx,body.vy,
+                        StrictMath.hypot(body.vx,body.vy));
+                double score=defensiveScore(defender,range,eta)-
+                        2.5*body.spec.health();
+                if(body.visualId==gun.trackedBodyId)score-=5;
+                if(score<best){
+                    best=score;
+                    chosen=new ParticleContact(body.visualId,body.x,body.y,
+                            body.targetId,body.sourceId,body.spec,
+                            null,null,body,null);
+                }
+            }
+        }
+        if(chosen==null&&defender.orders.pointDefense().craft()){
+            for(Craft body:crafts){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+                    continue;
+                ProjectileModel.Spec profile=body.radarProfile();
+                double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                if(range<8||range>ProjectileModel.acquisitionRange(gun.nominalRange,
+                        defender.sensorsCondition,weather.sensorFactor(),
+                        gun.profile,profile))continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.observedVx,body.observedVy,
+                        StrictMath.hypot(body.observedVx,body.observedVy));
+                double score=defensiveScore(defender,range,eta);
+                if(-(long)body.id==gun.trackedBodyId)score-=5;
+                if(score<best){
+                    best=score;
+                    chosen=new ParticleContact(-(long)body.id,body.x,body.y,
+                            body.targetId,body.sourceId,profile,
+                            null,null,null,body);
+                }
+            }
+        }
+        return chosen;
+    }
+
+    /** Real continuous, single-body ablation. Unlike pulsed laser CIWS,
+     * this channel has NO randomized instantaneous hit or shared reload.
+     * Damage grows only with observed uninterrupted dwell, stops on target
+     * loss or turret slew, and spends real power/heat for every beam tick.
+     * Thick guided hulls retain fractional integrity across frames. */
+    private void fireParticlePointDefense(){
+        for(Ship defender:ships){
+            if(!defender.alive()||defender.particlePdMounts.isEmpty()||
+                    defender.withdrawing||defender.crewReadiness()<.05||
+                    defender.pointDefenseCondition<=.20||
+                    defender.orders.pointDefense()==BattleOrders.PointDefense.HOLD_FIRE)
+                continue;
+            for(ParticlePointDefense.Mount gun:defender.particlePdMounts){
+                double tickPower=ParticlePointDefense.POWER_PER_SECOND*DT;
+                double tickHeat=ParticlePointDefense.HEAT_PER_SECOND*DT;
+                if(defender.power<4+tickPower){
+                    gun.powerLockouts++;gun.beamDwellSeconds=0;continue;
+                }
+                if(defender.heat>=defender.maxHeat*.91||!gun.available()){
+                    gun.beamDwellSeconds=0;continue;
+                }
+                ParticleContact target=particleContact(defender,gun);
+                if(target==null){gun.beamDwellSeconds=0;continue;}
+                WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
+                        defender,WeaponMuzzles.Family.PARTICLE_PD,gun.slotId);
+                if(!gun.track(target.bodyId,target.x,target.y,
+                        muzzle.x(),muzzle.y(),defender.facing,
+                        defender.pointDefenseCondition,tick,DT))continue;
+                // A beam without actual stored energy does zero damage.
+                defender.power-=tickPower;
+                defender.heat+=tickHeat;
+                double damage=gun.ablationPerSecond(target.profile)*DT;
+                gun.illuminate(DT);
+                long shot=nextVisualShotId++;
+                visual(shot,VisualPhase.FIRE,"PARTICLE_PD",
+                        defender.team,defender.id,target.sourceId,
+                        muzzle.x(),muzzle.y(),target.x,target.y);
+                beams.add(new Beam(shot,tick,muzzle.x(),muzzle.y(),
+                        target.x,target.y,defender.team,DamageType.PARTICLE,true));
+                if(target.missile!=null){
+                    Missile body=target.missile;
+                    body.integrity-=damage;
+                    if(body.integrity<=0&&missiles.remove(body)){
+                        missileIntercepts++;defender.intercepted++;
+                        recordDefensiveKill(DefensiveGun.PARTICLE_PD,
+                                guidedDefenseTarget(body));
+                        if(body.decoy)decoysIntercepted++;
+                        visual(body.visualId,VisualPhase.INTERCEPT,
+                                body.decoy?"DECOY":body.torpedo?"TORPEDO":"MISSILE",
+                                body.team,body.sourceId,body.targetId,
+                                body.x,body.y,body.x,body.y);
+                    }
+                }else if(target.rocket!=null){
+                    Rocket body=target.rocket;
+                    body.integrity-=damage*.72;
+                    if(body.integrity<=0&&rockets.remove(body)){
+                        rocketIntercepts++;defender.intercepted++;
+                        recordDefensiveKill(DefensiveGun.PARTICLE_PD,
+                                DefensiveTarget.ROCKET);
+                        visual(body.visualId,VisualPhase.INTERCEPT,"ROCKET",
+                                body.team,body.sourceId,body.targetId,
+                                body.x,body.y,body.x,body.y);
+                    }
+                }else if(target.shell!=null){
+                    Ballistic body=target.shell;
+                    body.integrity-=damage*.48;
+                    if(body.integrity<=0&&ballistics.remove(body)){
+                        ballisticIntercepts++;defender.intercepted++;
+                        recordDefensiveKill(DefensiveGun.PARTICLE_PD,
+                                DefensiveTarget.KINETIC);
+                        visual(body.visualId,VisualPhase.INTERCEPT,"KINETIC",
+                                body.team,body.sourceId,body.targetId,
+                                body.x,body.y,body.x,body.y);
+                    }
+                }else if(target.craft!=null){
+                    Craft body=target.craft;
+                    hitCraft(body,damage*.52,defender,shot,"PARTICLE_PD");
+                    pointDefenseCraftHits++;
+                    if(body.integrity<=0&&crafts.remove(body)){
+                        craftLosses++;pointDefenseCraftKills++;
+                        recordDefensiveKill(DefensiveGun.PARTICLE_PD,
+                                DefensiveTarget.CRAFT);
+                    }
+                }
+            }
+        }
+    }
+
     /** Optical track servicing is shared by the installed turrets on one
      * hull. A baseline capacity of N bodies per emitter is free; additional
      * physical contacts divide available tracking cycles. We take the square
@@ -4924,6 +5133,7 @@ public final class Battle {
         firePhysicalFlak();
         fireRotaryCiws();
         fireRailPointDefense();
+        fireParticlePointDefense();
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
