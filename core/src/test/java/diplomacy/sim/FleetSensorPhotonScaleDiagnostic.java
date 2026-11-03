@@ -122,8 +122,15 @@ public final class FleetSensorPhotonScaleDiagnostic {
             // Keep the command center in its designated rearward plotting
             // station. This is a sensor/relay diagnostic, not an AI pursuit
             // trial; the other fully armed line vessels still maneuver.
-            if(ship.network.commandCapacity()>0)
+            if(ship.network.commandCapacity()>0){
                 sim.registerDiagnosticStationaryTarget(ship.id);
+                // The FCM remains powered and can receive SHR/LNK, but its
+                // local radar/IR/X-ray/gravity receiver is offline. This
+                // deliberately verifies real remote contact transport
+                // rather than an accidental ordinary local acquisition.
+                ship.sensorRange=ship.infraredRange=ship.xrayRange=
+                        ship.graviticRange=0;
+            }
         }
         return sim;
     }
@@ -298,8 +305,9 @@ public final class FleetSensorPhotonScaleDiagnostic {
                 "Two identical-seed independently executed replays per size. "+
                 "SHR, RES, TRK, LNK, FCM and CAP modules are installed in real "+
                 "paid DREADNOUGHT sockets; RDR radars arm the forward scouts "+
-                "and tracking line while the rear FCM has no RDR so relayed "+
-                "data is meaningful. LAS/MSL guns are fitted on every vessel. "+
+                "and tracking line while the rear FCM has its local receivers "+
+                "offline as a deliberate remote-datalink failure-mode "+
+                "test. LAS/MSL guns are fitted on every vessel. "+
                 "One sensor family includes real HLP hologram hardware. "+
                 "Forward SHR scouts lose power at midpoint; the separate "+
                 "TRK/LNK archive must preserve aged tracks. Innate fighter "+
