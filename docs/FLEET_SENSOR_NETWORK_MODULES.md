@@ -63,6 +63,56 @@ fitted guided racks to select different *detected* hostile vessels and
 increases real per-mount precision point-defense concurrency. No free missile,
 gun, salvo or PD shot is ever created.
 
+## Read-only command picture and sensor provenance (November 2026)
+
+`Battle.tacticalPicture(team,viewerId)` now reports the actual physical
+observation route of **one living receiving ship**. A default
+`tacticalPicture(team)` chooses the first operational FCM-equipped command
+ship by bounded command capacity, falling back to the first surviving
+friendly vessel. It does **not** grant every hull a free sensor network.
+
+Each `TacticalContact` carries source ship ID, true observed channel
+flags, measured position/velocity, observation tick, derived
+classification confidence, and distinct `relayed`/`stale` flags.
+The live route is shared with the combat target-acquisition algorithm,
+but its read-only query cannot mutate track memory, consume ammunition
+or change targeting decisions.
+
+- **Direct:** the receiving hull itself observes the current target
+  through a genuinely functioning optical/radar/IR/X-ray/gravitic channel
+- **Live relay:** the receiving hull gets a currently observed contact
+  over the exact limited legacy formation-radio or equipped SHR route
+  already used for weapon acquisition
+- **Historical:** a TRK record from the receiving ship, or at most the
+  sender's finite freshest LNK records across a valid powered two-ended
+  link, at the **last measured coordinates and tick**; zero live channels
+  and never a new weapon lock
+- **Power/circuit damage:** a failed transmitter, receiver, local sensor
+  processor, missing LNK or expired TRK memory stops those reports
+- **FCM:** selects a functioning command display anchor and improves
+  bounded classification/correlation within the existing local command
+  network; no unlimited fleet-wide source visibility
+
+The graphical `SensorContactOverlay` reads this core report rather than
+walking all allied direct scanners independently. A remotely relayed
+optical report displays a `VIS ... LINK` instrument mark, not a
+revealed physical hull sprite. Retained memory renders a growing
+uncertainty circle centered on the **old** fix, never at hidden current
+target coordinates. A low-confidence live radar mark likewise cannot
+display a known enemy hull outline. The fog mask and contacts refresh
+against the same sampled display tick.
+
+The user's separate friendly optical field remains a rendering policy,
+not a change in which physical enemy target a ship may shoot.
+None of this requires secret server-side entity packets or filtered
+spectator state.
+
+**Remaining deeper work:** truly reconciled multi-source confidence,
+source covariance and fleet-wide FCM capacity scheduling across
+overlapping contact networks. Existing FCM currently provides a bounded,
+powered local command-assist and cooperative target weighting, rather
+than a complete independent multi-sensor state estimator.
+
 ## Diagnostic coverage
 
 `gradle --no-daemon :core:sensorNetworkSmoke` checks all eleven factions,
@@ -70,6 +120,11 @@ six standard modules, 24 alternatives, independent research stage IX,
 manufacturing budget validity, save identities, technology caps, primitive
 versus advanced performance, sensor-only amplification, contact-relay range,
 transmitter power loss and parallel target capacity.
+
+The new `SensorTacticalPictureTest` also runs as a dependency of
+`sensorNetworkSmoke`, exercising real SHR links, TRK/LNK stale fixes,
+power loss, no phantom local sight, nonmutating tactical reads and FCM
+command-anchor selection.
 
 The existing `sensingModulesSmoke` task now depends on this focused test.
 This is an objective functional test: **visual clarity, artwork and balance
