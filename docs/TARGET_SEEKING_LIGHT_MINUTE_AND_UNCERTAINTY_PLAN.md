@@ -456,10 +456,11 @@ visual overlays and balance tables are diagnostics.
 temporal signatures, operating scan doctrines, causal STANDARD contact
 authorization, real SHR and LNK sender-origin packet transport, deterministic
 kinetic prediction and first finite kinetic compute allocation are committed.
-Historical signatures and LNK transport have passed the focused regression
-workflow. The new compute budget is integrated but its dedicated CI result
-must be verified separately; do not treat a passing advisory workflow wrapper
-as proof without reading actual Gradle smoke output. Physical beam/rocket/
+Historical signatures and LNK transport passed focused Java 17 tests.
+The finite compute budget passed `:core:sensorComputeBudgetSmoke` in
+GitHub Actions run 41703851652 (actual Gradle `BUILD SUCCESSFUL`).
+This verifies work limits, CAP separation, power loss and deterministic
+allocation, not final balance or 200v200 performance. Physical beam/rocket/
 guided-target solutions, shared inter-ship compute, controls, persistence
 and large-scale endurance remain unfinished. Only actual functional
 failures should gate builds, not cosmetics or balance measurements.
