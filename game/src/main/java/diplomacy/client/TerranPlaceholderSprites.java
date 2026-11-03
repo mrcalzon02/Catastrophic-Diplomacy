@@ -109,6 +109,8 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     // One shader + cached textures for all faction/hull instances; no per-frame Pixmaps.
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
+    /** Fixed authored 24px RGB/alpha damage decals, loaded once per family. */
+    private final ShipDamageImageMasks authoredMasks=new ShipDamageImageMasks();
     public int litMaterialCount(){return surfaces.materialCount();}
     public int materialTextureBindings(){return surfaces.textureBindings();}
     private static String spriteName(Shipyard.Hull hull) {
@@ -376,7 +378,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         return result;
     }
     /** Only real physical impact centers contribute one small typed mark. */
-    private static int typedMark(float[][] wear,float[][] internal,
+    private int typedMark(float[][] wear,float[][] internal,
                     boolean[][] direct,Battle.DamageType[][] type,
                     ShipArmorStampAnchors anchors,float row,float col,
                     int id,float rough){
@@ -389,9 +391,13 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float ar=anchors.row(r,c),ac=anchors.col(r,c);
                 float d=(row-ar)*(row-ar)+(col-ac)*(col-ac);
                 if(d>1.7f)continue;
-                combined=ShipImpactProfiles.merge(combined,ShipImpactProfiles.sample(
-                    type[r][c],row,col,ar,ac,wear[r][c],internal[r][c],
-                    id*31+r*17+c*7,rough));
+                int seed=ShipDamageVariants.tileSeed(id,r,c);
+                int mark=type[r][c]==null
+                    ?ShipImpactProfiles.sample(null,row,col,ar,ac,
+                        wear[r][c],internal[r][c],seed,rough)
+                    :authoredMasks.material(type[r][c],col-ac,row-ar,
+                        wear[r][c],internal[r][c],seed);
+                combined=ShipImpactProfiles.merge(combined,mark);
                 if(d<best){best=d;nearestType=type[r][c]==null?
                     0:type[r][c].ordinal()+1;}
             }
@@ -407,7 +413,7 @@ public final class TerranPlaceholderSprites implements Disposable {
      * samples for the rim use exactly the same registered armor cells as the
      * alpha mask; they cannot invent additional geometry.
      */
-    private static float craterAt(float[][] wear,float[][] internal,
+    private float craterAt(float[][] wear,float[][] internal,
                                    boolean[][] anchorsImpact,
                                    Battle.DamageType[][] impactTypes,
                                    ShipArmorStampAnchors aligned,
@@ -419,9 +425,16 @@ public final class TerranPlaceholderSprites implements Disposable {
             for(int c=Math.max(0,centerC-1);c<=Math.min(GRID-1,centerC+1);c++){
                 if(!anchorsImpact[r][c]||
                         wear[r][c]<=.70f&&internal[r][c]<=.00001f)continue;
-                crater=Math.max(crater,ShipArmorStamps.typedOpeningAt(
-                        tileRow,tileCol,r,c,aligned.row(r,c),aligned.col(r,c),
-                        wear[r][c],internal[r][c],shipId,impactTypes[r][c]));
+                Battle.DamageType kind=impactTypes[r][c];
+                float opening=kind==null
+                    ?ShipArmorStamps.openingAt(tileRow,tileCol,r,c,
+                        aligned.row(r,c),aligned.col(r,c),
+                        wear[r][c],internal[r][c],shipId)
+                    :authoredMasks.opening(kind,
+                        tileCol-aligned.col(r,c),tileRow-aligned.row(r,c),
+                        wear[r][c],internal[r][c],
+                        ShipDamageVariants.tileSeed(shipId,r,c));
+                crater=Math.max(crater,opening);
             }
         return crater;
     }
@@ -1175,6 +1188,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture image:severeLayers.values())image.dispose();
         damagedLayers.clear();severeLayers.clear();originals.clear();
         surfaces.dispose();
+        authoredMasks.clear();
         if(shieldInk!=null)shieldInk.dispose();
         damagedMaterial.dispose();
         destroyedMaterial.dispose();
