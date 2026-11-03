@@ -45,14 +45,15 @@ public final class PointDefenseFleetScaleDiagnostic {
     }
     private record Result(String mode,long wallNanos,long peakHeapBytes,
                           int pd,int flak,int rotary,int rail,int maxBodies,
-                          int intercepted,int defensiveCartridges,int netKineticLoss,
+                          int peakFlak,int flakBursts,int flakTimeouts,int intercepted,int defensiveCartridges,int netKineticLoss,
                           double netProtectionLoss,int aliveAttack,
                           int aliveDefense,int cappedEventTicks) {
         String csv(){
             return mode+","+TICKS+","+
                     String.format(Locale.ROOT,"%.3f",wallNanos/1e6)+","+
                     peakHeapBytes+","+pd+","+flak+","+rotary+","+rail+","+
-                    maxBodies+","+intercepted+","+defensiveCartridges+","+
+                    maxBodies+","+peakFlak+","+flakBursts+","+flakTimeouts+","+
+                    intercepted+","+defensiveCartridges+","+
                     netKineticLoss+","+(netKineticLoss-defensiveCartridges)+","+
                     String.format(Locale.ROOT,"%.2f",netProtectionLoss)+","+
                     aliveAttack+","+aliveDefense+","+cappedEventTicks;
@@ -109,11 +110,12 @@ public final class PointDefenseFleetScaleDiagnostic {
                 BattleOrders.PointDefense.HOLD_FIRE);
 
         int pd=0,flak=0,rotary=0,rail=0,maxBodies=0,capped=0;
-        int peakCraft=0;
+        int peakCraft=0,peakFlak=0,totalFlakBursts=0,totalFlakTimeouts=0;
         long peakHeap=heapBytes();
         long begin=System.nanoTime();
         long windowBegin=begin;
         int windowPd=0,windowFlak=0,windowRotary=0,windowRail=0;
+        int windowFlakBursts=0,windowFlakTimeouts=0;
         for(int frame=0;frame<TICKS;frame++){
             battle.step();
             peakCraft=Math.max(peakCraft,battle.crafts().size());
@@ -125,8 +127,16 @@ public final class PointDefenseFleetScaleDiagnostic {
             for(int e=events.size()-1;e>=0;e--){
                 Battle.VisualEvent event=events.get(e);
                 if(event.tick()!=battle.tick)break;
-                if(event.team()!=1||
-                        event.phase()!=Battle.VisualPhase.FIRE)continue;
+                if(event.team()!=1)continue;
+                if(event.phase()==Battle.VisualPhase.IMPACT&&
+                        "FLAK_BURST".equals(event.weapon())){
+                    totalFlakBursts++;windowFlakBursts++;continue;
+                }
+                if(event.phase()==Battle.VisualPhase.TIMEOUT&&
+                        "FLAK".equals(event.weapon())){
+                    totalFlakTimeouts++;windowFlakTimeouts++;continue;
+                }
+                if(event.phase()!=Battle.VisualPhase.FIRE)continue;
                 switch(event.weapon()){
                     case "POINT_DEFENSE" -> {pd++;windowPd++;}
                     case "FLAK" -> {flak++;windowFlak++;}
@@ -135,9 +145,11 @@ public final class PointDefenseFleetScaleDiagnostic {
                     default -> { }
                 }
             }
+            int liveFlak=battle.flakRounds().size();
+            peakFlak=Math.max(peakFlak,liveFlak);
             int bodies=battle.missiles().size()+battle.rockets().size()+
                     battle.ballistics().size()+battle.rotaryRounds().size()+
-                    battle.railPenetrators().size();
+                    battle.railPenetrators().size()+liveFlak;
             maxBodies=Math.max(maxBodies,bodies);
             if(frame%30==29){
                 peakHeap=Math.max(peakHeap,heapBytes());
@@ -149,8 +161,11 @@ public final class PointDefenseFleetScaleDiagnostic {
                         (now-windowBegin)/1e6)+","+heapBytes()+","+
                         bodies+","+maxBodies+","+battle.alive(0)+","+
                         battle.alive(1)+","+windowPd+","+windowFlak+","+
-                        windowRotary+","+windowRail+","+intercepted);
+                        windowRotary+","+windowRail+","+intercepted+","+
+                        liveFlak+","+peakFlak+","+windowFlakBursts+","+
+                        windowFlakTimeouts);
                 windowPd=windowFlak=windowRotary=windowRail=0;
+                windowFlakBursts=windowFlakTimeouts=0;
                 windowBegin=now;
             }
         }
@@ -187,6 +202,10 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "Ordnance-only fleet spawned unexpected fighter/drone craft");
         require(enabled || (pd==0&&flak==0&&rotary==0&&rail==0),
                 "HOLD_FIRE emitted real point-defense shots in 200v200");
+        require(totalFlakBursts+totalFlakTimeouts<=flak,
+                "More physical flak shells resolved than were paid and launched");
+        require(enabled || (peakFlak==0&&totalFlakBursts==0&&totalFlakTimeouts==0),
+                "HOLD_FIRE spawned an unapproved live flak shell");
         int paidCartridges=flak+rotary+
                 rail*RailPointDefense.CARTRIDGES_PER_SHOT;
         int netLoss=stockBefore-stockAfter;
@@ -196,7 +215,8 @@ public final class PointDefenseFleetScaleDiagnostic {
         require(netLoss>=paidCartridges,
                 "Defensive physical shots were not paid by finite stock");
         return new Result(mode,elapsed,peakHeap,
-                pd,flak,rotary,rail,maxBodies,interceptions,
+                pd,flak,rotary,rail,maxBodies,
+                peakFlak,totalFlakBursts,totalFlakTimeouts,interceptions,
                 paidCartridges,netLoss,
                 Math.max(0,protectionBefore-protectionAfter),
                 battle.alive(0),battle.alive(1),capped);
@@ -208,7 +228,8 @@ public final class PointDefenseFleetScaleDiagnostic {
         List<String> samples=new ArrayList<>();
         samples.add("mode,tick,wall_window_ms,heap_bytes,active_bodies,"+
                 "peak_bodies,alive_attack,alive_defense,laser_shots,flak_shots,"+
-                "rotary_shots,rail_shots,ordnance_interceptions");
+                "rotary_shots,rail_shots,ordnance_interceptions,"+
+                "flak_live,peak_flak_live,flak_bursts_window,flak_expiry_window");
         List<String> familyKills=new ArrayList<>();
         familyKills.add("mode,gun,target,physical_kills");
         Result active=run(tech,true,true,samples,familyKills);
@@ -229,10 +250,11 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "fighter/drone reserves before tick one, but does not "+
                 "change any PD mount, attacking launcher or ammunition.\n\n"+
                 "|Mode|Ticks|Wall ms|Peak used heap bytes|PD|FLK|RCW|RPD|"+
-                "Peak active bodies|Real ordnance intercepts|Paid PD cartridges|"+
+                "Peak active bodies|Peak flak in flight|Flak fuze bursts|Flak expiries|"+
+                "Real ordnance intercepts|Paid PD cartridges|"+
                 "Net kinetic stock reduction|Other stock loss|Net protection loss|"+
                 "Attackers alive|Defenders alive|Capped visual ticks|\n"+
-                "|---|"+"---:|".repeat(16)+"\n"+
+                "|---|"+"---:|".repeat(19)+"\n"+
                 "|"+active.csv().replace(",", "|")+"|\n"+
                 "|"+hold.csv().replace(",", "|")+"|\n"+
                 "|"+ordnanceActive.csv().replace(",", "|")+"|\n"+
@@ -244,6 +266,9 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "Paid defensive cartridges are independently derived from "+
                 "actual FLK/RCW/RPD FIRE events; net kinetic stock loss "+
                 "also includes magazine damage and other stock effects. "+
+                "Peak active bodies now INCLUDE actual moving flak shells. "+
+                "A flak burst is counted only on physical fuze arrival; "+
+                "expiry is distinct from a successful fragmentation event. "+
                 "Net protection loss is remaining shield+armor+hull "+
                 "depletion, not cumulative pre-regeneration damage. "+
                 "Each row in samples.csv is one 30-tick measurement window. "+
