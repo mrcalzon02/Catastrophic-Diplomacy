@@ -93,6 +93,13 @@ public final class ShipSurfaceDamageVisualTest {
                 ShipLightProbes.impactLightGain("KINETIC")<=.025f&&
                 ShipLightProbes.impactLightGain("PLASMA")<=.045f,
                 "Hull material shader must follow reduced kinetic/plasma radii");
+        check(CombatHitRenderer.sparkLengthScale(diplomacy.sim.Battle.DamageType.PLASMA)
+                        <=.34f&&
+                CombatHitRenderer.sparkLengthScale(diplomacy.sim.Battle.DamageType.KINETIC)
+                        <=.55f&&
+                CombatHitRenderer.sparkOpacityScale(diplomacy.sim.Battle.DamageType.PLASMA)
+                        <=.42f,
+                "Plasma and kinetic spark spokes must not imitate broad emissive halos");
         check(ShipSurfaceLighting.FRAGMENT.contains("float peak=max(strikeLight.r,")&&
                 ShipSurfaceLighting.FRAGMENT.contains("0.12/max(peak,0.0001)")&&
                 ShipSurfaceLighting.FRAGMENT.contains("attenuation*attenuation*attenuation"),

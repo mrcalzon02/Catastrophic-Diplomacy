@@ -40,8 +40,7 @@ final class CombatHitRenderer {
                 // mask owns the shape and the laser anneal's smooth outer edge.
                 // Seeded fan scatter is stable across frames and replays.
                 int sparks=sparkCount(hit.weapon,armor);
-                float lengthScale=hit.weapon==diplomacy.sim.Battle.DamageType.PARTICLE?.68f:
-                        hit.weapon==diplomacy.sim.Battle.DamageType.TORPEDO?1.12f:1f;
+                float lengthScale=sparkLengthScale(hit.weapon);
                 float rr=1f,gg=.72f,bb=.31f;
                 if(hit.weapon==diplomacy.sim.Battle.DamageType.KINETIC){
                     rr=.82f;gg=.87f;bb=.95f;
@@ -52,7 +51,10 @@ final class CombatHitRenderer {
                 }else if(hit.weapon==diplomacy.sim.Battle.DamageType.LASER){
                     rr=1f;gg=.87f;bb=.64f;
                 }
-                shapes.setColor(rr,gg,bb,(armor?.82f:.94f)*fade);
+                // A broad, bright star can be mistaken for an emitted
+                // world-light halo. Keep sparks real but wound-local.
+                shapes.setColor(rr,gg,bb,
+                        (armor?.82f:.94f)*fade*sparkOpacityScale(hit.weapon));
                 for(int i=0;i<sparks;i++){
                     int h=ShipDamageVariants.hash(hit.visualSeed+i*719,
                             hit.weapon);
@@ -76,6 +78,18 @@ final class CombatHitRenderer {
         }
         shapes.setColor(Color.WHITE);
         shapes.end();
+    }
+    static float sparkLengthScale(diplomacy.sim.Battle.DamageType weapon){
+        if(weapon==diplomacy.sim.Battle.DamageType.PLASMA)return .33f;
+        if(weapon==diplomacy.sim.Battle.DamageType.KINETIC)return .55f;
+        if(weapon==diplomacy.sim.Battle.DamageType.PARTICLE)return .68f;
+        if(weapon==diplomacy.sim.Battle.DamageType.TORPEDO)return 1.12f;
+        return 1f;
+    }
+    static float sparkOpacityScale(diplomacy.sim.Battle.DamageType weapon){
+        if(weapon==diplomacy.sim.Battle.DamageType.PLASMA)return .42f;
+        if(weapon==diplomacy.sim.Battle.DamageType.KINETIC)return .55f;
+        return 1f;
     }
     static int sparkCount(diplomacy.sim.Battle.DamageType weapon,boolean armor){
         return switch(weapon==null?diplomacy.sim.Battle.DamageType.KINETIC:weapon){
