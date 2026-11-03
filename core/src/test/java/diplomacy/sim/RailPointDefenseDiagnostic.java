@@ -96,7 +96,7 @@ public final class RailPointDefenseDiagnostic {
     private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
                                int mounts,int seed,boolean enabled,
                                double separation,double offset){
-        return trial(tech,threat,tier,mounts,seed,enabled,separation,offset,false);
+        return trial(tech,threat,tier,mounts,seed,enabled,separation,offset,true);
     }
     private static Trial trial(TechnologyCatalog tech,Threat threat,int tier,
                                int mounts,int seed,boolean enabled,
@@ -372,8 +372,9 @@ public final class RailPointDefenseDiagnostic {
                 StandardCharsets.UTF_8);
         report.append("\nMatched relative-motion physical A/B comparisons: "+
                 sweepPairs+". Numeric outcomes remain advisory. Production"+
-                " remains on the established collision model until these"+
-                " measured results justify a change.\n\n");
+                " now uses physically correct two-body swept intersection;"+
+                " endpoint-only is retained as an explicit pre-battle"+
+                " diagnostic control.\n\n");
         Files.write(root.resolve("rail-trials.csv"),rows,StandardCharsets.UTF_8);
         Files.writeString(root.resolve("summary.md"),report);
         System.out.print(report);

@@ -796,8 +796,8 @@ public final class Battle {
         if(tick!=0)throw new IllegalStateException("Configure flak before combat");
         flakFragmentFalloff=enabled;
     }
-    /** A/B world-space swept crossing vs current moving-target endpoint.
-     * Opt-in for research ONLY; mechanics are unchanged in production. */
+    /** A/B compare old endpoint-only geometry with correct two-body
+     * swept flight. Production defaults to physical relative motion. */
     public void configureRailRelativeSweepForDiagnostic(boolean enabled){
         if(tick!=0)throw new IllegalStateException("Configure rail collision before combat");
         diagnosticRailRelativeSweep=enabled;
@@ -827,8 +827,9 @@ public final class Battle {
      * Verified against aircraft, swarms, fast shells and armored torpedoes;
      * a pre-battle laboratory override retains the old uniform-density A/B. */
     private boolean flakFragmentFalloff=true;
-    /** Opt-in A/B geometry; changing it never modifies projectile speed. */
-    private boolean diagnosticRailRelativeSweep;
+    /** Normal battle uses actual relative-motion sweeps. Controlled pre-tick
+     * A/B can temporarily restore the historical endpoint-only method. */
+    private boolean diagnosticRailRelativeSweep=true;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
