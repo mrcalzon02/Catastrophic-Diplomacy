@@ -45,6 +45,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case ROCKET -> 7; // Reuse the genuine authored missile launcher turret.
             case TORPEDO -> 8;
             case POINT_DEFENSE -> (slot&1)==0?6:5;
+            case FLAK -> 5; // Existing dedicated fitted flak turret art cell.
         };
     }
     /** Actual fitted component suffix distinguishes flak from rotary PD.

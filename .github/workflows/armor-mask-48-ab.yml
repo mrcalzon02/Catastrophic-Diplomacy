@@ -5,6 +5,7 @@ on:
     paths:
       - 'assets/damage_masks/ab/*.png'
       - 'game/src/main/java/diplomacy/client/ShipDamageImageMasks.java'
+      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
       - 'tools/armor_48_ab_compare.py'
       - '.github/workflows/armor-mask-48-ab.yml'
   workflow_dispatch:
