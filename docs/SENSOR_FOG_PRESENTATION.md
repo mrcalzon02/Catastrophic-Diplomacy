@@ -47,10 +47,10 @@ opened in the full ship-inspection panel merely by clicking a thermal or
 radar contact.
 
 The tactical UI collects sightings from the ships owned by the player as a
-command **presentation** only. It does not extend the combat AI's existing
-limited contact relay, alter ship-to-ship communications, or implement the
-planned sensor sharing, contact processing, target unification, or command
-capacity modules. Those remain separate development work.
+command **presentation**. The combat simulation independently applies fitted
+sensor sharing, resolution, tracking, track relay, fleet command and target
+capacity modules. The visual fog must reflect those detection capabilities
+without changing the preconfigured auto-battler orders or granting free locks.
 
 ## Validation and current limits
 
@@ -62,7 +62,19 @@ original combat detection.
 
 Graphic results should be reviewed visually in a running desktop/Android
 battle; visual quality findings are diagnostics only, never release blockers.
-Live network spectator snapshots currently use their own separate drawing
-path and **do not yet apply server-authorized per-player fog**. A multiplayer
-implementation must avoid sending hidden hostile states to unauthorized
-clients, not merely paint fog over an omniscient network snapshot.
+
+### Auto-battler visibility policy
+Players configure fleet orders, then run and observe the autonomous battle.
+Fog of war is a **visual presentation mechanic**, not an information-security
+boundary. Drawing a genuinely obscuring, softly blended fog layer over the
+complete simulation is sufficient. Client packets and spectator snapshots
+do **not** require server-side hostile-state concealment, filtered enemy
+serialization, or privacy-oriented per-player state redaction. Do not add
+packet concealment as a prerequisite to shipping this visual effect.
+
+The intended experience is limited visual awareness, useful differentiated
+sensor signatures, and fog that responds to the fleet's functioning detection
+hardware. Any network spectator view should use appropriate visual fog
+presentation when desired; its underlying packets may retain full state.
+The combat simulation continues to enforce real acquisition, range, contact
+sharing, weapon locks, and ammunition rules independently of rendering.
