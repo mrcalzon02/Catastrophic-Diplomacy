@@ -49,15 +49,17 @@ public final class PointDefenseWaveDiagnostic {
             int craftTerminal,int attackShots,int attackImpacts,int torpedoFired,
             int torpedoImpacts,int pdLaserShots,int flakShots,int flakAmmoSpent,
             long firstAircraftAttackTick,double actualDamage,
-            double finalPowerFraction,double peakHeatFraction,int pdDistinctSocketsFired) {
+            double finalPowerFraction,double peakHeatFraction,int pdDistinctSocketsFired,
+            int pdAcquisitions,int pdSlewTicks,int pdLockWaitTicks) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%d",
+                "%s,%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%d,%d,%d,%d",
                 battery,threat,wave,distance,rank,seed,defenseOn,launched,
                 craftKills,craftTerminal,attackShots,attackImpacts,torpedoFired,
                 torpedoImpacts,pdLaserShots,flakShots,flakAmmoSpent,
                 firstAircraftAttackTick,actualDamage,finalPowerFraction,
-                peakHeatFraction,pdDistinctSocketsFired);
+                peakHeatFraction,pdDistinctSocketsFired,pdAcquisitions,
+                pdSlewTicks,pdLockWaitTicks);
         }
     }
     private static void require(boolean b,String why){
@@ -159,6 +161,32 @@ public final class PointDefenseWaveDiagnostic {
                         "Precision laser round robin borrowed a flak hardpoint");
             }
         }
+    }
+    /** Mechanical targeting is actual elapsed tick time, not a global roll to
+     * arbitrarily miss individual rockets. Verify initial scan, a target
+     * switch, off-axis rotation and loss of contact for the same fitted part. */
+    private static void verifyPrecisionTracking(TechnologyCatalog cat){
+        Battle battle=new Battle(802410L);
+        battle.spawnWing(1,defenseFit(cat,Battery.PD_ONE,0),cat,1,600,300);
+        Battle.Ship ship=battle.ships().get(0);
+        Battle.Ship.PrecisionMount mount=ship.precisionMounts.get(0);
+        require(!Battle.acquirePrecisionTarget(ship,mount,5001L,450,300,1),
+                "Precision laser skipped initial optical acquisition");
+        boolean ready=false;
+        for(int t=2;t<20;t++)
+            ready=Battle.acquirePrecisionTarget(ship,mount,5001L,450,300,t);
+        require(ready,"Precision laser never attained a stable target");
+        require(!Battle.acquirePrecisionTarget(ship,mount,5002L,750,300,20),
+                "Precision laser skipped target switch / 180-degree traverse");
+        require(mount.slewTicks>0,"Mechanical turret did not take time to rotate");
+        ready=false;
+        for(int t=21;t<60;t++)
+            ready=Battle.acquirePrecisionTarget(ship,mount,5002L,750,300,t);
+        require(ready,"Off-axis mechanical turret could not traverse");
+        require(!Battle.acquirePrecisionTarget(ship,mount,5002L,750,300,70),
+                "Stale track retained instantaneous lock after contact gap");
+        require(mount.targetAcquisitions==2,
+                "Stable target reacquisition counted a fictitious new body");
     }
     private static Shipyard.Design carrier(TechnologyCatalog c,Threat threat){
         Shipyard.Design d=Shipyard.starter(Battle.Faction.TERRAN,
@@ -283,16 +311,23 @@ public final class PointDefenseWaveDiagnostic {
         double damage=Math.max(0,shields-protectedShip.shields)+
                 Math.max(0,armor-protectedShip.armor)+
                 Math.max(0,hull-protectedShip.hull);
+        int acquisitions=0,slew=0,lockWait=0;
+        for(Battle.Ship.PrecisionMount pd:protectedShip.precisionMounts){
+            acquisitions+=pd.targetAcquisitions;
+            slew+=pd.slewTicks;
+            lockWait+=pd.lockWaitTicks;
+        }
         return new Trial(battery,threat,wave,distance,rank,seed,enabled,
                 launched,craftKills,innerCraft.size(),attackShots,attackImpacts,
                 torpedoes,torpedoHits,lasers,flak,
                 flakStock-protectedShip.kineticAmmo,firstAttack,damage,
                 protectedShip.power/Math.max(1,protectedShip.maxPower),
-                peakHeat,firedPdSockets.size());
+                peakHeat,firedPdSockets.size(),acquisitions,slew,lockWait);
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog cat=TechnologyCatalog.loadDefault();
         verifyHardwareIsolation(cat);
+        verifyPrecisionTracking(cat);
         Path output=Path.of("test-output","pd-wave-diagnostic");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
@@ -302,7 +337,8 @@ public final class PointDefenseWaveDiagnostic {
                 "laser_pd_shots,flak_rounds,flak_kinetic_ammo_spent,"+
                 "first_aircraft_attack_tick,defender_damage,"+
                 "defender_final_power_fraction,defender_peak_heat_fraction,"+
-                "pd_distinct_sockets_fired");
+                "pd_distinct_sockets_fired,pd_acquisitions,pd_slew_ticks,"+
+                "pd_lock_wait_ticks");
         StringBuilder md=new StringBuilder("# Simultaneous fighter waves versus "+
                 "real fitted laser/flak batteries\n\n");
         md.append("Physical FTR launches, exactly 4 or 8 simultaneous aircraft, "+
