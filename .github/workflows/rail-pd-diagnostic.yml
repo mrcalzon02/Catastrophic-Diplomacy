@@ -1,0 +1,59 @@
+name: Physical charged rail point-defense validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/main/java/diplomacy/sim/RailPointDefense.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
+      - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
+      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
+      - 'core/src/test/java/diplomacy/sim/RailPointDefenseDiagnostic.java'
+      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
+      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
+      - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
+      - 'core/build.gradle'
+      - '.github/workflows/rail-pd-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rail-physical-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+jobs:
+  charged-railgun-mechanics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.11.1' }
+      - name: Validate researched railgun hardpoints and real travelling penetrators
+        id: mechanics
+        run: gradle --no-daemon :core:railPdDiagnostic
+      - name: Compile authored railgun turret and moving penetrator art
+        id: renderer
+        run: gradle --no-daemon :game:compileJava
+      - name: Publish measured defensive railgun results
+        if: always()
+        run: |
+          echo "## Physically installed charged rail interceptors" >> "$GITHUB_STEP_SUMMARY"
+          echo "Core mechanics: ${{ steps.mechanics.outcome }}; visual path compilation: ${{ steps.renderer.outcome }}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Physical results are measured, numerical balance targets are advisory, no APK was built." >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/rail-pd/summary.md ]; then
+            cat core/test-output/rail-pd/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No generated railgun report. Review the actual functional test failure." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve original railgun flight and ammunition telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rail-pd-physical-results
+          path: core/test-output/rail-pd/
+          if-no-files-found: warn
+          retention-days: 30
