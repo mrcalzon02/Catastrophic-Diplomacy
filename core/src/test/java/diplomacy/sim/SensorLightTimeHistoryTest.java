@@ -15,17 +15,17 @@ public final class SensorLightTimeHistoryTest {
         int channels=Battle.CONTACT_OPTICAL|Battle.CONTACT_RADAR;
         source.sensorHistory.capture(0,source);
         target.sensorHistory.capture(0,target);
+        target.x=608;target.vx=100; // A recorded maneuver after initial light emission.
+        for(long tick=1;tick<=echoTime;tick++){
+            source.sensorHistory.capture(tick,source);
+            target.sensorHistory.capture(tick,target);
+        }
         ok(SensorLightTimeHistory.receive(source,target,outward-1,channels,0)==null,
                 "Premature passive light observation");
         var passive=SensorLightTimeHistory.receive(source,target,outward,channels,0);
         ok(passive!=null&&passive.channels()==Battle.CONTACT_OPTICAL&&
                         passive.measuredTick()==0,
                 "Optical record was not one-way-old or radar leaked early");
-        target.x=608;target.vx=100;
-        for(long tick=1;tick<=echoTime;tick++){
-            source.sensorHistory.capture(tick,source);
-            target.sensorHistory.capture(tick,target);
-        }
         var premature=SensorLightTimeHistory.receive(source,target,echoTime-1,channels,0);
         ok(premature!=null&&(premature.channels()&Battle.CONTACT_RADAR)==0,
                 "Radar reflection arrived before two individually rounded legs");
