@@ -62,6 +62,18 @@ tasks.register('sensingModulesSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+tasks.register('battleArenaSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Headless 200v200 limit, fixed world boundaries, projectile age and arena-edge expiration.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleArenaLimitsTest'
+    dependsOn testClasses
+}
+// One small objective mechanics test, not an added packaging workflow.
+tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('battleArenaSmoke'))
+}
+
 tasks.register('sensorNetworkSmoke', JavaExec) {
     group = 'verification'
     description = 'Verify six physical sensor-network families and 24 variants, nine-rank research, power-loss counterplay and real shared contacts.'
