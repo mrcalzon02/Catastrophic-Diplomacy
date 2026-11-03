@@ -2295,15 +2295,25 @@ public final class Battle {
     public record TacticalContact(int targetId,int sourceId,int channels,
                                   double x,double y,double vx,double vy,
                                   long observedTick,float confidence,
-                                  boolean relayed,boolean stale){
+                                  boolean relayed,boolean stale,
+                                  long emittedTick,long receivedTick){
         public TacticalContact{
             if(targetId<=0||sourceId<=0||observedTick<0||channels<0||
+                    emittedTick<0||emittedTick>observedTick||
+                    receivedTick<observedTick||
                     !Double.isFinite(x)||!Double.isFinite(y)||
                     !Double.isFinite(vx)||!Double.isFinite(vy)||
                     !Float.isFinite(confidence)||confidence<0||confidence>1)
                 throw new IllegalArgumentException("Invalid physical sensor observation");
             if(stale&&channels!=0)
                 throw new IllegalArgumentException("Historical memory is not a live sensor");
+        }
+        /** Preserve constructor compatibility for older display adapters. */
+        public TacticalContact(int targetId,int sourceId,int channels,
+                double x,double y,double vx,double vy,long observedTick,
+                float confidence,boolean relayed,boolean stale){
+            this(targetId,sourceId,channels,x,y,vx,vy,observedTick,
+                    confidence,relayed,stale,observedTick,observedTick);
         }
     }
 
@@ -2409,7 +2419,8 @@ public final class Battle {
             picture.put(target.id,new TacticalContact(target.id,source.id,
                     observation.channels(),measured.x(),measured.y(),
                     measured.vx(),measured.vy(),observation.measuredTick(),
-                    confidence,relayed,false));
+                    confidence,relayed,false,observation.emittedTick(),
+                    observation.receivedTick()));
         }
         List<TacticalContact> sorted=new ArrayList<>(picture.values());
         sorted.sort((a,b)->Integer.compare(a.targetId(),b.targetId()));
@@ -2419,7 +2430,7 @@ public final class Battle {
     private static TacticalContact historicalContact(int id,int sourceId,
             ContactTrack track,boolean relayed){
         return new TacticalContact(id,sourceId,0,track.x,track.y,track.vx,
-                track.vy,track.tick,0,relayed,true);
+                track.vy,track.tick,0,relayed,true,track.tick,track.tick);
     }
 
     /** Powered tracking and contact resolution reduce estimated position
