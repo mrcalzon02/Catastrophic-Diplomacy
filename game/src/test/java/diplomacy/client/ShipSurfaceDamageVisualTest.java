@@ -320,7 +320,8 @@ public final class ShipSurfaceDamageVisualTest {
         for(String token:new String[]{
                 "float oxideMix=smoothstep(0.56,0.72,peel.b)*smoothstep(0.035,0.10,peel.g)",
                 "float thermal=peel.g*(1.0-oxideMix)",
-                "float anneal=clamp((peel.b-0.56)/0.44,0.0,1.0)*oxideMix",
+                "float coolPhase=smoothstep(0.40,0.69,phase)",
+                "float anneal=oxideMix*max(temper,0.46*coolPhase)",
                 "vec3 oxide=mix(", "float coolMetal=1.0-smoothstep(0.005,0.08,peel.g)",
                 "metalStrength=clamp(peel.b/0.56",
                 "vec3 residualHeat=vec3(0.0)",
