@@ -40,9 +40,13 @@ public final class BattleTerminalProtocolTest {
             synchronized(lock){
                 Battle real=(Battle)battleField.get(server);
                 ok(real.alive(0)>0&&real.alive(1)>0,"Live test fixture already ended");
-                if(expected.equals("LEFT_VICTORY")){
-                    for(Battle.Ship hostile:real.ships())
-                        if(hostile.team==1)hostile.hull=0;
+                if(expected.equals("LEFT_VICTORY")||
+                        expected.equals("NO_FIELD_CONTROL")){
+                    for(Battle.Ship ship:real.ships()){
+                        if(ship.team==1)ship.hull=0;
+                        if(ship.team==0&&expected.equals("NO_FIELD_CONTROL"))
+                            ship.withdrawing=true;
+                    }
                 }else{
                     reasonField.set(real,BattleTermination.Reason.valueOf(expected));
                 }
@@ -69,5 +73,6 @@ public final class BattleTerminalProtocolTest {
         run("STALEMATE");
         run("TIME_LIMIT");
         run("LEFT_VICTORY");
+        run("NO_FIELD_CONTROL");
     }
 }
