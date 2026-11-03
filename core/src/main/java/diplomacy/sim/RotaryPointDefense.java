@@ -19,6 +19,8 @@ public final class RotaryPointDefense {
         public final ProjectileModel.Defense profile;
         public double spin,shotCooldown,bearing=Double.NaN;
         public int roundsFired,acquisitions;
+        /** Tracking diagnostics for real physical turret duty cycle. */
+        public int eligibleScanFrames,contactFrames,aircraftVisibleFrames;
         public long trackedId=Long.MIN_VALUE;
         public Mount(int slot,int tier,double range,
                      ProjectileModel.Defense profile,double cycle){
