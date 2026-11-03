@@ -318,8 +318,10 @@ public final class BattleServer implements AutoCloseable {
         if(battle==null||!battle.finished())
             throw new IllegalStateException("Not a finished authoritative battle");
         String status=battle.unresolved()?battle.terminationReason().name():
-                battle.alive(0)>0?"LEFT_VICTORY":
-                battle.alive(1)>0?"RIGHT_VICTORY":"MUTUAL_DESTRUCTION";
+                battle.engaged(0)>0&&battle.alive(1)==0?"LEFT_VICTORY":
+                battle.engaged(1)>0&&battle.alive(0)==0?"RIGHT_VICTORY":
+                battle.alive(0)==0&&battle.alive(1)==0?
+                        "MUTUAL_DESTRUCTION":"NO_FIELD_CONTROL";
         return "RESULT|"+status+"|"+battle.tick;
     }
     private void sendTerminalResult(){
