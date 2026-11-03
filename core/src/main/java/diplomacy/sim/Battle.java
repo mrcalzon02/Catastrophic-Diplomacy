@@ -3869,6 +3869,223 @@ public final class Battle {
         }
     }
 
+    private record RotaryTrack(long bodyId,double x,double y,double vx,double vy,
+                               int targetId,int sourceId,ProjectileModel.Spec profile,
+                               double emission) { }
+    /** The fitted short-range sensor head sees true bodies, not hypothetical
+     * collision percentages. Per-mount radar/IR scan, research and weather
+     * gate every possible target. Captain scope and doctrine remain active. */
+    private RotaryTrack pickRotaryContact(Ship defender,RotaryPointDefense.Mount gun){
+        RotaryTrack best=null;
+        double rank=Double.POSITIVE_INFINITY;
+        if(defender.orders.pointDefense().ordnance()){
+            for(Rocket body:rockets){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+                double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                if(d<RotaryPointDefense.MIN_RANGE||d>
+                        RotaryPointDefense.acquisitionRange(defender,gun,body.spec,
+                                weather.sensorFactor(),
+                                RocketBarrage.hotEmission(body.motor,body.burning())))continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.vx,body.vy,
+                        StrictMath.hypot(body.vx,body.vy));
+                double score=defensiveScore(defender,d,eta);
+                if(score<rank){rank=score;best=new RotaryTrack(body.visualId,
+                        body.x,body.y,body.vx,body.vy,body.targetId,body.sourceId,
+                        body.spec,RocketBarrage.hotEmission(body.motor,body.burning()));}
+            }
+            for(Missile body:missiles){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+                double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                if(d<RotaryPointDefense.MIN_RANGE||d>
+                        RotaryPointDefense.acquisitionRange(defender,gun,body.spec,
+                                weather.sensorFactor(),
+                                OrdnancePropulsion.emissionMultiplier(body.thrustPhase)))continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.vx,body.vy,
+                        StrictMath.hypot(body.vx,body.vy));
+                double score=defensiveScore(defender,d,eta);
+                if(score<rank){rank=score;best=new RotaryTrack(body.visualId,
+                        body.x,body.y,body.vx,body.vy,body.targetId,body.sourceId,
+                        body.spec,OrdnancePropulsion.emissionMultiplier(body.thrustPhase));}
+            }
+            // Fast tiny kinetic slugs are allowed tracks, but lead and real
+            // physical collision geometry make them a poor rotary target.
+            for(Ballistic body:ballistics){
+                if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+                double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+                if(d<RotaryPointDefense.MIN_RANGE||d>
+                        RotaryPointDefense.acquisitionRange(defender,gun,body.spec,
+                                weather.sensorFactor(),1.0))continue;
+                double eta=approachEta(defender.x,defender.y,
+                        body.x,body.y,body.vx,body.vy,body.spec.speed());
+                double score=defensiveScore(defender,d,eta);
+                if(score<rank){rank=score;best=new RotaryTrack(body.visualId,
+                        body.x,body.y,body.vx,body.vy,body.targetId,body.sourceId,
+                        body.spec,1.0);}
+            }
+        }
+        // Rotary point defense screens drones and fighter hulls after any
+        // ordnance threatened by the same fitted firing doctrine.
+        if(best==null&&defender.orders.pointDefense().craft())for(Craft body:crafts){
+            if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+            ProjectileModel.Spec radar=body.radarProfile();
+            double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+            if(d<RotaryPointDefense.MIN_RANGE||d>
+                    RotaryPointDefense.acquisitionRange(defender,gun,radar,
+                            weather.sensorFactor(),1.0))continue;
+            double score=defensiveScore(defender,d,approachEta(
+                    defender.x,defender.y,body.x,body.y,body.observedVx,
+                    body.observedVy,StrictMath.hypot(body.observedVx,body.observedVy)));
+            if(score<rank){rank=score;best=new RotaryTrack(-(long)body.id,
+                    body.x,body.y,body.observedVx,body.observedVy,body.targetId,
+                    body.sourceId,radar,1.0);}
+        }
+        return best;
+    }
+    /** Real spool-up and servo tracking are paid by independent installed
+     * RCW barrels. Each action emits ONE physical round from its own muzzle;
+     * no beam, fragment-volume damage or arbitrary instant intercept occurs. */
+    private void fireRotaryCiws(){
+        for(Ship defender:ships){
+            if(!defender.alive()||defender.rotaryMounts.isEmpty()||
+                    defender.crewReadiness()<.05||defender.pointDefenseCondition<=.20)
+                continue;
+            for(RotaryPointDefense.Mount gun:defender.rotaryMounts){
+                if(defender.power<=4||defender.heat>=defender.maxHeat*.93||
+                        defender.kineticAmmo<=0||
+                        rotaryRounds.size()>=RotaryPointDefense.MAX_ACTIVE_ROUNDS)continue;
+                RotaryTrack target=pickRotaryContact(defender,gun);
+                if(target==null)continue;
+                gun.track(DT,target.bodyId);
+                WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
+                        defender,WeaponMuzzles.Family.ROTARY_CIWS,gun.slotId);
+                double desired=RotaryPointDefense.leadAngle(muzzle.x(),muzzle.y(),
+                        target.x,target.y,target.vx,target.vy);
+                if(!Double.isFinite(gun.bearing))gun.bearing=defender.facing;
+                double diff=StrictMath.atan2(StrictMath.sin(desired-gun.bearing),
+                        StrictMath.cos(desired-gun.bearing));
+                double servo=StrictMath.max(.8,StrictMath.min(11,
+                        6.4*gun.profile.tracking()*defender.pointDefenseCondition))*DT;
+                gun.bearing+=StrictMath.max(-servo,StrictMath.min(servo,diff));
+                defender.power-=.10*DT;
+                defender.heat+=.04*DT;
+                if(StrictMath.abs(StrictMath.atan2(
+                        StrictMath.sin(desired-gun.bearing),
+                        StrictMath.cos(desired-gun.bearing)))>.085||!gun.ready())continue;
+                double scatter=(random.nextDouble()-.5)*.034/
+                        StrictMath.max(.4,gun.profile.tracking());
+                long id=nextVisualShotId++;
+                rotaryRounds.add(new RotaryPointDefense.Round(id,tick,defender.id,
+                        defender.team,gun.slotId,muzzle.x(),muzzle.y(),
+                        gun.bearing+scatter,
+                        gun.profile.damage()*.98,gun.nominalRange));
+                gun.fired(defender.pointDefenseCondition);
+                defender.kineticAmmo--;
+                defender.power-=.44;defender.heat+=.52;
+                visual(id,VisualPhase.FIRE,"ROTARY_CIWS",defender.team,defender.id,
+                        target.sourceId,muzzle.x(),muzzle.y(),target.x,target.y);
+            }
+        }
+    }
+    /** Inertial one-shot tracer intersection AFTER hostile bodies moved.
+     * Earliest swept crossing wins: a projectile cannot kill two distant
+     * targets in the same frame, and bullets continue flying after target
+     * death until they physically strike another hostile body or expire. */
+    private void advanceRotaryRounds(){
+        for(int index=rotaryRounds.size()-1;index>=0;index--){
+            RotaryPointDefense.Round shot=rotaryRounds.get(index);
+            double dt=StrictMath.min(DT,shot.life);
+            double nextX=shot.x+shot.vx*dt,nextY=shot.y+shot.vy*dt;
+            double earliest=Double.POSITIVE_INFINITY;
+            Missile hitMissile=null;Rocket hitRocket=null;
+            Ballistic hitShell=null;Craft hitAircraft=null;
+            for(Missile body:missiles){
+                if(body.team==shot.team)continue;
+                double radius=1.7+2.1*StrictMath.sqrt(body.spec.crossSection());
+                double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
+                if(at<earliest){earliest=at;hitMissile=body;
+                    hitRocket=null;hitShell=null;hitAircraft=null;}
+            }
+            for(Rocket body:rockets){
+                if(body.team==shot.team)continue;
+                double radius=1.7+2.1*StrictMath.sqrt(body.spec.crossSection());
+                double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
+                if(at<earliest){earliest=at;hitRocket=body;
+                    hitMissile=null;hitShell=null;hitAircraft=null;}
+            }
+            for(Ballistic body:ballistics){
+                if(body.team==shot.team)continue;
+                double radius=1.0+StrictMath.sqrt(body.spec.crossSection());
+                double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
+                if(at<earliest){earliest=at;hitShell=body;
+                    hitMissile=null;hitRocket=null;hitAircraft=null;}
+            }
+            for(Craft body:crafts){
+                if(body.team==shot.team)continue;
+                double radius=5.0+3.1*StrictMath.sqrt(body.radarProfile().crossSection());
+                double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
+                if(at<earliest){earliest=at;hitAircraft=body;
+                    hitMissile=null;hitRocket=null;hitShell=null;}
+            }
+            shot.life-=DT;
+            if(Double.isFinite(earliest)){
+                shot.x+=(nextX-shot.x)*earliest;
+                shot.y+=(nextY-shot.y)*earliest;
+                Ship shooter=findShip(shot.sourceId);
+                if(hitAircraft!=null){
+                    hitCraft(hitAircraft,shot.damage*2.2,shooter,shot.visualId,
+                            "ROTARY_CIWS");
+                    pointDefenseCraftHits++;
+                    if(hitAircraft.integrity<=0){
+                        crafts.remove(hitAircraft);craftLosses++;pointDefenseCraftKills++;
+                    }
+                }else{
+                    ProjectileModel.Spec spec=hitMissile!=null?hitMissile.spec:
+                            hitRocket!=null?hitRocket.spec:hitShell.spec;
+                    double kinetic=shot.damage/
+                            (1+.58*StrictMath.max(0,spec.health()-2));
+                    if(hitMissile!=null){
+                        hitMissile.integrity-=kinetic;
+                        if(hitMissile.integrity<=0&&missiles.remove(hitMissile)){
+                            missileIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            if(hitMissile.decoy)decoysIntercepted++;
+                            visual(hitMissile.visualId,VisualPhase.INTERCEPT,
+                                    hitMissile.decoy?"DECOY":
+                                    hitMissile.torpedo?"TORPEDO":"MISSILE",
+                                    hitMissile.team,hitMissile.sourceId,
+                                    hitMissile.targetId,hitMissile.x,hitMissile.y,
+                                    hitMissile.x,hitMissile.y);
+                        }
+                    }else if(hitRocket!=null){
+                        hitRocket.integrity-=kinetic;
+                        if(hitRocket.integrity<=0&&rockets.remove(hitRocket)){
+                            rocketIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            visual(hitRocket.visualId,VisualPhase.INTERCEPT,"ROCKET",
+                                    hitRocket.team,hitRocket.sourceId,
+                                    hitRocket.targetId,hitRocket.x,hitRocket.y,
+                                    hitRocket.x,hitRocket.y);
+                        }
+                    }else{
+                        hitShell.integrity-=kinetic*.68;
+                        if(hitShell.integrity<=0&&ballistics.remove(hitShell)){
+                            ballisticIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            visual(hitShell.visualId,VisualPhase.INTERCEPT,"KINETIC",
+                                    hitShell.team,hitShell.sourceId,hitShell.targetId,
+                                    hitShell.x,hitShell.y,hitShell.x,hitShell.y);
+                        }
+                    }
+                    visual(shot.visualId,VisualPhase.IMPACT,"ROTARY_CIWS",
+                            shot.team,shot.sourceId,0,shot.x,shot.y,shot.x,shot.y);
+                }
+                rotaryRounds.remove(index);
+            }else{
+                shot.x=nextX;shot.y=nextY;
+                if(shot.life<=0)rotaryRounds.remove(index);
+            }
+        }
+    }
+
     /** Optical track servicing is shared by the installed turrets on one
      * hull. A baseline capacity of N bodies per emitter is free; additional
      * physical contacts divide available tracking cycles. We take the square
