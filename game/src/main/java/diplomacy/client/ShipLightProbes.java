@@ -25,6 +25,19 @@ final class ShipLightProbes {
     static final float IMPACT_LIGHT_RADIUS=18f;
     static final float BEAM_HIT_LIGHT_RADIUS=19f;
     static final float MAX_WEAPON_LIGHT_GAIN=.13f;
+    /** Active flash is narrower than the persistent material discoloration. */
+    static float impactLightReach(String weapon){
+        Battle.DamageType family=CombatHitFeedback.weaponKind(weapon);
+        if(family==Battle.DamageType.KINETIC)return 5f;
+        if(family==Battle.DamageType.PLASMA)return 6f;
+        return IMPACT_LIGHT_RADIUS;
+    }
+    static float impactLightGain(String weapon){
+        Battle.DamageType family=CombatHitFeedback.weaponKind(weapon);
+        if(family==Battle.DamageType.KINETIC)return .025f;
+        if(family==Battle.DamageType.PLASMA)return .045f;
+        return MAX_WEAPON_LIGHT_GAIN;
+    }
     private static final int CELLS_X=32,CELLS_Y=20;
     private final boolean[] receiverCells=new boolean[CELLS_X*CELLS_Y];
     private boolean requireReceivers;
@@ -125,12 +138,14 @@ final class ShipLightProbes {
             if(age<0)continue;
             if(age>9)break;
             if(event.phase()==Battle.VisualPhase.TIMEOUT)continue;
+            float gain=impactLightGain(event.weapon());
             float strength=event.phase()==Battle.VisualPhase.IMPACT?
-                    MAX_WEAPON_LIGHT_GAIN:
-                    event.phase()==Battle.VisualPhase.INTERCEPT?.085f:.055f;
+                    gain:event.phase()==Battle.VisualPhase.INTERCEPT?
+                    gain*.65f:gain*.42f;
             strength*=Math.max(0f,1f-age/10f);
             float reach=event.phase()==Battle.VisualPhase.IMPACT?
-                    IMPACT_LIGHT_RADIUS:12f;
+                    impactLightReach(event.weapon()):
+                    Math.min(12f,impactLightReach(event.weapon()));
             offerWeapon(event.x(),event.y(),reach,strength,event.weapon());
         }
         int counted=0;
@@ -142,8 +157,11 @@ final class ShipLightProbes {
             }else{
                 String type=beam.type==Battle.DamageType.LASER
                         ?LaserFamilies.eventWeapon(beam.laserType):beam.type.name();
-                offerWeapon(beam.x1,beam.y1,14f,.065f,type);
-                offerWeapon(beam.x2,beam.y2,BEAM_HIT_LIGHT_RADIUS,.09f,type);
+                float reach=impactLightReach(type);
+                float gain=impactLightGain(type);
+                offerWeapon(beam.x1,beam.y1,Math.min(14f,reach),gain*.50f,type);
+                offerWeapon(beam.x2,beam.y2,Math.min(BEAM_HIT_LIGHT_RADIUS,reach),
+                        gain*.70f,type);
             }
         }
         counted=0;

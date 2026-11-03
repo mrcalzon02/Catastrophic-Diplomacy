@@ -137,7 +137,7 @@ final class CombatLightingRenderer implements Disposable {
     /** Subpixel projected radius is allowed to disappear at tactical zoom. */
     static float hotMetalRadius(Battle.DamageType family){
         return CombatEffectScale.of(switch(family){
-            case PLASMA -> 3.0f;
+            case PLASMA -> 1.0f;  // Threefold tighter; molten lips stay in the material mask.
             case TORPEDO -> 2.7f;
             case MISSILE -> 2.2f;
             case PARTICLE -> 1.8f;
@@ -152,6 +152,24 @@ final class CombatLightingRenderer implements Disposable {
     }
     static float impactFlashAlpha(boolean intercepted){
         return intercepted?.13f:.18f;
+    }
+    /** Small kinetic chip flash; plasma is one-third the previous spread.
+     * No change to physical impact size, 96px mask or smoke/scorch zones. */
+    static float impactFlashRadius(Battle.DamageType family,boolean intercepted){
+        if(family==Battle.DamageType.KINETIC)
+            return CombatEffectScale.of(intercepted?3.5f:5f);
+        if(family==Battle.DamageType.PLASMA)
+            return CombatEffectScale.of(intercepted?3f:4f);
+        return impactFlashRadius(intercepted,family==Battle.DamageType.TORPEDO);
+    }
+    static float impactFlashAlpha(Battle.DamageType family,boolean intercepted){
+        if(family==Battle.DamageType.KINETIC)return intercepted?.025f:.045f;
+        if(family==Battle.DamageType.PLASMA)return intercepted?.035f:.07f;
+        return impactFlashAlpha(intercepted);
+    }
+    static float impactWhiteCoreAlpha(Battle.DamageType family){
+        return family==Battle.DamageType.KINETIC?.018f:
+                family==Battle.DamageType.PLASMA?.028f:.085f;
     }
 
     private void streak(SpriteBatch batch, OrthographicCamera camera,
@@ -402,8 +420,8 @@ final class CombatLightingRenderer implements Disposable {
             float age=(float)(battle.tick-e.tick())/lifetime;
             if(age<0||age>=1)continue;
             boolean intercepted=e.phase()==Battle.VisualPhase.INTERCEPT;
-            boolean heavy=e.weapon().equals("KINETIC")||e.weapon().equals("TORPEDO");
-            float radius=impactFlashRadius(intercepted,heavy);
+            Battle.DamageType family=CombatHitFeedback.weaponKind(e.weapon());
+            float radius=impactFlashRadius(family,intercepted);
             boolean near=false;
             for(int i=0;i<flashLights;i++){
                 float dx=flashX[i]-(float)e.x(),dy=flashY[i]-(float)e.y();
@@ -414,9 +432,9 @@ final class CombatLightingRenderer implements Disposable {
             Color tint=intercepted?Color.GREEN:eventColor(e.weapon());
             float fade=(1f-age)*(1f-age);
             tightSpot(batch,camera,e.x(),e.y(),radius*(.8f+age*.25f),
-                    tint,impactFlashAlpha(intercepted)*fade);
+                    tint,impactFlashAlpha(family,intercepted)*fade);
             tightSpot(batch,camera,e.x(),e.y(),radius*.25f,
-                    Color.WHITE,.085f*fade*fade);
+                    Color.WHITE,impactWhiteCoreAlpha(family)*fade*fade);
             flashX[flashLights]=(float)e.x();
             flashY[flashLights]=(float)e.y();
             flashR[flashLights++]=radius;
@@ -496,7 +514,7 @@ final class CombatLightingRenderer implements Disposable {
     static float emissionStrength(Battle.DamageType family){
         if(family==null)return 0f;
         return switch(family){
-            case PLASMA -> .12f;
+            case PLASMA -> .065f;
             case LASER -> .055f;
             case PARTICLE -> .075f;
             case TORPEDO -> .095f;

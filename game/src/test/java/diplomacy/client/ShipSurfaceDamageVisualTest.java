@@ -71,6 +71,28 @@ public final class ShipSurfaceDamageVisualTest {
                 ShipLightProbes.BEAM_HIT_LIGHT_RADIUS<=19f&&
                 ShipLightProbes.MAX_WEAPON_LIGHT_GAIN<=.13f,
                 "Hull shader probes must not revive ship-wide cyan/red tint");
+        check(CombatLightingRenderer.hotMetalRadius(diplomacy.sim.Battle.DamageType.PLASMA)
+                        <=CombatEffectScale.of(1.0f)&&
+                CombatLightingRenderer.emissionStrength(diplomacy.sim.Battle.DamageType.PLASMA)
+                        <=.065f,
+                "Plasma molten lip may glow but not light the entire scar");
+        check(CombatLightingRenderer.impactFlashRadius(diplomacy.sim.Battle.DamageType.PLASMA,false)
+                        <=CombatEffectScale.of(4f)&&
+                CombatLightingRenderer.impactFlashRadius(diplomacy.sim.Battle.DamageType.KINETIC,false)
+                        <=CombatEffectScale.of(5f),
+                "Plasma and cold kinetic impact halos must remain pin-sized");
+        check(CombatLightingRenderer.impactFlashAlpha(diplomacy.sim.Battle.DamageType.KINETIC,false)
+                        <=.045f&&
+                CombatLightingRenderer.impactFlashAlpha(diplomacy.sim.Battle.DamageType.PLASMA,false)
+                        <=.07f&&
+                CombatLightingRenderer.impactWhiteCoreAlpha(diplomacy.sim.Battle.DamageType.KINETIC)
+                        <=.018f,
+                "Cold kinetic chip and plasma flash must not be white spotlights");
+        check(ShipLightProbes.impactLightReach("KINETIC")<=5f&&
+                ShipLightProbes.impactLightReach("PLASMA")<=6f&&
+                ShipLightProbes.impactLightGain("KINETIC")<=.025f&&
+                ShipLightProbes.impactLightGain("PLASMA")<=.045f,
+                "Hull material shader must follow reduced kinetic/plasma radii");
         check(ShipSurfaceLighting.FRAGMENT.contains("float peak=max(strikeLight.r,")&&
                 ShipSurfaceLighting.FRAGMENT.contains("0.12/max(peak,0.0001)")&&
                 ShipSurfaceLighting.FRAGMENT.contains("attenuation*attenuation*attenuation"),
