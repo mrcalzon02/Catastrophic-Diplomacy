@@ -737,6 +737,24 @@ public final class Battle {
     /** Diagnostic counters: real PD hits and kills of hostile craft, excluding
      * ordinary fuel expiry, voluntary docking or other combat losses. */
     public int pointDefenseCraftHits,pointDefenseCraftKills;
+    /** Kill attribution is recorded only after a real hostile body is
+     * removed. These counters do not alter fire control, armor, probabilities,
+     * ammunition or RNG. Decoys are distinct from damaging guided bodies. */
+    public enum DefensiveGun { LASER_PD, FLAK, ROTARY_CIWS, RAIL_PD }
+    public enum DefensiveTarget { MISSILE, TORPEDO, DECOY, ROCKET, KINETIC, CRAFT }
+    private final int[][] defensiveKills=
+            new int[DefensiveGun.values().length][DefensiveTarget.values().length];
+    public int defensiveKills(DefensiveGun gun,DefensiveTarget target){
+        if(gun==null||target==null)throw new IllegalArgumentException("Defense counter key required");
+        return defensiveKills[gun.ordinal()][target.ordinal()];
+    }
+    private void recordDefensiveKill(DefensiveGun gun,DefensiveTarget target){
+        defensiveKills[gun.ordinal()][target.ordinal()]++;
+    }
+    private static DefensiveTarget guidedDefenseTarget(Missile missile){
+        return missile.decoy?DefensiveTarget.DECOY:
+                missile.torpedo?DefensiveTarget.TORPEDO:DefensiveTarget.MISSILE;
+    }
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
     /** Last observed position and velocity are snapshots, NOT hidden truth. */
     public static final class ContactTrack {
@@ -3886,6 +3904,7 @@ public final class Battle {
                         target.spec,burst.damage);
                 if(target.integrity<=0){
                     missiles.remove(i);missileIntercepts++;shooter.intercepted++;
+                    recordDefensiveKill(DefensiveGun.FLAK,guidedDefenseTarget(target));
                     if(target.decoy)decoysIntercepted++;
                     visual(target.visualId,VisualPhase.INTERCEPT,
                             target.decoy?"DECOY":target.torpedo?"TORPEDO":"MISSILE",
@@ -3905,6 +3924,7 @@ public final class Battle {
                         target.spec,burst.damage);
                 if(target.integrity<=0){
                     rockets.remove(i);rocketIntercepts++;shooter.intercepted++;
+                    recordDefensiveKill(DefensiveGun.FLAK,DefensiveTarget.ROCKET);
                     visual(target.visualId,VisualPhase.INTERCEPT,"ROCKET",
                             target.team,target.sourceId,target.targetId,
                             target.x,target.y,target.x,target.y);
@@ -3925,6 +3945,7 @@ public final class Battle {
                         target.spec,burst.damage)*.32;
                 if(target.integrity<=0){
                     ballistics.remove(i);ballisticIntercepts++;shooter.intercepted++;
+                    recordDefensiveKill(DefensiveGun.FLAK,DefensiveTarget.KINETIC);
                     visual(target.visualId,VisualPhase.INTERCEPT,"KINETIC",
                             target.team,target.sourceId,target.targetId,
                             target.x,target.y,target.x,target.y);
@@ -3949,6 +3970,7 @@ public final class Battle {
                 pointDefenseCraftHits++;
                 if(target.integrity<=0){
                     crafts.remove(i);craftLosses++;pointDefenseCraftKills++;
+                    recordDefensiveKill(DefensiveGun.FLAK,DefensiveTarget.CRAFT);
                 }
             }
         }
@@ -4291,6 +4313,7 @@ public final class Battle {
                     if(craftHit.integrity<=0){
                         crafts.remove(craftHit);
                         pointDefenseCraftKills++;craftLosses++;
+                        recordDefensiveKill(DefensiveGun.RAIL_PD,DefensiveTarget.CRAFT);
                     }
                 }else{
                     ProjectileModel.Spec signature=missileHit!=null?missileHit.spec:
@@ -4301,6 +4324,7 @@ public final class Battle {
                         missileHit.integrity-=depth;
                         if(missileHit.integrity<=0&&missiles.remove(missileHit)){
                             missileIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            recordDefensiveKill(DefensiveGun.RAIL_PD,guidedDefenseTarget(missileHit));
                             if(missileHit.decoy)decoysIntercepted++;
                             visual(missileHit.visualId,VisualPhase.INTERCEPT,
                                     missileHit.decoy?"DECOY":
@@ -4312,6 +4336,7 @@ public final class Battle {
                         rocketHit.integrity-=depth;
                         if(rocketHit.integrity<=0&&rockets.remove(rocketHit)){
                             rocketIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            recordDefensiveKill(DefensiveGun.RAIL_PD,DefensiveTarget.ROCKET);
                             visual(rocketHit.visualId,VisualPhase.INTERCEPT,"ROCKET",
                                     rocketHit.team,rocketHit.sourceId,rocketHit.targetId,
                                     rocketHit.x,rocketHit.y,rocketHit.x,rocketHit.y);
@@ -4320,6 +4345,7 @@ public final class Battle {
                         shellHit.integrity-=depth;
                         if(shellHit.integrity<=0&&ballistics.remove(shellHit)){
                             ballisticIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            recordDefensiveKill(DefensiveGun.RAIL_PD,DefensiveTarget.KINETIC);
                             visual(shellHit.visualId,VisualPhase.INTERCEPT,"KINETIC",
                                     shellHit.team,shellHit.sourceId,shellHit.targetId,
                                     shellHit.x,shellHit.y,shellHit.x,shellHit.y);
@@ -4524,6 +4550,7 @@ public final class Battle {
                     pointDefenseCraftHits++;
                     if(hitAircraft.integrity<=0){
                         crafts.remove(hitAircraft);craftLosses++;pointDefenseCraftKills++;
+                        recordDefensiveKill(DefensiveGun.ROTARY_CIWS,DefensiveTarget.CRAFT);
                     }
                 }else{
                     ProjectileModel.Spec spec=hitMissile!=null?hitMissile.spec:
@@ -4534,6 +4561,7 @@ public final class Battle {
                         hitMissile.integrity-=kinetic;
                         if(hitMissile.integrity<=0&&missiles.remove(hitMissile)){
                             missileIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            recordDefensiveKill(DefensiveGun.ROTARY_CIWS,guidedDefenseTarget(hitMissile));
                             if(hitMissile.decoy)decoysIntercepted++;
                             visual(hitMissile.visualId,VisualPhase.INTERCEPT,
                                     hitMissile.decoy?"DECOY":
@@ -4546,6 +4574,7 @@ public final class Battle {
                         hitRocket.integrity-=kinetic;
                         if(hitRocket.integrity<=0&&rockets.remove(hitRocket)){
                             rocketIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            recordDefensiveKill(DefensiveGun.ROTARY_CIWS,DefensiveTarget.ROCKET);
                             visual(hitRocket.visualId,VisualPhase.INTERCEPT,"ROCKET",
                                     hitRocket.team,hitRocket.sourceId,
                                     hitRocket.targetId,hitRocket.x,hitRocket.y,
@@ -4555,6 +4584,7 @@ public final class Battle {
                         hitShell.integrity-=kinetic*.68;
                         if(hitShell.integrity<=0&&ballistics.remove(hitShell)){
                             ballisticIntercepts++;if(shooter!=null)shooter.intercepted++;
+                            recordDefensiveKill(DefensiveGun.ROTARY_CIWS,DefensiveTarget.KINETIC);
                             visual(hitShell.visualId,VisualPhase.INTERCEPT,"KINETIC",
                                     hitShell.team,hitShell.sourceId,hitShell.targetId,
                                     hitShell.x,hitShell.y,hitShell.x,hitShell.y);
@@ -4815,6 +4845,7 @@ public final class Battle {
                             chosenMissile.spec,pdProfile);
                     if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
                         defender.intercepted++;missileIntercepts++;
+                        recordDefensiveKill(DefensiveGun.LASER_PD,guidedDefenseTarget(chosenMissile));
                         if(chosenMissile.decoy)decoysIntercepted++;
                         visual(chosenMissile.visualId,VisualPhase.INTERCEPT,
                                 chosenMissile.decoy?"DECOY":chosenMissile.torpedo?"TORPEDO":"MISSILE",
@@ -4826,6 +4857,7 @@ public final class Battle {
                             chosenRocket.spec,pdProfile);
                     if(chosenRocket.integrity<=0&&rockets.remove(chosenRocket)){
                         defender.intercepted++;rocketIntercepts++;
+                        recordDefensiveKill(DefensiveGun.LASER_PD,DefensiveTarget.ROCKET);
                         visual(chosenRocket.visualId,VisualPhase.INTERCEPT,"ROCKET",
                                 chosenRocket.team,chosenRocket.sourceId,
                                 chosenRocket.targetId,chosenRocket.x,chosenRocket.y,
@@ -4836,6 +4868,7 @@ public final class Battle {
                             chosenShell.spec,pdProfile);
                     if(chosenShell.integrity<=0 && ballistics.remove(chosenShell)){
                         defender.intercepted++;ballisticIntercepts++;
+                        recordDefensiveKill(DefensiveGun.LASER_PD,DefensiveTarget.KINETIC);
                         visual(chosenShell.visualId,VisualPhase.INTERCEPT,"KINETIC",
                                 chosenShell.team,chosenShell.sourceId,chosenShell.targetId,
                                 chosenShell.x,chosenShell.y,chosenShell.x,chosenShell.y);
@@ -4915,6 +4948,7 @@ public final class Battle {
                     pointDefenseCraftHits++;
                     if(craft.integrity<=0){
                         crafts.remove(i);craftLosses++;pointDefenseCraftKills++;
+                        recordDefensiveKill(DefensiveGun.LASER_PD,DefensiveTarget.CRAFT);
                     }
                 }
                 break;
