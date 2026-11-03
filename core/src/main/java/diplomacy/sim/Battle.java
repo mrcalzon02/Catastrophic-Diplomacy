@@ -185,6 +185,8 @@ public final class Battle {
         public final Map<Integer,ContactTrack> knownTracks=new HashMap<>();
         /** Fixed historical light-time samples; no instant telemetry in the HUD. */
         public final SensorLightTimeHistory sensorHistory=new SensorLightTimeHistory();
+        /** A packet must be transmitted by a real scout before ally receipt. */
+        public final SensorRelayBuffer relayPackets=new SensorRelayBuffer();
         /** Installed acquisition doctrine. STANDARD retains old automatic sensing. */
         public final SensorActiveScan.State scan=new SensorActiveScan.State();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
@@ -2133,19 +2135,28 @@ public final class Battle {
         for(Ship ship:ships)ship.sensorHistory.capture(observedTick,ship);
     }
 
-    /** A receipt is always a historical photon measurement, whether an
-     * independent local scan or a powered allied transmitter report.
-     * SHARED contact routing is still capped by the fitted existing hardware. */
+    /** Local sensors read only arrived historical light. Remote ships read
+     * the sender's finite actual packet archive. No allied receiver can
+     * reconstruct a packet the scout never observed and transmitted. */
     private SensorLightTimeHistory.Observation receivedContact(
             Ship viewer,Ship target,Ship source){
         if(source==null)return null;
-        double sourceDistance=StrictMath.hypot(
-                source.x-target.x,source.y-target.y);
-        int channels=directSensorChannels(source,target,sourceDistance);
+        if(source!=viewer){
+            if(viewer.power<=3||source.power<=3||source.sensorsCondition<=.05||
+                    viewer.crewReadiness()<.05||source.crewReadiness()<.05)
+                return null;
+            int fitted=(int)StrictMath.ceil(source.network.sharingCapacity()*
+                    StrictMath.max(0,source.sensorsCondition));
+            int capacity=StrictMath.min(SensorRelayBuffer.MAX_TARGETS,
+                    StrictMath.max(weather.preset().enabled()?4:0,fitted));
+            int linkTicks=SensorLightTimeHistory.propagationTicks(
+                    StrictMath.hypot(viewer.x-source.x,viewer.y-source.y));
+            return source.relayPackets.delivered(target.id,tick,linkTicks,capacity);
+        }
+        double distance=StrictMath.hypot(source.x-target.x,source.y-target.y);
+        int channels=directSensorChannels(source,target,distance);
         if(channels==0)return null;
-        int linkTicks=source==viewer?0:SensorLightTimeHistory.propagationTicks(
-                StrictMath.hypot(viewer.x-source.x,viewer.y-source.y));
-        return SensorLightTimeHistory.receive(source,target,tick,channels,linkTicks);
+        return SensorLightTimeHistory.receive(source,target,tick,channels,0);
     }
 
     /** Paid tracking retains measured-state history; a relayed fix must
@@ -2250,9 +2261,12 @@ public final class Battle {
             int capacity=(int)StrictMath.ceil(scout.network.sharingCapacity()
                     *StrictMath.max(0,scout.sensorsCondition));
             capacity=StrictMath.min(32,capacity);
-            if(capacity>0){
-                Arrays.fill(selected,0,capacity,null);
-                Arrays.fill(distances,0,capacity,Double.POSITIVE_INFINITY);
+            // The weather-enabled legacy short radio shares at most four
+            // contacts; without SHR it never acquires a long-range broadcast.
+            int broadcastCapacity=StrictMath.max(capacity,legacyRelay?4:0);
+            if(broadcastCapacity>0){
+                Arrays.fill(selected,0,broadcastCapacity,null);
+                Arrays.fill(distances,0,broadcastCapacity,Double.POSITIVE_INFINITY);
             }
             for(Ship hostile:ships){
                 if(!hostile.alive()||hostile.team==scout.team)continue;
@@ -2267,9 +2281,9 @@ public final class Battle {
                     closest[hostile.id]=d2;
                     contacts[hostile.id]=scout;
                 }
-                if(capacity<=0)continue;
-                for(int k=0;k<capacity;k++)if(d2<distances[k]){
-                    for(int n=capacity-1;n>k;n--){
+                if(broadcastCapacity<=0)continue;
+                for(int k=0;k<broadcastCapacity;k++)if(d2<distances[k]){
+                    for(int n=broadcastCapacity-1;n>k;n--){
                         distances[n]=distances[n-1];
                         selected[n]=selected[n-1];
                     }
@@ -2277,10 +2291,17 @@ public final class Battle {
                     break;
                 }
             }
-            for(int k=0;k<capacity;k++){
+            for(int k=0;k<broadcastCapacity;k++){
                 Ship hostile=selected[k];
                 if(hostile==null)break;
-                if(distances[k]<expandedNearest[scout.team][hostile.id]){
+                SensorLightTimeHistory.Observation received=
+                        receivedContact(scout,hostile,scout);
+                // Only an actually arrived local observation enters the
+                // finite packet buffer. This is the sender transmit time,
+                // distinct from original illumination and target reflection.
+                if(received!=null)
+                    scout.relayPackets.transmit(hostile.id,tick,received,broadcastCapacity);
+                if(k<capacity&&distances[k]<expandedNearest[scout.team][hostile.id]){
                     expandedNearest[scout.team][hostile.id]=distances[k];
                     expandedSpotters[scout.team][hostile.id]=scout;
                 }
