@@ -100,6 +100,10 @@ public final class WeaponFxProfile {
             return new Profile("point_defense",Motion.HITSCAN,
                     new Clip("effects/weapon_fx/laser/firing_%02d.png",8,1,false,14,14),
                     NONE,NONE,NONE);
+        if(weapon.equals("ROTARY_CIWS"))
+            return new Profile("rotary_ciws",Motion.BALLISTIC,
+                    seq("kinetic","firing",8,1,12,12),NONE,
+                    seq("kinetic","impact",8,1,13,13),NONE);
         if(weapon.equals("DRONE"))return new Profile("drone",Motion.CRAFT,
                 seq("drone","firing",8,1,22,22),NONE,NONE,NONE);
         try{return forType(Battle.DamageType.valueOf(weapon));}
