@@ -17,7 +17,11 @@ public final class ShipSurfaceDamageVisualTest {
                 check(ShipSurfaceSampleGrid.sourcePixel(y,height,144)==y*height/144,
                         "Damage mask row and shield overlay must use identical source UVs");
         check(ShipSurfaceSampleGrid.maskBytes(96,144)==55296,
-                "Per-sprite CPU cache must remain exactly one small RGBA mask");
+                "Legacy 96x144 resolution accounting must remain exact");
+        check(ShipSurfaceSampleGrid.maskBytes(192,288)==221184,
+                "Native-96 wound runtime overlay must report correct 2x-axis memory");
+        check(ShipDamageImageMasks.SIZE==96 && ShipDamageImageMasks.COUNT==6,
+                "Live authored wound source must provide six 96px frames per family");
         check(ShipSurfaceSampleGrid.originalBytes(1024,1536)>
                 ShipSurfaceSampleGrid.maskBytes(96,144)*100,
                 "The source-pixel cache must reduce retained decoded memory by over 100x for large PNGs");
