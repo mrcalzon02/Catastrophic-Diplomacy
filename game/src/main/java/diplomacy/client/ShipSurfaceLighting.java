@@ -59,41 +59,33 @@ final class ShipSurfaceLighting implements Disposable {
         "  vec4 peel=texture2D(u_damage,v_uv);\n"+
         "  albedo.a*=peel.a;\n"+
         "  albedo.rgb*=1.0-0.54*peel.r;\n"+
-        "  if(peel.b>0.62){\n"+
-        "   // Laser-annealed plating: gold/bronze/violet/blue interference oxide.\n"+
-        "   // The colored ring is permanent damage, not an emissive beam/glow.\n"+
-        "   float phase=peel.g;\n"+
-        "   vec3 oxide=mix(vec3(0.79,0.60,0.31),vec3(0.64,0.39,0.29),smoothstep(0.07,0.29,phase));\n"+
-        "   oxide=mix(oxide,vec3(0.49,0.35,0.66),smoothstep(0.30,0.57,phase));\n"+
-        "   oxide=mix(oxide,vec3(0.31,0.52,0.81),smoothstep(0.59,0.88,phase));\n"+
-        "   float anneal=clamp((peel.b-0.64)/0.36,0.0,1.0);\n"+
-        "   float luma=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
-        "   albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.33+0.15*smoothstep(0.06,0.70,luma)));\n"+
-        "   // Laser scores carry a very narrow incandescent lip, surrounded\n"+
-        "   // by the widest stable oxide/heat-affected radius of any weapon.\n"+
-        "   // This is clipped to surviving plating, never an outer glow sprite.\n"+
-        "   float laserLip=smoothstep(0.86,0.97,peel.b)*smoothstep(0.04,0.35,peel.a);\n"+
-        "   residualHeat+=vec3(0.32,0.115,0.025)*laserLip*0.72;\n"+
-        "  }else{\n"+
-        "   albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
-        "   float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
-        "   float metalBoost=1.0-smoothstep(0.12,0.60,sourceLum);\n"+
-        "   // Bilinear sampling of tagged oxide edges must not turn into\n"+
-        "   // an invented, blinding silver kinetic rim. Thermal shrapnel\n"+
-        "   // remains warm while unheated kinetic fractures stay chrome.\n"+
-        "   float coolMetal=1.0-smoothstep(0.005,0.08,peel.g);\n"+
-        "   float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost)*coolMetal;\n"+
-        "   albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
-        "   // Hot exposed lips brighten amber instead of disappearing when\n"+
-        "   // cool chrome is suppressed by the thermal G channel. Kinetic\n"+
-        "   // has no G heat and therefore never receives this molten tint.\n"+
-        "   float moltenLip=clamp(peel.b/0.56,0.0,1.0)*smoothstep(0.11,0.38,peel.g);\n"+
-        "   albedo.rgb=mix(albedo.rgb,vec3(1.0,0.72,0.33),moltenLip*0.43);\n"+
-        "   // Genuine compressed/melted edges emit a small steady amber\n"+
-        "   // contribution even on dark plating. Cooled laser oxide does not.\n"+
-        "   // G is zero outside the real armor impact mask.\n"+
-        "   residualHeat=vec3(0.32,0.105,0.018)*peel.g*peel.g;\n"+
-        "  }\n"+
+        "  // Feather B-channel material classification across bilinear texels.\n"+
+        "  // A hard laser/metal branch painted orange and chrome contours around\n"+
+        "  // the 96px oxide extent. Cold kinetic metal has G=0; hot plasma cannot\n"+
+        "  // reach the reserved B>=0.64 tag range. Neither is misclassified.\n"+
+        "  float oxideMix=smoothstep(0.56,0.72,peel.b)*smoothstep(0.035,0.10,peel.g);\n"+
+        "  float thermal=peel.g*(1.0-oxideMix);\n"+
+        "  albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),thermal*0.48);\n"+
+        "  float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
+        "  float metalBoost=1.0-smoothstep(0.12,0.60,sourceLum);\n"+
+        "  float coolMetal=1.0-smoothstep(0.005,0.08,peel.g);\n"+
+        "  float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost)*coolMetal*(1.0-oxideMix);\n"+
+        "  albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
+        "  float moltenLip=clamp(peel.b/0.56,0.0,1.0)*smoothstep(0.11,0.38,thermal);\n"+
+        "  albedo.rgb=mix(albedo.rgb,vec3(1.0,0.72,0.33),moltenLip*0.43);\n"+
+        "  residualHeat=vec3(0.32,0.105,0.018)*thermal*thermal;\n"+
+        "  // Laser discoloration is wider than plasma heat, but not a luminous\n"+
+        "  // outer circle. Oxide phase bends bronze -> violet -> blue on surviving\n"+
+        "  // plating; the narrow scored core may carry localized incandescent light.\n"+
+        "  float phase=peel.g;\n"+
+        "  vec3 oxide=mix(vec3(0.79,0.60,0.31),vec3(0.64,0.39,0.29),smoothstep(0.07,0.29,phase));\n"+
+        "  oxide=mix(oxide,vec3(0.49,0.35,0.66),smoothstep(0.30,0.57,phase));\n"+
+        "  oxide=mix(oxide,vec3(0.31,0.52,0.81),smoothstep(0.59,0.88,phase));\n"+
+        "  float anneal=clamp((peel.b-0.56)/0.44,0.0,1.0)*oxideMix;\n"+
+        "  float luma=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
+        "  albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.33+0.15*smoothstep(0.06,0.70,luma)));\n"+
+        "  float laserLip=smoothstep(0.86,0.97,peel.b)*smoothstep(0.04,0.35,peel.a)*oxideMix;\n"+
+        "  residualHeat+=vec3(0.32,0.115,0.025)*laserLip*0.72;\n"+
         " }\n"+
         " if(albedo.a<0.004){gl_FragColor=vec4(0.0);return;}\n"+
         " if(u_detail<0.01){gl_FragColor=vec4(min(albedo.rgb+residualHeat,vec3(1.0)),albedo.a);return;}\n"+
