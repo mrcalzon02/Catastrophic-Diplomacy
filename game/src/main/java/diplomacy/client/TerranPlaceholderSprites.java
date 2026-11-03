@@ -956,19 +956,19 @@ public final class TerranPlaceholderSprites implements Disposable {
                 surfaces.damage(batch,null);
                 drawWhole(batch,tex,pose,width,height,rotation);
             }else{
-                // The structurally exposed metal MUST be drawn without
-                // the ORIGINAL hull's normal/emissive maps. Those maps gave
-                // cut-through areas the same bright cyan/purple glow as the
-                // intact upper art and concealed the dark structural backing.
-                // Keep the original source alpha and deception opacity.
-                surfaces.damage(batch,null);
-                surfaces.unlit(batch);
-                batch.setColor(1f,1f,1f,
-                        DeceptionProjection.hullOpacity(ship,battle.tick));
-                drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*.30),
-                        pose,width,height,rotation);
-                // Rebind the normal/emissive surface ONLY for intact armor
-                // pixels of the overlying original full-resolution sprite.
+                // The true structural backing is visible ONLY through
+                // physically opened armor pixels. The earlier whole-hull
+                // underlayer doubled translucent edge pixels all around the
+                // silhouette, creating the reported transparency halo.
+                Texture woundMask=peeled.get(ship.id).overlay;
+                if(surfaces.underlay(batch,woundMask)){
+                    batch.setColor(1f,1f,1f,
+                            DeceptionProjection.hullOpacity(ship,battle.tick));
+                    drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*.30),
+                            pose,width,height,rotation);
+                }
+                // Upper artwork retains the ORIGINAL normal and emissive
+                // maps. The underlayer has neither illumination nor glow.
                 surfaces.bind(batch,tex);
                 surfaces.color(batch,rotation,(float)Math.max(0,
                         Math.min(1,ship.hull/Math.max(1,ship.maxHull))),
