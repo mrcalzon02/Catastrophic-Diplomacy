@@ -13,7 +13,7 @@ import java.util.List;
 public final class WeaponMuzzles {
     private WeaponMuzzles(){}
     public enum Family {
-        LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, ROCKET, POINT_DEFENSE, FLAK, ROTARY_CIWS
+        LASER, KINETIC, PLASMA, PARTICLE, MISSILE, TORPEDO, ROCKET, POINT_DEFENSE, FLAK, ROTARY_CIWS, RAIL_PD
     }
     public record Emitter(int slotId,Family family,double localX,double localY,
                           String component) {
@@ -38,6 +38,7 @@ public final class WeaponMuzzles {
             case "PD" -> Family.POINT_DEFENSE;
             case "FLK" -> Family.FLAK;
             case "RCW" -> Family.ROTARY_CIWS;
+            case "RPD" -> Family.RAIL_PD;
             default -> null;
         };
     }
