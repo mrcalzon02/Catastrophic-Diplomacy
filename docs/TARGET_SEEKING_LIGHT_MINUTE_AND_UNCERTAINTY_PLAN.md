@@ -1,6 +1,6 @@
 # Light-minute battlefield, probabilistic target seeking and physical aim error
 
-**Implementation underway • 2026-11-03 • Stages 0 and 1 integrated, initial Stage 2 bounded historical sensor sampling and delayed tactical display committed. Combat lock authorization and physical network delivery remain pending.**
+**Implementation underway • 2026-11-03 • Stages 0–2 include sublight geometry, light-time history and measured-time signatures. Operational scanning, causal STANDARD targeting, sender-origin SHR/LNK packet delivery and first finite kinetic compute are integrated. Full physical beams, guided-seeker prediction, UI and 200v200 balance remain outstanding.**
 
 ## Design intent
 
@@ -131,17 +131,40 @@ of 160 deterministic misaligned rays against a radius-12 world-unit hull,
 133 rays intersected and 27 missed; this is not a measured combat kill
 percentage or final balance statistic.
 
-**Remaining Stage 3–5 scope:** scan doctrine UI and saved orders,
-physical sector limits and emission detectability, full historical sensor
-signatures rather than present target signatures for candidate eligibility,
-genuine timestamped LNK historical track delivery, FCM/RES/TRK/CAP compute
-budget allocation, error covariance and maneuvering-target updates, live
-laser/plasma/particle physical beam intersections, guided seeker uncertainty,
-and 200v200 and Android endurance/performance tuning. The existing instant
-beam damage rules and many homing paths still consume target ground truth.
-Not all ammunition or drive envelopes are relativistically calibrated.
-Visual or balance diagnostics must remain nonblocking; functional failures
-must be reported and repaired.
+**Stage 4 additional integrations:** `SensorLightTimeHistory.Profile` stores
+historical radar cross-section, thermal signature, optical cloak, hull mass,
+armor and installed sensor capabilities, bounded to 128 per hull. The local
+acquisition and relay sender-choice paths check historical photon arrival and
+measured signatures instead of the presently maneuvering target. A bounded
+backward light-cone search retains echoes already in flight even after abrupt
+target movement.
+
+The separately fitted `SensorTrackRelayBuffer` transmits genuine TRK fixes
+over LNK, respecting up to 32 identified tracks, 32 per-track buffered sends,
+hardware slots, physical sender coordinates and receiver photon travel.
+Neither tactical displays nor captain search may reach directly into
+another vessel's live TRK map; remote historical packets cannot create
+weapon lock permission. Physical LNK buffer state enters replay fingerprints.
+
+`SensorComputeBudget` establishes a finite per-ship, per-combat-tick work
+pool using ACU/RES/TRK capacity, command aid, crew, reactor and sensor health.
+Distance, age and competing recorded hypotheses raise a quadratic-like work
+cost. The real kinetic firing path reserves work before solving a shot; when
+insufficient, its uncertainty increases rather than automatically missing.
+CAP increases parallel fire-control slots but cannot add processor cycles.
+Coefficients are provisional. Dedicated functional tests are included in
+`:core:sensorNetworkSmoke`.
+
+**Remaining Stage 3–5 scope:** sensor doctrine UI and saved orders, physical
+active scan sector limits and emission detectability, per-channel time-varying
+weather, explicit FCM shared-CPU arbitration between allies, richer maneuver
+covariance and false-hypothesis competition, physical laser/plasma/particle
+beam intersections, guided seeker uncertainty, and 200v200/Android endurance
+and balance tuning. Current beam and many guided weapons still consume
+hostile world truth after initial contact permission. Power and heat
+costs and the precise drive/munition speed envelopes need further tuning.
+Visual and balance diagnostics remain nonblocking; objective functional
+failures require repair.
 
 ## 1. One light-minute *diagonal*, not endless simulation space
 
@@ -429,13 +452,14 @@ visual overlays and balance tables are diagnostics.
    but every hit must derive from a real path through a target; stale
    contacts alone still must not silently grant automatic lock authorization.
 
-**Implementation status:** Geometry, sublight thrust, timestamped light
-history, directed paid sensor bursts, causal STANDARD contact permission,
-bounded sender-origin SHR/legacy radio transmissions and first physical
-kinetic prediction/uncertainty are committed and covered by focused
-regression tests. LNK historical track packets, complete historical
-signature acquisition, contested compute allocation, non-kinetic physical
-aim, user-facing scan controls and 200v200 balance remain pending.
-Existing tests may be extended in the headless CI workflow without
-building Windows/Linux/Android packages on every sensor edit; only
-objective functionality should block a release.
+**Implementation status:** Geometry, bounded historical photon arrivals,
+temporal signatures, operating scan doctrines, causal STANDARD contact
+authorization, real SHR and LNK sender-origin packet transport, deterministic
+kinetic prediction and first finite kinetic compute allocation are committed.
+Historical signatures and LNK transport have passed the focused regression
+workflow. The new compute budget is integrated but its dedicated CI result
+must be verified separately; do not treat a passing advisory workflow wrapper
+as proof without reading actual Gradle smoke output. Physical beam/rocket/
+guided-target solutions, shared inter-ship compute, controls, persistence
+and large-scale endurance remain unfinished. Only actual functional
+failures should gate builds, not cosmetics or balance measurements.
