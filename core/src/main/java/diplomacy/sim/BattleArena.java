@@ -13,7 +13,7 @@ public final class BattleArena {
     public static final int MAX_SHIPS_PER_SIDE=200;
     public static final double MAX_GUIDED_SECONDS=20;
     public static final double MAX_ROCKET_SECONDS=10;
-    public static final double MAX_BALLISTIC_SECONDS=12;
+    public static final double MAX_BALLISTIC_SECONDS=40;
     public static final double MAX_POINT_DEFENSE_SECONDS=3;
 
     public static boolean contains(double x,double y){
