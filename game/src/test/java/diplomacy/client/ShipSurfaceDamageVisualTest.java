@@ -67,6 +67,14 @@ public final class ShipSurfaceDamageVisualTest {
                         <=CombatEffectScale.of(19f)&&
                 CombatLightingRenderer.impactFlashAlpha(false)<=.18f,
                 "Impact flashes must not wash out entire cruiser and frigate hulls");
+        check(ShipLightProbes.IMPACT_LIGHT_RADIUS<=18f&&
+                ShipLightProbes.BEAM_HIT_LIGHT_RADIUS<=19f&&
+                ShipLightProbes.MAX_WEAPON_LIGHT_GAIN<=.13f,
+                "Hull shader probes must not revive ship-wide cyan/red tint");
+        check(ShipSurfaceLighting.FRAGMENT.contains("float peak=max(strikeLight.r,")&&
+                ShipSurfaceLighting.FRAGMENT.contains("0.12/max(peak,0.0001)")&&
+                ShipSurfaceLighting.FRAGMENT.contains("attenuation*attenuation*attenuation"),
+                "Weapon-light shader must cap and steeply fade combined lighting");
         check(ShipSurfaceSampleGrid.originalBytes(1024,1536)>
                 ShipSurfaceSampleGrid.maskBytes(96,144)*100,
                 "The source-pixel cache must reduce retained decoded memory by over 100x for large PNGs");
