@@ -1,0 +1,156 @@
+package diplomacy.client;
+
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import diplomacy.shipyard.HullLayouts;
+import diplomacy.shipyard.Shipyard;
+import diplomacy.sim.Battle;
+import diplomacy.sim.FogOfWarModel;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Actual direct multi-spectral returns drawn above the optical fog.
+ * No ship artwork is substituted for infrared, X-ray or gravitic contacts.
+ * This player-command display surveys owned hulls; it does not grant a
+ * ship-to-ship datalink or change the combat targeting model.
+ */
+final class SensorContactOverlay {
+    private final Map<Integer,Integer> contacts=new HashMap<>();
+    private Battle source;
+    private long scannedTick=Long.MIN_VALUE;
+    private int scannedTeam=-1;
+    void refresh(Battle battle,int team){
+        if(battle==source&&scannedTeam==team&&scannedTick!=Long.MIN_VALUE
+                &&battle.tick>=scannedTick&&battle.tick-scannedTick<6)return;
+        source=battle;scannedTeam=team;scannedTick=battle.tick;
+        contacts.clear();
+        for(Battle.Ship target:battle.ships()){
+            if(!target.alive()||target.team==team)continue;
+            int found=0;
+            for(Battle.Ship spotter:battle.ships()){
+                if(!spotter.alive()||spotter.team!=team)continue;
+                double range=Math.hypot(target.x-spotter.x,target.y-spotter.y);
+                found|=battle.directSensorChannels(spotter,target,range);
+                if((found & Battle.CONTACT_OPTICAL)!=0)break;
+            }
+            if(found!=0)contacts.put(target.id,found);
+        }
+    }
+    boolean opticallyVisible(int id){
+        return (contacts.getOrDefault(id,0)&Battle.CONTACT_OPTICAL)!=0;
+    }
+    private static float[] rotate(double x,double y,float scale,float c,float s,
+                                  float ox,float oy){
+        return new float[]{(float)x+scale*(ox*c-oy*s),
+                           (float)y+scale*(ox*s+oy*c)};
+    }
+    /** Radar displays the TRUE faction hull profile, never a solid fake ship. */
+    private static void radarHull(ShapeRenderer shapes,Battle.Ship ship,
+                                  BattleRenderPoses.Pose pose){
+        Shipyard.Hull hull=ship.hullClass==null?Shipyard.Hull.CORVETTE:ship.hullClass;
+        List<HullLayouts.Point> points=HullLayouts.outline(ship.faction,hull.spriteHull());
+        float angle=(float)(pose.angle()-Math.PI/2);
+        float c=(float)Math.cos(angle),s=(float)Math.sin(angle);
+        float scale=(float)ship.visualScale()*.2f;
+        for(int i=0;i<points.size();i++){
+            HullLayouts.Point a=points.get(i),b=points.get((i+1)%points.size());
+            float[] p=rotate(pose.x(),pose.y(),scale,c,s,a.x(),a.y());
+            float[] q=rotate(pose.x(),pose.y(),scale,c,s,b.x(),b.y());
+            shapes.line(p[0],p[1],q[0],q[1]);
+        }
+    }
+    private static String label(int mask){
+        StringBuilder out=new StringBuilder();
+        if((mask&Battle.CONTACT_RADAR)!=0)out.append("RAD");
+        if((mask&Battle.CONTACT_INFRARED)!=0){
+            if(out.length()>0)out.append('/');
+            out.append("IR");
+        }
+        if((mask&Battle.CONTACT_XRAY)!=0){
+            if(out.length()>0)out.append('/');
+            out.append("XR");
+        }
+        if((mask&Battle.CONTACT_GRAVITIC)!=0){
+            if(out.length()>0)out.append('/');
+            out.append("GRAV");
+        }
+        return out.toString();
+    }
+    void render(Battle battle,OrthographicCamera world,OrthographicCamera hud,
+                BattleRenderPoses poses,ShapeRenderer shapes,
+                SpriteBatch batch,BitmapFont font,int team){
+        refresh(battle,team);
+        CombatViewBounds view=CombatViewBounds.from(world);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA,GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapes.setProjectionMatrix(world.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for(Battle.Ship target:battle.ships()){
+            int mask=contacts.getOrDefault(target.id,0);
+            if(mask==0||(mask&Battle.CONTACT_OPTICAL)!=0)continue;
+            BattleRenderPoses.Pose pose=poses.ship(target);
+            if(!view.ship(pose,target.visualScale()))continue;
+            float x=pose.x(),y=pose.y(),r=Math.max(2f,world.zoom*5f);
+            // Thermal is a HEAT POINT, not an otherwise invisible hull sprite.
+            if((mask&Battle.CONTACT_INFRARED)!=0){
+                shapes.setColor(1f,.28f,.06f,.82f);
+                shapes.circle(x,y,r*1.5f,18);
+                shapes.setColor(1f,.82f,.27f,1f);
+                shapes.circle(x,y,r*.52f,12);
+            }else if((mask&Battle.CONTACT_RADAR)==0){
+                shapes.setColor((mask&Battle.CONTACT_XRAY)!=0
+                        ?new Color(.75f,.44f,1f,.8f):new Color(.28f,1f,.72f,.7f));
+                shapes.circle(x,y,r*.55f,12);
+            }
+        }
+        shapes.end();
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        for(Battle.Ship target:battle.ships()){
+            int mask=contacts.getOrDefault(target.id,0);
+            if(mask==0||(mask&Battle.CONTACT_OPTICAL)!=0)continue;
+            BattleRenderPoses.Pose pose=poses.ship(target);
+            if(!view.ship(pose,target.visualScale()))continue;
+            float x=pose.x(),y=pose.y(),r=Math.max(2.5f,world.zoom*8f);
+            if((mask&Battle.CONTACT_RADAR)!=0){
+                shapes.setColor(.28f,.85f,1f,.90f);
+                radarHull(shapes,target,pose);
+            }
+            if((mask&Battle.CONTACT_XRAY)!=0){
+                shapes.setColor(.76f,.46f,1f,.84f);
+                shapes.line(x,y+r,x+r,y);
+                shapes.line(x+r,y,x,y-r);
+                shapes.line(x,y-r,x-r,y);
+                shapes.line(x-r,y,x,y+r);
+            }
+            if((mask&Battle.CONTACT_GRAVITIC)!=0){
+                shapes.setColor(.28f,1f,.72f,.67f);
+                float pulse=1f+(battle.tick%45)/45f*.35f;
+                shapes.circle(x,y,r*1.25f*pulse,24);
+                shapes.circle(x,y,r*2.0f*pulse,32);
+            }
+        }
+        shapes.end();
+        if(world.zoom>2.25f||contacts.size()>64)return;
+        batch.setProjectionMatrix(hud.combined);
+        batch.begin();
+        for(Battle.Ship target:battle.ships()){
+            int mask=contacts.getOrDefault(target.id,0);
+            if(mask==0||(mask&Battle.CONTACT_OPTICAL)!=0)continue;
+            BattleRenderPoses.Pose pose=poses.ship(target);
+            float sx=(pose.x()-world.position.x)/world.zoom+640f;
+            float sy=(pose.y()-world.position.y)/world.zoom+360f;
+            if(sx<16||sx>1180||sy<75||sy>600)continue;
+            font.setColor(Color.LIGHT_GRAY);
+            font.draw(batch,label(mask),sx+12,sy+20);
+        }
+        font.setColor(Color.WHITE);
+        batch.end();
+    }
+}
