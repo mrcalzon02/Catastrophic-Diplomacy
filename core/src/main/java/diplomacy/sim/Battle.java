@@ -553,7 +553,7 @@ public final class Battle {
         public final RocketBarrage.Motor motor;
         public final ProjectileModel.Spec spec;
         public final double heading,damage,sustainedThrustFactor;
-        public double x,y,vx,vy,life=7.5,integrity;
+        public double x,y,vx,vy,life=RocketBarrage.MAX_FLIGHT_SECONDS,integrity;
         public double previousX,previousY;
         public int flightTicks;
         Rocket(long id,long start,Ship source,RocketBarrage.Rack rack,
@@ -3225,9 +3225,9 @@ public final class Battle {
                     ship,WeaponMuzzles.Family.ROCKET,rack.slot);
             // A rocket rack freezes its aim before the first round. Build
             // the solution from received observations, not target truth.
-            // The installed motor's terminal speed is a first-order lead
-            // estimate; each rocket subsequently follows its actual
-            // boost/coast or sustained-burn physics with NO guidance.
+            // Rocket flight lead uses the same discrete motor thrust as
+            // the actual unguided body, not its terminal speed as a constant.
+            // A committed salvo will NOT reacquire or alter its bearing.
             SensorComputeBudget.Allocation budget=SensorComputeBudget.solve(
                     ship.targetCompute,ship,firingFix,tick,distance,
                     tacticalPrecision(ship),
@@ -3238,8 +3238,22 @@ public final class Battle {
                     SensorTargetingSolution.solve(firingFix,tick,
                             muzzle.x(),muzzle.y(),rack.body.speed(),
                             budget.precision(),solutionId);
+            RocketTrajectoryPrediction.Intercept physicalLead=
+                    RocketTrajectoryPrediction.lead(
+                            firingFix.sample().x(),firingFix.sample().y(),
+                            firingFix.sample().vx(),firingFix.sample().vy(),
+                            firingFix.measuredTick(),tick,muzzle.x(),muzzle.y(),rack);
+            // Reuse the same deterministic finite-precision spread as the
+            // kinetic solver. A slower motor's longer flight increases error,
+            // but does not fabricate target truth or force every miss.
+            double stretch=StrictMath.sqrt(StrictMath.max(1,
+                    (physicalLead.seconds()+.5)/(estimate.flightSeconds()+.5)));
+            double aimX=physicalLead.x()+
+                    (estimate.aimX()-estimate.predictedX())*stretch;
+            double aimY=physicalLead.y()+
+                    (estimate.aimY()-estimate.predictedY())*stretch;
             rack.lockedBearing=StrictMath.atan2(
-                    estimate.aimY()-muzzle.y(),estimate.aimX()-muzzle.x());
+                    aimY-muzzle.y(),aimX-muzzle.x());
             rack.intendedTarget=target.id;
             rack.salvoRemaining=rack.salvoCount;
             rack.nextLaunchTick=tick;
