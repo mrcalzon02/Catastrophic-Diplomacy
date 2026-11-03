@@ -350,10 +350,14 @@ public final class RocketBarrageTest {
                 .withResources(ShipResourceOrders.DEFAULT
                         .withAmmunition(ShipResourceOrders.AmmoPolicy.HOLD_RESERVE)));
         contested.step();
+        require(contested.rocketRoundsFired==0,
+                "Contested two-rack scene fired before target photons arrived");
+        for(int acquisition=0;acquisition<20&&contested.rocketRoundsFired==0;
+                acquisition++)contested.step();
         require(contested.rocketRoundsFired==1&&
                         primary.salvoRemaining==primary.salvoCount-1&&
                         secondary.salvoRemaining==0,
-                "Two rocket racks double-booked the same finite kinetic stock");
+                "Two rocket racks double-booked finite kinetic stock after causal lock");
         System.out.println("PASS four native rocket sizes, 4/8/16 cheap physical volleys, two fixed-bearing motor envelopes, long reloads, PD, dodge, hit and replay");
     }
 }
