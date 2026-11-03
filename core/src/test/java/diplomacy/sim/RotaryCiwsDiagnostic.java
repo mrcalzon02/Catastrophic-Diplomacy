@@ -273,6 +273,10 @@ public final class RotaryCiwsDiagnostic {
                 " drone="+attacker.dronesLaunched+
                 " pdCondition="+defender.pointDefenseCondition+
                 " power="+defender.power+
+                " stockInitial="+ammo+" stockRemaining="+defender.kineticAmmo+
+                " protectedTargets="+defender.defendedShipIds+
+                " threatTarget="+(battle.crafts().isEmpty()?0:battle.crafts().get(0).targetId)+
+                " standing="+(defender.standingOrders!=null)+
                 " heat="+defender.heat+" maxHeat="+defender.maxHeat+
                 " crew="+defender.crewReadiness()+
                 " orders="+defender.orders.pointDefense()+
