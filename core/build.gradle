@@ -130,7 +130,15 @@ tasks.register('sensorTargetingSolutionSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorTargetingSolutionTest'
     dependsOn testClasses
 }
+tasks.register('sensorRelayBufferSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify finite real sensor packet transmissions, photon-limited receiver delivery and no retroactive reports.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorRelayBufferTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorRelayBufferSmoke'))
     dependsOn(tasks.named('sensorTargetingSolutionSmoke'))
     dependsOn(tasks.named('sensorCausalAcquisitionSmoke'))
     dependsOn(tasks.named('sensorActiveScanSmoke'))
