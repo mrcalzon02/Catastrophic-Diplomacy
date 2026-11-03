@@ -27,6 +27,7 @@ def stats(frame,family):
     phase_values=set()
     hot_values=set()
     outer_oxide_as_heat=0
+    outer_oxide_as_chrome=0
     for y in range(SIZE):
         for x in range(SIZE):
             r,g,b,a=px[x,y]
@@ -42,6 +43,10 @@ def stats(frame,family):
                 # shader bilinear filtering crossed from B-tagged hue to
                 # ordinary G thermal intensity; this should now be tapered.
                 outer_oxide_as_heat+=1
+            if family=="laser" and 164<=b<=177 and g<16:
+                # A completely cold phase at B's edge falls into the
+                # shader's cool-metal branch when bilinearly interpolated.
+                outer_oxide_as_chrome+=1
             if family!="laser" and g>45:hot_values.add(g)
     return {
         "cutPixels":len(cut),
@@ -51,6 +56,7 @@ def stats(frame,family):
         "oxidePhaseLevels":len(phase_values),
         "thermalGradientLevels":len(hot_values),
         "oxideFringeHueLeakPixels":outer_oxide_as_heat,
+        "oxideFringeChromeLeakPixels":outer_oxide_as_chrome,
     },cut
 
 def audit():
@@ -80,6 +86,9 @@ def audit():
             if family=="laser" and one["oxideFringeHueLeakPixels"]:
                 report["styleWarnings"].append(
                     "Laser oxide fringe may turn into heat at tag boundary")
+            if family=="laser" and one["oxideFringeChromeLeakPixels"]:
+                report["styleWarnings"].append(
+                    "Laser oxide fringe may turn into cold metal at tag boundary")
         overlap=[]
         for a,b in itertools.combinations(range(COUNT),2):
             union=len(cutsets[a]|cutsets[b])
