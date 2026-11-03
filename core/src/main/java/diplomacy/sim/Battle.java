@@ -3196,7 +3196,9 @@ public final class Battle {
             rocket.flightTicks++;
             double accel=RocketBarrage.acceleration(rocket.size,rocket.motor,age);
             if(rocket.motor==RocketBarrage.Motor.SUSTAINED_BURN)
-                accel*=diagnosticSustainedRocketThrustMultiplier;
+                accel*=RocketBarrage.researchedSustainedThrustScale(
+                        rocket.size,rocket.spec)*
+                        diagnosticSustainedRocketThrustMultiplier;
             if(accel>0){
                 double speed=StrictMath.hypot(rocket.vx,rocket.vy);
                 double next=StrictMath.min(rocket.spec.speed(),speed+accel*DT);
