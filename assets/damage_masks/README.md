@@ -1,7 +1,15 @@
-# Authored, image-based armor damage masks (v2)
+# Authored armor damage mask library
 
-These seven **real PNG image atlases** are the only approved *runtime*
-source of per-hit damage shape. Each 144x24 RGBA atlas is precisely six
+**Runtime default since the native 96px revision:** the seven
+`hires96/<weapon>.png` atlases, six distinct **96x96** frames each,
+authored by `tools/generate_damage_masks_96.py`. See
+[`hires96/README.md`](hires96/README.md) for current pixel channels,
+world-space footprint, localized material signatures, and resolution limits.
+
+## Legacy 24px comparison (preserved, not default)
+
+These seven **legacy PNG image atlases** are available only when
+`CD_ARMOR_MASK_SET=legacy24`. Each 144x24 RGBA atlas is precisely six
 independently authored 24x24 images in order from left to right. These
 are different wound topologies (separate punctures, tears, shorn plates,
 branches, scrape trajectories), not rotations or randomized variants of
