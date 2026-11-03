@@ -57,12 +57,12 @@ def enrich_materials(fields, family, variant):
         # WIDEST thermal-affected metal of every family. This follows the
         # actual long, narrow score and its forks; not a circular blast bowl.
         score = ImageChops.lighter(soot, holes)
-        oxide_core = score.filter(ImageFilter.MaxFilter(11)).filter(
-            ImageFilter.GaussianBlur(2.0)).load()
-        oxide_mid = score.filter(ImageFilter.MaxFilter(27)).filter(
-            ImageFilter.GaussianBlur(4.5)).load()
-        oxide_outer = score.filter(ImageFilter.MaxFilter(39)).filter(
-            ImageFilter.GaussianBlur(7.0)).load()
+        oxide_core = score.filter(ImageFilter.MaxFilter(9)).filter(
+            ImageFilter.GaussianBlur(1.8)).load()
+        oxide_mid = score.filter(ImageFilter.MaxFilter(17)).filter(
+            ImageFilter.GaussianBlur(3.8)).load()
+        oxide_outer = score.filter(ImageFilter.MaxFilter(25)).filter(
+            ImageFilter.GaussianBlur(5.4)).load()
     limits = {
         "laser": 1.29, "plasma": 1.08, "torpedo": 1.04,
         "missile": 1.01, "particle": .76, "fighter": .52,
@@ -87,12 +87,12 @@ def enrich_materials(fields, family, variant):
                     close = oxide_core[x,y] / 255.0
                     middle = oxide_mid[x,y] / 255.0
                     outer = oxide_outer[x,y] / 255.0
-                    coverage = max(close * .92, middle * .65, outer * .32)
-                    if coverage >= .034:
+                    coverage = max(close * .97, middle * .69, outer * .42)
+                    if coverage >= .105:
                         # The laser's actual cut remains a hairline. The B
                         # tag marks bronze/violet/blue annealed plating over
                         # the widest heat-affected perimeter, not a new hole.
-                        b = max(b, 170 + 82 * min(1.0, coverage))
+                        b = max(b, 165 + 85 * min(1.0, coverage * 1.18))
                         # G is oxide color phase for laser, not raw emissivity:
                         # cool outer blue/violet, hot inner bronze/gold.
                         g = 215 - 177 * min(1.0, close * .65 +
@@ -377,10 +377,22 @@ def generate(destination,preview=None):
                     r,g,b,a=px[x,y]
                     if max(r,g,b,255-a)>18:colored+=1
                     if a<127:cut+=1
-                    # Human-readable mask-field preview, NOT game hull art.
-                    out[x,y]=(min(255,int(r*.45+g*.95+b*.43+(255-a)*.35)),
-                              min(255,int(r*.32+g*.46+b*.77+(255-a)*.09)),
-                              min(255,int(r*.30+g*.13+b*.93+(255-a)*.12)))
+                    # These channels are COEFFICIENTS, not RGB pigments.
+                    # Laser G is oxide hue phase (not brightness). Show its
+                    # material-weighted anneal reach, not a false yellow disc.
+                    if family == "laser":
+                        strength=max(0.0,min(1.0,(b-164)/91.0))
+                        phase=g/255.0
+                        ox=(220*(1-phase)+103*phase,
+                            134*(1-phase)+150*phase,
+                            66*(1-phase)+220*phase)
+                        out[x,y]=tuple(min(255,round(18+r*.22+
+                                strength*ox[k]*(1.0 if k==0 else .85)))
+                                for k in range(3))
+                    else:
+                        out[x,y]=(min(255,int(r*.45+g*.95+b*.43+(255-a)*.35)),
+                                  min(255,int(r*.32+g*.46+b*.77+(255-a)*.09)),
+                                  min(255,int(r*.30+g*.13+b*.93+(255-a)*.12)))
             frames.append({"variant":variant+1,"coloredPixels":colored,"cutPixels":cut})
             gallery.paste(show.resize((118,118),Image.Resampling.NEAREST),
                           (145+variant*128,8+row*144))
