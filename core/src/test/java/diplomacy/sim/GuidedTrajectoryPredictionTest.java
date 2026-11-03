@@ -9,6 +9,10 @@ public final class GuidedTrajectoryPredictionTest {
         var m=new Battle.Missile(91,10,1,0,2,100,100,600,0,
                 30,false,ProjectileModel.standard(ProjectileModel.Kind.MISSILE),1);
         m.setPropulsion(OrdnancePropulsion.Mode.CONSTANT_BURN);
+        // Off-axis, sub-cap initial velocity requires genuinely powered
+        // acceleration and steering. A perfectly centered rated-speed body
+        // would correctly coast down the same path when out of propellant.
+        m.vx=140;m.vy=65;
         m.lastKnownX=640;m.lastKnownY=100;
         m.lastKnownVX=0;m.lastKnownVY=0;
         m.lastObservationTick=8;
