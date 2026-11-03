@@ -68,6 +68,20 @@ public final class Battle {
         public List<Shipyard.Slot> impactHardpoints=List.of();
         /** Installed weapon-family emitters in the original faction hull layout. */
         public List<WeaponMuzzles.Emitter> weaponEmitters=List.of();
+        /** Legacy ships use their original fitted/default beam PD; a fitted
+         * FLK-only ship does not automatically fire an invisible laser turret. */
+        public boolean laserPointDefenseEnabled=true;
+        /** Fitted flak is physical timed fragmentation with its own mount cycle. */
+        public static final class FlakMount {
+            public final int slotId;
+            public final double nominalRange;
+            public final ProjectileModel.Defense profile;
+            public double reload;
+            public FlakMount(int slot,double range,ProjectileModel.Defense spec){
+                slotId=slot;nominalRange=range;profile=spec;
+            }
+        }
+        public List<FlakMount> flakMounts=List.of();
         /** Opt-in physically distinct rack controllers; legacy remains family-wide. */
         public List<Launcher> launchers=List.of();
         /** Separate cheap dumbfire magazine per installed rocket hardpoint. */
@@ -597,6 +611,18 @@ public final class Battle {
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
     private final List<Rocket> rockets = new ArrayList<>();
+    /** One finite-flight physical burst for each equipped flak firing event. */
+    private static final class FlakRound {
+        final int team,shooterId,slotId;
+        final long shotId,burstTick;
+        final double aimX,aimY,radius,damage;
+        FlakRound(int team,int shooter,int slot,long shot,long at,
+                  double x,double y,double r,double d){
+            this.team=team;shooterId=shooter;slotId=slot;
+            shotId=shot;burstTick=at;aimX=x;aimY=y;radius=r;damage=d;
+        }
+    }
+    private final List<FlakRound> pendingFlak=new ArrayList<>();
     private static final int MAX_ROCKET_BODIES=8000;
     /** Queued physical salvo is owned by one socket, or -1 for legacy fleets. */
     private static final class PendingLaunch {
@@ -917,6 +943,19 @@ public final class Battle {
         }
         s.impactHardpoints=List.copyOf(installed);
         s.weaponEmitters=WeaponMuzzles.equipped(design,HullLayouts.slots(design.faction,design.hull));
+        // A real FLK socket is a different weapon from a precision PD laser.
+        // The existing module IDs and fitted save data are unchanged.
+        List<Ship.FlakMount> fittedFlak=new ArrayList<>();
+        s.laserPointDefenseEnabled=false;
+        for(WeaponMuzzles.Emitter emitter:s.weaponEmitters){
+            if(emitter.component().endsWith("-PD"))
+                s.laserPointDefenseEnabled=true;
+            if(emitter.component().endsWith("-FLK"))
+                fittedFlak.add(new Ship.FlakMount(emitter.slotId(),
+                        Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
+                        Shipyard.defenseAt(design,catalog,emitter.slotId())));
+        }
+        s.flakMounts=List.copyOf(fittedFlak);
         if(!rocketTemplates.isEmpty()){
             List<RocketBarrage.Rack> fittedRacks=new ArrayList<>(rocketTemplates.size());
             for(RocketBarrage.Rack prototype:rocketTemplates)
@@ -1512,6 +1551,8 @@ public final class Battle {
         s.laserReload = Math.max(0, s.laserReload - DT);
         s.missileReload = Math.max(0, s.missileReload - DT);
         s.pdReload = Math.max(0, s.pdReload - DT);
+        for(Ship.FlakMount mount:s.flakMounts)
+            mount.reload=Math.max(0,mount.reload-DT);
         s.kineticReload=Math.max(0,s.kineticReload-DT);
         s.plasmaReload=Math.max(0,s.plasmaReload-DT);
         s.particleReload=Math.max(0,s.particleReload-DT);
@@ -3222,12 +3263,191 @@ public final class Battle {
         }
     }
 
+    /** A flak burst is a timed physical volume, not an instant free hit or
+     * a second laser. It intersects only currently present hostile bodies. */
+    private void resolveFlakBursts(){
+        for(int k=pendingFlak.size()-1;k>=0;k--){
+            FlakRound burst=pendingFlak.get(k);
+            if(tick<burst.burstTick)continue;
+            pendingFlak.remove(k);
+            Ship shooter=findShip(burst.shooterId);
+            if(shooter==null)continue;
+            visual(burst.shotId,VisualPhase.IMPACT,"FLAK_BURST",
+                    burst.team,burst.shooterId,0,
+                    burst.aimX,burst.aimY,burst.aimX,burst.aimY);
+            for(int i=missiles.size()-1;i>=0;i--){
+                Missile target=missiles.get(i);
+                if(target.team==burst.team || 
+                   StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
+                    continue;
+                target.integrity-=burst.damage;
+                if(target.integrity<=0){
+                    missiles.remove(i);missileIntercepts++;shooter.intercepted++;
+                    if(target.decoy)decoysIntercepted++;
+                    visual(target.visualId,VisualPhase.INTERCEPT,
+                            target.decoy?"DECOY":target.torpedo?"TORPEDO":"MISSILE",
+                            target.team,target.sourceId,target.targetId,
+                            target.x,target.y,target.x,target.y);
+                }
+            }
+            for(int i=rockets.size()-1;i>=0;i--){
+                Rocket target=rockets.get(i);
+                if(target.team==burst.team ||
+                   StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
+                    continue;
+                target.integrity-=burst.damage;
+                if(target.integrity<=0){
+                    rockets.remove(i);rocketIntercepts++;shooter.intercepted++;
+                    visual(target.visualId,VisualPhase.INTERCEPT,"ROCKET",
+                            target.team,target.sourceId,target.targetId,
+                            target.x,target.y,target.x,target.y);
+                }
+            }
+            for(int i=ballistics.size()-1;i>=0;i--){
+                Ballistic target=ballistics.get(i);
+                if(target.team==burst.team ||
+                   StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
+                    continue;
+                target.integrity-=burst.damage;
+                if(target.integrity<=0){
+                    ballistics.remove(i);ballisticIntercepts++;shooter.intercepted++;
+                    visual(target.visualId,VisualPhase.INTERCEPT,"KINETIC",
+                            target.team,target.sourceId,target.targetId,
+                            target.x,target.y,target.x,target.y);
+                }
+            }
+            for(int i=crafts.size()-1;i>=0;i--){
+                Craft target=crafts.get(i);
+                if(target.team==burst.team ||
+                   StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>
+                           burst.radius+6)
+                    continue;
+                hitCraft(target,burst.damage*6.0,shooter,burst.shotId,"FLAK");
+                pointDefenseCraftHits++;
+                if(target.integrity<=0){
+                    crafts.remove(i);craftLosses++;pointDefenseCraftKills++;
+                }
+            }
+        }
+    }
+
+    private record FlakAim(double x,double y,double vx,double vy,
+                           int sourceId,int targetId,double priority) { }
+
+    /** Each real flak module independently loads and fires one finite shell.
+     * Leading uses current physical velocity, not perfect future tracking.
+     * Ballistic shells, torpedoes and craft may evade before the timed burst. */
+    private void firePhysicalFlak(){
+        var law=WeaponBehaviorTable.POINT_DEFENSE;
+        for(Ship defender:ships){
+            if(!defender.alive()||defender.flakMounts.isEmpty()||
+               defender.crewReadiness()<0.05||
+               defender.pointDefenseCondition<=law.minimumCondition())continue;
+            for(Ship.FlakMount mount:defender.flakMounts){
+                if(mount.reload>0||defender.kineticAmmo<=0||
+                   defender.power<law.minimumPower()+1||
+                   defender.heat>defender.maxHeat*.92||pendingFlak.size()>=3000)
+                    continue;
+                FlakAim best=null;
+                double bestPriority=Double.POSITIVE_INFINITY;
+                if(defender.orders.pointDefense().craft()){
+                    for(Craft craft:crafts){
+                        if(craft.team==defender.team||
+                           !coversThreat(defender,craft.targetId))continue;
+                        double d=StrictMath.hypot(craft.x-defender.x,craft.y-defender.y);
+                        if(d<15 || d>ProjectileModel.acquisitionRange(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile,craft.radarProfile()))
+                            continue;
+                        if(d<bestPriority){
+                            bestPriority=d;
+                            // Flak preferentially interrupts aircraft before
+                            // targeting smaller, more elusive physical bodies.
+                            best=new FlakAim(craft.x,craft.y,0,0,craft.sourceId,
+                                             craft.targetId,d);
+                        }
+                    }
+                }
+                if(best==null&&defender.orders.pointDefense().ordnance()){
+                    for(Missile m:missiles){
+                        if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+                        double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
+                        if(d<15||d>ProjectileModel.acquisitionRange(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile,m.spec,
+                                OrdnancePropulsion.emissionMultiplier(m.thrustPhase)))
+                            continue;
+                        double eta=approachEta(defender.x,defender.y,
+                                m.x,m.y,m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
+                        if(eta<bestPriority){bestPriority=eta;
+                            best=new FlakAim(m.x,m.y,m.vx,m.vy,m.sourceId,m.targetId,eta);}
+                    }
+                    for(Rocket r:rockets){
+                        if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
+                        double d=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
+                        if(d<15||d>ProjectileModel.acquisitionRange(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile,r.spec,
+                                RocketBarrage.hotEmission(r.motor,r.burning())))
+                            continue;
+                        double eta=approachEta(defender.x,defender.y,
+                                r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
+                        if(eta<bestPriority){bestPriority=eta;
+                            best=new FlakAim(r.x,r.y,r.vx,r.vy,r.sourceId,r.targetId,eta);}
+                    }
+                    for(Ballistic p:ballistics){
+                        if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
+                        double d=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
+                        if(d<15||d>ProjectileModel.acquisitionRange(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile,p.spec))
+                            continue;
+                        double eta=approachEta(defender.x,defender.y,
+                                p.x,p.y,p.vx,p.vy,p.spec.speed());
+                        if(eta<bestPriority){bestPriority=eta;
+                            best=new FlakAim(p.x,p.y,p.vx,p.vy,p.sourceId,p.targetId,eta);}
+                    }
+                }
+                if(best==null)continue;
+                double distance=StrictMath.hypot(best.x-defender.x,best.y-defender.y);
+                double flight=distance/390.0;
+                double speed=StrictMath.hypot(best.vx,best.vy);
+                // Finite lead precision. A fast point-sized kinetic round
+                // outruns prediction much more readily than a fighter.
+                double drift=Math.min(125,Math.max(9,speed*flight*.56));
+                double error=(random.nextDouble()-.5)*2*drift;
+                double angle=random.nextDouble()*StrictMath.PI*2;
+                double aimX=best.x+best.vx*flight+StrictMath.cos(angle)*error;
+                double aimY=best.y+best.vy*flight+StrictMath.sin(angle)*error;
+                long shot=nextVisualShotId++;
+                WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
+                        defender,WeaponMuzzles.Family.POINT_DEFENSE,mount.slotId);
+                visual(shot,VisualPhase.FIRE,"FLAK",defender.team,defender.id,
+                       best.sourceId,muzzle.x(),muzzle.y(),aimX,aimY);
+                // A physical shell consumes a real kinetic ammunition unit.
+                defender.kineticAmmo--;
+                defender.power-=law.powerPerShot()*1.25;
+                defender.heat+=law.heatPerShot()*2;
+                mount.reload=law.reload(false,
+                        defender.pdCycle*StrictMath.max(1,defender.flakMounts.size())*1.8,
+                        defender.pointDefenseCondition);
+                pendingFlak.add(new FlakRound(defender.team,defender.id,
+                        mount.slotId,shot,tick+Math.max(1,(int)StrictMath.ceil(flight/DT)),
+                        aimX,aimY,18+mount.profile.tracking()*2,
+                        mount.profile.damage()*.78));
+            }
+        }
+    }
+
     private void updateMissiles() {
+        resolveFlakBursts();
+        firePhysicalFlak();
         // One tracking decision and one firing opportunity per mount/cooldown.
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
         var pdLaw=WeaponBehaviorTable.POINT_DEFENSE;
-        for(Ship defender:ships)if(defender.alive() && defender.pdReload<=0
+        for(Ship defender:ships)if(defender.alive() && defender.laserPointDefenseEnabled
+                && defender.pdReload<=0
                 && defender.crewReadiness()>=0.05
                 && defender.pointDefenseCondition>pdLaw.minimumCondition()
                 && defender.pdRange>0 && defender.orders.pointDefense().ordnance()
@@ -3355,7 +3575,8 @@ public final class Battle {
                 }
             }
         }
-        for(Ship defender:ships)if(defender.alive()&&defender.pdReload<=0
+        for(Ship defender:ships)if(defender.alive()&&defender.laserPointDefenseEnabled
+                &&defender.pdReload<=0
                 &&defender.crewReadiness()>=0.05
                 &&defender.pointDefenseCondition>pdLaw.minimumCondition()
                 &&defender.pdRange>0

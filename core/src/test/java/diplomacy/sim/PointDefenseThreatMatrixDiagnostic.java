@@ -242,7 +242,8 @@ public final class PointDefenseThreatMatrixDiagnostic {
             }
             if(event.phase()==Battle.VisualPhase.FIRE && event.team()==1
                     &&event.sourceId()==defender.id
-                    &&"POINT_DEFENSE".equals(event.weapon()))pdShots++;
+                    &&("POINT_DEFENSE".equals(event.weapon())||
+                        "FLAK".equals(event.weapon())))pdShots++;
         }
         for(Battle.VisualEvent event:battle.visualEvents())
             if(event.team()==0 && event.sourceId()==attacker.id){
