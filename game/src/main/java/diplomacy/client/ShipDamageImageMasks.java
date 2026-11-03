@@ -6,12 +6,11 @@ import diplomacy.sim.Battle;
 import java.util.Locale;
 
 /**
- * Reads individually authored, FIXED 24x24 RGBA damage decals.
- * Asset: damage_masks/<weapon>.png — 6 adjacent 24x24 frames, each a
- * different hand-shaped wound. Optional diagnostic A/B uses two FIXED
- * 288x336 images, each containing 7 family rows of six 48x48 masks.
- * Both modes cover exactly the same 2.667-cell footprint, even if the
- * original ship is only a dozen pixels wide at gameplay zoom.
+ * Reads six distinct, FIXED native 96x96 RGBA damage decals per weapon.
+ * Runtime asset: damage_masks/hires96/<weapon>.png (576x96).
+ * Diagnostic CD_ARMOR_MASK_SET=legacy24, upscaled48 or authored48
+ * selects previously committed comparison images. All resolutions span
+ * exactly the same 2.667 defense-cell diameter and do not grow the wound.
  * No shape synthesis, rotation, per-pixel
  * noise, or stand-in sprite is used in the live renderer.
  *
@@ -21,17 +20,15 @@ import java.util.Locale;
  * never scaled to fill the ship.
  */
 final class ShipDamageImageMasks {
-    static final int SIZE=24, COUNT=6, MASK_RADIUS=12;
-    // Radius: the actual 24 pixels project onto 2.667 defense cells
-    // total diameter. In the 96x144 per-ship compositing mask that means
-    // no more than 16x24 of its pixels per isolated impact.
-    private static final float PIXELS_PER_ARMOR_TILE=9f;
+    static final int SIZE=96, COUNT=6, MASK_RADIUS=48;
+    // 24 / 9 == 48 / 18 == 96 / 36: fixed 2.667-cell footprint.
     private final int[][] atlases=new int[Battle.DamageType.values().length][];
-    /** Optional real-image A/B; unset keeps the previously approved 24px files. */
+    /** Absent/unknown diagnostic override uses the new native 96px artwork. */
     private final String testSet=System.getenv("CD_ARMOR_MASK_SET");
     private final boolean use48="upscaled48".equals(testSet)||"authored48".equals(testSet);
-    private final int sampleSize=use48?48:24;
-    private final float pixelsPerCell=use48?18f:9f;
+    private final boolean use24="legacy24".equals(testSet);
+    private final int sampleSize=use48?48:(use24?24:SIZE);
+    private final float pixelsPerCell=sampleSize*(9f/24f);
     private int[] shared48;
 
     private int[] shared48(){
@@ -61,16 +58,17 @@ final class ShipDamageImageMasks {
         int k=kind.ordinal();
         int[] cached=atlases[k];
         if(cached!=null)return cached;
-        String path="damage_masks/"+
+        String path=(use24?"damage_masks/":"damage_masks/hires96/")+
                 kind.name().toLowerCase(Locale.ROOT)+".png";
         if(!Gdx.files.internal(path).exists())
             throw new IllegalStateException("Missing authored 6-variant damage PNG: "+path);
         Pixmap art=new Pixmap(Gdx.files.internal(path));
         try{
-            if(art.getWidth()!=SIZE*COUNT||art.getHeight()!=SIZE)
-                throw new IllegalStateException("Wrong damage atlas dimensions: "+path);
-            int[] pixels=new int[art.getWidth()*SIZE];
-            for(int y=0;y<SIZE;y++)for(int x=0;x<art.getWidth();x++)
+            if(art.getWidth()!=sampleSize*COUNT||art.getHeight()!=sampleSize)
+                throw new IllegalStateException("Wrong authored damage atlas dimensions: "+
+                        path+" (expected "+(sampleSize*COUNT)+"x"+sampleSize+")");
+            int[] pixels=new int[art.getWidth()*sampleSize];
+            for(int y=0;y<sampleSize;y++)for(int x=0;x<art.getWidth();x++)
                 pixels[y*art.getWidth()+x]=art.getPixel(x,y);
             atlases[k]=pixels;
             return pixels;
