@@ -37,6 +37,12 @@ public final class PointDefenseWaveDiagnostic {
         };}
     }
     private enum Threat { INTERCEPTOR, TORPEDO_BOMBER }
+    private enum Formation {
+        COMPACT(10.0,0L), DISPERSED(46.0,10000007L);
+        final double lateralSpacing;
+        final long seedSalt;
+        Formation(double spacing,long salt){lateralSpacing=spacing;seedSalt=salt;}
+    }
     private record Trial(Battery battery,Threat threat,int wave,int distance,
             int rank,int seed,boolean defenseOn,int launched,int craftKills,
             int craftTerminal,int attackShots,int attackImpacts,int torpedoFired,
@@ -151,17 +157,17 @@ public final class PointDefenseWaveDiagnostic {
         throw new IllegalStateException("No physical FTR hardpoint");
     }
     private static Trial run(TechnologyCatalog cat,Battery battery,Threat threat,
-                             int wave,int distance,int rank,int seed,boolean enabled){
+                             int wave,int distance,Formation formation,int rank,int seed,boolean enabled){
         final long randomSeed=70260101L+threat.ordinal()*900003L+
                 wave*10007L+distance*29L+rank*13L+
-                battery.stableSeedCode()*11L+seed*173L;
+                battery.stableSeedCode()*11L+seed*173L+formation.seedSalt;
         Battle b=new Battle(randomSeed);
         Shipyard.Design craftFit=carrier(cat,threat);
         final double defenderX=600,defenderY=300;
         List<Battle.Ship> carriers=new ArrayList<>();
         for(int i=0;i<wave;i++){
             double x=defenderX-distance;
-            double y=defenderY+(i-(wave-1)/2.0)*10.0;
+            double y=defenderY+(i-(wave-1)/2.0)*formation.lateralSpacing;
             b.spawnWing(0,craftFit,cat,1,x,y);
             Battle.Ship source=b.ships().get(b.ships().size()-1);
             source.speed=source.vx=source.vy=0;
@@ -257,7 +263,7 @@ public final class PointDefenseWaveDiagnostic {
         Path output=Path.of("test-output","pd-wave-diagnostic");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
-        csv.add("battery,aircraft,wave_size,start_distance,pd_stage,seed,pd_enabled,"+
+        csv.add("formation,battery,aircraft,wave_size,start_distance,pd_stage,seed,pd_enabled,"+
                 "fighters_launched,fighters_killed,inner_90_entries,attacker_shots,"+
                 "attacker_impacts,torpedoes_launched,torpedo_impacts,"+
                 "laser_pd_shots,flak_rounds,flak_kinetic_ammo_spent,"+
@@ -267,24 +273,34 @@ public final class PointDefenseWaveDiagnostic {
                 "real fitted laser/flak batteries\n\n");
         md.append("Physical FTR launches, exactly 4 or 8 simultaneous aircraft, "+
                 "both interceptor and torpedo-bomber classes. "+
+                "Compact 10-unit launch spacing retained with identical historical RNG seeds; "+
+                "8-fighter dispersed 46-unit spacing adds controlled saturation geometry. "+
                 "Matched same-seed HOLD_FIRE, no fitted offensive IX attacker; "+
                 "three diagnostic seeds per case. "+
                 "Never a release balance threshold.\n\n");
-        md.append("|Aircraft|Wave|Start|Battery|Rank|Fighters killed|"+
+        md.append("|Formation|Aircraft|Wave|Start|Battery|Rank|Fighters killed|"+
                 "Shots landed|Hold-fire shots landed|Torpedo impacts|"+
                 "Hold-fire torpedo impacts|Flak rounds fired|\n");
-        md.append("|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|\n");
+        md.append("|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|\n");
         int cases=0,errors=0;
-        for(Threat threat:Threat.values())for(int wave:new int[]{4,8})
+        for(Formation formation:Formation.values())
+            for(Threat threat:Threat.values())for(int wave:new int[]{4,8})
             for(int distance:new int[]{95,220,390})for(Battery battery:Battery.values())
             for(int rank:new int[]{0,9}){
+                // Add a focused, controlled geometry sample; do not double
+                // the entire compact matrix or spawn unnecessary CI work.
+                if(formation==Formation.DISPERSED&&
+                        (wave!=8||distance==390||
+                         (battery!=Battery.PD_FOUR&&battery!=Battery.FLK_ONE&&
+                          battery!=Battery.FLK_FOUR&&battery!=Battery.MIXED_TWO_TWO)))
+                    continue;
                 int kills=0,impacts=0,controlImpacts=0,torpedoHits=0,
                         controlTorpedoHits=0,flakRounds=0;
                 for(int seed=0;seed<3;seed++){
                     try{
-                        Trial active=run(cat,battery,threat,wave,distance,rank,seed,true);
-                        Trial control=run(cat,battery,threat,wave,distance,rank,seed,false);
-                        csv.add(active.csv());csv.add(control.csv());
+                        Trial active=run(cat,battery,threat,wave,distance,formation,rank,seed,true);
+                        Trial control=run(cat,battery,threat,wave,distance,formation,rank,seed,false);
+                        csv.add(formation+","+active.csv());csv.add(formation+","+control.csv());
                         cases++;
                         kills+=active.craftKills();
                         impacts+=active.attackImpacts();
@@ -294,14 +310,14 @@ public final class PointDefenseWaveDiagnostic {
                         flakRounds+=active.flakShots();
                     }catch(RuntimeException ex){
                         errors++;
-                        csv.add("# DIAGNOSTIC_ERROR,"+threat+","+wave+","+distance+","+
+                        csv.add("# DIAGNOSTIC_ERROR,"+formation+","+threat+","+wave+","+distance+","+
                                 battery+","+rank+","+seed+","+ex);
                         System.err.println("PD fighter-wave case failed: "+ex);
                     }
                 }
                 md.append(String.format(Locale.ROOT,
-                        "|%s|%d|%d|%s|%d|%d|%d|%d|%d|%d|%d|\n",
-                        threat,wave,distance,battery,rank,kills,
+                        "|%s|%s|%d|%d|%s|%d|%d|%d|%d|%d|%d|%d|\n",
+                        formation,threat,wave,distance,battery,rank,kills,
                         impacts,controlImpacts,torpedoHits,
                         controlTorpedoHits,flakRounds));
             }
