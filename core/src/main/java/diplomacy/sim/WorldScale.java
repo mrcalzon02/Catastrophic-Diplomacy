@@ -9,6 +9,9 @@ package diplomacy.sim;
  */
 public final class WorldScale {
     private WorldScale(){}
+    /** Global in-battle linear size of all hulls, hardpoints and hit geometry.
+     * Source PNG pixels and large touch-friendly UI controls stay unchanged. */
+    public static final double SHIP_WORLD_SCALE=0.50;
     public static final double C_KM_PER_SECOND=299_792.458;
     public static final double PHYSICAL_SECONDS_PER_SIM_SECOND=60;
     public static final double LIGHT_MINUTE_KM=C_KM_PER_SECOND*60;
