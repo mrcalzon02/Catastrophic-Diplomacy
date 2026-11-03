@@ -744,6 +744,13 @@ public final class Battle {
             throw new IllegalArgumentException("Invalid CIWS tracking workload exponent");
         diagnosticPrecisionTrackExponent=exponent;
     }
+    /** Simulate radial fragment-density losses inside genuine timed flak bursts.
+     * This A/B changes only fragment energy versus spatial distance, not
+     * ammo, target acquisition, burst timing or number of physical bodies. */
+    public void configureFlakFragmentFalloffForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException("Configure flak before combat");
+        diagnosticFlakFragmentFalloff=enabled;
+    }
     /** Compare per-socket optical allocations to the old duplicate targeting.
      * This opt-in switch is only legal before the first simulation tick. */
     public void configurePrecisionReservationsForDiagnostic(boolean enabled){
@@ -765,6 +772,9 @@ public final class Battle {
     /** Measured intermediate parallel/serial scheduling under saturation;
      * laboratory trials can override, all multipliers remain <=4x. */
     private double diagnosticPrecisionTrackExponent=.90;
+    /** Alternative spatial frag falloff in controlled tests only. Default
+     * preserves existing physical flak until matched damage results justify it. */
+    private boolean diagnosticFlakFragmentFalloff;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -3364,6 +3374,23 @@ public final class Battle {
         }
     }
 
+    /** Fraction of fragments physically overlapping a body near a burst.
+     * The object's projected radius extends the cloud's overlap envelope.
+     * The central 30% of the burst maintains full density. Outside that
+     * core the fragment count falls smoothly to zero at the outer edge.
+     * Used for actual damaged objects only, never a free RNG hit/miss roll. */
+    static double flakFragmentCoverage(double distance,double burstRadius,
+                                       double targetRadius){
+        if(!Double.isFinite(distance)||distance<0||
+                !Double.isFinite(burstRadius)||burstRadius<=0||
+                !Double.isFinite(targetRadius)||targetRadius<0)
+            throw new IllegalArgumentException("Invalid physical flak overlap");
+        double overlap=(burstRadius+targetRadius-distance)/(burstRadius*.70);
+        if(overlap<=0)return 0;
+        if(overlap>=1)return 1;
+        return overlap*overlap*(3-2*overlap);
+    }
+
     /** A flak burst is a timed physical volume, not an instant free hit or
      * a second laser. It intersects only currently present hostile bodies. */
     private void resolveFlakBursts(){
@@ -3384,7 +3411,10 @@ public final class Battle {
                 // A flak fragment spreads kinetic energy over an increasingly
                 // hardened warhead casing; intact heavy torpedoes shrug off
                 // individual fragments much more readily than micro-missiles.
-                target.integrity-=ProjectileModel.fragmentationPdDamage(
+                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                        flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
+                                target.y-burst.aimY),burst.radius,0):1.0;
+                target.integrity-=fragmentFactor*ProjectileModel.fragmentationPdDamage(
                         target.spec,burst.damage);
                 if(target.integrity<=0){
                     missiles.remove(i);missileIntercepts++;shooter.intercepted++;
@@ -3400,7 +3430,10 @@ public final class Battle {
                 if(target.team==burst.team ||
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
                     continue;
-                target.integrity-=ProjectileModel.fragmentationPdDamage(
+                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                        flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
+                                target.y-burst.aimY),burst.radius,0):1.0;
+                target.integrity-=fragmentFactor*ProjectileModel.fragmentationPdDamage(
                         target.spec,burst.damage);
                 if(target.integrity<=0){
                     rockets.remove(i);rocketIntercepts++;shooter.intercepted++;
@@ -3417,7 +3450,10 @@ public final class Battle {
                 // Dense inert metallic bullets have little exposed surface
                 // for fragment impacts; shells should be handled by precision
                 // CIWS or an actual rail interceptor, not flak shrapnel.
-                target.integrity-=ProjectileModel.fragmentationPdDamage(
+                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                        flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
+                                target.y-burst.aimY),burst.radius,0):1.0;
+                target.integrity-=fragmentFactor*ProjectileModel.fragmentationPdDamage(
                         target.spec,burst.damage)*.32;
                 if(target.integrity<=0){
                     ballistics.remove(i);ballisticIntercepts++;shooter.intercepted++;
@@ -3436,7 +3472,12 @@ public final class Battle {
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>hitRadius)
                     continue;
                 double fragments=StrictMath.max(.65,StrictMath.min(2.4,area*2.2));
-                hitCraft(target,burst.damage*6.0*fragments,shooter,burst.shotId,"FLAK");
+                double fragmentFactor=diagnosticFlakFragmentFalloff?
+                        flakFragmentCoverage(StrictMath.hypot(target.x-burst.aimX,
+                                target.y-burst.aimY),burst.radius,22*area):1.0;
+                if(fragmentFactor<=0)continue;
+                hitCraft(target,burst.damage*6.0*fragments*fragmentFactor,
+                        shooter,burst.shotId,"FLAK");
                 pointDefenseCraftHits++;
                 if(target.integrity<=0){
                     crafts.remove(i);craftLosses++;pointDefenseCraftKills++;
