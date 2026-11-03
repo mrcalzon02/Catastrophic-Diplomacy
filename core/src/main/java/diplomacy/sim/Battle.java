@@ -444,6 +444,9 @@ public final class Battle {
         /** Physical-world holographic contact currently deceiving this seeker. */
         public int falseContactIndex=-1;
         public double lastKnownX,lastKnownY,lastKnownVX,lastKnownVY;
+        /** Bounded uncertainty of the last historical seeker estimate. A
+         * lost lock continues to age; CAP never grants perfect missile data. */
+        public double seekerUncertainty;
         /** Last physically received seeker sample, not target truth. */
         public long lastObservationTick;
         void setPropulsion(OrdnancePropulsion.Mode mode){
@@ -3471,6 +3474,8 @@ public final class Battle {
             body.lastKnownVX=fix.sample().vx();
             body.lastKnownVY=fix.sample().vy();
             body.lastObservationTick=fix.measuredTick();
+            body.seekerUncertainty=3+StrictMath.max(0,
+                    tick-fix.measuredTick())*DT*.8;
             missiles.add(body);
             visual(shot,VisualPhase.FIRE,decoy?"DECOY":order.family.name(),
                     source.team,source.id,target.id,muzzle.x(),muzzle.y(),
@@ -5792,25 +5797,24 @@ public final class Battle {
                 if(phantom>=0&&phantom!=m.falseContactIndex)
                     target.holoSeekersDiverted++;
                 m.falseContactIndex=phantom;
-                if(phantom>=0){
-                    // This ghost was physically emitted at the sensed tick.
-                    // The present emitter can move or power down; only the
-                    // arrived false-contact position/velocity guides the body.
-                    // Real collision/hull damage remains independent.
-                    var fix=sensed.sample();
-                    m.lastKnownX=DeceptionProjection.ghostX(target.id,fix,
-                            target.visualScale(),phantom);
-                    m.lastKnownY=DeceptionProjection.ghostY(target.id,fix,
-                            target.visualScale(),phantom);
-                    m.lastKnownVX=fix.vx();m.lastKnownVY=fix.vy();
-                    m.lastObservationTick=fix.tick();
-                }else if(sensed!=null){
-                    var fix=sensed.sample();
-                    m.lastKnownX=fix.x();m.lastKnownY=fix.y();
-                    m.lastKnownVX=fix.vx();m.lastKnownVY=fix.vy();
-                    m.lastObservationTick=fix.tick();
+                // The finite seeker must estimate both a real emitter and a
+                // false emitter from the SAME historical photon arrival.
+                // Physics still collides against current true geometry.
+                if(sensed!=null){
+                    var estimated=OrdnanceSeeker.estimate(
+                            sensed,target.id,m.visualId,m.guidanceQuality,
+                            phantom,target.visualScale());
+                    m.lastKnownX=estimated.x();m.lastKnownY=estimated.y();
+                    m.lastKnownVX=estimated.vx();m.lastKnownVY=estimated.vy();
+                    m.lastObservationTick=estimated.measuredTick();
+                    m.seekerUncertainty=estimated.uncertaintyRadius();
                 }
-            }else m.falseContactIndex=-1;
+            }else{
+                m.falseContactIndex=-1;
+                m.seekerUncertainty=StrictMath.min(120,
+                        m.seekerUncertainty+DT*
+                        (1+StrictMath.hypot(m.lastKnownVX,m.lastKnownVY)*.08));
+            }
             if (physicalRange < 13) {
                 if(m.decoy){
                     // A decoy has NO warhead and may never apply hull damage.
@@ -6192,6 +6196,7 @@ public final class Battle {
             hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.seekerLocked?1:0);
             hash=mix(hash,m.lastObservationTick);
+            hash=mix(hash,Double.doubleToLongBits(m.seekerUncertainty));
             hash=mix(hash,m.falseContactIndex);
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownX));
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownY));

@@ -73,6 +73,73 @@ public final class OrdnanceSeeker {
                 interference,guidanceQuality,torpedo,reacquiring);
     }
 
+    /**
+     * Finite per-body seeker error. This is an ESTIMATE from an already arrived
+     * photon sample, never a modification of target history or physical hits.
+     * The sensor-noise seed is stable over six measured ticks, modeling a
+     * bounded integration/dwell window without using the battle RNG stream.
+     */
+    public record Fix(double x,double y,double vx,double vy,
+                      double uncertaintyRadius,long measuredTick) {
+        public Fix {
+            if(!Double.isFinite(x)||!Double.isFinite(y)||
+                    !Double.isFinite(vx)||!Double.isFinite(vy)||
+                    !Double.isFinite(uncertaintyRadius)||uncertaintyRadius<0||
+                    measuredTick<0)
+                throw new IllegalArgumentException("Invalid seeker estimate");
+        }
+    }
+    private static long mix(long value){
+        value^=value>>>33;value*=0xff51afd7ed558ccdL;
+        value^=value>>>33;value*=0xc4ceb9fe1a85ec53L;
+        return value^(value>>>33);
+    }
+    private static double unit(long value){
+        return (value>>>11)*0x1.0p-53;
+    }
+    public static Fix estimate(Return observed,int emitterId,long seekerId,
+                               double guidanceQuality,int phantom,double hullScale){
+        if(observed==null||emitterId<=0||seekerId<=0||phantom< -1||
+                !Double.isFinite(guidanceQuality)||guidanceQuality<=0||
+                !Double.isFinite(hullScale)||hullScale<=0)
+            throw new IllegalArgumentException("Invalid photon seeker estimate");
+        if(phantom>=DeceptionProjection.falseContacts(observed.profile()))
+            throw new IllegalArgumentException("Phantom was not emitted at this tick");
+        SensorLightTimeHistory.Sample s=observed.sample();
+        double x=phantom>=0?DeceptionProjection.ghostX(
+                emitterId,s,hullScale,phantom):s.x();
+        double y=phantom>=0?DeceptionProjection.ghostY(
+                emitterId,s,hullScale,phantom):s.y();
+        SensorLightTimeHistory.Profile profile=observed.profile();
+        double interference=StrictMath.min(.95,StrictMath.max(0,
+                profile.ecmStrength()*profile.ecmCondition()+
+                (profile.power()>4&&profile.ecmCondition()>.15?
+                        .45*StrictMath.max(0,profile.hologramNoise()):0)));
+        double quality=StrictMath.max(.45,StrictMath.min(2.5,guidanceQuality));
+        double area=StrictMath.max(.5,StrictMath.min(1.6,
+                StrictMath.sqrt(StrictMath.max(.001,profile.radarCrossSection()))));
+        double age=(observed.receivedTick()-observed.measuredTick())*Battle.DT;
+        double measuredSpeed=StrictMath.hypot(s.vx(),s.vy());
+        double sigma=(1.25+observed.distance()*.005+
+                age*(.8+measuredSpeed*.045))*
+                (1+1.7*interference)/(quality*StrictMath.sqrt(area));
+        sigma=StrictMath.max(.25,StrictMath.min(90,sigma));
+        // Independent stable per-seeker noise, not a universal accuracy roll.
+        // A marginally wrong target solution can still hit a real hull.
+        long seed=mix(seekerId*0x9e3779b97f4a7c15L ^
+                (long)emitterId*0xbf58476d1ce4e5b9L ^
+                (s.tick()/6L)*0x94d049bb133111ebL);
+        double angle=2*StrictMath.PI*unit(seed);
+        double radial=sigma*StrictMath.sqrt(unit(mix(seed^0x632be59bd9b4e019L)));
+        double velocityAngle=2*StrictMath.PI*unit(mix(seed^0x2545f4914f6cdd1dL));
+        double velocityError=StrictMath.min(2.5,sigma*.028);
+        return new Fix(x+radial*StrictMath.cos(angle),
+                y+radial*StrictMath.sin(angle),
+                s.vx()+velocityError*StrictMath.cos(velocityAngle),
+                s.vy()+velocityError*StrictMath.sin(velocityAngle),
+                sigma,s.tick());
+    }
+
     /** Stable staggered scans avoid a per-frame reacquisition oracle. */
     public static boolean scanDue(int flightTicks,long visualId) {
         if(flightTicks<0||visualId<0)

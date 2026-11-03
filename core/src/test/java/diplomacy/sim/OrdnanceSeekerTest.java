@@ -132,8 +132,16 @@ public final class OrdnanceSeekerTest {
                 target.visualScale(),diverted.falseContactIndex);
         double ghostY=DeceptionProjection.ghostY(target.id,arriving.sample(),
                 target.visualScale(),diverted.falseContactIndex);
-        check(diverted.lastKnownX==ghostX&&diverted.lastKnownY==ghostY,
-                "Missile must guide to the emitted ghost, not today's sprite");
+        var expected=OrdnanceSeeker.estimate(arriving,target.id,
+                diverted.visualId,diverted.guidanceQuality,
+                diverted.falseContactIndex,target.visualScale());
+        check(diverted.lastKnownX==expected.x()&&
+                diverted.lastKnownY==expected.y()&&
+                diverted.seekerUncertainty==expected.uncertaintyRadius(),
+                "Missile must steer to its noisy historical ghost estimate");
+        check(StrictMath.hypot(expected.x()-ghostX,expected.y()-ghostY)
+                <=expected.uncertaintyRadius()+1e-8,
+                "Historical hologram seeker noise exceeded its finite bound");
         target.power=0;
         battle.step();
         check(diverted.falseContactIndex>=0,

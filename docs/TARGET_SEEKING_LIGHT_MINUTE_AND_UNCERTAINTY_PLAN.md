@@ -532,14 +532,19 @@ same historical light-delayed emitter profile and measured pose as the seeker
 return; live emitter movement or shutdown cannot edit already travelling
 ghost evidence. Visual phantom rendering remains current-time for spectators;
 a separate timestamped fleet-wide false-contact transmission stream has NOT
-yet been implemented. Targeting uncertainty
-and ECM influence are not yet probabilistic multi-hypothesis seeker tracks;
-the basic delayed sample still provides exact historical coordinates.
+yet been implemented. Guided missile steering now uses a bounded deterministic per-seeker estimate
+instead of consuming exact historical coordinates: historical ECM and
+cross-section affect finite position/velocity uncertainty, measurement age
+and range widen it, and fitted seeker quality narrows it. The sample in
+SensorLightTimeHistory remains immutable ground truth for sensor modeling;
+real missile guidance does not directly steer toward its exact coordinates.
+Onboard multiple competing hypotheses, stochastic belief filters and
+moving-receiver light-cone history are not yet implemented.
 These limitations should not be reported as solved.
 
 **Still pending:** full fleet-visible timestamped false-contact packet dissemination,
-measured receiver-position histories, per-seeker noise and
-uncertainty budgets, actual guided trajectory envelopes/ETA pips, complete
+measured receiver-position histories, probabilistic multi-hypothesis
+seeker filtering and compute arbitration, actual guided trajectory envelopes/ETA pips, complete
 200v200 balance/performance, maneuver covariance, fleet FCM shared-compute
 arbitration, beam light-time damage delivery and persisted scan doctrine
 controls. The rocket prediction is a constant-velocity TARGET hypothesis

@@ -121,8 +121,61 @@ public final class OrdnanceSeekerPhotonTest {
         require(arrived,"No delayed shutdown photons reached the observer");
         System.out.println("PASS historical hologram emission, movement and power-loss delay");
     }
+    private static void boundedSeekerNoise(){
+        Battle b=new Battle(461233);
+        Battle.Ship scout=b.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship target=b.addShip(1,Battle.Faction.DRAXIAN,760,100);
+        b.registerDiagnosticStationaryTarget(scout.id);
+        b.registerDiagnosticStationaryTarget(target.id);
+        target.ecmStrength=0;target.ecmCondition=1;target.hologramNoise=0;
+        for(int i=0;i<8;i++)b.step();
+        var received=OrdnanceSeeker.passiveReturn(target,100,100,b.tick);
+        require(received!=null,"No photons for bounded seeker-noise regression");
+        var nominal=OrdnanceSeeker.estimate(received,target.id,19,1,-1,target.visualScale());
+        var replay=OrdnanceSeeker.estimate(received,target.id,19,1,-1,target.visualScale());
+        require(nominal.equals(replay),"Identical seeker and photon history changed estimate");
+        require(nominal.uncertaintyRadius()>0&&
+                StrictMath.hypot(nominal.x()-received.sample().x(),
+                        nominal.y()-received.sample().y())<=
+                        nominal.uncertaintyRadius()+1e-8,
+                "Seeker coordinate error was either perfect or unbounded");
+        var highQuality=OrdnanceSeeker.estimate(received,target.id,19,2,-1,target.visualScale());
+        require(highQuality.uncertaintyRadius()<nominal.uncertaintyRadius(),
+                "Paid missile guidance failed to improve finite seeker resolution");
+        target.ecmStrength=.6;
+        b.step();
+        var old=OrdnanceSeeker.passiveReturn(target,100,100,b.tick);
+        require(old!=null&&old.profile().ecmStrength()==0,
+                "Future ECM incorrectly influenced earlier arriving photons");
+        var same=OrdnanceSeeker.estimate(old,target.id,19,1,-1,target.visualScale());
+        require(same.uncertaintyRadius()==nominal.uncertaintyRadius(),
+                "Future ECM retroactively increased old seeker uncertainty");
+        boolean newEvidence=false;
+        for(int i=0;i<18;i++){
+            b.step();
+            var later=OrdnanceSeeker.passiveReturn(target,100,100,b.tick);
+            if(later!=null&&later.profile().ecmStrength()>.5){
+                var degraded=OrdnanceSeeker.estimate(later,target.id,19,1,-1,target.visualScale());
+                require(degraded.uncertaintyRadius()>nominal.uncertaintyRadius(),
+                        "Observed ECM failed to increase finite seeker error");
+                newEvidence=true;break;
+            }
+        }
+        require(newEvidence,"Changed ECM never arrived at actual seeker");
+        var distant=OrdnanceSeeker.estimate(
+                new OrdnanceSeeker.Return(received.measuredTick(),
+                        received.receivedTick(),received.distance()*1.5,
+                        received.sample(),received.profile()),
+                target.id,19,1,-1,target.visualScale());
+        require(distant.uncertaintyRadius()>nominal.uncertaintyRadius(),
+                "Distant target failed to increase seeker uncertainty");
+        require(!OrdnanceSeeker.estimate(received,target.id,23,1,-1,
+                        target.visualScale()).equals(nominal),
+                "Distinct missile seekers incorrectly share identical noise");
+        System.out.println("PASS bounded finite seeker noise, paid quality, photon-delayed ECM and deterministic replay");
+    }
     public static void main(String[] args){
         delayedPositionAndEcm();emittedHologramCannotChangeInFlight();
-        deterministicCausalReplay();
+        boundedSeekerNoise();deterministicCausalReplay();
     }
 }
