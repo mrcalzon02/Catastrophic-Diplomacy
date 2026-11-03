@@ -11,6 +11,7 @@ on:
       - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
       - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
       - 'core/src/test/java/diplomacy/sim/RailPointDefenseDiagnostic.java'
+      - 'core/src/test/java/diplomacy/sim/PointDefenseFleetScaleDiagnostic.java'
       - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
       - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
@@ -39,6 +40,11 @@ jobs:
       - name: Verify rail projectile lifetime and 200v200 arena limits
         id: world
         run: gradle --no-daemon :core:battleArenaSmoke
+      - name: Advisory 200v200 four-family sustained load and HOLD_FIRE A/B
+        id: fleet_scale
+        continue-on-error: true
+        timeout-minutes: 4
+        run: gradle --no-daemon :core:pdFleetScaleDiagnostic
       - name: Compile authored railgun turret and moving penetrator art
         id: renderer
         run: gradle --no-daemon :game:compileJava
@@ -48,6 +54,10 @@ jobs:
           echo "## Physically installed charged rail interceptors" >> "$GITHUB_STEP_SUMMARY"
           echo "Core mechanics: ${{ steps.mechanics.outcome }}; arena bounds: ${{ steps.world.outcome }}; visual compilation: ${{ steps.renderer.outcome }}." >> "$GITHUB_STEP_SUMMARY"
           echo "Physical results are measured, numerical balance targets are advisory, no APK was built." >> "$GITHUB_STEP_SUMMARY"
+          echo "Advisory 200v200 load profile: ${{ steps.fleet_scale.outcome }} (nonblocking)." >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/pd-fleet-scale/summary.md ]; then
+            cat core/test-output/pd-fleet-scale/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ -f core/test-output/rail-pd/summary.md ]; then
             cat core/test-output/rail-pd/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
@@ -59,5 +69,13 @@ jobs:
         with:
           name: rail-pd-physical-results
           path: core/test-output/rail-pd/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Preserve 200v200 per-window performance and physical-fire report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pd-four-family-fleet-scale-results
+          path: core/test-output/pd-fleet-scale/
           if-no-files-found: warn
           retention-days: 30
