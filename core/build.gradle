@@ -151,7 +151,15 @@ tasks.register('sensorTrackRelayBufferSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorTrackRelayBufferTest'
     dependsOn testClasses
 }
+tasks.register('sensorComputeBudgetSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify real per-ship RES/TRK/ACU computation limits and independent CAP engagement slots.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorComputeBudgetTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorComputeBudgetSmoke'))
     dependsOn(tasks.named('sensorTrackRelayBufferSmoke'))
     dependsOn(tasks.named('sensorHistoricalSignaturesSmoke'))
     dependsOn(tasks.named('sensorRelayBufferSmoke'))
