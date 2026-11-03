@@ -12,6 +12,8 @@ on:
       - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
       - 'core/src/test/java/diplomacy/sim/RotaryCiwsDiagnostic.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
+      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
+      - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
       - 'core/build.gradle'
       - '.github/workflows/rotary-ciws-diagnostic.yml'
   workflow_dispatch:
