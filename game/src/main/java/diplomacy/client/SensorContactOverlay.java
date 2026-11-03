@@ -197,9 +197,17 @@ final class SensorContactOverlay {
         // or an actual future position. Render restrained lines for the first
         // three high-priority tracks; other contacts get a small lead reticle.
         Battle.Ship captain=battle.tacticalViewer(team);
-        if(captain!=null&&world.zoom<=3.0f&&captain.kineticDamage>0){
-            double speed=AmmunitionTable.kinetic(captain.kineticType)
-                    .physical(captain.kineticProjectile).speed();
+        if(captain!=null&&world.zoom<=3.0f){
+            // Every tracked contact gets a pip, including on beam-only
+            // command ships. A ballistic trajectory line is drawn only
+            // when an actual kinetic or dumbfire-rocket weapon is fitted.
+            boolean gun=captain.kineticDamage>0;
+            boolean rocket=!gun&&!captain.rocketRacks.isEmpty();
+            boolean ballistic=gun||rocket;
+            double speed=gun?AmmunitionTable.kinetic(captain.kineticType)
+                    .physical(captain.kineticProjectile).speed():
+                    rocket?captain.rocketRacks.get(0).body.speed():
+                    1_000_000_000.0; // Current main beams are instant ray hits.
             double precision=battle.targetingPrecision(captain.id);
             int count=0;
             for(Battle.TacticalContact mark:leadCandidates){
@@ -216,7 +224,7 @@ final class SensorContactOverlay {
                 shapes.circle(px,py,extent*.65f,12);
                 shapes.circle(px,py,Math.max(extent*1.3f,sigma),28);
                 shapes.line((float)mark.x(),(float)mark.y(),px,py);
-                if(count<MAX_TRAJECTORY_LINES){
+                if(ballistic&&count<MAX_TRAJECTORY_LINES){
                     // Straight unguided projectile path, not an invented
                     // missile guidance envelope or omniscient actual hit.
                     shapes.setColor(.94f,.74f,.32f,mark.stale()?.18f:.30f);
