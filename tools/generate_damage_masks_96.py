@@ -61,7 +61,10 @@ def enrich_materials(fields, family, variant):
             ImageFilter.GaussianBlur(1.8)).load()
         oxide_mid = score.filter(ImageFilter.MaxFilter(17)).filter(
             ImageFilter.GaussianBlur(3.8)).load()
-        oxide_outer = score.filter(ImageFilter.MaxFilter(25)).filter(
+        # The six separated laser pinholes have a smaller central ink mass:
+        # their discoloration still must extend farther than plasma.
+        oxide_outer = score.filter(ImageFilter.MaxFilter(
+            33 if variant == 4 else 25)).filter(
             ImageFilter.GaussianBlur(5.4)).load()
     limits = {
         "laser": 1.29, "plasma": 1.08, "torpedo": 1.04,
