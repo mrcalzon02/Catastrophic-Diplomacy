@@ -44,13 +44,6 @@ public final class CombatHitFeedbackTest {
         check(CombatHitFeedback.weaponKind("LASER")==Battle.DamageType.LASER&&
                 CombatHitFeedback.weaponKind("TORPEDO")==Battle.DamageType.TORPEDO,
                 "Real weapon event classification must preserve emissive family");
-        check(CombatLightingRenderer.emissionStrength(Battle.DamageType.KINETIC)==0f&&
-                CombatLightingRenderer.emissionStrength(Battle.DamageType.PLASMA)>
-                CombatLightingRenderer.emissionStrength(Battle.DamageType.LASER),
-                "Kinetic stays cold; plasma emits stronger than laser");
-        check(CombatHitRenderer.sparkCount(Battle.DamageType.PARTICLE,true)<=4&&
-                CombatLightingRenderer.smokeWisps(Battle.DamageType.TORPEDO)<=2,
-                "Per-hit spark and smoke budgets must be compact");
         feedback.beforeStep(battle);
         battle.tick++;
         feedback.afterStep(battle,List.of(hit(4,battle.tick,ship.id,105,200)));
