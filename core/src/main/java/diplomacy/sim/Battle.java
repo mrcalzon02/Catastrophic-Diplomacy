@@ -2133,16 +2133,33 @@ public final class Battle {
         for(Ship ship:ships)ship.sensorHistory.capture(observedTick,ship);
     }
 
-    /** Paid TRK remembers the received measured fix, never target truth. */
+    /** A receipt is always a historical photon measurement, whether an
+     * independent local scan or a powered allied transmitter report.
+     * SHARED contact routing is still capped by the fitted existing hardware. */
+    private SensorLightTimeHistory.Observation receivedContact(
+            Ship viewer,Ship target,Ship source){
+        if(source==null)return null;
+        double sourceDistance=StrictMath.hypot(
+                source.x-target.x,source.y-target.y);
+        int channels=directSensorChannels(source,target,sourceDistance);
+        if(channels==0)return null;
+        int linkTicks=source==viewer?0:SensorLightTimeHistory.propagationTicks(
+                StrictMath.hypot(viewer.x-source.x,viewer.y-source.y));
+        return SensorLightTimeHistory.receive(source,target,tick,channels,linkTicks);
+    }
+
+    /** Paid tracking retains measured-state history; a relayed fix must
+     * not be replaced with invented local sensor coordinates. */
     private void rememberTrack(Ship observer,Ship target){
+        SensorLightTimeHistory.Observation observation=
+                receivedContact(observer,target,observer);
+        rememberTrack(observer,target,observation);
+    }
+    private void rememberTrack(Ship observer,Ship target,
+            SensorLightTimeHistory.Observation observation){
         int capacity=observer.network.trackMemoryCapacity();
         if(capacity<=0||observer.power<=3||observer.sensorsCondition<=.05
-                ||observer.crewReadiness()<.05)return;
-        int channels=directSensorChannels(observer,target,StrictMath.hypot(
-                observer.x-target.x,observer.y-target.y));
-        SensorLightTimeHistory.Observation observation=
-                SensorLightTimeHistory.receive(observer,target,tick,channels,0);
-        if(observation==null)return;
+                ||observer.crewReadiness()<.05||observation==null)return;
         SensorLightTimeHistory.Sample measured=observation.sample();
         ContactTrack existing=observer.knownTracks.get(target.id);
         if(existing!=null){existing.update(measured);return;}
@@ -2301,23 +2318,19 @@ public final class Battle {
         return transmitter;
     }
 
+    /** Causal permission for ALL sensor doctrines, including STANDARD.
+     * No fire-control path may treat an undelivered observation as a lock.
+     * Stored last-known fixes remain navigational and never satisfy this gate. */
+    private SensorLightTimeHistory.Observation authorizedContact(
+            Ship actor,Ship hostile,double estimatedDistance){
+        Ship source=liveContactSource(actor,hostile,estimatedDistance);
+        SensorLightTimeHistory.Observation arrived=
+                receivedContact(actor,hostile,source);
+        if(arrived!=null)rememberTrack(actor,hostile,arrived);
+        return arrived;
+    }
     boolean hasTargetContact(Ship actor,Ship hostile,double distance){
-        Ship source=liveContactSource(actor,hostile,distance);
-        if(source==null)return false;
-        // A selected pulsed search doctrine must not use an echo before
-        // the specific fitted sensor actually emitted, reflected and heard it.
-        // STANDARD legacy contact gating remains unchanged until the broader
-        // causal fire-control migration is validated against campaign timing.
-        if(source.scan.mode()!=SensorActiveScan.Mode.STANDARD){
-            int channels=directSensorChannels(source,hostile,StrictMath.hypot(
-                    source.x-hostile.x,source.y-hostile.y));
-            int relay=source==actor?0:SensorLightTimeHistory.propagationTicks(
-                    StrictMath.hypot(source.x-actor.x,source.y-actor.y));
-            if(SensorLightTimeHistory.receive(source,hostile,tick,channels,relay)==null)
-                return false;
-        }
-        rememberTrack(actor,hostile);
-        return true;
+        return authorizedContact(actor,hostile,distance)!=null;
     }
 
     /** Read-only instrument display fix. Historical coordinates are recorded
@@ -2435,10 +2448,8 @@ public final class Battle {
                     source.x-target.x,source.y-target.y));
             if(channels==0)continue;
             boolean relayed=source!=viewer;
-            int linkTicks=relayed?SensorLightTimeHistory.propagationTicks(
-                    StrictMath.hypot(viewer.x-source.x,viewer.y-source.y)):0;
             SensorLightTimeHistory.Observation observation=
-                    SensorLightTimeHistory.receive(source,target,tick,channels,linkTicks);
+                    receivedContact(viewer,target,source);
             if(observation==null)continue;
             SensorLightTimeHistory.Sample measured=observation.sample();
             float working=source.power>3&&source.sensorsCondition>.05
@@ -2482,8 +2493,13 @@ public final class Battle {
             Ship choice = null;
             double best = Double.POSITIVE_INFINITY;
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
-                double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
-                if(!hasTargetContact(actor,s,distance))continue;
+                double routeDistance=StrictMath.hypot(s.x-actor.x,s.y-actor.y);
+                SensorLightTimeHistory.Observation contact=
+                        authorizedContact(actor,s,routeDistance);
+                if(contact==null)continue;
+                // Target preference cannot rank by an as-yet unseen trajectory.
+                double distance=StrictMath.hypot(
+                        contact.sample().x()-actor.x,contact.sample().y()-actor.y);
                 double estimationError = (random.nextDouble() - 0.5) * 0.52 /
                         (1+actor.commanderSkill*.4+tacticalPrecision(actor));
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
@@ -2517,8 +2533,13 @@ public final class Battle {
         for(Ship candidate:ships)if(candidate.team!=actor.team&&candidate.alive()){
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
-            double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
-            if(!hasTargetContact(actor,candidate,distance))continue;
+            double routeDistance=StrictMath.hypot(
+                    candidate.x-actor.x,candidate.y-actor.y);
+            SensorLightTimeHistory.Observation contact=
+                    authorizedContact(actor,candidate,routeDistance);
+            if(contact==null)continue;
+            double distance=StrictMath.hypot(contact.sample().x()-actor.x,
+                    contact.sample().y()-actor.y);
             double error=(random.nextDouble()-.5)*.52/
                     (1+actor.commanderSkill*.4+tacticalPrecision(actor));
             double assessed=distance*(1+error)*100.0/classOrder.priority()
