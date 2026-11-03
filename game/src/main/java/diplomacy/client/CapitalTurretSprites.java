@@ -47,6 +47,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             case POINT_DEFENSE -> (slot&1)==0?6:5;
             case FLAK -> 5; // Existing dedicated fitted flak turret art cell.
             case ROTARY_CIWS -> 10; // Actual authored small kinetic rotary turret cell.
+            case RAIL_PD -> 11; // Heavy authored rail cannon, not a laser barrel.
         };
     }
     /** Actual fitted component suffix distinguishes flak from rotary PD.
@@ -56,6 +57,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
         String id=emitter.component();
         if(id.endsWith("-FLK"))return 5;
         if(id.endsWith("-RCW"))return 10;
+        if(id.endsWith("-RPD"))return 11;
         if(id.endsWith("-PD"))return 6;
         if(emitter.family()==WeaponMuzzles.Family.KINETIC && hull!=null)
             return switch(hull.spriteHull()){
@@ -75,6 +77,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
         float value=(6.4f/3f)*shipScale;
         if(family==WeaponMuzzles.Family.POINT_DEFENSE)value*=.75f;
         if(family==WeaponMuzzles.Family.ROTARY_CIWS)value*=.82f;
+        if(family==WeaponMuzzles.Family.RAIL_PD)value*=1.02f;
         if(family==WeaponMuzzles.Family.TORPEDO)value*=1.14f;
         return value;
     }
@@ -137,6 +140,12 @@ public final class CapitalTurretSprites implements AutoCloseable {
                     for(diplomacy.sim.RotaryPointDefense.Mount rcw:ship.rotaryMounts)
                         if(rcw.slotId==mount.slotId()&&Double.isFinite(rcw.bearing)){
                             turretAngle=spriteAngle((float)StrictMath.toDegrees(rcw.bearing));
+                            break;
+                        }
+                if(mount.family()==WeaponMuzzles.Family.RAIL_PD)
+                    for(diplomacy.sim.RailPointDefense.Mount rail:ship.railMounts)
+                        if(rail.slotId==mount.slotId()&&Double.isFinite(rail.bearing)){
+                            turretAngle=spriteAngle((float)StrictMath.toDegrees(rail.bearing));
                             break;
                         }
                 // The world-space muzzle coordinates and turret socket agree.
