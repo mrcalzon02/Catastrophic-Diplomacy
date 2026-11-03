@@ -85,6 +85,35 @@ public final class SensorTacticalPictureTest {
                 "Unpowered sender continued supplying a live track");
         System.out.println("PASS SHR relay provenance and loss-of-power cutover");
     }
+    /** A newly powered transmitter cannot rebroadcast events it never saw.
+     * Historical enemy snapshots belong to physics, not the scout's memory. */
+    private static void lateScoutPowerOn(TechnologyCatalog catalog){
+        Battle battle=new Battle(56772);
+        Battle.Ship scout=battle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship captain=battle.addShip(0,Battle.Faction.TERRAN,1300,100);
+        Battle.Ship target=battle.addShip(1,Battle.Faction.DRAXIAN,600,100);
+        stationary(battle);
+        scout.network=network(catalog,"SHR");
+        scout.sensorRange=700;
+        captain.sensorRange=captain.infraredRange=captain.xrayRange=
+                captain.graviticRange=0;
+        scout.powerRegen=0;scout.power=0;
+        for(int i=0;i<15;i++)battle.step();
+        require(report(battle,captain.id,target.id)==null,
+                "Unpowered scout manufactured a historical packet");
+        scout.power=100;
+        battle.step();
+        require(report(battle,captain.id,target.id)==null,
+                "Newly powered transmitter sent a past echo it never observed");
+        boolean received=false;
+        for(int i=0;i<25;i++){
+            battle.step();
+            if(report(battle,captain.id,target.id)!=null){received=true;break;}
+        }
+        require(received,"Actual late scout report failed after echo and relay travel");
+        System.out.println("PASS no retroactive scout acquisition; only genuinely sent delayed packets");
+    }
+
     private static void historical(TechnologyCatalog catalog){
         Battle b=new Battle(56773);
         Battle.Ship scout=b.addShip(0,Battle.Faction.TERRAN,100,100);
@@ -162,6 +191,7 @@ public final class SensorTacticalPictureTest {
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         sharing(catalog);
+        lateScoutPowerOn(catalog);
         historical(catalog);
         optical(catalog);
         command(catalog);
