@@ -310,6 +310,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 Threat.MISSILE_MICRO_SWARM,Threat.MISSILE_CASCADE_SWARM,
                 Threat.TORPEDO_HEAVY_STRIKE,Threat.FIGHTER_INTERCEPTOR,
                 Threat.FIGHTER_TORPEDO_BOMBER};
+        final int measurementSeeds=8;
         for(Threat threat:threats){
             int range=threat.craft()?220:390;
             for(String family:new String[]{"PD","FLK"})
@@ -317,7 +318,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                     for(int mounts:new int[]{1,4}){
                         int fired=0,killed=0,entries=0,impacts=0,controlImpacts=0,shots=0;
                         double damage=0,controlDamage=0;
-                        for(int seed=0;seed<2;seed++){
+                        for(int seed=0;seed<measurementSeeds;seed++){
                             Result active=run(catalog,threat,rank,mounts,seed,
                                     BattleOrders.PointDefense.BALANCED,range,family);
                             Result control=run(catalog,threat,rank,mounts,seed,
@@ -334,8 +335,9 @@ public final class PointDefenseThreatMatrixDiagnostic {
                         require(fired>0,"No real physical launch in P0 "+threat+"/"+family);
                         double rate=100.0*killed/fired;
                         csv.add(String.format(Locale.ROOT,
-                                "%s,%s,0,%d,%d,%d,2,%d,%d,%.3f,%d,%d,%d,%d,%.4f,%.4f,MEASURED_LEGACY_ATTACKER",
-                                family,threat,rank,mounts,range,fired,killed,rate,
+                                "%s,%s,0,%d,%d,%d,%d,%d,%d,%.3f,%d,%d,%d,%d,%.4f,%.4f,MEASURED_LEGACY_ATTACKER",
+                                family,threat,rank,mounts,range,measurementSeeds,
+                                fired,killed,rate,
                                 entries,impacts,controlImpacts,shots,damage,controlDamage));
                         summary.append(String.format(Locale.ROOT,
                                 "|%s|%s|%d|%d|%d|%d|%.1f%%|%d|%d|%d|%d|\n",

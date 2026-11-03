@@ -3324,8 +3324,11 @@ public final class Battle {
                 if(target.team==burst.team ||
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
                     continue;
+                // Dense inert metallic bullets have little exposed surface
+                // for fragment impacts; shells should be handled by precision
+                // CIWS or an actual rail interceptor, not flak shrapnel.
                 target.integrity-=ProjectileModel.fragmentationPdDamage(
-                        target.spec,burst.damage);
+                        target.spec,burst.damage)*.32;
                 if(target.integrity<=0){
                     ballistics.remove(i);ballisticIntercepts++;shooter.intercepted++;
                     visual(target.visualId,VisualPhase.INTERCEPT,"KINETIC",
@@ -3335,11 +3338,15 @@ public final class Battle {
             }
             for(int i=crafts.size()-1;i>=0;i--){
                 Craft target=crafts.get(i);
+                // Larger aircraft present more physical surface to a cloud
+                // of fragments, while retaining their actual armor pool.
+                double area=StrictMath.sqrt(target.radarProfile().crossSection());
+                double hitRadius=burst.radius+8*area;
                 if(target.team==burst.team ||
-                   StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>
-                           burst.radius+6)
+                   StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>hitRadius)
                     continue;
-                hitCraft(target,burst.damage*6.0,shooter,burst.shotId,"FLAK");
+                double fragments=StrictMath.max(.65,StrictMath.min(2.4,area*2.2));
+                hitCraft(target,burst.damage*6.0*fragments,shooter,burst.shotId,"FLAK");
                 pointDefenseCraftHits++;
                 if(target.integrity<=0){
                     crafts.remove(i);craftLosses++;pointDefenseCraftKills++;
@@ -3624,7 +3631,13 @@ public final class Battle {
                 if(random.nextDouble()<ProjectileModel.interceptionChance(signature,
                         defender.pointDefenseProfile,defender.pointDefenseCondition,
                         weather.accuracyFactor())) {
-                    hitCraft(craft,defender.pointDefenseProfile.damage()*pdLaw.craftDamageMultiplier(),
+                    // Precision CIWS pulses ablate tiny ordnance very well,
+                    // but their narrow single-body spot does not transfer the
+                    // same damage into a large aircraft frame. Unfitted legacy
+                    // fixtures retain their historical combat behavior.
+                    double craftScale=defender.weaponEmitters.isEmpty()?
+                            pdLaw.craftDamageMultiplier():1.5;
+                    hitCraft(craft,defender.pointDefenseProfile.damage()*craftScale,
                             defender,defensiveShot,"POINT_DEFENSE");
                     pointDefenseCraftHits++;
                     if(craft.integrity<=0){
