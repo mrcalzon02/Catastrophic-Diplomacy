@@ -4081,6 +4081,7 @@ public final class Battle {
     private void fireRailPointDefense(){
         for(Ship defender:ships){
             if(!defender.alive()||defender.railMounts.isEmpty()||
+                    !defender.orders.pointDefense().ordnance()||
                     defender.crewReadiness()<.05||
                     defender.pointDefenseCondition<=.2)continue;
             for(RailPointDefense.Mount gun:defender.railMounts){
@@ -4088,6 +4089,14 @@ public final class Battle {
                         defender.kineticAmmo<RailPointDefense.CARTRIDGES_PER_SHOT||
                         railPenetrators.size()>=RailPointDefense.MAX_ACTIVE_PENETRATORS)
                     continue;
+                // Precharge the real paid capacitor while standing watch,
+                // NOT after a fast shell has almost reached the hull. No
+                // energy is spent while captain orders HOLD_FIRE.
+                double beforeCharge=gun.charge;
+                gun.charge(DT);
+                double charged=gun.charge-beforeCharge;
+                defender.power-=1.8*charged;
+                defender.heat+=.45*charged;
                 gun.scans++;
                 RailTrack target=chooseRailContact(defender,gun);
                 if(target==null)continue;
