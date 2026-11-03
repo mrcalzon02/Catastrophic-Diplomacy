@@ -16,6 +16,8 @@ on:
       - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
       - 'core/src/test/java/diplomacy/sim/SensorRelayBufferTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTrackRelayBuffer.java'
+      - 'core/src/main/java/diplomacy/sim/SensorComputeBudget.java'
+      - 'core/src/test/java/diplomacy/sim/SensorComputeBudgetTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorTrackRelayBufferTest.java'
       - 'core/src/test/java/diplomacy/sim/WeaponMuzzlesTest.java'
       - 'core/src/test/java/diplomacy/sim/SensingModulesTest.java'
