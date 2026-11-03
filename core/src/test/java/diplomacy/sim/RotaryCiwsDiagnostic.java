@@ -210,8 +210,8 @@ public final class RotaryCiwsDiagnostic {
         require(total==fired,"Fitted RCW muzzle shots and physical rounds disagree");
         require(ammo-defender.kineticAmmo==fired,
                 "Rotary rounds did not consume one actual kinetic cartridge each");
-        require(!on&&fired==0,"HOLD_FIRE launched unapproved rotary rounds");
-        require(on&&fired>0,"Powered rotary CIWS failed to fire at "+threat);
+        require(on||fired==0,"HOLD_FIRE launched unapproved rotary rounds");
+        require(!on||fired>0,"Powered rotary CIWS failed to fire at "+threat);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
         require(launched>0,"Attacker produced no physical "+threat);
         require(!on||seen>0,"No actual rotary projectile ever crossed a simulation frame");
