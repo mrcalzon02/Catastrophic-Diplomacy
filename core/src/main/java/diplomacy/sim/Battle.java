@@ -4225,18 +4225,14 @@ public final class Battle {
                         rocket.x,rocket.y,rocket.x,rocket.y);
                 rockets.remove(i);continue;
             }
-            double age=rocket.flightTicks*DT;
-            rocket.flightTicks++;
-            double accel=RocketBarrage.acceleration(rocket.size,rocket.motor,age);
-            if(rocket.motor==RocketBarrage.Motor.SUSTAINED_BURN)
-                accel*=rocket.sustainedThrustFactor*
-                        diagnosticSustainedRocketThrustMultiplier;
-            if(accel>0){
-                double speed=StrictMath.hypot(rocket.vx,rocket.vy);
-                double next=StrictMath.min(rocket.spec.speed(),speed+accel*DT);
-                rocket.vx=StrictMath.cos(rocket.heading)*next;
-                rocket.vy=StrictMath.sin(rocket.heading)*next;
-            }
+            double previousSpeed=StrictMath.hypot(rocket.vx,rocket.vy);
+            double speed=RocketBarrage.nextSpeed(
+                    rocket.size,rocket.motor,rocket.flightTicks++,
+                    previousSpeed,rocket.spec.speed(),
+                    rocket.sustainedThrustFactor*
+                            diagnosticSustainedRocketThrustMultiplier);
+            rocket.vx=StrictMath.cos(rocket.heading)*speed;
+            rocket.vy=StrictMath.sin(rocket.heading)*speed;
             double nx=rocket.x+rocket.vx*DT,ny=rocket.y+rocket.vy*DT;
             Ship hit=null;double earliest=Double.POSITIVE_INFINITY;
             for(Ship enemy:ships)if(enemy.team!=rocket.team&&enemy.alive()){
