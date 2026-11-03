@@ -1,0 +1,47 @@
+name: Optional PD vs flak simultaneous fighter-wave diagnostics
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/test/java/diplomacy/sim/PointDefenseWaveDiagnostic.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - '.github/workflows/pd-flak-wave-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cd-pd-wave-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+jobs:
+  measure-simultaneous-fighter-waves:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.11.1' }
+      - name: Compile and exercise real mounted 4/8 fighter attacks, no packaging
+        id: wave
+        continue-on-error: true
+        run: gradle --no-daemon :core:pdFlakWaveDiagnostic
+      - name: Report test outcome explicitly (advisory)
+        if: always()
+        run: |
+          echo "## PD/flak actual simultaneous fighter-wave tests" >> "$GITHUB_STEP_SUMMARY"
+          echo "Diagnostic: ${{ steps.wave.outcome }} (advisory only; NOT a release gate)" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/pd-wave-diagnostic/summary.md ]; then
+            cat core/test-output/pd-wave-diagnostic/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No wave metrics created. Inspect compilation and test logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve headless machine-readable test CSV and summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pd-flak-simultaneous-fighter-wave-results
+          path: core/test-output/pd-wave-diagnostic/
+          if-no-files-found: warn
+          retention-days: 30

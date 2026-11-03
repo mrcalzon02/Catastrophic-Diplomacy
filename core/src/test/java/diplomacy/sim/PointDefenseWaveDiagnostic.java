@@ -36,7 +36,7 @@ public final class PointDefenseWaveDiagnostic {
             double finalPowerFraction,double peakHeatFraction) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f",
+                "%s,%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f",
                 battery,threat,wave,distance,rank,seed,defenseOn,launched,
                 craftKills,craftTerminal,attackShots,attackImpacts,torpedoFired,
                 torpedoImpacts,pdLaserShots,flakShots,flakAmmoSpent,

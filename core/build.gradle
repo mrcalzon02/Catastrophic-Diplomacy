@@ -803,3 +803,14 @@ tasks.register('pdFamilyP0Diagnostic', JavaExec) {
     mainClass = 'diplomacy.sim.PointDefenseThreatMatrixDiagnostic'
     args '--p0'
 }
+
+
+// Standalone advisory fighter-wave diagnostics: testClasses ONLY.
+// No APK, desktop packaging, render/sprite checks, or release thresholds.
+tasks.register('pdFlakWaveDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Real simultaneous 4/8-aircraft attacks on PD, FLK and mixed fitted batteries.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PointDefenseWaveDiagnostic'
+}
