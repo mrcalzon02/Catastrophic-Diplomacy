@@ -171,9 +171,10 @@ public final class TerranPlaceholderSprites implements Disposable {
         // All original civilizations now load their own source-sheet sprites.
         // Missing generated art is a genuine packaging failure, not permission
         // to display blue geometric hulls for those factions.
-        // Installed before any campaign/skirmish ship spawns. The same exact
-        // projected slots drive FIRE origins, visible turret art, and editor taps.
-        HullLayouts.useSpriteProjector(this::projectOriginalArt);
+        // The build-baked, SHA-checked source-PNG map is shared with headless
+        // servers. Never replace it at runtime with a GPU-dependent projector.
+        // Actual rendered turret art and touch hitboxes read these same anchors.
+        HullLayouts.requireBakedHardpoints();
     }
     private static Pixmap loadMaterial(String path) {
         if(!Gdx.files.internal(path).exists())
