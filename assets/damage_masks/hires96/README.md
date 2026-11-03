@@ -51,11 +51,14 @@ at value 164; the renderer preserves that tag through damage severity.
 The green channel then selects the oxide phase. Very hot, narrow laser
 lips gain a small local incandescent contribution; the distant annealing
 band remains primarily discolored metal rather than a bright light source.
-The offline authoring pass also tapers the **G oxide hue phase** toward
-zero before the **B material tag** ends: otherwise bilinear interpolation
-can mistake a laser's outer edge for plasma heat, creating a hard orange
-polygon on original ship art. The material fringe is softened without
-blurring the physical alpha cutout or shortening its outer laser reach.
+The offline authoring pass tapers the **G oxide hue phase** down to
+a **small neutral floor (26/255)** before the **B material tag** ends.
+An unfeathered phase made bilinear interpolation misread the outer edge
+as hot plasma and draw an orange polygon. Tapering all the way to zero
+then let the same interpolated B values be mistaken for cold chrome,
+producing a pale outline. The small neutral floor suppresses both
+false boundaries while maintaining the intended wider anneal field,
+sharp structural alpha cutout and genuinely molten inner lip.
 Plasma and blast-family molten lips use the hot G channel with the B
 channel's exposed metal to produce local gold/amber highlights. Kinetic
 has **no thermal G response** and retains cold raised silver fractures.
