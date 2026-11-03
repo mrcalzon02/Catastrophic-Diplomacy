@@ -67,7 +67,7 @@ public final class PointDefenseFleetScaleDiagnostic {
                 Math.max(0,ship.hull);
     }
     private static Result run(TechnologyCatalog tech,boolean enabled,
-                              List<String> samples){
+                              List<String> samples,List<String> familyKills){
         Battle battle=new Battle(2026110204L);
         for(int family=0;family<OFFENSE.length;family++){
             double y=135+family*155;
@@ -149,6 +149,26 @@ public final class PointDefenseFleetScaleDiagnostic {
         }
         int interceptions=battle.missileIntercepts+
                 battle.rocketIntercepts+battle.ballisticIntercepts;
+        int attributedOrdnanceKills=0,attributedCraftKills=0;
+        for(Battle.DefensiveGun gun:Battle.DefensiveGun.values())
+            for(Battle.DefensiveTarget target:Battle.DefensiveTarget.values()){
+                int kills=battle.defensiveKills(gun,target);
+                require(kills>=0,"Negative physical defense attribution");
+                familyKills.add((enabled?"ACTIVE":"HOLD_FIRE")+","+
+                        gun+","+target+","+kills);
+                if(target==Battle.DefensiveTarget.CRAFT)
+                    attributedCraftKills+=kills;
+                else attributedOrdnanceKills+=kills;
+            }
+        // All 200 defensive hulls have only these four paid physical PD
+        // families. These counters follow actual removal, not hit attempts.
+        // Other attack or non-PD systems must never get phantom PD credit.
+        require(attributedOrdnanceKills==interceptions,
+                "Actual projectile kills were not attributed exactly once");
+        require(attributedCraftKills==battle.pointDefenseCraftKills,
+                "Actual craft kills were not attributed exactly once");
+        require(enabled || (attributedOrdnanceKills==0&&attributedCraftKills==0),
+                "HOLD_FIRE attributed nonexistent physical PD kills");
         require(enabled || (pd==0&&flak==0&&rotary==0&&rail==0),
                 "HOLD_FIRE emitted real point-defense shots in 200v200");
         int paidCartridges=flak+rotary+
@@ -173,9 +193,13 @@ public final class PointDefenseFleetScaleDiagnostic {
         samples.add("mode,tick,wall_window_ms,heap_bytes,active_bodies,"+
                 "peak_bodies,alive_attack,alive_defense,laser_shots,flak_shots,"+
                 "rotary_shots,rail_shots,ordnance_interceptions");
-        Result active=run(tech,true,samples);
-        Result hold=run(tech,false,samples);
+        List<String> familyKills=new ArrayList<>();
+        familyKills.add("mode,gun,target,physical_kills");
+        Result active=run(tech,true,samples,familyKills);
+        Result hold=run(tech,false,samples,familyKills);
         Files.write(root.resolve("samples.csv"),samples,StandardCharsets.UTF_8);
+        Files.write(root.resolve("family-target-kills.csv"),familyKills,
+                StandardCharsets.UTF_8);
         String report="# Real fitted 200v200 four-family point-defense load\n\n"+
                 "600 physical 30-Hz simulation ticks per mode, identical initial "+
                 "ship positions and RNG seed. Each fleet includes 50 live "+
@@ -202,7 +226,15 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "Each row in samples.csv is one 30-tick measurement window. "+
                 "Event history has an 8192-event ring and capped windows "+
                 "must be interpreted cautiously. CPU timings depend on the "+
-                "GitHub runner. No APK or desktop packaging is involved.\n";
+                "GitHub runner. No APK or desktop packaging is involved.\n"+
+                "\n## Per-family physical kill attribution\n\n"+
+                "Only real removed ordnance/craft bodies count as kills. "+
+                "Unsuccessful hits, harmless missed ordnance, electronic "+
+                "diversions and ordinary projectile expiry are excluded.\n\n"+
+                "|Mode|Defense|Target body|Destroyed|\n"+
+                "|---|---|---|---:|\n";
+        for(int i=1;i<familyKills.size();i++)
+            report+="|"+familyKills.get(i).replace(",","|")+"|\n";
         Files.writeString(root.resolve("summary.md"),report);
         System.out.print(report);
         System.out.println("PD_FLEET_SCALE_200v200_TICKS_PER_MODE="+TICKS);
