@@ -1808,46 +1808,166 @@ public final class Battle {
         return channels;
     }
 
-    /** Independent optical/radar acquisition precedes any fleet datalink.
-     * A relay is a detected enemy, not an omniscient target list: the spotter
-     * must be alive, powered and within local formation radio range, and the
-     * recipient must remain near the reported hostile. Simulated once per
-     * tick rather than rescanning every ally for every target candidate. */
+    /** Track memory is populated ONLY by an actual acquired contact. It is
+     * bounded per fitted ship; a missing TRK module never gains free memory. */
+    private void rememberTrack(Ship observer,Ship target){
+        int capacity=observer.network.trackMemoryCapacity();
+        if(capacity<=0||observer.power<=3||observer.sensorsCondition<=.05
+                ||observer.crewReadiness()<.05)return;
+        ContactTrack existing=observer.knownTracks.get(target.id);
+        if(existing!=null){existing.update(target,tick);return;}
+        if(observer.knownTracks.size()>=capacity){
+            int oldestId=-1;
+            long oldest=Long.MAX_VALUE;
+            for(Map.Entry<Integer,ContactTrack> entry:observer.knownTracks.entrySet()){
+                if(entry.getValue().tick<oldest ||
+                        (entry.getValue().tick==oldest && entry.getKey()<oldestId)){
+                    oldest=entry.getValue().tick;oldestId=entry.getKey();
+                }
+            }
+            if(oldestId>=0)observer.knownTracks.remove(oldestId);
+        }
+        observer.knownTracks.put(target.id,new ContactTrack(target,tick));
+    }
+
+    /** Command cores assist only allied ships physically inside a functioning
+     * powered local command cell. Each center has a finite recipient budget. */
+    private void refreshCommandAssistance(){
+        for(Ship ship:ships)ship.commandAssist=0;
+        Ship[] recipients=new Ship[40];
+        double[] closest=new double[40];
+        for(Ship command:ships){
+            int slots=command.network.commandCapacity();
+            if(!command.alive()||slots<=0||command.power<=3||
+                    command.commandCondition<=.15||command.sensorsCondition<=.15
+                    ||command.crewReadiness()<.05)continue;
+            slots=StrictMath.min(slots,40);
+            double power=StrictMath.min(command.commandCondition,command.sensorsCondition);
+            double radius=command.network.fusionRange()*power;
+            if(radius<=0)continue;
+            command.commandAssist=StrictMath.max(command.commandAssist,
+                    command.network.fusionStrength()*power);
+            Arrays.fill(recipients,0,slots,null);
+            Arrays.fill(closest,0,slots,Double.POSITIVE_INFINITY);
+            for(Ship friend:ships){
+                if(friend==command||friend.team!=command.team||!friend.alive())continue;
+                double dx=friend.x-command.x,dy=friend.y-command.y;
+                double d2=dx*dx+dy*dy;
+                if(d2>radius*radius)continue;
+                for(int k=0;k<slots;k++)if(d2<closest[k]){
+                    for(int j=slots-1;j>k;j--){
+                        closest[j]=closest[j-1];recipients[j]=recipients[j-1];
+                    }
+                    closest[k]=d2;recipients[k]=friend;
+                    break;
+                }
+            }
+            for(int k=0;k<slots;k++)if(recipients[k]!=null){
+                Ship recipient=recipients[k];
+                if(recipient.power<=3||recipient.crewReadiness()<.05)continue;
+                double link=1-.25*StrictMath.sqrt(closest[k])/radius;
+                recipient.commandAssist=StrictMath.max(recipient.commandAssist,
+                        command.network.fusionStrength()*power*link);
+            }
+        }
+    }
+
+    /** Existing short-range formation radio remains intact. Paid SHR hardware
+     * additionally broadcasts a bounded number of its closest REAL contacts.
+     * There are no fabricated phantom ships in the detection registry. */
     private void refreshSharedContacts(){
-        if(!weather.preset().enabled())return;
         for(int team=0;team<2;team++){
             if(sharedSpotters[team].length<nextId){
                 sharedSpotters[team]=new Ship[nextId];
                 sharedNearest[team]=new double[nextId];
-            }else Arrays.fill(sharedSpotters[team],null);
+                expandedSpotters[team]=new Ship[nextId];
+                expandedNearest[team]=new double[nextId];
+            }else{
+                Arrays.fill(sharedSpotters[team],null);
+                Arrays.fill(expandedSpotters[team],null);
+            }
             Arrays.fill(sharedNearest[team],Double.POSITIVE_INFINITY);
+            Arrays.fill(expandedNearest[team],Double.POSITIVE_INFINITY);
         }
+        if(!weather.preset().enabled())return;
+        Ship[] selected=new Ship[32];
+        double[] distances=new double[32];
         for(Ship scout:ships){
-            if(!scout.alive()||scout.power<=3||scout.crewReadiness()<0.05)continue;
+            if(!scout.alive()||scout.power<=3||scout.crewReadiness()<.05)continue;
             Ship[] contacts=sharedSpotters[scout.team];
             double[] closest=sharedNearest[scout.team];
+            int capacity=(int)StrictMath.ceil(scout.network.sharingCapacity()
+                    *StrictMath.max(0,scout.sensorsCondition));
+            capacity=StrictMath.min(32,capacity);
+            if(capacity>0){
+                Arrays.fill(selected,0,capacity,null);
+                Arrays.fill(distances,0,capacity,Double.POSITIVE_INFINITY);
+            }
             for(Ship hostile:ships){
                 if(!hostile.alive()||hostile.team==scout.team)continue;
                 double dx=hostile.x-scout.x,dy=hostile.y-scout.y;
                 double d2=dx*dx+dy*dy;
-                if(d2>=closest[hostile.id])continue;
+                // Always check a genuine direct channel; no datalink can
+                // bootstrap itself by resending an unconfirmed contact.
                 double range=targetAcquisitionRange(scout,hostile);
-                if(d2<=range*range){
+                if(d2>range*range)continue;
+                rememberTrack(scout,hostile);
+                if(d2<closest[hostile.id]){
                     closest[hostile.id]=d2;
                     contacts[hostile.id]=scout;
+                }
+                if(capacity<=0)continue;
+                for(int k=0;k<capacity;k++)if(d2<distances[k]){
+                    for(int n=capacity-1;n>k;n--){
+                        distances[n]=distances[n-1];
+                        selected[n]=selected[n-1];
+                    }
+                    distances[k]=d2;selected[k]=hostile;
+                    break;
+                }
+            }
+            for(int k=0;k<capacity;k++){
+                Ship hostile=selected[k];
+                if(hostile==null)break;
+                if(distances[k]<expandedNearest[scout.team][hostile.id]){
+                    expandedNearest[scout.team][hostile.id]=distances[k];
+                    expandedSpotters[scout.team][hostile.id]=scout;
                 }
             }
         }
     }
 
+    /** Direct detection or physically valid contact broadcast, never an
+     * unexplained global enemy list. Extended links cost fitted equipment.
+     * Stale tracks may guide searching but CANNOT authorize weapon firing. */
     boolean hasTargetContact(Ship actor,Ship hostile,double distance){
-        if(distance<=targetAcquisitionRange(actor,hostile))return true;
-        if(actor.power<=3||actor.crewReadiness()<0.05||distance>1250)return false;
+        if(distance<=targetAcquisitionRange(actor,hostile)){
+            rememberTrack(actor,hostile);
+            return true;
+        }
+        if(actor.power<=3||actor.crewReadiness()<.05)return false;
         Ship[] contacts=sharedSpotters[actor.team];
         if(hostile.id>=contacts.length)return false;
         Ship scout=contacts[hostile.id];
-        return scout!=null&&scout.alive()&&scout.power>3
-                &&StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000;
+        if(distance<=1250 && scout!=null && scout.alive() && scout.power>3
+                &&StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000){
+            rememberTrack(actor,hostile);
+            return true;
+        }
+        Ship transmitter=expandedSpotters[actor.team][hostile.id];
+        if(transmitter==null||!transmitter.alive()||transmitter.power<=3||
+                transmitter.sensorsCondition<=.05)return false;
+        double condition=StrictMath.min(1,StrictMath.max(0,
+                transmitter.sensorsCondition));
+        double link=1000+transmitter.network.sharingRange()*condition
+                +actor.network.trackRelayRange()*StrictMath.max(0,actor.sensorsCondition);
+        double horizon=1250+StrictMath.min(950,
+                transmitter.network.sharingRange()*.38+
+                actor.network.trackRelayRange()*.32);
+        if(distance>horizon||StrictMath.hypot(actor.x-transmitter.x,
+                actor.y-transmitter.y)>link)return false;
+        rememberTrack(actor,hostile);
+        return true;
     }
 
     private Ship chooseTarget(Ship actor) {
