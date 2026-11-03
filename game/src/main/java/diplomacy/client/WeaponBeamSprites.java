@@ -37,7 +37,9 @@ public final class WeaponBeamSprites implements Disposable {
     public int loaded(){return loaded;}
 
     private static int color(Battle.Beam beam){
-        if(beam.pointDefense)return 2; // green defensive optic
+        // Legacy pulse-laser PD is green. The separate actual particle
+        // defense beam must retain its physical PARTICLE/violet identity.
+        if(beam.pointDefense&&beam.type==Battle.DamageType.LASER)return 2;
         if(beam.type==Battle.DamageType.LASER)return switch(beam.laserType){
             case PULSE -> 0;     // blue
             case RAPID -> 2;     // green
