@@ -100,6 +100,15 @@ def enrich_materials(fields, family, variant):
                         # cool outer blue/violet, hot inner bronze/gold.
                         g = 215 - 177 * min(1.0, close * .65 +
                                             middle * .42)
+                        # Do not interpolate a full oxide HUE phase into a
+                        # blank pixel as though it were hot plasma. At the
+                        # outer B-tag transition this created a false hard
+                        # orange polygon on real full-resolution ship art.
+                        # Feather the phase to zero BEFORE the oxide ends.
+                        fringe = max(0.0, min(1.0,
+                            (coverage - .105) / .115))
+                        fringe = fringe * fringe * (3.0 - 2.0 * fringe)
+                        g *= fringe
                         # Bright, surviving incised edges (B > .9) can glow
                         # in the material shader; no light in empty alpha.
                         b = max(b, 173 + .31 * soft_lip)
