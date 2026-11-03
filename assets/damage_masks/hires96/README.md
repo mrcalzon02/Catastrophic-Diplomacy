@@ -8,7 +8,7 @@ The authoritative source recipes are `tools/generate_damage_masks_96.py`.
 | Channel | Meaning |
 | --- | --- |
 | R | Local soot and blackened plating |
-| G | Hot material and residual heat |
+| G | Hot material / residual heat; for laser oxide pixels, hue phase rather than glow strength |
 | B | Raised metal or tagged laser oxide |
 | A | Surviving original plating, 255 intact / 0 cut through |
 
@@ -27,6 +27,40 @@ The 96px source provides more fracture, pockmark, scoring and melt detail,
 but the 192x288 overlay and final display zoom still limit what can be
 resolved on screen. Evaluate real OpenGL screenshots at tactical and
 close zoom; these frames alone do not prove final hull readability.
+
+## Thermal treatment and selective anti-aliasing
+
+The current source masks are an **impact-topology + material** pass. The
+generator performs small, localized Gaussian softening only on soot, heat,
+oxide and torn-metal response. **Alpha opening topology is never blurred**:
+all 42 cutout alpha frames remain bit-for-bit identical to their
+pre-material-pass equivalents. The enlarged per-ship mask is just a cached
+coefficient texture; no full-hull artwork is replaced.
+
+**Laser annealing is intentionally the widest thermal-affected radius.**
+Across all six laser variants, the native-96 oxide material reaches about
+**1.18–1.29 armor cells** from the registered impact. Plasma's hot reach
+is about **0.97–1.08 cells**; torpedoes and missiles remain smaller.
+Laser width describes blue/violet/bronze discoloration of **surviving
+plating**, not a larger hole or a colored ellipse over the entire ship.
+The generator shapes this field around actual straight/forked/parallel
+scores, not a generic radial bowl.
+
+The blue channel uses an exclusive **laser anneal material tag** beginning
+at value 164; the renderer preserves that tag through damage severity.
+The green channel then selects the oxide phase. Very hot, narrow laser
+lips gain a small local incandescent contribution; the distant annealing
+band remains primarily discolored metal rather than a bright light source.
+Plasma and blast-family molten lips use the hot G channel with the B
+channel's exposed metal to produce local gold/amber highlights. Kinetic
+has **no thermal G response** and retains cold raised silver fractures.
+Shader blending and all masks remain clipped to the original hull alpha.
+
+Run `python3 tools/audit_damage_masks_96_materials.py` to inspect
+every authored frame's thermal/oxide reach, alpha cutout footprint,
+gradient levels and variant overlap. The report flags style issues as
+**nonblocking findings**; gameplay and release workflows are not gated
+by aesthetic thresholds.
 
 Family differences:
 - Laser: thin straight, forked, parallel and separated scoring, with
