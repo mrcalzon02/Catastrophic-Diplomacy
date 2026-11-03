@@ -162,33 +162,33 @@
   "torpedo": [
     {
       "variant": 1,
-      "coloredPixels": 1520,
-      "cutPixels": 761
+      "coloredPixels": 1399,
+      "cutPixels": 664
     },
     {
       "variant": 2,
-      "coloredPixels": 1539,
-      "cutPixels": 716
+      "coloredPixels": 1528,
+      "cutPixels": 362
     },
     {
       "variant": 3,
-      "coloredPixels": 1796,
-      "cutPixels": 856
+      "coloredPixels": 1419,
+      "cutPixels": 640
     },
     {
       "variant": 4,
-      "coloredPixels": 1659,
-      "cutPixels": 717
+      "coloredPixels": 1503,
+      "cutPixels": 681
     },
     {
       "variant": 5,
-      "coloredPixels": 1850,
-      "cutPixels": 923
+      "coloredPixels": 1467,
+      "cutPixels": 300
     },
     {
       "variant": 6,
-      "coloredPixels": 1609,
-      "cutPixels": 751
+      "coloredPixels": 1589,
+      "cutPixels": 458
     }
   ],
   "fighter": [
