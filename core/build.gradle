@@ -158,7 +158,23 @@ tasks.register('sensorComputeBudgetSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorComputeBudgetTest'
     dependsOn testClasses
 }
+tasks.register('sensorLeadProjectionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify read-only target leading pips, flight geometry, uncertainty and actual fire-control parity.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorLeadProjectionTest'
+    dependsOn testClasses
+}
+tasks.register('beamRaySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Real laser/plasma/particle firing rays, near-grazes, misses, range and impact alignment.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BeamRayGeometryTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorLeadProjectionSmoke'))
+    dependsOn(tasks.named('beamRaySmoke'))
     dependsOn(tasks.named('sensorComputeBudgetSmoke'))
     dependsOn(tasks.named('sensorTrackRelayBufferSmoke'))
     dependsOn(tasks.named('sensorHistoricalSignaturesSmoke'))
