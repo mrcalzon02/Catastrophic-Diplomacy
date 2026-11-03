@@ -737,6 +737,13 @@ public final class Battle {
             throw new IllegalArgumentException("Invalid CIWS optical track capacity");
         diagnosticPrecisionTracksPerMount=tracksPerMount;
     }
+    /** Vary how simultaneous contacts share real fire-control processing
+     * time, not hit chance or the number of free visual projectiles. */
+    public void configurePrecisionTrackExponentForDiagnostic(double exponent){
+        if(tick!=0||!Double.isFinite(exponent)||exponent<.25||exponent>1.25)
+            throw new IllegalArgumentException("Invalid CIWS tracking workload exponent");
+        diagnosticPrecisionTrackExponent=exponent;
+    }
     /** Compare per-socket optical allocations to the old duplicate targeting.
      * This opt-in switch is only legal before the first simulation tick. */
     public void configurePrecisionReservationsForDiagnostic(boolean enabled){
@@ -753,6 +760,9 @@ public final class Battle {
     /** Zero keeps normal per-socket tracking unchanged; diagnostics can
      * measure finite track-processing capacity without altering hit RNG. */
     private int diagnosticPrecisionTracksPerMount;
+    /** Laboratory-only routing efficiency between parallel (0.5) and
+     * serial (1.0) optical-track service. */
+    private double diagnosticPrecisionTrackExponent=.5;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -3547,11 +3557,18 @@ public final class Battle {
      * root to model parallel fire-control electronics rather than a serial
      * one-contact-per-tick queue. This is TIME, not hit probability. */
     static double precisionTrackLoadMultiplier(int acquired,int emitters,int channels){
-        if(acquired<0||emitters<1||channels<0||channels>16)
+        return precisionTrackLoadMultiplier(acquired,emitters,channels,.5);
+    }
+    static double precisionTrackLoadMultiplier(int acquired,int emitters,int channels,
+                                                double exponent){
+        if(acquired<0||emitters<1||channels<0||channels>16
+                ||!Double.isFinite(exponent)||exponent<.25||exponent>1.25)
             throw new IllegalArgumentException("Invalid precision track-load fixture");
         if(channels==0)return 1.0;
-        return StrictMath.sqrt(StrictMath.max(1.0,
-                acquired/(double)(emitters*channels)));
+        // Bound crowded fleet behavior: acquisition can never grow without
+        // limit due solely to optical scheduling, including in 200v200 tests.
+        double ratio=StrictMath.max(1.0,acquired/(double)(emitters*channels));
+        return StrictMath.min(4.0,StrictMath.pow(ratio,exponent));
     }
     /** Actual fitted CIWS acquisition: turn a physical turret toward the current
      * body before opening fire. Every new target consumes continuous tracking
@@ -3731,7 +3748,8 @@ public final class Battle {
                 }
                 double trackLoad=precisionTrackLoadMultiplier(acquiredTracks,
                         StrictMath.max(1,defender.precisionMounts.size()),
-                        diagnosticPrecisionTracksPerMount);
+                        diagnosticPrecisionTracksPerMount,
+                        diagnosticPrecisionTrackExponent);
                 if(!acquirePrecisionTarget(defender,pdSocket,physicalId,tx,ty,
                         tick,trackLoad))continue;
             }
