@@ -60,9 +60,12 @@ public final class SensorLightTimeHistory {
     public static int propagationTicks(double distance){
         return (int)StrictMath.ceil(WorldScale.signalDelayTicks(distance,false)-1e-10);
     }
-    /** Active channels require a round-trip echo before the reflected
-     * target state can be received. A relay adds an extra one-way hop.
-     * This does NOT yet authorize a fire-control lock or spend scan energy. */
+    /** Each observation requires a specific historical photon arrival:
+     * passive sensors receive one-way radiation; radar/X-ray require a paid
+     * or STANDARD powered outbound emission and its reflected return.
+     * The search is bounded by the one-light-minute arena diagonal.
+     * A relay hop is additive; hardware signature eligibility is filtered
+     * against the historical profile by the caller. */
     public static Observation receive(Battle.Ship source,Battle.Ship target,
             long receivedTick,int hardwareChannels,int linkTicks){
         if(source==null||target==null||receivedTick<0||linkTicks<0)
@@ -76,52 +79,51 @@ public final class SensorLightTimeHistory {
         if(sensorState==null&&sensorTick>0)
             sensorState=source.sensorHistory.at(sensorTick-1);
         if(sensorState==null)return null;
-        Sample lastRecorded=target.sensorHistory.at(sensorTick);
-        if(lastRecorded==null&&sensorTick>0)
-            lastRecorded=target.sensorHistory.at(sensorTick-1);
-        if(lastRecorded==null)return null;
-        // A bounded conservative light-cone solver. The latest available
-        // candidate is ONLY a seed for travel time: the actual measurement
-        // is always from an arrived, older historical sample. If a moving
-        // target had been farther away, increase age rather than acquiring
-        // it too early. Never read target.x/y/vx/vy here.
-        int outward=propagationTicks(StrictMath.hypot(
-                lastRecorded.x()-sensorState.x(),
-                lastRecorded.y()-sensorState.y()));
-        for(int pass=0;pass<4;pass++){
-            long candidateTick=sensorTick-outward;
-            Sample candidate=target.sensorHistory.at(candidateTick);
-            if(candidate==null)return null;
-            int required=propagationTicks(StrictMath.hypot(
-                    candidate.x()-sensorState.x(),
-                    candidate.y()-sensorState.y()));
-            if(required<=outward)break;
-            outward=required;
-        }
-        long measured=sensorTick-outward;
-        Sample sample=target.sensorHistory.at(measured);
-        if(sample==null||!sample.alive())return null;
-        // Quantized outward/return photons each require their own full
-        // causal interval; a rounded 2*d can be a tick too early.
+        // Select samples by the time photons actually ARRIVE, rather than
+        // seeding a delay with the target's latest hidden state. A sudden
+        // maneuver cannot erase a radar echo already on its return flight.
+        // The arena diagonal spans at most 30 ticks one-way; bounded scan.
         int passive=hardwareChannels&(Battle.CONTACT_OPTICAL|
                 Battle.CONTACT_INFRARED|Battle.CONTACT_GRAVITIC);
         int active=hardwareChannels&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY);
-        if(sensorTick<(long)outward*2)active=0;
-        // Explicit active search requires a genuine earlier physical pulse.
-        // A boosted sweep cannot masquerade as a continuous free radar and
-        // a focused X-ray burst cannot illuminate an unrelated hull.
-        long emissionTick=measured-outward;
-        // A continuously emitting STANDARD sensor must actually have been
-        // powered when the outbound light was launched. Turning on at tick N
-        // cannot create a radar/X-ray pulse retrospectively at tick N-2d/c.
-        Sample emitterAtPulse=source.sensorHistory.at(emissionTick);
-        if(active!=0&&(emitterAtPulse==null||
-                !emitterAtPulse.sensorsPowered()||
-                !source.scan.emittedFor(emissionTick,target.id,active)))
-            active=0;
-        int arrived=passive|active;
-        if(arrived==0)return null;
-        long emitted=active!=0?emissionTick:measured;
-        return new Observation(emitted,measured,receivedTick,arrived,sample);
+        Sample passiveFix=null,activeFix=null;
+        long activeEmission=-1;
+        int oneWayLimit=StrictMath.min(CAPACITY-1,
+                propagationTicks(WorldScale.DIAGONAL_WORLD_UNITS)+2);
+        for(int age=0;age<=oneWayLimit&&age<=sensorTick;age++){
+            long reflectedTick=sensorTick-age;
+            Sample reflected=target.sensorHistory.at(reflectedTick);
+            if(reflected==null||!reflected.alive())continue;
+            int returnTicks=propagationTicks(StrictMath.hypot(
+                    reflected.x()-sensorState.x(),
+                    reflected.y()-sensorState.y()));
+            // Each return is a specific immutable photon arrival, not a
+            // continuously available old radar fix until it is overwritten.
+            if(age!=returnTicks)continue;
+            if(passive!=0&&passiveFix==null)passiveFix=reflected;
+            if(active!=0&&activeFix==null){
+                long emittedTick=reflectedTick-returnTicks;
+                Sample sourceEmission=source.sensorHistory.at(emittedTick);
+                if(sourceEmission!=null&&sourceEmission.sensorsPowered()&&
+                        source.scan.emittedFor(emittedTick,target.id,active)){
+                    activeFix=reflected;
+                    activeEmission=emittedTick;
+                }
+            }
+            if(passiveFix!=null&&(active==0||activeFix!=null))break;
+        }
+        // Active echo has an independently verified outbound emission.
+        // Preserve passive corroboration only from the SAME measured sample:
+        // conflating separate photon epochs would fabricate track precision.
+        if(activeFix!=null){
+            int channels=active;
+            if(passiveFix!=null&&passiveFix.tick()==activeFix.tick())
+                channels|=passive;
+            return new Observation(activeEmission,activeFix.tick(),
+                    receivedTick,channels,activeFix);
+        }
+        if(passiveFix==null)return null;
+        return new Observation(passiveFix.tick(),passiveFix.tick(),
+                receivedTick,passive,passiveFix);
     }
 }
