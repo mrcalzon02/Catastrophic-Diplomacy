@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.Battle;
+import diplomacy.sim.DeceptionProjection;
 import diplomacy.sim.FogOfWarModel;
 import java.util.HashMap;
 import java.util.List;
@@ -49,17 +50,21 @@ final class SensorContactOverlay {
     /** Radar displays the TRUE faction hull profile, never a solid fake ship. */
     private static void radarHull(ShapeRenderer shapes,Battle.Ship ship,
                                   BattleRenderPoses.Pose pose){
+        radarHull(shapes,ship,pose.x(),pose.y(),pose.angle());
+    }
+    private static void radarHull(ShapeRenderer shapes,Battle.Ship ship,
+                                  float x,float y,float bearing){
         Shipyard.Hull hull=ship.hullClass==null?Shipyard.Hull.CORVETTE:ship.hullClass;
         List<HullLayouts.Point> points=HullLayouts.outline(ship.faction,hull.spriteHull());
-        float angle=(float)(pose.angle()-Math.PI/2);
+        float angle=(float)(bearing-Math.PI/2);
         float c=(float)Math.cos(angle),s=(float)Math.sin(angle);
         float scale=(float)ship.visualScale()*.2f;
         for(int i=0;i<points.size();i++){
             HullLayouts.Point a=points.get(i),b=points.get((i+1)%points.size());
-            float ax=pose.x()+scale*(a.x()*c-a.y()*s);
-            float ay=pose.y()+scale*(a.x()*s+a.y()*c);
-            float bx=pose.x()+scale*(b.x()*c-b.y()*s);
-            float by=pose.y()+scale*(b.x()*s+b.y()*c);
+            float ax=x+scale*(a.x()*c-a.y()*s);
+            float ay=y+scale*(a.x()*s+a.y()*c);
+            float bx=x+scale*(b.x()*c-b.y()*s);
+            float by=y+scale*(b.x()*s+b.y()*c);
             shapes.line(ax,ay,bx,by);
         }
     }
@@ -119,6 +124,15 @@ final class SensorContactOverlay {
             if((mask&Battle.CONTACT_RADAR)!=0){
                 shapes.setColor(.28f,.85f,1f,.90f);
                 radarHull(shapes,target,pose);
+                // The installed holo projector already supplies real seeker
+                // ghost positions. Its radar echoes mimic the same hull trace,
+                // but never create an extra damageable simulation vessel.
+                for(int echo=0;echo<DeceptionProjection.falseContacts(target);echo++){
+                    float gx=(float)DeceptionProjection.ghostX(target,echo,battle.tick);
+                    float gy=(float)DeceptionProjection.ghostY(target,echo,battle.tick);
+                    if(view.circle(gx,gy,50*target.visualScale()))
+                        radarHull(shapes,target,gx,gy,pose.angle());
+                }
             }
             if((mask&Battle.CONTACT_XRAY)!=0){
                 shapes.setColor(.76f,.46f,1f,.84f);
