@@ -389,8 +389,11 @@ public final class RocketPdBalanceDiagnostic {
                 "acquisitions,lock_wait_ticks");
         for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
             for(boolean moving:new boolean[]{false,true})
-                for(double dwell:new double[]{.65,1.0})
+                for(double dwell:new double[]{.65,1.0,1.15,1.30,1.45,1.60,1.80,2.0})
                     for(boolean coordinated:new boolean[]{false,true}){
+                        // The old duplicate-targeting control is already
+                        // measured at .65/1.0; avoid redundant large sweeps.
+                        if(dwell>1.0&&!coordinated)continue;
                         int launched=0,killed=0,terminal=0,impacts=0,acquisitions=0,wait=0;
                         for(int seed=0;seed<REPEAT_SEEDS;seed++){
                             Sample trial=run(tech,RocketBarrage.Size.SIEGE,9,4,16,
