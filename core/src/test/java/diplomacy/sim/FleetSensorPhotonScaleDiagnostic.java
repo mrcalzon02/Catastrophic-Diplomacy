@@ -119,6 +119,11 @@ public final class FleetSensorPhotonScaleDiagnostic {
         for(Battle.Ship ship:sim.ships()){
             ship.fighterReserve=0;ship.droneReserve=0;
             ship.repairDroneReserve=0;
+            // Keep the command center in its designated rearward plotting
+            // station. This is a sensor/relay diagnostic, not an AI pursuit
+            // trial; the other fully armed line vessels still maneuver.
+            if(ship.network.commandCapacity()>0)
+                sim.registerDiagnosticStationaryTarget(ship.id);
         }
         return sim;
     }
@@ -229,6 +234,19 @@ public final class FleetSensorPhotonScaleDiagnostic {
         }
         check(allocated>=0&&exhausted<=allocated,
                 "Invalid physically funded fire-control compute counters");
+        Battle.Ship command=battle.tacticalViewer(0);
+        System.out.println("PROFILE_ROUTE_TRACE "+count+"v"+count+
+                " direct="+direct+" relayed="+relayed+
+                " historical="+historical+" ghosts="+ghosts+
+                " fire="+shots+" beams="+peakBeams+
+                " compute="+allocated+
+                " command="+(command==null?"NONE":command.id+
+                        "/FCM="+command.network.commandCapacity()+
+                        "/SHR="+command.network.sharingCapacity()+
+                        "/LNK="+command.network.trackRelayRange()+
+                        "/radar="+String.format(Locale.ROOT,"%.1f",command.sensorRange)+
+                        "/power="+String.format(Locale.ROOT,"%.1f",command.power)+
+                        "/x="+String.format(Locale.ROOT,"%.1f",command.x)));
         check(shots>0&&peakBeams>0&&allocated>0,
                 "No real charged beam/fire-control use in "+count+"v"+count);
         check(relayed>0,
