@@ -343,6 +343,7 @@ public final class TechnologyCatalog {
             addSurvivalHardwareVariants(bases);
             addDumbfireRocketFamilies(bases,rows);
             addRotaryPointDefenseFamilies(bases,rows);
+            addRailPointDefenseFamilies(bases,rows);
             // Ranks VII-IX are synthesized on demand. No 13,200 extra
             // temporary CSV arrays/strings retained at Android startup.
         }
@@ -1068,6 +1069,44 @@ public final class TechnologyCatalog {
             row.set(5,"Rotary kinetic CIWS "+row.get(3)+" stage "+row.get(4));
             row.set(6,source.get(6).replace("-FLK-","-RCW-").replace("-FLK","-RCW"));
             row.set(19,"Rotary CIWS: "+row.get(19)+"; paid cartridges and sustained spin");
+            upgrades.add(row);
+        }
+    }
+
+    /** A new physical defensive rail line for all eleven faction technology
+     * trees. Reuse only the industry's FLK fabrication economics as a source;
+     * the fitted weapon has its own long-charge, high-velocity penetrator,
+     * separate sensor envelope and expensive power/ammo in live combat. */
+    private static void addRailPointDefenseFamilies(List<List<String>> bases,
+                                                      List<List<String>> upgrades){
+        List<List<String>> originals=List.copyOf(bases);
+        List<List<String>> research=List.copyOf(upgrades);
+        for(int i=1;i<originals.size();i++){
+            List<String> src=originals.get(i);
+            if(!"FLK".equals(src.get(2)))continue;
+            List<String> row=new ArrayList<>(src);
+            row.set(0,src.get(0).replace("-FLK","-RPD"));
+            row.set(2,"RPD");row.set(3,"Railgun Interceptor");
+            row.set(5,"Large charged anti-torpedo rail penetrator; long predicted lead");
+            row.set(6,ratio(Double.parseDouble(src.get(6)),1.28));
+            row.set(7,ratio(Double.parseDouble(src.get(7)),1.38));
+            row.set(8,ratio(Double.parseDouble(src.get(8)),1.23));
+            row.set(9,ratio(Double.parseDouble(src.get(9)),1.17));
+            row.set(10,Integer.toString(Math.max(1,(int)StrictMath.ceil(
+                    Integer.parseInt(src.get(10))*1.43))));
+            row.set(11,ratio(Double.parseDouble(src.get(11)),1.16));
+            row.set(12,"Expensive solid sabot; charged capacitor, recoil and minimum safe bore range");
+            bases.add(row);
+        }
+        for(int i=1;i<research.size();i++){
+            List<String> src=research.get(i);
+            if(!"FLK".equals(src.get(2)))continue;
+            List<String> row=new ArrayList<>(src);
+            row.set(0,src.get(0).replace("-FLK-","-RPD-"));
+            row.set(2,"RPD");
+            row.set(5,"Railgun interceptor "+row.get(3)+" stage "+row.get(4));
+            row.set(6,src.get(6).replace("-FLK-","-RPD-").replace("-FLK","-RPD"));
+            row.set(19,"Charged rail PD: "+row.get(19)+"; three sabots per shot and long recharge");
             upgrades.add(row);
         }
     }
