@@ -5829,6 +5829,7 @@ public final class Battle {
             hash = mix(hash,Double.doubleToLongBits(s.vy));
             hash = mix(hash,s.propulsion.ordinal());
             hash = mix(hash,s.scan.fingerprint());
+            hash = mix(hash,s.relayPackets.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));
