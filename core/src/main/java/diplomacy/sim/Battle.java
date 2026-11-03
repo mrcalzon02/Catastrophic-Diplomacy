@@ -4006,9 +4006,16 @@ public final class Battle {
             if(d<RotaryPointDefense.MIN_RANGE||d>
                     RotaryPointDefense.acquisitionRange(defender,gun,radar,
                             weather.sensorFactor(),1.0))continue;
-            double score=defensiveScore(defender,d,approachEta(
-                    defender.x,defender.y,body.x,body.y,body.observedVx,
-                    body.observedVy,StrictMath.hypot(body.observedVx,body.observedVy)));
+            double closingTime=approachEta(defender.x,defender.y,
+                    body.x,body.y,body.observedVx,body.observedVy,
+                    StrictMath.hypot(body.observedVx,body.observedVy));
+            // Aircraft can hold station at gun range while firing. They
+            // remain legitimate ANTI_CRAFT tracks even with zero closing
+            // velocity: an infinite impact ETA is not a missing contact.
+            // Keep imminent ordnance ahead of loitering aircraft without
+            // changing the captain's EARLY/CLOSE/FASTEST doctrine.
+            if(!Double.isFinite(closingTime))closingTime=1000+d/100.0;
+            double score=defensiveScore(defender,d,closingTime);
             if(score<rank){rank=score;best=new RotaryTrack(-(long)body.id,
                     body.x,body.y,body.observedVx,body.observedVy,body.targetId,
                     body.sourceId,radar,1.0);}
