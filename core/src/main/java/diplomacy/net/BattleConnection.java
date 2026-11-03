@@ -23,8 +23,11 @@ public final class BattleConnection implements AutoCloseable {
     private volatile long acknowledged;
     private volatile boolean connected=true;
     private volatile String fleetStatus="No fleet submitted",lobbyStatus="Waiting for lobby";
+    /** Host-issued real outcome, independent from whichever ship remains on screen. */
+    private volatile String terminalOutcome="";
     public String fleetStatus(){return fleetStatus;}
     public String lobbyStatus(){return lobbyStatus;}
+    public String terminalOutcome(){return terminalOutcome;}
     public BattleConnection(String address,int port,Hbnet.Client transport,boolean spectate)throws IOException{
         this(transport.connect(address,port),spectate);
     }
@@ -86,6 +89,17 @@ public final class BattleConnection implements AutoCloseable {
             if(p[0].equals("FLEET_REJECT")&&p.length==2){fleetStatus="Rejected by host: "+p[1];continue;}
             if(p[0].equals("LOBBY")&&p.length==3){lobbyStatus="Accepted seats "+p[1]+"/"+p[2];continue;}
             if(p[0].equals("BATTLE_START")&&p.length==2){lobbyStatus="Authoritative battle started";continue;}
+            if(p[0].equals("RESULT")&&p.length==3){
+                // Preserve the authoritative, fully parsed last snapshot.
+                // Reject unknown winner labels and broken frame sequences.
+                if(snapshot==null||Long.parseLong(p[2])!=snapshot.tick()||
+                        !java.util.Set.of("STALEMATE","TIME_LIMIT",
+                                "LEFT_VICTORY","RIGHT_VICTORY",
+                                "MUTUAL_DESTRUCTION").contains(p[1]))
+                    throw Hbnet.failure();
+                terminalOutcome=p[1];
+                continue;
+            }
             if(!p[0].equals("SNAP"))continue;
             if(p.length!=4)throw Hbnet.failure();long tick=Long.parseLong(p[1]),hash=Long.parseLong(p[2]);int count=Integer.parseInt(p[3]);if(count<0||count>8192)throw Hbnet.failure();
             List<String> body=new ArrayList<>();for(int i=0;i<count;i++){String line=Hbnet.read(socket.getInputStream());if(!(line.startsWith("SHIP|")||line.startsWith("MISSILE|")||line.startsWith("BALLISTIC|")||line.startsWith("CRAFT|")))throw Hbnet.failure();body.add(line);}
