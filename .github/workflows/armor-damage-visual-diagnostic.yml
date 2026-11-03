@@ -19,6 +19,7 @@ on:
       - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageCaptureTest.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
+      - 'game/src/main/java/diplomacy/client/ShipLightProbes.java'
       - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceSampleGrid.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageMaskRegion.java'
