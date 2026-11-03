@@ -51,6 +51,22 @@ public final class ShipSurfaceDamageVisualTest {
         check(CombatLightingRenderer.smokeWisps(diplomacy.sim.Battle.DamageType.TORPEDO)<=2&&
                 CombatHitRenderer.sparkCount(diplomacy.sim.Battle.DamageType.PARTICLE,true)<=4,
                 "Small punctures and torpedo smoke must respect tiny particle budgets");
+        // Appearance criteria are intentionally in the optional visual test,
+        // NEVER required by the app release or multiplayer functionality.
+        check(CombatLightingRenderer.hotMetalRadius(diplomacy.sim.Battle.DamageType.PLASMA)
+                        <=CombatEffectScale.of(3.0f)&&
+                CombatLightingRenderer.hotMetalRadius(diplomacy.sim.Battle.DamageType.LASER)
+                        <=CombatEffectScale.of(1.8f),
+                "Wound illumination must stay smaller than its material damage field");
+        check(CombatLightingRenderer.emissionStrength(diplomacy.sim.Battle.DamageType.PLASMA)
+                        <=.12f&&
+                CombatLightingRenderer.emissionStrength(diplomacy.sim.Battle.DamageType.LASER)
+                        <=.06f,
+                "Old broad additive hot-metal intensities cannot return");
+        check(CombatLightingRenderer.impactFlashRadius(false,true)
+                        <=CombatEffectScale.of(19f)&&
+                CombatLightingRenderer.impactFlashAlpha(false)<=.18f,
+                "Impact flashes must not wash out entire cruiser and frigate hulls");
         check(ShipSurfaceSampleGrid.originalBytes(1024,1536)>
                 ShipSurfaceSampleGrid.maskBytes(96,144)*100,
                 "The source-pixel cache must reduce retained decoded memory by over 100x for large PNGs");
