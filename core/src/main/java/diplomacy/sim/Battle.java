@@ -1958,11 +1958,15 @@ public final class Battle {
             Arrays.fill(sharedNearest[team],Double.POSITIVE_INFINITY);
             Arrays.fill(expandedNearest[team],Double.POSITIVE_INFINITY);
         }
-        if(!weather.preset().enabled())return;
+        // Preserve the legacy no-weather short-radio behavior, but real
+        // equipped datalinks and tracking processors must work in CLEAR space.
+        boolean legacyRelay=weather.preset().enabled();
         Ship[] selected=new Ship[32];
         double[] distances=new double[32];
         for(Ship scout:ships){
             if(!scout.alive()||scout.power<=3||scout.crewReadiness()<.05)continue;
+            if(!legacyRelay && scout.network.sharingCapacity()<=0
+                    && scout.network.trackMemoryCapacity()<=0)continue;
             Ship[] contacts=sharedSpotters[scout.team];
             double[] closest=sharedNearest[scout.team];
             int capacity=(int)StrictMath.ceil(scout.network.sharingCapacity()
@@ -1981,7 +1985,7 @@ public final class Battle {
                 double range=targetAcquisitionRange(scout,hostile);
                 if(d2>range*range)continue;
                 rememberTrack(scout,hostile);
-                if(d2<closest[hostile.id]){
+                if(legacyRelay && d2<closest[hostile.id]){
                     closest[hostile.id]=d2;
                     contacts[hostile.id]=scout;
                 }
