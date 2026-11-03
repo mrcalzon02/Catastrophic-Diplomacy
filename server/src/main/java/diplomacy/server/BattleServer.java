@@ -285,7 +285,20 @@ public final class BattleServer implements AutoCloseable {
     private void pump(){
         try{synchronized(lock){long now=System.nanoTime();if(battle==null){lastPump=now;accumulator=0;return;}accumulator=Math.min(accumulator+Math.max(0,now-lastPump),STEP*3);lastPump=now;int steps=0;
             while(accumulator>=STEP&&steps++<3){
-                if(battle.finished()){sendTerminalResult();accumulator=0;break;}
+                if(battle.finished()){
+                    // Also handle a match that was already terminal before
+                    // this pump. The RESULT tick must always match an actual
+                    // fully transmitted, hash-verified terminal snapshot.
+                    if(!terminalSent&&!peers.isEmpty()){
+                        List<String> last=snapshot();
+                        long size=last.stream().mapToLong(line->line.length()+4L).sum();
+                        bytesQueued+=size*peers.size();
+                        for(Peer peer:peers)peer.send(last);
+                    }
+                    sendTerminalResult();
+                    accumulator=0;
+                    break;
+                }
                 long start=System.nanoTime();battle.step();
                 maxTickNanos=Math.max(maxTickNanos,System.nanoTime()-start);
                 accumulator-=STEP;
