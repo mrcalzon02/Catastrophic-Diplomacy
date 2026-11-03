@@ -468,14 +468,19 @@ targeting solutions and damage the first truly intersected enemy hull
 using finite physical collision silhouettes; near misses cannot damage
 and slightly incorrect rays can strike a hull edge. First live tests
 passed 6/6 laser, 4/4 plasma and 3/3 particle ray/impact parity on
-high-acuity stationary-target fixtures (run 41707913126); these are not
-ordinary combat hit-rate figures. Main beam delivery remains instant
-in the current damage engine: photon time-of-flight is NOT yet queued.
+high-acuity stationary-target fixtures (verified again in run 41708998332);
+these are not ordinary combat hit-rate figures. Main beam delivery remains
+instant in the current damage engine: photon time-of-flight is NOT yet queued.
 Point-defense and fighter beam timing remain separate. Dumbfire rocket
 salvos now freeze their aim from a delayed track and a finite
 pre-salvo computation allocation rather than the present target state;
-their launch-time regression was updated to wait for photon arrival,
-and final combined tests remain to be verified.
+their launch-time and finite dual-rack reservation tests now wait for
+photon arrival. Focused run 41708998332 verified `:core:beamRaySmoke`,
+`:core:sensorLeadProjectionSmoke`, `:core:rocketBarrageSmoke`,
+`:core:sensorNetworkSmoke`, the physical muzzle/PD diagnostics, and
+`:game:compileJava` with actual Gradle `BUILD SUCCESSFUL`.
+This proves Java simulation and client compilation, NOT on-device HUD rendering,
+Android package signing, or final combat balance.
 
 **Still pending:** full 200v200 balance/performance, maneuver covariance,
 FCM shared compute arbitration, guided missile seeker reacquisition,
