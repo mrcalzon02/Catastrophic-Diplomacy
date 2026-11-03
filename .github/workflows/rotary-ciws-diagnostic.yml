@@ -11,6 +11,7 @@ on:
       - 'core/src/main/java/diplomacy/shipyard/HullLayouts.java'
       - 'core/src/main/java/diplomacy/shipyard/ApprovedHardpointResource.java'
       - 'core/src/test/java/diplomacy/sim/ApprovedHardpointsTest.java'
+      - 'core/src/test/java/diplomacy/sim/HullLayoutsTest.java'
       - 'tools/ApprovedHardpointBake.java'
       - 'build.gradle'
       - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
