@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SensorNetworkCatalog;
 import diplomacy.tech.SurvivalHardwareCatalog;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -13,8 +14,8 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 60192, "full technology count with survival research");
-        require(c.componentCount() == 1672, "all base components including survival hardware");
+        require(c.upgradeCount() == 72072, "full technology count including fleet sensor networks");
+        require(c.componentCount() == 2002, "all base components including fleet sensor networks");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
@@ -136,7 +137,7 @@ public final class TechnologyCatalogTest {
             }
             enumerated++;
         }
-        require(enumerated==c.upgradeCount() && highestStages==20064,
+        require(enumerated==c.upgradeCount() && highestStages==24024,
                 "Lazy technology enumeration missed or duplicated a stage");
         TechnologyCatalog.Upgrade sixth=c.get("TECH-TER-KIN-OUTPUT-06");
         TechnologyCatalog.Upgrade ninth=c.get("TECH-TER-KIN-OUTPUT-09");
