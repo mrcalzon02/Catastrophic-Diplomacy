@@ -145,7 +145,13 @@ final class MultiplayerPanel implements AutoCloseable {
         if(battleView&&connection!=null&&connection.snapshot()!=null){drawBattle.accept(connection.snapshot());return;}
         Gdx.gl.glClearColor(.015f,.025f,.055f,1);Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);stage.getViewport().update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight(),true);stage.act(Math.min(.05f,Gdx.graphics.getDeltaTime()));stage.draw();
         BattleConnection link=connection;if(link!=null&&!link.connected())matchRule.setText("HOST RULE: disconnected");
-        if(link!=null&&link.snapshot()!=null){var s=link.snapshot();status.setText("Authoritative tick "+s.tick()+" / fleet "+link.team+" / ack "+link.acknowledged()+" / "+(link.connected()?"connected":"connection ended"));}
+        if(link!=null&&link.snapshot()!=null){var s=link.snapshot();
+            String result=link.terminalOutcome();
+            status.setText(result.isEmpty()?"Authoritative tick "+s.tick()+" / fleet "+
+                    link.team+" / ack "+link.acknowledged()+" / "+
+                    (link.connected()?"connected":"connection ended"):
+                    "BATTLE RESULT: "+result.replace('_',' ')+" / authoritative tick "+s.tick());
+        }
         else if(link!=null&&link.matchRules!=null)status.setText(link.fleetStatus()+" / "+link.lobbyStatus());
     }
     boolean closed(){return closed;}
