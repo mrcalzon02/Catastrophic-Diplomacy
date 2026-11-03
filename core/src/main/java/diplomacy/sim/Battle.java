@@ -2365,13 +2365,15 @@ public final class Battle {
             }
             for(Ship hostile:ships){
                 if(!hostile.alive()||hostile.team==scout.team)continue;
-                double dx=hostile.x-scout.x,dy=hostile.y-scout.y;
+                // Only a measured observation can justify selection for
+                // broadcast, even if the enemy has since moved or cloaked.
+                SensorLightTimeHistory.Observation sensed=
+                        receivedContact(scout,hostile,scout);
+                if(sensed==null)continue;
+                double dx=sensed.sample().x()-scout.x;
+                double dy=sensed.sample().y()-scout.y;
                 double d2=dx*dx+dy*dy;
-                // Always check a genuine direct channel; no datalink can
-                // bootstrap itself by resending an unconfirmed contact.
-                double range=targetAcquisitionRange(scout,hostile);
-                if(d2>range*range)continue;
-                rememberTrack(scout,hostile);
+                rememberTrack(scout,hostile,sensed);
                 if(legacyRelay && d2<closest[hostile.id]){
                     closest[hostile.id]=d2;
                     contacts[hostile.id]=scout;
@@ -2410,15 +2412,22 @@ public final class Battle {
     /** Read-only counterpart of the actual fire-control link: no scanner
      * callbacks, ammunition, track memory mutation or random draws. This
      * route is shared by physical weapon acquisition and tactical telemetry. */
-    private Ship liveContactSource(Ship actor,Ship hostile,double distance){
-        if(distance<=targetAcquisitionRange(actor,hostile))return actor;
+    private Ship liveContactSource(Ship actor,Ship hostile,double ignoredDistance){
+        // Never select a source on hostile.x/y or present-time signature.
+        // A direct observation can be visible even if the enemy has moved
+        // beyond the sensor's present-day reach while its photons are enroute.
+        if(receivedContact(actor,hostile,actor)!=null)return actor;
         if(actor.power<=3||actor.crewReadiness()<.05)return null;
         Ship[] contacts=sharedSpotters[actor.team];
         if(hostile.id>=contacts.length)return null;
         Ship scout=contacts[hostile.id];
-        if(distance<=1250 && scout!=null&&scout.alive()&&scout.power>3
-                &&StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000)
-            return scout;
+        if(scout!=null&&scout.alive()&&scout.power>3&&
+                StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000){
+            SensorLightTimeHistory.Observation packet=
+                    receivedContact(actor,hostile,scout);
+            if(packet!=null&&StrictMath.hypot(actor.x-packet.sample().x(),
+                    actor.y-packet.sample().y())<=1250)return scout;
+        }
         Ship transmitter=expandedSpotters[actor.team][hostile.id];
         if(transmitter==null||!transmitter.alive()||transmitter.power<=3||
                 transmitter.sensorsCondition<=.05)return null;
@@ -2426,12 +2435,17 @@ public final class Battle {
                 transmitter.sensorsCondition));
         double link=1000+transmitter.network.sharingRange()*condition
                 +actor.network.trackRelayRange()*StrictMath.max(0,actor.sensorsCondition);
+        if(StrictMath.hypot(actor.x-transmitter.x,actor.y-transmitter.y)>link)
+            return null;
+        SensorLightTimeHistory.Observation packet=
+                receivedContact(actor,hostile,transmitter);
+        if(packet==null)return null;
         double horizon=1250+StrictMath.min(950,
                 transmitter.network.sharingRange()*.38+
                 actor.network.trackRelayRange()*.32);
-        if(distance>horizon||StrictMath.hypot(actor.x-transmitter.x,
-                actor.y-transmitter.y)>link)return null;
-        return transmitter;
+        double measuredDistance=StrictMath.hypot(actor.x-packet.sample().x(),
+                actor.y-packet.sample().y());
+        return measuredDistance<=horizon?transmitter:null;
     }
 
     /** Causal permission for ALL sensor doctrines, including STANDARD.
@@ -2560,9 +2574,8 @@ public final class Battle {
             double distance=StrictMath.hypot(viewer.x-target.x,viewer.y-target.y);
             Ship source=liveContactSource(viewer,target,distance);
             if(source==null)continue;
-            int channels=directSensorChannels(source,target,StrictMath.hypot(
-                    source.x-target.x,source.y-target.y));
-            if(channels==0)continue;
+            // Source selection already requires genuinely arrived measured
+            // sensor channels, not an instant current-position precheck.
             boolean relayed=source!=viewer;
             SensorLightTimeHistory.Observation observation=
                     receivedContact(viewer,target,source);
