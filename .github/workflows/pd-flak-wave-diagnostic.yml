@@ -5,6 +5,9 @@ on:
     paths:
       - 'core/src/test/java/diplomacy/sim/PointDefenseWaveDiagnostic.java'
       - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/SensorLightTimeHistory.java'
+      - 'core/src/test/java/diplomacy/sim/SensorLightTimeHistoryTest.java'
+      - 'core/src/test/java/diplomacy/sim/SensorTacticalPictureTest.java'
       - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
       - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
       - '.github/workflows/pd-flak-wave-diagnostic.yml'
@@ -24,15 +27,15 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.11.1' }
-      - name: Compile and exercise real mounted 4/8 fighter attacks, no packaging
+      - name: Verify mounted PD waves and causal sensor histories in one existing headless build
         id: wave
         continue-on-error: true
-        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic :core:sensorNetworkSmoke
       - name: Report test outcome explicitly (advisory)
         if: always()
         run: |
           echo "## PD/flak actual simultaneous fighter-wave tests" >> "$GITHUB_STEP_SUMMARY"
-          echo "Diagnostic: ${{ steps.wave.outcome }} (advisory only; NOT a release gate)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Mounted fighter waves + sensor-light-time/SHR/TRK/LNK/FCM functional smokes: ${{ steps.wave.outcome }} (advisory, no packaging)" >> "$GITHUB_STEP_SUMMARY"
           if [ -f core/test-output/pd-wave-diagnostic/summary.md ]; then
             cat core/test-output/pd-wave-diagnostic/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
