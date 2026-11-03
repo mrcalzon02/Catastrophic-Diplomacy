@@ -45,14 +45,13 @@ public final class HullLayouts {
         if(faction==null||hull==null)throw new IllegalArgumentException("Missing faction or hull");
         return CACHE.computeIfAbsent(faction.name()+"/"+hull.name(), key -> {
             List<Shipyard.Slot> schematic=buildSlots(faction,hull);
+            List<Shipyard.Slot> approved=ApprovedHardpointResource.get(faction,hull);
+            List<Shipyard.Slot> authoritative=approved==null?schematic:approved;
             SpriteProjector projector=spriteProjector;
-            if(projector==null){
-                List<Shipyard.Slot> approved=ApprovedHardpointResource.get(faction,hull);
-                return approved==null?schematic:approved;
-            }
-            // An explicit projector is now test/diagnostic-only; production
-            // never registers a texture-dependent source of simulation coordinates.
-            List<Shipyard.Slot> projected=projector.project(faction,hull,schematic);
+            if(projector==null)return authoritative;
+            // An explicit projector is test/diagnostic-only. Its input is the
+            // same baked authoritative map, never a second schematic source.
+            List<Shipyard.Slot> projected=projector.project(faction,hull,authoritative);
             if(projected==null||projected.size()!=schematic.size())
                 throw new IllegalStateException("Incomplete original-art hardpoint mapping for "+key);
             for(int i=0;i<projected.size();i++)
