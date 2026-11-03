@@ -34,13 +34,24 @@ public final class HullLayouts {
         CACHE.clear();
     }
 
+    /** A production simulation cannot silently use schematic coordinates.
+     * The resource is identical in headless, desktop and Android packages. */
+    public static void requireBakedHardpoints(){
+        ApprovedHardpointResource.require();
+    }
+
     /** Lazily cached; battle muzzles, turret artwork and shipyard all agree. */
     public static List<Shipyard.Slot> slots(Battle.Faction faction, Shipyard.Hull hull) {
         if(faction==null||hull==null)throw new IllegalArgumentException("Missing faction or hull");
         return CACHE.computeIfAbsent(faction.name()+"/"+hull.name(), key -> {
             List<Shipyard.Slot> schematic=buildSlots(faction,hull);
             SpriteProjector projector=spriteProjector;
-            if(projector==null)return schematic;
+            if(projector==null){
+                List<Shipyard.Slot> approved=ApprovedHardpointResource.get(faction,hull);
+                return approved==null?schematic:approved;
+            }
+            // An explicit projector is now test/diagnostic-only; production
+            // never registers a texture-dependent source of simulation coordinates.
             List<Shipyard.Slot> projected=projector.project(faction,hull,schematic);
             if(projected==null||projected.size()!=schematic.size())
                 throw new IllegalStateException("Incomplete original-art hardpoint mapping for "+key);
