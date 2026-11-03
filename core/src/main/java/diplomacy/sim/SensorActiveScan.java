@@ -36,6 +36,21 @@ public final class SensorActiveScan {
             mode=value;focusTargetId=targetId;nextPulseTick=1;
             stored=0;emissions=0;powerSpent=0;heatGenerated=0;lastEmissionTick=-1;
         }
+        /** Replay signature also includes the bounded historical pulse queue. */
+        public long fingerprint(){
+            long value=0xcbf29ce484222325L;
+            value=(value^mode.ordinal())*0x100000001b3L;
+            value=(value^focusTargetId)*0x100000001b3L;
+            value=(value^nextPulseTick)*0x100000001b3L;
+            value=(value^stored)*0x100000001b3L;
+            value=(value^Double.doubleToLongBits(powerSpent))*0x100000001b3L;
+            value=(value^Double.doubleToLongBits(heatGenerated))*0x100000001b3L;
+            for(int i=0;i<StrictMath.min(HISTORY,stored);i++){
+                value=(value^emittedTicks[i])*0x100000001b3L;
+                value=(value^emittedFocus[i])*0x100000001b3L;
+            }
+            return value;
+        }
         /** Every active return must originate in a real paid historical pulse. */
         public boolean emittedFor(long when,int targetId,int channel){
             if(mode==Mode.STANDARD)return true; // Baseline uninterrupted RDR/XRY.
