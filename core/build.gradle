@@ -907,3 +907,18 @@ tasks.register('pdFlakWaveDiagnostic', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.PointDefenseWaveDiagnostic'
 }
+
+/**
+ * Focused real-hardware particle PD validation (no APK or desktop packaging).
+ * Pass/fail is reserved for objective research, socket, physics and energy
+ * invariants; the emitted kill-rate CSV and performance are advisory only.
+ */
+tasks.register('particlePdDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Real fitted particle beam dwell, cooling, power and HOLD_FIRE'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ParticlePointDefenseDiagnostic'
+    workingDir = projectDir
+    jvmArgs '-Xmx768m'
+}
