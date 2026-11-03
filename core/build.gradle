@@ -854,6 +854,17 @@ tasks.register('railPdDiagnostic', JavaExec) {
     maxHeapSize = '512m'
 }
 
+// Optional real 200v200, four-family physical load and HOLD_FIRE comparison.
+// It does not gate releases, enforce performance thresholds, or build an APK.
+tasks.register('pdFleetScaleDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Record actual 200v200 four-family defensive fire, ordnance, CPU and heap at 30 Hz.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PointDefenseFleetScaleDiagnostic'
+    maxHeapSize = '1024m'
+}
+
 // Standalone advisory fighter-wave diagnostics: testClasses ONLY.
 // No APK, desktop packaging, render/sprite checks, or release thresholds.
 tasks.register('pdFlakWaveDiagnostic', JavaExec) {
