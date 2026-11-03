@@ -10,7 +10,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.shipyard.HullLayouts;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.Battle;
-import diplomacy.sim.DeceptionProjection;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.SensorLeadProjection;
 import diplomacy.sim.GuidedTrajectoryPrediction;
@@ -172,13 +171,7 @@ final class SensorContactOverlay {
                     // a real hull outline. Low-confidence returns stay dots.
                     BattleRenderPoses.Pose pose=poses.ship(target);
                     radarHull(shapes,target,cx,cy,pose.angle());
-                    if(!mark.relayed())
-                        for(int echo=0;echo<DeceptionProjection.falseContacts(target);echo++){
-                            float gx=(float)DeceptionProjection.ghostX(target,echo,battle.tick);
-                            float gy=(float)DeceptionProjection.ghostY(target,echo,battle.tick);
-                            if(view.circle(gx,gy,50*target.visualScale()))
-                                radarHull(shapes,target,gx,gy,pose.angle());
-                        }
+
                 }else shapes.circle(cx,cy,r,20);
             }
             if((channels&Battle.CONTACT_XRAY)!=0){
@@ -194,6 +187,19 @@ final class SensorContactOverlay {
                 shapes.circle(cx,cy,r*1.25f*pulse,24);
                 shapes.circle(cx,cy,r*2.0f*pulse,32);
             }
+        }
+        // Independently received phantom reports: no current enemy
+        // sprite/pose lookup or real-ship lock eligibility. Capped at 32.
+        Battle.Ship falseViewer=battle.tacticalViewer(team);
+        if(falseViewer!=null)for(Battle.TacticalFalseContact hypothesis:
+                battle.tacticalFalseContacts(team,falseViewer.id)){
+            float px=(float)hypothesis.x(),py=(float)hypothesis.y();
+            if(!view.circle(px,py,55))continue;
+            float r=Math.max(3f,world.zoom*7f);
+            shapes.setColor(.73f,.54f,.88f,.52f);
+            shapes.circle(px,py,r,16);
+            shapes.line(px-r*.55f,py-r*.55f,px+r*.55f,py+r*.55f);
+            shapes.line(px-r*.55f,py+r*.55f,px+r*.55f,py-r*.55f);
         }
         // Fire-control leading pips use ONLY received contacts, not ship(target)
         // or an actual future position. Render restrained lines for the first

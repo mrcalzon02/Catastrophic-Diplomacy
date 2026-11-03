@@ -554,7 +554,22 @@ sensor permissions. Coasting/empty-fuel bodies receive no fictitious turns.
 Focused `guidedTrajectoryPredictionSmoke` is a required part of
 `sensorNetworkSmoke`; visual layout/balance remains advisory.
 
-**Still pending:** full fleet-visible timestamped false-contact packet dissemination,
+**Fleet false-contact packet integration (2026-11-03):**
+Fitted SHR scouts now relay bounded phantom hypotheses with separate
+observation, transmission and light-limited arrival timestamps. Every phantom
+competes with genuine contacts for the SAME limited SHR transmission slots,
+rather than receiving a free infinite broadcast. Inactive historical emitter
+returns produce delayed shutdown tombstones; old photons remain visible
+until the newer information arrives. A 32-hypothesis, eight-report per-key
+ring bounds memory; packet expiration prevents an abandoned phantom from
+persisting indefinitely. `tacticalFalseContacts` is independent of true
+`TacticalContact` and weapon authorization, and the battle HUD's false
+contact markers now derive from genuinely received historical packets instead
+of present-time enemy ghost geometry. This stage adds an actual, finite
+fleet-wide false-contact picture and regressions, but NOT multi-hypothesis
+weapon fire-control or target-ID substitution. Visual fidelity is diagnostic.
+
+**Still pending:** multi-hypothesis weapon fire-control arbitration,
 measured receiver-position histories, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
 envelopes with future onboard scan updates, complete

@@ -30,6 +30,8 @@ on:
       - 'core/src/test/java/diplomacy/sim/RocketBarrageTest.java'
       - 'game/src/main/java/diplomacy/client/SensorContactOverlay.java'
       - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
+      - 'core/src/main/java/diplomacy/sim/SensorFalseContactRelay.java'
+      - 'core/src/test/java/diplomacy/sim/SensorFalseContactRelayTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorRelayBufferTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTrackRelayBuffer.java'
       - 'core/src/main/java/diplomacy/sim/SensorComputeBudget.java'

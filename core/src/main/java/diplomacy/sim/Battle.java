@@ -187,6 +187,8 @@ public final class Battle {
         public final SensorLightTimeHistory sensorHistory=new SensorLightTimeHistory();
         /** A packet must be transmitted by a real scout before ally receipt. */
         public final SensorRelayBuffer relayPackets=new SensorRelayBuffer();
+        /** Separate non-locking phantom reports share the actual SHR budget. */
+        public final SensorFalseContactRelay falsePackets=new SensorFalseContactRelay();
         /** Fitted LNK sends actual remembered fixes with separate causal transit. */
         public final SensorTrackRelayBuffer trackPackets=new SensorTrackRelayBuffer();
         /** Installed acquisition doctrine. STANDARD retains old automatic sensing. */
@@ -2394,19 +2396,39 @@ public final class Battle {
                     break;
                 }
             }
+            // One fitted SHR budget must accommodate true contact packets
+            // AND competing deceptive hypotheses. More false returns reduce
+            // the number of distinct real targets this scout can relay.
+            int fittedRemaining=capacity;
             for(int k=0;k<broadcastCapacity;k++){
                 Ship hostile=selected[k];
                 if(hostile==null)break;
                 SensorLightTimeHistory.Observation received=
                         receivedContact(scout,hostile,scout);
-                // Only an actually arrived local observation enters the
-                // finite packet buffer. This is the sender transmit time,
-                // distinct from original illumination and target reflection.
-                if(received!=null)
+                if(received==null)continue;
+                boolean fitted=capacity>0&&fittedRemaining>0;
+                // Legacy short-radio weather reports stay independent and
+                // cannot conjure paid SHR false-contact bandwidth.
+                if(fitted||legacyRelay)
                     scout.relayPackets.transmit(hostile.id,tick,received,broadcastCapacity);
-                if(k<capacity&&distances[k]<expandedNearest[scout.team][hostile.id]){
-                    expandedNearest[scout.team][hostile.id]=distances[k];
-                    expandedSpotters[scout.team][hostile.id]=scout;
+                if(fitted){
+                    fittedRemaining--;
+                    if(distances[k]<expandedNearest[scout.team][hostile.id]){
+                        expandedNearest[scout.team][hostile.id]=distances[k];
+                        expandedSpotters[scout.team][hostile.id]=scout;
+                    }
+                    SensorLightTimeHistory.Profile emission=
+                            hostile.sensorHistory.profileAt(received.measuredTick());
+                    int active=DeceptionProjection.falseContacts(emission);
+                    // Each phantom or shutdown tombstone costs one full
+                    // transmitter slot. If bandwidth is exhausted, older
+                    // false reports expire instead of living forever.
+                    for(int ghost=0;ghost<3&&fittedRemaining>0;ghost++){
+                        scout.falsePackets.transmit(hostile.id,ghost,
+                                ghost<active,received.sample(),tick,scout.x,
+                                scout.y,hostile.visualScale(),capacity);
+                        fittedRemaining--;
+                    }
                 }
             }
         }
@@ -2529,6 +2551,88 @@ public final class Battle {
             this(targetId,sourceId,channels,x,y,vx,vy,observedTick,
                     confidence,relayed,stale,observedTick,observedTick);
         }
+    }
+
+    /** One possible phantom image, NOT a true ship or an authorized target.
+     * Local observations and remote packet reception retain independent
+     * measurement and arrival times. */
+    public record TacticalFalseContact(int emitterId,int index,int sourceId,
+            double x,double y,double vx,double vy,long observedTick,
+            long receivedTick,boolean relayed){
+        public TacticalFalseContact{
+            if(emitterId<=0||index<0||index>2||sourceId<=0||
+                    observedTick<0||receivedTick<observedTick||
+                    !Double.isFinite(x)||!Double.isFinite(y)||
+                    !Double.isFinite(vx)||!Double.isFinite(vy))
+                throw new IllegalArgumentException("Invalid false-contact picture");
+        }
+    }
+    /**
+     * READ-ONLY tactical false hypotheses, never added to tacticalPicture,
+     * actual ship identity tables, or hasTargetContact weapon authorization.
+     * Remote hypotheses require an existing fitted SHR scout transmission
+     * and a separate sender->receiver photon transit.
+     */
+    public List<TacticalFalseContact> tacticalFalseContacts(int team,int viewerId){
+        checkTeam(team);
+        Ship viewer=findShip(viewerId);
+        if(viewer==null||!viewer.alive()||viewer.team!=team)
+            throw new IllegalArgumentException("False picture requires allied viewer");
+        java.util.Map<Long,TacticalFalseContact> picture=new java.util.TreeMap<>();
+        if(viewer.power>3&&viewer.sensorsCondition>.05&&viewer.crewReadiness()>.05)
+            for(Ship source:ships){
+                if(source==viewer||source.team!=team||!source.alive()||
+                        source.power<=3||source.sensorsCondition<=.05||
+                        source.crewReadiness()<.05||
+                        source.network.sharingCapacity()<=0)continue;
+                double link=1000+source.network.sharingRange()*
+                        StrictMath.min(1,source.sensorsCondition)+
+                        viewer.network.trackRelayRange()*
+                        StrictMath.max(0,viewer.sensorsCondition);
+                if(StrictMath.hypot(viewer.x-source.x,viewer.y-source.y)>link)
+                    continue;
+                int cap=StrictMath.min(SensorFalseContactRelay.MAX_HYPOTHESES,
+                        (int)StrictMath.ceil(source.network.sharingCapacity()*
+                                StrictMath.max(0,source.sensorsCondition)));
+                for(SensorFalseContactRelay.Packet packet:
+                        source.falsePackets.delivered(tick,viewer.x,viewer.y,cap)){
+                    long key=((long)packet.emitterId()<<2)|packet.index();
+                    var old=picture.get(key);
+                    if(old==null||old.observedTick()<packet.observedTick())
+                        picture.put(key,new TacticalFalseContact(
+                                packet.emitterId(),packet.index(),source.id,
+                                packet.x(),packet.y(),packet.vx(),packet.vy(),
+                                packet.observedTick(),packet.receivedTick(),true));
+                }
+            }
+        // Local passive/active sensor returns use only photons actually
+        // received by this viewer; no current emitter state is consulted.
+        for(Ship enemy:ships){
+            if(enemy.team==team||!enemy.alive())continue;
+            SensorLightTimeHistory.Observation seen=
+                    receivedContact(viewer,enemy,viewer);
+            if(seen==null)continue;
+            SensorLightTimeHistory.Profile emitted=
+                    enemy.sensorHistory.profileAt(seen.measuredTick());
+            int count=DeceptionProjection.falseContacts(emitted);
+            for(int index=0;index<count;index++){
+                long key=((long)enemy.id<<2)|index;
+                picture.put(key,new TacticalFalseContact(enemy.id,index,
+                        viewer.id,DeceptionProjection.ghostX(enemy.id,
+                                seen.sample(),enemy.visualScale(),index),
+                        DeceptionProjection.ghostY(enemy.id,
+                                seen.sample(),enemy.visualScale(),index),
+                        seen.sample().vx(),seen.sample().vy(),
+                        seen.measuredTick(),tick,false));
+            }
+        }
+        // 200v200 HUD must never draw every possible enemy phantom.
+        List<TacticalFalseContact> out=new ArrayList<>(32);
+        for(TacticalFalseContact contact:picture.values()){
+            if(out.size()==32)break;
+            out.add(contact);
+        }
+        return List.copyOf(out);
     }
 
     /** A commander without a powered FCM receives only the first alive
@@ -6072,6 +6176,7 @@ public final class Battle {
             hash = mix(hash,s.propulsion.ordinal());
             hash = mix(hash,s.scan.fingerprint());
             hash = mix(hash,s.relayPackets.fingerprint());
+            hash = mix(hash,s.falsePackets.fingerprint());
             hash = mix(hash,s.trackPackets.fingerprint());
             hash = mix(hash,s.targetCompute.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.hull));

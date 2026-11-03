@@ -200,7 +200,15 @@ tasks.register('guidedTrajectoryPredictionSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.GuidedTrajectoryPredictionTest'
     dependsOn testClasses
 }
+tasks.register('sensorFalseContactRelaySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify real fitted SHR false-contact bandwidth, historical ghosts, causal relay and no weapon locks.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorFalseContactRelayTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
     dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
     dependsOn(tasks.named('guidedSalvoCausalitySmoke'))
     dependsOn(tasks.named('ordnanceSeekerPhotonSmoke'))
