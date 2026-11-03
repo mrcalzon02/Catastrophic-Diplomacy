@@ -4000,6 +4000,7 @@ public final class Battle {
         // ordnance threatened by the same fitted firing doctrine.
         if(best==null&&defender.orders.pointDefense().craft())for(Craft body:crafts){
             if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+            gun.aircraftVisibleFrames++;
             ProjectileModel.Spec radar=body.radarProfile();
             double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
             if(d<RotaryPointDefense.MIN_RANGE||d>
@@ -4026,8 +4027,10 @@ public final class Battle {
                 if(defender.power<=4||defender.heat>=defender.maxHeat*.93||
                         defender.kineticAmmo<=0||
                         rotaryRounds.size()>=RotaryPointDefense.MAX_ACTIVE_ROUNDS)continue;
+                gun.eligibleScanFrames++;
                 RotaryTrack target=pickRotaryContact(defender,gun);
                 if(target==null)continue;
+                gun.contactFrames++;
                 gun.track(DT,target.bodyId);
                 WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
                         defender,WeaponMuzzles.Family.ROTARY_CIWS,gun.slotId);
