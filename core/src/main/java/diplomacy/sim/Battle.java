@@ -3607,7 +3607,9 @@ public final class Battle {
     private void updateRockets(){
         for(int i=rockets.size()-1;i>=0;i--){
             Rocket rocket=rockets.get(i);
-            if((rocket.life-=DT)<=0){
+            if((rocket.life-=DT)<=0 ||
+                    tick-rocket.spawnTick>BattleArena.MAX_ROCKET_SECONDS/DT ||
+                    !BattleArena.contains(rocket.x,rocket.y)){
                 visual(rocket.visualId,VisualPhase.TIMEOUT,"ROCKET",
                         rocket.team,rocket.sourceId,rocket.targetId,
                         rocket.x,rocket.y,rocket.x,rocket.y);
@@ -3640,13 +3642,24 @@ public final class Battle {
                         AmmunitionTable.warhead(AmmunitionTable.Warhead.HIGH_EXPLOSIVE));
                 rocketHits++;
                 rockets.remove(i);
-            }else {rocket.x=nx;rocket.y=ny;}
+            }else {
+                rocket.x=nx;rocket.y=ny;
+                if(!BattleArena.contains(nx,ny)){
+                    rocket.x=BattleArena.x(nx);rocket.y=BattleArena.y(ny);
+                    visual(rocket.visualId,VisualPhase.TIMEOUT,"ROCKET",
+                            rocket.team,rocket.sourceId,rocket.targetId,
+                            rocket.x,rocket.y,rocket.x,rocket.y);
+                    rockets.remove(i);
+                }
+            }
         }
     }
     private void updateBallistics() {
         for(int i=ballistics.size()-1;i>=0;i--){
             Ballistic p=ballistics.get(i);
-            if((p.life-=DT)<=0){
+            if((p.life-=DT)<=0 ||
+                    tick-p.spawnTick>BattleArena.MAX_BALLISTIC_SECONDS/DT ||
+                    !BattleArena.contains(p.x,p.y)){
                 ballistics.remove(i);
                 visual(p.visualId,VisualPhase.TIMEOUT,"KINETIC",p.team,p.sourceId,
                         p.targetId,p.x,p.y,p.x,p.y);
@@ -3676,7 +3689,15 @@ public final class Battle {
                 hitPayload(closest,p.damage,findShip(p.sourceId),DamageType.KINETIC,
                         p.visualId,p.x,p.y,AmmunitionTable.kinetic(p.ammunition));
                 ballistics.remove(i);
-            }else{p.x=nextX;p.y=nextY;}
+            }else{
+                p.x=nextX;p.y=nextY;
+                if(!BattleArena.contains(nextX,nextY)){
+                    p.x=BattleArena.x(nextX);p.y=BattleArena.y(nextY);
+                    visual(p.visualId,VisualPhase.TIMEOUT,"KINETIC",p.team,p.sourceId,
+                            p.targetId,p.x,p.y,p.x,p.y);
+                    ballistics.remove(i);
+                }
+            }
         }
     }
 
@@ -3785,6 +3806,7 @@ public final class Battle {
             FlakRound burst=pendingFlak.get(k);
             if(tick<burst.burstTick)continue;
             pendingFlak.remove(k);
+            if(!BattleArena.contains(burst.aimX,burst.aimY))continue;
             Ship shooter=findShip(burst.shooterId);
             if(shooter==null)continue;
             visual(burst.shotId,VisualPhase.IMPACT,"FLAK_BURST",
@@ -4107,6 +4129,10 @@ public final class Battle {
     private void advanceRailPenetrators(){
         for(int i=railPenetrators.size()-1;i>=0;i--){
             RailPointDefense.Penetrator shot=railPenetrators.get(i);
+            if(!BattleArena.contains(shot.x,shot.y)||
+                    tick-shot.spawnTick>BattleArena.MAX_POINT_DEFENSE_SECONDS/DT){
+                railPenetrators.remove(i);continue;
+            }
             double dt=StrictMath.min(DT,shot.life);
             double nx=shot.x+shot.vx*dt,ny=shot.y+shot.vy*dt;
             double first=Double.POSITIVE_INFINITY;
@@ -4190,7 +4216,8 @@ public final class Battle {
                 railPenetrators.remove(i);
             }else{
                 shot.x=nx;shot.y=ny;
-                if(shot.life<=0)railPenetrators.remove(i);
+                if(shot.life<=0||!BattleArena.contains(nx,ny))
+                    railPenetrators.remove(i);
             }
         }
     }
@@ -4331,6 +4358,10 @@ public final class Battle {
     private void advanceRotaryRounds(){
         for(int index=rotaryRounds.size()-1;index>=0;index--){
             RotaryPointDefense.Round shot=rotaryRounds.get(index);
+            if(!BattleArena.contains(shot.x,shot.y)||
+                    tick-shot.spawnTick>BattleArena.MAX_POINT_DEFENSE_SECONDS/DT){
+                rotaryRounds.remove(index);continue;
+            }
             double dt=StrictMath.min(DT,shot.life);
             double nextX=shot.x+shot.vx*dt,nextY=shot.y+shot.vy*dt;
             double earliest=Double.POSITIVE_INFINITY;
@@ -4417,7 +4448,8 @@ public final class Battle {
                 rotaryRounds.remove(index);
             }else{
                 shot.x=nextX;shot.y=nextY;
-                if(shot.life<=0)rotaryRounds.remove(index);
+                if(shot.life<=0||!BattleArena.contains(nextX,nextY))
+                    rotaryRounds.remove(index);
             }
         }
     }
@@ -4774,7 +4806,9 @@ public final class Battle {
         for (int i = missiles.size() - 1; i >= 0; i--) {
             Missile m = missiles.get(i);
             Ship target = findShip(m.targetId);
-            if (target == null || !target.alive() || (m.fuel -= DT) <= 0) {
+            if (target == null || !target.alive() || (m.fuel -= DT) <= 0
+                    || tick-m.spawnTick>BattleArena.MAX_GUIDED_SECONDS/DT
+                    || !BattleArena.contains(m.x,m.y)) {
                 missiles.remove(i);
                 visual(m.visualId,VisualPhase.TIMEOUT,m.decoy?"DECOY":m.torpedo?"TORPEDO":"MISSILE",
                         m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
@@ -4873,7 +4907,16 @@ public final class Battle {
                             m.torpedo?DamageType.TORPEDO:DamageType.MISSILE,
                             m.visualId,m.x,m.y,AmmunitionTable.warhead(m.warhead));
                     missiles.remove(i);
-                }else {m.x=nextX;m.y=nextY;}
+                }else {
+                    m.x=nextX;m.y=nextY;
+                    if(!BattleArena.contains(nextX,nextY)){
+                        m.x=BattleArena.x(nextX);m.y=BattleArena.y(nextY);
+                        visual(m.visualId,VisualPhase.TIMEOUT,
+                                m.decoy?"DECOY":m.torpedo?"TORPEDO":"MISSILE",
+                                m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+                        missiles.remove(i);
+                    }
+                }
             }
         }
     }
