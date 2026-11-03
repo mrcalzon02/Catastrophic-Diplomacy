@@ -764,6 +764,13 @@ public final class Battle {
     };
     private final long seed;
     public long tick;
+    /** Unresolved termination is recorded in the authoritative deterministic
+     * battle, not inferred from which side happened to have surviving hulls. */
+    private BattleTermination.Reason terminationReason=BattleTermination.Reason.NONE;
+    private long lastCombatProgressTick;
+    private int lastObservedHits,lastObservedDestructions,lastObservedEscapes;
+    public BattleTermination.Reason terminationReason(){return terminationReason;}
+    public boolean unresolved(){return terminationReason!=BattleTermination.Reason.NONE;}
     public int hitCount, missileIntercepts, ballisticIntercepts, destructions, environmentalHits;
     /** Proof counters distinguish launched fighter rounds from mere animation. */
     public int fighterGunShots,fighterLaserShots,fighterParticleShots,
@@ -1467,9 +1474,14 @@ public final class Battle {
     private static void checkTeam(int team) {
         if(team!=0&&team!=1)throw new IllegalArgumentException("Invalid fleet side");
     }
-    public boolean finished() { return alive(0) == 0 || alive(1) == 0; }
+    /** A mutual withdrawal or actual hull elimination still resolves normally.
+     * Stalemates retain every physically surviving ship, not an invented loss. */
+    public boolean finished() {
+        return unresolved()||alive(0)==0||alive(1)==0;
+    }
 
     public void step() {
+        if(unresolved())return;
         tick++;
         // All active vessels enter contact and environmental simulation in
         // the same immutable world, including externally issued coordinates.
@@ -1582,6 +1594,61 @@ public final class Battle {
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
         }
+        updateTermination();
+    }
+
+    /** No quantized wall clock or random result: only observed battle ticks,
+     * real hit/kill/escape progress, and live physical threats can end a fight.
+     * Expensive capability inspection runs once per 30 simulation ticks. */
+    private void updateTermination(){
+        int escapes=escaped(0)+escaped(1);
+        if(hitCount!=lastObservedHits||destructions!=lastObservedDestructions
+                ||escapes!=lastObservedEscapes){
+            lastCombatProgressTick=tick;
+            lastObservedHits=hitCount;
+            lastObservedDestructions=destructions;
+            lastObservedEscapes=escapes;
+        }
+        if(alive(0)==0||alive(1)==0||tick%30!=0)return;
+        boolean movingExtraction=false,anyOffense=false;
+        for(Ship ship:ships)if(ship.alive()){
+            if(ship.withdrawing && (ship.fuel>0&&ship.engineCondition>.1
+                    ||StrictMath.hypot(ship.vx,ship.vy)>.05))
+                movingExtraction=true;
+            if(!anyOffense && retainsOffensiveCapability(ship))
+                anyOffense=true;
+        }
+        boolean inFlight=!missiles.isEmpty()||!rockets.isEmpty()
+                ||!ballistics.isEmpty()||!crafts.isEmpty()||!launchQueue.isEmpty()
+                ||!pendingFlak.isEmpty()||!rotaryRounds.isEmpty()
+                ||!railPenetrators.isEmpty();
+        terminationReason=BattleTermination.evaluate(tick,lastCombatProgressTick,
+                !anyOffense,inFlight,movingExtraction);
+        if(unresolved())log("Engagement unresolved: "+
+                (terminationReason==BattleTermination.Reason.STALEMATE?
+                        "both fleets remain but neither can secure a result":
+                        "maximum finite battle time reached")+
+                " (no victory or fabricated hull losses)");
+    }
+    /** Conservative: when hardware might ever rearm or resume, wait for the
+     * long no-progress policy. Repair drones and tenders are NOT free weapons,
+     * but active logistics could still replenish a genuinely armed ally. */
+    private boolean retainsOffensiveCapability(Ship ship){
+        if(ship.withdrawing||diagnosticStationaryTargets.contains(ship.id))
+            return false;
+        if(ship.laserDamage>0||ship.plasmaDamage>0||ship.particleDamage>0
+                ||ship.kineticDamage>0&&ship.kineticAmmo>0
+                ||ship.missileDamage>0&&ship.missileAmmo>0
+                ||ship.torpedoDamage>0&&ship.torpedoAmmo>0
+                ||ship.fighterReserve>0&&ship.fighterLaunchBays>0
+                ||ship.droneReserve>0)return true;
+        for(RocketBarrage.Rack rack:ship.rocketRacks)
+            if(ship.kineticAmmo>0&&(rack.rounds>0||rack.salvoRemaining>0))
+                return true;
+        // Fuel and ammunition can be transferred by actual living tenders;
+        // don't declare a quick irreversible disarmament while rearm exists.
+        return ship.tenders!=TenderDoctrine.NONE||
+                ship.logistics!=SupportDoctrine.NONE;
     }
 
     private void containFleet(){
@@ -5294,6 +5361,8 @@ public final class Battle {
     public long fingerprint() {
         long hash = 0xcbf29ce484222325L;
         hash = mix(hash, tick); hash = mix(hash, hitCount);
+        hash=mix(hash,terminationReason.ordinal());
+        hash=mix(hash,lastCombatProgressTick);
         hash = mix(hash, environmentalHits); hash = mix(hash, weather.preset().seed());
         hash = mix(hash,fighterGunShots);hash=mix(hash,fighterLaserShots);
         hash = mix(hash,fighterParticleShots);hash=mix(hash,fighterMissilesLaunched);
