@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
+import diplomacy.fx.WeaponFxProfile;
 import diplomacy.tech.TechnologyCatalog;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -51,6 +52,9 @@ public final class ParticlePointDefenseDiagnostic {
                             "TECH-%s-PPD-%s-%02d",faction,track,rank))!=null,
                             "Missing PPD researched mechanism "+faction+"/"+track+"/"+rank);
         }
+        require(WeaponFxProfile.forWeapon("PARTICLE_PD")!=null&&
+                WeaponFxProfile.forWeapon("PARTICLE_PD").firing().present(),
+                "Powered PPD has no real particle-beam muzzle effect profile");
         double last=0;
         for(int tier:new int[]{0,3,6,9}){
             Battle b=new Battle(66100+tier);
@@ -243,10 +247,53 @@ public final class ParticlePointDefenseDiagnostic {
                 heatLockouts,powerLockouts,
                 StrictMath.max(0,protectedInitially-after),activeBeams);
     }
+    /** Optical contact never authorizes a free beam without ship power.
+     * The attacker uses an actual bought missile launcher; this is not an
+     * injected projectile or a mocked probability roll. */
+    private static void verifyPowerStarvation(TechnologyCatalog technology){
+        Battle battle=new Battle(774388L);
+        battle.spawnWing(0,armedAttacker(technology,Threat.MISSILE,0),
+                technology,1,320,300);
+        battle.spawnWing(1,battery(technology,0,1),technology,1,550,300);
+        Battle.Ship attacker=battle.ships().get(0);
+        Battle.Ship defender=battle.ships().get(1);
+        battle.registerDiagnosticStationaryTarget(defender.id);
+        attacker.speed=attacker.vx=attacker.vy=0;
+        attacker.maxHull=attacker.hull=100000;
+        attacker.maxPower=attacker.power=10000;
+        defender.power=0;
+        defender.powerRegen=0;
+        defender.kineticAmmo=0;
+        defender.maxHull=defender.hull=100000;
+        int missileFires=0,beamFires=0;
+        long last=0;
+        for(int t=0;t<200;t++){
+            battle.step();
+            for(Battle.VisualEvent event:battle.visualEvents()){
+                if(event.sequence()<=last)continue;
+                last=event.sequence();
+                if(event.phase()!=Battle.VisualPhase.FIRE)continue;
+                if(event.team()==0&&"MISSILE".equals(event.weapon()))
+                    missileFires++;
+                if(event.team()==1&&"PARTICLE_PD".equals(event.weapon()))
+                    beamFires++;
+            }
+        }
+        require(missileFires>0,"Unpowered PPD test had no real incoming missiles");
+        require(beamFires==0&&
+                defender.particlePdMounts.get(0).illuminatedTicks==0,
+                "Powerless particle projector emitted free damage");
+        require(defender.particlePdMounts.get(0).powerLockouts>0,
+                "Power-starved PPD did not register physical energy lockout");
+        require(battle.defensiveKills(Battle.DefensiveGun.PARTICLE_PD,
+                Battle.DefensiveTarget.MISSILE)==0,
+                "Unpowered PPD fabricated real ordnance destruction");
+    }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         auditHardware(tech);
         thermalAndDwell();
+        verifyPowerStarvation(tech);
         Path root=Path.of("test-output","particle-pd");
         Files.createDirectories(root);
         List<String> rows=new ArrayList<>();
