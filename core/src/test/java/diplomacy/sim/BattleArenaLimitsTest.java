@@ -47,8 +47,10 @@ public final class BattleArenaLimitsTest {
                 a.id,0,0,x,y,0,3,220);
         rotary.life=999;
         inject(b,"rotaryRounds",rotary);
+        // A synthetic arena-lifetime fixture supplies its own reservation
+        // metadata; real RPD shots use the actual tracked incoming body ID.
         RailPointDefense.Penetrator rail=new RailPointDefense.Penetrator(105,start,
-                0,a.id,0,x,y,0,200,3);
+                0,a.id,0,x,y,0,200,3,105,3);
         rail.life=999;
         inject(b,"railPenetrators",rail);
     }
