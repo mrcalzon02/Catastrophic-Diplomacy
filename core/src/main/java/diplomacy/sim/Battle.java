@@ -103,6 +103,9 @@ public final class Battle {
             }
         }
         public List<PrecisionMount> precisionMounts=List.of();
+        /** Per-hull scratch map reused at 30 Hz; bounded by actual turret count. */
+        public final java.util.Map<Long,Double> precisionDamageReservations=
+                new java.util.HashMap<>();
         /** Opt-in physically distinct rack controllers; legacy remains family-wide. */
         public List<Launcher> launchers=List.of();
         /** Separate cheap dumbfire magazine per installed rocket hardpoint. */
@@ -3572,7 +3575,8 @@ public final class Battle {
             // Reserve expected laser damage while each turret is still
             // acquiring its target. Prevent duplicate fragile-rocket locks,
             // but allow multiple lasers to suppress hardened torpedoes.
-            java.util.Map<Long,Double> reservedDamage=new java.util.HashMap<>();
+            java.util.Map<Long,Double> reservedDamage=defender.precisionDamageReservations;
+            reservedDamage.clear();
             for(Ship.PrecisionMount pdSocket:sockets){
                 if(defender.power<pdLaw.minimumPower())continue;
                 double pdRange=pdSocket==null?defender.pdRange:pdSocket.nominalRange;
