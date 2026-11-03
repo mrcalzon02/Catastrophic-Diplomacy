@@ -123,7 +123,15 @@ tasks.register('sensorCausalAcquisitionSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorCausalAcquisitionTest'
     dependsOn testClasses
 }
+tasks.register('sensorTargetingSolutionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove historical track lead and finite uncertainty can produce genuine physical hits and misses.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorTargetingSolutionTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorTargetingSolutionSmoke'))
     dependsOn(tasks.named('sensorCausalAcquisitionSmoke'))
     dependsOn(tasks.named('sensorActiveScanSmoke'))
     dependsOn(tasks.named('sensorTacticalPictureSmoke'))
