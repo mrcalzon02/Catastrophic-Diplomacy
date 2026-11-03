@@ -729,6 +729,14 @@ public final class Battle {
             throw new IllegalArgumentException("Invalid laboratory rocket thrust");
         diagnosticSustainedRocketThrustMultiplier=multiplier;
     }
+    /** Laboratory-only finite optical fire-control track capacity. A given
+     * turret can track N simultaneous physical bodies at full acquisition
+     * speed; excess tracks lengthen elapsed lock time, never force a miss. */
+    public void configurePrecisionTrackCapacityForDiagnostic(int tracksPerMount){
+        if(tick!=0||tracksPerMount<0||tracksPerMount>16)
+            throw new IllegalArgumentException("Invalid CIWS optical track capacity");
+        diagnosticPrecisionTracksPerMount=tracksPerMount;
+    }
     /** Compare per-socket optical allocations to the old duplicate targeting.
      * This opt-in switch is only legal before the first simulation tick. */
     public void configurePrecisionReservationsForDiagnostic(boolean enabled){
@@ -742,6 +750,9 @@ public final class Battle {
     private double diagnosticRocketPdPressure;
     /** Laboratory-only propulsion sensitivity; production stays neutral. */
     private double diagnosticSustainedRocketThrustMultiplier=1.0;
+    /** Zero keeps normal per-socket tracking unchanged; diagnostics can
+     * measure finite track-processing capacity without altering hit RNG. */
+    private int diagnosticPrecisionTracksPerMount;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -3530,6 +3541,18 @@ public final class Battle {
         }
     }
 
+    /** Optical track servicing is shared by the installed turrets on one
+     * hull. A baseline capacity of N bodies per emitter is free; additional
+     * physical contacts divide available tracking cycles. We take the square
+     * root to model parallel fire-control electronics rather than a serial
+     * one-contact-per-tick queue. This is TIME, not hit probability. */
+    static double precisionTrackLoadMultiplier(int acquired,int emitters,int channels){
+        if(acquired<0||emitters<1||channels<0||channels>16)
+            throw new IllegalArgumentException("Invalid precision track-load fixture");
+        if(channels==0)return 1.0;
+        return StrictMath.sqrt(StrictMath.max(1.0,
+                acquired/(double)(emitters*channels)));
+    }
     /** Actual fitted CIWS acquisition: turn a physical turret toward the current
      * body before opening fire. Every new target consumes continuous tracking
      * time; a hard-lock only survives while the same body remains visible on
@@ -3537,7 +3560,13 @@ public final class Battle {
      * Aim state is per purchased socket, not a global random miss penalty. */
     boolean acquirePrecisionTarget(Ship defender,Ship.PrecisionMount mount,
                                          long bodyId,double x,double y,long atTick){
-        if(defender==null||mount==null||bodyId==Long.MIN_VALUE||atTick<0)
+        return acquirePrecisionTarget(defender,mount,bodyId,x,y,atTick,1.0);
+    }
+    boolean acquirePrecisionTarget(Ship defender,Ship.PrecisionMount mount,
+                                         long bodyId,double x,double y,long atTick,
+                                         double trackLoad){
+        if(defender==null||mount==null||bodyId==Long.MIN_VALUE||atTick<0
+                ||!Double.isFinite(trackLoad)||trackLoad<1.0)
             throw new IllegalArgumentException("Invalid precision CIWS track");
         if(mount.trackedBodyId!=bodyId || mount.lastAimTick<atTick-1){
             mount.lockSeconds=0;
@@ -3567,7 +3596,7 @@ public final class Battle {
             defender.heat+=.025*DT;
         }
         double requiredLock=(.055+.15/StrictMath.max(.40,mount.profile.tracking()))
-                *diagnosticPrecisionLockMultiplier;
+                *diagnosticPrecisionLockMultiplier*trackLoad;
         boolean ready=remaining<.065&&mount.lockSeconds>=requiredLock;
         if(!ready)mount.lockWaitTicks++;
         return ready;
@@ -3600,7 +3629,7 @@ public final class Battle {
                 if(pdRange<=0)continue;
             Missile chosenMissile=null;Ballistic chosenShell=null;Rocket chosenRocket=null;
             double quickest=Double.POSITIVE_INFINITY;
-            int acquiredRockets=0;
+            int acquiredRockets=0,acquiredTracks=0;
             for(Missile m:missiles){
                 if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
@@ -3609,6 +3638,7 @@ public final class Battle {
                         pdProfile,m.spec,
                         OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
                 if(distance>detection)continue;
+                acquiredTracks++;
                 if(!diagnosticDisablePrecisionReservations&&
                         reservedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
                     continue;
@@ -3631,6 +3661,7 @@ public final class Battle {
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,p.spec);
                 if(distance>detection)continue;
+                acquiredTracks++;
                 if(!diagnosticDisablePrecisionReservations&&
                         reservedDamage.getOrDefault(p.visualId,0.0)>=p.integrity)
                     continue;
@@ -3656,6 +3687,7 @@ public final class Battle {
                         pdProfile,r.spec,
                         RocketBarrage.hotEmission(r.motor,r.burning()));
                 if(distance>detection)continue;
+                acquiredTracks++;
                 if(!diagnosticDisablePrecisionReservations&&
                         reservedDamage.getOrDefault(r.visualId,0.0)>=r.integrity)
                     continue;
@@ -3697,8 +3729,11 @@ public final class Battle {
                             ProjectileModel.precisionPdDamage(planned,pdProfile);
                     reservedDamage.merge(physicalId,promised,Double::sum);
                 }
-                if(!acquirePrecisionTarget(defender,pdSocket,physicalId,tx,ty,tick))
-                    continue;
+                double trackLoad=precisionTrackLoadMultiplier(acquiredTracks,
+                        StrictMath.max(1,defender.precisionMounts.size()),
+                        diagnosticPrecisionTracksPerMount);
+                if(!acquirePrecisionTarget(defender,pdSocket,physicalId,tx,ty,
+                        tick,trackLoad))continue;
             }
             if((pdSocket==null?defender.pdReload:pdSocket.reload)>0)continue;
             defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
