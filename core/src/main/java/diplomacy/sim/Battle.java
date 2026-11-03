@@ -4043,7 +4043,9 @@ public final class Battle {
             double emission=OrdnancePropulsion.emissionMultiplier(m.thrustPhase);
             if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
                     d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
-                            weather.sensorFactor(),emission))continue;
+                            weather.sensorFactor(),emission,
+                            RailPointDefense.radialClosing(defender,
+                                    m.x,m.y,m.vx,m.vy)))continue;
             double eta=approachEta(defender.x,defender.y,m.x,m.y,
                     m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
             double score=defensiveScore(defender,d,
@@ -4061,7 +4063,9 @@ public final class Battle {
             double emission=RocketBarrage.hotEmission(m.motor,m.burning());
             if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
                     d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
-                            weather.sensorFactor(),emission))continue;
+                            weather.sensorFactor(),emission,
+                            RailPointDefense.radialClosing(defender,
+                                    m.x,m.y,m.vx,m.vy)))continue;
             double eta=approachEta(defender.x,defender.y,m.x,m.y,
                     m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
             double score=defensiveScore(defender,d,
@@ -4078,7 +4082,9 @@ public final class Battle {
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
             if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
                     d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
-                            weather.sensorFactor(),1))continue;
+                            weather.sensorFactor(),1,
+                            RailPointDefense.radialClosing(defender,
+                                    m.x,m.y,m.vx,m.vy)))continue;
             double eta=approachEta(defender.x,defender.y,m.x,m.y,m.vx,m.vy,
                     StrictMath.hypot(m.vx,m.vy));
             double score=defensiveScore(defender,d,
