@@ -13,6 +13,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.DeceptionProjection;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.SensorLeadProjection;
+import diplomacy.sim.RocketBarrage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -204,27 +205,31 @@ final class SensorContactOverlay {
             boolean gun=captain.kineticDamage>0;
             boolean rocket=!gun&&!captain.rocketRacks.isEmpty();
             boolean ballistic=gun||rocket;
+            RocketBarrage.Rack rack=rocket?captain.rocketRacks.get(0):null;
             double speed=gun?AmmunitionTable.kinetic(captain.kineticType)
                     .physical(captain.kineticProjectile).speed():
-                    rocket?captain.rocketRacks.get(0).body.speed():
                     1_000_000_000.0; // Current main beams are instant ray hits.
             double precision=battle.targetingPrecision(captain.id);
             int count=0;
             for(Battle.TacticalContact mark:leadCandidates){
-                SensorLeadProjection.Lead pip=SensorLeadProjection.predict(
-                        mark,battle.tick,captain.x,captain.y,speed,precision);
+                SensorLeadProjection.Lead pip=rocket?
+                        SensorLeadProjection.predictRocket(
+                                mark,battle.tick,captain.x,captain.y,rack,precision):
+                        SensorLeadProjection.predict(
+                                mark,battle.tick,captain.x,captain.y,speed,precision);
                 float px=(float)pip.predictedX(),py=(float)pip.predictedY();
                 if(!view.circle(px,py,80))continue;
                 float extent=Math.max(world.zoom*4.0f,2.0f);
                 float sigma=(float)StrictMath.min(80,pip.uncertaintyRadius());
-                if(mark.stale())shapes.setColor(.65f,.69f,.78f,.55f);
+                if(!pip.reachable())shapes.setColor(.72f,.45f,.45f,.46f);
+                else if(mark.stale())shapes.setColor(.65f,.69f,.78f,.55f);
                 else shapes.setColor(1f,.83f,.36f,.78f);
                 shapes.line(px-extent,py,px+extent,py);
                 shapes.line(px,py-extent,px,py+extent);
                 shapes.circle(px,py,extent*.65f,12);
                 shapes.circle(px,py,Math.max(extent*1.3f,sigma),28);
                 shapes.line((float)mark.x(),(float)mark.y(),px,py);
-                if(ballistic&&count<MAX_TRAJECTORY_LINES){
+                if(ballistic&&pip.reachable()&&count<MAX_TRAJECTORY_LINES){
                     // Straight unguided projectile path, not an invented
                     // missile guidance envelope or omniscient actual hit.
                     shapes.setColor(.94f,.74f,.32f,mark.stale()?.18f:.30f);
