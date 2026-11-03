@@ -113,7 +113,7 @@ public final class RocketPdBalanceDiagnostic {
                               double sustainedThrustScale) {
         return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,
                 seed,pressure,acquisitionScale,coordinated,defenderTier,
-                sustainedThrustScale,0);
+                sustainedThrustScale,-1);
     }
     private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
@@ -140,10 +140,13 @@ public final class RocketPdBalanceDiagnostic {
             battle.configurePrecisionReservationsForDiagnostic(false);
         if(sustainedThrustScale!=1.0)
             battle.configureSustainedRocketThrustForDiagnostic(sustainedThrustScale);
-        if(pdOnline&&channelsPerMount>0){
+        if(pdOnline&&channelsPerMount>=0){
+            // -1 exercises actual current gameplay: four optical channels
+            // and exponent 0.90. Zero deliberately disables scheduling for
+            // a measured pre-change A/B control. Explicit positive values
+            // are unambiguous laboratory overrides, including exponent .50.
             battle.configurePrecisionTrackCapacityForDiagnostic(channelsPerMount);
-            if(opticalExponent!=.5)
-                battle.configurePrecisionTrackExponentForDiagnostic(opticalExponent);
+            battle.configurePrecisionTrackExponentForDiagnostic(opticalExponent);
         }
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,defenderTier,true);
@@ -647,14 +650,14 @@ public final class RocketPdBalanceDiagnostic {
                 }
         Files.write(output.resolve("optical-track-capacity-ab.csv"),
                 opticalRows,StandardCharsets.UTF_8);
-        detail.append("\nTracks/mount = 0 is the ACTUAL existing gameplay controller "+
-                "with no overload. A positive number is an opt-in laboratory "+
-                "model: detection remains per purchased socket, but optical "+
-                "lock time scales with sqrt(max(1, visible tracks / "+
-                "(fitted emitters * channels per emitter))). No missile receives "+
-                "a forced accuracy miss or a free interception; outcomes use "+
-                "real 30Hz trajectories, ammunition and hit resolution. "+
-                "No result is a release gate.\n");
+        detail.append("\nTracks/mount = 0 is the PREVIOUS no-overload controller, "+
+                "not current gameplay. Positive capacity rows explicitly use "+
+                "the historical square-root exponent 0.50 for matched A/B. "+
+                "Current gameplay uses four free optical channels per PD "+
+                "emitter and exponent 0.90; the separate exponent table "+
+                "compares both formulas. No missile receives a forced "+
+                "accuracy miss or free interception. All test outcomes "+
+                "are advisory and cannot block release.\n");
         // Compare processing-scheduling laws at the SAME four physical
         // optical channels per fitted precision emitter. A base-tier
         // 4-round rack offers at most four contacts per emitter and should
@@ -707,7 +710,9 @@ public final class RocketPdBalanceDiagnostic {
                 exponentRows,StandardCharsets.UTF_8);
         detail.append("\nAll exponent cases use exactly four available optical "+
                 "track channels per purchased CIWS emitter and the normal 1.00 "+
-                "lock duration. Saturation affects time-to-lock only; a "+
+                "lock duration. Exponent 0.90 is the CURRENT gameplay setting; "+
+                "other exponents are opt-in diagnostic controls. "+
+                "Saturation affects time-to-lock only; a "+
                 "body must still physically exist, be detected, and be hit "+
                 "by a real paid emitter. Above-channel scheduling is bounded "+
                 "to a 4x maximum delay under extreme fleet load. All reported "+
