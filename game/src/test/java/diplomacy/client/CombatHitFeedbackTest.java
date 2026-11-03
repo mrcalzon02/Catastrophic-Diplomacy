@@ -71,8 +71,10 @@ public final class CombatHitFeedbackTest {
         check(CombatHitFeedback.changedLayer(mixed,100,100,100)==null,
                 "Non-damaging impact must not invent hull smoke or breach glow");
         Battle mass=new Battle(17L);
+        // 400-ship FX budget fixture must fit inside the fixed shared arena.
+        // Prior linear X coordinates silently exceeded the current world bounds.
         for(int i=0;i<400;i++)mass.addShip(i%2,Battle.Faction.TERRAN,
-                20*i,10);
+                -1100+(i%25)*140,-620+(i/25)*120);
         feedback.beforeStep(mass);
         List<Battle.VisualEvent> events=new ArrayList<>();
         mass.tick++;
