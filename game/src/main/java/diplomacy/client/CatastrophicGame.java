@@ -199,6 +199,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final boolean verifySurfaceReview;
     /** Explicitly requested CI capture directory, absent in normal gameplay. */
     private final String armorCaptureDirectory=System.getenv("CD_ARMOR_CAPTURE_DIR");
+    /** Preserve real hit FX only when requested by optional visual CI. */
+    private final boolean armorVfxCapture="1".equals(
+            System.getenv("CD_ARMOR_CAPTURE_VFX"));
     private int armorCaptureFrame,armorCaptureStage,armorCaptureView;
     private ShipSurfaceDamageCapture.Snapshot currentArmorCapture;
     private final Runnable updateCheck;
@@ -3122,8 +3125,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     /** Setup a new self-contained seeded firing lane or explicit artificial stress. */
     private void selectArmorCapture(int index){
-        currentArmorCapture=ShipSurfaceDamageCapture.create(technology,index);
+        currentArmorCapture=ShipSurfaceDamageCapture.create(technology,index,armorVfxCapture);
         battle=currentArmorCapture.battle();
+        hitFeedback.restoreCaptured(battle,currentArmorCapture.capturedEffects());
         running=false;
         armorCaptureStage=index;
         armorCaptureView=0;
@@ -3179,7 +3183,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 " tick="+currentArmorCapture.ticks()+
                 " hits="+currentArmorCapture.hits()+
                 " milestone="+currentArmorCapture.milestoneReached()+
-                " masks="+terranSprites.maskTextureUploads());
+                " masks="+terranSprites.maskTextureUploads()+
+                " effectPulses="+hitFeedback.count()+
+                " hotSites="+hitFeedback.afterglowCount());
         armorCaptureFrame=0;
         if(armorCaptureView<2)armorCaptureView++;
         else if(armorCaptureStage+1<ShipSurfaceDamageCapture.KEYS.length)
