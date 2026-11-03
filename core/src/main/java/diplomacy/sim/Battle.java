@@ -2608,6 +2608,27 @@ public final class Battle {
             }
         }
     }
+    /** Paid CAP capacity gives separate guided hardpoints different real
+     * targets. A launcher cannot shoot unseen/out-of-range hulls; without
+     * CAP all racks retain the original common fleet target. */
+    private Ship independentRackTarget(Ship source,Ship primary,int lane,double limit){
+        if(lane<=0||source.network.targetCapacity()<=1)return primary;
+        int index=(lane-1)%StrictMath.max(1,source.network.targetCapacity()-1);
+        Ship first=null;
+        int seen=0;
+        for(Ship alternative:ships){
+            if(alternative==primary||!alternative.alive()||
+                    alternative.team==source.team)continue;
+            double distance=StrictMath.hypot(alternative.x-source.x,
+                    alternative.y-source.y);
+            if(distance>limit||!hasTargetContact(source,alternative,distance))
+                continue;
+            if(first==null)first=alternative;
+            if(seen++==index)return alternative;
+        }
+        return first==null?primary:first;
+    }
+
     private void queueRackSalvos(Ship source,Ship target,DamageType family,
                                  double distance,WeaponBehaviorTable.Gun gun){
         int ammo=family==DamageType.MISSILE?source.missileAmmo:source.torpedoAmmo;
@@ -2616,10 +2637,14 @@ public final class Battle {
                 source.weapons.torpedoRange();
         double cycle=family==DamageType.MISSILE?source.weapons.missileCycle():
                 source.weapons.torpedoCycle();
+        int lane=0;
         for(Ship.Launcher rack:source.launchers){
             if(rack.family!=family||rack.magazine<=0||rack.reload>0)continue;
             if(hasPendingGuided(source.id,family,rack.slot))continue;
-            if(!gun.available(damage,ammo,distance,reach,rack.reload,
+            Ship assigned=independentRackTarget(source,target,lane++,gun.range(reach));
+            double assignedDistance=StrictMath.hypot(assigned.x-source.x,
+                    assigned.y-source.y);
+            if(!gun.available(damage,ammo,assignedDistance,reach,rack.reload,
                     source.power,source.heat,source.maxHeat,
                     source.weaponsCondition,source.magazineCondition))continue;
             OrdnanceFitting.Mounted loaded=rack.fitting;
@@ -2628,7 +2653,7 @@ public final class Battle {
             if(ammo<pattern.ammoNeeded()||rack.magazine<pattern.ammoNeeded()||
                     !resourcePermit(source,family,rack.slot,pattern.ammoNeeded()))continue;
             rack.reload=gun.reload(cycle,source.weaponsCondition)*pattern.reloadMultiplier();
-            launchQueue.add(new PendingLaunch(source.id,target.id,family,pattern,tick,
+            launchQueue.add(new PendingLaunch(source.id,assigned.id,family,pattern,tick,
                     loaded.warhead(),loaded.guided().motor(),loaded.guided().guidance(),
                     rack.slot));
             salvosStarted++;
