@@ -36,19 +36,48 @@ public final class SensorLightTimeHistory {
         if(source==null||target==null||receivedTick<0||linkTicks<0)
             throw new IllegalArgumentException("Invalid sensor route");
         if(hardwareChannels==0)return null;
-        double d=StrictMath.hypot(target.x-source.x,target.y-source.y);
-        int outward=propagationTicks(d),roundtrip=propagationTicks(2*d);
+        // The receiver knows its own physical position at reception; use the
+        // timestamped sensor pose, never the distant hostile's current pose.
+        long sensorTick=receivedTick-linkTicks;
+        if(sensorTick<0)return null;
+        Sample sensorState=source.sensorHistory.at(sensorTick);
+        if(sensorState==null&&sensorTick>0)
+            sensorState=source.sensorHistory.at(sensorTick-1);
+        if(sensorState==null)return null;
+        Sample lastRecorded=target.sensorHistory.at(sensorTick);
+        if(lastRecorded==null&&sensorTick>0)
+            lastRecorded=target.sensorHistory.at(sensorTick-1);
+        if(lastRecorded==null)return null;
+        // A bounded conservative light-cone solver. The latest available
+        // candidate is ONLY a seed for travel time: the actual measurement
+        // is always from an arrived, older historical sample. If a moving
+        // target had been farther away, increase age rather than acquiring
+        // it too early. Never read target.x/y/vx/vy here.
+        int outward=propagationTicks(StrictMath.hypot(
+                lastRecorded.x()-sensorState.x(),
+                lastRecorded.y()-sensorState.y()));
+        for(int pass=0;pass<4;pass++){
+            long candidateTick=sensorTick-outward;
+            Sample candidate=target.sensorHistory.at(candidateTick);
+            if(candidate==null)return null;
+            int required=propagationTicks(StrictMath.hypot(
+                    candidate.x()-sensorState.x(),
+                    candidate.y()-sensorState.y()));
+            if(required<=outward)break;
+            outward=required;
+        }
+        long measured=sensorTick-outward;
+        Sample sample=target.sensorHistory.at(measured);
+        if(sample==null||!sample.alive())return null;
+        // Quantized outward/return photons each require their own full
+        // causal interval; a rounded 2*d can be a tick too early.
         int passive=hardwareChannels&(Battle.CONTACT_OPTICAL|
                 Battle.CONTACT_INFRARED|Battle.CONTACT_GRAVITIC);
         int active=hardwareChannels&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY);
-        if(receivedTick<(long)outward+linkTicks)passive=0;
-        if(receivedTick<(long)roundtrip+linkTicks)active=0;
+        if(sensorTick<(long)outward*2)active=0;
         int arrived=passive|active;
         if(arrived==0)return null;
-        long measured=receivedTick-outward-linkTicks;
-        Sample sample=target.sensorHistory.at(measured);
-        if(sample==null||!sample.alive())return null;
-        long emitted=active!=0?receivedTick-roundtrip-linkTicks:measured;
+        long emitted=active!=0?measured-outward:measured;
         return new Observation(emitted,measured,receivedTick,arrived,sample);
     }
 }
