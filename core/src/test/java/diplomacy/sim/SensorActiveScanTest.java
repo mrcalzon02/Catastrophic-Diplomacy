@@ -22,6 +22,9 @@ public final class SensorActiveScanTest {
         b.configureSensorScan(pair[0].id,SensorActiveScan.Mode.PASSIVE,0);
         ok(b.directSensorChannels(pair[0],pair[1],500)==0,
                 "PASSIVE used powered radar or active X-ray channel");
+        int overlapping=b.directSensorChannels(pair[0],pair[1],0);
+        ok((overlapping&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY))==0,
+                "Missing active channel gained a free zero-range lock");
         for(int i=0;i<20;i++)b.step();
         ok(pair[0].scan.emissions==0&&pair[0].scan.powerSpent==0,
                 "Passive sensor mode used active emission power");
@@ -90,6 +93,10 @@ public final class SensorActiveScanTest {
         Battle missing=new Battle(92389);
         Battle.Ship[] absent=duel(missing);
         absent[0].sensorRange=0;absent[0].xrayRange=0;
+        int nullScan=missing.directSensorChannels(absent[0],absent[1],0);
+        ok((nullScan&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY|
+                        Battle.CONTACT_INFRARED|Battle.CONTACT_GRAVITIC))==0,
+                "An unfitted zero-range electronic sensor reported contact");
         missing.configureSensorScan(absent[0].id,SensorActiveScan.Mode.XRAY_BURST,
                 absent[1].id);
         for(int i=0;i<70;i++)missing.step();
