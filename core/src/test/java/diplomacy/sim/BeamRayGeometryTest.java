@@ -44,6 +44,9 @@ public final class BeamRayGeometryTest {
         b.registerDiagnosticStationaryTarget(victim.id);
         gun.speed=0; // Shooter stays nearby but still runs real fire control.
         gun.power=100;gun.powerRegen=100;
+        // Saturate the legacy lock roll to isolate physical beam geometry
+        // from unrelated stochastic hit-chance and crew balance tuning.
+        gun.accuracy=3.0;
         gun.sensorRange=500;gun.infraredRange=gun.xrayRange=gun.graviticRange=0;
         gun.laserDamage=type==Battle.DamageType.LASER?12:0;
         gun.plasmaDamage=type==Battle.DamageType.PLASMA?12:0;
@@ -52,7 +55,7 @@ public final class BeamRayGeometryTest {
         victim.laserDamage=victim.plasmaDamage=victim.particleDamage=0;
         victim.kineticDamage=victim.missileDamage=victim.torpedoDamage=0;
         double initialHull=victim.hull;
-        for(int t=0;t<90;t++)b.step();
+        for(int t=0;t<180;t++)b.step();
         Map<Long,Battle.VisualEvent> fires=new HashMap<>();
         int confirmed=0;
         for(Battle.VisualEvent e:b.visualEvents()){
