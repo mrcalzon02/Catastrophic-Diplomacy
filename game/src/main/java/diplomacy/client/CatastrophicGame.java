@@ -2873,6 +2873,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Exhibition and forensic armor photography remain unobstructed.
         if(!screensaverMode && currentArmorCapture==null && fogOfWar!=null){
             try{
+                // Optical mask and instrument overlays must consume the SAME
+                // per-tick authoritative contact picture; refreshing only
+                // after the mask draws leaked a stale previous-frame view.
+                sensorContacts.refresh(battle,0);
                 fogOfWar.render(battle,battleCamera,camera,batch,renderPoses,0,sensorContacts);
                 sensorContacts.render(battle,battleCamera,camera,renderPoses,
                         shapes,batch,font,0);
