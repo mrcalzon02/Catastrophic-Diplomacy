@@ -67,7 +67,10 @@ public final class PointDefenseFleetScaleDiagnostic {
                 Math.max(0,ship.hull);
     }
     private static Result run(TechnologyCatalog tech,boolean enabled,
-                              List<String> samples,List<String> familyKills){
+                              boolean allowAuxiliaries,List<String> samples,
+                              List<String> familyKills){
+        String mode=(allowAuxiliaries?"MIXED":"ORDNANCE_ONLY")+
+                (enabled?"_ACTIVE":"_HOLD_FIRE");
         Battle battle=new Battle(2026110204L);
         for(int family=0;family<OFFENSE.length;family++){
             double y=135+family*155;
@@ -78,6 +81,15 @@ public final class PointDefenseFleetScaleDiagnostic {
         }
         require(battle.ships().size()==400 && battle.alive(0)==200 &&
                 battle.alive(1)==200,"200v200 fitted setup was incomplete");
+        // Every bare dreadnought has intrinsic fighter storage. Preserve it
+        // in MIXED, but disable ONLY reserves in ORDNANCE_ONLY so target
+        // specialization is not contaminated by automatic baseline wings.
+        // Real fitted PD sensors, power, guns and incoming stock stay intact.
+        if(!allowAuxiliaries)for(Battle.Ship ship:battle.ships()){
+            ship.fighterReserve=0;
+            ship.droneReserve=0;
+            ship.repairDroneReserve=0;
+        }
         int[] physicalMounts=new int[4];
         int stockBefore=0;
         double protectionBefore=0;
@@ -97,12 +109,14 @@ public final class PointDefenseFleetScaleDiagnostic {
                 BattleOrders.PointDefense.HOLD_FIRE);
 
         int pd=0,flak=0,rotary=0,rail=0,maxBodies=0,capped=0;
+        int peakCraft=0;
         long peakHeap=heapBytes();
         long begin=System.nanoTime();
         long windowBegin=begin;
         int windowPd=0,windowFlak=0,windowRotary=0,windowRail=0;
         for(int frame=0;frame<TICKS;frame++){
             battle.step();
+            peakCraft=Math.max(peakCraft,battle.crafts().size());
             List<Battle.VisualEvent> events=battle.visualEvents();
             // The rolling visual ring is capped at 8192 entries. Count only
             // this simulation tick, newest first, to avoid replaying history.
@@ -130,7 +144,7 @@ public final class PointDefenseFleetScaleDiagnostic {
                 long now=System.nanoTime();
                 int intercepted=battle.missileIntercepts+
                         battle.rocketIntercepts+battle.ballisticIntercepts;
-                samples.add((enabled?"ACTIVE":"HOLD_FIRE")+","+
+                samples.add(mode+","+
                         (frame+1)+","+String.format(Locale.ROOT,"%.3f",
                         (now-windowBegin)/1e6)+","+heapBytes()+","+
                         bodies+","+maxBodies+","+battle.alive(0)+","+
@@ -154,7 +168,7 @@ public final class PointDefenseFleetScaleDiagnostic {
             for(Battle.DefensiveTarget target:Battle.DefensiveTarget.values()){
                 int kills=battle.defensiveKills(gun,target);
                 require(kills>=0,"Negative physical defense attribution");
-                familyKills.add((enabled?"ACTIVE":"HOLD_FIRE")+","+
+                familyKills.add(mode+","+
                         gun+","+target+","+kills);
                 if(target==Battle.DefensiveTarget.CRAFT)
                     attributedCraftKills+=kills;
@@ -169,6 +183,8 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "Actual craft kills were not attributed exactly once");
         require(enabled || (attributedOrdnanceKills==0&&attributedCraftKills==0),
                 "HOLD_FIRE attributed nonexistent physical PD kills");
+        require(allowAuxiliaries || (peakCraft==0&&attributedCraftKills==0),
+                "Ordnance-only fleet spawned unexpected fighter/drone craft");
         require(enabled || (pd==0&&flak==0&&rotary==0&&rail==0),
                 "HOLD_FIRE emitted real point-defense shots in 200v200");
         int paidCartridges=flak+rotary+
@@ -179,7 +195,7 @@ public final class PointDefenseFleetScaleDiagnostic {
         // magazine inventory, not just active point-defense fire.
         require(netLoss>=paidCartridges,
                 "Defensive physical shots were not paid by finite stock");
-        return new Result(enabled?"ACTIVE":"HOLD_FIRE",elapsed,peakHeap,
+        return new Result(mode,elapsed,peakHeap,
                 pd,flak,rotary,rail,maxBodies,interceptions,
                 paidCartridges,netLoss,
                 Math.max(0,protectionBefore-protectionAfter),
@@ -195,8 +211,10 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "rotary_shots,rail_shots,ordnance_interceptions");
         List<String> familyKills=new ArrayList<>();
         familyKills.add("mode,gun,target,physical_kills");
-        Result active=run(tech,true,samples,familyKills);
-        Result hold=run(tech,false,samples,familyKills);
+        Result active=run(tech,true,true,samples,familyKills);
+        Result hold=run(tech,false,true,samples,familyKills);
+        Result ordnanceActive=run(tech,true,false,samples,familyKills);
+        Result ordnanceHold=run(tech,false,false,samples,familyKills);
         Files.write(root.resolve("samples.csv"),samples,StandardCharsets.UTF_8);
         Files.write(root.resolve("family-target-kills.csv"),familyKills,
                 StandardCharsets.UTF_8);
@@ -206,14 +224,19 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "missile, torpedo, kinetic and siege-rocket attackers versus "+
                 "50 laser PD, flak, rotary CIWS and charged rail interceptors. "+
                 "All guns occupy paid WEAPON sockets; no fabricated damage "+
-                "or free interception events.\n\n"+
+                "or free interception events. MIXED retains the bare-hull "+
+                "intrinsic fighter inventory. ORDNANCE_ONLY clears all "+
+                "fighter/drone reserves before tick one, but does not "+
+                "change any PD mount, attacking launcher or ammunition.\n\n"+
                 "|Mode|Ticks|Wall ms|Peak used heap bytes|PD|FLK|RCW|RPD|"+
                 "Peak active bodies|Real ordnance intercepts|Paid PD cartridges|"+
                 "Net kinetic stock reduction|Other stock loss|Net protection loss|"+
                 "Attackers alive|Defenders alive|Capped visual ticks|\n"+
                 "|---|"+"---:|".repeat(16)+"\n"+
                 "|"+active.csv().replace(",", "|")+"|\n"+
-                "|"+hold.csv().replace(",", "|")+"|\n\n"+
+                "|"+hold.csv().replace(",", "|")+"|\n"+
+                "|"+ordnanceActive.csv().replace(",", "|")+"|\n"+
+                "|"+ordnanceHold.csv().replace(",", "|")+"|\n\n"+
                 "This is an advisory initial sustained-load profile, NOT "+
                 "a hit-rate, execution-speed, or memory release gate. The "+
                 "HOLD_FIRE case changes combat outcomes, so wall-clock "+
