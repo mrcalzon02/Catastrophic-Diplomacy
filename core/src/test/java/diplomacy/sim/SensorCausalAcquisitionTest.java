@@ -49,6 +49,35 @@ public final class SensorCausalAcquisitionTest {
                 "Unpowered radar still authorized fresh fire control");
         System.out.println("PASS STANDARD radar obeys physical roundtrip, powered hardware and no-free-TRK");
     }
+    private static void powerOnCannotRetroactivelyEmit(){
+        Battle battle=new Battle(93575);
+        Battle.Ship radar=battle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship hostile=battle.addShip(1,Battle.Faction.DRAXIAN,600,100);
+        battle.registerDiagnosticStationaryTarget(radar.id);
+        battle.registerDiagnosticStationaryTarget(hostile.id);
+        radar.sensorRange=700;radar.infraredRange=radar.xrayRange=
+                radar.graviticRange=0;
+        radar.powerRegen=0;radar.power=0;
+        for(int t=0;t<12;t++)battle.step();
+        radar.power=100;
+        battle.step(); // Emission hardware is powered for the first real tick.
+        long firstPoweredTick=battle.tick;
+        require(!battle.hasTargetContact(radar,hostile,500),
+                "Power-up produced an impossible echo emitted while radar was off");
+        int echo=2*SensorLightTimeHistory.propagationTicks(500);
+        for(int age=1;age<echo;age++){
+            battle.step();
+            require(!battle.hasTargetContact(radar,hostile,500),
+                    "Standard radar reconstructed an echo before first powered emission");
+        }
+        battle.step();
+        require(battle.hasTargetContact(radar,hostile,500),
+                "Newly enabled standard radar never received a legitimate echo");
+        require(battle.tick==firstPoweredTick+echo,
+                "Power-up echo fixture has an incorrect physical clock");
+        System.out.println("PASS radar power-on cannot fabricate historical outbound photons");
+    }
+
     private static void passiveOptical(){
         Battle battle=new Battle(93573);
         Battle.Ship observer=battle.addShip(0,Battle.Faction.TERRAN,100,100);
@@ -73,6 +102,7 @@ public final class SensorCausalAcquisitionTest {
     }
     public static void main(String[] args){
         radarEcho();
+        powerOnCannotRetroactivelyEmit();
         passiveOptical();
         System.out.println("PASS causal STANDARD acquisition and passive optical contact");
     }
