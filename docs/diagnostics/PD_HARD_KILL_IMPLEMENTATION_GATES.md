@@ -61,7 +61,7 @@ code is present in this specification.
 6. Aircraft destruction, incoming aircraft weapon shots, impacts, torpedo
    launches, terminal passages, defender damage and flak rounds remain separate
    telemetry. Eventual kills are not automatically damage prevention.
-7. Four original battery identities use fixed numeric seed codes. Adding
+7. Five original battery identities use fixed numeric seed codes. Adding
    experimental variants cannot change old tests' random seeds. Geometry
    A/B intentionally uses the same starting seed, changing only position.
 8. Numerical balance targets and visual quality are **advisory**. Objective
