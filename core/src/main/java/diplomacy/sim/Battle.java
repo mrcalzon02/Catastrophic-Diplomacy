@@ -720,6 +720,14 @@ public final class Battle {
             throw new IllegalArgumentException("Invalid laboratory CIWS lock duration");
         diagnosticPrecisionLockMultiplier=multiplier;
     }
+    /** Test sustained-burn ROCKET acceleration without changing live weapons.
+     * Real rocket heading, researched speed cap, lifetime and ammunition remain
+     * unchanged. Configure only before the simulation starts. */
+    public void configureSustainedRocketThrustForDiagnostic(double multiplier){
+        if(tick!=0||!Double.isFinite(multiplier)||multiplier<.50||multiplier>3.0)
+            throw new IllegalArgumentException("Invalid laboratory rocket thrust");
+        diagnosticSustainedRocketThrustMultiplier=multiplier;
+    }
     /** Compare per-socket optical allocations to the old duplicate targeting.
      * This opt-in switch is only legal before the first simulation tick. */
     public void configurePrecisionReservationsForDiagnostic(boolean enabled){
@@ -731,6 +739,8 @@ public final class Battle {
     private boolean unattendedExhibition;
     /** Diagnostic-only crowding trial, disabled for all ordinary battles. */
     private double diagnosticRocketPdPressure;
+    /** Laboratory-only propulsion sensitivity; production stays neutral. */
+    private double diagnosticSustainedRocketThrustMultiplier=1.0;
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -3185,6 +3195,8 @@ public final class Battle {
             double age=rocket.flightTicks*DT;
             rocket.flightTicks++;
             double accel=RocketBarrage.acceleration(rocket.size,rocket.motor,age);
+            if(rocket.motor==RocketBarrage.Motor.SUSTAINED_BURN)
+                accel*=diagnosticSustainedRocketThrustMultiplier;
             if(accel>0){
                 double speed=StrictMath.hypot(rocket.vx,rocket.vy);
                 double next=StrictMath.min(rocket.spec.speed(),speed+accel*DT);
