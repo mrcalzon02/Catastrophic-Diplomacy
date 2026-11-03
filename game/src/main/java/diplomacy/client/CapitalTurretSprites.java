@@ -93,12 +93,19 @@ public final class CapitalTurretSprites implements AutoCloseable {
     public void render(Battle battle,SpriteBatch batch,
                        BattleRenderPoses poses,CombatViewBounds view,
                        float cameraZoom){
+        render(battle,batch,poses,view,cameraZoom,ship -> true);
+    }
+    public void render(Battle battle,SpriteBatch batch,
+                       BattleRenderPoses poses,CombatViewBounds view,
+                       float cameraZoom,
+                       java.util.function.Predicate<Battle.Ship> hullVisible){
         if(battle==null||batch==null||poses==null||cameraZoom>2.3f)return;
         Map<Integer,Battle.Ship> ids=new HashMap<>();
         for(Battle.Ship ship:battle.ships())ids.put(ship.id,ship);
         batch.begin();
         for(Battle.Ship ship:battle.ships()){
-            if(!ship.alive()||!capital(ship.hullClass)||ship.weaponEmitters.isEmpty())continue;
+            if(!ship.alive()||!hullVisible.test(ship)
+                    ||!capital(ship.hullClass)||ship.weaponEmitters.isEmpty())continue;
             BattleRenderPoses.Pose pose=poses.ship(ship);
             float scale=(float)ship.visualScale();
             if(view!=null&&!view.ship(pose,scale))continue;
