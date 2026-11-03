@@ -10,6 +10,7 @@ on:
       - 'core/src/test/java/diplomacy/sim/SensorLightTimeHistoryTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorActiveScanTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorCausalAcquisitionTest.java'
+      - 'core/src/test/java/diplomacy/sim/SensorHistoricalSignaturesTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorTargetingSolutionTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTargetingSolution.java'
       - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
