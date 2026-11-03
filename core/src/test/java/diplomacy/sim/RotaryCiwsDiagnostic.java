@@ -272,7 +272,14 @@ public final class RotaryCiwsDiagnostic {
                 " aircraft="+attacker.fightersLaunched+
                 " drone="+attacker.dronesLaunched+
                 " pdCondition="+defender.pointDefenseCondition+
-                " power="+defender.power);
+                " power="+defender.power+
+                " heat="+defender.heat+" maxHeat="+defender.maxHeat+
+                " crew="+defender.crewReadiness()+
+                " orders="+defender.orders.pointDefense()+
+                " spool="+defender.rotaryMounts.get(0).spin+
+                " bearing="+defender.rotaryMounts.get(0).bearing+
+                " acquired="+defender.rotaryMounts.get(0).acquisitions+
+                " trackId="+defender.rotaryMounts.get(0).trackedId);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
         require(launched>0,"Attacker produced no physical "+threat);
         // A near-range round may cross a tiny kinetic shell and vanish
