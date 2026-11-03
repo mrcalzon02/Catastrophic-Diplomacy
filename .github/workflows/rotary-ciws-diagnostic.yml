@@ -5,6 +5,8 @@ on:
     paths:
       - 'core/src/main/java/diplomacy/sim/RotaryPointDefense.java'
       - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/BattleArena.java'
+      - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
       - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
       - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
       - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
@@ -32,7 +34,7 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.11.1' }
-      - name: Verify mounted rotary gun, finite projectiles, research and sensors
+      - name: Verify mounted rotary gun, arena limits and finite projectile lifetimes
         id: physical
         run: gradle --no-daemon :core:rotaryCiwsDiagnostic
       - name: Compile live tracer render path without packaging game
