@@ -7,7 +7,7 @@ per-frame procedural geometry in the battle renderer. A 96px mask spans
 the same 2.667 defense cells as the legacy 24px assets.
 """
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageChops
 import argparse
 import json
 import math
@@ -29,6 +29,108 @@ def line(draw,points,value,width=1):
     if width>=3:
         for x,y in points[1:-1]:
             draw.ellipse((x-width//2,y-width//2,x+width//2,y+width//2),fill=value)
+
+def enrich_materials(fields, family, variant):
+    """Keep authored cutouts sharp; anti-alias only the surrounding material.
+
+    R: broken char/soot with a shallow soft falloff.
+    G: thermal intensity, or the oxide color phase for *tagged* laser pixels.
+    B: raised metal (cool) or tagged laser annealing (B >= 164).
+    A: exactly the original cutout, unchanged by blur or dilation.
+    """
+    soot, heat, metal, holes = fields
+    # All of this is offline asset authoring, never a per-hit runtime filter.
+    narrow = ImageChops.subtract(holes.filter(ImageFilter.MaxFilter(7)), holes)
+    wide = ImageChops.subtract(holes.filter(ImageFilter.MaxFilter(13)), holes)
+    soot_soft = soot.filter(ImageFilter.GaussianBlur(1.55))
+    outer_char = soot.filter(ImageFilter.MaxFilter(13)).filter(
+        ImageFilter.GaussianBlur(3.0))
+    heat_soft = heat.filter(ImageFilter.GaussianBlur(2.3))
+    rim_soft = narrow.filter(ImageFilter.GaussianBlur(1.0))
+    out = [Image.new("L", (SIZE, SIZE), 0) for _ in range(3)]
+    original = [im.load() for im in (soot, heat, metal, holes)]
+    smooth = [im.load() for im in (soot_soft, outer_char, heat_soft,
+                                  narrow, wide, rim_soft)]
+    output = [im.load() for im in out]
+
+    if family == "laser":
+        # WIDEST thermal-affected metal of every family. This follows the
+        # actual long, narrow score and its forks; not a circular blast bowl.
+        score = ImageChops.lighter(soot, holes)
+        oxide_core = score.filter(ImageFilter.MaxFilter(11)).filter(
+            ImageFilter.GaussianBlur(2.0)).load()
+        oxide_mid = score.filter(ImageFilter.MaxFilter(27)).filter(
+            ImageFilter.GaussianBlur(4.5)).load()
+        oxide_outer = score.filter(ImageFilter.MaxFilter(39)).filter(
+            ImageFilter.GaussianBlur(7.0)).load()
+    limits = {
+        "laser": 1.29, "plasma": 1.08, "torpedo": 1.04,
+        "missile": 1.01, "particle": .76, "fighter": .52,
+        "kinetic": 0.0,
+    }
+    # Cold kinetic metal stays visible but never inherits the heat pass.
+    hot_rim = {"kinetic": 0, "fighter": 30, "particle": 100,
+               "missile": 155, "torpedo": 180, "plasma": 245}
+    bright_rim = {"kinetic": 225, "fighter": 105, "particle": 145,
+                  "missile": 155, "torpedo": 200, "plasma": 180}
+    for y in range(SIZE):
+        for x in range(SIZE):
+            r, g, b, opening = (p[x,y] for p in original)
+            soften, char, heat_glow, lip, broad_lip, soft_lip = (
+                p[x,y] for p in smooth)
+            radius = math.hypot(x - 47.5, y - 47.5) / 36.0
+            # Fine antialias on soot; no dirt outside the local wound.
+            dark = max(r * .84, soften * .72,
+                       char * .20 if radius < 1.22 else 0)
+            if family == "laser":
+                if radius <= limits[family]:
+                    close = oxide_core[x,y] / 255.0
+                    middle = oxide_mid[x,y] / 255.0
+                    outer = oxide_outer[x,y] / 255.0
+                    coverage = max(close * .92, middle * .65, outer * .32)
+                    if coverage >= .034:
+                        # The laser's actual cut remains a hairline. The B
+                        # tag marks bronze/violet/blue annealed plating over
+                        # the widest heat-affected perimeter, not a new hole.
+                        b = max(b, 170 + 82 * min(1.0, coverage))
+                        # G is oxide color phase for laser, not raw emissivity:
+                        # cool outer blue/violet, hot inner bronze/gold.
+                        g = 215 - 177 * min(1.0, close * .65 +
+                                            middle * .42)
+                        # Bright, surviving incised edges (B > .9) can glow
+                        # in the material shader; no light in empty alpha.
+                        b = max(b, 173 + .31 * rim_soft[x,y])
+                        dark = max(dark, r * .92)
+                    else:
+                        b = 0
+                        g = 0
+                else:
+                    b = 0
+                    g = 0
+            else:
+                # Differentiated temperature envelopes, all strictly
+                # smaller than the LASER annealing reach. No thermal
+                # coloration whatsoever for KINETIC.
+                if radius <= limits[family]:
+                    lip_heat = max(lip * .83, soft_lip * .72)
+                    g = max(g * .82, heat_glow * .77,
+                            lip_heat * hot_rim[family] / 255.0)
+                    # Peripheral soot is soft; edge-bearing metal remains
+                    # sharp with a 1px antialias near raised torn lips.
+                    b = max(b, lip * bright_rim[family] / 255.0,
+                            broad_lip * bright_rim[family] / 420.0)
+                    if family in ("plasma", "torpedo", "missile"):
+                        g = max(g, wide[x,y] * hot_rim[family] / 510.0)
+                else:
+                    g = 0
+                if family == "kinetic":
+                    g = 0
+            output[0][x,y] = round(max(0, min(255, dark)))
+            output[1][x,y] = round(max(0, min(255, g)))
+            output[2][x,y] = round(max(0, min(255, b)))
+    # Do NOT blur A, move marks, or inflate the physical crater.
+    return [out[0], out[1], out[2], holes]
+
 
 def create(family,v):
     fields=[Image.new("L",(SIZE,SIZE),0) for _ in range(4)]
@@ -246,6 +348,7 @@ def create(family,v):
             if pixels[x,y]>85 and rng.random()<.42:
                 pixels[x,y]=max(0,min(255,pixels[x,y]+
                             rng.choice((-47,-27,19,31))))
+    fields = enrich_materials(fields, family, v)
     channels=[im.tobytes() for im in fields]
     rgba=bytearray(SIZE*SIZE*4)
     for i in range(SIZE*SIZE):
