@@ -319,6 +319,23 @@ final class ModularWeaponFxRenderer implements Disposable {
                     8,3,angle);
             batch.setColor(1,1,1,1);
         }
+        // Charged anti-torpedo rail slugs are independent REAL moving solids;
+        // the original relativistic/penetrator artwork follows each position.
+        for(diplomacy.sim.RailPointDefense.Penetrator shot:battle.railPenetrators()){
+            if(view!=null&&!view.circle((float)shot.x,(float)shot.y,7))continue;
+            Texture fallback=shells==null?frame(kinetic.payload(),
+                    battle.tick-shot.spawnTick):null;
+            if(shells==null&&fallback==null)continue;
+            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
+                    shot.vy,shot.vx));
+            batch.setColor(.82f,.93f,1f,1f);
+            if(shells!=null)
+                drawCentered(batch,shells[4],(float)shot.x,(float)shot.y,
+                        13,4,angle);
+            else drawCentered(batch,fallback,(float)shot.x,(float)shot.y,
+                        13,4,angle);
+            batch.setColor(1,1,1,1);
+        }
         lasers.draw(batch,battle,view);
         batch.setColor(1,1,1,1);
         batch.end();
