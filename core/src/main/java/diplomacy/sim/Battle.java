@@ -1086,9 +1086,9 @@ public final class Battle {
                         Shipyard.defenseAt(design,catalog,emitter.slotId()),
                         Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
             if(emitter.family()==WeaponMuzzles.Family.ROTARY_CIWS){
-                Shipyard.Installed installed=design.at(emitter.slotId());
-                int tier=installed.branch()==null?0:
-                        installed.stage(installed.branch());
+                Shipyard.Installed rotaryPart=design.at(emitter.slotId());
+                int tier=rotaryPart.branch()==null?0:
+                        rotaryPart.stage(rotaryPart.branch());
                 fittedRotary.add(new RotaryPointDefense.Mount(emitter.slotId(),tier,
                         Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
                         Shipyard.defenseAt(design,catalog,emitter.slotId()),
