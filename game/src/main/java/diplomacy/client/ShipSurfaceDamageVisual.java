@@ -53,6 +53,22 @@ final class ShipSurfaceDamageVisual {
     }
 
     /**
+     * Correct underlayer opacity for a source-over draw followed by intact
+     * exterior. The shader uses the same equation per fragment.
+     *
+     * upperAlpha = originalAlpha * retainedArmor
+     * backingAlpha = (originalAlpha - upperAlpha)/(1 - upperAlpha)
+     *
+     * The two passes therefore composite to the ORIGINAL source silhouette
+     * instead of a bright double-edge halo or a see-through hole.
+     */
+    static float backingAlpha(float originalAlpha,float retainedArmor){
+        float source=clamp(originalAlpha),upper=source*clamp(retainedArmor);
+        return clamp(source*(1f-clamp(retainedArmor))/
+                Math.max(.0001f,1f-upper));
+    }
+
+    /**
      * Hot torn-plating rim: local mask alpha gradient, not a glow billboard.
      * There MUST be both a real source hull pixel and a clipped interior
      * pixel underneath. Never draw on transparent source artwork or an empty
