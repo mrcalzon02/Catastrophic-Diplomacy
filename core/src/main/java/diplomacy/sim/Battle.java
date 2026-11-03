@@ -1049,14 +1049,22 @@ public final class Battle {
             visualEvents.subList(0,visualEvents.size()-VISUAL_HISTORY_MAX).clear();
     }
 
+    /** Atomic preflight prevents partially deployed oversized fleets. */
+    private void requireFleetCapacity(int team,int requested){
+        checkTeam(team);
+        if(requested<0||requested>BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
+        int placed=0;
+        for(Ship entry:ships)if(entry.team==team)placed++;
+        if(placed+requested>BattleArena.MAX_SHIPS_PER_SIDE)
+            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
+    }
+
     public Ship addShip(int team, Faction faction, double x, double y) {
         if (team != 0 && team != 1) throw new IllegalArgumentException("Only two teams in the skirmish mode");
         if(!BattleArena.contains(x,y))
             throw new IllegalArgumentException("Ship outside fixed combat arena");
-        int deployed=0;
-        for(Ship existing:ships)if(existing.team==team)deployed++;
-        if(deployed>=BattleArena.MAX_SHIPS_PER_SIDE)
-            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
+        requireFleetCapacity(team,1);
         Ship ship = new Ship(nextId++, team, faction, faction.name().substring(0, 3) + "-" + nextId);
         ship.x = x; ship.y = y; ship.facing = team == 0 ? 0 : Math.PI;
         ship.orders=teamOrders[team];
@@ -1268,8 +1276,7 @@ public final class Battle {
     }
     public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
                           int count, double centerX, double centerY) {
-        if (count < 0 || count > BattleArena.MAX_SHIPS_PER_SIDE)
-            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
+        requireFleetCapacity(team,count);
         Shipyard.Fitted machinery = Shipyard.fit(design, catalog);
         SupportDoctrine doctrine=Shipyard.supportDoctrine(design,catalog);
         List<RocketBarrage.Rack> rocketTemplates=Shipyard.rocketRacks(design,catalog);
@@ -1288,6 +1295,7 @@ public final class Battle {
                 designs.size()>BattleArena.MAX_SHIPS_PER_SIDE||catalog==null||
                 designs.stream().anyMatch(d->d==null))
             throw new IllegalArgumentException("Invalid custom fleet");
+        requireFleetCapacity(team,designs.size());
         List<Shipyard.Fitted> fittings=new ArrayList<>(designs.size());
         List<SupportDoctrine> doctrines=new ArrayList<>(designs.size());
         List<List<RocketBarrage.Rack>> rocketsByHull=new ArrayList<>(designs.size());
@@ -1324,8 +1332,7 @@ public final class Battle {
         return battle;
     }
     public void spawnWing(int team, Faction faction, int count, double centerX, double centerY) {
-        if (count < 0 || count > BattleArena.MAX_SHIPS_PER_SIDE)
-            throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
+        requireFleetCapacity(team,count);
         for (int i = 0; i < count; i++) {
             double[] point = formationPosition(i,count,centerX,centerY,random);
             addShip(team, faction, point[0], point[1]);
