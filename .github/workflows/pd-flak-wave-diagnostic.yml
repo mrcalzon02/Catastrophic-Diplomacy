@@ -14,6 +14,9 @@ on:
       - 'core/src/test/java/diplomacy/sim/SensorTargetingSolutionTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTargetingSolution.java'
       - 'core/src/main/java/diplomacy/sim/SensorLeadProjection.java'
+      - 'core/src/main/java/diplomacy/sim/RocketTrajectoryPrediction.java'
+      - 'core/src/main/java/diplomacy/sim/RocketBarrage.java'
+      - 'core/src/test/java/diplomacy/sim/RocketTrajectoryPredictionTest.java'
       - 'core/src/main/java/diplomacy/sim/BeamRayGeometry.java'
       - 'core/src/test/java/diplomacy/sim/SensorLeadProjectionTest.java'
       - 'core/src/test/java/diplomacy/sim/BeamRayGeometryTest.java'
@@ -49,15 +52,19 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.11.1' }
-      - name: Verify mounted PD, physical beams, sensor lead prediction and client Java compilation
+      - name: Verify objective sensor, weapons, rocket trajectory and game-client functionality
+        id: mechanics
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:rocketBarrageSmoke :game:compileJava
+      - name: Measure optional PD/flak simultaneous fighter-wave balance
         id: wave
         continue-on-error: true
-        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic :core:sensorNetworkSmoke :core:rocketBarrageSmoke :game:compileJava
-      - name: Report test outcome explicitly (advisory)
+        run: gradle --no-daemon :core:pdFlakWaveDiagnostic
+      - name: Report functional gate and advisory diagnostic independently
         if: always()
         run: |
-          echo "## PD/flak actual simultaneous fighter-wave tests" >> "$GITHUB_STEP_SUMMARY"
-          echo "Mounted fighter waves + sensor-light-time/SHR/TRK/LNK/FCM functional smokes: ${{ steps.wave.outcome }} (advisory, no packaging)" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Physical combat functional verification and PD/flak balance" >> "$GITHUB_STEP_SUMMARY"
+          echo "Java functional tests and client compile: ${{ steps.mechanics.outcome }} (required)" >> "$GITHUB_STEP_SUMMARY"
+          echo "PD/flak fighter-wave balance: ${{ steps.wave.outcome }} (advisory)" >> "$GITHUB_STEP_SUMMARY"
           if [ -f core/test-output/pd-wave-diagnostic/summary.md ]; then
             cat core/test-output/pd-wave-diagnostic/summary.md >> "$GITHUB_STEP_SUMMARY"
           else
