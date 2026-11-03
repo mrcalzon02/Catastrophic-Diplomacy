@@ -170,20 +170,20 @@ public final class PointDefenseWaveDiagnostic {
         battle.spawnWing(1,defenseFit(cat,Battery.PD_ONE,0),cat,1,600,300);
         Battle.Ship ship=battle.ships().get(0);
         Battle.Ship.PrecisionMount mount=ship.precisionMounts.get(0);
-        require(!Battle.acquirePrecisionTarget(ship,mount,5001L,450,300,1),
+        require(!battle.acquirePrecisionTarget(ship,mount,5001L,450,300,1),
                 "Precision laser skipped initial optical acquisition");
         boolean ready=false;
         for(int t=2;t<20;t++)
-            ready=Battle.acquirePrecisionTarget(ship,mount,5001L,450,300,t);
+            ready=battle.acquirePrecisionTarget(ship,mount,5001L,450,300,t);
         require(ready,"Precision laser never attained a stable target");
-        require(!Battle.acquirePrecisionTarget(ship,mount,5002L,750,300,20),
+        require(!battle.acquirePrecisionTarget(ship,mount,5002L,750,300,20),
                 "Precision laser skipped target switch / 180-degree traverse");
         require(mount.slewTicks>0,"Mechanical turret did not take time to rotate");
         ready=false;
         for(int t=21;t<60;t++)
-            ready=Battle.acquirePrecisionTarget(ship,mount,5002L,750,300,t);
+            ready=battle.acquirePrecisionTarget(ship,mount,5002L,750,300,t);
         require(ready,"Off-axis mechanical turret could not traverse");
-        require(!Battle.acquirePrecisionTarget(ship,mount,5002L,750,300,70),
+        require(!battle.acquirePrecisionTarget(ship,mount,5002L,750,300,70),
                 "Stale track retained instantaneous lock after contact gap");
         require(mount.targetAcquisitions==2,
                 "Stable target reacquisition counted a fictitious new body");

@@ -62,15 +62,17 @@ public final class RocketPdBalanceDiagnostic {
                           double launchCostCredits,double nominalRocketSpeed,
                           double rocketHealth,double rocketCrossSection,
                           double rocketSignature,double pdTracking,double pdCycle,
-                          double rocketReload,double rocketSingleDamage) {
+                          double rocketReload,double rocketSingleDamage,
+                          int acquisitions,int slewTicks,int lockWaitTicks) {
         String csv(){
             return String.format(Locale.ROOT,
-                    "%s,%d,%d,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f",
+                    "%s,%d,%d,%d,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.3f,%.3f,%.3f,%.3f,%.3f,%.4f,%.3f,%.4f,%d,%d,%d",
                     label,tier,modules,barrage,motor,evasive,pdOnline,seed,launched,intercepted,
                     terminalEntries,collided,pdShots,detectionFrames,firstDetectionSeconds,initialPdRange,
                     coldDetection,hotDetection,damageToProtection,targetHullLoss,
                     launchCostCredits,nominalRocketSpeed,rocketHealth,rocketCrossSection,
-                    rocketSignature,pdTracking,pdCycle,rocketReload,rocketSingleDamage);
+                    rocketSignature,pdTracking,pdCycle,rocketReload,rocketSingleDamage,
+                    acquisitions,slewTicks,lockWaitTicks);
         }
     }
     private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
@@ -81,10 +83,18 @@ public final class RocketPdBalanceDiagnostic {
     private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
                               boolean evasive,boolean pdOnline,int seed,double pressure) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,seed,pressure,1.0);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure,
+                              double acquisitionScale) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
         if(pdOnline&&pressure>0)battle.configureRocketPdCrowdingForDiagnostic(pressure);
+        if(pdOnline&&acquisitionScale!=1.0)
+            battle.configurePrecisionLockForDiagnostic(acquisitionScale);
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,tier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
@@ -176,6 +186,12 @@ public final class RocketPdBalanceDiagnostic {
         double protectionLoss=Math.max(0,startShield-defender.shields)
                 +Math.max(0,startArmor-defender.armor)
                 +Math.max(0,startHull-defender.hull);
+        int acquisitions=0,slew=0,lockWait=0;
+        for(Battle.Ship.PrecisionMount mount:defender.precisionMounts){
+            acquisitions+=mount.targetAcquisitions;
+            slew+=mount.slewTicks;
+            lockWait+=mount.lockWaitTicks;
+        }
         return new Sample(size.name(),tier,modules,barrage,motor,evasive,pdOnline,seed,
                 battle.rocketRoundsFired,battle.rocketIntercepts,innerEntries.size(),
                 battle.rocketHits,
@@ -183,7 +199,8 @@ public final class RocketPdBalanceDiagnostic {
                 protectionLoss,Math.max(0,startHull-defender.hull),paidFor,
                 first.body.speed(),first.body.health(),first.body.crossSection(),
                 first.body.signature(),defender.pointDefenseProfile.tracking(),
-                defender.pdCycle,first.reloadSeconds(),first.damage);
+                defender.pdCycle,first.reloadSeconds(),first.damage,
+                acquisitions,slew,lockWait);
     }
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
@@ -191,7 +208,8 @@ public final class RocketPdBalanceDiagnostic {
         Files.createDirectories(output);
         List<String> rows=new ArrayList<>();
         List<Sample> all=new ArrayList<>();
-        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,pd_online,seed,launched,intercepted,terminal_entries,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage");
+        rows.add("size,tier,modules_each,salvo_per_rack,motor,evasive,pd_online,seed,launched,intercepted,terminal_entries,hits,pd_shots,rocket_detection_frames,first_detection_sec,pd_nominal_range,coast_acquire_range,burn_acquire_range,damage_to_protection,hull_damage,ammo_credits,nominal_rocket_speed,rocket_hp,rocket_rcs,rocket_signature,pd_tracking,pd_cycle,rocket_reload,rocket_damage,pd_target_acquisitions,"+
+                "pd_slew_ticks,pd_lock_wait_ticks");
         int runs=0,launches=0,intercepts=0,hits=0;
         for(RocketBarrage.Size size:RocketBarrage.Size.values())
             for(int tier:TIERS)
@@ -307,6 +325,49 @@ public final class RocketPdBalanceDiagnostic {
                 "the chance of a physical PD shot against rockets when acquired "+
                 "inbound tracks exceed four per fitted PD emitter. Its outcomes "+
                 "must be measured before enabling any pressure in actual combat.\n");
+        // Controlled physical optical-acquisition sweep. The ship's real
+        // turret turn, target retention, missiles, defenses and ammunition
+        // are unchanged. Only lock dwell duration varies in opt-in laboratory
+        // battles; no additional global accuracy rolls are introduced.
+        detail.append("\n## Physical precision-CIWS target lock-time sensitivity (laboratory only)\n\n");
+        detail.append("|Motor|Moving|Dwell multiplier|Launched|Intercepted|Escaped %|"+
+                "Terminal entry %|Actual impacts|PD shots|Target acquisitions|Slew ticks|Lock-wait ticks|\n");
+        detail.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        List<String> lockSweep=new ArrayList<>();
+        lockSweep.add("motor,evasive,lock_scale,launched,intercepted,escaped,escape_fraction,"+
+                "terminal_entries,terminal_fraction,impacts,pd_shots,acquisitions,slew_ticks,lock_wait_ticks");
+        for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+            for(boolean moving:new boolean[]{false,true})
+                for(double lockScale:new double[]{.35,.50,.65,.80,1.0}){
+                    int fired=0,killed=0,terminal=0,impacted=0,shots=0,
+                            acquisitions=0,slew=0,lockWait=0;
+                    for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                        Sample trial=run(tech,RocketBarrage.Size.SIEGE,9,4,16,
+                                motor,moving,true,seed,0,lockScale);
+                        fired+=trial.launched();killed+=trial.intercepted();
+                        terminal+=trial.terminalEntries();impacted+=trial.collided();
+                        shots+=trial.pdShots();acquisitions+=trial.acquisitions();
+                        slew+=trial.slewTicks();lockWait+=trial.lockWaitTicks();
+                    }
+                    double escaped=fired==0?0:(fired-killed)/(double)fired;
+                    double terminalFraction=fired==0?0:terminal/(double)fired;
+                    lockSweep.add(String.format(Locale.ROOT,
+                            "%s,%s,%.2f,%d,%d,%d,%.6f,%d,%.6f,%d,%d,%d,%d,%d",
+                            motor,moving,lockScale,fired,killed,fired-killed,
+                            escaped,terminal,terminalFraction,impacted,shots,
+                            acquisitions,slew,lockWait));
+                    detail.append(String.format(Locale.ROOT,
+                            "|%s|%s|%.2f|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|%d|%d|\n",
+                            motor,moving,lockScale,fired,killed,
+                            escaped*100,terminalFraction*100,impacted,shots,
+                            acquisitions,slew,lockWait));
+                }
+        Files.write(output.resolve("physical-lock-sweep.csv"),lockSweep,StandardCharsets.UTF_8);
+        detail.append("\nThese are real simulated launch/interception trajectories, not a Monte "+
+                "Carlo estimator. A dwell multiplier is a duration, NOT a forced "+
+                "probability of missing. This sweep does not change normal battles. "+
+                "The ~33% siege escape goal is advisory and must be weighed "+
+                "against inner-zone breaches, true impacts, and power/thermal costs.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);

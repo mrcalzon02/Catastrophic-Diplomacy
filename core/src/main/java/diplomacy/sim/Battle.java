@@ -709,11 +709,21 @@ public final class Battle {
      * Reused every tick, so 200v200 targeting has no per-ship relay allocation. */
     private final Ship[][] sharedSpotters={new Ship[16],new Ship[16]};
     private final double[][] sharedNearest={new double[16],new double[16]};
+    /** Optional physical precision-CIWS lock-time sweep. It changes how
+     * long optics must hold a real body before firing, never shot accuracy or
+     * weapon damage. Configure only before tick one in a diagnostic battle. */
+    public void configurePrecisionLockForDiagnostic(double multiplier){
+        if(tick!=0||!Double.isFinite(multiplier)||multiplier<.20||multiplier>2.0)
+            throw new IllegalArgumentException("Invalid laboratory CIWS lock duration");
+        diagnosticPrecisionLockMultiplier=multiplier;
+    }
     /** Opt-in screensaver policy only. Player/campaign battles never make
      * autonomous extraction decisions for the player's surviving ships. */
     private boolean unattendedExhibition;
     /** Diagnostic-only crowding trial, disabled for all ordinary battles. */
     private double diagnosticRocketPdPressure;
+    /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
+    private double diagnosticPrecisionLockMultiplier=1.0;
     /**
      * Strictly opt-in stationary target vessels for local development firing
      * ranges. The vessel remains a regular damageable fitted Ship: only captain
@@ -3500,7 +3510,7 @@ public final class Battle {
      * time; a hard-lock only survives while the same body remains visible on
      * consecutive simulation ticks. Legacy unfitted fixtures bypass this path.
      * Aim state is per purchased socket, not a global random miss penalty. */
-    static boolean acquirePrecisionTarget(Ship defender,Ship.PrecisionMount mount,
+    boolean acquirePrecisionTarget(Ship defender,Ship.PrecisionMount mount,
                                          long bodyId,double x,double y,long atTick){
         if(defender==null||mount==null||bodyId==Long.MIN_VALUE||atTick<0)
             throw new IllegalArgumentException("Invalid precision CIWS track");
@@ -3531,7 +3541,8 @@ public final class Battle {
             defender.power-=.08*DT;
             defender.heat+=.025*DT;
         }
-        double requiredLock=.055+.15/StrictMath.max(.40,mount.profile.tracking());
+        double requiredLock=(.055+.15/StrictMath.max(.40,mount.profile.tracking()))
+                *diagnosticPrecisionLockMultiplier;
         boolean ready=remaining<.065&&mount.lockSeconds>=requiredLock;
         if(!ready)mount.lockWaitTicks++;
         return ready;
