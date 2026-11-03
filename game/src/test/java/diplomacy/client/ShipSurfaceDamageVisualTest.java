@@ -45,8 +45,22 @@ public final class ShipSurfaceDamageVisualTest {
         check(opened[47*width+80]==255,
                 "Cutout recovery must not enlarge the outer damage footprint");
         check(ShipSurfaceLighting.FLAT_DAMAGE_FRAGMENT.contains("1.0-peel.a")&&
+                ShipSurfaceLighting.FLAT_DAMAGE_FRAGMENT.contains("upperAlpha")&&
                 ShipSurfaceLighting.FLAT_DAMAGE_FRAGMENT.contains("u_underlayPass"),
-                "The structural layer must be clipped to inverse damage alpha at all LODs");
+                "Dark backing must use alpha-correct inverse armor mask at all LODs");
+        for(float sourceAlpha:new float[]{0f,.07f,.23f,.5f,.83f,1f})
+            for(float retained:new float[]{0f,.03f,.22f,.56f,.97f,1f}){
+                float top=sourceAlpha*retained;
+                float under=ShipSurfaceDamageVisual.backingAlpha(sourceAlpha,retained);
+                float combined=top+under*(1f-top);
+                check(Math.abs(combined-sourceAlpha)<.00011f,
+                        "Underlayer + exterior must reproduce the exact source silhouette");
+                if(retained==1f)
+                    check(under==0,"Intact armor must not duplicate alpha at ship edges");
+                if(sourceAlpha==1f&&retained<1f)
+                    check(Math.abs(combined-1f)<.00011f,
+                            "An opaque hull opening cannot reveal background sky");
+            }
 
         java.util.HashSet<Integer> angles=new java.util.HashSet<>();
         java.util.HashSet<Integer> sizes=new java.util.HashSet<>();
