@@ -13,6 +13,11 @@ on:
       - 'core/src/test/java/diplomacy/sim/SensorHistoricalSignaturesTest.java'
       - 'core/src/test/java/diplomacy/sim/SensorTargetingSolutionTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTargetingSolution.java'
+      - 'core/src/main/java/diplomacy/sim/SensorLeadProjection.java'
+      - 'core/src/main/java/diplomacy/sim/BeamRayGeometry.java'
+      - 'core/src/test/java/diplomacy/sim/SensorLeadProjectionTest.java'
+      - 'core/src/test/java/diplomacy/sim/BeamRayGeometryTest.java'
+      - 'game/src/main/java/diplomacy/client/SensorContactOverlay.java'
       - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
       - 'core/src/test/java/diplomacy/sim/SensorRelayBufferTest.java'
       - 'core/src/main/java/diplomacy/sim/SensorTrackRelayBuffer.java'
@@ -43,10 +48,10 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.11.1' }
-      - name: Verify mounted PD waves and causal sensor histories in one existing headless build
+      - name: Verify mounted PD, physical beams, sensor lead prediction and client Java compilation
         id: wave
         continue-on-error: true
-        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic :core:sensorNetworkSmoke
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic :core:sensorNetworkSmoke :game:compileJava
       - name: Report test outcome explicitly (advisory)
         if: always()
         run: |
