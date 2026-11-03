@@ -323,7 +323,10 @@ public final class RocketPdBalanceDiagnostic {
                                 // rates independently of successful interception.
                                 // One paired baseline seed per configuration
                                 // keeps the optional diagnostic quick.
-                                if(seed==0){
+                                // Endgame parity gets THREE exact-seed no-PD
+                                // controls; comparing one control against three
+                                // PD-active trials would misstate damage saved.
+                                if(seed==0||(size==RocketBarrage.Size.SIEGE&&tier==9)){
                                     Sample baseline=run(tech,size,tier,modules,
                                             barrage,motor,evasive,false,seed);
                                     rows.add(baseline.csv());all.add(baseline);runs++;
@@ -334,7 +337,8 @@ public final class RocketPdBalanceDiagnostic {
         String summary="# Physical rocket versus point-defense balance ladder\n\n"+
                 "- Scenarios: "+runs+" (four rocket sizes, 0/3/6/9 research ranks, "+
                 "1/2/4 equally fitted modules per side, both motors, stationary/moving, "+
-                REPEAT_SEEDS+" seeded live PD runs and one paired offline-PD control per configuration).\n"+
+                REPEAT_SEEDS+" seeded live PD runs; at least one paired PD-off control "+
+                "per configuration, and three matched controls for IX siege).\n"+
                 "- Recorded launches: "+launches+", interceptions: "+intercepts+
                 ", real impacts: "+hits+".\n"+
                 "- The final late-game row includes rank-IX SIEGE batteries with "+
@@ -346,18 +350,20 @@ public final class RocketPdBalanceDiagnostic {
                 "percentage, win rate or cosmetic change can fail a release.\n";
         StringBuilder detail=new StringBuilder(summary);
         detail.append("\n## Endgame: rank IX SIEGE versus same-rank laser PD, 16 rockets per rack\n\n");
-        detail.append("|Modules each|Motor|Target moves|Runs|Rockets|Intercepted|Escaped PD|Escape %|Terminal entry %|Impacts|Offline-PD impacts|PD shots|Protection lost|\n");
-        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        detail.append("|Modules each|Motor|Target moves|Runs|Rockets|Intercepted|Escaped PD|Escape %|Terminal entry %|Impacts|PD-off impacts (3 seeds)|Impacts prevented|PD shots|Protection lost|PD-off protection lost|Protection saved|\n");
+        detail.append("|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         for(int modules:MODULES)
             for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
                 for(boolean moving:new boolean[]{false,true}){
                     int samples=0,fired=0,stopped=0,landed=0,shots=0,offlineHits=0,terminal=0;
-                    double damage=0;
+                    double damage=0,offlineDamage=0;
                     for(Sample measure:all){
                         if(measure.label.equals("SIEGE")&&measure.tier==9&&
                                 measure.modules==modules&&measure.barrage==16&&
-                                measure.motor==motor&&measure.evasive==moving&&!measure.pdOnline)
+                                measure.motor==motor&&measure.evasive==moving&&!measure.pdOnline){
                             offlineHits+=measure.collided;
+                            offlineDamage+=measure.damageToProtection;
+                        }
                         if(measure.label.equals("SIEGE")&&measure.tier==9&&
                                 measure.modules==modules&&measure.barrage==16&&
                                 measure.motor==motor&&measure.evasive==moving&&measure.pdOnline){
@@ -367,19 +373,23 @@ public final class RocketPdBalanceDiagnostic {
                         }
                     }
                     detail.append(String.format(Locale.ROOT,
-                            "|%d / %d|%s|%s|%d|%d|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|%.1f|\n",
+                            "|%d / %d|%s|%s|%d|%d|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|%d|%.1f|%.1f|%.1f|\n",
                             modules,modules,motor,moving,samples,fired,stopped,
                             fired-stopped,fired==0?0:100.0*(fired-stopped)/fired,
                             fired==0?0:100.0*terminal/fired,
-                            landed,offlineHits,shots,damage));
+                            landed,offlineHits,offlineHits-landed,shots,
+                            damage,offlineDamage,offlineDamage-damage));
                 }
         detail.append("\nEscaped PD = launched - intercepted after all initial "+
                 "bodies resolve (impact or physical flight timeout). This is "+
                 "NOT the same as impacts or terminal-zone entry (within 90 world "+ 
                 "units of the actual defended hull), which exclude harmless "+ 
                 "wide misses. Impacts also depend on inertial spread "+
-                "and evasion. Offline-PD impacts represent one paired seed "+
-                "against three online seeds. The ~33% desired escape rate "+
+                "and evasion. All endgame PD-on and PD-off impacts and "+
+                "protection damage represent three matched seeds each; other "+
+                "broad CSV configurations retain one PD-off control. "+
+                "Negative damage prevention must be reported, not hidden. "+
+                "The ~33% desired escape rate "+
                 "is a non-blocking balance goal, not an objective release gate.\n");
         // Optional A/B sweep exercises real physical rockets and fitted PD.
         // No proposed overload coefficient affects regular game battles.
