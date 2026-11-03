@@ -21,6 +21,9 @@ public final class ParticlePointDefense {
         public final double nominalRange,cycle;
         public final ProjectileModel.Defense profile;
         public double bearing=Double.NaN,lockSeconds,thermalLoad,beamDwellSeconds;
+        /** Hard thermal trip requires a genuine radiator cooldown interval.
+         * Hysteresis prevents one-tick on/off flickering at the heat limit. */
+        public boolean quenched;
         public long trackedBodyId=Long.MIN_VALUE,lastTrackTick=-1;
         public int acquisitions,illuminatedTicks,heatLockouts,powerLockouts;
         public Mount(int slot,int tier,double reach,ProjectileModel.Defense spec,double cycle){
@@ -36,6 +39,7 @@ public final class ParticlePointDefense {
                 throw new IllegalArgumentException("Invalid particle cooling interval");
             thermalLoad=StrictMath.max(0,thermalLoad-
                     dt*.50*StrictMath.max(.10,StrictMath.min(1,coolingCondition)));
+            if(quenched&&thermalLoad<=.55)quenched=false;
         }
         /** One real gimballed optical contact, not an instantaneous hit roll.
          * No continuity is granted when track was absent in the previous tick.
@@ -79,7 +83,8 @@ public final class ParticlePointDefense {
             return profile.damage()*2.7*exposure*saturation/hardness;
         }
         public boolean available(){
-            if(thermalLoad>=OVERHEAT){heatLockouts++;return false;}
+            if(thermalLoad>=OVERHEAT)quenched=true;
+            if(quenched){heatLockouts++;return false;}
             return true;
         }
         public void illuminate(double dt){
@@ -87,6 +92,7 @@ public final class ParticlePointDefense {
             illuminatedTicks++;
             beamDwellSeconds=StrictMath.min(2,beamDwellSeconds+dt);
             thermalLoad+=.78*dt;
+            if(thermalLoad>=OVERHEAT)quenched=true;
         }
     }
 }
