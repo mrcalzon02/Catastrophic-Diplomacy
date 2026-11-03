@@ -1,0 +1,57 @@
+name: Physical particle point-defense validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/main/java/diplomacy/sim/ParticlePointDefense.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
+      - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
+      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
+      - 'core/src/test/java/diplomacy/sim/ParticlePointDefenseDiagnostic.java'
+      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
+      - 'core/build.gradle'
+      - '.github/workflows/particle-pd-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cd-physical-particle-pd-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+jobs:
+  continuous-particle-ablation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.11.1' }
+      - name: Verify installed PPD research, powered beam dwell, cooling and real interception
+        id: mechanics
+        run: gradle --no-daemon :core:particlePdDiagnostic
+      - name: Compile actual PPD ship turret and particle beam visuals, no packaging
+        id: visuals
+        run: gradle --no-daemon :game:compileJava
+      - name: Publish physically measured particle beam controls and ratios
+        if: always()
+        run: |
+          echo "## Particle-beam point defense: real fitted continuous ablation" >> "$GITHUB_STEP_SUMMARY"
+          echo "Hardware physics: ${{ steps.mechanics.outcome }}; renderer compile: ${{ steps.visuals.outcome }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Numbers are advisory. Only mechanical and compile failures are functional gates." >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/particle-pd/summary.md ]; then
+            cat core/test-output/particle-pd/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No physical diagnostic output: inspect job logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve real-beam same-seed trial CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: particle-pd-physical-trials
+          path: core/test-output/particle-pd/
+          if-no-files-found: warn
+          retention-days: 30
