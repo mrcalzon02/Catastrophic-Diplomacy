@@ -2,224 +2,224 @@
   "laser": [
     {
       "variant": 1,
-      "coloredPixels": 426,
+      "coloredPixels": 5996,
       "cutPixels": 42
     },
     {
       "variant": 2,
-      "coloredPixels": 443,
+      "coloredPixels": 5997,
       "cutPixels": 43
     },
     {
       "variant": 3,
-      "coloredPixels": 571,
+      "coloredPixels": 6199,
       "cutPixels": 61
     },
     {
       "variant": 4,
-      "coloredPixels": 514,
+      "coloredPixels": 6199,
       "cutPixels": 65
     },
     {
       "variant": 5,
-      "coloredPixels": 299,
+      "coloredPixels": 6288,
       "cutPixels": 70
     },
     {
       "variant": 6,
-      "coloredPixels": 447,
+      "coloredPixels": 6066,
       "cutPixels": 43
     }
   ],
   "kinetic": [
     {
       "variant": 1,
-      "coloredPixels": 963,
+      "coloredPixels": 2535,
       "cutPixels": 248
     },
     {
       "variant": 2,
-      "coloredPixels": 1014,
+      "coloredPixels": 2793,
       "cutPixels": 511
     },
     {
       "variant": 3,
-      "coloredPixels": 1269,
+      "coloredPixels": 3230,
       "cutPixels": 256
     },
     {
       "variant": 4,
-      "coloredPixels": 969,
+      "coloredPixels": 2384,
       "cutPixels": 505
     },
     {
       "variant": 5,
-      "coloredPixels": 925,
+      "coloredPixels": 2769,
       "cutPixels": 136
     },
     {
       "variant": 6,
-      "coloredPixels": 721,
+      "coloredPixels": 2804,
       "cutPixels": 82
     }
   ],
   "plasma": [
     {
       "variant": 1,
-      "coloredPixels": 761,
+      "coloredPixels": 1796,
       "cutPixels": 215
     },
     {
       "variant": 2,
-      "coloredPixels": 916,
+      "coloredPixels": 2486,
       "cutPixels": 212
     },
     {
       "variant": 3,
-      "coloredPixels": 728,
+      "coloredPixels": 1939,
       "cutPixels": 194
     },
     {
       "variant": 4,
-      "coloredPixels": 957,
+      "coloredPixels": 2489,
       "cutPixels": 250
     },
     {
       "variant": 5,
-      "coloredPixels": 852,
+      "coloredPixels": 2037,
       "cutPixels": 286
     },
     {
       "variant": 6,
-      "coloredPixels": 1104,
+      "coloredPixels": 2671,
       "cutPixels": 315
     }
   ],
   "particle": [
     {
       "variant": 1,
-      "coloredPixels": 307,
+      "coloredPixels": 1240,
       "cutPixels": 88
     },
     {
       "variant": 2,
-      "coloredPixels": 447,
+      "coloredPixels": 1460,
       "cutPixels": 124
     },
     {
       "variant": 3,
-      "coloredPixels": 359,
+      "coloredPixels": 1390,
       "cutPixels": 101
     },
     {
       "variant": 4,
-      "coloredPixels": 370,
+      "coloredPixels": 1298,
       "cutPixels": 122
     },
     {
       "variant": 5,
-      "coloredPixels": 345,
+      "coloredPixels": 1250,
       "cutPixels": 80
     },
     {
       "variant": 6,
-      "coloredPixels": 398,
+      "coloredPixels": 1392,
       "cutPixels": 127
     }
   ],
   "missile": [
     {
       "variant": 1,
-      "coloredPixels": 853,
+      "coloredPixels": 2433,
       "cutPixels": 254
     },
     {
       "variant": 2,
-      "coloredPixels": 981,
+      "coloredPixels": 2785,
       "cutPixels": 206
     },
     {
       "variant": 3,
-      "coloredPixels": 1038,
+      "coloredPixels": 2930,
       "cutPixels": 489
     },
     {
       "variant": 4,
-      "coloredPixels": 952,
+      "coloredPixels": 2472,
       "cutPixels": 192
     },
     {
       "variant": 5,
-      "coloredPixels": 830,
+      "coloredPixels": 2947,
       "cutPixels": 423
     },
     {
       "variant": 6,
-      "coloredPixels": 949,
+      "coloredPixels": 2912,
       "cutPixels": 119
     }
   ],
   "torpedo": [
     {
       "variant": 1,
-      "coloredPixels": 1399,
+      "coloredPixels": 3156,
       "cutPixels": 664
     },
     {
       "variant": 2,
-      "coloredPixels": 1528,
+      "coloredPixels": 3458,
       "cutPixels": 362
     },
     {
       "variant": 3,
-      "coloredPixels": 1419,
+      "coloredPixels": 3168,
       "cutPixels": 640
     },
     {
       "variant": 4,
-      "coloredPixels": 1503,
+      "coloredPixels": 3370,
       "cutPixels": 681
     },
     {
       "variant": 5,
-      "coloredPixels": 1467,
+      "coloredPixels": 3253,
       "cutPixels": 300
     },
     {
       "variant": 6,
-      "coloredPixels": 1589,
+      "coloredPixels": 3366,
       "cutPixels": 458
     }
   ],
   "fighter": [
     {
       "variant": 1,
-      "coloredPixels": 220,
+      "coloredPixels": 795,
       "cutPixels": 21
     },
     {
       "variant": 2,
-      "coloredPixels": 287,
+      "coloredPixels": 1235,
       "cutPixels": 42
     },
     {
       "variant": 3,
-      "coloredPixels": 592,
+      "coloredPixels": 1907,
       "cutPixels": 63
     },
     {
       "variant": 4,
-      "coloredPixels": 319,
+      "coloredPixels": 1178,
       "cutPixels": 42
     },
     {
       "variant": 5,
-      "coloredPixels": 500,
+      "coloredPixels": 1686,
       "cutPixels": 42
     },
     {
       "variant": 6,
-      "coloredPixels": 372,
+      "coloredPixels": 1443,
       "cutPixels": 63
     }
   ]
