@@ -2121,10 +2121,10 @@ public final class Battle {
                 *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
         int channels=0;
         if(distance<=optical)channels|=CONTACT_OPTICAL;
-        if(distance<=radar)channels|=CONTACT_RADAR;
-        if(distance<=infrared)channels|=CONTACT_INFRARED;
-        if(distance<=xray)channels|=CONTACT_XRAY;
-        if(distance<=gravity)channels|=CONTACT_GRAVITIC;
+        if(radar>0&&distance<=radar)channels|=CONTACT_RADAR;
+        if(infrared>0&&distance<=infrared)channels|=CONTACT_INFRARED;
+        if(xray>0&&distance<=xray)channels|=CONTACT_XRAY;
+        if(gravity>0&&distance<=gravity)channels|=CONTACT_GRAVITIC;
         return channels;
     }
 
@@ -5787,6 +5787,7 @@ public final class Battle {
             hash = mix(hash, Double.doubleToLongBits(s.armor));
             hash = mix(hash,s.defense.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.power));
+            hash = mix(hash, Double.doubleToLongBits(s.heat));
             hash = mix(hash,s.missileAmmo);hash=mix(hash,s.torpedoAmmo);
             hash=mix(hash,s.kineticAmmo);
             hash=mix(hash,s.kineticType.ordinal());
