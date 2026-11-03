@@ -2645,6 +2645,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         // The camera and interpolated poses define one shared drawable world rectangle.
         CombatViewBounds view=CombatViewBounds.from(battleCamera);
+        // Resolve direct contacts before the hull draw passes. Even a close
+        // cloak must not appear as a real sprite from radar/infrared alone.
+        if(!screensaverMode && currentArmorCapture==null)
+            sensorContacts.refresh(battle,0);
         // World-space sky & hazard layers render before tactical grid, weapons and hulls.
         if (starfield != null) starfield.render(batch,camera,battleCamera,W,H);
         if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
@@ -2741,10 +2745,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         else {
             try {
                 instanced.render(battle,battleCamera,
-                        ship -> terranSprites!=null && terranSprites.hasSprite(ship),renderPoses);
+                        ship -> !hullOpticallyVisible(ship) ||
+                                (terranSprites!=null && terranSprites.hasSprite(ship)),
+                        renderPoses);
                 int expected=0;
                 for(Battle.Ship ship:battle.ships())
-                    if(ship.alive() && (terranSprites==null || !terranSprites.hasSprite(ship))
+                    if(ship.alive() && hullOpticallyVisible(ship)
+                            && (terranSprites==null || !terranSprites.hasSprite(ship))
                             && view.ship(renderPoses.ship(ship),ship.visualScale()))expected++;
                 if(instanced.instances!=expected)
                     throw new IllegalStateException("GPU instance count disagrees with non-sprite ships");
@@ -2758,7 +2765,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // The original GPU/geometry path remains the non-Terran and missing-asset fallback.
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null && terranSprites.loaded()>0)
-            terranSprites.render(battle,batch,renderPoses,view,shieldFx,surfaceCapture);
+            terranSprites.render(battle,batch,renderPoses,view,shieldFx,
+                    surfaceCapture,this::hullOpticallyVisible);
         if(craftSprites!=null)try {
             craftSprites.render(battle,batch,renderPoses,view);
         }catch(RuntimeException failed){
@@ -3337,10 +3345,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
         battleCamera.update();
     }
 
-    private void drawShipsFallback() { drawShipsFallback(null); }
+    private boolean hullOpticallyVisible(Battle.Ship ship){
+        return screensaverMode || currentArmorCapture!=null || ship.team==0
+                || sensorContacts.opticallyVisible(ship.id);
+    }
+    private void drawShipsFallback() { drawShipsFallback(null,true); }
     private void drawShipsFallback(CombatViewBounds view) {
+        drawShipsFallback(view,false);
+    }
+    private void drawShipsFallback(CombatViewBounds view,boolean unrestricted) {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Ship s : battle.ships()) if (s.alive()
+                && (unrestricted||hullOpticallyVisible(s))
                 && (terranSprites==null||!terranSprites.hasSprite(s))) {
             shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             BattleRenderPoses.Pose pose=renderPoses.ship(s);
