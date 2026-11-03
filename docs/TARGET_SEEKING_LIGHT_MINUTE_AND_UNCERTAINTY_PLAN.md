@@ -505,10 +505,40 @@ The new focused Java check first ran on commit `c4fdb8f` (Actions
 41710225241); verify the actual task output and full job conclusion
 rather than assuming a green balance wrapper implies functional success.
 
-**Still pending:** full 200v200 balance/performance, maneuver covariance,
-FCM shared compute arbitration, guided missile seeker reacquisition,
-beam light-time delivery, historical ECM lock factors and
-saved scan doctrine controls. The rocket prediction is a first-order
-constant-velocity TARGET hypothesis over the actual rocket throttle
-schedule, not a guarantee against target maneuvers or a guided-seeker
-future path. Visual presentation and balance tuning remain diagnostic.
+**Guided ordnance observation and launch causality (2026-11-03):**
+`OrdnanceSeeker.passiveReturn` now reads the target's historical position,
+velocity, RCS, ECM strength and hologram-emitter status with one-way photon
+delay. Live missile guidance and terminal propulsion states use delayed
+measurements and bounded velocity extrapolation, not target present-time
+coordinates. Physical collisions, payload detonation and parent-canister
+release still test real current hull proximity. Fitted and legacy missile/
+torpedo launch queues store one actual received targeting fix and retain
+that fix for the remainder of their finite launched salvo, including
+CAP-selected rack targets. The pending-launch snapshot participates in the
+battle fingerprint; no queued round receives a free current-target update.
+
+The historical seeker, ECM, lost-lock, decoy, cold-coast PD, actual cluster/
+cascade deployment and deterministic replay smoke passed in Actions
+41717830198. Eight separate guided rounds retaining their original
+observed bearing while the target moved were verified in Actions
+41718280159, with the complete required core and client Java smoke
+also returning `BUILD SUCCESSFUL`.
+
+**Important first-pass limitations:** the on-body passive receive solver
+uses the missile's current own pose, rather than a recorded historical
+moving-receiver trajectory; it is not yet an exact relativistic light-cone
+solution for fast moving receivers. Hologram decoy world geometry and
+spoof-selection are still computed using the present emitter state rather
+than a full timestamped false-contact stream. Targeting uncertainty
+and ECM influence are not yet probabilistic multi-hypothesis seeker tracks;
+the basic delayed sample still provides exact historical coordinates.
+These limitations should not be reported as solved.
+
+**Still pending:** fully timestamped false-contact emission and guided
+reacquisition, measured receiver-position histories, per-seeker noise and
+uncertainty budgets, actual guided trajectory envelopes/ETA pips, complete
+200v200 balance/performance, maneuver covariance, fleet FCM shared-compute
+arbitration, beam light-time damage delivery and persisted scan doctrine
+controls. The rocket prediction is a constant-velocity TARGET hypothesis
+over the real rocket thrust schedule, not a guarantee against maneuver.
+Visual presentation and balance tuning remain diagnostic.
