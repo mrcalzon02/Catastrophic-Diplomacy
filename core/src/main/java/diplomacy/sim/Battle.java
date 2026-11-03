@@ -111,6 +111,10 @@ public final class Battle {
         /** Per-hull scratch map reused at 30 Hz; bounded by actual turret count. */
         public final java.util.Map<Long,Double> precisionDamageReservations=
                 new java.util.HashMap<>();
+        /** Reused each simulation frame; expensive rail rounds avoid redundant
+         * shots against the same already-committed fragile incoming body. */
+        public final java.util.Map<Long,Double> railDamageReservations=
+                new java.util.HashMap<>();
         /** Opt-in physically distinct rack controllers; legacy remains family-wide. */
         public List<Launcher> launchers=List.of();
         /** Separate cheap dumbfire magazine per installed rocket hardpoint. */
@@ -4033,12 +4037,15 @@ public final class Battle {
     /** Physically visible ordnance tracks only: charged railguns should not
      * consume a three-cartridge penetrator against a fighter-sized target
      * unless the target physically crosses a shot's inertial path. */
-    private RailTrack chooseRailContact(Ship defender,RailPointDefense.Mount gun){
+    private RailTrack chooseRailContact(Ship defender,RailPointDefense.Mount gun,
+                                       java.util.Map<Long,Double> committedDamage){
         RailTrack best=null;
         double bestPriority=Double.POSITIVE_INFINITY;
         if(!defender.orders.pointDefense().ordnance())return null;
         for(Missile m:missiles){
             if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            if(committedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
+                continue;
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
             double emission=OrdnancePropulsion.emissionMultiplier(m.thrustPhase);
             if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
@@ -4059,6 +4066,8 @@ public final class Battle {
         }
         for(Rocket m:rockets){
             if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            if(committedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
+                continue;
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
             double emission=RocketBarrage.hotEmission(m.motor,m.burning());
             if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
@@ -4079,6 +4088,8 @@ public final class Battle {
         }
         for(Ballistic m:ballistics){
             if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            if(committedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
+                continue;
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
             if(d<RailPointDefense.MIN_ENGAGEMENT_RANGE||
                     d>RailPointDefense.acquisitionRange(defender,gun,m.spec,
@@ -4107,6 +4118,8 @@ public final class Battle {
                     !defender.orders.pointDefense().ordnance()||
                     defender.crewReadiness()<.05||
                     defender.pointDefenseCondition<=.2)continue;
+            java.util.Map<Long,Double> committed=defender.railDamageReservations;
+            committed.clear();
             for(RailPointDefense.Mount gun:defender.railMounts){
                 if(defender.power<8||defender.heat>=defender.maxHeat*.88||
                         defender.kineticAmmo<RailPointDefense.CARTRIDGES_PER_SHOT||
@@ -4121,7 +4134,7 @@ public final class Battle {
                 defender.power-=1.8*charged;
                 defender.heat+=.45*charged;
                 gun.scans++;
-                RailTrack target=chooseRailContact(defender,gun);
+                RailTrack target=chooseRailContact(defender,gun,committed);
                 if(target==null)continue;
                 gun.track(target.bodyId,DT);
                 WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(defender,
@@ -4150,6 +4163,9 @@ public final class Battle {
                 gun.fire(defender.pointDefenseCondition);
                 defender.kineticAmmo-=RailPointDefense.CARTRIDGES_PER_SHOT;
                 defender.power-=5.2;defender.heat+=5.4;
+                committed.merge(target.bodyId,
+                        RailPointDefense.directDamage(target.profile,gun.profile),
+                        Double::sum);
                 visual(id,VisualPhase.FIRE,"RAIL_PD",defender.team,defender.id,
                         target.sourceId,muzzle.x(),muzzle.y(),target.x,target.y);
             }
