@@ -9,6 +9,8 @@ on:
       - 'core/src/main/java/diplomacy/sim/BattleTermination.java'
       - 'core/src/main/java/diplomacy/sim/CampaignEncounter.java'
       - 'server/src/main/java/diplomacy/server/BattleServer.java'
+      - 'server/src/test/java/diplomacy/server/BattleTerminalProtocolTest.java'
+      - 'server/build.gradle'
       - 'core/src/main/java/diplomacy/net/BattleConnection.java'
       - 'game/src/main/java/diplomacy/client/MultiplayerPanel.java'
       - 'core/src/test/java/diplomacy/sim/BattleTerminationTest.java'
