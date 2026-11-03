@@ -179,7 +179,16 @@ tasks.register('rocketTrajectorySmoke', JavaExec) {
     mainClass = 'diplomacy.sim.RocketTrajectoryPredictionTest'
     dependsOn testClasses
 }
+tasks.register('ordnanceSeekerPhotonSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Prove onboard missile seeker observes time-delayed hull/ECM emissions and deterministic fixes.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.OrdnanceSeekerPhotonTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('ordnanceSeekerPhotonSmoke'))
+    dependsOn(tasks.named('ordnanceSeekerSmoke'))
     dependsOn(tasks.named('rocketTrajectorySmoke'))
     dependsOn(tasks.named('sensorLeadProjectionSmoke'))
     dependsOn(tasks.named('beamRaySmoke'))
