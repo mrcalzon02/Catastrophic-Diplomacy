@@ -10,6 +10,7 @@ on:
       - 'assets/damage_masks/*.png'
       - 'assets/damage_masks/hires96/*.png'
       - 'tools/audit_damage_mask_assets.py'
+      - 'tools/audit_damage_masks_96_materials.py'
       - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
       - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
@@ -75,6 +76,12 @@ jobs:
           python3 tools/audit_damage_mask_assets.py \
             --report test-output/armor-observation/mask-library-audit.json \
             --export-frames test-output/armor-observation/native-masks
+          # Examine laser oxide reach, molten gradients and unchanged alpha
+          # topology. Art findings remain nonblocking and are saved alongside
+          # actual framebuffers for review.
+          python3 tools/audit_damage_masks_96_materials.py \
+            --report test-output/armor-observation/96-material-audit.json || \
+            echo "VISUAL-ONLY WARNING: material audit unavailable"
           mkdir -p test-output/armor-observation/framebuffer
           export CD_ARMOR_CAPTURE_DIR="$PWD/test-output/armor-observation/framebuffer"
           export LIBGL_ALWAYS_SOFTWARE=1
