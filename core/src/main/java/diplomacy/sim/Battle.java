@@ -71,6 +71,7 @@ public final class Battle {
         /** Legacy ships use their original fitted/default beam PD; a fitted
          * FLK-only ship does not automatically fire an invisible laser turret. */
         public boolean laserPointDefenseEnabled=true;
+        public int laserPointDefenseMountCount;
         /** Fitted flak is physical timed fragmentation with its own mount cycle. */
         public static final class FlakMount {
             public final int slotId;
@@ -951,8 +952,10 @@ public final class Battle {
         List<Ship.FlakMount> fittedFlak=new ArrayList<>();
         s.laserPointDefenseEnabled=false;
         for(WeaponMuzzles.Emitter emitter:s.weaponEmitters){
-            if(emitter.component().endsWith("-PD"))
+            if(emitter.component().endsWith("-PD")){
                 s.laserPointDefenseEnabled=true;
+                s.laserPointDefenseMountCount++;
+            }
             if(emitter.component().endsWith("-FLK"))
                 fittedFlak.add(new Ship.FlakMount(emitter.slotId(),
                         Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
@@ -3341,7 +3344,7 @@ public final class Battle {
                 // Larger aircraft present more physical surface to a cloud
                 // of fragments, while retaining their actual armor pool.
                 double area=StrictMath.sqrt(target.radarProfile().crossSection());
-                double hitRadius=burst.radius+8*area;
+                double hitRadius=burst.radius+22*area;
                 if(target.team==burst.team ||
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>hitRadius)
                     continue;
@@ -3618,7 +3621,16 @@ public final class Battle {
                                 defender.sensorsCondition,weather.sensorFactor(),
                                 defender.pointDefenseProfile,craft.radarProfile()))continue;
                 defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
-                defender.pdReload=pdLaw.reload(true,defender.pdCycle,defender.pointDefenseCondition);
+                // Small precision beams can retarget fragile rockets quickly,
+                // but an aircraft requires a longer stable acquisition/dwell.
+                // Installed barrel count grants bounded extra opportunities;
+                // it does NOT turn four mounts into a 30-Hz fighter shredder.
+                double standardCycle=pdLaw.reload(true,defender.pdCycle,
+                                                   defender.pointDefenseCondition);
+                double aircraftDwell=defender.weaponEmitters.isEmpty()?0:
+                        1.2/StrictMath.sqrt(
+                                StrictMath.max(1,defender.laserPointDefenseMountCount));
+                defender.pdReload=StrictMath.max(standardCycle,aircraftDwell);
                 long defensiveShot=nextVisualShotId++;
                 WeaponMuzzles.Origin pdMuzzle=WeaponMuzzles.at(
                         defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot);
@@ -3636,7 +3648,7 @@ public final class Battle {
                     // same damage into a large aircraft frame. Unfitted legacy
                     // fixtures retain their historical combat behavior.
                     double craftScale=defender.weaponEmitters.isEmpty()?
-                            pdLaw.craftDamageMultiplier():1.5;
+                            pdLaw.craftDamageMultiplier():0.85;
                     hitCraft(craft,defender.pointDefenseProfile.damage()*craftScale,
                             defender,defensiveShot,"POINT_DEFENSE");
                     pointDefenseCraftHits++;
