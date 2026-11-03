@@ -4,6 +4,22 @@ package diplomacy.sim;
 public final class SensorLightTimeHistory {
     public static final int CAPACITY=128;
     private final Sample[] samples=new Sample[CAPACITY];
+    /** Physical/EM sensor signatures and actual installed receiver capabilities
+     * at the same tick as each motion sample. Never substituted with current
+     * target truth after an enemy changes cloak, heat or hull profile. */
+    private final Profile[] profiles=new Profile[CAPACITY];
+    public record Profile(long tick,double radarCrossSection,
+            double thermalSignature,double opticalSignature,
+            double maxHull,double maxArmor,double power,double ecmCondition,
+            double coolingCondition,double sensorRange,double infraredRange,
+            double xrayRange,double graviticRange,double sensorsCondition,
+            double crewReadiness,double sensorAcuity,double resolutionGain,
+            double commandAssist,SensorActiveScan.Mode scanMode,int focusId) { }
+    public Profile profileAt(long tick){
+        if(tick<0)return null;
+        Profile profile=profiles[(int)(tick%CAPACITY)];
+        return profile!=null&&profile.tick()==tick?profile:null;
+    }
     public record Sample(long tick,double x,double y,double vx,double vy,
                          boolean alive,boolean sensorsPowered){
         /** Compatibility for deterministic geometry-only sample fixtures. */
@@ -25,8 +41,16 @@ public final class SensorLightTimeHistory {
         if(tick<0||ship==null)throw new IllegalArgumentException("Invalid sample");
         boolean activeReady=ship.alive()&&ship.power>3&&
                 ship.sensorsCondition>.05&&ship.crewReadiness()>=.05;
-        samples[(int)(tick%CAPACITY)]=new Sample(tick,ship.x,ship.y,ship.vx,
+        int slot=(int)(tick%CAPACITY);
+        samples[slot]=new Sample(tick,ship.x,ship.y,ship.vx,
                 ship.vy,ship.alive(),activeReady);
+        profiles[slot]=new Profile(tick,ship.radarCrossSection,
+                ship.thermalSignature,ship.opticalSignature,ship.maxHull,
+                ship.maxArmor,ship.power,ship.ecmCondition,ship.coolingCondition,
+                ship.sensorRange,ship.infraredRange,ship.xrayRange,
+                ship.graviticRange,ship.sensorsCondition,ship.crewReadiness(),
+                ship.sensorAcuity,ship.network.resolutionGain(),
+                ship.commandAssist,ship.scan.mode(),ship.scan.focusTargetId());
     }
     public Sample at(long tick){
         if(tick<0)return null;
