@@ -2800,7 +2800,15 @@ public final class Battle {
         if(s.crewReadiness()<0.05||
                 (s.standingOrders!=null&&s.standingOrders.resources().fireIntent()
                 ==ShipResourceOrders.FireIntent.HOLD_OFFENSE))return;
-        double distance=StrictMath.hypot(target.x-s.x,target.y-s.y);
+        // An actual selected shot uses the captain's received measurement,
+        // not the target's present hidden coordinates. The source/relay gate
+        // remains the same one that authorized captain target selection.
+        double routeDistance=StrictMath.hypot(target.x-s.x,target.y-s.y);
+        SensorLightTimeHistory.Observation firingFix=receivedContact(
+                s,target,liveContactSource(s,target,routeDistance));
+        if(firingFix==null)return;
+        double distance=StrictMath.hypot(firingFix.sample().x()-s.x,
+                firingFix.sample().y()-s.y);
         double lockRange=targetAcquisitionRange(s,target);
         double lock=Math.max(0,1-distance/Math.max(1,lockRange))
                 *s.crewReadiness()*s.sensorsCondition*weather.sensorFactor()
@@ -2900,7 +2908,14 @@ public final class Battle {
             recordResourceShot(s,DamageType.KINETIC,-1,s.kineticReload);
             long shotId=nextVisualShotId++;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.KINETIC,shotId);
-            double angle=StrictMath.atan2(target.y-muzzle.y(),target.x-muzzle.x());
+            ProjectileModel.Spec body=shell.physical(s.kineticProjectile);
+            SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
+                    firingFix,tick,muzzle.x(),muzzle.y(),body.speed(),
+                    tacticalPrecision(s),shotId);
+            // A slightly wrong estimated ray can STILL hit a real ship because
+            // swept collision below is geometry-driven, not an aim flag.
+            double angle=StrictMath.atan2(solution.aimY()-muzzle.y(),
+                    solution.aimX()-muzzle.x());
             boolean onTarget=random.nextDouble()<kinetic.aim(
                     s.accuracy,s.weapons.kineticTracking(),weatherAim,lock);
             if(!onTarget){
@@ -2915,9 +2930,13 @@ public final class Battle {
             }
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
                     muzzle.x(),muzzle.y(),angle,s.kineticDamage*shell.damage(),
-                    shell.physical(s.kineticProjectile),s.kineticType));
+                    body,s.kineticType));
+            // Publish the physical emitted ray. Do not betray enemy truth in
+            // tracer visuals or mistakenly draw toward a hidden current pose.
             visual(shotId,VisualPhase.FIRE,"KINETIC",s.team,s.id,target.id,
-                    muzzle.x(),muzzle.y(),target.x,target.y);
+                    muzzle.x(),muzzle.y(),
+                    muzzle.x()+StrictMath.cos(angle)*distance,
+                    muzzle.y()+StrictMath.sin(angle)*distance);
         }
         if(plasma.available(s.plasmaDamage,0,distance,s.weapons.plasmaRange(),
                 s.plasmaReload,s.power,s.heat,s.maxHeat,
