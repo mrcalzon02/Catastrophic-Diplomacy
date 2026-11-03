@@ -158,6 +158,9 @@ public final class Battle {
         public double engineCondition = 1, reactorCondition = 1, weaponsCondition = 1, pointDefenseCondition = 1;
         public double sensorsCondition = 1, coolingCondition = 1, commandCondition = 1;
         public double damageControl, speed, accuracy, laserDamage, missileDamage, pdRange;
+        /** Physical engine mode, derived from actual installed and licensed ENG
+         * systems. Legacy headless fixtures default to basic fusion thrust. */
+        public SublightPropulsion.Drive propulsion=SublightPropulsion.Drive.FUSION_TORCH;
         /** Manned hulls have NO intrinsic complement; berths/oxygen are installed. */
         public double crewCount;
         public int crewRequired, crewBerths, lifeSupport;
@@ -386,7 +389,8 @@ public final class Battle {
         public double visualScale() {
             double ordinary=Math.max(0.78, Math.min(1.90, StrictMath.sqrt(maxHull / 200.0)))
                     * (hullClass==null?1:hullClass.spriteScale());
-            return "warrant_spire".equals(campaignBossArt)?ordinary*2.5:ordinary;
+            double size="warrant_spire".equals(campaignBossArt)?ordinary*2.5:ordinary;
+            return size*WorldScale.SHIP_WORLD_SCALE;
         }
         public double combatReadiness() {
             return Math.max(0, hull / maxHull) * (0.5 + 0.5 * weaponsCondition)
@@ -1301,6 +1305,7 @@ public final class Battle {
         s.powerRegen = machinery.powerRegen();
         s.coolingRate = machinery.coolingRate(); s.passiveHeat = machinery.passiveHeat();
         s.speed = machinery.speed(); s.accuracy = machinery.accuracy();
+        s.propulsion=SublightPropulsion.fitted(design);
         s.laserDamage = machinery.laserDamage(); s.missileDamage = machinery.missileDamage();
         s.pdRange = machinery.pdRange(); s.damageControl = machinery.damageControl();
         s.kineticProjectile=machinery.kineticProjectile();
@@ -2536,13 +2541,9 @@ public final class Battle {
         if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
-        double thrust = s.fuel>0?s.speed * s.engineCondition * s.crewReadiness():0;
-        double desiredVx = StrictMath.cos(s.facing) * thrust, desiredVy = StrictMath.sin(s.facing) * thrust;
-        double smoothing = Math.min(1, 1.6 * DT);
-        s.vx += (desiredVx - s.vx) * smoothing;
-        s.vy += (desiredVy - s.vy) * smoothing;
-        s.x += s.vx * DT; s.y += s.vy * DT;
-        if(thrust>0)consumeEngineFuel(s);
+        double rated=SublightPropulsion.maximumSpeed(s);
+        SublightPropulsion.advance(s,StrictMath.cos(s.facing)*rated,
+                StrictMath.sin(s.facing)*rated,DT);
     }
 
     private void orderedSteer(Ship ship,Ship target) {
@@ -2651,23 +2652,12 @@ public final class Battle {
         ship.facing=wrap(ship.facing+change);
         double speedCap=ship.standingOrders==null?1:
                 ship.standingOrders.directives().speedPercent()/100.0;
-        double velocity=ship.fuel>0?ship.speed*speedCap*ship.engineCondition*ship.crewReadiness():0;
-        double smooth=Math.min(1,1.6*DT);
-        ship.vx+=(StrictMath.cos(ship.facing)*velocity-ship.vx)*smooth;
-        ship.vy+=(StrictMath.sin(ship.facing)*velocity-ship.vy)*smooth;
-        ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
-        if(velocity>0)consumeEngineFuel(ship);
+        double velocity=SublightPropulsion.maximumSpeed(ship)*speedCap;
+        SublightPropulsion.advance(ship,StrictMath.cos(ship.facing)*velocity,
+                StrictMath.sin(ship.facing)*velocity,DT);
     }
 
-    /** Every powered steering path (pursuit, patrol, commands and retreat)
-     * debits the same physical fuel store. Coasting and holding do not burn
-     * propulsion fuel. Called once per powered movement tick. */
-    private static void consumeEngineFuel(Ship ship){
-        ship.fuel=StrictMath.max(0,ship.fuel-
-                StrictMath.hypot(ship.vx,ship.vy)*DT*.018);
-    }
-
-    /** Cost transfer occurs only for real FIRE events. All costs and rates
+     /** Cost transfer occurs only for real FIRE events. All costs and rates
      * are shared with the public authoritative WeaponBehaviorTable. */
     private static void chargeGun(Ship s,WeaponBehaviorTable.Gun behavior){
         s.power-=behavior.powerPerShot();
