@@ -85,8 +85,8 @@ read-only tactical display and pulse-mode weapon contact authorization.
 `Battle.configureSensorScan(shipId,mode,focusId)` accepts pre-engage
 runtime orders. Existing equipment and hardware IDs remain unchanged:
 
-- `STANDARD`: original always-on default, intentionally retained until
-  the baseline full causal fire-control migration passes regressions.
+- `STANDARD`: continuous powered radar/X-ray reception, now restricted by
+  real round-trip source-emission history before a weapon contact is granted.
 - `PASSIVE`: radar and X-ray shut off; optical/IR/gravitic capabilities
   remain independently determined by existing equipment and visibility.
 - `BOOSTED_RADAR`: 1.55× RDR range, a paid pulse every 18 combat ticks.
@@ -108,20 +108,40 @@ bonus is not an instant lock or extra omniscient data.
 The focused existing headless diagnostic runs these without a full
 Windows/Linux/Android package build.
 
-**Stage 3 remaining scope:** scan doctrine UI and persistent order encoding,
-physical sector geometry, enemy passive detection of emissions, asynchronous
-LNK message queues, precise per-channel historical detection constraints,
-and power/heat balance analysis over complete 200v200 battles.
+**Stage 4 initial causal targeting and SHR transit:** STANDARD acquisition
+and both captain target-priority branches require actual arrived optical
+or electronic evidence. Firing geometry receives an immutable historical
+target sample rather than relying on current target position alone.
+Sender ships maintain `SensorRelayBuffer`, at most 32 contact identities
+and 32 immutable transmissions per contact; a receiver can read a packet
+only after the originating scout actually acquired and transmitted it and
+the additional light-speed relay interval elapsed. Powering sensors on
+cannot manufacture earlier outbound radar/X-ray pulses: emitter power is
+captured with the original historical sample. Relay queues participate
+in the deterministic multiplayer battle fingerprint.
 
-**Important limitations:** channel detection and weapon lock eligibility
-still consult current positions, and LNK/SHR routing still needs
-a timestamped delayed-delivery queue. The current active radar/X-ray
-treatment is only a continuous-echo timing foundation; powered directed
-bursts, heat, signature exposure, cooldown and uncertainty resolution
-remain separate later stages. Real ballistic aim errors, near misses,
-grazes and Android/200v200 performance validation also remain pending.
-Projectile weapon velocities retain their existing data for now;
-do not call every ammunition type fully relativistic-calibrated.
+**First physically aimed kinetics:** `SensorTargetingSolution` computes
+a finite, deterministic target ray from observation age, measured velocity,
+projectile speed/lead, channel resolution and track computation precision.
+Real travelling kinetic rounds now launch along this estimated ray, rather
+than pointing at the presently hidden target. Existing swept intersection
+decides actual contact, so slightly erroneous targeting can still hit, and
+even an ostensibly good solution can miss. In one *geometric diagnostic*
+of 160 deterministic misaligned rays against a radius-12 world-unit hull,
+133 rays intersected and 27 missed; this is not a measured combat kill
+percentage or final balance statistic.
+
+**Remaining Stage 3–5 scope:** scan doctrine UI and saved orders,
+physical sector limits and emission detectability, full historical sensor
+signatures rather than present target signatures for candidate eligibility,
+genuine timestamped LNK historical track delivery, FCM/RES/TRK/CAP compute
+budget allocation, error covariance and maneuvering-target updates, live
+laser/plasma/particle physical beam intersections, guided seeker uncertainty,
+and 200v200 and Android endurance/performance tuning. The existing instant
+beam damage rules and many homing paths still consume target ground truth.
+Not all ammunition or drive envelopes are relativistically calibrated.
+Visual or balance diagnostics must remain nonblocking; functional failures
+must be reported and repaired.
 
 ## 1. One light-minute *diagonal*, not endless simulation space
 
@@ -409,13 +429,13 @@ visual overlays and balance tables are diagnostics.
    but every hit must derive from a real path through a target; stale
    contacts alone still must not silently grant automatic lock authorization.
 
-**Implementation status:** Stages 0 and 1 and the first Stage 2
-historical observations are committed. Stage 3 preordered operational
-acquisition modes and their delayed emitted probes now have functional
-tests. Only non-legacy pulsed channels are causally gated for weapon
-contact; the baseline STANDARD acquisition/target selection remains
-legacy, and all contact eligibility still needs true historical sensor
-signature checks. Real delayed fleet message delivery, computation and
-capacity budgets, error ellipses and physical impact paths are next.
-Keep cosmetic and balance trials diagnostic; objective core failures
-are the only build/launch gates.
+**Implementation status:** Geometry, sublight thrust, timestamped light
+history, directed paid sensor bursts, causal STANDARD contact permission,
+bounded sender-origin SHR/legacy radio transmissions and first physical
+kinetic prediction/uncertainty are committed and covered by focused
+regression tests. LNK historical track packets, complete historical
+signature acquisition, contested compute allocation, non-kinetic physical
+aim, user-facing scan controls and 200v200 balance remain pending.
+Existing tests may be extended in the headless CI workflow without
+building Windows/Linux/Android packages on every sensor edit; only
+objective functionality should block a release.
