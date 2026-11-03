@@ -160,6 +160,14 @@ public final class Battle {
         public double infraredRange,xrayRange,graviticRange;
         public double thermalSignature=1,opticalSignature=1,sensorAcuity=1;
         public double hologramNoise;
+        /** Six installed sensor-network modules; zeroed baseline grants no
+         * extra spectrum, memory, command bandwidth or target processors. */
+        public Shipyard.Network network=new Shipyard.Network(
+                0,0,1,0,0,0,0,0,0,0,0,1);
+        public double commandAssist;
+        /** Only contacts actually acquired during this battle are recorded.
+         * Never refresh these coordinates from a currently invisible enemy. */
+        public final Map<Integer,ContactTrack> knownTracks=new HashMap<>();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
          * fooled by this emitter, not fictional effects counters. */
         public int holoShotsDiverted,holoSeekersDiverted;
@@ -709,10 +717,26 @@ public final class Battle {
      * ordinary fuel expiry, voluntary docking or other combat losses. */
     public int pointDefenseCraftHits,pointDefenseCraftKills;
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
+    /** Last observed position and velocity are snapshots, NOT hidden truth. */
+    public static final class ContactTrack {
+        public double x,y,vx,vy;
+        public long tick;
+        ContactTrack(Ship observed,long time){
+            update(observed,time);
+        }
+        void update(Ship observed,long time){
+            x=observed.x;y=observed.y;
+            vx=observed.vx;vy=observed.vy;tick=time;
+        }
+    }
+
     /** One actual close-contact spotting ship per enemy for each faction.
      * Reused every tick, so 200v200 targeting has no per-ship relay allocation. */
     private final Ship[][] sharedSpotters={new Ship[16],new Ship[16]};
     private final double[][] sharedNearest={new double[16],new double[16]};
+    /** Separate additional broadcasts, limited by paid transceiver capacity. */
+    private final Ship[][] expandedSpotters={new Ship[16],new Ship[16]};
+    private final double[][] expandedNearest={new double[16],new double[16]};
     /** Optional physical precision-CIWS lock-time sweep. It changes how
      * long optics must hold a real body before firing, never shot accuracy or
      * weapon damage. Configure only before tick one in a diagnostic battle. */
@@ -1094,6 +1118,7 @@ public final class Battle {
         s.opticalSignature=machinery.sensing().opticalSignature();
         s.sensorAcuity=machinery.sensing().acuity();
         s.hologramNoise=machinery.sensing().hologramNoise();
+        s.network=machinery.network();
         s.crewProtection=machinery.survival().crewProtection();
         s.commandProtection=machinery.survival().commandProtection();
         s.fuelProtection=machinery.survival().fuelProtection();
@@ -1323,6 +1348,7 @@ public final class Battle {
             hitAt(victim, effect.damage(), null, kind, effect.fromX(), effect.fromY());
             environmentalHits++;
         }
+        refreshCommandAssistance();
         refreshSharedContacts();
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
@@ -1685,8 +1711,11 @@ public final class Battle {
                 ?StrictMath.max(0,observer.sensorsCondition):0;
         double weatherRange=weather.sensorFactor();
         double acuity=observer.sensorAcuity;
+        double resolution=condition>0
+                ?StrictMath.min(2.2,observer.network.resolutionGain()
+                        *(1+.30*observer.commandAssist)):1;
         double rcs=StrictMath.max(0.06,StrictMath.min(4,target.radarCrossSection));
-        double radar=observer.sensorRange*condition*weatherRange
+        double radar=observer.sensorRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+0.09*(acuity-1));
         // Visual silhouettes remain discernible even when electronic sensors fail.
         // The cloak needs power and working electronic warfare electronics.
@@ -1703,14 +1732,14 @@ public final class Battle {
                 *cloak*silhouette;
         double thermalDamping=1-(1-target.thermalSignature)
                 *StrictMath.max(0,target.coolingCondition);
-        double infrared=observer.infraredRange*condition*weatherRange
+        double infrared=observer.infraredRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(StrictMath.max(0.10,thermalDamping))
                 *(1+0.08*(acuity-1));
-        double xray=observer.xrayRange*condition*weatherRange
+        double xray=observer.xrayRange*condition*weatherRange*resolution
                 *(1+0.10*(acuity-1))/
                 (1+0.16*StrictMath.min(2,target.maxArmor/650));
         double mass=StrictMath.max(0.45,StrictMath.min(2.4,target.maxHull/550));
-        double gravitic=observer.graviticRange*condition*weatherRange
+        double gravitic=observer.graviticRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(mass)*(1+0.07*(acuity-1));
         return StrictMath.max(optical,StrictMath.max(radar,
                 StrictMath.max(infrared,StrictMath.max(xray,gravitic))));
@@ -1727,8 +1756,11 @@ public final class Battle {
                 ?StrictMath.max(0,observer.sensorsCondition):0;
         double weatherRange=weather.sensorFactor();
         double acuity=observer.sensorAcuity;
+        double resolution=condition>0
+                ?StrictMath.min(2.2,observer.network.resolutionGain()
+                        *(1+.30*observer.commandAssist)):1;
         double rcs=StrictMath.max(.06,StrictMath.min(4,target.radarCrossSection));
-        double radar=observer.sensorRange*condition*weatherRange
+        double radar=observer.sensorRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1));
         double cloak=target.power>4&&target.ecmCondition>.15
                 ?target.opticalSignature:1;
@@ -1738,12 +1770,12 @@ public final class Battle {
                 *cloak*silhouette;
         double damping=1-(1-target.thermalSignature)
                 *StrictMath.max(0,target.coolingCondition);
-        double infrared=observer.infraredRange*condition*weatherRange
+        double infrared=observer.infraredRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(StrictMath.max(.10,damping))*(1+.08*(acuity-1));
-        double xray=observer.xrayRange*condition*weatherRange
+        double xray=observer.xrayRange*condition*weatherRange*resolution
                 *(1+.10*(acuity-1))/(1+.16*StrictMath.min(2,target.maxArmor/650));
         double mass=StrictMath.max(.45,StrictMath.min(2.4,target.maxHull/550));
-        double gravity=observer.graviticRange*condition*weatherRange
+        double gravity=observer.graviticRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
         int channels=0;
         if(distance<=optical)channels|=CONTACT_OPTICAL;
