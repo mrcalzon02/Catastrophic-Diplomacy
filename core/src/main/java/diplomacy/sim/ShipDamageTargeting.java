@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SensorNetworkCatalog;
 import java.util.List;
 
 /**
@@ -79,14 +80,15 @@ public final class ShipDamageTargeting {
     /** Map real fitted module types onto their physical combat subsystems. */
     public static Battle.Subsystem subsystem(String component){
         if(component==null||component.length()<3)return null;
-        String kind=SensingVariantCatalog.root(
-                component.substring(component.lastIndexOf('-')+1));
+        String kind=SensorNetworkCatalog.root(SensingVariantCatalog.root(
+                component.substring(component.lastIndexOf('-')+1)));
         return switch(kind){
             case "REA","SIF","SHD","XFR","HPR","APR","PWR","DHL","DSH","DAR","DPW","AHL","ASH","AAR","APW" -> Battle.Subsystem.REACTOR;
             case "ENG" -> Battle.Subsystem.ENGINES;
             case "RAD" -> Battle.Subsystem.COOLING;
-            case "SEN","RDR","IRT","ACU","XRY","GRA" -> Battle.Subsystem.SENSORS;
-            case "DMC","HCR","CIC","EPD","RCB" -> Battle.Subsystem.COMMAND;
+            case "SEN","RDR","IRT","ACU","XRY","GRA",
+                 "SHR","RES","TRK","LNK","CAP" -> Battle.Subsystem.SENSORS;
+            case "DMC","HCR","CIC","EPD","RCB","FCM" -> Battle.Subsystem.COMMAND;
             case "FBN","AMV" -> Battle.Subsystem.MAGAZINE;
             case "PGO","JPB","IBR","IRG" -> Battle.Subsystem.REACTOR;
             case "IST" -> Battle.Subsystem.COOLING;
