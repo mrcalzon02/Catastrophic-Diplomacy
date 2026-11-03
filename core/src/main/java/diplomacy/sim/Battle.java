@@ -183,6 +183,8 @@ public final class Battle {
         /** Only contacts actually acquired during this battle are recorded.
          * Never refresh these coordinates from a currently invisible enemy. */
         public final Map<Integer,ContactTrack> knownTracks=new HashMap<>();
+        /** Fixed historical light-time samples; no instant telemetry in the HUD. */
+        public final SensorLightTimeHistory sensorHistory=new SensorLightTimeHistory();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
          * fooled by this emitter, not fictional effects counters. */
         public int holoShotsDiverted,holoSeekersDiverted;
@@ -804,16 +806,14 @@ public final class Battle {
                 missile.torpedo?DefensiveTarget.TORPEDO:DefensiveTarget.MISSILE;
     }
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
-    /** Last observed position and velocity are snapshots, NOT hidden truth. */
+    /** Physical TRK memory stores received historical samples only. */
     public static final class ContactTrack {
         public double x,y,vx,vy;
         public long tick;
-        ContactTrack(Ship observed,long time){
-            update(observed,time);
-        }
-        void update(Ship observed,long time){
-            x=observed.x;y=observed.y;
-            vx=observed.vx;vy=observed.vy;tick=time;
+        ContactTrack(SensorLightTimeHistory.Sample sample){update(sample);}
+        void update(SensorLightTimeHistory.Sample sample){
+            x=sample.x();y=sample.y();vx=sample.vx();vy=sample.vy();
+            tick=sample.tick();
         }
     }
 
@@ -1505,6 +1505,7 @@ public final class Battle {
         // All active vessels enter contact and environmental simulation in
         // the same immutable world, including externally issued coordinates.
         containFleet();
+        if(tick==1)captureSensorHistory(0);
         focusCounts.clear();
         for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0)
             focusCounts.merge(ship.lastTargetId,1,Integer::sum);
@@ -1613,6 +1614,7 @@ public final class Battle {
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
         }
+        captureSensorHistory(tick);
         updateTermination();
     }
 
@@ -2108,14 +2110,24 @@ public final class Battle {
         return channels;
     }
 
-    /** Track memory is populated ONLY by an actual acquired contact. It is
-     * bounded per fitted ship; a missing TRK module never gains free memory. */
+    /** One fixed-capacity historical snapshot per ship each simulation tick. */
+    private void captureSensorHistory(long observedTick){
+        for(Ship ship:ships)ship.sensorHistory.capture(observedTick,ship);
+    }
+
+    /** Paid TRK remembers the received measured fix, never target truth. */
     private void rememberTrack(Ship observer,Ship target){
         int capacity=observer.network.trackMemoryCapacity();
         if(capacity<=0||observer.power<=3||observer.sensorsCondition<=.05
                 ||observer.crewReadiness()<.05)return;
+        int channels=directSensorChannels(observer,target,StrictMath.hypot(
+                observer.x-target.x,observer.y-target.y));
+        SensorLightTimeHistory.Observation observation=
+                SensorLightTimeHistory.receive(observer,target,tick,channels,0);
+        if(observation==null)return;
+        SensorLightTimeHistory.Sample measured=observation.sample();
         ContactTrack existing=observer.knownTracks.get(target.id);
-        if(existing!=null){existing.update(target,tick);return;}
+        if(existing!=null){existing.update(measured);return;}
         if(observer.knownTracks.size()>=capacity){
             int oldestId=-1;
             long oldest=Long.MAX_VALUE;
@@ -2127,7 +2139,7 @@ public final class Battle {
             }
             if(oldestId>=0)observer.knownTracks.remove(oldestId);
         }
-        observer.knownTracks.put(target.id,new ContactTrack(target,tick));
+        observer.knownTracks.put(target.id,new ContactTrack(measured));
     }
 
     /** Command cores assist only allied ships physically inside a functioning
@@ -2382,15 +2394,22 @@ public final class Battle {
                     source.x-target.x,source.y-target.y));
             if(channels==0)continue;
             boolean relayed=source!=viewer;
+            int linkTicks=relayed?SensorLightTimeHistory.propagationTicks(
+                    StrictMath.hypot(viewer.x-source.x,viewer.y-source.y)):0;
+            SensorLightTimeHistory.Observation observation=
+                    SensorLightTimeHistory.receive(source,target,tick,channels,linkTicks);
+            if(observation==null)continue;
+            SensorLightTimeHistory.Sample measured=observation.sample();
             float working=source.power>3&&source.sensorsCondition>.05
                     ?(float)StrictMath.min(1,source.sensorsCondition):0;
             float confidence=(float)StrictMath.max(0,StrictMath.min(1,
                     .20+.50*(source.network.resolutionGain()-1)*working
-                    +.09*StrictMath.max(0,Integer.bitCount(channels)-1)
+                    +.09*StrictMath.max(0,Integer.bitCount(observation.channels())-1)
                     +.20*source.commandAssist));
             picture.put(target.id,new TacticalContact(target.id,source.id,
-                    channels,target.x,target.y,target.vx,target.vy,
-                    tick,confidence,relayed,false));
+                    observation.channels(),measured.x(),measured.y(),
+                    measured.vx(),measured.vy(),observation.measuredTick(),
+                    confidence,relayed,false));
         }
         List<TacticalContact> sorted=new ArrayList<>(picture.values());
         sorted.sort((a,b)->Integer.compare(a.targetId(),b.targetId()));
