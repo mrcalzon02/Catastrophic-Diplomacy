@@ -12,7 +12,7 @@ import diplomacy.tech.SensorNetworkCatalog;
 public final class ModuleBranchEffects {
     private ModuleBranchEffects(){}
     private static final Set<String> GUNS=Set.of("LAS","KIN","MSL","TOR","PAR","PLA");
-    private static final Set<String> DEFENSE=Set.of("PD","FLK");
+    private static final Set<String> DEFENSE=Set.of("PD","FLK","RCW");
     public record Tuning(double damage,double cycle,double reach,double tracking,
                          double selfRepair,double remoteRepair,double shieldTransfer,
                          double supportEfficiency,double droneEndurance) {
@@ -60,7 +60,7 @@ public final class ModuleBranchEffects {
             }
         }else if(DEFENSE.contains(subsystem)){
             // PD and flak share acquisition laws but flak rewards broad scans.
-            double flak=subsystem.equals("FLK")?1.18:1.0;
+            double flak=subsystem.equals("FLK")?1.18:1.0; // rotary has its own shorter mechanical envelope
             switch(branch){
                 case OUTPUT -> damage+=0.050*rank;
                 case EFFICIENCY -> {cycle-=0.030*rank;efficiency+=0.046*rank;}
