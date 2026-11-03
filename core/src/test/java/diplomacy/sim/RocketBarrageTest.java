@@ -264,8 +264,16 @@ public final class RocketBarrageTest {
         // without guidance. The target can simply vacate the line of fire.
         for(RocketBarrage.Motor motor:RocketBarrage.Motor.values()){
             Battle battle=scene(tech,RocketBarrage.Size.MEDIUM,4,motor,false);
+            // Real dumbfire racks cannot commit a predicted bearing until
+            // photons have brought in the first actual sensor observation.
+            // No initial time-zero omniscient rocket launch is allowed.
             battle.step();
-            require(!battle.rockets().isEmpty(),"Rocket did not launch at trigger");
+            require(battle.rockets().isEmpty(),
+                    "Dumbfire rocket launched before any causal target fix");
+            for(int acquisition=0;acquisition<20&&battle.rockets().isEmpty();acquisition++)
+                battle.step();
+            require(!battle.rockets().isEmpty(),
+                    "Dumbfire rocket never launched after delayed sensor acquisition");
             Battle.Rocket first=battle.rockets().get(0);
             double heading=first.heading;
             Battle.Ship target=battle.ships().get(1);
