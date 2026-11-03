@@ -72,6 +72,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private CombatLightingRenderer lighting;
     private ProceduralStarfield starfield;
     private BattlefieldWeatherVfx weatherVfx;
+    private FogOfWarRenderer fogOfWar;
+    private final SensorContactOverlay sensorContacts=new SensorContactOverlay();
     private CombatAudio audio;
     private final RenderPerformanceCounters renderProfile=new RenderPerformanceCounters();
     private int voiceSliderPointer=-1, menuButtonPointer=-1;
@@ -277,6 +279,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         } catch (RuntimeException error) {
             Gdx.app.error("WEATHER-FX", "Visual hazard renderer unavailable", error);
             weatherVfx = null;
+        }
+        try {
+            fogOfWar=new FogOfWarRenderer();
+        } catch(RuntimeException failed) {
+            Gdx.app.error("SENSOR-FOG","Optical fog presentation unavailable",failed);
         }
         font.getData().setScale(1.23f);
         try {
@@ -919,6 +926,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(battle==null)return;
         int chosen=ShipInspectionPanel.pick(battle,renderPoses,uiX,uiY,
                 battleCamera.position.x,battleCamera.position.y,battleCamera.zoom);
+        // An unidentified radar/thermal return cannot be opened as an
+        // omniscient enemy ship inspection panel or selected through the fog.
+        if(!screensaverMode && chosen>=0){
+            for(Battle.Ship selected:battle.ships())if(selected.id==chosen && selected.team!=0){
+                sensorContacts.refresh(battle,0);
+                if(!sensorContacts.opticallyVisible(chosen))chosen=-1;
+                break;
+            }
+        }
         shipInspector.select(chosen);
         if(follow){
             focusedShipId=chosen;
@@ -2836,6 +2852,27 @@ public final class CatastrophicGame extends ApplicationAdapter {
             lighting.renderGlow(battle,batch,battleCamera,renderPoses,shieldFx);
             lightingOverlayNs+=System.nanoTime()-beforeLight;
         }
+        // Fog conceals the completed physical framebuffer, including unseen
+        // shots and emissive effects. Instrument-only contacts overlay it.
+        // Exhibition and forensic armor photography remain unobstructed.
+        if(!screensaverMode && currentArmorCapture==null && fogOfWar!=null){
+            try{
+                fogOfWar.render(battle,battleCamera,camera,batch,renderPoses,0);
+                sensorContacts.render(battle,battleCamera,camera,renderPoses,
+                        shapes,batch,font,0);
+                Battle.Ship inspected=shipInspector.selected(battle);
+                if(inspected!=null && inspected.team!=0
+                        && !sensorContacts.opticallyVisible(inspected.id)){
+                    shipInspector.close();
+                    if(focusedShipId==inspected.id)focusedShipId=-1;
+                }
+            }catch(RuntimeException failed){
+                Gdx.app.error("SENSOR-FOG",
+                        "Disabling failed tactical fog pass; combat continues",failed);
+                try{fogOfWar.close();}catch(RuntimeException ignored){}
+                fogOfWar=null;
+            }
+        }
         if(screensaverMode){
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
@@ -3376,6 +3413,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(shipyard!=null)shipyard.dispose();
         if(starfield!=null)starfield.dispose();
         if(weatherVfx!=null)weatherVfx.dispose();
+        if(fogOfWar!=null)fogOfWar.close();
         shapes.dispose(); batch.dispose(); font.dispose();
     }
 }
