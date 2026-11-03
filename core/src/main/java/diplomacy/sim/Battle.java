@@ -2043,6 +2043,17 @@ public final class Battle {
         return true;
     }
 
+    /** Powered tracking and contact resolution reduce estimated position
+     * error; broken or unpowered processors grant no phantom precision. */
+    private static double tacticalPrecision(Ship actor){
+        if(actor.power<=3||actor.sensorsCondition<=.05||
+                actor.crewReadiness()<.05)return 0;
+        return StrictMath.max(0,StrictMath.min(1,actor.sensorsCondition))
+                *(actor.network.trackingPrecision()
+                  +.65*(actor.network.resolutionGain()-1)
+                  +actor.commandAssist);
+    }
+
     private Ship chooseTarget(Ship actor) {
         // Preserve old target selection and RNG stream for baseline fleet tests.
         if(actor.standingOrders==null&&
@@ -2053,9 +2064,7 @@ public final class Battle {
                 double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
                 if(!hasTargetContact(actor,s,distance))continue;
                 double estimationError = (random.nextDouble() - 0.5) * 0.52 /
-                        (1+actor.commanderSkill*.4+actor.network.trackingPrecision()
-                         +(.65*(actor.network.resolutionGain()-1))
-                         +actor.commandAssist);
+                        (1+actor.commanderSkill*.4+tacticalPrecision(actor));
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
             }
@@ -2090,9 +2099,7 @@ public final class Battle {
             double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
             if(!hasTargetContact(actor,candidate,distance))continue;
             double error=(random.nextDouble()-.5)*.52/
-                    (1+actor.commanderSkill*.4+actor.network.trackingPrecision()
-                     +(.65*(actor.network.resolutionGain()-1))
-                     +actor.commandAssist);
+                    (1+actor.commanderSkill*.4+tacticalPrecision(actor));
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
             if(actor.standingOrders!=null &&
@@ -2372,7 +2379,10 @@ public final class Battle {
         double lock=Math.max(0,1-distance/Math.max(1,lockRange))
                 *s.crewReadiness()*s.sensorsCondition*weather.sensorFactor()
                 *(1-target.ecmStrength*target.ecmCondition)
-                *DeceptionProjection.lockMultiplier(target,s.sensorAcuity);
+                *DeceptionProjection.lockMultiplier(target,
+                        s.sensorAcuity*(s.power>3&&s.sensorsCondition>.05
+                            ?s.network.resolutionGain()*(1+.30*s.commandAssist)
+                            :1));
         double weatherAim=weather.accuracyFactor();
         var laser=WeaponBehaviorTable.gun(DamageType.LASER);
         var missile=WeaponBehaviorTable.gun(DamageType.MISSILE);
