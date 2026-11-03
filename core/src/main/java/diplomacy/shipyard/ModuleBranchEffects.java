@@ -2,6 +2,7 @@ package diplomacy.shipyard;
 
 import java.util.Set;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SensorNetworkCatalog;
 
 /**
  * Per-component behavioral deltas from a single exclusive technology branch.
@@ -32,6 +33,8 @@ public final class ModuleBranchEffects {
         // An alternative gets its own research IDs but retains the tuned
         // behavioral physics of its base sensor/detector lineage.
         String parent=SensingVariantCatalog.root(subsystem);
+        if(!parent.equals(subsystem))return tune(parent,branch,rank);
+        parent=SensorNetworkCatalog.root(subsystem);
         if(!parent.equals(subsystem))return tune(parent,branch,rank);
         if(subsystem.equals("DMC"))return tune("REP",branch,rank);
         // Every newly installed logistics family has its own research ID but
@@ -99,7 +102,8 @@ public final class ModuleBranchEffects {
                     case SPECIALIST -> {drone+=0.050*rank;remote+=0.050*rank;}
                 }
             }
-            case "SEN","RDR","STC","IRT","HTD","VCL","ACU","XRY","GRA","HLP" -> {
+            case "SEN","RDR","STC","IRT","HTD","VCL","ACU","XRY","GRA","HLP",
+                 "SHR","RES","TRK","LNK","FCM","CAP" -> {
                 switch(branch){
                     case OUTPUT -> reach+=0.027*rank;
                     case EFFICIENCY -> efficiency+=0.040*rank;
