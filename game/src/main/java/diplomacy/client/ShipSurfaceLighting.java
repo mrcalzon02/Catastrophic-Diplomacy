@@ -49,7 +49,7 @@ final class ShipSurfaceLighting implements Disposable {
         " vec2 direction=ray/max(0.01,distance);\n"+
         " vec2 local=vec2(dot(direction,axis),-direction.x*axis.y+direction.y*axis.x);\n"+
         " float facing=max(dot(normal,normalize(vec3(local,0.85))),0.0);\n"+
-        " return tint*(0.20+0.80*facing)*spot.w*attenuation*attenuation;\n"+
+        " return tint*(0.12+0.88*facing)*spot.w*attenuation*attenuation*attenuation;\n"+
         "}\n"+
         "void main(){\n"+
         " vec4 albedo=texture2D(u_texture,v_uv);\n"+
@@ -104,8 +104,12 @@ final class ShipSurfaceLighting implements Disposable {
         " vec3 emitted=texture2D(u_emission,v_uv).rgb*v_color.b;\n"+
         " vec3 lit=albedo.rgb*(0.67+0.40*diffuse)+vec3(0.19)*glint;\n"+
         " lit+=vec3(0.055,0.10,0.13)*rim+emitted*0.95;\n"+
-        " lit+=localLight(u_light0,u_color0,n,axis)*u_detail;\n"+
-        " lit+=localLight(u_light1,u_color1,n,axis)*u_detail;\n"+
+        " // Combined dynamic weapon lighting may never flood intact armor.\n"+
+        " vec3 strikeLight=(localLight(u_light0,u_color0,n,axis)+\n"+
+        "                   localLight(u_light1,u_color1,n,axis))*u_detail;\n"+
+        " float peak=max(strikeLight.r,max(strikeLight.g,strikeLight.b));\n"+
+        " strikeLight*=min(1.0,0.12/max(peak,0.0001));\n"+
+        " lit+=strikeLight;\n"+
         " lit=mix(albedo.rgb,lit,u_detail)+residualHeat;\n"+
         " gl_FragColor=vec4(min(lit,vec3(1.0)),albedo.a);\n"+
         "}\n";
