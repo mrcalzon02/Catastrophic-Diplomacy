@@ -2224,23 +2224,21 @@ public final class Battle {
     /** Direct detection or physically valid contact broadcast, never an
      * unexplained global enemy list. Extended links cost fitted equipment.
      * Stale tracks may guide searching but CANNOT authorize weapon firing. */
-    boolean hasTargetContact(Ship actor,Ship hostile,double distance){
-        if(distance<=targetAcquisitionRange(actor,hostile)){
-            rememberTrack(actor,hostile);
-            return true;
-        }
-        if(actor.power<=3||actor.crewReadiness()<.05)return false;
+    /** Read-only counterpart of the actual fire-control link: no scanner
+     * callbacks, ammunition, track memory mutation or random draws. This
+     * route is shared by physical weapon acquisition and tactical telemetry. */
+    private Ship liveContactSource(Ship actor,Ship hostile,double distance){
+        if(distance<=targetAcquisitionRange(actor,hostile))return actor;
+        if(actor.power<=3||actor.crewReadiness()<.05)return null;
         Ship[] contacts=sharedSpotters[actor.team];
-        if(hostile.id>=contacts.length)return false;
+        if(hostile.id>=contacts.length)return null;
         Ship scout=contacts[hostile.id];
-        if(distance<=1250 && scout!=null && scout.alive() && scout.power>3
-                &&StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000){
-            rememberTrack(actor,hostile);
-            return true;
-        }
+        if(distance<=1250 && scout!=null&&scout.alive()&&scout.power>3
+                &&StrictMath.hypot(actor.x-scout.x,actor.y-scout.y)<=1000)
+            return scout;
         Ship transmitter=expandedSpotters[actor.team][hostile.id];
         if(transmitter==null||!transmitter.alive()||transmitter.power<=3||
-                transmitter.sensorsCondition<=.05)return false;
+                transmitter.sensorsCondition<=.05)return null;
         double condition=StrictMath.min(1,StrictMath.max(0,
                 transmitter.sensorsCondition));
         double link=1000+transmitter.network.sharingRange()*condition
@@ -2249,7 +2247,12 @@ public final class Battle {
                 transmitter.network.sharingRange()*.38+
                 actor.network.trackRelayRange()*.32);
         if(distance>horizon||StrictMath.hypot(actor.x-transmitter.x,
-                actor.y-transmitter.y)>link)return false;
+                actor.y-transmitter.y)>link)return null;
+        return transmitter;
+    }
+
+    boolean hasTargetContact(Ship actor,Ship hostile,double distance){
+        if(liveContactSource(actor,hostile,distance)==null)return false;
         rememberTrack(actor,hostile);
         return true;
     }
