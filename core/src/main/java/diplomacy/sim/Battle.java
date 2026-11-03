@@ -2640,6 +2640,14 @@ public final class Battle {
 
     /** Powered tracking and contact resolution reduce estimated position
      * error; broken or unpowered processors grant no phantom precision. */
+    /** Nominal fitted processing precision for read-only HUD predictions.
+     * The real fire-control allocation still consumes a finite compute pool. */
+    public double targetingPrecision(int observerId){
+        Ship ship=findShip(observerId);
+        if(ship==null)throw new IllegalArgumentException("Unknown observer");
+        return tacticalPrecision(ship);
+    }
+
     private static double tacticalPrecision(Ship actor){
         if(actor.power<=3||actor.sensorsCondition<=.05||
                 actor.crewReadiness()<.05)return 0;
