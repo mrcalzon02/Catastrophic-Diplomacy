@@ -187,6 +187,8 @@ public final class Battle {
         public final SensorLightTimeHistory sensorHistory=new SensorLightTimeHistory();
         /** A packet must be transmitted by a real scout before ally receipt. */
         public final SensorRelayBuffer relayPackets=new SensorRelayBuffer();
+        /** Fitted LNK sends actual remembered fixes with separate causal transit. */
+        public final SensorTrackRelayBuffer trackPackets=new SensorTrackRelayBuffer();
         /** Installed acquisition doctrine. STANDARD retains old automatic sensing. */
         public final SensorActiveScan.State scan=new SensorActiveScan.State();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
@@ -1544,6 +1546,7 @@ public final class Battle {
         for(Ship scanner:ships)SensorActiveScan.advance(scanner,tick);
         refreshCommandAssistance();
         refreshSharedContacts();
+        broadcastTrackPackets();
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             if(!s.alive())continue;
@@ -1759,39 +1762,32 @@ public final class Battle {
             double score=contactSearchScore(observer,track,tick);
             if(score<bestScore){best=track;bestScore=score;}
         }
-        // A track link is not a scanner or a remote weapon lock. Share only
-        // the sender's newest finite contact set, observed before data loss.
+        // LNK receives only immutable packets that were actually sent by
+        // powered transmitters, after the physical inter-ship propagation.
+        // Historical tracks help search, but NEVER authorize weapon fire.
         if(observer.network.trackRelayRange()>0){
-            ContactTrack[] priority=new ContactTrack[32];
             for(Ship source:ships){
                 if(source==observer||source.team!=observer.team||!source.alive()
-                        ||source.power<=3||source.crewReadiness()<.05
-                        ||source.network.trackRelayCapacity()<=0
-                        ||source.network.trackMemoryTicks()<=0)continue;
+                        ||source.power<=3||source.sensorsCondition<=.05||
+                        source.crewReadiness()<.05||
+                        source.network.trackRelayCapacity()<=0||
+                        source.network.trackMemoryTicks()<=0)continue;
                 double range=StrictMath.min(observer.network.trackRelayRange(),
-                        source.network.trackRelayRange())
-                        *StrictMath.min(source.sensorsCondition,
+                        source.network.trackRelayRange())*
+                        StrictMath.min(source.sensorsCondition,
                                 observer.sensorsCondition);
                 if(range<=0||StrictMath.hypot(source.x-observer.x,
                         source.y-observer.y)>range)continue;
-                int count=StrictMath.min(32,source.network.trackRelayCapacity());
-                Arrays.fill(priority,0,count,null);
-                int window=(int)(source.network.trackMemoryTicks()
-                        *StrictMath.min(1,source.sensorsCondition));
-                for(ContactTrack track:source.knownTracks.values()){
-                    long age=tick-track.tick;
+                int cap=StrictMath.min(SensorTrackRelayBuffer.MAX_CONTACTS,
+                        source.network.trackRelayCapacity());
+                int window=(int)(source.network.trackMemoryTicks()*
+                        StrictMath.min(1,source.sensorsCondition));
+                for(SensorTrackRelayBuffer.Packet packet:
+                        source.trackPackets.deliveredAll(tick,observer.x,
+                                observer.y,cap)){
+                    long age=tick-packet.observedTick();
                     if(age<0||age>window)continue;
-                    for(int k=0;k<count;k++)if(priority[k]==null ||
-                            track.tick>priority[k].tick){
-                        for(int n=count-1;n>k;n--)priority[n]=priority[n-1];
-                        priority[k]=track;
-                        break;
-                    }
-                }
-                for(int k=0;k<count;k++){
-                    ContactTrack track=priority[k];
-                    if(track==null)break;
-                    // Fleet data has a small latency/confidence penalty.
+                    ContactTrack track=trackFromPacket(packet);
                     double score=contactSearchScore(observer,track,tick)+10;
                     if(score<bestScore){best=track;bestScore=score;}
                 }
@@ -2406,6 +2402,40 @@ public final class Battle {
         }
     }
 
+    private static ContactTrack trackFromPacket(SensorTrackRelayBuffer.Packet p){
+        return new ContactTrack(new SensorLightTimeHistory.Sample(
+                p.observedTick(),p.x(),p.y(),p.vx(),p.vy(),true));
+    }
+
+    /** Copy the freshest actually measured TRK records into physical datalink
+     * transmissions, subject to fitted LNK slots, power and expiry. */
+    private void broadcastTrackPackets(){
+        for(Ship source:ships){
+            if(!source.alive()||source.power<=3||
+                    source.sensorsCondition<=.05||source.crewReadiness()<.05||
+                    source.network.trackRelayCapacity()<=0||
+                    source.network.trackMemoryTicks()<=0)continue;
+            int cap=StrictMath.min(SensorTrackRelayBuffer.MAX_CONTACTS,
+                    source.network.trackRelayCapacity());
+            int window=(int)(source.network.trackMemoryTicks()*
+                    StrictMath.min(1,source.sensorsCondition));
+            if(window<=0)continue;
+            List<Map.Entry<Integer,ContactTrack>> records=
+                    new ArrayList<>(source.knownTracks.entrySet());
+            records.removeIf(e->tick-e.getValue().tick<0||
+                    tick-e.getValue().tick>window);
+            records.sort((a,b)->{
+                int fresher=Long.compare(b.getValue().tick,a.getValue().tick);
+                return fresher!=0?fresher:Integer.compare(a.getKey(),b.getKey());
+            });
+            for(int i=0;i<StrictMath.min(cap,records.size());i++){
+                Map.Entry<Integer,ContactTrack> item=records.get(i);
+                source.trackPackets.transmit(item.getKey(),tick,
+                        item.getValue(),cap,source.x,source.y);
+            }
+        }
+    }
+
     /** Direct detection or physically valid contact broadcast, never an
      * unexplained global enemy list. Extended links cost fitted equipment.
      * Stale tracks may guide searching but CANNOT authorize weapon firing. */
@@ -2549,23 +2579,19 @@ public final class Battle {
                                     source.sensorsCondition);
                     if(range<=0||StrictMath.hypot(viewer.x-source.x,
                             viewer.y-source.y)>range)continue;
-                    int cap=StrictMath.min(32,source.network.trackRelayCapacity());
+                    int cap=StrictMath.min(SensorTrackRelayBuffer.MAX_CONTACTS,
+                            source.network.trackRelayCapacity());
                     int window=(int)(source.network.trackMemoryTicks()
                             *StrictMath.min(1,source.sensorsCondition));
-                    List<Map.Entry<Integer,ContactTrack>> remembered=
-                            new ArrayList<>(source.knownTracks.entrySet());
-                    remembered.removeIf(e->tick-e.getValue().tick<0||
-                            tick-e.getValue().tick>window);
-                    remembered.sort((a,b)->{
-                        int newer=Long.compare(b.getValue().tick,a.getValue().tick);
-                        return newer!=0?newer:Integer.compare(a.getKey(),b.getKey());
-                    });
-                    for(int k=0;k<StrictMath.min(cap,remembered.size());k++){
-                        Map.Entry<Integer,ContactTrack> entry=remembered.get(k);
-                        TacticalContact previous=picture.get(entry.getKey());
-                        if(previous==null||previous.observedTick()<entry.getValue().tick)
-                            picture.put(entry.getKey(),historicalContact(entry.getKey(),
-                                    source.id,entry.getValue(),true));
+                    for(SensorTrackRelayBuffer.Packet packet:
+                            source.trackPackets.deliveredAll(tick,viewer.x,viewer.y,cap)){
+                        long age=tick-packet.observedTick();
+                        if(age<0||age>window)continue;
+                        TacticalContact previous=picture.get(packet.targetId());
+                        if(previous==null||previous.observedTick()<packet.observedTick())
+                            picture.put(packet.targetId(),historicalContact(
+                                    packet.targetId(),source.id,
+                                    trackFromPacket(packet),true));
                     }
                 }
         }
@@ -5938,6 +5964,7 @@ public final class Battle {
             hash = mix(hash,s.propulsion.ordinal());
             hash = mix(hash,s.scan.fingerprint());
             hash = mix(hash,s.relayPackets.fingerprint());
+            hash = mix(hash,s.trackPackets.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));
