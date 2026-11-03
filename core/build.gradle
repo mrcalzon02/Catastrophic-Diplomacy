@@ -109,7 +109,15 @@ tasks.register('sensorTacticalPictureSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+tasks.register('sensorActiveScanSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify paid boosted radar, focused radar, passive scopes and targeted X-ray burst light-time arrivals.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorActiveScanTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorActiveScanSmoke'))
     dependsOn(tasks.named('sensorTacticalPictureSmoke'))
     group = 'verification'
     description = 'Verify six physical sensor-network families and 24 variants, nine-rank research, power-loss counterplay and real shared contacts.'
