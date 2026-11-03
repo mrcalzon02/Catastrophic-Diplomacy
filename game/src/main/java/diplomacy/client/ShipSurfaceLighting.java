@@ -68,7 +68,12 @@ final class ShipSurfaceLighting implements Disposable {
         "   oxide=mix(oxide,vec3(0.31,0.52,0.81),smoothstep(0.59,0.88,phase));\n"+
         "   float anneal=clamp((peel.b-0.64)/0.36,0.0,1.0);\n"+
         "   float luma=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
-        "   albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.25+0.17*smoothstep(0.06,0.70,luma)));\n"+
+        "   albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.33+0.15*smoothstep(0.06,0.70,luma)));\n"+
+        "   // Laser scores carry a very narrow incandescent lip, surrounded\n"+
+        "   // by the widest stable oxide/heat-affected radius of any weapon.\n"+
+        "   // This is clipped to surviving plating, never an outer glow sprite.\n"+
+        "   float laserLip=smoothstep(0.86,0.97,peel.b)*smoothstep(0.04,0.35,peel.a);\n"+
+        "   residualHeat+=vec3(0.32,0.115,0.025)*laserLip*0.72;\n"+
         "  }else{\n"+
         "   albedo.rgb=mix(albedo.rgb,vec3(1.0,0.48,0.18),peel.g*0.48);\n"+
         "   float sourceLum=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
@@ -79,6 +84,11 @@ final class ShipSurfaceLighting implements Disposable {
         "   float coolMetal=1.0-smoothstep(0.005,0.08,peel.g);\n"+
         "   float metalStrength=clamp(peel.b/0.56,0.0,1.0)*mix(0.82,1.0,metalBoost)*coolMetal;\n"+
         "   albedo.rgb=mix(albedo.rgb,vec3(0.90,0.94,1.0),metalStrength);\n"+
+        "   // Hot exposed lips brighten amber instead of disappearing when\n"+
+        "   // cool chrome is suppressed by the thermal G channel. Kinetic\n"+
+        "   // has no G heat and therefore never receives this molten tint.\n"+
+        "   float moltenLip=clamp(peel.b/0.56,0.0,1.0)*smoothstep(0.11,0.38,peel.g);\n"+
+        "   albedo.rgb=mix(albedo.rgb,vec3(1.0,0.72,0.33),moltenLip*0.43);\n"+
         "   // Genuine compressed/melted edges emit a small steady amber\n"+
         "   // contribution even on dark plating. Cooled laser oxide does not.\n"+
         "   // G is zero outside the real armor impact mask.\n"+
