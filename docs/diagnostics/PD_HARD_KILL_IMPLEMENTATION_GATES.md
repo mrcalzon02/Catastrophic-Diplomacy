@@ -35,7 +35,7 @@ reactive armor are independent equipment categories.
 
 | Type | Current physical combat method | Status |
 |---|---|---|
-| **PD** precision laser | Real installed PD emitter family, immediate single-target beam hit attempt; projectile-specific kinetic/armor ablation; weak air-target tracking/dwell. PD-only stats are now isolated from flak modules, with genuine PD-only muzzle selection. | **Works**, but laser firing still uses **one ship-wide** `pdReload` instead of truly independent per-socket firing state. |
+| **PD** precision laser | Real installed PD emitter family, immediate single-target beam hit attempt; projectile-specific kinetic/armor ablation; weak air-target tracking/dwell. PD-only stats are now isolated from flak modules, with genuine PD-only muzzle selection. | **Independent socket controller committed; diagnostic runner pending.** Per-socket research range, hit profile, dwell and reload replace the pooled fitted laser controller; legacy unfitted fixtures keep `pdReload`. Shared track caching and throughput measurement remain open. |
 | **FLK** fragmentation | Real installed FLK emitter family; per-socket researched cooldown, physical kinetic-ammo charge, future `burstTick`, predicted point and finite-radius fragmentation that intersects real ordnance/craft bodies on burst. Fitted FLK no longer contributes precision laser range/accuracy/damage or fire rate. | **Working first physical differentiation**. A flak shell is currently a **deferred burst**, not yet a continuously moving/interceptable artillery body. Blast damage uses an inside-radius rule; radial fragmentation falloff and separate magazine controls remain unimplemented. |
 | **RCW** rotary kinetic CIWS | Physical small solid rounds, rotational spin-up, point-target lead, finite magazine and heat; strong short-range anti-rocket/drone with a weak answer to armored torpedoes. | **Specified; not implemented.** |
 | **RPD** rail interceptor | Charged high-velocity solid body, low volume of fire, projectile lead, high energy/thermal cost, armor penetration. | **Specified; not implemented.** |
@@ -134,3 +134,19 @@ single-aircraft kills**.
 
 **Release discipline:** Never run a full APK/desktop package build just to
 adjust balance. No balance percentage or art test may block publication.
+
+## Current precision-emitter change awaiting diagnostic acceptance
+
+Fitted precision CIWS now has independently ticking, socket-bound cooldowns, researched
+profiles and weapon muzzle locations for both physical ordnance and hostile craft.
+The four-mount fit no longer inherits a single accelerated ship-wide controller;
+legacy manually constructed simulation fixtures retain their prior behavior. The
+fighter-wave CSV adds `pd_distinct_sockets_fired` and asserts that each observed
+laser event originates at a purchased PD socket. Installed socket inventories and
+independent timer progression have functional assertions at stages 0 and IX.
+
+**Still incomplete:** bounded hull-shared hostile-contact acquisition, deconflicted
+per-target predicted damage, true saturation throughput measurement against
+kinetic/rocket/missile salvos, and optional 200v200 load profiling. The existing
+wave diagnostic remains advisory and does not build an APK. Do not assert new
+interception percentages or stage parity until GitHub runner artifacts are read.

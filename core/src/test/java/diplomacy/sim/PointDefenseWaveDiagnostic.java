@@ -49,15 +49,15 @@ public final class PointDefenseWaveDiagnostic {
             int craftTerminal,int attackShots,int attackImpacts,int torpedoFired,
             int torpedoImpacts,int pdLaserShots,int flakShots,int flakAmmoSpent,
             long firstAircraftAttackTick,double actualDamage,
-            double finalPowerFraction,double peakHeatFraction) {
+            double finalPowerFraction,double peakHeatFraction,int pdDistinctSocketsFired) {
         String csv(){
             return String.format(Locale.ROOT,
-                "%s,%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f",
+                "%s,%s,%d,%d,%d,%d,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.4f,%.4f,%.4f,%d",
                 battery,threat,wave,distance,rank,seed,defenseOn,launched,
                 craftKills,craftTerminal,attackShots,attackImpacts,torpedoFired,
                 torpedoImpacts,pdLaserShots,flakShots,flakAmmoSpent,
                 firstAircraftAttackTick,actualDamage,finalPowerFraction,
-                peakHeatFraction);
+                peakHeatFraction,pdDistinctSocketsFired);
         }
     }
     private static void require(boolean b,String why){
@@ -135,8 +135,23 @@ public final class PointDefenseWaveDiagnostic {
                     require(!borrowed,"Precision CIWS borrowed the flak socket");
                 }
             }
-            require(lasers==2&&flaks==2&&ship.flakMounts.size()==2,
+            require(lasers==2&&flaks==2&&ship.flakMounts.size()==2&&
+                    ship.precisionMounts.size()==2,
                     "Mixed fitted defenses failed hardware inventory");
+            for(Battle.Ship.PrecisionMount mount:ship.precisionMounts){
+                require(mixedDesign.at(mount.slotId).component.endsWith("-PD"),
+                        "Precision mount borrowed another component's socket");
+                require(Math.abs(mount.cycle-Shipyard.pointDefenseCycleAt(
+                        mixedDesign,catalog,mount.slotId))<1e-8,
+                        "Per-socket precision research cycle was lost");
+            }
+            // Independent installed timers must tick without synchronization.
+            ship.precisionMounts.get(0).reload=3.0;
+            ship.precisionMounts.get(1).reload=1.0;
+            battle.step();
+            require(Math.abs(ship.precisionMounts.get(0).reload-
+                    ship.precisionMounts.get(1).reload-2.0)<1e-8,
+                    "Separate precision mount cooldowns were merged");
             for(long shot=0;shot<8;shot++){
                 int slot=WeaponMuzzles.at(ship,
                         WeaponMuzzles.Family.POINT_DEFENSE,shot).slotId();
@@ -187,6 +202,8 @@ public final class PointDefenseWaveDiagnostic {
         b.spawnWing(1,defenseFit(cat,battery,rank),cat,1,defenderX,defenderY);
         Battle.Ship protectedShip=b.ships().get(b.ships().size()-1);
         protectedShip.speed=protectedShip.vx=protectedShip.vy=0;
+        require(protectedShip.precisionMounts.size()==battery.pd(),
+                "Precision defense socket inventory differs from purchased modules");
         protectedShip.maxHull=protectedShip.hull=1500000;
         b.registerDiagnosticStationaryTarget(protectedShip.id);
         b.setShipOrders(protectedShip.id,BattleOrders.DEFAULT.withPointDefense(
@@ -196,6 +213,7 @@ public final class PointDefenseWaveDiagnostic {
                 hull=protectedShip.hull;
         final int flakStock=protectedShip.kineticAmmo;
         Set<Integer> innerCraft=new HashSet<>();
+        Set<Integer> firedPdSockets=new HashSet<>();
         long seq=0,firstAttack=-1;
         int attackShots=0,attackImpacts=0,torpedoes=0,torpedoHits=0,
                 lasers=0,flak=0;
@@ -213,7 +231,20 @@ public final class PointDefenseWaveDiagnostic {
                 seq=e.sequence();
                 if(e.team()==1&&e.sourceId()==protectedShip.id&&
                         e.phase()==Battle.VisualPhase.FIRE){
-                    if("POINT_DEFENSE".equals(e.weapon()))lasers++;
+                    if("POINT_DEFENSE".equals(e.weapon())){
+                        lasers++;
+                        boolean found=false;
+                        for(Battle.Ship.PrecisionMount socket:protectedShip.precisionMounts){
+                            var origin=WeaponMuzzles.atSlot(protectedShip,
+                                    WeaponMuzzles.Family.POINT_DEFENSE,socket.slotId);
+                            if(StrictMath.hypot(e.x()-origin.x(),
+                                    e.y()-origin.y())<0.00001){
+                                firedPdSockets.add(socket.slotId);
+                                found=true;break;
+                            }
+                        }
+                        require(found,"Precision PD fired outside a paid physical socket");
+                    }
                     if("FLAK".equals(e.weapon()))flak++;
                 }
                 if(e.team()!=0)continue;
@@ -256,7 +287,8 @@ public final class PointDefenseWaveDiagnostic {
                 launched,craftKills,innerCraft.size(),attackShots,attackImpacts,
                 torpedoes,torpedoHits,lasers,flak,
                 flakStock-protectedShip.kineticAmmo,firstAttack,damage,
-                protectedShip.power/Math.max(1,protectedShip.maxPower),peakHeat);
+                protectedShip.power/Math.max(1,protectedShip.maxPower),
+                peakHeat,firedPdSockets.size());
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog cat=TechnologyCatalog.loadDefault();
@@ -269,7 +301,8 @@ public final class PointDefenseWaveDiagnostic {
                 "attacker_impacts,torpedoes_launched,torpedo_impacts,"+
                 "laser_pd_shots,flak_rounds,flak_kinetic_ammo_spent,"+
                 "first_aircraft_attack_tick,defender_damage,"+
-                "defender_final_power_fraction,defender_peak_heat_fraction");
+                "defender_final_power_fraction,defender_peak_heat_fraction,"+
+                "pd_distinct_sockets_fired");
         StringBuilder md=new StringBuilder("# Simultaneous fighter waves versus "+
                 "real fitted laser/flak batteries\n\n");
         md.append("Physical FTR launches, exactly 4 or 8 simultaneous aircraft, "+

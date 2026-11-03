@@ -85,6 +85,20 @@ public final class Battle {
             }
         }
         public List<FlakMount> flakMounts=List.of();
+        /** Each fitted precision CIWS module owns its socket, research and timer.
+         * Legacy unfitted fixtures retain the original shared PD controller. */
+        public static final class PrecisionMount {
+            public final int slotId;
+            public final double nominalRange,cycle;
+            public final ProjectileModel.Defense profile;
+            public double reload;
+            public PrecisionMount(int slot,double range,ProjectileModel.Defense spec,double firingCycle){
+                if(slot<0||range<=0||spec==null||!Double.isFinite(firingCycle)||firingCycle<=0)
+                    throw new IllegalArgumentException("Invalid precision CIWS hardware");
+                slotId=slot;nominalRange=range;profile=spec;cycle=firingCycle;
+            }
+        }
+        public List<PrecisionMount> precisionMounts=List.of();
         /** Opt-in physically distinct rack controllers; legacy remains family-wide. */
         public List<Launcher> launchers=List.of();
         /** Separate cheap dumbfire magazine per installed rocket hardpoint. */
@@ -952,11 +966,16 @@ public final class Battle {
         // A real FLK socket is a different weapon from a precision PD laser.
         // The existing module IDs and fitted save data are unchanged.
         List<Ship.FlakMount> fittedFlak=new ArrayList<>();
+        List<Ship.PrecisionMount> fittedPrecision=new ArrayList<>();
         s.laserPointDefenseEnabled=false;
         for(WeaponMuzzles.Emitter emitter:s.weaponEmitters){
             if(emitter.component().endsWith("-PD")){
                 s.laserPointDefenseEnabled=true;
                 s.laserPointDefenseMountCount++;
+                fittedPrecision.add(new Ship.PrecisionMount(emitter.slotId(),
+                        Shipyard.pointDefenseRangeAt(design,catalog,emitter.slotId()),
+                        Shipyard.defenseAt(design,catalog,emitter.slotId()),
+                        Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
             }
             if(emitter.component().endsWith("-FLK"))
                 fittedFlak.add(new Ship.FlakMount(emitter.slotId(),
@@ -965,6 +984,7 @@ public final class Battle {
                         Shipyard.pointDefenseCycleAt(design,catalog,emitter.slotId())));
         }
         s.flakMounts=List.copyOf(fittedFlak);
+        s.precisionMounts=List.copyOf(fittedPrecision);
         if(!rocketTemplates.isEmpty()){
             List<RocketBarrage.Rack> fittedRacks=new ArrayList<>(rocketTemplates.size());
             for(RocketBarrage.Rack prototype:rocketTemplates)
@@ -1568,6 +1588,8 @@ public final class Battle {
         s.laserReload = Math.max(0, s.laserReload - DT);
         s.missileReload = Math.max(0, s.missileReload - DT);
         s.pdReload = Math.max(0, s.pdReload - DT);
+        for(Ship.PrecisionMount mount:s.precisionMounts)
+            mount.reload=Math.max(0,mount.reload-DT);
         for(Ship.FlakMount mount:s.flakMounts)
             mount.reload=Math.max(0,mount.reload-DT);
         s.kineticReload=Math.max(0,s.kineticReload-DT);
@@ -3476,12 +3498,20 @@ public final class Battle {
         // Hostile missiles, torpedoes and slow ballistic shells share the same
         // defensive attention. Threats are ranked by approximate time-to-range.
         var pdLaw=WeaponBehaviorTable.POINT_DEFENSE;
-        for(Ship defender:ships)if(defender.alive() && defender.laserPointDefenseEnabled
-                && defender.pdReload<=0
-                && defender.crewReadiness()>=0.05
-                && defender.pointDefenseCondition>pdLaw.minimumCondition()
-                && defender.pdRange>0 && defender.orders.pointDefense().ordnance()
-                && defender.power>=pdLaw.minimumPower()) {
+        for(Ship defender:ships)if(defender.alive()&&defender.laserPointDefenseEnabled
+                &&defender.crewReadiness()>=0.05
+                &&defender.pointDefenseCondition>pdLaw.minimumCondition()
+                &&defender.orders.pointDefense().ordnance()) {
+            List<Ship.PrecisionMount> sockets=defender.precisionMounts.isEmpty()
+                    ?java.util.Collections.singletonList(null):defender.precisionMounts;
+            for(Ship.PrecisionMount pdSocket:sockets){
+                if((pdSocket==null?defender.pdReload:pdSocket.reload)>0||
+                   defender.power<pdLaw.minimumPower())continue;
+                double pdRange=pdSocket==null?defender.pdRange:pdSocket.nominalRange;
+                ProjectileModel.Defense pdProfile=pdSocket==null?
+                        defender.pointDefenseProfile:pdSocket.profile;
+                double pdCycle=pdSocket==null?defender.pdCycle:pdSocket.cycle;
+                if(pdRange<=0)continue;
             Missile chosenMissile=null;Ballistic chosenShell=null;Rocket chosenRocket=null;
             double quickest=Double.POSITIVE_INFINITY;
             int acquiredRockets=0;
@@ -3489,8 +3519,8 @@ public final class Battle {
                 if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
-                        defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
-                        defender.pointDefenseProfile,m.spec,
+                        pdRange,defender.sensorsCondition,weather.sensorFactor(),
+                        pdProfile,m.spec,
                         OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
@@ -3507,8 +3537,8 @@ public final class Battle {
                 if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
                 double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
-                        defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
-                        defender.pointDefenseProfile,p.spec);
+                        pdRange,defender.sensorsCondition,weather.sensorFactor(),
+                        pdProfile,p.spec);
                 if(distance>detection)continue;
                 double eta=approachEta(defender.x,defender.y,
                         p.x,p.y,p.vx,p.vy,p.spec.speed());
@@ -3526,8 +3556,8 @@ public final class Battle {
                 if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
                 double distance=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
-                        defender.pdRange,defender.sensorsCondition,weather.sensorFactor(),
-                        defender.pointDefenseProfile,r.spec,
+                        pdRange,defender.sensorsCondition,weather.sensorFactor(),
+                        pdProfile,r.spec,
                         RocketBarrage.hotEmission(r.motor,r.burning()));
                 if(distance>detection)continue;
                 acquiredRockets++;
@@ -3543,7 +3573,9 @@ public final class Battle {
             }
             if(chosenMissile==null && chosenShell==null && chosenRocket==null)continue;
             defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
-            defender.pdReload=pdLaw.reload(false,defender.pdCycle,defender.pointDefenseCondition);
+            double nextPdReload=pdLaw.reload(false,pdCycle,defender.pointDefenseCondition);
+            if(pdSocket==null)defender.pdReload=nextPdReload;
+            else pdSocket.reload=nextPdReload;
             double tx=chosenMissile!=null?chosenMissile.x:
                     chosenShell!=null?chosenShell.x:chosenRocket.x;
             double ty=chosenMissile!=null?chosenMissile.y:
@@ -3551,8 +3583,9 @@ public final class Battle {
             int hostileSource=chosenMissile!=null?chosenMissile.sourceId:
                     chosenShell!=null?chosenShell.sourceId:chosenRocket.sourceId;
             long defensiveShot=nextVisualShotId++;
-            WeaponMuzzles.Origin pdMuzzle=WeaponMuzzles.at(
-                    defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot);
+            WeaponMuzzles.Origin pdMuzzle=pdSocket==null
+                    ?WeaponMuzzles.at(defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot)
+                    :WeaponMuzzles.atSlot(defender,WeaponMuzzles.Family.POINT_DEFENSE,pdSocket.slotId);
             visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                     defender.team,defender.id,hostileSource,pdMuzzle.x(),pdMuzzle.y(),tx,ty);
             beams.add(new Beam(defensiveShot,tick,pdMuzzle.x(),pdMuzzle.y(),
@@ -3562,7 +3595,7 @@ public final class Battle {
             ProjectileModel.Spec incoming=chosenMissile!=null?chosenMissile.spec:
                     chosenShell!=null?chosenShell.spec:chosenRocket.spec;
             double chance=ProjectileModel.interceptionChance(incoming,
-                    defender.pointDefenseProfile,defender.pointDefenseCondition,
+                    pdProfile,defender.pointDefenseCondition,
                     weather.accuracyFactor(),chosenMissile!=null?
                     StrictMath.hypot(chosenMissile.vx,chosenMissile.vy):
                     chosenRocket!=null?StrictMath.hypot(chosenRocket.vx,chosenRocket.vy):
@@ -3577,7 +3610,7 @@ public final class Battle {
             if(random.nextDouble()<chance){
                 if(chosenMissile!=null){
                     chosenMissile.integrity-=ProjectileModel.precisionPdDamage(
-                            chosenMissile.spec,defender.pointDefenseProfile);
+                            chosenMissile.spec,pdProfile);
                     if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
                         defender.intercepted++;missileIntercepts++;
                         if(chosenMissile.decoy)decoysIntercepted++;
@@ -3588,7 +3621,7 @@ public final class Battle {
                     }
                 }else if(chosenRocket!=null){
                     chosenRocket.integrity-=ProjectileModel.precisionPdDamage(
-                            chosenRocket.spec,defender.pointDefenseProfile);
+                            chosenRocket.spec,pdProfile);
                     if(chosenRocket.integrity<=0&&rockets.remove(chosenRocket)){
                         defender.intercepted++;rocketIntercepts++;
                         visual(chosenRocket.visualId,VisualPhase.INTERCEPT,"ROCKET",
@@ -3598,7 +3631,7 @@ public final class Battle {
                     }
                 }else{
                     chosenShell.integrity-=ProjectileModel.precisionPdDamage(
-                            chosenShell.spec,defender.pointDefenseProfile);
+                            chosenShell.spec,pdProfile);
                     if(chosenShell.integrity<=0 && ballistics.remove(chosenShell)){
                         defender.intercepted++;ballisticIntercepts++;
                         visual(chosenShell.visualId,VisualPhase.INTERCEPT,"KINETIC",
@@ -3608,34 +3641,43 @@ public final class Battle {
                 }
             }
         }
+        }
         for(Ship defender:ships)if(defender.alive()&&defender.laserPointDefenseEnabled
-                &&defender.pdReload<=0
                 &&defender.crewReadiness()>=0.05
                 &&defender.pointDefenseCondition>pdLaw.minimumCondition()
-                &&defender.pdRange>0
-                &&defender.orders.pointDefense().craft()
-                &&defender.power>pdLaw.minimumPower()){
+                &&defender.orders.pointDefense().craft()) {
+            List<Ship.PrecisionMount> sockets=defender.precisionMounts.isEmpty()
+                    ?java.util.Collections.singletonList(null):defender.precisionMounts;
+            for(Ship.PrecisionMount pdSocket:sockets){
+                if((pdSocket==null?defender.pdReload:pdSocket.reload)>0||
+                   defender.power<=pdLaw.minimumPower())continue;
+                double pdRange=pdSocket==null?defender.pdRange:pdSocket.nominalRange;
+                ProjectileModel.Defense pdProfile=pdSocket==null?
+                        defender.pointDefenseProfile:pdSocket.profile;
+                double pdCycle=pdSocket==null?defender.pdCycle:pdSocket.cycle;
+                if(pdRange<=0)continue;
             for(int i=crafts.size()-1;i>=0;i--) {
                 Craft craft=crafts.get(i);
                 if(craft.team==defender.team||!coversThreat(defender,craft.targetId)
                         || StrictMath.hypot(craft.x-defender.x,craft.y-defender.y)>
-                        ProjectileModel.acquisitionRange(defender.pdRange,
+                        ProjectileModel.acquisitionRange(pdRange,
                                 defender.sensorsCondition,weather.sensorFactor(),
-                                defender.pointDefenseProfile,craft.radarProfile()))continue;
+                                pdProfile,craft.radarProfile()))continue;
                 defender.power-=pdLaw.powerPerShot();defender.heat+=pdLaw.heatPerShot();
                 // Small precision beams can retarget fragile rockets quickly,
                 // but an aircraft requires a longer stable acquisition/dwell.
                 // Installed barrel count grants bounded extra opportunities;
                 // it does NOT turn four mounts into a 30-Hz fighter shredder.
-                double standardCycle=pdLaw.reload(true,defender.pdCycle,
+                double standardCycle=pdLaw.reload(true,pdCycle,
                                                    defender.pointDefenseCondition);
-                double aircraftDwell=defender.weaponEmitters.isEmpty()?0:
-                        1.2/StrictMath.sqrt(
-                                StrictMath.max(1,defender.laserPointDefenseMountCount));
-                defender.pdReload=StrictMath.max(standardCycle,aircraftDwell);
+                double aircraftDwell=pdSocket==null?0:1.2;
+                double nextPdReload=StrictMath.max(standardCycle,aircraftDwell);
+                if(pdSocket==null)defender.pdReload=nextPdReload;
+                else pdSocket.reload=nextPdReload;
                 long defensiveShot=nextVisualShotId++;
-                WeaponMuzzles.Origin pdMuzzle=WeaponMuzzles.at(
-                        defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot);
+                WeaponMuzzles.Origin pdMuzzle=pdSocket==null
+                    ?WeaponMuzzles.at(defender,WeaponMuzzles.Family.POINT_DEFENSE,defensiveShot)
+                    :WeaponMuzzles.atSlot(defender,WeaponMuzzles.Family.POINT_DEFENSE,pdSocket.slotId);
                 visual(defensiveShot,VisualPhase.FIRE,"POINT_DEFENSE",
                         defender.team,defender.id,craft.sourceId,
                         pdMuzzle.x(),pdMuzzle.y(),craft.x,craft.y);
@@ -3643,7 +3685,7 @@ public final class Battle {
                         craft.x,craft.y,defender.team,DamageType.LASER,true));
                 ProjectileModel.Spec signature=craft.radarProfile();
                 double aircraftChance=ProjectileModel.interceptionChance(signature,
-                        defender.pointDefenseProfile,defender.pointDefenseCondition,
+                        pdProfile,defender.pointDefenseCondition,
                         weather.accuracyFactor());
                 if(!defender.weaponEmitters.isEmpty()){
                     // Aircraft are maneuvering large bodies, unlike point-like
@@ -3663,7 +3705,7 @@ public final class Battle {
                     // fixtures retain their historical combat behavior.
                     double craftScale=defender.weaponEmitters.isEmpty()?
                             pdLaw.craftDamageMultiplier():0.85;
-                    hitCraft(craft,defender.pointDefenseProfile.damage()*craftScale,
+                    hitCraft(craft,pdProfile.damage()*craftScale,
                             defender,defensiveShot,"POINT_DEFENSE");
                     pointDefenseCraftHits++;
                     if(craft.integrity<=0){
@@ -3672,6 +3714,7 @@ public final class Battle {
                 }
                 break;
             }
+        }
         }
         for (int i = missiles.size() - 1; i >= 0; i--) {
             Missile m = missiles.get(i);
