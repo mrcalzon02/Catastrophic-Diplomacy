@@ -33,7 +33,7 @@ final class ShipSurfaceDamageVisual {
 
     /**
      * The exposed metal is a silhouette-clipped sublayer, not another ship
-     * sprite. Darken RGB to 40% of the previous 30/70 composite; preserve
+     * sprite. Darken RGB to 28% of the previous 30/70 composite; preserve
      * the original silhouette alpha. Empty PNG pixels must remain empty.
      * A fully transparent material sample must not turn an opaque source
      * pixel into undefined black/transparent data: use the source palette.
@@ -48,8 +48,8 @@ final class ShipSurfaceDamageVisual {
                             :(source>>>16)&255;
         int b=materialExists?(((source>>>8)&255)*3+((material>>>8)&255)*7)/10
                             :(source>>>8)&255;
-        return (Math.round(r*.40f)<<24)|(Math.round(g*.40f)<<16)
-                |(Math.round(b*.40f)<<8)|a;
+        return (Math.round(r*.28f)<<24)|(Math.round(g*.28f)<<16)
+                |(Math.round(b*.28f)<<8)|a;
     }
 
     /**
