@@ -1493,6 +1493,45 @@ public final class Battle {
      * real sensors reacquire a target. HOLD/LAST_STAND ships remain stationary;
      * mobile ships sweep broader sectors after prolonged loss of contact.
      */
+    private ContactTrack newestValidTrack(Ship observer){
+        if(observer.power<=3||observer.sensorsCondition<=.05
+                ||observer.crewReadiness()<.05)return null;
+        ContactTrack newest=null;
+        int window=(int)(observer.network.trackMemoryTicks()
+                *StrictMath.min(1,observer.sensorsCondition));
+        if(window>0)for(ContactTrack track:observer.knownTracks.values()){
+            long age=tick-track.tick;
+            if(age<0||age>window)continue;
+            if(newest==null||track.tick>newest.tick)newest=track;
+        }
+        // A track-link is not a clairvoyant scanner. It relays only previously
+        // observed, time-limited fixes from allied powered TRK+LNK hardware.
+        if(observer.network.trackRelayRange()>0){
+            for(Ship source:ships){
+                if(source==observer||source.team!=observer.team||!source.alive()
+                        ||source.power<=3||source.crewReadiness()<.05
+                        ||source.network.trackRelayCapacity()<=0
+                        ||source.network.trackMemoryTicks()<=0)continue;
+                double range=StrictMath.min(observer.network.trackRelayRange(),
+                        source.network.trackRelayRange())
+                        *StrictMath.min(source.sensorsCondition,
+                                observer.sensorsCondition);
+                if(range<=0||StrictMath.hypot(source.x-observer.x,
+                        source.y-observer.y)>range)continue;
+                int windowSource=(int)(source.network.trackMemoryTicks()
+                        *StrictMath.min(1,source.sensorsCondition));
+                // Rank by timestamp first; at most the paid relay capacity
+                // can be exported from this single source per update.
+                for(ContactTrack track:source.knownTracks.values()){
+                    long age=tick-track.tick;
+                    if(age<0||age>windowSource)continue;
+                    if(newest==null||track.tick>newest.tick)newest=track;
+                }
+            }
+        }
+        return newest;
+    }
+
     private void searchForContact(Ship ship) {
         // Advance patrol waypoints on simulation ticks, not frame time or
         // hidden enemy coordinates. Both fleets search overlapping lanes;
@@ -1515,6 +1554,14 @@ public final class Battle {
             long legY=ship.id*11L+tick/900L;
             rallyX=640+((legX%9)-4)*145*expansion;
             rallyY=565+((legY%7)-3)*140*expansion;
+        }
+        ContactTrack lastFix=newestValidTrack(ship);
+        if(lastFix!=null){
+            // Dead reckoning only from OBSERVED velocity; do not read a
+            // presently hidden target's true coordinates or heading.
+            double age=StrictMath.min(1.5,(tick-lastFix.tick)*DT);
+            rallyX=lastFix.x+lastFix.vx*age;
+            rallyY=lastFix.y+lastFix.vy*age;
         }
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
                 ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
@@ -1979,7 +2026,10 @@ public final class Battle {
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
                 double distance = StrictMath.hypot(s.x - actor.x, s.y - actor.y);
                 if(!hasTargetContact(actor,s,distance))continue;
-                double estimationError = (random.nextDouble() - 0.5) * 0.52 / (1 + actor.commanderSkill * 0.4);
+                double estimationError = (random.nextDouble() - 0.5) * 0.52 /
+                        (1+actor.commanderSkill*.4+actor.network.trackingPrecision()
+                         +(.65*(actor.network.resolutionGain()-1))
+                         +actor.commandAssist);
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
             }
@@ -2013,7 +2063,10 @@ public final class Battle {
             if(classOrder.priority()==0)continue;
             double distance=StrictMath.hypot(candidate.x-actor.x,candidate.y-actor.y);
             if(!hasTargetContact(actor,candidate,distance))continue;
-            double error=(random.nextDouble()-0.5)*0.52/(1+actor.commanderSkill*0.4);
+            double error=(random.nextDouble()-.5)*.52/
+                    (1+actor.commanderSkill*.4+actor.network.trackingPrecision()
+                     +(.65*(actor.network.resolutionGain()-1))
+                     +actor.commandAssist);
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
             if(actor.standingOrders!=null &&
@@ -2025,7 +2078,8 @@ public final class Battle {
                 case COOPERATE -> {
                     int allies=focusCounts.getOrDefault(candidate.id,0)
                             -(actor.lastTargetId==candidate.id?1:0);
-                    assessed-=Math.min(6,Math.max(0,allies))*25;
+                    assessed-=Math.min(6,Math.max(0,allies))
+                            *(25+18*actor.commandAssist);
                 }
                 case RETALIATE -> {
                     if(candidate.id==actor.lastAttackerId)assessed-=225;
@@ -4013,7 +4067,8 @@ public final class Battle {
                 }
                 double trackLoad=precisionTrackLoadMultiplier(acquiredTracks,
                         StrictMath.max(1,defender.precisionMounts.size()),
-                        diagnosticPrecisionTracksPerMount,
+                        StrictMath.min(16,diagnosticPrecisionTracksPerMount+
+                                StrictMath.max(0,defender.network.targetCapacity()-1)),
                         diagnosticPrecisionTrackExponent);
                 if(!acquirePrecisionTarget(defender,pdSocket,physicalId,tx,ty,
                         tick,trackLoad))continue;
