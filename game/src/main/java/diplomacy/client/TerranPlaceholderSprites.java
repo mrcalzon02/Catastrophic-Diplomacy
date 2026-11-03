@@ -956,12 +956,23 @@ public final class TerranPlaceholderSprites implements Disposable {
                 surfaces.damage(batch,null);
                 drawWhole(batch,tex,pose,width,height,rotation);
             }else{
-                // Source art must NEVER be replaced by the tiny damage mask.
-                // Only the actual punched-through regions reveal the shared
-                // full-resolution, silhouette-clipped structural material.
+                // The structurally exposed metal MUST be drawn without
+                // the ORIGINAL hull's normal/emissive maps. Those maps gave
+                // cut-through areas the same bright cyan/purple glow as the
+                // intact upper art and concealed the dark structural backing.
+                // Keep the original source alpha and deception opacity.
                 surfaces.damage(batch,null);
+                surfaces.unlit(batch);
+                batch.setColor(1f,1f,1f,
+                        DeceptionProjection.hullOpacity(ship,battle.tick));
                 drawWhole(batch,exposedInterior(tex,ship.hull<ship.maxHull*.30),
                         pose,width,height,rotation);
+                // Rebind the normal/emissive surface ONLY for intact armor
+                // pixels of the overlying original full-resolution sprite.
+                surfaces.bind(batch,tex);
+                surfaces.color(batch,rotation,(float)Math.max(0,
+                        Math.min(1,ship.hull/Math.max(1,ship.maxHull))),
+                        DeceptionProjection.hullOpacity(ship,battle.tick));
                 surfaces.damage(batch,peeled.get(ship.id).overlay);
                 drawWhole(batch,tex,pose,width,height,rotation);
             }
