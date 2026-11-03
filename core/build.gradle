@@ -62,7 +62,16 @@ tasks.register('sensingModulesSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+tasks.register('battleTerminationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Physical 1v1 disarmament, 60-minute horizon, delayed ordnance, survivor accounting and campaign draw.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleTerminationTest'
+    dependsOn testClasses
+}
+
 tasks.register('battleArenaSmoke', JavaExec) {
+    dependsOn(tasks.named('battleTerminationSmoke'))
     group = 'verification'
     description = 'Headless 200v200 limit, fixed world boundaries, projectile age and arena-edge expiration.'
     classpath = sourceSets.test.runtimeClasspath
