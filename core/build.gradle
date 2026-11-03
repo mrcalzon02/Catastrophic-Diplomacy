@@ -92,7 +92,16 @@ tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
     dependsOn(tasks.named('battleArenaSmoke'))
 }
 
+tasks.register('sensorLightTimeSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Causal light-time sensor history, active echo and bounded relay fixtures.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorLightTimeHistoryTest'
+    dependsOn testClasses
+}
+
 tasks.register('sensorTacticalPictureSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorLightTimeSmoke'))
     group = 'verification'
     description = 'Actual commander SHR/TRK/LNK/FCM picture, stale coordinates and no invisible weapon locks.'
     classpath = sourceSets.test.runtimeClasspath
