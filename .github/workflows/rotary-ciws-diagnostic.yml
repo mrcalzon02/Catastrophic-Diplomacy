@@ -5,6 +5,8 @@ on:
     paths:
       - 'core/src/main/java/diplomacy/sim/RotaryPointDefense.java'
       - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/test/java/diplomacy/sim/SensorTacticalPictureTest.java'
+      - 'game/src/main/java/diplomacy/client/SensorContactOverlay.java'
       - 'core/src/main/java/diplomacy/sim/BattleArena.java'
       - 'core/src/main/java/diplomacy/sim/BattleTermination.java'
       - 'core/src/main/java/diplomacy/sim/CampaignEncounter.java'
@@ -51,6 +53,9 @@ jobs:
       - name: Verify baked source geometry and functional hardpoint identities
         id: baked_geometry
         run: gradle --no-daemon :core:hullLayoutsSmoke
+      - name: Verify bounded live and retained fleet sensor observations
+        id: sensor
+        run: gradle --no-daemon :core:sensorNetworkSmoke
       - name: Verify mounted rotary gun, arena limits and finite projectile lifetimes
         id: physical
         run: gradle --no-daemon :core:rotaryCiwsDiagnostic
