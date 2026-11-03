@@ -85,12 +85,17 @@ public final class PointDefenseThreatMatrixDiagnostic {
         if(!test)throw new IllegalStateException(what);
     }
     private static Shipyard.Design pdFitting(TechnologyCatalog catalog,int tier,int mounts){
+        return pdFitting(catalog,tier,mounts,"PD");
+    }
+    private static Shipyard.Design pdFitting(TechnologyCatalog catalog,int tier,int mounts,
+                                           String family){
+        require("PD".equals(family)||"FLK".equals(family),"Unknown physical defense family");
         Shipyard.Design fit=Shipyard.bareHull(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT);
         int count=0;
         for(Shipyard.Slot slot:fit.hull.slots){
             if(count>=mounts)break;
             if(slot.mount()!=Shipyard.Mount.WEAPON)continue;
-            fit=fit.install(slot.index(),"BASE-TER-PD");
+            fit=fit.install(slot.index(),"BASE-TER-"+family);
             if(tier>0)fit=fit.stage(slot.index(),Shipyard.Track.SPECIALIST,tier);
             count++;
         }
@@ -117,6 +122,11 @@ public final class PointDefenseThreatMatrixDiagnostic {
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
                               int separation){
+        return run(catalog,threat,tier,mounts,seed,pdMode,separation,"PD");
+    }
+    private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
+                              int mounts,int seed,BattleOrders.PointDefense pdMode,
+                              int separation,String family){
         if(separation!=220&&separation!=390)
             throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
@@ -128,7 +138,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         }else{
             attacker=battle.addShip(0,Battle.Faction.TERRAN,180,330);
         }
-        battle.spawnWing(1,pdFitting(catalog,tier,mounts),catalog,1,
+        battle.spawnWing(1,pdFitting(catalog,tier,mounts,family),catalog,1,
                 180+separation,330);
         Battle.Ship defender=battle.ships().get(1);
         battle.registerDiagnosticStationaryTarget(defender.id);
@@ -280,8 +290,67 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 protectionLoss,initialPower-defender.power,heatPeak,
                 defender.pointDefenseProfile.tracking(),defender.pdRange);
     }
+    /** P0 family comparison: real fitted existing PD versus existing FLK.
+     * Deliberately records actual current combat behavior before the redesign.
+     * Attackers remain legacy base-tier physical launch fixtures, so these
+     * results are NOT IX attacker versus IX defender parity measurements. */
+    private static void familyP0(TechnologyCatalog catalog)throws IOException{
+        Path output=Path.of("test-output","pd-family-p0");
+        Files.createDirectories(output);
+        List<String> csv=new ArrayList<>();
+        csv.add("defense_family,threat,attack_stage,pd_stage,mounts,separation,seeds,launched,physical_intercepts,intercept_pct,terminal_entries,actual_impacts,hold_fire_impacts,pd_shots,defender_damage,hold_fire_damage,result_status");
+        StringBuilder summary=new StringBuilder("# Existing physical PD versus FLK: P0 baseline\\n\\n");
+        summary.append("All defender modules are genuine equipped Terran weapon hardpoints; PD and FLK use their actual existing combat paths. ")
+                .append("The attacker is an unupgraded real physical launcher fixture, not a stage-IX fitted attacker. ")
+                .append("All balance readings are advisory. No other PD families are fabricated.\\n\\n");
+        summary.append("|Threat|Defense|Def tier|Mounts|Launched|Intercepted|Kill %|Terminal|Impacts|Hold-fire impacts|PD shots|\\n");
+        summary.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\\n");
+        Threat[] threats={Threat.KINETIC_STANDARD,Threat.KINETIC_RELATIVISTIC,
+                Threat.MISSILE_MICRO_SWARM,Threat.MISSILE_CASCADE_SWARM,
+                Threat.TORPEDO_HEAVY_STRIKE,Threat.FIGHTER_INTERCEPTOR,
+                Threat.FIGHTER_TORPEDO_BOMBER};
+        for(Threat threat:threats){
+            int range=threat.craft()?220:390;
+            for(String family:new String[]{"PD","FLK"})
+                for(int rank:new int[]{0,9})
+                    for(int mounts:new int[]{1,4}){
+                        int fired=0,killed=0,entries=0,impacts=0,controlImpacts=0,shots=0;
+                        double damage=0,controlDamage=0;
+                        for(int seed=0;seed<2;seed++){
+                            Result active=run(catalog,threat,rank,mounts,seed,
+                                    BattleOrders.PointDefense.BALANCED,range,family);
+                            Result control=run(catalog,threat,rank,mounts,seed,
+                                    BattleOrders.PointDefense.HOLD_FIRE,range,family);
+                            fired+=active.primaryLaunched;
+                            killed+=threat.craft()?active.craftLost:active.primaryIntercepted;
+                            entries+=active.terminalEntries;
+                            impacts+=threat.craft()?active.secondaryHits:active.primaryHits;
+                            controlImpacts+=threat.craft()?control.secondaryHits:control.primaryHits;
+                            shots+=active.shots;
+                            damage+=active.shieldArmorHullLoss;
+                            controlDamage+=control.shieldArmorHullLoss;
+                        }
+                        require(fired>0,"No real physical launch in P0 "+threat+"/"+family);
+                        double rate=100.0*killed/fired;
+                        csv.add(String.format(Locale.ROOT,
+                                "%s,%s,0,%d,%d,%d,2,%d,%d,%.3f,%d,%d,%d,%d,%.4f,%.4f,MEASURED_LEGACY_ATTACKER",
+                                family,threat,rank,mounts,range,fired,killed,rate,
+                                entries,impacts,controlImpacts,shots,damage,controlDamage));
+                        summary.append(String.format(Locale.ROOT,
+                                "|%s|%s|%d|%d|%d|%d|%.1f%%|%d|%d|%d|%d|\\n",
+                                threat,family,rank,mounts,fired,killed,rate,
+                                entries,impacts,controlImpacts,shots));
+                    }
+        }
+        Files.write(output.resolve("p0.csv"),csv,StandardCharsets.UTF_8);
+        Files.writeString(output.resolve("summary.md"),summary.toString(),StandardCharsets.UTF_8);
+        System.out.print(summary);
+        System.out.println("PD_FAMILY_P0_ROWS="+(csv.size()-1));
+    }
     public static void main(String[] args)throws IOException{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        if(args.length==1&&"--p0".equals(args[0])){familyP0(catalog);return;}
+        require(args.length==0,"Unrecognized point-defense diagnostic argument");
         Path output=Path.of("test-output","pd-interception-matrix");
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
