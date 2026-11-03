@@ -81,9 +81,14 @@ final class ShipSurfaceLighting implements Disposable {
         "  vec3 oxide=mix(vec3(0.79,0.60,0.31),vec3(0.64,0.39,0.29),smoothstep(0.07,0.29,phase));\n"+
         "  oxide=mix(oxide,vec3(0.49,0.35,0.66),smoothstep(0.30,0.57,phase));\n"+
         "  oxide=mix(oxide,vec3(0.31,0.52,0.81),smoothstep(0.59,0.88,phase));\n"+
-        "  float anneal=clamp((peel.b-0.56)/0.44,0.0,1.0)*oxideMix;\n"+
+        "  float temper=clamp((peel.b-0.56)/0.44,0.0,1.0);\n"+
+        "  // Cooled violet/blue plating should be visible outside the warmer\n"+
+        "  // score. Previously B opacity falloff suppressed this broad band\n"+
+        "  // and left an orange crater. Color strength stays tied to oxide.\n"+
+        "  float coolPhase=smoothstep(0.40,0.69,phase);\n"+
+        "  float anneal=oxideMix*max(temper,0.46*coolPhase);\n"+
         "  float luma=dot(albedo.rgb,vec3(0.2126,0.7152,0.0722));\n"+
-        "  albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.33+0.15*smoothstep(0.06,0.70,luma)));\n"+
+        "  albedo.rgb=mix(albedo.rgb,oxide,anneal*(0.39+0.15*smoothstep(0.06,0.70,luma)));\n"+
         "  float laserLip=smoothstep(0.86,0.97,peel.b)*smoothstep(0.04,0.35,peel.a)*oxideMix;\n"+
         "  residualHeat+=vec3(0.32,0.115,0.025)*laserLip*0.72;\n"+
         " }\n"+
