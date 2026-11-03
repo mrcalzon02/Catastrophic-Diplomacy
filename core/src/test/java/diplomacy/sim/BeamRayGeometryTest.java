@@ -39,8 +39,10 @@ public final class BeamRayGeometryTest {
         Battle b=new Battle(seed);
         Battle.Ship gun=b.addShip(0,Battle.Faction.TERRAN,100,100);
         Battle.Ship victim=b.addShip(1,Battle.Faction.DRAXIAN,260,100);
-        b.registerDiagnosticStationaryTarget(gun.id);
+        // Only the receiving dummy is NO-AI. Registering the gun ship as
+        // diagnostic-stationary suppresses its entire captain/fire loop.
         b.registerDiagnosticStationaryTarget(victim.id);
+        gun.speed=0; // Shooter stays nearby but still runs real fire control.
         gun.power=100;gun.powerRegen=100;
         gun.sensorRange=500;gun.infraredRange=gun.xrayRange=gun.graviticRange=0;
         gun.laserDamage=type==Battle.DamageType.LASER?12:0;
@@ -71,7 +73,10 @@ public final class BeamRayGeometryTest {
             confirmed++;
         }
         require(!fires.isEmpty()&&confirmed>0,
-                "Installed "+type+" did not emit and physically connect in a real battle");
+                "Installed "+type+" failed live beam trial: fire="+fires.size()+
+                " impacts="+confirmed+" tick="+b.tick+" gunPower="+gun.power+
+                " reload="+(type==Battle.DamageType.LASER?gun.laserReload:
+                type==Battle.DamageType.PLASMA?gun.plasmaReload:gun.particleReload));
         require(victim.hull<=initialHull,
                 "A physical beam collision increased target hull integrity");
         System.out.println("PASS live "+type+" physical beam fire/impact parity; "+
