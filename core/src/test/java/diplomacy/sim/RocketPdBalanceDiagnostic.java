@@ -111,6 +111,15 @@ public final class RocketPdBalanceDiagnostic {
                               boolean evasive,boolean pdOnline,int seed,double pressure,
                               double acquisitionScale,boolean coordinated,int defenderTier,
                               double sustainedThrustScale) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,
+                seed,pressure,acquisitionScale,coordinated,defenderTier,
+                sustainedThrustScale,0);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure,
+                              double acquisitionScale,boolean coordinated,int defenderTier,
+                              double sustainedThrustScale,int channelsPerMount) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
@@ -121,6 +130,8 @@ public final class RocketPdBalanceDiagnostic {
             battle.configurePrecisionReservationsForDiagnostic(false);
         if(sustainedThrustScale!=1.0)
             battle.configureSustainedRocketThrustForDiagnostic(sustainedThrustScale);
+        if(pdOnline&&channelsPerMount>0)
+            battle.configurePrecisionTrackCapacityForDiagnostic(channelsPerMount);
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,defenderTier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
@@ -231,6 +242,14 @@ public final class RocketPdBalanceDiagnostic {
     /** Verify actual installed research, cloned live racks and immutable
      * propulsion factor remain aligned, independent of accuracy/reload stats. */
     private static void verifyFittedMotorResearch(TechnologyCatalog tech){
+        require(Battle.precisionTrackLoadMultiplier(0,4,4)==1.0,
+                "Empty optical channels generated fictitious overload");
+        require(Battle.precisionTrackLoadMultiplier(16,4,4)==1.0,
+                "Precisely provisioned optical channels were overloaded");
+        require(StrictMath.abs(Battle.precisionTrackLoadMultiplier(64,4,4)-2.0)<1e-8,
+                "Finite CIWS optical overload does not account for emitter count");
+        require(Battle.precisionTrackLoadMultiplier(64,4,0)==1.0,
+                "Disabled optical experiment leaked into ordinary combat");
         double previous=0;
         for(int tier:new int[]{0,3,6,9}){
             Shipyard.Design design=fitting(tech,"RKG",4,tier,false);
@@ -562,6 +581,62 @@ public final class RocketPdBalanceDiagnostic {
                 "caps, finite rocket ammunition and real collision physics. "+
                 "Compare genuine impacts against each matched PD-off control; "+
                 "no interception percentage is a release gate.\n");
+        // All physical threat groups share one opt-in optical track-capacity
+        // measurement. Unlike an RNG accuracy penalty, extra contacts consume
+        // time as the fitted turrets rotate and identify each missile/rocket.
+        detail.append("\n## Physical simultaneous CIWS optical-track capacity A/B\n\n");
+        detail.append("|Att tier|PD tier|Motor|Moving|Tracks/mount|Rockets|Intercepted|"+
+                "Escape %|Terminal %|Hits|No-PD hits|PD shots|\n");
+        detail.append("|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        List<String> opticalRows=new ArrayList<>();
+        opticalRows.add("attacker_tier,pd_tier,motor,evasive,tracks_per_mount,"+
+                "launched,intercepted,escaped,escape_fraction,terminal_entries,"+
+                "terminal_fraction,impacts,control_impacts,pd_shots");
+        for(int[] stages:new int[][]{{0,0},{9,9},{9,0},{0,9}})
+            for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+                for(boolean moving:new boolean[]{false,true}){
+                    int offlineHits=0;
+                    int barrage=stages[0]==0?4:16;
+                    for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                        Sample offline=run(tech,RocketBarrage.Size.SIEGE,stages[0],
+                                4,barrage,motor,moving,false,seed,0,1.0,true,
+                                stages[1],1.0,0);
+                        offlineHits+=offline.collided();
+                    }
+                    for(int channels:new int[]{0,2,4,6,8}){
+                        int launched=0,killed=0,inner=0,impacts=0,shots=0;
+                        for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                            Sample active=run(tech,RocketBarrage.Size.SIEGE,stages[0],
+                                    4,barrage,motor,moving,true,seed,0,1.0,true,
+                                    stages[1],1.0,channels);
+                            launched+=active.launched();killed+=active.intercepted();
+                            inner+=active.terminalEntries();impacts+=active.collided();
+                            shots+=active.pdShots();
+                        }
+                        double escaped=launched==0?0:(launched-killed)/(double)launched;
+                        double terminal=launched==0?0:inner/(double)launched;
+                        opticalRows.add(String.format(Locale.ROOT,
+                                "%d,%d,%s,%s,%d,%d,%d,%d,%.6f,%d,%.6f,%d,%d,%d",
+                                stages[0],stages[1],motor,moving,channels,
+                                launched,killed,launched-killed,escaped,inner,terminal,
+                                impacts,offlineHits,shots));
+                        detail.append(String.format(Locale.ROOT,
+                                "|%d|%d|%s|%s|%d|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|\n",
+                                stages[0],stages[1],motor,moving,channels,
+                                launched,killed,escaped*100,terminal*100,
+                                impacts,offlineHits,shots));
+                    }
+                }
+        Files.write(output.resolve("optical-track-capacity-ab.csv"),
+                opticalRows,StandardCharsets.UTF_8);
+        detail.append("\nTracks/mount = 0 is the ACTUAL existing gameplay controller "+
+                "with no overload. A positive number is an opt-in laboratory "+
+                "model: detection remains per purchased socket, but optical "+
+                "lock time scales with sqrt(max(1, visible tracks / "+
+                "(fitted emitters * channels per emitter))). No missile receives "+
+                "a forced accuracy miss or a free interception; outcomes use "+
+                "real 30Hz trajectories, ammunition and hit resolution. "+
+                "No result is a release gate.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
