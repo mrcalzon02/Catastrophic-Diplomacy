@@ -10,7 +10,7 @@ import java.util.List;
  * Only completing every wave with survivors qualifies for a campaign victory.
  */
 public final class CampaignEncounter {
-    public enum Advance { ACTIVE, NEXT_WAVE, VICTORY, DEFEAT }
+    public enum Advance { ACTIVE, NEXT_WAVE, VICTORY, DEFEAT, DRAW }
     private final LevelEconomy.Level level;
     private final int deployed;
     private final Shipyard.Design opponent;
@@ -117,6 +117,9 @@ public final class CampaignEncounter {
      * The same Battle instance is retained across reinforcements; it is never reset.
      */
     public Advance advance(){
+        // The finite encounter watchdog cannot fabricate a victory or trigger
+        // the next hostile wave. A draw retains actual commissioned survivors.
+        if(battle.unresolved())return Advance.DRAW;
         // Retreating captains have already surrendered field control, even
         // if their engines have not carried them over the rear line yet.
         if(battle.engaged(0)==0)return Advance.DEFEAT;
