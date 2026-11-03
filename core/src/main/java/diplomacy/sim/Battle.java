@@ -4118,8 +4118,9 @@ public final class Battle {
                     !defender.orders.pointDefense().ordnance()||
                     defender.crewReadiness()<.05||
                     defender.pointDefenseCondition<=.2)continue;
+            // Keep expected damage reserved while the real penetrator is
+            // airborne. No full-fleet scan or invented instantaneous kill.
             java.util.Map<Long,Double> committed=defender.railDamageReservations;
-            committed.clear();
             for(RailPointDefense.Mount gun:defender.railMounts){
                 if(defender.power<8||defender.heat>=defender.maxHeat*.88||
                         defender.kineticAmmo<RailPointDefense.CARTRIDGES_PER_SHOT||
@@ -4156,20 +4157,31 @@ public final class Battle {
                 double dispersion=(random.nextDouble()-.5)*.016/
                         StrictMath.max(.35,gun.profile.tracking());
                 long id=nextVisualShotId++;
+                double predicted=RailPointDefense.directDamage(
+                        target.profile,gun.profile);
                 railPenetrators.add(new RailPointDefense.Penetrator(id,tick,
                         defender.team,defender.id,gun.slotId,
                         muzzle.x(),muzzle.y(),gun.bearing+dispersion,
-                        gun.nominalRange,gun.profile.damage()));
+                        gun.nominalRange,gun.profile.damage(),target.bodyId,predicted));
                 gun.fire(defender.pointDefenseCondition);
                 defender.kineticAmmo-=RailPointDefense.CARTRIDGES_PER_SHOT;
                 defender.power-=5.2;defender.heat+=5.4;
-                committed.merge(target.bodyId,
-                        RailPointDefense.directDamage(target.profile,gun.profile),
-                        Double::sum);
+                committed.merge(target.bodyId,predicted,Double::sum);
                 visual(id,VisualPhase.FIRE,"RAIL_PD",defender.team,defender.id,
                         target.sourceId,muzzle.x(),muzzle.y(),target.x,target.y);
             }
         }
+    }
+    /** Pending predicted damage ends with the actual projectile, whether
+     * that shot collides with its target, hits something else, or expires. */
+    private void releaseRailReservation(RailPointDefense.Penetrator shot){
+        Ship shooter=findShip(shot.sourceId);
+        if(shooter==null)return;
+        java.util.Map<Long,Double> pending=shooter.railDamageReservations;
+        double remaining=pending.getOrDefault(shot.assignedBodyId,0.0)-
+                shot.reservedDamage;
+        if(remaining<=1e-7)pending.remove(shot.assignedBodyId);
+        else pending.put(shot.assignedBodyId,remaining);
     }
     /** Exact swept solid-penetrator collision with moving actual bodies.
      * The first world-space intersection absorbs the shot; an unhit projectile
@@ -4179,6 +4191,7 @@ public final class Battle {
             RailPointDefense.Penetrator shot=railPenetrators.get(i);
             if(!BattleArena.contains(shot.x,shot.y)||
                     tick-shot.spawnTick>BattleArena.MAX_POINT_DEFENSE_SECONDS/DT){
+                releaseRailReservation(shot);
                 railPenetrators.remove(i);continue;
             }
             double dt=StrictMath.min(DT,shot.life);
@@ -4261,11 +4274,14 @@ public final class Battle {
                 }
                 visual(shot.visualId,VisualPhase.IMPACT,"RAIL_PD",shot.team,
                         shot.sourceId,0,shot.x,shot.y,shot.x,shot.y);
+                releaseRailReservation(shot);
                 railPenetrators.remove(i);
             }else{
                 shot.x=nx;shot.y=ny;
-                if(shot.life<=0||!BattleArena.contains(nx,ny))
+                if(shot.life<=0||!BattleArena.contains(nx,ny)){
+                    releaseRailReservation(shot);
                     railPenetrators.remove(i);
+                }
             }
         }
     }
