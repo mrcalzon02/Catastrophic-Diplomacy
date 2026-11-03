@@ -8,6 +8,7 @@ on:
       - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
       - 'game/src/main/java/diplomacy/client/ShipImpactProfiles.java'
       - 'assets/damage_masks/*.png'
+      - 'assets/damage_masks/hires96/*.png'
       - 'tools/audit_damage_mask_assets.py'
       - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
