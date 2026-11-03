@@ -1821,10 +1821,9 @@ public final class Battle {
         if(thrust) {
             steerToward(ship,rallyX,rallyY);
         } else {
-            // Coast to a halt when holding, at the patrol post, or powerless.
-            // Crucially, no-fuel hulls must never be propelled by search AI.
-            ship.vx*=0.82;ship.vy*=0.82;
-            ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+            // Braking is powered thrust, never free drag in vacuum.
+            // A depleted hull coasts on the last real momentum.
+            SublightPropulsion.advance(ship,0,0,DT);
         }
     }
 
@@ -2509,15 +2508,15 @@ public final class Battle {
             case MOVE -> {
                 double distance=StrictMath.hypot(command.x()-ship.x,command.y()-ship.y);
                 if(distance<=12) {
-                    ship.vx=0;ship.vy=0;
-                    ship.commandQueue.complete();
+                    SublightPropulsion.advance(ship,0,0,DT);
+                    if(StrictMath.hypot(ship.vx,ship.vy)<.15)
+                        ship.commandQueue.complete();
                 }else steerToward(ship,command.x(),command.y());
                 return true;
             }
             case HOLD -> {
-                ship.vx*=0.82;ship.vy*=0.82;
-                ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
-                // Unpowered inertia costs no thrust propellant.
+                SublightPropulsion.advance(ship,0,0,DT);
+                // Coasting remains physical if fuel is depleted.
                 ship.commandQueue.tickTimed();
                 return true;
             }
@@ -2549,8 +2548,7 @@ public final class Battle {
     private void orderedSteer(Ship ship,Ship target) {
         BattleOrders.Orders orders=ship.orders;
         if(orders.position()==BattleOrders.Position.HOLD){
-            ship.vx*=0.82;ship.vy*=0.82;
-            ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;
+            SublightPropulsion.advance(ship,0,0,DT);
             return;
         }
         Ship dedicated=findShip(ship.escortShipId);
@@ -2588,8 +2586,8 @@ public final class Battle {
         double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
         if(orders.position()!=BattleOrders.Position.KEEP_MOVING
                 &&distance>=preferredRange*0.5&&distance<=preferredRange){
-            ship.vx*=0.86;ship.vy*=0.86;
-            ship.x+=ship.vx*DT;ship.y+=ship.vy*DT;return;
+            SublightPropulsion.advance(ship,0,0,DT);
+            return;
         }
         if(distance<preferredRange*0.5){
             double dx=ship.x-target.x,dy=ship.y-target.y;
@@ -5705,6 +5703,9 @@ public final class Battle {
         for (Ship s : ships) {
             hash = mix(hash, s.id); hash = mix(hash, Double.doubleToLongBits(s.x));
             hash = mix(hash, Double.doubleToLongBits(s.y));
+            hash = mix(hash,Double.doubleToLongBits(s.vx));
+            hash = mix(hash,Double.doubleToLongBits(s.vy));
+            hash = mix(hash,s.propulsion.ordinal());
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));
