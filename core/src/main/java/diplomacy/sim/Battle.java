@@ -444,6 +444,8 @@ public final class Battle {
         /** Physical-world holographic contact currently deceiving this seeker. */
         public int falseContactIndex=-1;
         public double lastKnownX,lastKnownY,lastKnownVX,lastKnownVY;
+        /** Last physically received seeker sample, not target truth. */
+        public long lastObservationTick;
         void setPropulsion(OrdnancePropulsion.Mode mode){
             if(mode==null)throw new IllegalArgumentException("No propulsion mode");
             propulsionMode=mode;
@@ -5723,9 +5725,17 @@ public final class Battle {
             // Resolve real propulsion state before maneuvering. Cold-launched
             // canisters eject slowly without thrust, then light their main
             // engine. Heavy strikes boost/coast/restart for terminal attack.
-            double dx = target.x - m.x, dy = target.y - m.y, range = StrictMath.hypot(dx, dy);
+            // Current enemy geometry is used ONLY for real hull collision and
+            // physical submunition proximity. Guidance and terminal burn
+            // decisions consume a delayed onboard photon measurement.
+            double physicalDx=target.x-m.x,physicalDy=target.y-m.y;
+            double physicalRange=StrictMath.hypot(physicalDx,physicalDy);
+            OrdnanceSeeker.Return sensed=OrdnanceSeeker.passiveReturn(
+                    target,m.x,m.y,tick);
+            double measuredRange=sensed!=null?sensed.distance():
+                    StrictMath.hypot(m.lastKnownX-m.x,m.lastKnownY-m.y);
             m.flightTicks++;
-            if(OrdnanceSubmunitions.carrier(m.payload)&&range<=m.releaseRange){
+            if(OrdnanceSubmunitions.carrier(m.payload)&&physicalRange<=m.releaseRange){
                 // The parent has not reached the ship: deploying is not a hit.
                 // Children appended here are advanced starting on the NEXT tick.
                 missiles.remove(i);
@@ -5733,15 +5743,13 @@ public final class Battle {
                 continue;
             }
             m.thrustPhase=OrdnancePropulsion.phase(m.propulsionMode,m.flightTicks,
-                    m.ignitionDelayTicks,range,m.torpedo);
+                    m.ignitionDelayTicks,measuredRange,m.torpedo);
             if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
-            // Maintain lock with actual target RCS and ECM; a broken lock
-            // only reacquires on a bounded scan with stricter geometry.
-            double holograms=DeceptionProjection.hologramStrength(target);
-            boolean visible=OrdnanceSeeker.canTrack(range,target.radarCrossSection,
-                    StrictMath.min(0.95,target.ecmStrength*target.ecmCondition+
-                            0.45*holograms),m.guidanceQuality,
-                    m.torpedo,!m.seekerLocked);
+            // A seeker cannot see current target position or current ECM
+            // merely because a target entity remains alive. Relock needs
+            // a real delayed sample plus the normal staggered scan.
+            boolean visible=OrdnanceSeeker.canTrackReturn(
+                    sensed,m.guidanceQuality,m.torpedo,!m.seekerLocked);
             if(m.seekerLocked&&!visible)m.seekerLocked=false;
             else if(!m.seekerLocked&&visible
                     &&OrdnanceSeeker.scanDue(m.flightTicks,m.visualId))
@@ -5760,12 +5768,14 @@ public final class Battle {
                     m.lastKnownX=DeceptionProjection.ghostX(target,phantom,tick);
                     m.lastKnownY=DeceptionProjection.ghostY(target,phantom,tick);
                     m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
-                }else{
-                    m.lastKnownX=target.x;m.lastKnownY=target.y;
-                    m.lastKnownVX=target.vx;m.lastKnownVY=target.vy;
+                }else if(sensed!=null){
+                    var fix=sensed.sample();
+                    m.lastKnownX=fix.x();m.lastKnownY=fix.y();
+                    m.lastKnownVX=fix.vx();m.lastKnownVY=fix.vy();
+                    m.lastObservationTick=fix.tick();
                 }
             }else m.falseContactIndex=-1;
-            if (range < 13) {
+            if (physicalRange < 13) {
                 if(m.decoy){
                     // A decoy has NO warhead and may never apply hull damage.
                     visual(m.visualId,VisualPhase.TIMEOUT,"DECOY",
@@ -5775,19 +5785,26 @@ public final class Battle {
                         m.x,m.y,AmmunitionTable.warhead(m.warhead));
                 missiles.remove(i);continue;
             }
-            if (range > 0) {
+            if (measuredRange > 0) {
+                double measuredInterference=sensed==null?1:
+                        sensed.profile().ecmStrength()*
+                                sensed.profile().ecmCondition();
                 double guidance=Math.min(0.35,WeaponBehaviorTable.gun(
                         m.torpedo?DamageType.TORPEDO:DamageType.MISSILE).guidancePerTick()
                         *m.guidanceQuality
-                        *weather.guidanceFactor()*(1-target.ecmStrength*target.ecmCondition)
+                        *weather.guidanceFactor()*(1-measuredInterference)
                         *OrdnancePropulsion.guidanceMultiplier(m.thrustPhase)
                         *(m.seekerLocked?1:0));
                 // Apply bounded thrust/steering to persistent world-space
                 // velocity. Coast and cold eject preserve inertial motion.
                 if(m.propellant<=1e-9&&OrdnancePropulsion.burning(m.thrustPhase))
                     m.thrustPhase=OrdnancePropulsion.Phase.COAST;
+                double predictedSeconds=StrictMath.max(0,
+                        tick-m.lastObservationTick)*DT;
                 var steering=OrdnanceGuidance.aim(m.guidanceMode,m.x,m.y,m.vx,m.vy,
-                        m.lastKnownX,m.lastKnownY,m.lastKnownVX,m.lastKnownVY,
+                        m.lastKnownX+m.lastKnownVX*predictedSeconds,
+                        m.lastKnownY+m.lastKnownVY*predictedSeconds,
+                        m.lastKnownVX,m.lastKnownVY,
                         m.flightTicks,m.approachSide);
                 var nextVelocity=OrdnancePropulsion.advanceVelocity(
                         m.vx,m.vy,steering.dx(),steering.dy(),
@@ -6131,6 +6148,7 @@ public final class Battle {
             hash=mix(hash,m.approachSide);
             hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.seekerLocked?1:0);
+            hash=mix(hash,m.lastObservationTick);
             hash=mix(hash,m.falseContactIndex);
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownX));
             hash=mix(hash,Double.doubleToLongBits(m.lastKnownY));
