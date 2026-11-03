@@ -281,7 +281,7 @@ kill attribution obey objective accounting invariants. The production
 `breachStores` process destroys inventory after real penetration,
 so total store depletion cannot be called 'PD ammo fired'.
 
-The four ordnance-only conditions retained a peak of 881-891 active
+The two ordnance-only conditions retained a peak of 881-891 active
 physical projectile bodies, with no craft artificially reintroduced.
 The headless ACTIVE simulation took 2.47s wall time versus 2.10s in
 HOLD_FIRE on that runner, but these are **not** isolated PD CPU timings:
