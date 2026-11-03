@@ -1075,3 +1075,39 @@ tasks.register('prepareShipSurfaceMaps') {
                     normal.size()+' normal / '+emit.size()+' emissive')
     }
 }
+
+
+/**
+ * One original-PNG-derived hardpoint map for the headless server AND graphical
+ * Android/desktop builds. This is asset baking, not an additional release job.
+ * The baked resource is copied into core's ordinary Java resources and both
+ * graphics clients' standard asset directories.
+ */
+def approvedHardpointsOutput = layout.buildDirectory.dir('generated/cd-hardpoints')
+tasks.register('bakeApprovedHardpoints') {
+    group = 'assets'
+    description = 'Bake source-alpha weapon and module anchors from all 110 approved hull PNGs.'
+    dependsOn ':core:compileJava'
+    dependsOn tasks.named('prepareStage1Art')
+    dependsOn tasks.named('prepareLegacyFactionArt')
+    inputs.file file('tools/ApprovedHardpointBake.java')
+    inputs.files tasks.named('prepareStage1Art')
+    inputs.files tasks.named('prepareLegacyFactionArt')
+    inputs.files fileTree('assets/ships/factions') { include '**/*.png' }
+    outputs.file approvedHardpointsOutput.map { it.file('hardpoints/approved-v1.txt') }
+    doLast {
+        def target = approvedHardpointsOutput.get().file('hardpoints/approved-v1.txt').asFile
+        target.parentFile.mkdirs()
+        project.exec {
+            executable new File(System.getProperty('java.home'),'bin/java').absolutePath
+            args '-Djava.awt.headless=true','-cp',
+                    project(':core').layout.buildDirectory.dir('classes/java/main').get().asFile.absolutePath,
+                    'tools/ApprovedHardpointBake.java',target.absolutePath,
+                    file('assets').absolutePath,
+                    layout.buildDirectory.dir('generated/cd-stage1').get().asFile.absolutePath,
+                    layout.buildDirectory.dir('generated/cd-legacy-factions').get().asFile.absolutePath
+        }
+        if(!target.isFile()||target.length()<2000)
+            throw new GradleException('No valid original-art hardpoint map was produced')
+    }
+}
