@@ -104,6 +104,20 @@ public final class ShipSurfaceDamageCaptureTest {
                     scene.armorExposure(),scene.internalExposure(),scene.wornCells(),
                     scene.exposedCells(),scene.milestoneReached(),scene.syntheticStress());
         }
+        // Optional captures must retain ACTUAL simulated visual events,
+        // not generate impact particles at artificial positions or times.
+        var vfx=ShipSurfaceDamageCapture.create(tech,23,true);
+        check(vfx.capturedEffects()!=null && vfx.hits()>0,
+                "Laser lane must capture genuinely fitted weapon impacts");
+        check(vfx.capturedEffects().count()>0,
+                "Recently struck laser target must retain a real spark pulse");
+        check(vfx.capturedEffects().afterglowCount()>0,
+                "Armor loss must retain short-lived heat from a real hit");
+        var pristine=ShipSurfaceDamageCapture.create(tech,24,true);
+        check(pristine.capturedEffects()!=null &&
+                pristine.capturedEffects().count()==0 &&
+                pristine.capturedEffects().afterglowCount()==0,
+                "Pristine target must never receive synthetic hit effects");
         var a=ShipSurfaceDamageCapture.create(tech,2);
         var b=ShipSurfaceDamageCapture.create(tech,2);
         check(a.ticks()==b.ticks()&&a.hits()==b.hits()&&
