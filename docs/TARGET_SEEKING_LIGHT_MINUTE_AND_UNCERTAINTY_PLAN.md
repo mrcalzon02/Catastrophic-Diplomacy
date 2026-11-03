@@ -1,0 +1,309 @@
+# Light-minute battlefield, probabilistic target seeking and physical aim error
+
+**Design proposal • 2026-11-03 • no code or production balance change implied by this document**
+
+## Design intent
+
+Our preordered auto-battler should not grant every cannon knowledge of the
+instantaneous position, future acceleration, or identity of a distant hostile.
+Detected, identified, tracked, fire-control-grade and *actually struck* are
+separate events. An inaccurate solution can still strike a ship when the
+actual projectile/ray crosses its silhouette. A correct solution can miss when
+the target maneuvers after observation. Weapon impact is physical; no binary
+"incorrect track means automatic miss" rule.
+
+Current foundation: 11 factions, 506 source-verified faction/hull variants,
+fixed 3,840×2,160 arena, 200 per side, 30Hz; RDR/IRT/XRY/GRA/ACU and stealth
+countermeasures; SHR/RES/TRK/LNK/FCM/CAP networks with separately tested
+read-only command observations. Preserve all their hardware IDs, researched
+variants, socket indices, existing saves and original sprite artwork.
+
+## 1. One light-minute *diagonal*, not endless simulation space
+
+Set the arena's maximum corner-to-corner distance to approximately one
+light-minute, without changing the boundaries:
+
+- Fixed world: x=-1280..2560 (3,840 units); y=-720..1440 (2,160 units).
+- Diagonal: 4,405.814 world units.
+- Light-minute: **17,987,547.48 km**, from c=299,792,458 m/s.
+- Illustrative physical unit: ~4,082.684 km/world unit.
+- Light propagation constant: **c≈73.430 world units / real second**.
+- Horizontal one-way light time: 52.29 s; vertical: 29.42 s; diagonal: 60 s.
+- Passive optical/IR arrival reports the state at **observation timestamp
+  earlier than receipt** by approx `distance/c`; active radar/X-ray echo
+  has an approximate **round-trip** delay `2*distance/c`. Inter-ship
+  command transmissions also incur propagation, not instant teleportation.
+- Keep the max 200v200 arena and finite projectile lifetimes. No distant
+  target or round may expand the simulation world.
+
+**Physics consistency blocker to settle before claiming realism:** currently
+a basic hull can move tens of world units per simulated second, some legacy
+hulls move ~62 units/s, and projectile specs allow up to 1,500 units/s. This
+is comparable to, or exceeds, **c=73.43 units/s** under a literal physical
+mapping. Even the base drawn 34-unit-high ship would be ~138,811 km long
+at 1× scale, and ~69,406 km after halving—still a *stylized tactical glyph*,
+not a literal ship diameter. The project MUST NOT claim both literal light
+delay and existing engine speed values are SI-consistent.
+
+Adopt a two-layer contract rather than quietly changing all gameplay:
+`WorldDistanceScale` documents the one-light-minute sensor range mapping;
+`SimulationMotionScale` records the *explicit* combat speed/time compression
+choice. Stage velocity normalization and projectile time-of-flight in a
+separate, test-covered migration. No superluminal ordinary shells or hulls
+should be described as physically realistic. If physical fidelity is chosen,
+retune movement/projectile speeds and use battle fast-forward rather than
+pretend the current units are already correct.
+
+## 2. Halve ship size coherently (50% linear diameter)
+
+Primary request: reduce ship hull rendering and its apparent physical extent
+to **0.50×** the currently deployed game scale. Apply a shared dimensionless
+multiplier; preserve relative hull-family differences, paid tech inventory,
+faction source PNGs, exact approved image-space socket coordinates and
+special-variant identity.
+
+`Battle.Ship.visualScale()` currently controls ship sprite height (34×),
+ballistic/rocket collision radius (12×), turret placement, hit effect dimensions
+and `WeaponMuzzles` fitted-socket transforms. Changing only the renderer
+creates invisible large targets and disconnected floating guns. Changing
+`visualScale()` changes **real hit odds** and must be called a gameplay
+rebalance rather than an innocent cosmetic fix.
+
+Implementation choice: a single `SHIP_WORLD_SCALE=0.5` contract applied
+consistently to the existing rendered hull, transformed hardpoints,
+collision radii, damage overlays, shields, selectable hitboxes and physical
+turret locations. Audit hard-coded other ship radii and hull-relative
+measurements first. Keep editor/shipyard preview controls separately
+legible; do not halve Android button sizes or touch target accessibility.
+
+We should eventually distinguish `renderMagnification` from
+`physicalCollisionRadius` and use an explicitly stylized visual glyph.
+At light-minute physical scale even half-sized hull artwork is literally
+tens of thousands of kilometres long, so the sprite size is a readability
+choice and **not** a physical ship-length measurement.
+
+Acceptance: same ship ordinal, modules, art alpha, local socket map and
+campaign save; projectile muzzle on actual downsized hull; real swept-hit
+radii on the same outline; stable click selection and no unclickably tiny
+Android touch areas. Visual screenshots diagnostic only, objective hit/
+muzzle/selection mismatches functional blockers.
+
+## 3. Observation data and uncertainty
+
+Use separate physical stages: **SEARCH → DETECTION → CLASSIFICATION →
+TRACK → SOLUTION → RELEASE → IN-FLIGHT CORRECTION → IMPACT/EXPIRY**.
+A contact may fail, be wrong, or persist as an uncertain last-known fix
+without an authorized fire-control solution.
+
+A source observation has: target hypothesis ID; source ship and channel(s);
+sensor emission and object-measurement timestamps; receipt timestamp;
+measured x/y and vx/vy (not instantaneous hidden target truth); estimate of
+angular/range/velocity error; false-contact likelihood; confidence; and
+power/heat/crew/detection provenance. Track records are bounded by physical
+TRK memory and by LNK sender/receiver link capacity. CAP bounds simultaneous
+target solutions. Never expose target truth to a solver merely because the
+simulation owns those coordinates.
+
+Represent each candidate target as **one Gaussian-like 2D uncertainty
+ellipse and optionally a small bounded set of competing hypotheses**
+(real ship, ECM ghost, decoy). No unbounded particle swarm or per-pixel
+Monte-Carlo cloud. Axis-aligned or motion-aligned variances are adequate.
+
+Provisional uncertainty law for each axis (units, not tuned constants):
+
+`sigma^2 = sigma_measurement^2
+         + (age_seconds * sigma_velocity)^2
+         + (0.5 * age_seconds^2 * sigma_acceleration)^2
+         + sigma_ECM^2`
+
+Here `age_seconds = (currentTick - measuredTick)/30 + projectileETA`.
+The measured tick already includes passive or active sensor propagation
+history; do not double-count. Angular uncertainty alone grows into a larger
+positional error proportional to distance. Maneuver unpredictability grows
+quadratically with the prediction horizon. Higher range, smaller hull,
+weaker signal-to-noise, exhausted power, weather, interference, ghosts and
+unresolved tracks all worsen the solution.
+
+A cheap bounded prediction uses **measured** `p+v*age` and optionally
+measured acceleration from recent valid fixes. Under no circumstances
+consult the actual target velocity at fire tick unless a fresh physical
+observation has arrived. Use a compact deterministic solver, not a
+high-iteration orbital optimizer.
+
+### Errors that may still hit
+
+At fire time select **one deterministic aim-point error offset** from the
+solution's ellipse, using the existing shot seed/identity and sensor error
+quality. A kinetic, rail or rocket body travels that physical angle. A
+near-but-wrong aim point can intersect the downsized hull and cause the
+**normal actual impact**. An apparent correct center aim can miss because
+the target later accelerates. A decoy-aimed round can accidentally intersect
+a real ship on its path; it does not receive a fake "lucky hit" buff.
+
+Do not add a separate binary `if(targetingDataWrong) miss` gate. The current
+`Battle.fire` laser/plasma/particle energy families use immediate
+Bernoulli hit rolls; migrate carefully to an aim ray/short finite travel
+event or a geometry-overlap test before removing those rolls. In the interim
+do NOT add a second arbitrary hit roll on top of the existing probability.
+
+### Latency and physically meaningful information
+
+For a source-target separation `d`:
+- Passive receipt age ≈`d/c`.
+- Active monostatic illumination and echo age ≈`2d/c` between initial
+  probe and return (target state at reflection is midway through that trip).
+- Routed allied signal adds another sender-receiver propagation and finite
+  throughput. A shared track may be intrinsically older than a local fix.
+- Projectile interception horizon adds `distance/projectileSpeed`, plus
+  acceleration and coasting phases where appropriate.
+- Missile terminal seeker can update a new solution based on actual onboard
+  measurements without giving launch ship omniscient target access.
+
+A gameplay mode may compress the resulting time scales, but it must declare
+which clock is physical and which is compressed. Until the speed model is
+consistent, treat these as an explicit staged design contract, not already
+implemented relativistic physics.
+
+## 4. New search/acquisition *modes*, using existing equipment
+
+**Do not create a duplicate sensor tree.** Extend modes/upgrades of existing
+RDR, IRT, XRY, GRA, ACU, SHR, RES, TRK, LNK, FCM and CAP modules, respecting
+normal power, heat, crew condition, tech tier and fitted sockets.
+
+| Mode | Existing systems | Benefit | Non-negotiable drawback |
+| --- | --- | --- | --- |
+| Wide-area boosted radar sweep | RDR, RES | Long range, many low-grade potential contacts per scan | Broad low-precision returns, power/heat, long echo delay, detectable active emission |
+| Narrow-beam fire-control radar | RDS/RDA, RES, TRK | Long dwell and precise range/velocity on one sector | Narrow field, sweep blind spots, expensive compute and exposure |
+| Targeted high-output X-ray probe | XRY/XRS/XRA, RES | Hard-to-fake contrasting return useful for close-to-mid-range identification | Extremely expensive energy, heat, cooldown, physically weak distant return; speculative future hardware, not a magic armor-vision ray |
+| Passive IR telescope / spectroscopy | IRT, RES | Detect hot engines and thrust changes without illuminating target | Thermal masking, low angular resolution, distant aging |
+| Multi-baseline optical interferometry | FCM + LNK + optical | Cross-correlate genuine spatially separated observations | Needs several live sensors, timing and bandwidth; cannot eliminate light-delay |
+| Gravitic mass corroboration | GRA, RES | Independent, weaker clue against some heat/radar ghosts | Slow/low-resolution, only when dedicated hardware fitted |
+| Track reconstruction & maneuver forecast | ACU + TRK + FCM | Lowers velocity/acceleration uncertainty from historical fixes | Consumes bounded computation; high target maneuverability remains unpredictable |
+| Terminal seeker cue & reacquisition | Existing missile/torpedo guidance | Corrects accumulated launch error near target | Onboard seeker range, ECM, power, guidance and fuel remain physical limits |
+
+Active pulses should reveal the scanner with a propagation-aware emission
+signature to enemy passive receivers. Scan modes are selected before pressing
+`ENGAGE` through ship orders/doctrine (e.g. PASSIVE, SEARCH, FOCUSED,
+EMERGENCY PING), not realtime tactical micromanagement.
+
+## 5. Bounded computation / target solutions
+
+Each surviving ship receives a **per-second/tick compute budget** derived
+from paid ACU/RES/TRK and crew/power, not a free global fleet solver.
+FCM contributes a small finite shared pool to a bounded number of allies
+within range. CAP defines **parallel solutions**/engagement capacity and
+must never substitute for actual CPU, sensor observations or weapon mounts.
+
+Proposed normalized planning law (not committed balance):
+
+`cost = base * (1 + alpha*normalizedRange)^2
+             * (1 + beta*observationAge/60)
+             * (1 + gamma*competingHypotheses)`
+
+Fast close-range locks are cheap; intermittent long-range targets demand
+more tracking updates, more confidence work and longer dwell. If resources
+cannot fund a solution, a ship may make a lower-confidence shot if doctrine
+permits, keep searching, allocate another pulse, or decline to fire. False
+hypotheses also consume bounded tracking slots and compute; this makes ECM
+deception economically meaningful.
+
+Performance contract: do not recompute every ship vs every other ship
+against several hypothesis samples every combat tick. Sensor sweeps use a
+scheduled staggered cadence, a finite max candidates per ship/sector, cached
+tracks and bounded memory. Use a sampled ring buffer or timestamped event
+queue for delayed observations; choose whichever achieves actual light-delay
+in acceptable Android memory. A 10Hz, 120s, 400-object, four-float history
+is roughly **7.7 MB** before index/metadata, so a compact history is
+plausible; a naive per-source/target/per-tick event log is not.
+
+## 6. Gameplay readability and incentives
+
+Tactical HUD should show the **selected** contact's uncertainty ellipse,
+last observation age, confidence and source/channel, plus whether the
+ship is SEARCHING, TRACKING, SOLVING or LOCKED. A very stale ghost can be
+visible as a grey expanding last-fix ring rather than an actual hull.
+Limit full ellipses to selected targets or a capped few important tracks
+so the 200v200 screen is still legible. Keep Android text/touch targets
+responsive, not desktop UI scaled down.
+
+Different enemy tactics now have genuine counterplay:
+- Keep moving → old trajectories become unreliable; unguided rockets lose
+  more than terminal-guided missiles.
+- Change direction → acceleration uncertainty grows; powerful early radar
+  cannot perfectly foresee later maneuvers.
+- Manage emissions → passive visibility versus active scanning confidence.
+- Deploy ECM/ghosts → waste enemy track and computation capacity; independent
+  corroboration may reject false candidates without direct access to truth.
+- Buy RES/TRK/ACU/FCM/CAP → real quality, compute, track retention, fusion and
+  capacity advantages, not a universal `+10% accuracy` buff.
+- Fight close → dramatically reduce observation age, projected uncertainty,
+  solution cost and projectile response time.
+
+## 7. Safe integration sequence
+
+**Stage 0 — scale audit and 0.50× geometry:** audit every
+`visualScale()`, hard-coded hit radius, hull selection, muzzle transform
+and visual emitter. Make one shared multiplier and adjust physical overlap
+tests as a functional change. Keep snapshot/screenshot comparison as
+diagnostic. Do not alter source sprites or save IDs.
+
+**Stage 1 — define actual world/time contract:** commit world light-minute
+calibration and explicit simulated velocity/time interpretation. Baseline
+existing speeds, ammo and missions; decide real-speed versus time-compressed
+mode before making light-delay a combat blocker. Preserve fixed arena and
+lifetime caps.
+
+**Stage 2 — provenance and delayed observations:** extend existing
+`Battle.TacticalContact`/TRK tracks; introduce a capped history or event
+scheduler. Require that a viewer's delayed position derives from an
+old measured state, not current hidden truth. Add passive and active
+roundtrip timing fixtures.
+
+**Stage 3 — active search modes:** implement boosted/wide radar,
+narrow radar and targeted X-ray bursts with explicit power/heat/exposure,
+cone, scan cadence and TTL. Validate that an unfitted hull cannot do them.
+
+**Stage 4 — uncertainty and computation:** one bounded per-target ellipse,
+deterministic error growth, finite compute credits per track, capacity and
+cooldown, false hypotheses and power/crew degradation. Wire real ACU, RES,
+TRK, FCM and CAP without inventing free sensors.
+
+**Stage 5 — physically resolved aiming:** replace binary Bernoulli for
+appropriate weapon families with a chosen estimated aim point and real
+path intersection. Ballistics/rockets first (already swept bodies), then
+missile terminal updates, then lasers/plasma/particle once the travel-time
+and geometry contract is settled. Preserve ordinary hull damage and
+munition inventory; never double count a hit.
+
+**Stage 6 — headless and device acceptance:** 1v1/16v16/200v200 paired
+seed runs at close/mid/far range; static versus maneuvering/accelerating;
+real versus decoy; sensor blackout; active pulse with no returned echo;
+same-hull moving target with just-off-center aim; weapon arrivals after
+old data; FCM contention/capacity; the 0.5× hitboxes and changed hit odds;
+frame time and heap on Android plus desktop visual inspection.
+
+Keep existing focused CI; **functional failure gates only** (bad launch,
+wrong targeting permissions, corrupted saves, unresolved terminal battle,
+missiles crossing nonexistent hitboxes). Confidence tuning, graphics,
+visual overlays and balance tables are diagnostics.
+
+## Decisions before implementing the light-delay physics
+
+1. **Physical consistency:** Is a one-light-minute world literal with
+   lower physical ship/munition speeds and fast-forward for gameplay, or a
+   gameplay-compressed representation with explicitly abstract speeds?
+   Do not silently mix those incompatible meanings.
+2. **0.50× scope:** The user asked for *overall ship* scale reduction.
+   Preferred is shared visual/physical footprint now, with touch UI kept
+   usable; later separate sprite magnification and authentic hit radius
+   once physical ship dimensions exist.
+3. **Futuristic active X-ray:** treat a targeted X-ray burst as high-cost
+   speculative sensor hardware, not a real-world radar-quality long-range
+   reflected X-ray imager.
+4. **Distant guesses:** doctrines may permit low-confidence blind fire,
+   but every hit must derive from a real path through a target; stale
+   contacts alone still must not silently grant automatic lock authorization.
+
+**Implementation status:** planning only. No production ship-scale,
+trajectory, timestamp, active scan or weapon accuracy changes have been
+committed in this document's work.
