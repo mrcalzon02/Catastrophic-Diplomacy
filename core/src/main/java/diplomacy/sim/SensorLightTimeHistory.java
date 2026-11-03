@@ -5,7 +5,13 @@ public final class SensorLightTimeHistory {
     public static final int CAPACITY=128;
     private final Sample[] samples=new Sample[CAPACITY];
     public record Sample(long tick,double x,double y,double vx,double vy,
-                         boolean alive){}
+                         boolean alive,boolean sensorsPowered){
+        /** Compatibility for deterministic geometry-only sample fixtures. */
+        public Sample(long tick,double x,double y,double vx,double vy,
+                      boolean alive){
+            this(tick,x,y,vx,vy,alive,true);
+        }
+    }
     public record Observation(long emittedTick,long measuredTick,long receivedTick,
                               int channels,Sample sample){
         public Observation{
@@ -17,8 +23,10 @@ public final class SensorLightTimeHistory {
     }
     public void capture(long tick,Battle.Ship ship){
         if(tick<0||ship==null)throw new IllegalArgumentException("Invalid sample");
+        boolean activeReady=ship.alive()&&ship.power>3&&
+                ship.sensorsCondition>.05&&ship.crewReadiness()>=.05;
         samples[(int)(tick%CAPACITY)]=new Sample(tick,ship.x,ship.y,ship.vx,
-                ship.vy,ship.alive());
+                ship.vy,ship.alive(),activeReady);
     }
     public Sample at(long tick){
         if(tick<0)return null;
@@ -79,7 +87,13 @@ public final class SensorLightTimeHistory {
         // A boosted sweep cannot masquerade as a continuous free radar and
         // a focused X-ray burst cannot illuminate an unrelated hull.
         long emissionTick=measured-outward;
-        if(active!=0 && !source.scan.emittedFor(emissionTick,target.id,active))
+        // A continuously emitting STANDARD sensor must actually have been
+        // powered when the outbound light was launched. Turning on at tick N
+        // cannot create a radar/X-ray pulse retrospectively at tick N-2d/c.
+        Sample emitterAtPulse=source.sensorHistory.at(emissionTick);
+        if(active!=0&&(emitterAtPulse==null||
+                !emitterAtPulse.sensorsPowered()||
+                !source.scan.emittedFor(emissionTick,target.id,active)))
             active=0;
         int arrived=passive|active;
         if(arrived==0)return null;
