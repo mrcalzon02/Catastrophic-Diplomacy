@@ -81,9 +81,11 @@ public final class TerranPlaceholderSprites implements Disposable {
     private Texture[] shieldShell;
     /** Optional cosmetic shader; failure must never prevent the game launching. */
     private final ShieldMaterialShader shieldInk;
-    // A compact per-vessel overlay keeps irregular hull peeling inexpensive
-    // even when several hundred damaged vessels share the same original PNG.
-    private static final int MASK_W=96, MASK_H=144;
+    // Twice the previous coefficient resolution (4x texels) preserves fine
+    // 96px wound edges on larger vessels; unchanged panels still use the
+    // ORIGINAL full-resolution albedo. Impact diameter remains unchanged.
+    // Build/upload only dirty regions when physics changes, never per frame.
+    private static final int MASK_W=192, MASK_H=288;
     private static final class Peel {
         Texture overlay, original;
         int[] levels;
@@ -109,7 +111,7 @@ public final class TerranPlaceholderSprites implements Disposable {
     }
     // One shader + cached textures for all faction/hull instances; no per-frame Pixmaps.
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
-    /** Fixed authored 24px RGB/alpha damage decals, loaded once per family. */
+    /** Fixed authored 96px RGBA damage decals, loaded once per weapon family. */
     private final ShipDamageImageMasks authoredMasks=new ShipDamageImageMasks();
     public int litMaterialCount(){return surfaces.materialCount();}
     public int materialTextureBindings(){return surfaces.textureBindings();}
@@ -321,7 +323,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(path==null)throw new IllegalStateException("Original hull art source not indexed");
         // The full-resolution PNG still lives in the ORIGINAL GPU texture.
         // All three CPU consumers (shield stencil, armor registration, damage
-        // overlay) sample only these same fixed 96x144 positions. Retaining
+        // overlay) sample only these same fixed 192x288 positions. Retaining
         // full decoded Pixmaps for all faction hulls needlessly consumes
         // hundreds of MB of heap on older Android phones.
         Pixmap decoded=new Pixmap(Gdx.files.internal(path));
@@ -500,7 +502,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 if(originalAlpha==0){
                     // Background alpha belongs solely to original high-res art.
                     // Keep the coefficient mask opaque here; otherwise coarse
-                    // 96x144 alpha samples erase thin authentic ship geometry.
+                    // 192x288 alpha samples erase thin authentic ship geometry.
                     output.drawPixel(localX,localY,ShipSurfaceDamageVisual.maskPixel(0,0,0));
                     continue;
                 }
