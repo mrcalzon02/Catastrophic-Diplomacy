@@ -510,6 +510,9 @@ public final class Battle {
         /** Physical bay that launched this craft; empty for non-fighter drones. */
         public String launchBayId="";
         public double x, y, integrity, maxIntegrity,armor,fuel,reload,repairReserve;
+        /** Measured physical travel from the preceding completed simulation tick.
+         * Flak uses this actual motion, not perfect future course knowledge. */
+        public double lastObservedX,lastObservedY,observedVx,observedVy;
         public SupportDoctrine.Channel serviceChannel;
         public boolean reusable,returning;
         public double serviceRange,servicePulse,serviceMaxCharge;
@@ -1290,7 +1293,15 @@ public final class Battle {
         updateMissiles();
         updateRockets();
         updateBallistics();
+        for(Craft craft:crafts){
+            craft.lastObservedX=craft.x;
+            craft.lastObservedY=craft.y;
+        }
         updateCraft();
+        for(Craft craft:crafts){
+            craft.observedVx=(craft.x-craft.lastObservedX)/DT;
+            craft.observedVy=(craft.y-craft.lastObservedY)/DT;
+        }
     }
 
     /** Voluntary disengagement is limited to a last armed-force survivor of a
@@ -3280,7 +3291,11 @@ public final class Battle {
                 if(target.team==burst.team || 
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
                     continue;
-                target.integrity-=burst.damage;
+                // A flak fragment spreads kinetic energy over an increasingly
+                // hardened warhead casing; intact heavy torpedoes shrug off
+                // individual fragments much more readily than micro-missiles.
+                target.integrity-=ProjectileModel.fragmentationPdDamage(
+                        target.spec,burst.damage);
                 if(target.integrity<=0){
                     missiles.remove(i);missileIntercepts++;shooter.intercepted++;
                     if(target.decoy)decoysIntercepted++;
@@ -3295,7 +3310,8 @@ public final class Battle {
                 if(target.team==burst.team ||
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
                     continue;
-                target.integrity-=burst.damage;
+                target.integrity-=ProjectileModel.fragmentationPdDamage(
+                        target.spec,burst.damage);
                 if(target.integrity<=0){
                     rockets.remove(i);rocketIntercepts++;shooter.intercepted++;
                     visual(target.visualId,VisualPhase.INTERCEPT,"ROCKET",
@@ -3308,7 +3324,8 @@ public final class Battle {
                 if(target.team==burst.team ||
                    StrictMath.hypot(target.x-burst.aimX,target.y-burst.aimY)>burst.radius)
                     continue;
-                target.integrity-=burst.damage;
+                target.integrity-=ProjectileModel.fragmentationPdDamage(
+                        target.spec,burst.damage);
                 if(target.integrity<=0){
                     ballistics.remove(i);ballisticIntercepts++;shooter.intercepted++;
                     visual(target.visualId,VisualPhase.INTERCEPT,"KINETIC",
@@ -3363,8 +3380,9 @@ public final class Battle {
                             bestPriority=d;
                             // Flak preferentially interrupts aircraft before
                             // targeting smaller, more elusive physical bodies.
-                            best=new FlakAim(craft.x,craft.y,0,0,craft.sourceId,
-                                             craft.targetId,d);
+                            best=new FlakAim(craft.x,craft.y,
+                                             craft.observedVx,craft.observedVy,
+                                             craft.sourceId,craft.targetId,d);
                         }
                     }
                 }
@@ -3546,7 +3564,8 @@ public final class Battle {
             }
             if(random.nextDouble()<chance){
                 if(chosenMissile!=null){
-                    chosenMissile.integrity-=defender.pointDefenseProfile.damage();
+                    chosenMissile.integrity-=ProjectileModel.precisionPdDamage(
+                            chosenMissile.spec,defender.pointDefenseProfile);
                     if(chosenMissile.integrity<=0 && missiles.remove(chosenMissile)){
                         defender.intercepted++;missileIntercepts++;
                         if(chosenMissile.decoy)decoysIntercepted++;
@@ -3556,7 +3575,8 @@ public final class Battle {
                                 chosenMissile.x,chosenMissile.y,chosenMissile.x,chosenMissile.y);
                     }
                 }else if(chosenRocket!=null){
-                    chosenRocket.integrity-=defender.pointDefenseProfile.damage();
+                    chosenRocket.integrity-=ProjectileModel.precisionPdDamage(
+                            chosenRocket.spec,defender.pointDefenseProfile);
                     if(chosenRocket.integrity<=0&&rockets.remove(chosenRocket)){
                         defender.intercepted++;rocketIntercepts++;
                         visual(chosenRocket.visualId,VisualPhase.INTERCEPT,"ROCKET",
@@ -3565,7 +3585,8 @@ public final class Battle {
                                 chosenRocket.x,chosenRocket.y);
                     }
                 }else{
-                    chosenShell.integrity-=defender.pointDefenseProfile.damage();
+                    chosenShell.integrity-=ProjectileModel.precisionPdDamage(
+                            chosenShell.spec,defender.pointDefenseProfile);
                     if(chosenShell.integrity<=0 && ballistics.remove(chosenShell)){
                         defender.intercepted++;ballisticIntercepts++;
                         visual(chosenShell.visualId,VisualPhase.INTERCEPT,"KINETIC",

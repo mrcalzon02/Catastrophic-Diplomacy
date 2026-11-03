@@ -300,7 +300,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Files.createDirectories(output);
         List<String> csv=new ArrayList<>();
         csv.add("defense_family,threat,attack_stage,pd_stage,mounts,separation,seeds,launched,physical_intercepts,intercept_pct,terminal_entries,actual_impacts,hold_fire_impacts,pd_shots,defender_damage,hold_fire_damage,result_status");
-        StringBuilder summary=new StringBuilder("# Existing physical PD versus FLK: P0 baseline\n\n");
+        StringBuilder summary=new StringBuilder("# Physical PD versus FLK: P0 comparison\n\n");
         summary.append("All defender modules are genuine equipped Terran weapon hardpoints; PD and FLK use their actual existing combat paths. ")
                 .append("The attacker is an unupgraded real physical launcher fixture, not a stage-IX fitted attacker. ")
                 .append("All balance readings are advisory. No other PD families are fabricated.\n\n");

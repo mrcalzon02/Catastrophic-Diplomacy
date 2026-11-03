@@ -110,6 +110,24 @@ public final class ProjectileModel {
                 *clamp(weatherFactor,0,2.5)*system.detectionMultiplier
                 *clamp(StrictMath.sqrt(StrictMath.sqrt(effective)),0.30,2.2);
     }
+    /** Hardening limits laser ablation per precise hit. This is a physical
+     * durability response, not a fixed chance-to-miss or immunity flag.
+     * The lightest rockets/micro ordnance retain full laser vulnerability. */
+    public static double precisionPdDamage(Spec target,Defense system){
+        if(target==null||system==null)return 0;
+        double hardened=StrictMath.max(0,target.health()-2.1);
+        return system.damage()/(1+1.2*hardened);
+    }
+
+    /** Flak fragmentation has much weaker penetration through thick intact
+     * warhead casing. A live frag cloud can still damage multiple soft bodies,
+     * but must hit a hardened torpedo repeatedly to destroy it. */
+    public static double fragmentationPdDamage(Spec target,double baseDamage){
+        if(target==null||!Double.isFinite(baseDamage)||baseDamage<0)return 0;
+        double hardened=StrictMath.max(0,target.health()-2.0);
+        return baseDamage/(1+1.5*hardened*hardened);
+    }
+
     /** Speed, aspect/size and dedicated tracking quality determine PD accuracy.
      * The output is the actual chance used by the combat RNG, not a visual guess. */
     public static double interceptionChance(Spec target,Defense system,
