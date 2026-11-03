@@ -25,8 +25,16 @@ final class CombatLightingRenderer implements Disposable {
     private static final int GLOW_SIZE = 64;
     private static final int MAX_BEAM_LIGHTS = 256;
     private static final int MAX_MISSILE_LIGHTS = 192;
+    // Per-frame caps and scratch positions are renderer-owned and never grow
+    // with a 200 vs 200 combat. Recent hot wounds win over older stacked hits.
+    private static final int MAX_HOT_METAL_LIGHTS = 24;
+    private final float[] hotX=new float[MAX_HOT_METAL_LIGHTS];
+    private final float[] hotY=new float[MAX_HOT_METAL_LIGHTS];
+    private final float[] hotRadius=new float[MAX_HOT_METAL_LIGHTS];
     private final CombatLightingModel timeline = new CombatLightingModel();
     private final Texture glow;
+    /** Steeper falloff only for impact/wound lights, not engines or missiles. */
+    private final Texture tightGlow;
     private final Texture smokeMask;
     private int lastGlowQuads;
     private int lastSmokeQuads;
@@ -48,6 +56,22 @@ final class CombatLightingRenderer implements Disposable {
         glow = new Texture(pixels);
         pixels.dispose();
         glow.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
+        Pixmap tightPixels=new Pixmap(GLOW_SIZE,GLOW_SIZE,Pixmap.Format.RGBA8888);
+        tightPixels.setBlending(Pixmap.Blending.None);
+        for(int py=0;py<GLOW_SIZE;py++)for(int px=0;px<GLOW_SIZE;px++){
+            float dx=(px+.5f-GLOW_SIZE*.5f)/(GLOW_SIZE*.5f);
+            float dy=(py+.5f-GLOW_SIZE*.5f)/(GLOW_SIZE*.5f);
+            float edge=Math.max(0f,1f-(float)StrictMath.hypot(dx,dy));
+            float smooth=edge*edge*(3f-2f*edge);
+            // The regular radial alpha is smooth; cubing it makes the
+            // brightest part hug the metal incision instead of the hull.
+            float tight=smooth*smooth*smooth;
+            tightPixels.setColor(1f,1f,1f,tight);
+            tightPixels.drawPixel(px,py);
+        }
+        tightGlow=new Texture(tightPixels);
+        tightPixels.dispose();
+        tightGlow.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
         Pixmap cloud=new Pixmap(GLOW_SIZE,GLOW_SIZE,Pixmap.Format.RGBA8888);
         cloud.setBlending(Pixmap.Blending.None);
         for(int py=0;py<GLOW_SIZE;py++)for(int px=0;px<GLOW_SIZE;px++){
@@ -97,6 +121,36 @@ final class CombatLightingRenderer implements Disposable {
         batch.draw(glow, (float) x - radius, (float) y - radius,
                 radius * 2, radius * 2);
         lastGlowQuads++;
+    }
+
+    private void tightSpot(SpriteBatch batch,OrthographicCamera camera,
+                           double x,double y,float radius,Color color,float alpha){
+        if(radius<=0||alpha<=0||radius*2f/camera.zoom<1f||
+                !visible(camera,x,y,radius))return;
+        // Never bleed alpha from a shared SpriteBatch color into the next draw.
+        batch.setColor(color.r,color.g,color.b,Math.min(.25f,alpha));
+        batch.draw(tightGlow,(float)x-radius,(float)y-radius,radius*2f,radius*2f);
+        lastGlowQuads++;
+    }
+
+    /** Subpixel projected radius is allowed to disappear at tactical zoom. */
+    static float hotMetalRadius(Battle.DamageType family){
+        return CombatEffectScale.of(switch(family){
+            case PLASMA -> 3.0f;
+            case TORPEDO -> 2.7f;
+            case MISSILE -> 2.2f;
+            case PARTICLE -> 1.8f;
+            case LASER -> 1.8f; // annealing radius is MATERIAL, not light
+            default -> 0f;
+        });
+    }
+    static float impactFlashRadius(boolean intercepted,boolean heavy){
+        // Previous wide explosions used 47 world units before global scaling.
+        // These tiny optical cues must not illuminate an entire hull.
+        return CombatEffectScale.of(intercepted?(heavy?10f:7f):(heavy?19f:12f));
+    }
+    static float impactFlashAlpha(boolean intercepted){
+        return intercepted?.13f:.18f;
     }
 
     private void streak(SpriteBatch batch, OrthographicCamera camera,
@@ -274,17 +328,17 @@ final class CombatLightingRenderer implements Disposable {
                     beam.type==Battle.DamageType.LASER?
                     beam.laserType.thickness/6.3f:1f;
             streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
-                    CombatEffectScale.of(31)*scale,
-                    tint,beam.pointDefense?.11f:.22f);
-            streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
                     CombatEffectScale.of(12)*scale,
-                    tint,beam.pointDefense?.24f:.40f);
-            spot(batch,camera,beam.x1,beam.y1,
-                    CombatEffectScale.of(21)*scale,
-                    tint,beam.pointDefense?.24f:.32f);
-            spot(batch,camera,beam.x2,beam.y2,
-                    CombatEffectScale.of(23)*scale,
-                    tint,beam.pointDefense?.27f:.38f);
+                    tint,beam.pointDefense?.035f:.085f);
+            streak(batch,camera,beam.x1,beam.y1,beam.x2,beam.y2,
+                    CombatEffectScale.of(5)*scale,
+                    tint,beam.pointDefense?.08f:.14f);
+            tightSpot(batch,camera,beam.x1,beam.y1,
+                    CombatEffectScale.of(8)*scale,
+                    tint,beam.pointDefense?.07f:.10f);
+            tightSpot(batch,camera,beam.x2,beam.y2,
+                    CombatEffectScale.of(9)*scale,
+                    tint,beam.pointDefense?.08f:.12f);
         }
 
         // A new ignition burst whenever the actual engine switches from
@@ -335,47 +389,74 @@ final class CombatLightingRenderer implements Disposable {
 
         // Only true simulation FIRE, IMPACT or INTERCEPT events cause bursts.
         // Timeouts deliberately do not become hits or unexplained explosions.
+        // The former 47-unit bright impact corona repeatedly covered much of
+        // a ship. Use small, steep, low-alpha flashes instead. Multiple hits
+        // at the same coordinate share a single visual glow per rendered frame.
+        int flashLights=0;
+        final float[] flashX=new float[48],flashY=new float[48],flashR=new float[48];
         for (CombatLightingModel.Flash flash : timeline.flashes()) {
-            Battle.VisualEvent e = flash.event();
-            int lifetime = CombatLightingModel.flashLife(e);
-            float age = (float) (battle.tick - e.tick()) / lifetime;
-            if (age < 0 || age >= 1) continue;
+            if(flashLights>=48)break;
+            Battle.VisualEvent e=flash.event();
+            int lifetime=CombatLightingModel.flashLife(e);
+            if(lifetime<=0)continue;
+            float age=(float)(battle.tick-e.tick())/lifetime;
+            if(age<0||age>=1)continue;
             boolean intercepted=e.phase()==Battle.VisualPhase.INTERCEPT;
-            boolean large=e.weapon().equals("KINETIC")||e.weapon().equals("TORPEDO");
-            float baseRadius=CombatEffectScale.of(intercepted?
-                    (large?18:13):(large?47:29));
-            float intensity=1-age;
+            boolean heavy=e.weapon().equals("KINETIC")||e.weapon().equals("TORPEDO");
+            float radius=impactFlashRadius(intercepted,heavy);
+            boolean near=false;
+            for(int i=0;i<flashLights;i++){
+                float dx=flashX[i]-(float)e.x(),dy=flashY[i]-(float)e.y();
+                float d=Math.max(radius,flashR[i]);
+                if(dx*dx+dy*dy<d*d){near=true;break;}
+            }
+            if(near)continue;
             Color tint=intercepted?Color.GREEN:eventColor(e.weapon());
-            float expansion=intercepted?1+age*.5f:.7f+age*.65f;
-            spot(batch,camera,e.x(),e.y(),baseRadius*expansion,
-                    tint,(intercepted?.44f:.76f)*intensity);
-            spot(batch,camera,e.x(),e.y(),baseRadius*.37f,
-                    Color.WHITE,(intercepted?.28f:.67f)*intensity*intensity);
+            float fade=(1f-age)*(1f-age);
+            tightSpot(batch,camera,e.x(),e.y(),radius*(.8f+age*.25f),
+                    tint,impactFlashAlpha(intercepted)*fade);
+            tightSpot(batch,camera,e.x(),e.y(),radius*.25f,
+                    Color.WHITE,.085f*fade*fade);
+            flashX[flashLights]=(float)e.x();
+            flashY[flashLights]=(float)e.y();
+            flashR[flashLights++]=radius;
         }
         // Fresh hot metal glows at the actual lost-armor or breached-hull
         // impact site. The broad LASER anneal stays permanent *oxide color*,
         // never a world-space halo. Cold kinetic damage emits no persistent light.
         int hotLights=0;
-        if(impactsForGlow!=null)for(CombatHitFeedback.Afterglow wound:
-                impactsForGlow.afterglows()){
-            if(hotLights>=96)break;
-            if(wound.weapon==null||wound.weapon==Battle.DamageType.KINETIC||
-                    wound.weapon==Battle.DamageType.FIGHTER)continue;
-            float age=wound.age/CombatHitFeedback.AFTERGLOW_LIFETIME;
-            if(age<0||age>=1)continue;
-            float fade=(1f-age)*(1f-age);
-            float strength=emissionStrength(wound.weapon);
-            float radius=CombatEffectScale.of(
-                    wound.weapon==Battle.DamageType.PLASMA?6f:
-                    wound.weapon==Battle.DamageType.TORPEDO?5.2f:3.6f)*wound.scale;
-            Color color=wound.weapon==Battle.DamageType.PARTICLE?Color.VIOLET:
-                    wound.weapon==Battle.DamageType.PLASMA?Color.ORANGE:Color.GOLD;
-            spot(batch,camera,wound.x,wound.y,radius,color,
-                    strength*fade);
-            // White-hot puncture core only while the impact is genuinely fresh.
-            if(age<.17f)spot(batch,camera,wound.x,wound.y,
-                    radius*.34f,Color.WHITE,strength*.35f*(1f-age/.17f));
-            hotLights++;
+        if(impactsForGlow!=null){
+            var wounds=impactsForGlow.afterglows();
+            // Most recent real wounds win, with overlapping halos suppressed
+            // and a hard global cap independent of fleet size.
+            for(int n=wounds.size()-1;n>=0&&hotLights<MAX_HOT_METAL_LIGHTS;n--){
+                CombatHitFeedback.Afterglow wound=wounds.get(n);
+                if(wound.weapon==null||wound.weapon==Battle.DamageType.KINETIC||
+                        wound.weapon==Battle.DamageType.FIGHTER)continue;
+                float age=wound.age/CombatHitFeedback.AFTERGLOW_LIFETIME;
+                if(age<0||age>=1)continue;
+                float strength=emissionStrength(wound.weapon);
+                float radius=hotMetalRadius(wound.weapon)*wound.scale;
+                if(radius<=0f||radius*2f/camera.zoom<1f||
+                        !visible(camera,wound.x,wound.y,radius))continue;
+                boolean stacked=false;
+                for(int i=0;i<hotLights;i++){
+                    float dx=hotX[i]-wound.x,dy=hotY[i]-wound.y;
+                    float d=Math.max(radius,hotRadius[i])*1.25f;
+                    if(dx*dx+dy*dy<d*d){stacked=true;break;}
+                }
+                if(stacked)continue;
+                float fade=(1f-age)*(1f-age)*(1f-age);
+                Color color=wound.weapon==Battle.DamageType.PARTICLE?Color.VIOLET:
+                        wound.weapon==Battle.DamageType.PLASMA?Color.ORANGE:Color.GOLD;
+                tightSpot(batch,camera,wound.x,wound.y,radius,color,
+                        strength*fade);
+                // The material shader already draws glowing lips, so never
+                // add a second broad white disc over intact plating.
+                hotX[hotLights]=wound.x;
+                hotY[hotLights]=wound.y;
+                hotRadius[hotLights++]=radius;
+            }
         }
         // Tiny additive shield spill follows the same authoritative per-facing
         // timeline as the art overlay. Capped, camera-culled and mobile-friendly.
@@ -415,16 +496,16 @@ final class CombatLightingRenderer implements Disposable {
     static float emissionStrength(Battle.DamageType family){
         if(family==null)return 0f;
         return switch(family){
-            case PLASMA -> .48f;
-            case LASER -> .32f;
-            case PARTICLE -> .28f;
-            case TORPEDO -> .38f;
-            case MISSILE -> .31f;
+            case PLASMA -> .12f;
+            case LASER -> .055f;
+            case PARTICLE -> .075f;
+            case TORPEDO -> .095f;
+            case MISSILE -> .075f;
             case FIGHTER, KINETIC -> 0f;
         };
     }
     int glowQuads() { return lastGlowQuads; }
     int smokeQuads() { return lastSmokeQuads; }
     int smokeParticles() { return timeline.smokeCount(); }
-    @Override public void dispose() { glow.dispose();smokeMask.dispose(); }
+    @Override public void dispose() { glow.dispose();tightGlow.dispose();smokeMask.dispose(); }
 }
