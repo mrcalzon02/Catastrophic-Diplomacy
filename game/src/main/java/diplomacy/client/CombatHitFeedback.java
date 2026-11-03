@@ -55,7 +55,7 @@ final class CombatHitFeedback {
         return switch(weapon){
             case "KINETIC", "FLAK" -> Battle.DamageType.KINETIC;
             case "PLASMA" -> Battle.DamageType.PLASMA;
-            case "PARTICLE" -> Battle.DamageType.PARTICLE;
+            case "PARTICLE","PARTICLE_PD" -> Battle.DamageType.PARTICLE;
             case "MISSILE", "ROCKET" -> Battle.DamageType.MISSILE;
             case "TORPEDO" -> Battle.DamageType.TORPEDO;
             case "FIGHTER" -> Battle.DamageType.FIGHTER;
