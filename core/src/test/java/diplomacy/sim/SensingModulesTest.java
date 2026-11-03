@@ -113,25 +113,25 @@ public final class SensingModulesTest {
         Battle.Ship spotter=duel.ships().get(0),enemy=duel.ships().get(1);
         enemy.x=spotter.x+520;enemy.y=spotter.y;
         spotter.sensorRange=0;spotter.infraredRange=600;
-        require(duel.hasTargetContact(spotter,enemy,520),
+        require(duel.directSensorChannels(spotter,enemy,520)!=0,
                 "Infrared must see beyond the local optical silhouette");
         enemy.thermalSignature=0.25;
-        require(!duel.hasTargetContact(spotter,enemy,520),
+        require(duel.directSensorChannels(spotter,enemy,520)==0,
                 "Thermal suppression must defeat a passive infrared contact");
         spotter.infraredRange=0;spotter.xrayRange=620;
-        require(duel.hasTargetContact(spotter,enemy,520),
+        require(duel.directSensorChannels(spotter,enemy,520)!=0,
                 "X-ray detector must counter heat damping");
         spotter.xrayRange=0;spotter.graviticRange=800;
-        require(duel.hasTargetContact(spotter,enemy,520),
+        require(duel.directSensorChannels(spotter,enemy,520)!=0,
                 "Gravitic detector must locate a massive stealth hull");
         spotter.graviticRange=0;enemy.x=spotter.x+300;
-        require(duel.hasTargetContact(spotter,enemy,300),
+        require(duel.directSensorChannels(spotter,enemy,300)!=0,
                 "Undisguised vessels must remain optically observable nearby");
         enemy.opticalSignature=0.25;
-        require(!duel.hasTargetContact(spotter,enemy,300),
+        require(duel.directSensorChannels(spotter,enemy,300)==0,
                 "Powered visual cloak must conceal an optical-only contact");
         enemy.power=0;
-        require(duel.hasTargetContact(spotter,enemy,300),
+        require(duel.directSensorChannels(spotter,enemy,300)!=0,
                 "Unpowered visual cloak must fail open");
         require(!DeceptionProjection.cloakActive(enemy) &&
                 DeceptionProjection.hullOpacity(enemy,120)==1f,
@@ -157,16 +157,17 @@ public final class SensingModulesTest {
         require(DeceptionProjection.falseContacts(enemy)==0 &&
                 DeceptionProjection.lockMultiplier(enemy,1)==1,
                 "Loss of emitter power must remove both ghosts and their combat advantage");
-        // Radar stealth must actually break an otherwise valid distant radar
+        // These equipment-level assertions check sensor ranges/signatures, not
+        // instantaneous weapon authorization; light-time is independently gated.\n        // Radar stealth must actually break an otherwise valid distant radar
         // acquisition, independently of optical, infrared or gravitic sensors.
         spotter.sensorRange=450;spotter.infraredRange=0;
         spotter.xrayRange=0;spotter.graviticRange=0;
         enemy.power=80;enemy.opticalSignature=1;enemy.hologramNoise=0;
         enemy.x=spotter.x+510;enemy.radarCrossSection=4;
-        require(duel.hasTargetContact(spotter,enemy,510),
+        require(duel.directSensorChannels(spotter,enemy,510)!=0,
                 "Large radar return must be observed beyond optical silhouette");
         enemy.radarCrossSection=.15;
-        require(!duel.hasTargetContact(spotter,enemy,510),
+        require(duel.directSensorChannels(spotter,enemy,510)==0,
                 "Installed radar-stealth plating must defeat the distant radar contact");
         // Passive recognition depends on the real size of the silhouette.
         // This closes the case where an inoperative, abandoned capital ship
@@ -176,22 +177,22 @@ public final class SensingModulesTest {
         spotter.graviticRange=0;
         enemy.power=0;enemy.opticalSignature=1;
         enemy.x=spotter.x+430;enemy.maxHull=2200;
-        require(duel.hasTargetContact(spotter,enemy,430),
+        require(duel.directSensorChannels(spotter,enemy,430)!=0,
                 "Large exposed capital silhouette should be passively visible nearby");
         enemy.maxHull=140;
-        require(!duel.hasTargetContact(spotter,enemy,430),
+        require(duel.directSensorChannels(spotter,enemy,430)==0,
                 "Tiny unpowered escort must not inherit capital visual range");
         enemy.x=spotter.x+780;
         spotter.sensorRange=1050;spotter.infraredRange=960;
         spotter.xrayRange=960;spotter.graviticRange=980;
         spotter.power=50;spotter.sensorsCondition=1;
-        require(duel.hasTargetContact(spotter,enemy,780),
+        require(duel.directSensorChannels(spotter,enemy,780)!=0,
                 "Powerful real scanner hardware must acquire a distant target");
         spotter.power=0;
-        require(!duel.hasTargetContact(spotter,enemy,780),
+        require(duel.directSensorChannels(spotter,enemy,780)==0,
                 "Unpowered radar/IR/X-ray/gravitic equipment must not grant target locks");
         spotter.power=50;spotter.sensorsCondition=0;
-        require(!duel.hasTargetContact(spotter,enemy,780),
+        require(duel.directSensorChannels(spotter,enemy,780)==0,
                 "Disabled scanner circuits must not keep detecting distant vessels");
         enemy.maxHull=550;enemy.radarCrossSection=1;enemy.power=70;
         enemy.opticalSignature=1;
