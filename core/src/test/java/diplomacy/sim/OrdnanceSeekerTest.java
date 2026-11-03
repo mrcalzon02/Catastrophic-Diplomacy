@@ -22,13 +22,20 @@ public final class OrdnanceSeekerTest {
         t.maxHull=t.hull=100000;
         return b;
     }
+    /** Causal radar requires a real outbound/return trip before first launch;
+     * tests may not summon an instantaneous target simply by stepping once. */
+    private static Battle.Missile awaitLaunch(Battle battle,int limit){
+        for(int i=0;i<limit&&battle.missiles().isEmpty();i++)battle.step();
+        check(!battle.missiles().isEmpty(),
+                "Authorized missile failed to launch after physically arrived contact");
+        return battle.missiles().get(0);
+    }
     private static void lossAndReacquisition(){
         Battle b=scene(908172L);
         Battle.Ship t=b.ships().get(1);
         t.ecmStrength=1;t.ecmCondition=1;
-        b.step();
-        check(b.missiles().size()==1,"one real missile must launch");
-        Battle.Missile m=b.missiles().get(0);
+        Battle.Missile m=awaitLaunch(b,60);
+        check(b.missiles().size()==1,"one actual authorized launcher must fire");
         check(!m.seekerLocked,"hostile ECM must break initial seeker lock");
         check(m.targetId==t.id,"ECM cannot magically retarget the missile");
         double oldY=m.lastKnownY;
@@ -38,13 +45,13 @@ public final class OrdnanceSeekerTest {
                 "lost seeker cannot observe a moving target through ECM");
         t.ecmStrength=0;
         boolean recovered=false;
-        for(int i=0;i<12;i++){
+        for(int i=0;i<36;i++){
             b.step();
             if(m.seekerLocked){recovered=true;break;}
         }
-        check(recovered,"unobstructed target must be reacquired on a bounded scan");
-        check(m.lastKnownY==t.y&&m.targetId==t.id,
-                "reacquisition must use actual original target coordinates");
+        check(recovered,"unobstructed target must be reacquired after photon arrival and bounded scan");
+        check(m.lastObservationTick<b.tick&&m.targetId==t.id,
+                "Reacquisition must use delayed original-hull evidence, never target truth");
         check(OrdnanceSeeker.canTrack(560,1,0,1,false,false)
                 &&!OrdnanceSeeker.canTrack(560,1,1,1,false,false),
                 "physical range and ECM must change lock outcome");
@@ -102,10 +109,12 @@ public final class OrdnanceSeekerTest {
             shooter.pdRange=0;shooter.fighterReserve=shooter.droneReserve=0;
             shooter.maxPower=shooter.power=20000;
         }
-        battle.step();
         Battle.Missile diverted=null;
-        for(Battle.Missile m:battle.missiles())
-            if(m.falseContactIndex>=0){diverted=m;break;}
+        for(int i=0;i<65&&diverted==null;i++){
+            battle.step();
+            for(Battle.Missile m:battle.missiles())
+                if(m.falseContactIndex>=0){diverted=m;break;}
+        }
         check(diverted!=null,
                 "Live autonomous missile salvos never acquired a real false contact");
         check(diverted.targetId==target.id&&diverted.seekerLocked,
@@ -130,8 +139,7 @@ public final class OrdnanceSeekerTest {
         Battle.Ship a=b.ships().get(0),t=b.ships().get(1);
         a.setPropulsionMode(Battle.DamageType.MISSILE,
                 OrdnancePropulsion.Mode.SILENT_GHOST);
-        b.step();
-        check(b.missiles().size()==1,"ghost missile launched");
+        awaitLaunch(b,60);
         for(int i=0;i<21;i++)b.step();
         check(b.missiles().size()==1,"coasting missile still physical");
         Battle.Missile m=b.missiles().get(0);
