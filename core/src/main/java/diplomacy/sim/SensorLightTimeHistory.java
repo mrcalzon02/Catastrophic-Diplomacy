@@ -75,9 +75,15 @@ public final class SensorLightTimeHistory {
                 Battle.CONTACT_INFRARED|Battle.CONTACT_GRAVITIC);
         int active=hardwareChannels&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY);
         if(sensorTick<(long)outward*2)active=0;
+        // Explicit active search requires a genuine earlier physical pulse.
+        // A boosted sweep cannot masquerade as a continuous free radar and
+        // a focused X-ray burst cannot illuminate an unrelated hull.
+        long emissionTick=measured-outward;
+        if(active!=0 && !source.scan.emittedFor(emissionTick,target.id,active))
+            active=0;
         int arrived=passive|active;
         if(arrived==0)return null;
-        long emitted=active!=0?measured-outward:measured;
+        long emitted=active!=0?emissionTick:measured;
         return new Observation(emitted,measured,receivedTick,arrived,sample);
     }
 }
