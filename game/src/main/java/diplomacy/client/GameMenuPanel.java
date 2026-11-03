@@ -413,7 +413,8 @@ final class GameMenuPanel {
               long purchaseCost,String dockNotice,
               boolean music,boolean effects,boolean trackFinal,boolean updaterAvailable,
               float voiceVolume,
-              boolean won,long reward,int surviving,int deployed,int escaped,int destroyed,
+              boolean won,diplomacy.sim.BattleTermination.Reason termination,long reward,
+              int surviving,int deployed,int escaped,int destroyed,
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
                int themePage,FleetNames.Style themeCandidate,
                int selectedSquadron,Screen namingReturn,
@@ -1175,8 +1176,14 @@ final class GameMenuPanel {
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");
                 if(report!=null){
-                    label(batch,font,won?"MISSION ACCOMPLISHED":"BATTLE ENDED",
-                            56,565,won?Color.GREEN:Color.SCARLET);
+                    label(batch,font,won?"MISSION ACCOMPLISHED":
+                            termination==diplomacy.sim.BattleTermination.Reason.STALEMATE?
+                                    "STALEMATE / NO VICTORY":
+                            termination==diplomacy.sim.BattleTermination.Reason.TIME_LIMIT?
+                                    "TIME LIMIT / NO VICTORY":"BATTLE ENDED",
+                            56,565,won?Color.GREEN:termination==
+                                    diplomacy.sim.BattleTermination.Reason.NONE?
+                                    Color.SCARLET:Color.GOLD);
                     label(batch,font,"SURVIVED: "+
                             report.count(CampaignAfterAction.Outcome.SURVIVED),56,516,Color.WHITE);
                     label(batch,font,"WITHDRAWING: "+
@@ -1208,8 +1215,14 @@ final class GameMenuPanel {
                     label(batch,font,"NEXT >",1034,284,Color.WHITE);
                 }else{
                     label(batch,font,won?"MISSION ACCOMPLISHED":
+                            termination==diplomacy.sim.BattleTermination.Reason.STALEMATE?
+                                    "STALEMATE / NO VICTORY":
+                            termination==diplomacy.sim.BattleTermination.Reason.TIME_LIMIT?
+                                    "TIME LIMIT / NO VICTORY":
                             escaped+withdrawing>0&&surviving==0?"FLEET WITHDREW":"FLEET DEFEATED",
-                            416,494,won?Color.GREEN:Color.SCARLET);
+                            416,494,won?Color.GREEN:termination==
+                                    diplomacy.sim.BattleTermination.Reason.NONE?
+                                    Color.SCARLET:Color.GOLD);
                     label(batch,font,"ACTIVE SURVIVORS: "+surviving+" / "+deployed,416,448,Color.WHITE);
                     label(batch,font,"WITHDRAWING: "+withdrawing+" (NOT SURVIVORS)",416,412,Color.CYAN);
                     label(batch,font,"ESCAPED SHIPS: "+escaped+" (NO VICTORY CREDIT)",416,380,Color.CYAN);
