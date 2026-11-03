@@ -2927,6 +2927,72 @@ public final class Battle {
         double bow=point.x()*25.0,port=point.y()*19.0;
         return new SurfaceAim(target.x+bow*c-port*s,target.y+bow*s+port*c);
     }
+    /** A historical target track produces a ray, then CURRENT hull geometry
+     * alone determines whether it physically intersects anything.
+     * No independently rolled "hit=true" flag can bypass the real ray.
+     * This first pass retains instant beam delivery; time-of-flight effects
+     * and full relativistic propagation remain separate future work. */
+    private void emitMainBeam(Ship shooter,Ship intended,
+            SensorLightTimeHistory.Observation track,double observedRange,
+            long shotId,WeaponMuzzles.Origin muzzle,DamageType family,
+            double maximumRange,double rawDamage,double lockChance,
+            String label,LaserFamilies.Type laserType){
+        SensorComputeBudget.Allocation allocation=SensorComputeBudget.solve(
+                shooter.targetCompute,shooter,track,tick,observedRange,
+                tacticalPrecision(shooter),
+                StrictMath.max(0,shooter.knownTracks.size()-1));
+        SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
+                track,tick,muzzle.x(),muzzle.y(),
+                1_000_000_000.0,allocation.precision(),shotId);
+        double aimX=solution.aimX(),aimY=solution.aimY();
+        boolean goodLock=random.nextDouble()<lockChance;
+        if(!goodLock){
+            int phantoms=DeceptionProjection.falseContacts(intended);
+            if(phantoms>0){
+                intended.holoShotsDiverted++;
+                int phantom=(int)Math.floorMod(shotId,phantoms);
+                aimX=DeceptionProjection.ghostX(intended,phantom,tick);
+                aimY=DeceptionProjection.ghostY(intended,phantom,tick);
+            }else{
+                double dx=aimX-muzzle.x(),dy=aimY-muzzle.y();
+                double angle=StrictMath.atan2(dy,dx)+
+                        (shotId%2==0?1:-1)*1.15;
+                double reach=StrictMath.max(1,StrictMath.hypot(dx,dy));
+                aimX=muzzle.x()+StrictMath.cos(angle)*reach;
+                aimY=muzzle.y()+StrictMath.sin(angle)*reach;
+            }
+        }
+        BeamRayGeometry.Ray ray=BeamRayGeometry.aim(
+                muzzle.x(),muzzle.y(),aimX,aimY,maximumRange);
+        Ship struck=null;
+        BeamRayGeometry.Intersection closest=null;
+        for(Ship candidate:ships){
+            if(!candidate.alive()||candidate.team==shooter.team)continue;
+            BeamRayGeometry.Intersection impact=BeamRayGeometry.intersect(
+                    ray,candidate.x,candidate.y,12*candidate.visualScale());
+            if(impact==null)continue;
+            if(closest==null||impact.fraction()<closest.fraction()||
+                    (impact.fraction()==closest.fraction()&&candidate.id<struck.id)){
+                closest=impact;struck=candidate;
+            }
+        }
+        double endX=closest==null?ray.x2():closest.x();
+        double endY=closest==null?ray.y2():closest.y();
+        if(family==DamageType.LASER)
+            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),
+                    endX,endY,shooter.team,family,false,laserType));
+        else
+            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),
+                    endX,endY,shooter.team,family));
+        visual(shotId,VisualPhase.FIRE,label,shooter.team,shooter.id,intended.id,
+                muzzle.x(),muzzle.y(),endX,endY);
+        if(struck!=null){
+            if(family==DamageType.LASER)
+                hitLaser(struck,rawDamage,shooter,shotId,endX,endY,label);
+            else hit(struck,rawDamage,shooter,family,shotId,endX,endY);
+        }
+    }
+
     /** Queued rounds are already committed, but not paid until actually fired. */
     private int committedResource(Ship source,DamageType family){
         int n=0;
@@ -3014,34 +3080,13 @@ public final class Battle {
                     *laserType.cycle;
             s.power-=laserPower;s.heat+=laserHeat;
             long shotId=nextVisualShotId++;
-            SurfaceAim aim=surfaceAim(s,target,shotId);
-            boolean landed=random.nextDouble()<laser.aim(
+            double chance=laser.aim(
                     s.accuracy*laserType.aim,s.weapons.laserTracking(),weatherAim,lock);
-            double endX=aim.x(),endY=aim.y();
-            if(!landed){
-                int phantoms=DeceptionProjection.falseContacts(target);
-                if(phantoms>0){
-                    target.holoShotsDiverted++;
-                    // Failed electronic lock traces the actual visible
-                    // holographic contact, not an unrelated fake hit marker.
-                    int phantom=(int)Math.floorMod(shotId,phantoms);
-                    endX=DeceptionProjection.ghostX(target,phantom,tick);
-                    endY=DeceptionProjection.ghostY(target,phantom,tick);
-                }else{
-                    double deviation=28+(shotId%5)*4;
-                    double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
-                            +(shotId%2==0?1:-1)*1.15;
-                    endX+=StrictMath.cos(angle)*deviation;
-                    endY+=StrictMath.sin(angle)*deviation;
-                }
-            }
-            beams.add(new Beam(shotId,tick,laserMuzzle.x(),laserMuzzle.y(),
-                    endX,endY,s.team,DamageType.LASER,false,laserType));
-            String label=LaserFamilies.eventWeapon(laserType);
-            visual(shotId,VisualPhase.FIRE,label,s.team,s.id,target.id,
-                    laserMuzzle.x(),laserMuzzle.y(),endX,endY);
-            if(landed)hitLaser(target,s.laserDamage*laserType.damage,
-                    s,shotId,aim.x(),aim.y(),label);
+            emitMainBeam(s,target,firingFix,distance,shotId,laserMuzzle,
+                    DamageType.LASER,
+                    laser.range(s.weapons.laserRange())*laserType.range,
+                    s.laserDamage*laserType.damage,chance,
+                    LaserFamilies.eventWeapon(laserType),laserType);
         }
         if(!s.launchers.isEmpty()){
             queueRackSalvos(s,target,DamageType.MISSILE,distance,missile);
@@ -3119,33 +3164,13 @@ public final class Battle {
             s.plasmaReload=plasma.reload(s.weapons.plasmaCycle(),s.weaponsCondition);
             chargeGun(s,plasma);
             long shotId=nextVisualShotId++;
-            SurfaceAim aim=surfaceAim(s,target,shotId);
-            boolean landed=random.nextDouble()<plasma.aim(
-                    s.accuracy,s.weapons.plasmaTracking(),weatherAim,lock);
-            // Keep a missed beam from appearing to strike and erode its target.
-            double endX=aim.x(),endY=aim.y();
-            if(!landed){
-                int phantoms=DeceptionProjection.falseContacts(target);
-                if(phantoms>0){
-                    target.holoShotsDiverted++;
-                    // Failed electronic lock traces the actual visible
-                    // holographic contact, not an unrelated fake hit marker.
-                    int phantom=(int)Math.floorMod(shotId,phantoms);
-                    endX=DeceptionProjection.ghostX(target,phantom,tick);
-                    endY=DeceptionProjection.ghostY(target,phantom,tick);
-                }else{
-                    double deviation=28+(shotId%5)*4;
-                    double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
-                            +(shotId%2==0?1:-1)*1.15;
-                    endX+=StrictMath.cos(angle)*deviation;
-                    endY+=StrictMath.sin(angle)*deviation;
-                }
-            }
-            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.PLASMA,shotId);
-            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.PLASMA));
-            visual(shotId,VisualPhase.FIRE,"PLASMA",s.team,s.id,target.id,
-                    muzzle.x(),muzzle.y(),endX,endY);
-            if(landed)hit(target,s.plasmaDamage,s,DamageType.PLASMA,shotId,aim.x(),aim.y());
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(
+                    s,WeaponMuzzles.Family.PLASMA,shotId);
+            double chance=plasma.aim(s.accuracy,s.weapons.plasmaTracking(),
+                    weatherAim,lock);
+            emitMainBeam(s,target,firingFix,distance,shotId,muzzle,
+                    DamageType.PLASMA,plasma.range(s.weapons.plasmaRange()),
+                    s.plasmaDamage,chance,"PLASMA",null);
         }
         if(particle.available(s.particleDamage,0,distance,s.weapons.particleRange(),
                 s.particleReload,s.power,s.heat,s.maxHeat,
@@ -3153,33 +3178,13 @@ public final class Battle {
             s.particleReload=particle.reload(s.weapons.particleCycle(),s.weaponsCondition);
             chargeGun(s,particle);
             long shotId=nextVisualShotId++;
-            SurfaceAim aim=surfaceAim(s,target,shotId);
-            boolean landed=random.nextDouble()<particle.aim(
-                    s.accuracy,s.weapons.particleTracking(),weatherAim,lock);
-            // Keep a missed beam from appearing to strike and erode its target.
-            double endX=aim.x(),endY=aim.y();
-            if(!landed){
-                int phantoms=DeceptionProjection.falseContacts(target);
-                if(phantoms>0){
-                    target.holoShotsDiverted++;
-                    // Failed electronic lock traces the actual visible
-                    // holographic contact, not an unrelated fake hit marker.
-                    int phantom=(int)Math.floorMod(shotId,phantoms);
-                    endX=DeceptionProjection.ghostX(target,phantom,tick);
-                    endY=DeceptionProjection.ghostY(target,phantom,tick);
-                }else{
-                    double deviation=28+(shotId%5)*4;
-                    double angle=StrictMath.atan2(target.y-s.y,target.x-s.x)
-                            +(shotId%2==0?1:-1)*1.15;
-                    endX+=StrictMath.cos(angle)*deviation;
-                    endY+=StrictMath.sin(angle)*deviation;
-                }
-            }
-            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.PARTICLE,shotId);
-            beams.add(new Beam(shotId,tick,muzzle.x(),muzzle.y(),endX,endY,s.team,DamageType.PARTICLE));
-            visual(shotId,VisualPhase.FIRE,"PARTICLE",s.team,s.id,target.id,
-                    muzzle.x(),muzzle.y(),endX,endY);
-            if(landed)hit(target,s.particleDamage,s,DamageType.PARTICLE,shotId,aim.x(),aim.y());
+            WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(
+                    s,WeaponMuzzles.Family.PARTICLE,shotId);
+            double chance=particle.aim(s.accuracy,s.weapons.particleTracking(),
+                    weatherAim,lock);
+            emitMainBeam(s,target,firingFix,distance,shotId,muzzle,
+                    DamageType.PARTICLE,particle.range(s.weapons.particleRange()),
+                    s.particleDamage,chance,"PARTICLE",null);
         }
         queueRocketBarrage(s,target,distance);
         if(!s.launchers.isEmpty()){
