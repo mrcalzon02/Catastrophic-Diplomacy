@@ -510,7 +510,7 @@ public final class Battle {
         public final RocketBarrage.Size size;
         public final RocketBarrage.Motor motor;
         public final ProjectileModel.Spec spec;
-        public final double heading,damage;
+        public final double heading,damage,sustainedThrustFactor;
         public double x,y,vx,vy,life=7.5,integrity;
         public int flightTicks;
         Rocket(long id,long start,Ship source,RocketBarrage.Rack rack,
@@ -518,6 +518,7 @@ public final class Battle {
             visualId=id;spawnTick=start;sourceId=source.id;team=source.team;
             targetId=aimedAt;size=rack.size;motor=rack.motor;
             spec=rack.body;damage=rack.damage;
+            sustainedThrustFactor=rack.sustainedThrustFactor;
             x=px;y=py;heading=bearing;
             vx=StrictMath.cos(heading)*78;vy=StrictMath.sin(heading)*78;
             integrity=spec.health();
@@ -3196,8 +3197,7 @@ public final class Battle {
             rocket.flightTicks++;
             double accel=RocketBarrage.acceleration(rocket.size,rocket.motor,age);
             if(rocket.motor==RocketBarrage.Motor.SUSTAINED_BURN)
-                accel*=RocketBarrage.researchedSustainedThrustScale(
-                        rocket.size,rocket.spec)*
+                accel*=rocket.sustainedThrustFactor*
                         diagnosticSustainedRocketThrustMultiplier;
             if(accel>0){
                 double speed=StrictMath.hypot(rocket.vx,rocket.vy);
