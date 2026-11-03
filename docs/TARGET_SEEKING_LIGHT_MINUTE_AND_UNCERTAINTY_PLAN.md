@@ -1,6 +1,6 @@
 # Light-minute battlefield, probabilistic target seeking and physical aim error
 
-**Design proposal • 2026-11-03 • no code or production balance change implied by this document**
+**Implementation started • 2026-11-03 • Stage 0 shared half-size geometry and Stage 1 sublight thrust are live. Delayed sensor observations and uncertainty-based firing remain planned.**
 
 ## Design intent
 
@@ -17,6 +17,60 @@ fixed 3,840×2,160 arena, 200 per side, 30Hz; RDR/IRT/XRY/GRA/ACU and stealth
 countermeasures; SHR/RES/TRK/LNK/FCM/CAP networks with separately tested
 read-only command observations. Preserve all their hardware IDs, researched
 variants, socket indices, existing saves and original sprite artwork.
+
+## Implemented in the current production model
+
+`WorldScale` now fixes the existing 4,405.814-unit arena diagonal to
+17,987,547.48 km; one simulation second represents **60 physical seconds**.
+This is explicit gameplay time compression, not a claim that the 30Hz tick
+is physical realtime. The physical speed of light is 73.430 world units
+per physical second, or 4,405.814 world units per simulation second.
+One-way photons traversing the diagonal need 60 physical seconds,
+**30 combat ticks**; a round-trip radar echo requires **60 ticks**.
+Future sensor work must use measured-state time history, never instantaneous
+world coordinates.
+
+`WorldScale.SHIP_WORLD_SCALE=0.50` is now applied to
+`Battle.Ship.visualScale()`; the same factor is already consumed by the
+original ship renderer, fitted turret/hardpoint transforms, physical
+rocket/ballistic hull overlap, damage/shield surface effects and world
+selection/culling. Approved source PNGs and blueprint socket IDs are
+unchanged. Physical ship lengths remain **abstract glyphs**, not literal
+69,000-km hulls; exact collision/range balance needs retesting.
+
+`SublightPropulsion` replaces instantaneous target-velocity smoothing
+with finite physical acceleration, engine fuel spent on delta-V and
+inertial coasting on empty fuel. Original ENG hardpoints, count and
+existing nine-stage upgrade level select drive profiles:
+
+| Installed machinery | Drive | Maximum physical speed | Max acceleration |
+| --- | --- | ---: | ---: |
+| Bare hull, no paid ENG | Auxiliary electric | 0.1% c | 0.3 g |
+| One standard ENG | Fusion torch | 0.6% c | 3 g |
+| Two ENG units or ENG stage IV-VI | Advanced fusion | 1.2% c | 6 g |
+| ENG stage VII-IX | High-energy torch | 1.8% c | 9 g |
+
+These are **speculative far-future upper bounds**, not today's
+flight-proven propulsion. Actual speed is no higher than both the
+engine class cap and the existing purchased/fitted speed rating,
+multiplied by physical damage and crew condition. The class defines
+a maximum possible cruise speed accumulated over long periods,
+*not* the instant speed an engine creates from rest. Search, pursuit,
+retreat, waypoints, hold/braking and command maneuvers debit the same
+acceleration/fuel pathway; powerless coasting does not receive free
+vacuum friction. The battle fingerprint includes propulsion mode and
+velocity to detect state mismatch.
+
+`WorldScaleAndPropulsionTest` (run automatically through
+`:core:battleArenaSmoke`) asserts physical photon delays, cruise caps,
+installed engine count and research tiers, real delta-V/fuel and coast,
+the 50% geometry factor and aligned original-art muzzle transforms.
+
+**Still pending:** history-delayed live sensors, predictive covariance,
+active radar/X-ray pulses, distinction of near-miss and graze for
+instant-beam families, and thorough 200v200 performance tuning.
+Projectile weapon velocities retain their existing data for now;
+do not call every ammunition type fully relativistic-calibrated.
 
 ## 1. One light-minute *diagonal*, not endless simulation space
 
@@ -304,6 +358,7 @@ visual overlays and balance tables are diagnostics.
    but every hit must derive from a real path through a target; stale
    contacts alone still must not silently grant automatic lock authorization.
 
-**Implementation status:** planning only. No production ship-scale,
-trajectory, timestamp, active scan or weapon accuracy changes have been
-committed in this document's work.
+**Implementation status:** real shared 50% ship scale, physical
+world/light/time constants and engine-thrust migration are committed.
+The remaining sensor delay, active scan, probability-cloud and aiming
+phases in this design are NOT implemented yet.
