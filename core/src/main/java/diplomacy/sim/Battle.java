@@ -191,6 +191,8 @@ public final class Battle {
         public final SensorTrackRelayBuffer trackPackets=new SensorTrackRelayBuffer();
         /** Installed acquisition doctrine. STANDARD retains old automatic sensing. */
         public final SensorActiveScan.State scan=new SensorActiveScan.State();
+        /** Finite per-tick RES/TRK/ACU compute workload; CAP is not CPU. */
+        public final SensorComputeBudget.State targetCompute=new SensorComputeBudget.State();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
          * fooled by this emitter, not fictional effects counters. */
         public int holoShotsDiverted,holoSeekersDiverted;
@@ -3064,9 +3066,13 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.KINETIC,shotId);
             ProjectileModel.Spec body=shell.physical(s.kineticProjectile);
+            SensorComputeBudget.Allocation work=SensorComputeBudget.solve(
+                    s.targetCompute,s,firingFix,tick,distance,
+                    tacticalPrecision(s),
+                    StrictMath.max(0,s.knownTracks.size()-1));
             SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                     firingFix,tick,muzzle.x(),muzzle.y(),body.speed(),
-                    tacticalPrecision(s),shotId);
+                    work.precision(),shotId);
             // A slightly wrong estimated ray can STILL hit a real ship because
             // swept collision below is geometry-driven, not an aim flag.
             double angle=StrictMath.atan2(solution.aimY()-muzzle.y(),
@@ -5965,6 +5971,7 @@ public final class Battle {
             hash = mix(hash,s.scan.fingerprint());
             hash = mix(hash,s.relayPackets.fingerprint());
             hash = mix(hash,s.trackPackets.fingerprint());
+            hash = mix(hash,s.targetCompute.fingerprint());
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));
