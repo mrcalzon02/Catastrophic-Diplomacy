@@ -108,7 +108,13 @@ def enrich_materials(fields, family, variant):
                         fringe = max(0.0, min(1.0,
                             (coverage - .105) / .115))
                         fringe = fringe * fringe * (3.0 - 2.0 * fringe)
-                        g *= fringe
+                        # Retain a LOW neutral phase at the tag boundary.
+                        # A zero-G transition is interpreted as *cold metal*
+                        # by the shader's bilinear B interpolation, producing
+                        # an unwanted pale polygon just outside laser oxide.
+                        # This tiny G pedestal suppresses the silver fringe
+                        # without recreating the former hot-orange halo.
+                        g = max(26.0, g * fringe)
                         # Bright, surviving incised edges (B > .9) can glow
                         # in the material shader; no light in empty alpha.
                         b = max(b, 173 + .31 * soft_lip)
