@@ -15,7 +15,18 @@ public final class SensorLeadProjection {
             double launchX,double launchY,double predictedX,double predictedY,
             double impactX,double impactY,double flightSeconds,
             double contactAgeSeconds,double uncertaintyRadius,
-            long observedTick,boolean stale) {
+            long observedTick,boolean stale,boolean reachable) {
+        /** Existing constant-speed projections are within their nominal
+         * firing window; the rocket-specific solver can report no intercept. */
+        public Lead(int targetId,double observedX,double observedY,
+                double launchX,double launchY,double predictedX,double predictedY,
+                double impactX,double impactY,double flightSeconds,
+                double contactAgeSeconds,double uncertaintyRadius,
+                long observedTick,boolean stale) {
+            this(targetId,observedX,observedY,launchX,launchY,
+                    predictedX,predictedY,impactX,impactY,flightSeconds,
+                    contactAgeSeconds,uncertaintyRadius,observedTick,stale,true);
+        }
         public Lead {
             if(targetId<=0||!Double.isFinite(predictedX)||
                     !Double.isFinite(predictedY)||!Double.isFinite(impactX)||
@@ -33,6 +44,30 @@ public final class SensorLeadProjection {
             return launchY+(impactY-launchY)*u;
         }
     }
+    /** Predict an unguided rocket's leading pip using its real thrust/cap
+     * and 7.5-second finite lifetime. This does not spend compute or peek at
+     * enemy hull state. Unreachable targets remain visible as warnings,
+     * never as confident guaranteed-hit trajectories. */
+    public static Lead predictRocket(Battle.TacticalContact contact,long now,
+            double shooterX,double shooterY,RocketBarrage.Rack rack,
+            double precision){
+        if(rack==null)throw new IllegalArgumentException("Fitted rocket rack required");
+        Lead nominal=predict(contact,now,shooterX,shooterY,
+                rack.body.speed(),precision);
+        RocketTrajectoryPrediction.Intercept physical=
+                RocketTrajectoryPrediction.lead(contact.x(),contact.y(),
+                        contact.vx(),contact.vy(),contact.observedTick(),
+                        now,shooterX,shooterY,rack);
+        double extraFlight=StrictMath.max(0,
+                physical.seconds()-nominal.flightSeconds());
+        double sigma=nominal.uncertaintyRadius()*(1+.18*extraFlight);
+        return new Lead(contact.targetId(),contact.x(),contact.y(),
+                shooterX,shooterY,physical.x(),physical.y(),
+                physical.x(),physical.y(),physical.seconds(),
+                physical.ageSeconds(),sigma,contact.observedTick(),
+                contact.stale(),physical.reachable());
+    }
+
     public static Lead predict(Battle.TacticalContact contact,long now,
             double shooterX,double shooterY,double projectileSpeed,
             double precision){
