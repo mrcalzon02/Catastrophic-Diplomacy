@@ -17,7 +17,7 @@ public final class RailPointDefense {
         public final int slotId,researchTier;
         public final double nominalRange,cycle;
         public final ProjectileModel.Defense profile;
-        public double charge,reload,bearing=Double.NaN;
+        public double charge,reload,lockSeconds,bearing=Double.NaN;
         public long trackedBodyId=Long.MIN_VALUE;
         public int scans,acquisitions,shotsFired,chargeWaitTicks;
         public Mount(int slot,int rank,double range,
@@ -31,21 +31,27 @@ public final class RailPointDefense {
         }
         public void tick(double dt){
             reload=StrictMath.max(0,reload-dt);
-            if(trackedBodyId==Long.MIN_VALUE)
-                charge=StrictMath.max(0,charge-dt*.12);
         }
-        /** An interrupted/reacquired target loses part of its fire-control
-         * capacitor alignment; previous tracking cannot become a free shot. */
-        public void track(long physicalId,double dt){
-            if(physicalId!=trackedBodyId){
-                charge*=trackedBodyId==Long.MIN_VALUE?1:.45;
-                trackedBodyId=physicalId;acquisitions++;
-            }
+        /** The capacitor is powered independently of fire-control locks.
+         * Without precharge, a late small-shell track cannot be intercepted
+         * even by an otherwise capable long-range defensive rail weapon. */
+        public void charge(double dt){
             charge=StrictMath.min(1,charge+dt/
                     StrictMath.max(.72,1.25*cycle));
             if(charge<1)chargeWaitTicks++;
         }
-        public boolean ready(){return charge>=1&&reload<=0;}
+        /** Mechanical pointing lock needs real continuous observation. A
+         * target switch resets the lock, but does NOT discharge an already
+         * energized electromagnetic capacitor for no physical reason. */
+        public void track(long physicalId,double dt){
+            if(physicalId!=trackedBodyId){
+                trackedBodyId=physicalId;acquisitions++;lockSeconds=0;
+            }
+            lockSeconds=StrictMath.min(2,lockSeconds+dt);
+        }
+        public boolean ready(){
+            return charge>=1&&reload<=0&&lockSeconds>=.20;
+        }
         public void fire(double condition){
             shotsFired++;charge=0;
             reload=StrictMath.max(1.25,2.4*cycle/
