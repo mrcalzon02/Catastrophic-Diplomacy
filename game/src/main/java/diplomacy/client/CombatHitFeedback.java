@@ -143,6 +143,15 @@ final class CombatHitFeedback {
         while(!aftermath.isEmpty()&&aftermath.peekFirst().age>=AFTERGLOW_LIFETIME)
             aftermath.removeFirst();
     }
+    /** Restore only actual Battle.step() impact evidence in optional captures. */
+    void restoreCaptured(Battle battle,CombatHitFeedback evidence){
+        sync(battle);
+        active.clear();aftermath.clear();
+        if(evidence==null)return;
+        for(Pulse pulse:evidence.active)active.addLast(pulse);
+        for(Afterglow wound:evidence.aftermath)aftermath.addLast(wound);
+        sequence=evidence.sequence;
+    }
     List<Pulse> pulses(){return List.copyOf(active);}
     List<Afterglow> afterglows(){return List.copyOf(aftermath);}
     int count(){return active.size();}
