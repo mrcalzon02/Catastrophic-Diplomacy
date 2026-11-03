@@ -8,7 +8,11 @@ import java.util.Locale;
 /**
  * Reads individually authored, FIXED 24x24 RGBA damage decals.
  * Asset: damage_masks/<weapon>.png — 6 adjacent 24x24 frames, each a
- * different hand-shaped wound. No shape synthesis, rotation, per-pixel
+ * different hand-shaped wound. Optional diagnostic A/B uses two FIXED
+ * 288x336 images, each containing 7 family rows of six 48x48 masks.
+ * Both modes cover exactly the same 2.667-cell footprint, even if the
+ * original ship is only a dozen pixels wide at gameplay zoom.
+ * No shape synthesis, rotation, per-pixel
  * noise, or stand-in sprite is used in the live renderer.
  *
  * Channels: R soot, G residual heat, B exposed metal/laser oxide;
@@ -23,12 +27,37 @@ final class ShipDamageImageMasks {
     // no more than 16x24 of its pixels per isolated impact.
     private static final float PIXELS_PER_ARMOR_TILE=9f;
     private final int[][] atlases=new int[Battle.DamageType.values().length][];
+    /** Optional real-image A/B; unset keeps the previously approved 24px files. */
+    private final String testSet=System.getenv("CD_ARMOR_MASK_SET");
+    private final boolean use48="upscaled48".equals(testSet)||"authored48".equals(testSet);
+    private final int sampleSize=use48?48:24;
+    private final float pixelsPerCell=use48?18f:9f;
+    private int[] shared48;
+
+    private int[] shared48(){
+        if(shared48!=null)return shared48;
+        String path="damage_masks/ab/"+testSet+".png";
+        if(!Gdx.files.internal(path).exists())
+            throw new IllegalStateException("Missing real A/B PNG: "+path);
+        Pixmap art=new Pixmap(Gdx.files.internal(path));
+        try{
+            int width=48*COUNT, height=48*Battle.DamageType.values().length;
+            if(art.getWidth()!=width||art.getHeight()!=height)
+                throw new IllegalStateException("Wrong 48px A/B atlas dimensions: "+path);
+            int[] pixels=new int[width*height];
+            for(int y=0;y<height;y++)for(int x=0;x<width;x++)
+                pixels[y*width+x]=art.getPixel(x,y);
+            shared48=pixels;
+            return pixels;
+        }finally{art.dispose();}
+    }
 
     static int pick(int seed,Battle.DamageType kind){
         return ShipDamageVariants.variant(seed,kind);
     }
 
     private int[] atlas(Battle.DamageType kind){
+        if(use48)return shared48();
         int k=kind.ordinal();
         int[] cached=atlases[k];
         if(cached!=null)return cached;
@@ -49,10 +78,11 @@ final class ShipDamageImageMasks {
     }
 
     private int lookup(Battle.DamageType kind,float dx,float dy,int seed){
-        int x=(int)StrictMath.floor(MASK_RADIUS+dx*PIXELS_PER_ARMOR_TILE);
-        int y=(int)StrictMath.floor(MASK_RADIUS+dy*PIXELS_PER_ARMOR_TILE);
-        if(x<0||x>=SIZE||y<0||y>=SIZE)return 0x000000ff;
-        return atlas(kind)[y*(SIZE*COUNT)+pick(seed,kind)*SIZE+x];
+        int x=(int)StrictMath.floor(sampleSize*.5f+dx*pixelsPerCell);
+        int y=(int)StrictMath.floor(sampleSize*.5f+dy*pixelsPerCell);
+        if(x<0||x>=sampleSize||y<0||y>=sampleSize)return 0x000000ff;
+        int row=use48?kind.ordinal()*sampleSize+y:y;
+        return atlas(kind)[row*(sampleSize*COUNT)+pick(seed,kind)*sampleSize+x];
     }
 
     int material(Battle.DamageType kind,float dx,float dy,
@@ -82,5 +112,6 @@ final class ShipDamageImageMasks {
 
     void clear(){
         for(int i=0;i<atlases.length;i++)atlases[i]=null;
+        shared48=null;
     }
 }
