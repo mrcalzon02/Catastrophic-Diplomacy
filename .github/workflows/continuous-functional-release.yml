@@ -12,9 +12,9 @@ on:
 permissions:
   contents: write
 
-# One active release per branch. A newer main commit supersedes the entire
-# older build/test/emulator matrix, rather than filling the runner queue with
-# mutually obsolete signed packages. Every required check remains intact.
+# One active explicit release request per branch. A subsequent request
+# supersedes older release builds, but routine development commits do not
+# invalidate the pinned, fully tested source snapshot.
 concurrency:
   group: cd-functional-release-${{ github.ref }}
   cancel-in-progress: true
@@ -375,9 +375,17 @@ jobs:
           # Even if this run passes every functional test, do not publish a
           # stale commit when main advanced during the final packaging stage.
           # The latest-only rule applies to actual published prereleases too.
-          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)"
-          if [[ "$GITHUB_REF" != "refs/heads/main" || "$latest_sha" != "$GITHUB_SHA" ]]; then
-            echo "BLOCKED: obsolete/non-main candidate ($GITHUB_SHA); current main is $latest_sha"
+          # Pin this explicit release request to the commit that triggered it.
+          # Ongoing commits may advance main while tested packages are building.
+          # The release source must remain an ancestor of main; diverged or
+          # rewritten history is a blocker, but ordinary development is not.
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "BLOCKED: verified releases must originate from main"
+            exit 1
+          fi
+          relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...main" --jq .status)"
+          if [[ "$relation" != "identical" && "$relation" != "ahead" ]]; then
+            echo "BLOCKED: release source $GITHUB_SHA is no longer in current main history ($relation)"
             exit 1
           fi
           cd dist
@@ -425,9 +433,9 @@ jobs:
                 index("Catastrophic-Diplomacy-Windows-x64.msi")!=null and
                 index("Catastrophic-Diplomacy-Linux-x64.zip")!=null and
                 index("Catastrophic-Diplomacy-Android.apk")!=null)'
-          latest_sha="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)"
-          if [[ "$latest_sha" != "$GITHUB_SHA" ]]; then
-            echo "BLOCKED: main advanced during upload; obsolete release remains a draft"
+          relation="$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...main" --jq .status)"
+          if [[ "$relation" != "identical" && "$relation" != "ahead" ]]; then
+            echo "BLOCKED: release source history diverged during upload; draft retained ($relation)"
             exit 1
           fi
           gh release edit "$CD_RELEASE_TAG" -R "$GH_REPO" --draft=false

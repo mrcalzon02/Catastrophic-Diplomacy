@@ -2,5 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-03",
-  "note": "Explicit request: Push updated release. All functional gates retained; cosmetic diagnostics non-blocking."
+  "revision": 2,
+  "note": "Release current pinned main snapshot; all functional, signing, updater and checksum gates required. Ordinary later commits do not invalidate a tested release."
 }
