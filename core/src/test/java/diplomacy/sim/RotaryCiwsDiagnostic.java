@@ -180,8 +180,10 @@ public final class RotaryCiwsDiagnostic {
                 attacker.missileReload=attacker.torpedoReload=
                         attacker.kineticReload=10000;
         }
-        int fired=0,launched=0,impacts=0;
+        int fired=0,launched=0,impacts=0,rotaryImpacts=0;
         for(Battle.VisualEvent e:battle.visualEvents()){
+            if(e.phase()==Battle.VisualPhase.IMPACT&&e.team()==1&&
+                    "ROTARY_CIWS".equals(e.weapon()))rotaryImpacts++;
             if(e.phase()==Battle.VisualPhase.FIRE&&
                     e.team()==1&&"ROTARY_CIWS".equals(e.weapon())){
                 fired++;
@@ -214,11 +216,14 @@ public final class RotaryCiwsDiagnostic {
         require(!on||fired>0,"Powered rotary CIWS failed to fire at "+threat);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
         require(launched>0,"Attacker produced no physical "+threat);
-        require(!on||seen>0,"No in-flight RCW round at end of tick: "+threat+
-                " rank="+tier+" mounts="+mounts+" seed="+seed+" fired="+fired+
-                " first="+first+" ammoSpent="+(ammo-defender.kineticAmmo)+
-                " missilesRemaining="+battle.missiles().size()+
-                " rocketsRemaining="+battle.rockets().size());
+        // A near-range round may cross a tiny kinetic shell and vanish
+        // within ONE 30Hz tick; end-of-tick visual sampling then correctly
+        // sees zero live bullets. Demand either real in-flight frames OR an
+        // actual recorded kinetic collision (no fictitious travel tweens).
+        require(!on||seen>0||rotaryImpacts>0,
+                "No live flight OR physical tracer impact: "+threat+
+                " rank="+tier+" mounts="+mounts+" seed="+seed+
+                " fired="+fired+" first="+first+" collisions="+rotaryImpacts);
         double loss=StrictMath.max(0,armor-defender.armor)+
                 StrictMath.max(0,shield-defender.shields)+
                 StrictMath.max(0,hull-defender.hull);
