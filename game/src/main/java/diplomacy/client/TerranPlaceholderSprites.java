@@ -897,6 +897,14 @@ public final class TerranPlaceholderSprites implements Disposable {
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
                        CombatViewBounds view,ShieldFxTimeline shieldFx,
                        boolean forensicSurface) {
+        render(battle,batch,poses,view,shieldFx,forensicSurface,ship -> true);
+    }
+    /** Player optical identification gates source art, hull shaders, shields,
+     * engineering flashes and decoy sprite copies consistently. */
+    public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
+                       CombatViewBounds view,ShieldFxTimeline shieldFx,
+                       boolean forensicSurface,
+                       java.util.function.Predicate<Battle.Ship> hullVisible) {
         if(assetPaths.isEmpty())return;
         artFrame++;
         if(battle!=activeBattle){resetPeelCache();activeBattle=battle;}
@@ -929,7 +937,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         // forensic inspection. Production five-argument rendering is unchanged.
         surfaces.begin(batch,forensicSurface?null:battle,view);
         for(Battle.Ship ship:battle.ships()) {
-            if(!hasSprite(ship))continue;
+            if(!hasSprite(ship)||!hullVisible.test(ship))continue;
             Texture tex=texture(ship);
             if(tex==null)continue;
             float height=(float)(34*ship.visualScale());
@@ -966,15 +974,15 @@ public final class TerranPlaceholderSprites implements Disposable {
         // Active holographic ECM displays false electronic contacts using
         // transparent copies of the EXACT source-art hull. These are never
         // second physical ships and receive no damage/shields/hardpoints.
-        renderHolographicContacts(battle,batch,poses,view);
-        renderEngineeringResponse(battle,batch,poses,view);
+        renderHolographicContacts(battle,batch,poses,view,hullVisible);
+        renderEngineeringResponse(battle,batch,poses,view,hullVisible);
         // Cached source-art hex textures are recolored using per-vertex RGB:
         // one shader for all factions, generators and independent facings.
         batch.setShader(shieldInk==null?null:shieldInk.program());
         batch.begin();
         if(shieldInk!=null)shieldInk.configure(false,battle.tick);
         for(Battle.Ship ship:battle.ships()){
-            if(!hasSprite(ship)||ship.shields<=0)continue;
+            if(!hasSprite(ship)||!hullVisible.test(ship)||ship.shields<=0)continue;
             Texture tex=texture(ship);
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
@@ -992,6 +1000,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(shieldFx!=null && shieldShell!=null)
             for(ShieldFxTimeline.Effect fx:shieldFx.events()){
                 if(fx.kind!=ShieldFxTimeline.Kind.COLLAPSE||!hasSprite(fx.ship)
+                        ||!hullVisible.test(fx.ship)
                         ||fx.ship.defense.shields(fx.facing)>.015)continue;
                 BattleRenderPoses.Pose pose=poses==null
                         ?new BattleRenderPoses.Pose((float)fx.ship.x,(float)fx.ship.y,(float)fx.ship.facing)
@@ -1019,7 +1028,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             batch.begin();
             if(shieldInk!=null)shieldInk.configure(true,battle.tick);
             for(Battle.Ship ship:battle.ships()){
-                if(!hasSprite(ship)||ship.shields<=0)continue;
+                if(!hasSprite(ship)||!hullVisible.test(ship)||ship.shields<=0)continue;
                 BattleRenderPoses.Pose pose=poses==null
                         ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
                         :poses.ship(ship);
@@ -1059,10 +1068,11 @@ public final class TerranPlaceholderSprites implements Disposable {
     /** Visible consequence of a real hazard roll or repair pulse, drawn from
      * original hull alpha, never a substitute geometry silhouette. */
     private void renderEngineeringResponse(Battle battle,SpriteBatch batch,
-                                           BattleRenderPoses poses,CombatViewBounds view){
+                                           BattleRenderPoses poses,CombatViewBounds view,
+                                           java.util.function.Predicate<Battle.Ship> hullVisible){
         boolean drawing=false;
         for(Battle.Ship ship:battle.ships()){
-            if(!ship.alive())continue;
+            if(!ship.alive()||!hullVisible.test(ship))continue;
             long faultAge=battle.tick-ship.lastHazardTick;
             long repairAge=battle.tick-ship.lastRepairTick;
             boolean fault=faultAge>=0&&faultAge<18;
@@ -1101,9 +1111,11 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(drawing){batch.setColor(1,1,1,1);batch.end();}
     }
     private void renderHolographicContacts(Battle battle,SpriteBatch batch,
-                                           BattleRenderPoses poses,CombatViewBounds view){
+                                           BattleRenderPoses poses,CombatViewBounds view,
+                                           java.util.function.Predicate<Battle.Ship> hullVisible){
         boolean drawing=false;
         for(Battle.Ship ship:battle.ships()){
+            if(!hullVisible.test(ship))continue;
             int contacts=DeceptionProjection.falseContacts(ship);
             if(contacts==0)continue;
             Texture original=texture(ship);
