@@ -97,7 +97,7 @@ public final class SensorHistoricalSignaturesTest {
                 "Present-time emitter shutdown retroactively rewrote lock penalty");
         b.step();
         require(DeceptionProjection.hologramStrength(
-                        hostile.sensorHistory.profileAt(b.tick()))==0,
+                        hostile.sensorHistory.profileAt(b.tick))==0,
                 "Later inactive emitter state did not enter photon history");
         System.out.println("PASS fire-control lock penalty retains historical emitter timing");
     }
