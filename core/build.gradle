@@ -62,6 +62,15 @@ tasks.register('sensingModulesSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+tasks.register('sensorNetworkSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify six physical sensor-network families and 24 variants, nine-rank research, power-loss counterplay and real shared contacts.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorNetworkModulesTest'
+    dependsOn testClasses
+}
+tasks.named('sensingModulesSmoke') { dependsOn(tasks.named('sensorNetworkSmoke')) }
+
 
 tasks.register('hullLayoutsSmoke', JavaExec) {
     group = 'verification'
