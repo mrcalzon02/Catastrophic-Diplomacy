@@ -2,32 +2,32 @@
   "laser": [
     {
       "variant": 1,
-      "coloredPixels": 5996,
+      "coloredPixels": 3372,
       "cutPixels": 42
     },
     {
       "variant": 2,
-      "coloredPixels": 5997,
+      "coloredPixels": 3416,
       "cutPixels": 43
     },
     {
       "variant": 3,
-      "coloredPixels": 6199,
+      "coloredPixels": 3788,
       "cutPixels": 61
     },
     {
       "variant": 4,
-      "coloredPixels": 6199,
+      "coloredPixels": 3565,
       "cutPixels": 65
     },
     {
       "variant": 5,
-      "coloredPixels": 6288,
+      "coloredPixels": 3182,
       "cutPixels": 70
     },
     {
       "variant": 6,
-      "coloredPixels": 6066,
+      "coloredPixels": 3349,
       "cutPixels": 43
     }
   ],
