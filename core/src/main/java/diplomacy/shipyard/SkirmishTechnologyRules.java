@@ -28,7 +28,7 @@ public record SkirmishTechnologyRules(
     public SkirmishTechnologyRules {
         if(maxStage<0||maxStage>9||maxHullGeneration<1||maxHullGeneration>10||
                 allowedTracks==null||bannedTechnologyIds==null||allowedHulls==null||
-                bannedTechnologyIds.size()>72072)
+                bannedTechnologyIds.size()>72468)
             throw new IllegalArgumentException("Invalid skirmish technology challenge");
         allowedTracks=Set.copyOf(allowedTracks);
         bannedTechnologyIds=Set.copyOf(bannedTechnologyIds);
