@@ -52,7 +52,6 @@ final class CombatHitRenderer {
                 }else if(hit.weapon==diplomacy.sim.Battle.DamageType.LASER){
                     rr=1f;gg=.87f;bb=.64f;
                 }
-                float fade=(1-t)*(1-t);
                 shapes.setColor(rr,gg,bb,(armor?.82f:.94f)*fade);
                 for(int i=0;i<sparks;i++){
                     int h=ShipDamageVariants.hash(hit.visualSeed+i*719,
