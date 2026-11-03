@@ -1493,20 +1493,30 @@ public final class Battle {
      * real sensors reacquire a target. HOLD/LAST_STAND ships remain stationary;
      * mobile ships sweep broader sectors after prolonged loss of contact.
      */
+    /** Prefer recent, nearby ACTUALLY OBSERVED fixes. Even an advanced
+     * datalink exports only its finite highest-priority track records. */
+    private static double contactSearchScore(Ship observer,ContactTrack track,long now){
+        double age=StrictMath.max(0,now-track.tick);
+        double distance=StrictMath.hypot(track.x-observer.x,track.y-observer.y);
+        return age*3+distance*.045;
+    }
     private ContactTrack newestValidTrack(Ship observer){
         if(observer.power<=3||observer.sensorsCondition<=.05
                 ||observer.crewReadiness()<.05)return null;
-        ContactTrack newest=null;
-        int window=(int)(observer.network.trackMemoryTicks()
+        ContactTrack best=null;
+        double bestScore=Double.POSITIVE_INFINITY;
+        int localWindow=(int)(observer.network.trackMemoryTicks()
                 *StrictMath.min(1,observer.sensorsCondition));
-        if(window>0)for(ContactTrack track:observer.knownTracks.values()){
+        if(localWindow>0)for(ContactTrack track:observer.knownTracks.values()){
             long age=tick-track.tick;
-            if(age<0||age>window)continue;
-            if(newest==null||track.tick>newest.tick)newest=track;
+            if(age<0||age>localWindow)continue;
+            double score=contactSearchScore(observer,track,tick);
+            if(score<bestScore){best=track;bestScore=score;}
         }
-        // A track-link is not a clairvoyant scanner. It relays only previously
-        // observed, time-limited fixes from allied powered TRK+LNK hardware.
+        // A track link is not a scanner or a remote weapon lock. Share only
+        // the sender's newest finite contact set, observed before data loss.
         if(observer.network.trackRelayRange()>0){
+            ContactTrack[] priority=new ContactTrack[32];
             for(Ship source:ships){
                 if(source==observer||source.team!=observer.team||!source.alive()
                         ||source.power<=3||source.crewReadiness()<.05
@@ -1518,18 +1528,30 @@ public final class Battle {
                                 observer.sensorsCondition);
                 if(range<=0||StrictMath.hypot(source.x-observer.x,
                         source.y-observer.y)>range)continue;
-                int windowSource=(int)(source.network.trackMemoryTicks()
+                int count=StrictMath.min(32,source.network.trackRelayCapacity());
+                Arrays.fill(priority,0,count,null);
+                int window=(int)(source.network.trackMemoryTicks()
                         *StrictMath.min(1,source.sensorsCondition));
-                // Rank by timestamp first; at most the paid relay capacity
-                // can be exported from this single source per update.
                 for(ContactTrack track:source.knownTracks.values()){
                     long age=tick-track.tick;
-                    if(age<0||age>windowSource)continue;
-                    if(newest==null||track.tick>newest.tick)newest=track;
+                    if(age<0||age>window)continue;
+                    for(int k=0;k<count;k++)if(priority[k]==null ||
+                            track.tick>priority[k].tick){
+                        for(int n=count-1;n>k;n--)priority[n]=priority[n-1];
+                        priority[k]=track;
+                        break;
+                    }
+                }
+                for(int k=0;k<count;k++){
+                    ContactTrack track=priority[k];
+                    if(track==null)break;
+                    // Fleet data has a small latency/confidence penalty.
+                    double score=contactSearchScore(observer,track,tick)+10;
+                    if(score<bestScore){best=track;bestScore=score;}
                 }
             }
         }
-        return newest;
+        return best;
     }
 
     private void searchForContact(Ship ship) {
