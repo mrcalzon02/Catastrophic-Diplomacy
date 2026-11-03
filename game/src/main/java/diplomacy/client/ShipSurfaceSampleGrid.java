@@ -2,7 +2,7 @@ package diplomacy.client;
 
 /**
  * Exact first-sample projection from an approved original PNG into the
- * fixed 96x144 damage/sector mask. Cache only those sampled source pixels,
+ * chosen damage/sector mask resolution. Cache only sampled source pixels,
  * never the entire decoded original atlas on an older Android device.
  */
 final class ShipSurfaceSampleGrid {
