@@ -312,15 +312,22 @@ public final class ShipSurfaceDamageVisualTest {
                 "Tagged laser oxide and kinetic metal must occupy different material ranges");
         // Artistic palette assertions belong ONLY to this nonblocking
         // diagnostic, not the functional release's shipSurfaceSmoke gate.
-        for(String token:new String[]{"if(peel.b>0.62)",
-                "float anneal=clamp((peel.b-0.64)/0.36",
-                "vec3 oxide=mix(","float coolMetal=1.0-smoothstep(0.005,0.08,peel.g)",
+        // Material interpolation is now continuous through the reserved B
+        // range. Hard branches fabricated orange/chrome polygons at the 96px
+        // laser annealing boundary, despite correct source mask gradients.
+        check(!ShipSurfaceLighting.FRAGMENT.contains("if(peel.b>0.62)"),
+                "Hard laser material branch would recreate the visible halo seam");
+        for(String token:new String[]{
+                "float oxideMix=smoothstep(0.56,0.72,peel.b)*smoothstep(0.035,0.10,peel.g)",
+                "float thermal=peel.g*(1.0-oxideMix)",
+                "float anneal=clamp((peel.b-0.56)/0.44,0.0,1.0)*oxideMix",
+                "vec3 oxide=mix(", "float coolMetal=1.0-smoothstep(0.005,0.08,peel.g)",
                 "metalStrength=clamp(peel.b/0.56",
                 "vec3 residualHeat=vec3(0.0)",
-                "residualHeat=vec3(0.32,0.105,0.018)*peel.g*peel.g",
+                "residualHeat=vec3(0.32,0.105,0.018)*thermal*thermal",
                 "lit=mix(albedo.rgb,lit,u_detail)+residualHeat"})
             check(ShipSurfaceLighting.FRAGMENT.contains(token),
-                    "Laser temper / kinetic metal shader path missing: "+token);
+                    "Continuous laser/metal shader material path missing: "+token);
         // In all severity states, char -> soot -> heat must fade to the
         // EXACT original source pixel before reaching the neighboring tile.
         for(float severity:new float[]{.2f,.5f,1f}){
