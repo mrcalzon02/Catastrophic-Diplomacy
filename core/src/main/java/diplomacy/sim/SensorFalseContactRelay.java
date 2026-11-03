@@ -10,12 +10,12 @@ import java.util.List;
  * obtain packets until a real sender-to-receiver light hop has elapsed.
  * This buffer does NOT contain combat targets or authorize weapon locks.
  *
- * Fixed 32 independent phantom identities x 8 reports. Inactive tombstones
+ * Fixed 32 independent phantom identities x 32 reports. Inactive tombstones
  * are transmitted too: a later observed shutdown does not erase old photons,
  * but does eventually replace the false hypothesis after link propagation.
  */
 public final class SensorFalseContactRelay {
-    public static final int MAX_HYPOTHESES=32,REPORTS_PER_HYPOTHESIS=8;
+    public static final int MAX_HYPOTHESES=32,REPORTS_PER_HYPOTHESIS=32;
     public static final int MAX_REPORT_AGE_TICKS=45;
     public record Packet(int emitterId,int index,boolean active,
                          double x,double y,double vx,double vy,
