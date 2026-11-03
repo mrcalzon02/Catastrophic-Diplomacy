@@ -120,7 +120,7 @@ def enrich_materials(fields, family, variant):
                     b = max(b, lip * bright_rim[family] / 255.0,
                             broad_lip * bright_rim[family] / 420.0)
                     if family in ("plasma", "torpedo", "missile"):
-                        g = max(g, wide[x,y] * hot_rim[family] / 510.0)
+                        g = max(g, broad_lip * hot_rim[family] / 510.0)
                 else:
                     g = 0
                 if family == "kinetic":
