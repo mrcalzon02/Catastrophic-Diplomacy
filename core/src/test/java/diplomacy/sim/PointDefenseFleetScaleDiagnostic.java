@@ -45,19 +45,26 @@ public final class PointDefenseFleetScaleDiagnostic {
     }
     private record Result(String mode,long wallNanos,long peakHeapBytes,
                           int pd,int flak,int rotary,int rail,int maxBodies,
-                          int intercepted,int stockSpent,int aliveAttack,
+                          int intercepted,int defensiveCartridges,int netKineticLoss,
+                          double netProtectionLoss,int aliveAttack,
                           int aliveDefense,int cappedEventTicks) {
         String csv(){
             return mode+","+TICKS+","+
                     String.format(Locale.ROOT,"%.3f",wallNanos/1e6)+","+
                     peakHeapBytes+","+pd+","+flak+","+rotary+","+rail+","+
-                    maxBodies+","+intercepted+","+stockSpent+","+
+                    maxBodies+","+intercepted+","+defensiveCartridges+","+
+                    netKineticLoss+","+(netKineticLoss-defensiveCartridges)+","+
+                    String.format(Locale.ROOT,"%.2f",netProtectionLoss)+","+
                     aliveAttack+","+aliveDefense+","+cappedEventTicks;
         }
     }
     private static long heapBytes(){
         Runtime rt=Runtime.getRuntime();
         return rt.totalMemory()-rt.freeMemory();
+    }
+    private static double remainingProtection(Battle.Ship ship){
+        return Math.max(0,ship.shields)+Math.max(0,ship.armor)+
+                Math.max(0,ship.hull);
     }
     private static Result run(TechnologyCatalog tech,boolean enabled,
                               List<String> samples){
@@ -73,12 +80,14 @@ public final class PointDefenseFleetScaleDiagnostic {
                 battle.alive(1)==200,"200v200 fitted setup was incomplete");
         int[] physicalMounts=new int[4];
         int stockBefore=0;
+        double protectionBefore=0;
         for(Battle.Ship ship:battle.ships())if(ship.team==1){
             physicalMounts[0]+=ship.precisionMounts.size();
             physicalMounts[1]+=ship.flakMounts.size();
             physicalMounts[2]+=ship.rotaryMounts.size();
             physicalMounts[3]+=ship.railMounts.size();
             stockBefore+=ship.kineticAmmo;
+            protectionBefore+=remainingProtection(ship);
         }
         for(int n:physicalMounts)
             require(n==SHIPS_PER_FAMILY,
@@ -133,17 +142,28 @@ public final class PointDefenseFleetScaleDiagnostic {
         }
         long elapsed=System.nanoTime()-begin;
         int stockAfter=0;
-        for(Battle.Ship ship:battle.ships())if(ship.team==1)
+        double protectionAfter=0;
+        for(Battle.Ship ship:battle.ships())if(ship.team==1){
             stockAfter+=ship.kineticAmmo;
+            protectionAfter+=remainingProtection(ship);
+        }
         int interceptions=battle.missileIntercepts+
                 battle.rocketIntercepts+battle.ballisticIntercepts;
         require(enabled || (pd==0&&flak==0&&rotary==0&&rail==0),
                 "HOLD_FIRE emitted real point-defense shots in 200v200");
-        require(stockAfter<=stockBefore,
-                "Defensive finite kinetic ammunition multiplied during battle");
+        int paidCartridges=flak+rotary+
+                rail*RailPointDefense.CARTRIDGES_PER_SHOT;
+        int netLoss=stockBefore-stockAfter;
+        // Fitted FLK/RCW each use one real round; RPD uses three.
+        // Further stock loss can arise from actual incoming hits destroying
+        // magazine inventory, not just active point-defense fire.
+        require(netLoss>=paidCartridges,
+                "Defensive physical shots were not paid by finite stock");
         return new Result(enabled?"ACTIVE":"HOLD_FIRE",elapsed,peakHeap,
                 pd,flak,rotary,rail,maxBodies,interceptions,
-                stockBefore-stockAfter,battle.alive(0),battle.alive(1),capped);
+                paidCartridges,netLoss,
+                Math.max(0,protectionBefore-protectionAfter),
+                battle.alive(0),battle.alive(1),capped);
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
@@ -164,15 +184,21 @@ public final class PointDefenseFleetScaleDiagnostic {
                 "All guns occupy paid WEAPON sockets; no fabricated damage "+
                 "or free interception events.\n\n"+
                 "|Mode|Ticks|Wall ms|Peak used heap bytes|PD|FLK|RCW|RPD|"+
-                "Peak active bodies|Real ordnance intercepts|Kinetic ammo spent|"+
+                "Peak active bodies|Real ordnance intercepts|Paid PD cartridges|"+
+                "Net kinetic stock reduction|Other stock loss|Net protection loss|"+
                 "Attackers alive|Defenders alive|Capped visual ticks|\n"+
-                "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n"+
+                "|---|"+"---:|".repeat(16)+"\n"+
                 "|"+active.csv().replace(",", "|")+"|\n"+
                 "|"+hold.csv().replace(",", "|")+"|\n\n"+
                 "This is an advisory initial sustained-load profile, NOT "+
                 "a hit-rate, execution-speed, or memory release gate. The "+
                 "HOLD_FIRE case changes combat outcomes, so wall-clock "+
                 "difference is not isolated point-defense CPU cost. "+
+                "Paid defensive cartridges are independently derived from "+
+                "actual FLK/RCW/RPD FIRE events; net kinetic stock loss "+
+                "also includes magazine damage and other stock effects. "+
+                "Net protection loss is remaining shield+armor+hull "+
+                "depletion, not cumulative pre-regeneration damage. "+
                 "Each row in samples.csv is one 30-tick measurement window. "+
                 "Event history has an 8192-event ring and capped windows "+
                 "must be interpreted cautiously. CPU timings depend on the "+
