@@ -300,6 +300,25 @@ final class ModularWeaponFxRenderer implements Disposable {
             else drawCentered(batch,fallback,pose.x(),pose.y(),
                     clip.width(),clip.height(),angle);
         }
+        // RCW rounds are not beams or fake muzzle-to-target tweens. Render
+        // each ACTUAL in-flight kinetic tracer at its physical simulation
+        // coordinates using the existing authored kinetic-shell atlas.
+        // No fabricated placeholder sprites or per-shot texture allocations.
+        for(diplomacy.sim.RotaryPointDefense.Round shot:battle.rotaryRounds()){
+            if(view!=null&&!view.circle((float)shot.x,(float)shot.y,5))continue;
+            Texture fallback=shells==null?frame(kinetic.payload(),
+                    battle.tick-shot.spawnTick):null;
+            if(shells==null&&fallback==null)continue;
+            float angle=(float)StrictMath.toDegrees(
+                    StrictMath.atan2(shot.vy,shot.vx));
+            batch.setColor(1f,.84f,.54f,1f);
+            if(shells!=null)
+                drawCentered(batch,shells[0],(float)shot.x,(float)shot.y,
+                        8,3,angle);
+            else drawCentered(batch,fallback,(float)shot.x,(float)shot.y,
+                    8,3,angle);
+            batch.setColor(1,1,1,1);
+        }
         lasers.draw(batch,battle,view);
         batch.setColor(1,1,1,1);
         batch.end();
