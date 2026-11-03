@@ -15,7 +15,8 @@ import java.util.Locale;
  */
 public final class RotaryCiwsDiagnostic {
     private RotaryCiwsDiagnostic(){}
-    private enum Threat { MISSILE, TORPEDO, KINETIC, ROCKET_BOOST, ROCKET_SUSTAIN }
+    private enum Threat { MISSILE, TORPEDO, KINETIC, ROCKET_BOOST, ROCKET_SUSTAIN,
+        FIGHTER_INTERCEPTOR, DRONE }
     private record Trial(Threat threat,int tier,int mounts,int seed,boolean on,
                          int attackLaunched,int rotaryShots,int bulletsSeen,
                          int kineticSpent,int intercepts,int impacts,
@@ -55,6 +56,22 @@ public final class RotaryCiwsDiagnostic {
         require(Shipyard.inspect(ship,catalog).valid(),"Illegal rocket source fixture");
         return ship;
     }
+    /** Real purchased carrier bay: RCW bullets must hit an aircraft's own
+     * armor/integrity, never a fabricated missile-with-a-fighter-label. */
+    private static Shipyard.Design fighterSource(TechnologyCatalog catalog){
+        Shipyard.Design fit=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CRUISER);
+        for(Shipyard.Slot slot:fit.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){
+                fit=fit.install(slot.index(),"BASE-TER-FTR")
+                        .withFighterHull(FighterModel.Hull.INTERCEPTOR);
+                require(Shipyard.inspect(fit,catalog).valid(),
+                        "Actual interceptor carrier fitting invalid");
+                return fit;
+            }
+        throw new IllegalStateException("Missing physical FTR launch socket");
+    }
+
     private static void verifyFittedMechanics(TechnologyCatalog catalog){
         for(String faction:new String[]{"TER","DRA","CAR","ZIP","UZI","MAN",
                 "VAE","ZEL","AUR","NYX","UMB"}){
@@ -129,7 +146,11 @@ public final class RotaryCiwsDiagnostic {
         if(threat==Threat.ROCKET_BOOST||threat==Threat.ROCKET_SUSTAIN){
             battle.spawnWing(0,rocketBattery(catalog),catalog,1,180,300);
             attacker=battle.ships().get(0);
-        }else attacker=battle.addShip(0,Battle.Faction.TERRAN,180,300);
+        }else if(threat==Threat.FIGHTER_INTERCEPTOR){
+            battle.spawnWing(0,fighterSource(catalog),catalog,1,235,300);
+            attacker=battle.ships().get(0);
+        }else attacker=battle.addShip(0,Battle.Faction.TERRAN,
+                threat==Threat.DRONE?288:180,300);
         battle.spawnWing(1,fitting(catalog,tier,mounts),catalog,1,355,300);
         Battle.Ship defender=battle.ships().get(1);
         battle.registerDiagnosticStationaryTarget(defender.id);
@@ -154,11 +175,19 @@ public final class RotaryCiwsDiagnostic {
             attacker.missileDamage=35;attacker.missileAmmo=40;
         }else if(threat==Threat.TORPEDO){
             attacker.torpedoDamage=65;attacker.torpedoAmmo=30;
+        }else if(threat==Threat.FIGHTER_INTERCEPTOR){
+            attacker.fighterReserve=1;
+            require(attacker.fighterLaunchBays>0,
+                    "Actual aircraft source has no fitted launch hangar");
+        }else if(threat==Threat.DRONE){
+            attacker.droneReserve=1;
         }else{
             attacker.kineticDamage=27;attacker.kineticAmmo=30;
         }
         battle.setShipOrders(defender.id,BattleOrders.DEFAULT.withPointDefense(
-                on?BattleOrders.PointDefense.INTERCEPT_ONLY:
+                on?(threat==Threat.FIGHTER_INTERCEPTOR||threat==Threat.DRONE?
+                        BattleOrders.PointDefense.ANTI_CRAFT:
+                        BattleOrders.PointDefense.INTERCEPT_ONLY):
                         BattleOrders.PointDefense.HOLD_FIRE));
         double armor=defender.armor,shield=defender.shields,hull=defender.hull;
         double startPower=defender.power;
@@ -200,7 +229,8 @@ public final class RotaryCiwsDiagnostic {
             if(e.team()==0&&e.sourceId()==attacker.id){
                 if(e.phase()==Battle.VisualPhase.FIRE&&(
                         "MISSILE".equals(e.weapon())||"TORPEDO".equals(e.weapon())||
-                        "KINETIC".equals(e.weapon())||"ROCKET".equals(e.weapon())))
+                        "KINETIC".equals(e.weapon())||"ROCKET".equals(e.weapon())||
+                        "FIGHTER".equals(e.weapon())||"DRONE".equals(e.weapon())))
                     launched++;
                 if(e.phase()==Battle.VisualPhase.IMPACT&&e.targetId()==defender.id)
                     impacts++;
@@ -233,7 +263,8 @@ public final class RotaryCiwsDiagnostic {
                 StrictMath.max(0,shield-defender.shields)+
                 StrictMath.max(0,hull-defender.hull);
         return new Trial(threat,tier,mounts,seed,on,launched,fired,seen,
-                ammo-defender.kineticAmmo,defender.intercepted,impacts,
+                ammo-defender.kineticAmmo,
+                defender.intercepted+battle.pointDefenseCraftKills,impacts,
                 loss,startPower-defender.power,first);
     }
     public static void main(String[] args)throws Exception{
