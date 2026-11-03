@@ -674,7 +674,7 @@ public final class Battle {
     public static final class FlakRound {
         public final int team,shooterId,slotId;
         public final long shotId,spawnTick;
-        public final double aimX,aimY,radius,damage,vx,vy;
+        public final double startX,startY,aimX,aimY,radius,damage,vx,vy,totalDistance;
         public double x,y,remainingDistance,life;
         public FlakRound(int team,int shooter,int slot,long shot,long at,
                          double startX,double startY,double targetX,double targetY,
@@ -689,7 +689,8 @@ public final class Battle {
                 throw new IllegalArgumentException("Invalid real flak shell");
             this.team=team;shooterId=shooter;slotId=slot;
             shotId=shot;spawnTick=at;
-            x=startX;y=startY;aimX=targetX;aimY=targetY;
+            x=startX;y=startY;this.startX=startX;this.startY=startY;
+            aimX=targetX;aimY=targetY;totalDistance=distance;
             this.radius=radius;this.damage=damage;
             vx=FLAK_SHELL_SPEED*dx/distance;
             vy=FLAK_SHELL_SPEED*dy/distance;
