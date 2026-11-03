@@ -33,6 +33,8 @@ public final class RocketBarrage {
             return null;
         }
     }
+    /** Identical horizon for live rocket expiry and read-only intercept pips. */
+    public static final double MAX_FLIGHT_SECONDS=7.5;
     public enum Motor { BOOST_COAST, SUSTAINED_BURN }
 
     /** Blueprint-only fire program: no live ammunition or reload is serialized. */
