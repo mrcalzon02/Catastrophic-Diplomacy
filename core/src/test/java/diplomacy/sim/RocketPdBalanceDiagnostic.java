@@ -103,6 +103,14 @@ public final class RocketPdBalanceDiagnostic {
                               int tier,int modules,int barrage,RocketBarrage.Motor motor,
                               boolean evasive,boolean pdOnline,int seed,double pressure,
                               double acquisitionScale,boolean coordinated,int defenderTier) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,
+                seed,pressure,acquisitionScale,coordinated,defenderTier,1.0);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure,
+                              double acquisitionScale,boolean coordinated,int defenderTier,
+                              double sustainedThrustScale) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
@@ -111,6 +119,8 @@ public final class RocketPdBalanceDiagnostic {
             battle.configurePrecisionLockForDiagnostic(acquisitionScale);
         if(pdOnline&&!coordinated)
             battle.configurePrecisionReservationsForDiagnostic(false);
+        if(sustainedThrustScale!=1.0)
+            battle.configureSustainedRocketThrustForDiagnostic(sustainedThrustScale);
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,defenderTier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
@@ -470,6 +480,56 @@ public final class RocketPdBalanceDiagnostic {
                 "research pairs (0/0, IX/IX, IX/0, 0/IX), with equal four "+
                 "socket counts, finite real rocket stock and 3 same-attack-seed "+
                 "trials per row. It is NOT a final tuned balance specification.\n");
+        // Physical motor A/B, using the same rocket hardware and same seeded
+        // no-PD controls at each candidate thrust. No player-side motor change.
+        detail.append("\n## Sustained rocket thrust versus fitted precision CIWS (laboratory only)\n\n");
+        detail.append("|Attack|Defense|Motor|Moving|Thrust x|Lock x|Launched|Intercepted|"+
+                "Escaped %|Terminal %|Actual impacts|PD-off impacts|Protection lost|\n");
+        detail.append("|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        List<String> motorRows=new ArrayList<>();
+        motorRows.add("attack_tier,defense_tier,motor,moving,thrust_scale,lock_scale,"+
+                "launched,intercepted,escaped,escape_fraction,terminal_entries,"+
+                "terminal_fraction,impacts,pd_off_impacts,protection_loss");
+        for(int[] tiers:new int[][]{{0,0},{9,9},{9,0},{0,9}})
+            for(boolean moving:new boolean[]{false,true})
+                for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+                    for(double thrust:new double[]{1.0,1.30,1.60,2.0,2.50}){
+                        if(motor==RocketBarrage.Motor.BOOST_COAST&&thrust!=1.0)
+                            continue; // high-thrust control, physically untouched
+                        int launched=0,killed=0,terminal=0,impacted=0,offline=0;
+                        double protection=0;
+                        int salvo=tiers[0]==0?4:16;
+                        for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                            Sample active=run(tech,RocketBarrage.Size.SIEGE,tiers[0],
+                                    4,salvo,motor,moving,true,seed,0,1.60,true,
+                                    tiers[1],thrust);
+                            Sample noPd=run(tech,RocketBarrage.Size.SIEGE,tiers[0],
+                                    4,salvo,motor,moving,false,seed,0,1.60,true,
+                                    tiers[1],thrust);
+                            require(active.launched()==noPd.launched(),
+                                    "Rocket count drift across paired motor cases");
+                            launched+=active.launched();killed+=active.intercepted();
+                            terminal+=active.terminalEntries();impacted+=active.collided();
+                            offline+=noPd.collided();protection+=active.damageToProtection();
+                        }
+                        double escape=launched==0?0:(launched-killed)/(double)launched;
+                        double entry=launched==0?0:terminal/(double)launched;
+                        motorRows.add(String.format(Locale.ROOT,
+                                "%d,%d,%s,%s,%.2f,1.60,%d,%d,%d,%.6f,%d,%.6f,%d,%d,%.3f",
+                                tiers[0],tiers[1],motor,moving,thrust,launched,killed,
+                                launched-killed,escape,terminal,entry,impacted,offline,protection));
+                        detail.append(String.format(Locale.ROOT,
+                                "|%d|%d|%s|%s|%.2f|1.60|%d|%d|%.1f%%|%.1f%%|%d|%d|%.1f|\n",
+                                tiers[0],tiers[1],motor,moving,thrust,launched,killed,
+                                escape*100,entry*100,impacted,offline,protection));
+                    }
+        Files.write(output.resolve("motor-thrust-physical-ab.csv"),
+                motorRows,StandardCharsets.UTF_8);
+        detail.append("\nAll sensitivity rows retain fixed unguided headings, "+
+                "research-derived speed caps, finite rocket ammunition and "+
+                "real collision physics. Increased thrust is laboratory-only. "+
+                "Compare genuine impacts against each matched PD-off control; "+
+                "no interception percentage is a release gate.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
