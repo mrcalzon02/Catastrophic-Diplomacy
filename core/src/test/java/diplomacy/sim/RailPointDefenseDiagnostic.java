@@ -70,6 +70,14 @@ public final class RailPointDefenseDiagnostic {
             double damaged=RailPointDefense.acquisitionRange(ship,gun,torpedo,1,1);
             require(intact>damaged&&damaged>0,
                     "Long-range rail tracking ignores sensor damage");
+            ProjectileModel.Spec compact=ProjectileModel.standard(
+                    ProjectileModel.Kind.KINETIC);
+            double oncoming=RailPointDefense.acquisitionRange(ship,gun,
+                    compact,1,1,345);
+            double sideways=RailPointDefense.acquisitionRange(ship,gun,
+                    compact,1,1,0);
+            require(oncoming>sideways,
+                    "Rail radar must use true closing Doppler, not just maximum speed");
             ship.power=0;
             require(RailPointDefense.acquisitionRange(ship,gun,torpedo,1,1)==0,
                     "Unpowered rail sensor magically tracks targets");
@@ -202,6 +210,11 @@ public final class RailPointDefenseDiagnostic {
                         intercepted+=live.intercepted;impacts+=live.impacts;
                         control+=hold.impacts;spent+=live.stockSpent;paired++;
                     }
+                    // Gate firing mechanics only, not desired intercept ratios.
+                    if(threat==Threat.TORPEDO&&tier==0&&count==1)
+                        require(fired>0,"Baseline RPD never fires at actual torpedoes");
+                    if(threat==Threat.KINETIC&&tier==9&&count==1)
+                        require(fired>0,"IX RPD never fires at incoming physical shells");
                     report.append(String.format(Locale.ROOT,
                             "|%s|%d|%d|%d|%d|%d|%d|%d|%d|\n",
                             threat,tier,count,launched,fired,intercepted,
