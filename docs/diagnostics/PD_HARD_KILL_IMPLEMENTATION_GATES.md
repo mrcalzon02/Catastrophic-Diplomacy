@@ -1,6 +1,6 @@
 # Point defense: controlled hardware, firing-method and geometry gates
 
-**Status: validated working subset + explicit remaining work (November 2, 2026).**
+**Status: validated working subset + explicit remaining work (updated November 3, 2026).**
 This is an implementation ledger, not a new all-defense redesign. It covers
 **hard-kill point-defense gun modules only**; ECM, decoys, defensive fighters and
 reactive armor are independent equipment categories.
@@ -36,7 +36,7 @@ reactive armor are independent equipment categories.
 | Type | Current physical combat method | Status |
 |---|---|---|
 | **PD** precision laser | Real installed PD emitter family, immediate single-target beam hit attempt; projectile-specific kinetic/armor ablation; weak air-target tracking/dwell. PD-only stats are now isolated from flak modules, with genuine PD-only muzzle selection. | **Independent socket controller committed; diagnostic runner pending.** Per-socket research range, hit profile, dwell and reload replace the pooled fitted laser controller; legacy unfitted fixtures keep `pdReload`. Shared track caching and throughput measurement remain open. |
-| **FLK** fragmentation | Real installed FLK emitter family; per-socket researched cooldown, physical kinetic-ammo charge, future `burstTick`, predicted point and finite-radius fragmentation that intersects real ordnance/craft bodies on burst. Fitted FLK no longer contributes precision laser range/accuracy/damage or fire rate. | **Working first physical differentiation**. A flak shell is currently a **deferred burst**, not yet a continuously moving/interceptable artillery body. Blast damage uses an inside-radius rule; radial fragmentation falloff and separate magazine controls remain unimplemented. |
+| **FLK** fragmentation | Independent mounted 390-unit/s inertial shell, actual world-space muzzle-to-fuze flight, finite world/lifetime bounds, paid physical ammunition, and radial fragment-density damage against current hostile ordnance/craft at true arrival. Fitted FLK does not contribute precision-laser range, damage, or firing rate. | **Travel and burst physics verified November 3.** In-flight shells have independent positions and authored kinetic sprite rendering. Enemy interception of flying flak shells and distinct on-mount magazines remain open. |
 | **RCW** rotary kinetic CIWS | Physical small solid rounds, rotational spin-up, point-target lead, finite magazine and heat; strong short-range anti-rocket/drone with a weak answer to armored torpedoes. | **Implemented; 84 paired physical live/HOLD_FIRE trials and renderer compile verified.** |
 | **RPD** rail interceptor | A distinct paid precharged capacitor, physical 1210-unit/s solid body, 120-unit blind zone, Doppler radar on actual closing velocity, independent target lock and 3 cartridges per shot; correct two-body swept interception in production. | **Implemented; 36 baseline and 192 geometry pairs plus 192 A/B measurements; headless combat, arena and client compile verified.** |
 | **PPD** particle-beam PD | Per-target armor ablation with actual dwell and thermal saturation rather than laser-like instant damage. | **Specified; not implemented.** |
@@ -300,7 +300,79 @@ matrix. This preserves the documented intention that RCW is weaker
 against fast tiny solid shells without concealing actual failures.
 
 Next implementation work remains distinct PPD continuous beam dwell/
-charging, then PLS short-range thermobaric area denial, then IMD
-paid guided counter-missiles; flak's timed fragmentation origin still
-needs true shell flight geometry. Fleet sensor sharing/fusion/capacity
-is an independent module concern, not automatically part of PD.
+charging, then PLS short-range thermal area denial, then IMD
+paid guided counter-missiles. Flak shell **flight** is now implemented;
+hostile interception of flying flak bodies, per-mount magazines and
+off-axis lead analysis remain separate open work. Fleet sensor
+sharing/fusion/capacity is an independent module concern, not automatically
+part of PD.
+
+
+## Gate B follow-up: live physical flak shell flight (November 3, 2026)
+
+**Production implementation commits:** [world-space flight](https://github.com/mrcalzon02/Catastrophic-Diplomacy/commit/082c870f096e9a9f22f49bae122d854643e6d14e),
+[in-flight authored-kinetic rendering](https://github.com/mrcalzon02/Catastrophic-Diplomacy/commit/fcdf3a4e3a28e5574d88a7655ecba3b780db34dc),
+[wave trajectory assertions](https://github.com/mrcalzon02/Catastrophic-Diplomacy/commit/43b7ee0d8e39978c3a2e9ba955807411fd2ede17),
+[arena lifetime checks](https://github.com/mrcalzon02/Catastrophic-Diplomacy/commit/78cbb9cf2abf8537425d595ac6baca046c282794).
+
+A purchased FLK socket now launches **one physically moving unguided
+390-world-unit/s shell** from `WeaponMuzzles.atSlot` to a fixed
+predicted airburst/fuze point. Its `x/y/vx/vy`, launch tick, original
+muzzle, target aim, remaining travel and finite lifetime persist in the
+Battle simulation. The shell changes world position each 30-Hz tick,
+cannot expand the fixed 3840×2160 battle arena, and is removed if it
+leaves the world or exceeds the 3-second PD lifetime. **Only physically
+reaching the original fuze point produces fragmentation**, using the
+already implemented radial fragment-density/armor-exposure model.
+The projectile is now visible using the original kinetic atlas; it is
+not a decorative fire-to-target tween. Prior static scheduled `burstTick`
+explosions no longer cause damage.
+
+**Verified focused Java17 runner evidence (no APK packaging):**
+
+- [528 measured simultaneous-fighter ON/HOLD_FIRE pairs; zero validation
+  errors](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41612688509).
+  Asserts physical travel velocity, paid muzzle identity, finite flight,
+  no duplicated or premature bursts, plus all historical real-aircraft
+  attacks. This tests compact and dispersed formations, four/eight
+  simultaneous craft, both fighter classes, one/four/mixed batteries,
+  two defense ranks and three seeds per condition.
+- [Rotary/arena/renderer CI passed](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41612745201),
+  including actual flak lifetime/edge removal among six live projectile
+  families and compiled live flight renderer.
+- [Charged rail, arena and 200v200 load validation passed](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41612745217),
+  including the new FLK shell physics with the existing PD/RCW/RPD families.
+
+**Measured flak-vs-fighter-wave behavior**, comparing matching aggregate
+rows from the last validated pre-flight 528-pair run
+[41604234379](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41604234379)
+against the first post-flight run [41612688509](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41612688509):
+
+| Aggregated compact scenario | Fighters killed before → after | FLK shots before → after | Incoming attack hits before → after |
+|---|---:|---:|---:|
+| INTERCEPTOR, FLK ×1 | 216 → 216 | 204 → 210 | 347 → 357 |
+| INTERCEPTOR, FLK ×4 | 216 → 216 | 452 → 492 | 168 → 183 |
+| TORPEDO_BOMBER, FLK ×1 | 144 → 144 | 338 → 338 | 360 → 360 |
+| TORPEDO_BOMBER, FLK ×4 | 144 → 144 | 1216 → 1216 | 360 → 360 |
+
+Rows aggregate multiple 3-seed wave/range/tier cases, not a single
+216-aircraft simultaneous engagement. The grouped figures are not
+cross-target effectiveness percentages. They show that moving FLK shells
+retain the intended anti-craft role while small differences in arrival
+timing influence ammunition efficiency and earlier attack impacts.
+**Do not automatically tune away these differences.**
+
+**One maximum-fleet ordnance-only check** from run 41612745217 recorded
+343 physically destroyed ordnance with active defense versus zero
+with HOLD_FIRE, and 117 defender ships remaining versus 104
+with HOLD_FIRE. The same-seed test measured 1,861 FLK shots and
+2,849 paid total defensive cartridges; ship magazine damage remains
+tracked separately. This is 20 simulated seconds on the GitHub runner,
+not a sustained mobile-framerate guarantee or a complete campaign match.
+
+**Remaining FLK work:** independent shell interception by incoming
+hostile point-defense hardware, mount-specific magazine reserves, 
+friendly/neutral blast exclusion if the rules require it, moving-ship
+relative aim and more equal-cost off-axis wave geometry. Preserve the
+existing real fragment-density physics. Numeric balance, visual finish
+and economic goals remain advisory; only real functionality may block.
