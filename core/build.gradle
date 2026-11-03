@@ -137,7 +137,15 @@ tasks.register('sensorRelayBufferSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorRelayBufferTest'
     dependsOn testClasses
 }
+tasks.register('sensorHistoricalSignaturesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Reject retroactive radar/cloak/range and hardware observations with measured-time signatures.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SensorHistoricalSignaturesTest'
+    dependsOn testClasses
+}
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('sensorHistoricalSignaturesSmoke'))
     dependsOn(tasks.named('sensorRelayBufferSmoke'))
     dependsOn(tasks.named('sensorTargetingSolutionSmoke'))
     dependsOn(tasks.named('sensorCausalAcquisitionSmoke'))
