@@ -1,0 +1,59 @@
+name: Focused physical rotary CIWS validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'core/src/main/java/diplomacy/sim/RotaryPointDefense.java'
+      - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
+      - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
+      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
+      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
+      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
+      - 'core/src/test/java/diplomacy/sim/RotaryCiwsDiagnostic.java'
+      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
+      - 'core/build.gradle'
+      - '.github/workflows/rotary-ciws-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: rotary-ciws-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+jobs:
+  physical-rotary-ciws:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.11.1' }
+      - name: Verify mounted rotary gun, finite projectiles, research and sensors
+        id: physical
+        continue-on-error: true
+        run: gradle --no-daemon :core:rotaryCiwsDiagnostic
+      - name: Compile live tracer render path without packaging game
+        id: render
+        continue-on-error: true
+        run: gradle --no-daemon :game:compileJava
+      - name: Publish physical tracking and target effectiveness report
+        if: always()
+        run: |
+          echo "## Rotary kinetic CIWS headless validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "Physical functional checks: ${{ steps.physical.outcome }}. Renderer compilation: ${{ steps.render.outcome }}." >> "$GITHUB_STEP_SUMMARY"
+          echo "All balance/effectiveness values are advisory; no APK or desktop distribution was built." >> "$GITHUB_STEP_SUMMARY"
+          if [ -f core/test-output/rotary-ciws/summary.md ]; then
+            cat core/test-output/rotary-ciws/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "The physical test report was not produced; inspect test logs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retain actual shot and target metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rotary-ciws-physical-results
+          path: core/test-output/rotary-ciws/
+          if-no-files-found: warn
+          retention-days: 30
