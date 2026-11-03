@@ -38,10 +38,11 @@ public final class PointDefenseWaveDiagnostic {
     }
     private enum Threat { INTERCEPTOR, TORPEDO_BOMBER }
     private enum Formation {
-        COMPACT(10.0,0L), DISPERSED(46.0,10000007L);
+        // Matched compact/dispersed A/B: identical initial RNG seed,
+        // only the physical carrier spacing differs.
+        COMPACT(10.0), DISPERSED(46.0);
         final double lateralSpacing;
-        final long seedSalt;
-        Formation(double spacing,long salt){lateralSpacing=spacing;seedSalt=salt;}
+        Formation(double spacing){lateralSpacing=spacing;}
     }
     private record Trial(Battery battery,Threat threat,int wave,int distance,
             int rank,int seed,boolean defenseOn,int launched,int craftKills,
@@ -160,7 +161,7 @@ public final class PointDefenseWaveDiagnostic {
                              int wave,int distance,Formation formation,int rank,int seed,boolean enabled){
         final long randomSeed=70260101L+threat.ordinal()*900003L+
                 wave*10007L+distance*29L+rank*13L+
-                battery.stableSeedCode()*11L+seed*173L+formation.seedSalt;
+                battery.stableSeedCode()*11L+seed*173L;
         Battle b=new Battle(randomSeed);
         Shipyard.Design craftFit=carrier(cat,threat);
         final double defenderX=600,defenderY=300;
@@ -273,8 +274,9 @@ public final class PointDefenseWaveDiagnostic {
                 "real fitted laser/flak batteries\n\n");
         md.append("Physical FTR launches, exactly 4 or 8 simultaneous aircraft, "+
                 "both interceptor and torpedo-bomber classes. "+
-                "Compact 10-unit launch spacing retained with identical historical RNG seeds; "+
-                "8-fighter dispersed 46-unit spacing adds controlled saturation geometry. "+
+                "Compact 10-unit launch spacing retains historical RNG seeds; "+
+                "dispersed 46-unit carrier spacing uses the exact SAME seeds "+
+                "so geometry alone changes between paired A/B tests. "+
                 "Matched same-seed HOLD_FIRE, no fitted offensive IX attacker; "+
                 "three diagnostic seeds per case. "+
                 "Never a release balance threshold.\n\n");

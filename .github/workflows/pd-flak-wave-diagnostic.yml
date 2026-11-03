@@ -27,7 +27,7 @@ jobs:
       - name: Compile and exercise real mounted 4/8 fighter attacks, no packaging
         id: wave
         continue-on-error: true
-        run: gradle --no-daemon :core:pdFlakWaveDiagnostic
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:pdFlakWaveDiagnostic
       - name: Report test outcome explicitly (advisory)
         if: always()
         run: |
