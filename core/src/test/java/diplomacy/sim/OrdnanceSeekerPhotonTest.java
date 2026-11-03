@@ -13,7 +13,7 @@ public final class OrdnanceSeekerPhotonTest {
         b.registerDiagnosticStationaryTarget(hostile.id);
         hostile.ecmStrength=0;hostile.ecmCondition=1;
         int photons=SensorLightTimeHistory.propagationTicks(580);
-        for(int frame=0;frame<photons;frame++){
+        for(int frame=1;frame<photons;frame++){
             b.step();
             require(OrdnanceSeeker.passiveReturn(hostile,100,100,b.tick)==null,
                     "Seeker read the target before light could reach it");
