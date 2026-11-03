@@ -3186,7 +3186,7 @@ public final class Battle {
                     DamageType.PARTICLE,particle.range(s.weapons.particleRange()),
                     s.particleDamage,chance,"PARTICLE",null);
         }
-        queueRocketBarrage(s,target,distance);
+        queueRocketBarrage(s,target,distance,firingFix);
         if(!s.launchers.isEmpty()){
             queueRackSalvos(s,target,DamageType.TORPEDO,distance,torpedo);
         }else if(torpedo.available(s.torpedoDamage,s.torpedoAmmo,distance,s.weapons.torpedoRange(),
@@ -3211,7 +3211,8 @@ public final class Battle {
 
     /** Each rocket battery freezes a single predictive bearing at trigger.
      * It will never track the victim again, even between salvo rounds. */
-    private void queueRocketBarrage(Ship ship,Ship target,double distance){
+    private void queueRocketBarrage(Ship ship,Ship target,double distance,
+            SensorLightTimeHistory.Observation firingFix){
         if(ship.rocketRacks.isEmpty()||ship.power<5||
                 ship.weaponsCondition<=.16||ship.magazineCondition<=.16)return;
         for(RocketBarrage.Rack rack:ship.rocketRacks){
@@ -3222,8 +3223,23 @@ public final class Battle {
                 continue;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.atSlot(
                     ship,WeaponMuzzles.Family.ROCKET,rack.slot);
-            rack.lockedBearing=RocketBarrage.firingAngle(muzzle.x(),muzzle.y(),
-                    target.x,target.y,target.vx,target.vy,rack.body.speed());
+            // A rocket rack freezes its aim before the first round. Build
+            // the solution from received observations, not target truth.
+            // The installed motor's terminal speed is a first-order lead
+            // estimate; each rocket subsequently follows its actual
+            // boost/coast or sustained-burn physics with NO guidance.
+            SensorComputeBudget.Allocation budget=SensorComputeBudget.solve(
+                    ship.targetCompute,ship,firingFix,tick,distance,
+                    tacticalPrecision(ship),
+                    StrictMath.max(0,ship.knownTracks.size()-1));
+            long solutionId=1L+ship.id*1_000_003L+
+                    ((long)rack.slot)*137L+tick*31L;
+            SensorTargetingSolution.Solution estimate=
+                    SensorTargetingSolution.solve(firingFix,tick,
+                            muzzle.x(),muzzle.y(),rack.body.speed(),
+                            budget.precision(),solutionId);
+            rack.lockedBearing=StrictMath.atan2(
+                    estimate.aimY()-muzzle.y(),estimate.aimX()-muzzle.x());
             rack.intendedTarget=target.id;
             rack.salvoRemaining=rack.salvoCount;
             rack.nextLaunchTick=tick;
