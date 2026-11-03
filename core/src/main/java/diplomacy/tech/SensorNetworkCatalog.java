@@ -41,7 +41,7 @@ public final class SensorNetworkCatalog {
     );
 
     public static final List<Model> VARIANTS=List.of(
-        new Model("SHP","SHR","Primitive Signal Flag Relay",0,.42,.75,.58,.55,.82,.42),
+        new Model("SHP","SHR","Primitive Narrowband Contact Relay",0,.42,.75,.58,.55,.82,.42),
         new Model("SHC","SHR","Compact Contact Radio",2,.77,.62,.77,.76,.78,.85),
         new Model("SHS","SHR","Dedicated Wideband Transceiver",4,1.38,1.22,1.40,1.26,1.02,1.48),
         new Model("SHA","SHR","Advanced Quantum-Key Transceiver",6,1.69,1.42,1.81,1.59,1.12,2.12),
