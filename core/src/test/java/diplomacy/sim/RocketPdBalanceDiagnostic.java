@@ -120,6 +120,16 @@ public final class RocketPdBalanceDiagnostic {
                               boolean evasive,boolean pdOnline,int seed,double pressure,
                               double acquisitionScale,boolean coordinated,int defenderTier,
                               double sustainedThrustScale,int channelsPerMount) {
+        return run(catalog,size,tier,modules,barrage,motor,evasive,pdOnline,seed,
+                pressure,acquisitionScale,coordinated,defenderTier,
+                sustainedThrustScale,channelsPerMount,.5);
+    }
+    private static Sample run(TechnologyCatalog catalog,RocketBarrage.Size size,
+                              int tier,int modules,int barrage,RocketBarrage.Motor motor,
+                              boolean evasive,boolean pdOnline,int seed,double pressure,
+                              double acquisitionScale,boolean coordinated,int defenderTier,
+                              double sustainedThrustScale,int channelsPerMount,
+                              double opticalExponent) {
         Battle battle=new Battle(900000L+seed*131L+tier*11L+modules*7L+
                 size.ordinal()*19L+(motor==RocketBarrage.Motor.BOOST_COAST?1:2)+
                 (evasive?13001:0));
@@ -130,8 +140,11 @@ public final class RocketPdBalanceDiagnostic {
             battle.configurePrecisionReservationsForDiagnostic(false);
         if(sustainedThrustScale!=1.0)
             battle.configureSustainedRocketThrustForDiagnostic(sustainedThrustScale);
-        if(pdOnline&&channelsPerMount>0)
+        if(pdOnline&&channelsPerMount>0){
             battle.configurePrecisionTrackCapacityForDiagnostic(channelsPerMount);
+            if(opticalExponent!=.5)
+                battle.configurePrecisionTrackExponentForDiagnostic(opticalExponent);
+        }
         Shipyard.Design source=fitting(catalog,size.code,modules,tier,false);
         Shipyard.Design defensive=fitting(catalog,"PD",modules,defenderTier,true);
         battle.spawnWing(0,source,catalog,1,200,300);
@@ -250,6 +263,11 @@ public final class RocketPdBalanceDiagnostic {
                 "Finite CIWS optical overload does not account for emitter count");
         require(Battle.precisionTrackLoadMultiplier(64,4,0)==1.0,
                 "Disabled optical experiment leaked into ordinary combat");
+        require(StrictMath.abs(Battle.precisionTrackLoadMultiplier(
+                64,4,4,.75)-StrictMath.pow(4.0,.75))<1e-8,
+                "Optical channel scheduling ignores measured throughput exponent");
+        require(Battle.precisionTrackLoadMultiplier(100000,4,4,1.0)<=4.0,
+                "CIWS optical overload not bounded under fleet-scale saturation");
         double previous=0;
         for(int tier:new int[]{0,3,6,9}){
             Shipyard.Design design=fitting(tech,"RKG",4,tier,false);
@@ -637,6 +655,63 @@ public final class RocketPdBalanceDiagnostic {
                 "a forced accuracy miss or a free interception; outcomes use "+
                 "real 30Hz trajectories, ammunition and hit resolution. "+
                 "No result is a release gate.\n");
+        // Compare processing-scheduling laws at the SAME four physical
+        // optical channels per fitted precision emitter. A base-tier
+        // 4-round rack offers at most four contacts per emitter and should
+        // therefore remain at its original acquisition time, while the
+        // research-IX 16-round rack can overwhelm those same channels.
+        detail.append("\n## CIWS optical scheduling exponent at four tracks per emitter\n\n");
+        detail.append("|Att tier|PD tier|Motor|Moving|Exponent|Rockets|Intercepted|"+
+                "Escape %|Terminal %|Impacts|No-PD impacts|PD shots|\n");
+        detail.append("|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        List<String> exponentRows=new ArrayList<>();
+        exponentRows.add("attack_tier,pd_tier,motor,evasive,exponent,channels_per_mount,"+
+                "launched,intercepted,escaped,escape_fraction,terminal_entries,"+
+                "terminal_fraction,impacts,no_pd_impacts,pd_shots");
+        for(int[] stages:new int[][]{{0,0},{9,9},{9,0},{0,9}})
+            for(RocketBarrage.Motor motor:RocketBarrage.Motor.values())
+                for(boolean moving:new boolean[]{false,true}){
+                    int naturalHits=0;
+                    int salvo=stages[0]==0?4:16;
+                    for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                        Sample control=run(tech,RocketBarrage.Size.SIEGE,stages[0],4,
+                                salvo,motor,moving,false,seed,0,1.0,true,
+                                stages[1],1.0,0);
+                        naturalHits+=control.collided();
+                    }
+                    for(double exponent:new double[]{.50,.65,.75,.90,1.00}){
+                        int launched=0,killed=0,inner=0,impacts=0,shots=0;
+                        for(int seed=0;seed<REPEAT_SEEDS;seed++){
+                            Sample active=run(tech,RocketBarrage.Size.SIEGE,stages[0],
+                                    4,salvo,motor,moving,true,seed,0,1.0,true,
+                                    stages[1],1.0,4,exponent);
+                            launched+=active.launched();killed+=active.intercepted();
+                            inner+=active.terminalEntries();impacts+=active.collided();
+                            shots+=active.pdShots();
+                        }
+                        double escaped=launched==0?0:(launched-killed)/(double)launched;
+                        double terminal=launched==0?0:inner/(double)launched;
+                        exponentRows.add(String.format(Locale.ROOT,
+                                "%d,%d,%s,%s,%.2f,4,%d,%d,%d,%.6f,%d,%.6f,%d,%d,%d",
+                                stages[0],stages[1],motor,moving,exponent,
+                                launched,killed,launched-killed,escaped,
+                                inner,terminal,impacts,naturalHits,shots));
+                        detail.append(String.format(Locale.ROOT,
+                                "|%d|%d|%s|%s|%.2f|%d|%d|%.1f%%|%.1f%%|%d|%d|%d|\n",
+                                stages[0],stages[1],motor,moving,exponent,
+                                launched,killed,escaped*100,terminal*100,
+                                impacts,naturalHits,shots));
+                    }
+                }
+        Files.write(output.resolve("optical-workload-exponent-ab.csv"),
+                exponentRows,StandardCharsets.UTF_8);
+        detail.append("\nAll exponent cases use exactly four available optical "+
+                "track channels per purchased CIWS emitter and the normal 1.00 "+
+                "lock duration. Saturation affects time-to-lock only; a "+
+                "body must still physically exist, be detected, and be hit "+
+                "by a real paid emitter. Above-channel scheduling is bounded "+
+                "to a 4x maximum delay under extreme fleet load. All reported "+
+                "acceptance bands remain advisory, never build gates.\n");
         summary=detail.toString();
         Files.writeString(output.resolve("summary.md"),summary,StandardCharsets.UTF_8);
         System.out.println(summary);
