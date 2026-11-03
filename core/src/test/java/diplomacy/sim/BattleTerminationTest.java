@@ -73,11 +73,19 @@ public final class BattleTerminationTest {
             ship.hull=ship.maxHull;
             ship.shields=ship.maxShields;
             ship.power=ship.maxPower;
+            disarm(ship);
+            // Real fitted campaign supports may otherwise keep their aircraft
+            // and resupply routines active. This fixture specifically tests
+            // exhausted combatants, not a disabled-weather clock shortcut.
+            ship.repairDroneReserve=0;
+            ship.tenders=TenderDoctrine.NONE;
+            ship.logistics=SupportDoctrine.NONE;
         }
-        battle.tick=BattleTermination.HARD_LIMIT_TICKS-1;
-        battle.step();
+        for(int i=0;i<BattleTermination.DEPLETED_MIN_TICKS+60
+                &&!battle.finished();i++)battle.step();
         ok(battle.unresolved()&&battle.terminationReason()==
-                BattleTermination.Reason.TIME_LIMIT,"Hard finite horizon not enforced");
+                BattleTermination.Reason.STALEMATE,
+                "Disarmed campaign did not terminate by real consecutive ticks");
         ok(encounter.advance()==CampaignEncounter.Advance.DRAW,
                 "Campaign granted a wave or false victory at time limit");
         ok(encounter.wave()==1&&battle.engaged(0)>0,
@@ -87,7 +95,7 @@ public final class BattleTerminationTest {
         physicalWin.addShip(1,Battle.Faction.DRAXIAN,800,300).hull=0;
         ok(physicalWin.finished()&&!physicalWin.unresolved(),
                 "Actual fleet destruction was mistaken for a draw");
-        System.out.println("PASS campaign unresolved time limit, unchanged wave and actual-win distinction");
+        System.out.println("PASS campaign unresolved draw, unchanged wave and actual-win distinction");
     }
     public static void main(String[] args) throws Exception {
         policy();
