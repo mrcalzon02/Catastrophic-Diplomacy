@@ -114,6 +114,21 @@ final class ShipSurfaceLighting implements Disposable {
         " gl_FragColor=vec4(min(lit,vec3(1.0)),albedo.a);\n"+
         "}\n";
 
+    /** One additional texture read only for damaged ships at tactical LOD.
+     * Intact vessels retain the original cheap flat rendering path. */
+    static final String FLAT_DAMAGE_FRAGMENT =
+        "#ifdef GL_ES\\nprecision mediump float;\\n#endif\\n"+
+        "varying vec4 v_color;\\n"+
+        "varying vec2 v_uv;\\n"+
+        "uniform sampler2D u_texture;\\n"+
+        "uniform sampler2D u_damage;\\n"+
+        "void main(){\\n"+
+        " vec4 albedo=texture2D(u_texture,v_uv);\\n"+
+        " vec4 peel=texture2D(u_damage,v_uv);\\n"+
+        " albedo.rgb*=1.0-0.54*peel.r;\\n"+
+        " albedo.a*=peel.a*v_color.a;\\n"+
+        " gl_FragColor=albedo;\\n"+
+        "}\\n";
     private static final class Pair {
         final Texture normal,emissive;
         Pair(Texture normal,Texture emissive){this.normal=normal;this.emissive=emissive;}
@@ -121,6 +136,8 @@ final class ShipSurfaceLighting implements Disposable {
     }
     private final Map<Texture,Pair> pairs=new IdentityHashMap<>();
     private final ShaderProgram shader;
+    private ShaderProgram flatDamageShader;
+    private boolean flatDamageShaderUnavailable;
     private final ShipLightProbes probes=new ShipLightProbes();
     private Texture active;
     private Texture activeDamage;
@@ -222,6 +239,21 @@ final class ShipSurfaceLighting implements Disposable {
         shader.setUniformf("u_color0",probes.red(0),probes.green(0),probes.blue(0));
         shader.setUniformf("u_color1",probes.red(1),probes.green(1),probes.blue(1));
     }
+    private ShaderProgram flatDamageShader(){
+        if(flatDamageShader!=null)return flatDamageShader;
+        if(flatDamageShaderUnavailable)return null;
+        ShaderProgram program=new ShaderProgram(VERTEX,FLAT_DAMAGE_FRAGMENT);
+        if(!program.isCompiled()){
+            String log=program.getLog();
+            program.dispose();
+            flatDamageShaderUnavailable=true;
+            // Optional visual path must NEVER prevent battle launch.
+            if(Gdx.app!=null)Gdx.app.error("ARMOR","Tactical damage shader unavailable: "+log);
+            return null;
+        }
+        flatDamageShader=program;
+        return program;
+    }
     /** In the hot draw loop: only flush when the *source sprite* changes. */
     void bind(SpriteBatch batch,Texture original){
         if(flat)return;
@@ -248,7 +280,27 @@ final class ShipSurfaceLighting implements Disposable {
      * albedo, normals, and emissive material stay bound as the source artwork.
      */
     void damage(SpriteBatch batch,Texture mask){
-        if(flat)return;
+        if(flat){
+            if(mask==null){
+                if(batch.getShader()!=null)batch.setShader(null);
+                activeDamage=null;
+                return;
+            }
+            ShaderProgram simple=flatDamageShader();
+            if(simple==null)return;
+            if(batch.getShader()!=simple){
+                batch.setShader(simple);
+                simple.setUniformi("u_damage",1);
+                activeDamage=null;
+            }
+            if(activeDamage!=mask){
+                batch.flush();
+                mask.bind(1);
+                Gdx.gl.glActiveTexture(GL20.GL_TEXTURE0);
+                activeDamage=mask;
+            }
+            return;
+        }
         if(activeDamage==mask)return;
         batch.flush();
         if(mask!=null){
@@ -261,7 +313,7 @@ final class ShipSurfaceLighting implements Disposable {
     /** Only truly unillustrated fallback craft should use the unlit path. */
     void unlit(SpriteBatch batch){
         if(batch.getShader()!=null)batch.setShader(null);
-        active=null;
+        active=null;activeDamage=null;
     }
     void end(SpriteBatch batch){
         if(!started)return;
@@ -278,6 +330,7 @@ final class ShipSurfaceLighting implements Disposable {
     int materialCount(){return pairs.size();}
     int textureBindings(){return binds;}
     @Override public void dispose(){
+        if(flatDamageShader!=null)flatDamageShader.dispose();
         for(Pair p:pairs.values())p.dispose();
         pairs.clear();
         shader.dispose();
