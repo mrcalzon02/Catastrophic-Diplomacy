@@ -8,6 +8,9 @@ on:
       - 'core/src/main/java/diplomacy/sim/BattleArena.java'
       - 'core/src/main/java/diplomacy/sim/BattleTermination.java'
       - 'core/src/main/java/diplomacy/sim/CampaignEncounter.java'
+      - 'server/src/main/java/diplomacy/server/BattleServer.java'
+      - 'core/src/main/java/diplomacy/net/BattleConnection.java'
+      - 'game/src/main/java/diplomacy/client/MultiplayerPanel.java'
       - 'core/src/test/java/diplomacy/sim/BattleTerminationTest.java'
       - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
       - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
@@ -52,11 +55,14 @@ jobs:
       - name: Compile live tracer render path without packaging game
         id: render
         run: gradle --no-daemon :game:compileJava
+      - name: Verify authoritative LAN battle termination and fleet protocol
+        id: network
+        run: gradle --no-daemon :server:check
       - name: Publish physical tracking and target effectiveness report
         if: always()
         run: |
           echo "## Rotary kinetic CIWS headless validation" >> "$GITHUB_STEP_SUMMARY"
-          echo "Physical functional checks: ${{ steps.physical.outcome }}. Renderer compilation: ${{ steps.render.outcome }}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Physical functional checks: ${{ steps.physical.outcome }}. Renderer compilation: ${{ steps.render.outcome }}. LAN protocol: ${{ steps.network.outcome }}." >> "$GITHUB_STEP_SUMMARY"
           echo "Baked 506-hull geometry and saved-socket identity: ${{ steps.baked_geometry.outcome }}. Marker crowding is advisory in the test report." >> "$GITHUB_STEP_SUMMARY"
           echo "All balance/effectiveness values are advisory; no APK or desktop distribution was built." >> "$GITHUB_STEP_SUMMARY"
           if [ -f core/test-output/rotary-ciws/summary.md ]; then
