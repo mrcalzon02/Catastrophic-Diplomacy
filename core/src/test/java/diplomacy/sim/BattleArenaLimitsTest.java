@@ -27,7 +27,7 @@ public final class BattleArenaLimitsTest {
         b.registerDiagnosticStationaryTarget(z.id);
         return b;
     }
-    private static void addFive(Battle b,long start,double x,double y)throws Exception{
+    private static void addSix(Battle b,long start,double x,double y)throws Exception{
         Battle.Ship a=b.ships().get(0),z=b.ships().get(1);
         Battle.Missile m=new Battle.Missile(101,start,a.id,0,z.id,x,y,500,0,20,
                 false,ProjectileModel.standard(ProjectileModel.Kind.MISSILE),1);
@@ -53,6 +53,13 @@ public final class BattleArenaLimitsTest {
                 0,a.id,0,x,y,0,200,3,105,3);
         rail.life=999;
         inject(b,"railPenetrators",rail);
+        // Physical flak has independent world-space travel, arena bounds
+        // and finite lifetime. It can neither burst outside the world nor
+        // remain as a forever-pending invisible scheduled explosion.
+        Battle.FlakRound flak=new Battle.FlakRound(0,a.id,0,106,0,
+                x,y,x+300,y,20,6);
+        if(start<0)flak.life=-100;
+        inject(b,"pendingFlak",flak);
     }
     private static void noProjectiles(Battle b,String context){
         ok(b.missiles().isEmpty(),context+" guided missile survived");
@@ -60,6 +67,7 @@ public final class BattleArenaLimitsTest {
         ok(b.ballistics().isEmpty(),context+" kinetic shell survived");
         ok(b.rotaryRounds().isEmpty(),context+" rotary CIWS round survived");
         ok(b.railPenetrators().isEmpty(),context+" rail penetrator survived");
+        ok(b.flakRounds().isEmpty(),context+" flak projectile survived");
     }
     public static void main(String[] args)throws Exception{
         ok(BattleArena.MAX_X-BattleArena.MIN_X==3840 &&
@@ -95,10 +103,10 @@ public final class BattleArenaLimitsTest {
                 &&wandering.vx==0 && wandering.vy==0,
                 "Ship coasted past arena border");
         Battle aged=stationary(819L);
-        addFive(aged,-10000,300,400);aged.step();
+        addSix(aged,-10000,300,400);aged.step();
         noProjectiles(aged,"Hard maximum age");
         Battle outbound=stationary(820L);
-        addFive(outbound,0,BattleArena.MAX_X-1,600);outbound.step();
+        addSix(outbound,0,BattleArena.MAX_X-1,600);outbound.step();
         noProjectiles(outbound,"World-edge crossing");
         Battle.Ballistic slow=new Battle.Ballistic(106,0,1,0,2,200,300,0,4,
                 new ProjectileModel.Spec(10,1.6,.24,.54));
@@ -109,6 +117,6 @@ public final class BattleArenaLimitsTest {
                 1,OrdnanceDoctrine.Payload.STANDARD,90);
         ok(torpedo.fuel<=BattleArena.MAX_GUIDED_SECONDS,
                 "Cold launch exceeded maximum flight time");
-        System.out.println("PASS fixed arena, 200v200, ship bounds, five projectile types and timeouts");
+        System.out.println("PASS fixed arena, 200v200, ship bounds, six projectile types and timeouts");
     }
 }
