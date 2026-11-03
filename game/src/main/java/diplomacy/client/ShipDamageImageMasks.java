@@ -24,6 +24,12 @@ final class ShipDamageImageMasks {
     static final int SIZE=96, COUNT=6, MASK_RADIUS=48;
     // 24 / 9 == 48 / 18 == 96 / 36: fixed 2.667-cell footprint.
     private final int[][] atlases=new int[Battle.DamageType.values().length][];
+    // The authored 96px R/G/B artwork remains untouched. The replacement
+    // 96px atlases had only 40-80 physically-open cut pixels per 9,216px
+    // frame, leaving just 2-8 pixels of structural backing at ship-mask LOD.
+    // Precompute ONLY a wider version of the existing irregular A cutout,
+    // retaining every fissure/puncture's shape and the original hull outline.
+    private final int[][] cutoutAlpha=new int[Battle.DamageType.values().length][];
     /** Absent/unknown diagnostic override uses the new native 96px artwork. */
     private final String testSet=System.getenv("CD_ARMOR_MASK_SET");
     private final boolean use48="upscaled48".equals(testSet)||"authored48".equals(testSet);
@@ -48,6 +54,71 @@ final class ShipDamageImageMasks {
             shared48=pixels;
             return pixels;
         }finally{art.dispose();}
+    }
+
+    /** Per-family edge recovery is smaller than the original impact extent.
+     * Long laser oxide discoloration and the R/G/B material response are NEVER
+     * broadened here: this affects only pixels revealing structural metal. */
+    static int cutoutRecoveryRadius(Battle.DamageType kind){
+        return switch(kind){
+            case LASER -> 5;
+            case KINETIC, PLASMA, MISSILE -> 7;
+            case TORPEDO -> 8;
+            case PARTICLE, FIGHTER -> 4;
+        };
+    }
+    /**
+     * Offline/once-per-atlas alpha dilation. It follows the ACTUAL authored
+     * cutout topology (including branches/holes), not a new oval or explosion.
+     * The last 1.5px feathers the edge to avoid another hard transparency halo.
+     * Each frame is isolated: neighboring variants can never bleed together.
+     */
+    static int[] recoverCutoutAlpha(int[] rgba,int size,int frames,int radius){
+        if(rgba==null||size<4||frames<1||radius<0||
+                rgba.length!=size*size*frames)
+            throw new IllegalArgumentException("Invalid RGBA cutout atlas");
+        int[] recovered=new int[rgba.length];
+        int width=size*frames;
+        for(int variant=0;variant<frames;variant++){
+            int origin=variant*size;
+            for(int y=0;y<size;y++)for(int x=0;x<size;x++){
+                int original=rgba[y*width+origin+x]&255;
+                if(original==0){recovered[y*width+origin+x]=0;continue;}
+                int nearestSquared=Integer.MAX_VALUE;
+                int cut=255;
+                for(int dy=-radius;dy<=radius;dy++){
+                    int sy=y+dy;
+                    if(sy<0||sy>=size)continue;
+                    for(int dx=-radius;dx<=radius;dx++){
+                        int distance=dx*dx+dy*dy;
+                        if(distance>radius*radius || distance>=nearestSquared)
+                            continue;
+                        int sx=x+dx;
+                        if(sx<0||sx>=size)continue;
+                        int candidate=rgba[sy*width+origin+sx]&255;
+                        if(candidate>=243)continue;
+                        nearestSquared=distance;cut=candidate;
+                    }
+                }
+                if(nearestSquared==Integer.MAX_VALUE){
+                    recovered[y*width+origin+x]=original;
+                    continue;
+                }
+                float proximity=(float)StrictMath.sqrt(nearestSquared);
+                float opacity=Math.max(0f,Math.min(1f,
+                        (radius+.5f-proximity)/1.5f));
+                int expanded=255-Math.round((255-cut)*opacity);
+                recovered[y*width+origin+x]=Math.min(original,expanded);
+            }
+        }
+        return recovered;
+    }
+    private int[] alphaAtlas(Battle.DamageType kind){
+        int family=kind.ordinal();
+        if(cutoutAlpha[family]!=null)return cutoutAlpha[family];
+        cutoutAlpha[family]=recoverCutoutAlpha(
+                atlas(kind),sampleSize,COUNT,cutoutRecoveryRadius(kind));
+        return cutoutAlpha[family];
     }
 
     static int pick(int seed,Battle.DamageType kind){
@@ -98,6 +169,27 @@ final class ShipDamageImageMasks {
         return atlas(kind)[row*(sampleSize*COUNT)+pick(seed,kind)*sampleSize+x];
     }
 
+    private int openingAlpha(Battle.DamageType kind,float dx,float dy,int seed){
+        // Both material and opening must use precisely the SAME deterministic
+        // seed/rotation/scale. Reuse the existing lookup's registered UV, but
+        // sample the preprocessed A channel rather than the color atlas.
+        if(use24||use48)return lookup(kind,dx,dy,seed)&255;
+        float bound=sampleSize*.5f/pixelsPerCell;
+        if(Math.abs(dx)>=bound||Math.abs(dy)>=bound)return 255;
+        int angle=ShipDamageVariants.maskAngleDegrees(seed,kind);
+        float cosine=ShipDamageVariants.maskCos(angle);
+        float sine=ShipDamageVariants.maskSin(angle);
+        float inv=1f/ShipDamageVariants.maskScale(seed,kind);
+        float ox=dx,oy=dy;
+        dx=(ox*cosine+oy*sine)*inv;
+        dy=(oy*cosine-ox*sine)*inv;
+        int x=(int)StrictMath.floor(sampleSize*.5f+dx*pixelsPerCell);
+        int y=(int)StrictMath.floor(sampleSize*.5f+dy*pixelsPerCell);
+        if(x<0||x>=sampleSize||y<0||y>=sampleSize)return 255;
+        return alphaAtlas(kind)[y*sampleSize*COUNT+
+                pick(seed,kind)*sampleSize+x];
+    }
+
     int material(Battle.DamageType kind,float dx,float dy,
                  float armor,float internal,int seed){
         if(kind==null)return 0;
@@ -131,11 +223,12 @@ final class ShipDamageImageMasks {
         float peeled=ShipDamageVariants.clamp((wear-.70f)/.20f);
         float structural=(float)StrictMath.sqrt(inside);
         float depth=Math.max(peeled,Math.min(.8f,structural*.8f));
-        return depth*(255-(lookup(kind,dx,dy,seed)&255))/255f;
+        return depth*(255-openingAlpha(kind,dx,dy,seed))/255f;
     }
 
     void clear(){
         for(int i=0;i<atlases.length;i++)atlases[i]=null;
         shared48=null;
+        for(int i=0;i<cutoutAlpha.length;i++)cutoutAlpha[i]=null;
     }
 }
