@@ -13,6 +13,7 @@ on:
       - 'core/src/test/java/diplomacy/sim/RailPointDefenseDiagnostic.java'
       - 'core/src/test/java/diplomacy/sim/PointDefenseFleetScaleDiagnostic.java'
       - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
+      - 'core/src/test/java/diplomacy/sim/BattleTerminationTest.java'
       - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
       - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
