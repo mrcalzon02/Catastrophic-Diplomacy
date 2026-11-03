@@ -185,6 +185,8 @@ public final class Battle {
         public final Map<Integer,ContactTrack> knownTracks=new HashMap<>();
         /** Fixed historical light-time samples; no instant telemetry in the HUD. */
         public final SensorLightTimeHistory sensorHistory=new SensorLightTimeHistory();
+        /** Installed acquisition doctrine. STANDARD retains old automatic sensing. */
+        public final SensorActiveScan.State scan=new SensorActiveScan.State();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
          * fooled by this emitter, not fictional effects counters. */
         public int holoShotsDiverted,holoSeekersDiverted;
@@ -824,6 +826,15 @@ public final class Battle {
     /** Separate additional broadcasts, limited by paid transceiver capacity. */
     private final Ship[][] expandedSpotters={new Ship[16],new Ship[16]};
     private final double[][] expandedNearest={new double[16],new double[16]};
+    /** Configure preordered scan doctrine without changing shipyard save IDs.
+     * Later ship-order integration will serialize these policy selections. */
+    public void configureSensorScan(int shipId,SensorActiveScan.Mode mode,int focusTargetId){
+        if(tick!=0)throw new IllegalArgumentException("Scan doctrines are pre-engage orders");
+        Ship ship=findShip(shipId);
+        if(ship==null||!ship.alive())throw new IllegalArgumentException("Missing scanner");
+        ship.scan.configure(mode,focusTargetId);
+    }
+
     /** Optional physical precision-CIWS lock-time sweep. It changes how
      * long optics must hold a real body before firing, never shot accuracy or
      * weapon damage. Configure only before tick one in a diagnostic battle. */
@@ -1526,6 +1537,9 @@ public final class Battle {
             hitAt(victim, effect.damage(), null, kind, effect.fromX(), effect.fromY());
             environmentalHits++;
         }
+        // Pulses spend actual reactor power and heat at their emission tick;
+        // incoming echoes can only later appear in causal sensor history.
+        for(Ship scanner:ships)SensorActiveScan.advance(scanner,tick);
         refreshCommandAssistance();
         refreshSharedContacts();
         for (Ship s : ships) if (s.alive()) {
@@ -2040,7 +2054,8 @@ public final class Battle {
                         *(1+.30*observer.commandAssist)):1;
         double rcs=StrictMath.max(0.06,StrictMath.min(4,target.radarCrossSection));
         double radar=observer.sensorRange*condition*weatherRange*resolution
-                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+0.09*(acuity-1));
+                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+0.09*(acuity-1))
+                *SensorActiveScan.radarFactor(observer.scan,target.id);
         // Visual silhouettes remain discernible even when electronic sensors fail.
         // The cloak needs power and working electronic warfare electronics.
         double cloak=target.power>4&&target.ecmCondition>0.15
@@ -2061,7 +2076,8 @@ public final class Battle {
                 *(1+0.08*(acuity-1));
         double xray=observer.xrayRange*condition*weatherRange*resolution
                 *(1+0.10*(acuity-1))/
-                (1+0.16*StrictMath.min(2,target.maxArmor/650));
+                (1+0.16*StrictMath.min(2,target.maxArmor/650))
+                *SensorActiveScan.xrayFactor(observer.scan,target.id);
         double mass=StrictMath.max(0.45,StrictMath.min(2.4,target.maxHull/550));
         double gravitic=observer.graviticRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(mass)*(1+0.07*(acuity-1));
@@ -2085,7 +2101,8 @@ public final class Battle {
                         *(1+.30*observer.commandAssist)):1;
         double rcs=StrictMath.max(.06,StrictMath.min(4,target.radarCrossSection));
         double radar=observer.sensorRange*condition*weatherRange*resolution
-                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1));
+                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1))
+                *SensorActiveScan.radarFactor(observer.scan,target.id);
         double cloak=target.power>4&&target.ecmCondition>.15
                 ?target.opticalSignature:1;
         double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
@@ -2097,7 +2114,8 @@ public final class Battle {
         double infrared=observer.infraredRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(StrictMath.max(.10,damping))*(1+.08*(acuity-1));
         double xray=observer.xrayRange*condition*weatherRange*resolution
-                *(1+.10*(acuity-1))/(1+.16*StrictMath.min(2,target.maxArmor/650));
+                *(1+.10*(acuity-1))/(1+.16*StrictMath.min(2,target.maxArmor/650))
+                *SensorActiveScan.xrayFactor(observer.scan,target.id);
         double mass=StrictMath.max(.45,StrictMath.min(2.4,target.maxHull/550));
         double gravity=observer.graviticRange*condition*weatherRange*resolution
                 *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
@@ -2284,7 +2302,20 @@ public final class Battle {
     }
 
     boolean hasTargetContact(Ship actor,Ship hostile,double distance){
-        if(liveContactSource(actor,hostile,distance)==null)return false;
+        Ship source=liveContactSource(actor,hostile,distance);
+        if(source==null)return false;
+        // A selected pulsed search doctrine must not use an echo before
+        // the specific fitted sensor actually emitted, reflected and heard it.
+        // STANDARD legacy contact gating remains unchanged until the broader
+        // causal fire-control migration is validated against campaign timing.
+        if(source.scan.mode()!=SensorActiveScan.Mode.STANDARD){
+            int channels=directSensorChannels(source,hostile,StrictMath.hypot(
+                    source.x-hostile.x,source.y-hostile.y));
+            int relay=source==actor?0:SensorLightTimeHistory.propagationTicks(
+                    StrictMath.hypot(source.x-actor.x,source.y-actor.y));
+            if(SensorLightTimeHistory.receive(source,hostile,tick,channels,relay)==null)
+                return false;
+        }
         rememberTrack(actor,hostile);
         return true;
     }
