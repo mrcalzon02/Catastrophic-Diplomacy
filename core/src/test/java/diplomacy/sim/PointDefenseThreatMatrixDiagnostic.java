@@ -128,7 +128,7 @@ public final class PointDefenseThreatMatrixDiagnostic {
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
                               int separation,String pdFamily){
         return run(catalog,threat,tier,mounts,seed,pdMode,
-                separation,pdFamily,false);
+                separation,pdFamily,true);
     }
     private static Result run(TechnologyCatalog catalog,Threat threat,int tier,
                               int mounts,int seed,BattleOrders.PointDefense pdMode,
@@ -137,7 +137,9 @@ public final class PointDefenseThreatMatrixDiagnostic {
             throw new IllegalArgumentException("Invalid physical diagnostic range");
         Battle battle=new Battle(8312009L+seed*101L+tier*17L+mounts*23L+
                 threat.ordinal()*193L);
-        if(radialFalloff)battle.configureFlakFragmentFalloffForDiagnostic(true);
+        // A/B explicitly selects the legacy uniform field or the physical
+        // production falloff. Never infer from the battle's current default.
+        battle.configureFlakFragmentFalloffForDiagnostic(radialFalloff);
         Battle.Ship attacker;
         if(threat.name().startsWith("FIGHTER_")){
             battle.spawnWing(0,fighterFitting(threat.fighter(),catalog),catalog,1,180,330);
@@ -370,9 +372,11 @@ public final class PointDefenseThreatMatrixDiagnostic {
                 "radial_actual_impacts,legacy_pd_shots,radial_pd_shots,"+
                 "legacy_damage,radial_damage,role");
         summary.append("\n## Measured FLK burst falloff A/B (8 paired attack seeds)\n\n");
-        summary.append("Both configurations fire real timed FLK shells and consume"+
-                " normal kinetic ammunition. Only spatial fragmentation energy"+
-                " varies. Laser PD, rockets and ECM are not modified.\n\n");
+        summary.append("Normal gameplay now uses radial fragmentation. Both"+
+                " configurations fire real timed FLK shells and consume"+
+                " normal kinetic ammunition. The legacy full-density field"+
+                " is retained only as a diagnostic control. Laser PD, rockets"+
+                " and ECM are not modified.\n\n");
         summary.append("|Threat|Range|Tier|FLK mounts|Launched|Legacy killed|"+
                 "Falloff killed|Legacy impacts|Falloff impacts|"+
                 "Legacy FLK shots|Falloff FLK shots|\n");
@@ -421,9 +425,10 @@ public final class PointDefenseThreatMatrixDiagnostic {
         }
         Files.write(output.resolve("flak-radial-ab.csv"),radialCsv,
                 StandardCharsets.UTF_8);
-        summary.append("\nFLK falloff is opt-in, not production balance."+
-                " Values indicate actual physical vessel and aircraft combat"+
-                " at eight seeds, not synthetic accuracy changes.\n");
+        summary.append("\nFLK radial falloff is the current production"+
+                " behavior; the original full-strength rim is an explicit"+
+                " pre-battle A/B control. Measurements use real physical"+
+                " vessel and aircraft combat, not synthetic accuracy rolls.\n");
         Files.write(output.resolve("p0.csv"),csv,StandardCharsets.UTF_8);
         Files.writeString(output.resolve("summary.md"),summary.toString(),StandardCharsets.UTF_8);
         System.out.print(summary);
