@@ -41,6 +41,8 @@ public final class BattleServer implements AutoCloseable {
     private final Set<Peer> peers=new HashSet<>();
     private final List<String> orders=new ArrayList<>();
     private volatile boolean closed;
+    /** Final match result is sent once, after the last complete snapshot. */
+    private boolean terminalSent;
     private long lastPump=System.nanoTime(),accumulator,maxTickNanos,bytesQueued;
     private static final long STEP=1_000_000_000L/30;
     private static final class Seat {final int team;long sequence;boolean active;Seat(int team){this.team=team;}}
@@ -272,10 +274,30 @@ public final class BattleServer implements AutoCloseable {
     }
     private void pump(){
         try{synchronized(lock){long now=System.nanoTime();if(battle==null){lastPump=now;accumulator=0;return;}accumulator=Math.min(accumulator+Math.max(0,now-lastPump),STEP*3);lastPump=now;int steps=0;
-            while(accumulator>=STEP&&steps++<3){long start=System.nanoTime();battle.step();maxTickNanos=Math.max(maxTickNanos,System.nanoTime()-start);accumulator-=STEP;
-                if(battle.tick%3==0&&!peers.isEmpty()){List<String> snapshot=snapshot();long size=snapshot.stream().mapToLong(s->s.length()+4L).sum();bytesQueued+=size*peers.size();for(Peer p:peers)p.send(snapshot);}
+            while(accumulator>=STEP&&steps++<3){
+                if(battle.finished()){sendTerminalResult();accumulator=0;break;}
+                long start=System.nanoTime();battle.step();
+                maxTickNanos=Math.max(maxTickNanos,System.nanoTime()-start);
+                accumulator-=STEP;
+                if((battle.tick%3==0||battle.finished())&&!peers.isEmpty()){
+                    List<String> current=snapshot();
+                    long size=current.stream().mapToLong(line->line.length()+4L).sum();
+                    bytesQueued+=size*peers.size();
+                    for(Peer peer:peers)peer.send(current);
+                }
+                if(battle.finished())sendTerminalResult();
             }
         }}catch(RuntimeException e){System.err.println("Authoritative battle halted (NET-STATE)");close();}
+    }
+    /** A distinct wire notification, never a fake fatal snapshot or victory.
+     * All actual survivors are preserved in the preceding terminal frame. */
+    private void sendTerminalResult(){
+        if(terminalSent||battle==null||!battle.finished())return;
+        String status=battle.unresolved()?battle.terminationReason().name():
+                battle.alive(0)>0?"LEFT_VICTORY":
+                battle.alive(1)>0?"RIGHT_VICTORY":"MUTUAL_DESTRUCTION";
+        for(Peer peer:peers)peer.send(List.of("RESULT|"+status+"|"+battle.tick));
+        terminalSent=true;
     }
     private List<String> snapshot(){
         if(battle==null)return List.of("LOBBY|"+(submitted[0]==null?0:1)+"|"+(submitted[1]==null?0:1));
