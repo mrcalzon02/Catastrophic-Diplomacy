@@ -44,11 +44,14 @@ public final class FleetSensorPhotonScaleDiagnostic {
         // families face the same physically fitted offense and acquisition.
         design=design.install(slot(hull,Shipyard.Mount.WEAPON,0),prefix+"LAS");
         design=design.install(slot(hull,Shipyard.Mount.WEAPON,1),prefix+"MSL");
-        design=design.install(slot(hull,Shipyard.Mount.SYSTEM,0),prefix+"RDR");
+        // The command ship deliberately does not mount long-range RDR.
+        // It MUST obtain the distant battlespace through physical SHR/LNK.
+        if(role!=2)
+            design=design.install(slot(hull,Shipyard.Mount.SYSTEM,0),prefix+"RDR");
         String[] electronics=switch(role){
             case 0 -> new String[]{"SHR","RES"};
             case 1 -> new String[]{"TRK","LNK"};
-            case 2 -> new String[]{"SHR"};
+            case 2 -> new String[]{"SHR","LNK"};
             case 3 -> new String[]{"TRK","CAP"};
             default -> throw new IllegalArgumentException("Unknown sensor family");
         };
@@ -95,7 +98,12 @@ public final class FleetSensorPhotonScaleDiagnostic {
                         (role<count%ROLES.length?1:0);
                 if(part<=0)continue;
                 var design=fitted(catalog,factions[team],role);
-                double cx=team==0?310:970;
+                double cx=switch(role){
+                    case 0 -> team==0?510:770; // Forward paid scouts
+                    case 1,3 -> team==0?445:835; // Armed tracking line
+                    case 2 -> team==0?90:1190; // Rear fleet command
+                    default -> throw new IllegalStateException("Unknown fleet role");
+                };
                 double cy=95+role*160;
                 sim.spawnWing(team,design,catalog,part,cx,cy);
                 allocated+=part;
@@ -142,6 +150,19 @@ public final class FleetSensorPhotonScaleDiagnostic {
         int peakMissiles=0,peakBeams=0;
         int alive0=0,alive1=0;
         for(int frame=1;frame<=steps;frame++){
+            if(frame==steps/2){
+                // Physically lose selected forward SHR transmitters while
+                // LNK-only TRK scouts keep valid stored observations alive.
+                // The command viewer must retain historical stale packets,
+                // not counterfeit live contacts or instantaneous photon state.
+                for(Battle.Ship ship:battle.ships())
+                    if(ship.network.sharingCapacity()>0&&
+                            ship.network.commandCapacity()==0&&
+                            ship.network.trackRelayRange()==0){
+                        ship.powerRegen=0;
+                        ship.power=0;
+                    }
+            }
             battle.step();
             for(Battle.Ship ship:battle.ships()){
                 check(Double.isFinite(ship.x)&&Double.isFinite(ship.y)&&
@@ -208,8 +229,14 @@ public final class FleetSensorPhotonScaleDiagnostic {
         }
         check(allocated>=0&&exhausted<=allocated,
                 "Invalid physically funded fire-control compute counters");
-        check(shots>0,"No real weapon launches in "+count+"v"+count+
-                " scenario: this would not test combat integration");
+        check(shots>0&&peakBeams>0&&allocated>0,
+                "No real charged beam/fire-control use in "+count+"v"+count);
+        check(relayed>0,
+                "No genuine remote SHR contact reached rear command ship");
+        check(historical>0,
+                "No finite aged TRK/LNK contact survived the scout outage");
+        check(ghosts>0,
+                "No emitted historical HLP hypotheses reached any command scope");
         return new Result(count,steps,System.nanoTime()-begin,peak,
                 battle.fingerprint(),shots,battle.hitCount,direct,relayed,
                 historical,ghosts,peakMissiles,peakBeams,allocated,exhausted,
@@ -252,10 +279,13 @@ public final class FleetSensorPhotonScaleDiagnostic {
                 "# Real fitted sensor-network integration at 16v16 and 200v200\n\n"+
                 "Two identical-seed independently executed replays per size. "+
                 "SHR, RES, TRK, LNK, FCM and CAP modules are installed in real "+
-                "paid DREADNOUGHT sockets; RDR radars, LAS and MSL modules "+
-                "are fitted to every vessel. One sensor family includes "+
-                "real HLP hologram hardware. Innate fighter and repair-drone "+
-                "reserves are disabled only for this focused profile. "+
+                "paid DREADNOUGHT sockets; RDR radars arm the forward scouts "+
+                "and tracking line while the rear FCM has no RDR so relayed "+
+                "data is meaningful. LAS/MSL guns are fitted on every vessel. "+
+                "One sensor family includes real HLP hologram hardware. "+
+                "Forward SHR scouts lose power at midpoint; the separate "+
+                "TRK/LNK archive must preserve aged tracks. Innate fighter "+
+                "and repair-drone reserves are disabled for this profile. "+
                 "All positional, photon, false packet, beam and ship states "+
                 "come from actual battles.\n\n"+
                 "|Per side|Ticks|Wall ms|Peak heap bytes|Real FIRE events|Hits|"+
