@@ -46,11 +46,6 @@ final class SensorContactOverlay {
     boolean opticallyVisible(int id){
         return (contacts.getOrDefault(id,0)&Battle.CONTACT_OPTICAL)!=0;
     }
-    private static float[] rotate(double x,double y,float scale,float c,float s,
-                                  float ox,float oy){
-        return new float[]{(float)x+scale*(ox*c-oy*s),
-                           (float)y+scale*(ox*s+oy*c)};
-    }
     /** Radar displays the TRUE faction hull profile, never a solid fake ship. */
     private static void radarHull(ShapeRenderer shapes,Battle.Ship ship,
                                   BattleRenderPoses.Pose pose){
@@ -61,9 +56,11 @@ final class SensorContactOverlay {
         float scale=(float)ship.visualScale()*.2f;
         for(int i=0;i<points.size();i++){
             HullLayouts.Point a=points.get(i),b=points.get((i+1)%points.size());
-            float[] p=rotate(pose.x(),pose.y(),scale,c,s,a.x(),a.y());
-            float[] q=rotate(pose.x(),pose.y(),scale,c,s,b.x(),b.y());
-            shapes.line(p[0],p[1],q[0],q[1]);
+            float ax=pose.x()+scale*(a.x()*c-a.y()*s);
+            float ay=pose.y()+scale*(a.x()*s+a.y()*c);
+            float bx=pose.x()+scale*(b.x()*c-b.y()*s);
+            float by=pose.y()+scale*(b.x()*s+b.y()*c);
+            shapes.line(ax,ay,bx,by);
         }
     }
     private static String label(int mask){
@@ -105,8 +102,9 @@ final class SensorContactOverlay {
                 shapes.setColor(1f,.82f,.27f,1f);
                 shapes.circle(x,y,r*.52f,12);
             }else if((mask&Battle.CONTACT_RADAR)==0){
-                shapes.setColor((mask&Battle.CONTACT_XRAY)!=0
-                        ?new Color(.75f,.44f,1f,.8f):new Color(.28f,1f,.72f,.7f));
+                if((mask&Battle.CONTACT_XRAY)!=0)
+                    shapes.setColor(.75f,.44f,1f,.8f);
+                else shapes.setColor(.28f,1f,.72f,.7f);
                 shapes.circle(x,y,r*.55f,12);
             }
         }
