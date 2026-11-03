@@ -221,8 +221,86 @@ planned and must not be counted as installed guns.
   [192 same-seed moving-vs-endpoint A/B pairs](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41603953046),
   [production RPD plus fixed-arena and visual compilation](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41604234413).
 - These tests confirm physical role fidelity and measured contact geometry,
-  not fully balanced production costs. Sustained **200v200** CPU/heap profiling
-  with all four installed hard-kill families remains to do; the static
-  arena-limit check is not that sustained benchmark.
+  not fully balanced production costs. A subsequent 200v200 focused load
+  diagnostic now exists; its 20-second trial is documented under Gate D below.
+  The static arena-limit check alone was not a sustained benchmark.
 
 [Full real-battle railgun balance report](PD_RAIL_INTERCEPTOR_MOVING_BODY_BALANCE_2026-11-02.md).
+
+
+## Gate D verification update: genuine four-family 200v200 differentiated load
+
+**Verified:** [full Java17 rail + 200v200 A/B + renderer CI run 41607457278](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41607457278);
+[earlier source-attribution run 41606914482](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41606914482);
+[RCW physical-mechanics correction 41607196653](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/41607196653).
+Headless measurements only; no APK built, no subjective threshold promoted to a release gate.
+
+The optional `:core:pdFleetScaleDiagnostic` was added to the **existing**
+physical rail CI job as a **nonblocking** performance/balance step. Its
+real combat setup has 200 attacker hulls (50 each of fitted MSL, TOR, KIN,
+siege rocket) and 200 defender hulls (50 fitted PD laser, FLK, RCW, RPD).
+Each same-seed ACTIVE/HOLD_FIRE pair runs 600 ticks at 30 Hz. Two
+controlled conditions are reported because a bare dreadnought includes
+intrinsic fighter capacity: **MIXED** retains the default baseline
+fighter wings; **ORDNANCE_ONLY** zeroes just fighter/drone reserves before
+combat on both teams, leaving the real gun sockets, ammunition, sensors,
+orders, and attacking launchers intact.
+
+| Condition | Real intercepted ordnance | Real craft destroyed | Defender hulls alive ACTIVE / HOLD | Net defense protection loss ACTIVE / HOLD |
+|---|---:|---:|---:|---:|
+| MIXED | 388 | 372 | 114 / 77 | 163217.51 / 241839.26 |
+| ORDNANCE_ONLY | 324 | 0 | 111 / 104 | 161915.55 / 182166.16 |
+
+The isolated ordnance-only kill attribution is **per physically removed
+hostile body**, not per shot or successful hit roll:
+
+| Real hard-kill source | Missiles | Torpedoes | Rockets | Kinetic shells | Sum |
+|---|---:|---:|---:|---:|---:|
+| PD laser | 8 | 12 | 0 | 1 | 21 |
+| FLK | 6 | 3 | 1 | 1 | 11 |
+| RCW | 1 | 20 | 179 | 78 | 278 |
+| RPD | 0 | 6 | 5 | 3 | 14 |
+| **Total** | **15** | **41** | **185** | **83** | **324** |
+
+These figures support **role differentiation in the measured scenario**:
+FLK is decisively the anti-craft volume weapon in MIXED (363 physical
+craft kills credited to FLK), rotary is the principal close-in
+rocket/shell screen in ORDNANCE_ONLY (179 rockets and 78 kinetic shells),
+and the slow charged railgun produces a small number of individual
+physical hardened-body intercepts. This does **not** yet establish an
+equal-cost dominance ranking, balancing of research rank I-IX, or
+statistically robust performance across formation geometry.
+
+The diagnostic fixes a misleading ammunition distinction: in the
+ordnance-only ACTIVE trial, **2756** kinetic cartridges were paid for
+actual FLK/RCW/RPD firing, while **3647** net kinetic inventory was
+depleted; the residual **891** reflects other stock effects, including
+combat magazine losses. The corresponding HOLD_FIRE had **zero**
+defensive shot ammunition yet lost **999** stock. Per-gun firing and
+kill attribution obey objective accounting invariants. The production
+`breachStores` process destroys inventory after real penetration,
+so total store depletion cannot be called 'PD ammo fired'.
+
+The four ordnance-only conditions retained a peak of 881-891 active
+physical projectile bodies, with no craft artificially reintroduced.
+The headless ACTIVE simulation took 2.47s wall time versus 2.10s in
+HOLD_FIRE on that runner, but these are **not** isolated PD CPU timings:
+combat outcomes and world-body counts change between runs. Runner heap
+and timing do not demonstrate Android frame rate or a complete 200v200
+campaign battle. A future sustained full-battle time profile and
+research/cost-parity geometry matrix are still necessary.
+
+A recent RCW test incorrectly required a spinning kinetic CIWS to fire
+in **every** tiny, fast KINETIC encounter even where physical sensor
+contacts were too fleeting for mechanical slew/spin-up. The test now
+reports zero-fire contacts as advisory, still verifies weather/sensor
+damage, real mount legitimacy, paid cartridges and actual projectile
+flight, and requires at least one real shot across the full threat
+matrix. This preserves the documented intention that RCW is weaker
+against fast tiny solid shells without concealing actual failures.
+
+Next implementation work remains distinct PPD continuous beam dwell/
+charging, then PLS short-range thermobaric area denial, then IMD
+paid guided counter-missiles; flak's timed fragmentation origin still
+needs true shell flight geometry. Fleet sensor sharing/fusion/capacity
+is an independent module concern, not automatically part of PD.
