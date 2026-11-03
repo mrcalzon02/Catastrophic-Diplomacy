@@ -11,6 +11,12 @@ on:
       - 'assets/damage_masks/hires96/*.png'
       - 'tools/audit_damage_mask_assets.py'
       - 'tools/audit_damage_masks_96_materials.py'
+      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
+      - 'game/src/main/java/diplomacy/client/CombatHitRenderer.java'
+      - 'game/src/main/java/diplomacy/client/CombatLightingRenderer.java'
+      - 'game/src/main/java/diplomacy/client/ShipDamageImageMasks.java'
+      - 'game/src/test/java/diplomacy/client/CombatHitFeedbackTest.java'
+      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageCaptureTest.java'
       - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
       - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
       - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
@@ -59,6 +65,8 @@ jobs:
         # capture of the real framebuffer evidence needed to judge/fix them.
         continue-on-error: true
         run: gradle --no-daemon :game:shipDamageVisualSmoke
+      - name: Verify real damage-event feedback and lifetime caps
+        run: gradle --no-daemon :game:combatHitFeedbackSmoke
       - name: Verify deterministic real-weapon screenshot scenarios
         run: gradle --no-daemon :game:shipDamageCaptureSmoke
       - name: Measure actual time to armor exposure in fitted duels (diagnostic only)
@@ -84,6 +92,9 @@ jobs:
             echo "VISUAL-ONLY WARNING: material audit unavailable"
           mkdir -p test-output/armor-observation/framebuffer
           export CD_ARMOR_CAPTURE_DIR="$PWD/test-output/armor-observation/framebuffer"
+          # Impact particles are captured from Battle.step()-derived hit events.
+          # The clean surface captures still intentionally omit all VFX.
+          export CD_ARMOR_CAPTURE_VFX=1
           export LIBGL_ALWAYS_SOFTWARE=1
           export ALSOFT_DRIVERS=null
           timeout --signal=INT --kill-after=10s 12m \
