@@ -805,6 +805,18 @@ tasks.register('pdFamilyP0Diagnostic', JavaExec) {
 }
 
 
+// RCW mechanical validation: every configured shot must originate from a
+// paid equipped socket, consume one cartridge and travel to a real collision.
+// Outcome ratios are advisory; no desktop or Android package is rebuilt.
+tasks.register('rotaryCiwsDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Verify rotary kinetic CIWS physical tracer flight, sensors, spool-up and ammo across research stages.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.RotaryCiwsDiagnostic'
+    maxHeapSize = '512m'
+}
+
 // Standalone advisory fighter-wave diagnostics: testClasses ONLY.
 // No APK, desktop packaging, render/sprite checks, or release thresholds.
 tasks.register('pdFlakWaveDiagnostic', JavaExec) {
