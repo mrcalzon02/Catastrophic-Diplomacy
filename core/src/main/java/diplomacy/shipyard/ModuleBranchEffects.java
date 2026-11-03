@@ -12,7 +12,7 @@ import diplomacy.tech.SensorNetworkCatalog;
 public final class ModuleBranchEffects {
     private ModuleBranchEffects(){}
     private static final Set<String> GUNS=Set.of("LAS","KIN","MSL","TOR","PAR","PLA");
-    private static final Set<String> DEFENSE=Set.of("PD","FLK","RCW","RPD");
+    private static final Set<String> DEFENSE=Set.of("PD","FLK","RCW","RPD","PPD");
     public record Tuning(double damage,double cycle,double reach,double tracking,
                          double selfRepair,double remoteRepair,double shieldTransfer,
                          double supportEfficiency,double droneEndurance) {
