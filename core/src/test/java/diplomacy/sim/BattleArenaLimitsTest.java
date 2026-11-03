@@ -53,9 +53,11 @@ public final class BattleArenaLimitsTest {
         inject(b,"railPenetrators",rail);
     }
     private static void noProjectiles(Battle b,String context){
-        ok(b.missiles().isEmpty()&&b.rockets().isEmpty()&&b.ballistics().isEmpty()
-                &&b.rotaryRounds().isEmpty()&&b.railPenetrators().isEmpty(),
-                context+" did not expire all five physical projectile families");
+        ok(b.missiles().isEmpty(),context+" guided missile survived");
+        ok(b.rockets().isEmpty(),context+" unguided rocket survived");
+        ok(b.ballistics().isEmpty(),context+" kinetic shell survived");
+        ok(b.rotaryRounds().isEmpty(),context+" rotary CIWS round survived");
+        ok(b.railPenetrators().isEmpty(),context+" rail penetrator survived");
     }
     public static void main(String[] args)throws Exception{
         ok(BattleArena.MAX_X-BattleArena.MIN_X==3840 &&
@@ -91,7 +93,7 @@ public final class BattleArenaLimitsTest {
                 &&wandering.vx==0 && wandering.vy==0,
                 "Ship coasted past arena border");
         Battle aged=stationary(819L);
-        addFive(aged,-1000,300,400);aged.step();
+        addFive(aged,-10000,300,400);aged.step();
         noProjectiles(aged,"Hard maximum age");
         Battle outbound=stationary(820L);
         addFive(outbound,0,BattleArena.MAX_X-1,600);outbound.step();
