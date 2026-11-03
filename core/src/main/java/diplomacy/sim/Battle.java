@@ -665,15 +665,48 @@ public final class Battle {
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
     private final List<Rocket> rockets = new ArrayList<>();
-    /** One finite-flight physical burst for each equipped flak firing event. */
-    private static final class FlakRound {
-        final int team,shooterId,slotId;
-        final long shotId,burstTick;
-        final double aimX,aimY,radius,damage;
-        FlakRound(int team,int shooter,int slot,long shot,long at,
-                  double x,double y,double r,double d){
+    /** Actual finite, unguided fragmentation shell. The blast is resolved
+     * only when this paid, world-space projectile reaches its preset fuze
+     * point, never at a time inferred from the target's last known range.
+     * Projected lead/error are fixed at launch; the shell cannot retarget. */
+    public static final double FLAK_SHELL_SPEED=390.0;
+    public static final int MAX_ACTIVE_FLAK_SHELLS=3000;
+    public static final class FlakRound {
+        public final int team,shooterId,slotId;
+        public final long shotId,spawnTick;
+        public final double aimX,aimY,radius,damage,vx,vy;
+        public double x,y,remainingDistance,life;
+        public FlakRound(int team,int shooter,int slot,long shot,long at,
+                         double startX,double startY,double targetX,double targetY,
+                         double radius,double damage){
+            double dx=targetX-startX,dy=targetY-startY;
+            double distance=StrictMath.hypot(dx,dy);
+            if(team<0||shooter<=0||slot<0||shot<=0||at<0||
+                    !Double.isFinite(distance)||distance<.001||
+                    !Double.isFinite(startX)||!Double.isFinite(startY)||
+                    !Double.isFinite(radius)||radius<=0||
+                    !Double.isFinite(damage)||damage<=0)
+                throw new IllegalArgumentException("Invalid real flak shell");
             this.team=team;shooterId=shooter;slotId=slot;
-            shotId=shot;burstTick=at;aimX=x;aimY=y;radius=r;damage=d;
+            shotId=shot;spawnTick=at;
+            x=startX;y=startY;aimX=targetX;aimY=targetY;
+            this.radius=radius;this.damage=damage;
+            vx=FLAK_SHELL_SPEED*dx/distance;
+            vy=FLAK_SHELL_SPEED*dy/distance;
+            remainingDistance=distance;
+            life=StrictMath.min(BattleArena.MAX_POINT_DEFENSE_SECONDS,
+                    distance/FLAK_SHELL_SPEED+DT);
+        }
+        /** Move only within the actual travelled segment; no teleport to
+         * fuze point and no burst beyond the fixed simulation world. */
+        public boolean advance(double dt){
+            if(!Double.isFinite(dt)||dt<=0)throw new IllegalArgumentException("Invalid shell timestep");
+            double advance=StrictMath.min(remainingDistance,dt*FLAK_SHELL_SPEED);
+            x+=vx/FLAK_SHELL_SPEED*advance;
+            y+=vy/FLAK_SHELL_SPEED*advance;
+            remainingDistance=StrictMath.max(0,remainingDistance-advance);
+            life-=dt;
+            return remainingDistance<=.000001;
         }
     }
     private final List<FlakRound> pendingFlak=new ArrayList<>();
@@ -936,6 +969,8 @@ public final class Battle {
         ship.setGuidanceMode(family,mode);
     }
     public List<Ballistic> ballistics() { return Collections.unmodifiableList(ballistics); }
+    /** Live fragments shells, at actual positions before physical fuze arrival. */
+    public List<FlakRound> flakRounds(){return Collections.unmodifiableList(pendingFlak);}
     public List<RotaryPointDefense.Round> rotaryRounds(){
         return Collections.unmodifiableList(rotaryRounds);
     }
@@ -3881,9 +3916,21 @@ public final class Battle {
     private void resolveFlakBursts(){
         for(int k=pendingFlak.size()-1;k>=0;k--){
             FlakRound burst=pendingFlak.get(k);
-            if(tick<burst.burstTick)continue;
+            boolean arrived=burst.advance(DT);
+            // Every shell has a fixed maximum lifetime and cannot grow the
+            // arena. An outbound shell expires before its scheduled burst.
+            if(burst.life<-.000001||!BattleArena.contains(burst.x,burst.y)){
+                pendingFlak.remove(k);
+                visual(burst.shotId,VisualPhase.TIMEOUT,"FLAK",burst.team,
+                        burst.shooterId,0,burst.x,burst.y,burst.x,burst.y);
+                continue;
+            }
+            if(!arrived)continue;
             pendingFlak.remove(k);
-            if(!BattleArena.contains(burst.aimX,burst.aimY))continue;
+            // Precise arrival is evaluated from the shell's true integrated
+            // position. Numerical tolerances cannot create a remote blast.
+            if(StrictMath.hypot(burst.x-burst.aimX,burst.y-burst.aimY)>.001)
+                throw new IllegalStateException("Flak fuze burst detached from live shell");
             Ship shooter=findShip(burst.shooterId);
             if(shooter==null)continue;
             visual(burst.shotId,VisualPhase.IMPACT,"FLAK_BURST",
@@ -3991,7 +4038,8 @@ public final class Battle {
             for(Ship.FlakMount mount:defender.flakMounts){
                 if(mount.reload>0||defender.kineticAmmo<=0||
                    defender.power<law.minimumPower()+1||
-                   defender.heat>defender.maxHeat*.92||pendingFlak.size()>=3000)
+                   defender.heat>defender.maxHeat*.92||
+                   pendingFlak.size()>=MAX_ACTIVE_FLAK_SHELLS)
                     continue;
                 FlakAim best=null;
                 double bestPriority=Double.POSITIVE_INFINITY;
@@ -4083,9 +4131,13 @@ public final class Battle {
                 defender.heat+=law.heatPerShot()*2;
                 mount.reload=law.reload(false,
                         mount.cycle*1.8,defender.pointDefenseCondition);
+                // One paid, unguided shell travels from this exact
+                // authoritative socket to its already-chosen airburst point.
+                // Target motion after launch cannot alter its bearing or fuze.
                 pendingFlak.add(new FlakRound(defender.team,defender.id,
-                        mount.slotId,shot,tick+Math.max(1,(int)StrictMath.ceil(flight/DT)),
-                        aimX,aimY,18+mount.profile.tracking()*2,
+                        mount.slotId,shot,tick,
+                        muzzle.x(),muzzle.y(),aimX,aimY,
+                        18+mount.profile.tracking()*2,
                         mount.profile.damage()*.78));
             }
         }
