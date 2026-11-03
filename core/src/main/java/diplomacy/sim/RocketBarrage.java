@@ -149,6 +149,21 @@ public final class RocketBarrage {
             return age<.46?size.boostThrust:0;
         return age<2.4?size.sustainedThrust:0;
     }
+    /** Shared exact step law for actual rockets and HUD/fire-control
+     * predictions. This intentionally uses the battle's fixed DT; changing
+     * rocket acceleration here changes both the flight and its prediction. */
+    public static double nextSpeed(Size size,Motor motor,int flightTick,
+            double previousSpeed,double terminalSpeed,double sustainedFactor){
+        if(size==null||motor==null||flightTick<0||
+                !Double.isFinite(previousSpeed)||previousSpeed<0||
+                !Double.isFinite(terminalSpeed)||terminalSpeed<=0||
+                !Double.isFinite(sustainedFactor)||sustainedFactor<=0)
+            throw new IllegalArgumentException("Invalid rocket integration");
+        double accel=acceleration(size,motor,flightTick*Battle.DT);
+        if(motor==Motor.SUSTAINED_BURN)accel*=sustainedFactor;
+        return accel>0?StrictMath.min(terminalSpeed,
+                previousSpeed+accel*Battle.DT):previousSpeed;
+    }
     public static boolean burning(Motor motor,double age){
         return acceleration(Size.SMALL,motor,age)>0;
     }
