@@ -48,11 +48,14 @@ public final class ShipSurfaceDamageVisualTest {
         check(ShipSurfaceDamageVisual.interiorPixel(0xffffff00,0xc08040ff)==0,
                 "Underlayer must not fill transparent gaps between sprite parts");
         check(ShipSurfaceDamageVisual.interiorPixel(0xc08040ff,0x804020ff)
-                        ==0x3b2110ff,
-                "Exposed interior must preserve identifiable 40%-lit structural detail");
+                        ==0x29170bff,
+                "Exposed interior must preserve identifiable 28%-lit structural detail");
         check(ShipSurfaceDamageVisual.interiorPixel(0xc0804080,0x00000000)
-                        ==0x4d331a80,
-                "Missing metal sample falls back to a shadowed ORIGINAL sprite pixel");
+                        ==0x36241280,
+                "Missing metal sample must retain dark original-color fallback and alpha");
+        int under=ShipSurfaceDamageVisual.interiorPixel(0xc08040ff,0x804020ff);
+        check((under&255)==255 && ((under>>>24)&255)<((0x3b2110ff>>>24)&255),
+                "Darker structural metal must not affect original alpha or brighten breach");
         check(ShipSurfaceDamageVisual.breachRim(.5f,0,1,0,1,0,255)==0,
                 "Transparent source PNG must never have an emissive rim");
         check(ShipSurfaceDamageVisual.breachRim(.5f,0,1,0,1,255,0)==0,
