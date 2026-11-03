@@ -89,6 +89,11 @@ public final class WeaponFxProfile {
                         NONE,seq("fighter","impact",7,1,22,22),NONE));
         return Map.copyOf(byType);
     }
+    /** Shared across every continuous PPD tick; no new effects profiles or
+     * clip objects per 30-Hz projectile/body exposure event. */
+    private static final Profile PARTICLE_PD_PROFILE=
+            new Profile("particle_pd",Motion.HITSCAN,
+                    seq("particle","firing",2,1,10,10),NONE,NONE,NONE);
     public static Profile forType(Battle.DamageType type){return DEFAULTS.get(type);}
     public static Profile forWeapon(String weapon){
         if(weapon==null)return null;
@@ -103,9 +108,7 @@ public final class WeaponFxProfile {
         // Continuous PPD reports one actually powered beam tick at a time.
         // Use two compact source-art frames, never a huge pulse flash per
         // tick or unbounded accumulated decorative emitter glow.
-        if(weapon.equals("PARTICLE_PD"))
-            return new Profile("particle_pd",Motion.HITSCAN,
-                    seq("particle","firing",2,1,10,10),NONE,NONE,NONE);
+        if(weapon.equals("PARTICLE_PD"))return PARTICLE_PD_PROFILE;
         if(weapon.equals("RAIL_PD"))
             return new Profile("rail_point_defense",Motion.BALLISTIC,
                     seq("kinetic","firing",8,1,18,18),NONE,
