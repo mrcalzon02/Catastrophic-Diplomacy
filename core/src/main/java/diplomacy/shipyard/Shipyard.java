@@ -1163,7 +1163,8 @@ public final class Shipyard {
             RocketBarrage.Rack rack=new RocketBarrage.Rack(slot,size,
                     part.effect/part.base.effect,
                     part.integrity/part.base.integrity,
-                    part.accuracy*part.tuning().cycle());
+                    part.accuracy*part.tuning().cycle(),
+                    installed.branch()==null?0:installed.stage(installed.branch()));
             RocketBarrage.Fitting program=design.rocketBarrage(slot);
             rack.configure(program.count(),program.motor());
             result.add(rack);
