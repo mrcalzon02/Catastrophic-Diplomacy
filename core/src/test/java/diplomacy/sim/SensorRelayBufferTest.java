@@ -18,7 +18,11 @@ public final class SensorRelayBufferTest {
         require(buffer.delivered(41,100,lag,2)==null,
                 "Receiver fabricated a scouting packet before transmission");
         var first=observed(4,6,9,420);
+        long initialHash=buffer.fingerprint();
         buffer.transmit(41,9,first,2);
+        require(buffer.fingerprint()!=initialHash,
+                "Actual sender transmission did not change replay fingerprint");
+        long signed=buffer.fingerprint();
         require(buffer.delivered(41,9+lag-1,lag,2)==null,
                 "Relay jumped past one-way photon travel");
         var arrived=buffer.delivered(41,9+lag,lag,2);
@@ -26,6 +30,12 @@ public final class SensorRelayBufferTest {
                 arrived.emittedTick()==4&&arrived.measuredTick()==6&&
                 arrived.receivedTick()==9+lag,
                 "Relay modified scouting sample or invented reception timestamps");
+        require(buffer.fingerprint()==signed,
+                "Read-only tactical relay inspection mutated replay state");
+        var replay=new SensorRelayBuffer();
+        replay.transmit(41,9,first,2);
+        require(replay.fingerprint()==signed,
+                "Identical scout reports generated different deterministic signatures");
         var second=observed(5,7,10,440);
         buffer.transmit(41,10,second,2);
         require(buffer.delivered(41,9+lag,lag,2).sample().x()==420,
