@@ -12,6 +12,7 @@ import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnancePropulsion;
 import diplomacy.sim.OrdnanceGuidance;
 import diplomacy.tech.SensingVariantCatalog;
+import diplomacy.tech.SensorNetworkCatalog;
 import diplomacy.tech.SurvivalHardwareCatalog;
 import diplomacy.tech.TechnologyCatalog;
 import diplomacy.tech.TechnologyCatalog.Component;
@@ -751,6 +752,15 @@ public final class Shipyard {
                           double graviticRange,double radarSignature,
                           double thermalSignature,double opticalSignature,
                           double acuity,double hologramNoise) { }
+    /** Separate capabilities: exchange reach/bandwidth, local classification,
+     * persistent track quality, last-known-position relay, command fusion,
+     * and true fire-control scheduling capacity. */
+    public record Network(double sharingRange,int sharingCapacity,
+                          double resolutionGain,int trackMemoryTicks,
+                          double trackingPrecision,int trackMemoryCapacity,
+                          double trackRelayRange,int trackRelayCapacity,
+                          double fusionRange,double fusionStrength,
+                          int commandCapacity,int targetCapacity) { }
     public record Survival(double crewProtection,double commandProtection,
                            double fuelBonus,double fuelProtection,
                            double magazineContainment,int escapePods,boolean recoveryBeacon,
@@ -770,7 +780,8 @@ public final class Shipyard {
                          Weapons weapons,Support support,double pdCycle,
                          HullBaseline.Stats baseline,Crew crew,
                          AmmunitionResearch.Access ammunition,
-                         double shieldRechargeBoost,Sensing sensing,Survival survival) { }
+                         double shieldRechargeBoost,Sensing sensing,Network network,
+                         Survival survival) { }
     public static Fitted fit(Design design,TechnologyCatalog catalog) {
         Report report=inspect(design,catalog);
         if(!report.valid())throw new IllegalArgumentException("Fitting rejected: "+report.explanation());
@@ -791,6 +802,10 @@ public final class Shipyard {
         double radarGain=1,infraredRange=0,xrayRange=0,graviticRange=0;
         double radarSignature=1,thermalSignature=1,opticalSignature=1;
         double acuity=1,hologramNoise=0;
+        double sharingRange=0,resolutionGain=1,trackingPrecision=0,
+                trackRelayRange=0,fusionRange=0,fusionStrength=0;
+        int sharingCapacity=0,trackMemoryTicks=0,trackMemoryCapacity=0,
+                trackRelayCapacity=0,commandCapacity=0,targetCapacity=1;
         double crewProtection=0,commandProtection=0,fuelBonus=0,fuelProtection=0,
                 magazineContainment=0,hazardInstability=0,hazardSeverity=0,
                 rechargeBoost=0,extraHazardHeat=0;
@@ -819,11 +834,14 @@ public final class Shipyard {
                 weaponCounts[weaponIndex]++;
             }
             double variantPower=SensingVariantCatalog.performance(p.base.subsystem);
+            double networkPower=SensorNetworkCatalog.performance(p.base.subsystem);
+            double networkStrength=networkPower*(p.effect/p.base.effect)*p.accuracy;
             double survivalGain=(p.effect/p.base.effect)*
                     SurvivalHardwareCatalog.performance(p.base.subsystem);
             double survivalRisk=SurvivalHardwareCatalog.risk(p.base.subsystem);
             switch(SurvivalHardwareCatalog.root(
-                    SensingVariantCatalog.root(p.base.subsystem))) {
+                    SensorNetworkCatalog.root(
+                    SensingVariantCatalog.root(p.base.subsystem)))) {
                 case "ARM", "CMP", "ABL", "DEN", "RAC" ->
                     armor+=p.effect*2.0*p.integrity/p.base.integrity;
                 case "BLK" -> hull+=p.effect*3.2*p.integrity/p.base.integrity;
@@ -899,6 +917,35 @@ public final class Shipyard {
                         *p.accuracy*tuning.reach();
                 case "HLP" -> hologramNoise+=0.25*variantPower*(p.effect/p.base.effect)
                         *p.accuracy*tuning.reach();
+                case "SHR" -> {
+                    sharingRange+=420*networkStrength*tuning.reach();
+                    sharingCapacity+=(int)StrictMath.ceil(5*networkStrength);
+                }
+                case "RES" -> {
+                    // Classification helps only channels physically present.
+                    // No optical range or free exotic detector is created.
+                    resolutionGain+=.18*networkStrength*tuning.tracking();
+                }
+                case "TRK" -> {
+                    trackMemoryTicks+=(int)StrictMath.ceil(75*networkStrength
+                            *tuning.tracking());
+                    trackingPrecision+=.22*networkStrength*tuning.tracking();
+                    trackMemoryCapacity+=(int)StrictMath.ceil(3*networkStrength);
+                }
+                case "LNK" -> {
+                    trackRelayRange+=620*networkStrength*tuning.reach();
+                    trackRelayCapacity+=(int)StrictMath.ceil(4*networkStrength);
+                }
+                case "FCM" -> {
+                    fusionRange=StrictMath.max(fusionRange,
+                            720*networkStrength*tuning.reach());
+                    fusionStrength+=.24*networkStrength*tuning.tracking();
+                    commandCapacity+=(int)StrictMath.ceil(4*networkStrength);
+                }
+                case "CAP" -> {
+                    targetCapacity+=(int)StrictMath.ceil(3*networkStrength
+                            *tuning.tracking());
+                }
                 case "REP" -> {
                     repair+=p.effect*0.0004;
                     selfRate+=p.effect*0.028*tuning.selfRepair();
@@ -1038,6 +1085,13 @@ public final class Shipyard {
                         Math.max(0.12,radarSignature),Math.max(0.12,thermalSignature),
                         Math.max(0.12,opticalSignature),Math.min(2.5,acuity),
                         Math.min(0.75,hologramNoise)),
+                new Network(Math.min(1700,sharingRange),Math.min(32,sharingCapacity),
+                        Math.min(1.9,resolutionGain),
+                        Math.min(450,trackMemoryTicks),Math.min(.85,trackingPrecision),
+                        Math.min(32,trackMemoryCapacity),
+                        Math.min(2000,trackRelayRange),Math.min(32,trackRelayCapacity),
+                        Math.min(2000,fusionRange),Math.min(.9,fusionStrength),
+                        Math.min(40,commandCapacity),Math.min(16,targetCapacity)),
                 new Survival(Math.min(.80,crewProtection),Math.min(.85,commandProtection),
                         fuelBonus,Math.min(.80,fuelProtection),
                         Math.min(.85,magazineContainment),escapePods,recoveryBeacon,
