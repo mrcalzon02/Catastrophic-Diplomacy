@@ -80,7 +80,29 @@ public final class SensorHistoricalSignaturesTest {
                 "Newly powered and fitted scanner failed at actual echo arrival");
         System.out.println("PASS active sensor fitting cannot create past radar illumination");
     }
+    private static void oldEmitterStillHasOldLockPenalty(){
+        Battle b=new Battle(94231);
+        Battle.Ship viewer=b.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship hostile=b.addShip(1,Battle.Faction.DRAXIAN,680,100);
+        freeze(b);
+        hostile.power=100;hostile.ecmCondition=1;hostile.hologramNoise=.75;
+        hostile.ecmStrength=.8;
+        for(int i=0;i<6;i++)b.step();
+        var old=hostile.sensorHistory.profileAt(0);
+        require(old!=null&&DeceptionProjection.hologramStrength(old)>0,
+                "Historical emitter profile not recorded at photon emission");
+        double earlier=DeceptionProjection.lockMultiplier(old,1);
+        hostile.power=0;hostile.hologramNoise=0;hostile.ecmStrength=0;
+        require(DeceptionProjection.lockMultiplier(old,1)==earlier&&earlier<1,
+                "Present-time emitter shutdown retroactively rewrote lock penalty");
+        b.step();
+        require(DeceptionProjection.hologramStrength(
+                        hostile.sensorHistory.profileAt(b.tick()))==0,
+                "Later inactive emitter state did not enter photon history");
+        System.out.println("PASS fire-control lock penalty retains historical emitter timing");
+    }
     public static void main(String[] args){
+        oldEmitterStillHasOldLockPenalty();
         radarCannotSeeNewStealthInPast();
         opticalCloakDoesNotRewriteOldPhotons();
         installedRadarCannotEmitBeforeInstallation();

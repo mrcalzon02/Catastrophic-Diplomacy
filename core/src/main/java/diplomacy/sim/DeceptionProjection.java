@@ -39,6 +39,12 @@ public final class DeceptionProjection {
         return 1-StrictMath.min(.8,hologramStrength(host)/
                 StrictMath.max(.6,hostileAcuity));
     }
+    /** Arrived fire-control data must not evaluate today's emitter strength. */
+    public static double lockMultiplier(SensorLightTimeHistory.Profile observed,
+                                        double hostileAcuity) {
+        return 1-StrictMath.min(.8,hologramStrength(observed)/
+                StrictMath.max(.6,hostileAcuity));
+    }
     /** One locked seeker acquires a coherent real-world false contact.
      * A 45-tick lock epoch keeps the phantom stable enough for a physical
      * missile to pursue, then allows normal electronic reacquisition.

@@ -2119,6 +2119,58 @@ public final class Battle {
         return StrictMath.max(optical,StrictMath.max(radar,
                 StrictMath.max(infrared,StrictMath.max(xray,gravitic))));
     }
+    /** Lock quality from the SAME historical signal provenance that
+     * authorizes the shot, not a present-time enemy stealth/ECM oracle.
+     * Only channels in the actual arrived sample contribute. */
+    private double receivedLockRange(Ship observer,
+            SensorLightTimeHistory.Observation fix,
+            SensorLightTimeHistory.Profile target){
+        if(target==null)return 0;
+        double condition=observer.power>3&&observer.crewReadiness()>=.05
+                ?StrictMath.max(0,observer.sensorsCondition):0;
+        double acuity=observer.sensorAcuity;
+        double resolution=condition>0?StrictMath.min(2.2,
+                observer.network.resolutionGain()*(1+.30*observer.commandAssist)):1;
+        double weatherRange=weather.sensorFactor();
+        int channels=fix.channels();
+        double best=0;
+        if((channels&CONTACT_RADAR)!=0){
+            double rcs=StrictMath.max(.06,StrictMath.min(4,
+                    target.radarCrossSection()));
+            best=StrictMath.max(best,observer.sensorRange*condition*
+                    weatherRange*resolution*StrictMath.sqrt(StrictMath.sqrt(rcs))*
+                    (1+.09*(acuity-1)));
+        }
+        if((channels&CONTACT_OPTICAL)!=0){
+            double cloak=target.power()>4&&target.ecmCondition()>.15?
+                    target.opticalSignature():1;
+            double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
+                    StrictMath.sqrt(StrictMath.max(1,target.maxHull())/550)));
+            best=StrictMath.max(best,(weather.preset().includes(
+                    SpaceWeather.Kind.NEBULA)?310:390)*cloak*silhouette);
+        }
+        if((channels&CONTACT_INFRARED)!=0){
+            double damping=1-(1-target.thermalSignature())*
+                    StrictMath.max(0,target.coolingCondition());
+            best=StrictMath.max(best,observer.infraredRange*condition*
+                    weatherRange*resolution*
+                    StrictMath.sqrt(StrictMath.max(.10,damping))*
+                    (1+.08*(acuity-1)));
+        }
+        if((channels&CONTACT_XRAY)!=0)
+            best=StrictMath.max(best,observer.xrayRange*condition*
+                    weatherRange*resolution*(1+.10*(acuity-1))/
+                    (1+.16*StrictMath.min(2,target.maxArmor()/650)));
+        if((channels&CONTACT_GRAVITIC)!=0){
+            double mass=StrictMath.max(.45,StrictMath.min(2.4,
+                    target.maxHull()/550));
+            best=StrictMath.max(best,observer.graviticRange*condition*
+                    weatherRange*resolution*StrictMath.sqrt(mass)*
+                    (1+.07*(acuity-1)));
+        }
+        return best;
+    }
+
     /** Render/UI classification of DIRECT detections, without granting locks or
      * introducing a fleet-wide sensor datalink. Multiple bits can be present.
      * Keep channel thresholds identical to targetAcquisitionRange above. */
@@ -3222,11 +3274,16 @@ public final class Battle {
         if(firingFix==null)return;
         double distance=StrictMath.hypot(firingFix.sample().x()-s.x,
                 firingFix.sample().y()-s.y);
-        double lockRange=targetAcquisitionRange(s,target);
+        SensorLightTimeHistory.Profile measuredSignature=
+                target.sensorHistory.profileAt(firingFix.measuredTick());
+        if(measuredSignature==null)return;
+        double lockRange=receivedLockRange(s,firingFix,measuredSignature);
+        double interference=StrictMath.min(.95,StrictMath.max(0,
+                measuredSignature.ecmStrength()*measuredSignature.ecmCondition()));
         double lock=Math.max(0,1-distance/Math.max(1,lockRange))
                 *s.crewReadiness()*s.sensorsCondition*weather.sensorFactor()
-                *(1-target.ecmStrength*target.ecmCondition)
-                *DeceptionProjection.lockMultiplier(target,
+                *(1-interference)
+                *DeceptionProjection.lockMultiplier(measuredSignature,
                         s.sensorAcuity*(s.power>3&&s.sensorsCondition>.05
                             ?s.network.resolutionGain()*(1+.30*s.commandAssist)
                             :1));

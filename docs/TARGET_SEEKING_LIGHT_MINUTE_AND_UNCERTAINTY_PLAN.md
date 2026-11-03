@@ -531,8 +531,8 @@ solution for fast moving receivers. Hologram seeker spoof selection and ghost co
 same historical light-delayed emitter profile and measured pose as the seeker
 return; live emitter movement or shutdown cannot edit already travelling
 ghost evidence. Visual phantom rendering remains current-time for spectators;
-a separate timestamped fleet-wide false-contact transmission stream has NOT
-yet been implemented. Guided missile steering now uses a bounded deterministic per-seeker estimate
+a timestamped fleet-wide SHR false-contact stream is now implemented, but
+independent multi-hypothesis weapons arbitration is not yet supported. Guided missile steering now uses a bounded deterministic per-seeker estimate
 instead of consuming exact historical coordinates: historical ECM and
 cross-section affect finite position/velocity uncertainty, measurement age
 and range widen it, and fitted seeker quality narrows it. The sample in
@@ -582,6 +582,15 @@ collision and deterministic replay checks are required through
 `beamRaySmoke`. Point-defense/fighter energy remains separate and has NOT
 yet been migrated to this photon model. Finite 30-Hz segment collision is
 not a complete relativistic moving-body light-cone calculation.
+
+**Historical lock-quality consistency:** All ship-mounted firing families
+now derive their lock-quality ECM and hologram penalties from the received
+emitter profile rather than the enemy's present electronics. The lock-range
+estimate uses only channels reported as actually received and the historical
+radar/optical/thermal/armor signatures. This closes a second current-state
+causality leak following the timestamped false-contact and finite photon-beam
+changes. Lock scoring remains a balance law rather than a full probabilistic
+hypothesis fusion solver.
 
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 measured receiver-position histories, probabilistic multi-hypothesis
