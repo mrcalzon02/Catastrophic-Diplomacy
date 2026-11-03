@@ -195,12 +195,26 @@ public final class RotaryCiwsDiagnostic {
         double armor=defender.armor,shield=defender.shields,hull=defender.hull;
         double startPower=defender.power;
         int ammo=defender.kineticAmmo,seen=0;
+        double closestCraft=Double.POSITIVE_INFINITY,largestCraftDetection=0;
+        int craftVisibleFrames=0,craftTotalFrames=0;
         long first=-1;
         // Physical rounds only have ~0.1s flight time. Sampling EACH 30Hz
         // frame matters: never reconstruct a synthetic path from hit logs.
         for(int frame=0;frame<420;frame++){
             battle.step();
             seen+=battle.rotaryRounds().size();
+            if(threat==Threat.FIGHTER_INTERCEPTOR||threat==Threat.DRONE)
+                for(Battle.Craft craft:battle.crafts())if(craft.team==0){
+                    craftTotalFrames++;
+                    double d=StrictMath.hypot(craft.x-defender.x,craft.y-defender.y);
+                    double range=RotaryPointDefense.acquisitionRange(defender,
+                            defender.rotaryMounts.get(0),craft.radarProfile(),
+                            battle.weather().sensorFactor(),1.0);
+                    closestCraft=StrictMath.min(closestCraft,d);
+                    largestCraftDetection=StrictMath.max(largestCraftDetection,range);
+                    if(d>=RotaryPointDefense.MIN_RANGE&&d<=range)
+                        craftVisibleFrames++;
+                }
             if(first<0)for(Battle.VisualEvent event:battle.visualEvents())
                 if(event.team()==1&&"ROTARY_CIWS".equals(event.weapon())&&
                         event.phase()==Battle.VisualPhase.FIRE){
@@ -251,7 +265,14 @@ public final class RotaryCiwsDiagnostic {
                 " rank="+tier+" mounts="+mounts+" fired="+fired+
                 " storeDepletion="+(ammo-defender.kineticAmmo));
         require(on||fired==0,"HOLD_FIRE launched unapproved rotary rounds");
-        require(!on||fired>0,"Powered rotary CIWS failed to fire at "+threat);
+        require(!on||fired>0,"Powered rotary CIWS failed to fire at "+threat+
+                " rank="+tier+" mounts="+mounts+" closestCraft="+closestCraft+
+                " sensor="+largestCraftDetection+" visibleFrames="+craftVisibleFrames+
+                " craftFrames="+craftTotalFrames+" launched="+launched+
+                " aircraft="+attacker.fightersLaunched+
+                " drone="+attacker.dronesLaunched+
+                " pdCondition="+defender.pointDefenseCondition+
+                " power="+defender.power);
         require(!on||first>0,"Rotary weapon skipped physical spin-up time");
         require(launched>0,"Attacker produced no physical "+threat);
         // A near-range round may cross a tiny kinetic shell and vanish
