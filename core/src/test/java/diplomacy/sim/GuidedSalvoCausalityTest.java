@@ -19,7 +19,7 @@ public final class GuidedSalvoCausalityTest {
         shooter.maxHeat=10000;
         shooter.sensorRange=850;
         shooter.infraredRange=shooter.xrayRange=shooter.graviticRange=0;
-        shooter.missileDamage=45;shooter.missileAmmo=12;
+        shooter.missileDamage=45;shooter.missileAmmo=20;
         shooter.laserDamage=shooter.kineticDamage=shooter.plasmaDamage=0;
         shooter.particleDamage=shooter.torpedoDamage=0;
         shooter.fighterReserve=shooter.droneReserve=0;
@@ -41,17 +41,17 @@ public final class GuidedSalvoCausalityTest {
         check(b.pendingSalvoCount()>0,
                 "Micro-swarm has no pending rounds to verify frozen launch fix");
         target.y+=420;
-        for(int i=0;i<20&&source.launched<8;i++)b.step();
-        check(source.launched==8,
-                "Eight finite micro-swarm rounds failed independent queued launch");
+        for(int i=0;i<20&&source.launched<16;i++)b.step();
+        check(source.launched==16,
+                "Sixteen finite micro-swarm rounds failed independent queued launch");
         List<Double> bearings=new ArrayList<>();
         for(Battle.VisualEvent event:b.visualEvents())
             if(event.sourceId()==source.id&&
                     event.phase()==Battle.VisualPhase.FIRE&&
                     "MISSILE".equals(event.weapon()))
                 bearings.add(event.targetY());
-        check(bearings.size()==8,
-                "Actual eight guided rounds did not publish distinct launch events");
+        check(bearings.size()==16,
+                "Actual sixteen guided rounds did not publish distinct launch events");
         for(double recordedY:bearings)
             check(StrictMath.abs(recordedY-100)<1e-6,
                     "Queued guided launch cheated with target position after maneuver");
@@ -65,6 +65,6 @@ public final class GuidedSalvoCausalityTest {
         var y=frozenVolley(b);
         check(x.equals(y)&&a.fingerprint()==b.fingerprint(),
                 "Causal guided volley did not replay identically");
-        System.out.println("PASS eight guided rounds preserve original received fix after evasive target maneuver");
+        System.out.println("PASS sixteen guided rounds preserve original received fix after evasive target maneuver");
     }
 }
