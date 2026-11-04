@@ -211,6 +211,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int armorCaptureFrame,armorCaptureStage,armorCaptureView;
     private ShipSurfaceDamageCapture.Snapshot currentArmorCapture;
     private final Runnable updateCheck;
+    private final java.util.function.Consumer<String> diagnosticExportHandler;
     private long verifiedSequence;
     private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads,peakShieldEvents,peakShieldDrawn;
     private boolean verificationReported;
@@ -220,8 +221,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
     public CatastrophicGame(boolean verifyDemo){this(null,verifyDemo,false);}
     public CatastrophicGame(Runnable updater,boolean verifyDemo){this(updater,verifyDemo,false);}
     public CatastrophicGame(Runnable updater,boolean verifyDemo,boolean verifySurfaceReview){
+        this(updater,verifyDemo,verifySurfaceReview,null);
+    }
+    public CatastrophicGame(Runnable updater,boolean verifyDemo,boolean verifySurfaceReview,
+                            java.util.function.Consumer<String> exportHandler){
         this.updateCheck=updater;this.verifyDemo=verifyDemo;
         this.verifySurfaceReview=verifySurfaceReview;
+        this.diagnosticExportHandler=exportHandler;
         if(verifyDemo){fleetIndex=FLEET_SIZES.length-1;speed=8;}
     }
 
@@ -2481,7 +2487,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void exportDiagnostics(){
         String path="diagnostics/cd-performance-"+System.currentTimeMillis()+".zip";
         try{
-            var output=Gdx.files.local(path);
+            boolean android=Gdx.app.getType()==com.badlogic.gdx.Application.ApplicationType.Android;
+            var output=android?Gdx.files.local(path):
+                    Gdx.files.external("CatastrophicDiplomacy/"+path);
             output.parent().mkdirs();
             diagnosticRecorder.export(output.write(false),
                     Gdx.app.getType().name(),speed,paceGovernor.effective(),
@@ -2489,6 +2497,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             performanceNotice("EXPORTED "+path);
             Gdx.app.log("CD-PERF-EXPORT",output.file().getAbsolutePath()+
                     " bytes="+output.length());
+            if(diagnosticExportHandler!=null)diagnosticExportHandler.accept(path);
         }catch(Exception error){
             performanceNotice("PERFORMANCE EXPORT FAILED: "+error.getMessage());
             Gdx.app.error("CD-PERF-EXPORT","Capture export failed",error);
