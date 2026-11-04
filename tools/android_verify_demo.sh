@@ -20,9 +20,21 @@ adb shell am start -W -n "$package/$activity" --ez cd.verify_200v200 true
 sleep 6
 adb exec-out screencap -p > "$report/early.png"
 completed=0
-for attempt in $(seq 1 75); do
+last_progress=""
+stalled_polls=0
+# The software-GL emulator is not a 30-FPS device. Keep the full 480-tick
+# functional run; give a live, progressing application up to ten minutes.
+# An app that stops drawing receives no unlimited grace period.
+for attempt in $(seq 1 150); do
     adb logcat -d -v time > "$report/logcat.txt"
     grep 'CD-DEMO-VERIFY' "$report/logcat.txt" > "$report/demo-telemetry.txt" || true
+    progress=$(grep 'CD-DEMO-VERIFY.*PROGRESS tick=' "$report/demo-telemetry.txt" | tail -n 1 || true)
+    if [[ -n "$progress" && "$progress" != "$last_progress" ]]; then
+        last_progress="$progress"
+        stalled_polls=0
+    else
+        stalled_polls=$((stalled_polls+1))
+    fi
     if grep -q 'CD-DEMO-VERIFY.*FAIL 200v200' "$report/demo-telemetry.txt"; then
         echo "FAIL: in-game assertions failed; inspect demo-telemetry.txt" >&2
         exit 1
@@ -42,6 +54,10 @@ for attempt in $(seq 1 75); do
     if ! adb shell pidof "$package" >/dev/null 2>&1; then
         echo "FAIL: application exited before live combat verification" >&2
         exit 1
+    fi
+    if (( stalled_polls >= 75 )); then
+        echo "FAIL: Android combat stopped reporting rendered progress for approximately five minutes" >&2
+        break
     fi
     sleep 4
 done
