@@ -43,6 +43,12 @@ final class GameWikiCatalog {
             searchable=search.toString().toLowerCase(Locale.ROOT).replace('_',' ');
         }
     }
+    // Every generated research article contains this exact label. Reuse it
+    // for guaranteed-all-match searches rather than formatting tens of
+    // thousands of temporary articles simply to find the word "research".
+    private static final String RESEARCH_COST_LABEL="Research cost ";
+    private static final String RESEARCH_COST_SEARCH=
+            RESEARCH_COST_LABEL.toLowerCase(Locale.ROOT);
     private final List<Article> articles;
     private final List<Article> upgradeArticles;
     private final List<Article> staticArticles;
@@ -92,7 +98,9 @@ final class GameWikiCatalog {
         private final List<String> matchedIds;
         IndexedArticles(List<Article> fixed,List<String> matchedIds){
             this.fixed=List.copyOf(fixed);
-            this.matchedIds=List.copyOf(matchedIds);
+            // The canonical research index is already immutable and sorted;
+            // do not copy another 73k references for an ALL-category query.
+            this.matchedIds=matchedIds==upgradeIds?upgradeIds:List.copyOf(matchedIds);
         }
         @Override public int size(){return fixed.size()+matchedIds.size();}
         @Override public Article get(int index){
@@ -314,7 +322,7 @@ final class GameWikiCatalog {
         return new Article("upgrade."+u.id,"UPGRADES",u.name+" / "+u.id,
             "Exact technology ID: "+u.id+". Faction "+u.faction+", subsystem "+u.subsystem+
                 ", branch "+u.track+", stage "+u.stage+" of 9.",
-            "Prerequisite: "+u.prerequisite+". Research cost "+u.researchCost+
+            "Prerequisite: "+u.prerequisite+". "+RESEARCH_COST_LABEL+u.researchCost+
                 "; industry cost "+u.industryCost+".",
             "Physical multipliers: mass x"+number(u.mass)+", power x"+number(u.power)+
                 ", heat x"+number(u.heat)+", output x"+number(u.output)+
@@ -464,6 +472,13 @@ final class GameWikiCatalog {
                         &&(needle.isEmpty()||article.searchable.contains(needle)))
                     fixed.add(article);
         if(!selected.equals("ALL")&&!selected.equals("UPGRADES"))return fixed;
+
+        // The same fixed label is emitted into EVERY upgrade Article. A
+        // query contained within it matches all canonical research entries.
+        // Keep ALL-category guide/module results alongside the virtual
+        // upgrades and preserve every ordinary query's full-text fallback.
+        if(RESEARCH_COST_SEARCH.contains(needle))
+            return fixed.isEmpty()?upgradeArticles:new IndexedArticles(fixed,upgradeIds);
 
         List<String> matchedIds=new ArrayList<>();
         for(String id:upgradeIds){
