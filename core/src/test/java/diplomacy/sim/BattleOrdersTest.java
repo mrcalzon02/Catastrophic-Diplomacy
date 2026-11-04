@@ -40,13 +40,25 @@ public final class BattleOrdersTest {
     private static void checkModes(boolean craft){
         for(BattleOrders.PointDefense mode:BattleOrders.PointDefense.values()){
             Battle b=threat(117,craft,mode);
-            b.step();
             boolean mustFire=craft?mode.craft():mode.ordnance();
-            check((b.ships().get(1).pdReload>0)==mustFire,
+            boolean animatedShot=false,realThreat=false;
+            // Sensors may not see the launch before its light reaches the
+            // defender. Accumulate actual physical intercepts, not a reload
+            // state on tick one before ordnance even exists.
+            for(int frame=0;frame<160;frame++){
+                b.step();
+                realThreat|=craft?b.ships().get(0).fightersLaunched>0:
+                        b.visualEvents().stream().anyMatch(e->
+                                e.team()==0&&e.phase()==Battle.VisualPhase.FIRE&&
+                                e.weapon().equals("MISSILE"));
+                animatedShot|=b.visualEvents().stream().anyMatch(e->
+                        e.phase()==Battle.VisualPhase.FIRE&&
+                                e.weapon().equals("POINT_DEFENSE")&&e.team()==1);
+                if(animatedShot)break;
+            }
+            check(realThreat,"fixture must actually launch "+(craft?"fighters":"missiles"));
+            check(animatedShot==mustFire,
                     mode+" must "+(mustFire?"fire at":"ignore")+" "+(craft?"craft":"missiles"));
-            boolean animatedShot=b.visualEvents().stream().anyMatch(e->
-                    e.phase()==Battle.VisualPhase.FIRE
-                            && e.weapon().equals("POINT_DEFENSE") && e.team()==1);
             check(animatedShot==mustFire,"PD firing visuals must follow actual mode and firing event");
             check(b.teamOrders(1).pointDefense()==mode,"fleet orders exposed");
             check(b.ships().get(1).orders.pointDefense()==mode,"orders applied to deployed ships");
