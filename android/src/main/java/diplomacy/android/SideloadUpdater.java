@@ -18,6 +18,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.FilterInputStream;
+import android.util.JsonReader;
+import android.util.JsonToken;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.file.Files;
@@ -30,7 +34,6 @@ import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -119,46 +122,38 @@ final class SideloadUpdater {
         try {
             PackageInfo installed = activity.getPackageManager().getPackageInfo(activity.getPackageName(), 0);
             long installedCode = code(installed);
-            JSONObject newest = null;
-            JSONObject newestApk = null;
+            ReleaseInfo newest = null;
+            AssetInfo newestApk = null;
             String newestPublished = "";
             int rejected = 0;
             boolean complete = false;
 
-            // Same user flow as ReverieVR: offer ONE newest published APK.
-            // GitHub's /releases/latest excludes prereleases, so inspect the full
-            // published feed and compare published_at rather than relying on
-            // GitHub's creation-date ordering or on a stable-only endpoint.
-            // Inspect release metadata here; download only the winner's manifest.
+            // Stream all GitHub release metadata, including prereleases, rather
+            // than allocating the entire response, a UTF-8 String and a JSONArray
+            // at once on Android 10's observed 16 MiB runtime heap.
+            // The same 200-page / 2000-release horizon is retained.
             for (int page = 1; page <= MAX_PAGES; page++) {
-                JSONArray releases = new JSONArray(new String(
-                        downloadBytes(RELEASE_API + page, MAX_RELEASE_JSON),
-                        java.nio.charset.StandardCharsets.UTF_8));
-                for (int i = 0; i < releases.length(); i++) {
-                    JSONObject release = releases.optJSONObject(i);
-                    if (release == null || !UpdatePolicy.eligibleRelease(
-                            release.optBoolean("draft"), release.optBoolean("prerelease"))) continue;
-                    String publishedAt = release.optString("published_at", "");
-                    String tag = release.optString("tag_name", "");
-                    JSONArray assets = release.optJSONArray("assets");
-                    if (publishedAt.isEmpty() || assets == null) continue;
+                ReleasePage feed = readReleasePage(page);
+                for (ReleaseInfo release : feed.releases()) {
+                    if (!UpdatePolicy.eligibleRelease(release.draft(), release.prerelease()))
+                        continue;
+                    String publishedAt = release.publishedAt();
+                    String tag = release.tag();
+                    if (publishedAt.isEmpty() || release.assets() == null) continue;
 
-                    JSONObject selectedApk = null;
-                    for (int j = 0; j < assets.length(); j++) {
-                        JSONObject asset = assets.optJSONObject(j);
-                        if (asset == null) continue;
-                        String name = asset.optString("name", "");
+                    AssetInfo selectedApk = null;
+                    for (AssetInfo asset : release.assets()) {
+                        String name = asset.name();
                         if (!name.toLowerCase(Locale.ROOT).endsWith(".apk")) continue;
                         try {
-                            long bytes = asset.getLong("size");
-                            String apkUrl = asset.getString("browser_download_url");
+                            long bytes = asset.bytes();
+                            String apkUrl = asset.url();
                             UpdatePolicy.requireDownloadUrl(apkUrl, tag, name);
-                            String digest = asset.optString("digest", "");
+                            String digest = asset.digest();
                             String sha = digest.startsWith("sha256:") ? digest.substring(7) : "";
                             UpdatePolicy.provisional(tag, name, bytes, sha);
-                            // Prefer the ordinary Android package when a release
-                            // also contains a distinct Fire OS package.
-                            if (selectedApk == null || name.equalsIgnoreCase("Catastrophic-Diplomacy-Android.apk"))
+                            if (selectedApk == null ||
+                                    name.equalsIgnoreCase("Catastrophic-Diplomacy-Android.apk"))
                                 selectedApk = asset;
                         } catch (Exception invalid) {
                             rejected++;
@@ -171,29 +166,32 @@ final class SideloadUpdater {
                         newestPublished = publishedAt;
                     }
                 }
-                if (releases.length() < PER_PAGE) { complete = true; break; }
+                if (feed.count() < PER_PAGE) { complete = true; break; }
             }
             if (!complete) throw new IOException("Release history exceeds supported scan; cannot report no updates");
 
             Release selected = null;
             boolean alreadyCurrent = false;
             if (newest != null) {
-                String tag = newest.getString("tag_name");
-                String name = newestApk.getString("name");
-                long bytes = newestApk.getLong("size");
-                String apkUrl = newestApk.getString("browser_download_url");
-                String githubDigest = newestApk.optString("digest", "");
+                String tag = newest.tag();
+                String name = newestApk.name();
+                long bytes = newestApk.bytes();
+                String apkUrl = newestApk.url();
+                String githubDigest = newestApk.digest();
                 String sha = githubDigest.startsWith("sha256:") ? githubDigest.substring(7) : "";
                 UpdatePolicy.Candidate candidate = UpdatePolicy.provisional(tag, name, bytes, sha);
 
-                JSONArray assets = newest.getJSONArray("assets");
-                JSONObject manifestAsset;
-                try { manifestAsset = findAsset(assets, MANIFEST_NAME); }
-                catch (JSONException malformed) { manifestAsset = null; rejected++; }
-                if (manifestAsset != null && manifestAsset.optLong("size", 0) > 0 &&
-                        manifestAsset.optLong("size") <= MAX_MANIFEST_JSON) {
+                AssetInfo manifestAsset = null;
+                for (AssetInfo asset : newest.assets()) {
+                    if (MANIFEST_NAME.equals(asset.name())) {
+                        if (manifestAsset != null) { rejected++; manifestAsset = null; break; }
+                        manifestAsset = asset;
+                    }
+                }
+                if (manifestAsset != null && manifestAsset.bytes() > 0 &&
+                        manifestAsset.bytes() <= MAX_MANIFEST_JSON) {
                     try {
-                        String manifestUrl = manifestAsset.getString("browser_download_url");
+                        String manifestUrl = manifestAsset.url();
                         UpdatePolicy.requireDownloadUrl(manifestUrl, tag, MANIFEST_NAME);
                         JSONObject manifest = new JSONObject(new String(
                                 downloadBytes(manifestUrl, MAX_MANIFEST_JSON),
@@ -226,7 +224,7 @@ final class SideloadUpdater {
                         android.util.Log.w("CD-Updater", "Release manifest unavailable or inconsistent", badManifest);
                     }
                 }
-                selected = new Release(candidate, apkUrl, newest.optBoolean("prerelease"));
+                selected = new Release(candidate, apkUrl, newest.prerelease());
             }
 
             Release latest = selected;
@@ -403,17 +401,96 @@ final class SideloadUpdater {
         catch (RuntimeException failure) { dialog("Installer unavailable", safeError(failure), null); }
     }
 
-    private static JSONObject findAsset(JSONArray assets, String name) throws JSONException {
-        JSONObject found = null;
-        for (int i = 0; i < assets.length(); i++) {
-            JSONObject asset = assets.getJSONObject(i);
-            if (name.equals(asset.optString("name"))) {
-                if (found != null) throw new JSONException("Duplicate asset " + name);
-                found = asset;
-            }
-        }
-        return found;
+    private record AssetInfo(String name,long bytes,String url,String digest) { }
+    private record ReleaseInfo(String tag,String publishedAt,boolean draft,
+                               boolean prerelease,List<AssetInfo> assets) { }
+    private record ReleasePage(int count,List<ReleaseInfo> releases) { }
+
+    private static String optionalString(JsonReader json) throws IOException {
+        if(json.peek()==JsonToken.NULL){json.nextNull();return "";}
+        return json.nextString();
     }
+    private static List<AssetInfo> readAssets(JsonReader json) throws IOException {
+        if(json.peek()==JsonToken.NULL){json.nextNull();return null;}
+        List<AssetInfo> assets=new ArrayList<>();
+        json.beginArray();
+        while(json.hasNext()){
+            String name="",url="",digest="";
+            long bytes=0;
+            json.beginObject();
+            while(json.hasNext()){
+                switch(json.nextName()){
+                    case "name" -> name=optionalString(json);
+                    case "browser_download_url" -> url=optionalString(json);
+                    case "digest" -> digest=optionalString(json);
+                    case "size" -> {
+                        if(json.peek()==JsonToken.NULL)json.nextNull();
+                        else bytes=json.nextLong();
+                    }
+                    default -> json.skipValue();
+                }
+            }
+            json.endObject();
+            // Retain only the APKs and manifest candidates; large release
+            // descriptions, platform assets and screenshots never stay resident.
+            if(name.toLowerCase(Locale.ROOT).endsWith(".apk") ||
+                    MANIFEST_NAME.equals(name))
+                assets.add(new AssetInfo(name,bytes,url,digest));
+        }
+        json.endArray();
+        return assets;
+    }
+    private static ReleasePage readReleasePage(int page) throws IOException {
+        HttpURLConnection connection=connect(RELEASE_API+page);
+        try(InputStream stream=new BufferedInputStream(connection.getInputStream());
+            InputStream bounded=new FilterInputStream(stream){
+                private int remaining=MAX_RELEASE_JSON;
+                @Override public int read() throws IOException {
+                    if(remaining<=0)throw new IOException("Release metadata exceeded size limit");
+                    int value=super.read();
+                    if(value>=0)remaining--;
+                    return value;
+                }
+                @Override public int read(byte[] buffer,int offset,int length) throws IOException {
+                    if(remaining<=0)throw new IOException("Release metadata exceeded size limit");
+                    int read=super.read(buffer,offset,Math.min(length,remaining));
+                    if(read>0)remaining-=read;
+                    return read;
+                }
+            };
+            JsonReader json=new JsonReader(new InputStreamReader(bounded,
+                    java.nio.charset.StandardCharsets.UTF_8))){
+            List<ReleaseInfo> releases=new ArrayList<>(PER_PAGE);
+            json.beginArray();
+            int count=0;
+            while(json.hasNext()){
+                if(++count>PER_PAGE)throw new IOException("GitHub release page exceeds requested limit");
+                String tag="",publishedAt="";
+                boolean draft=true,prerelease=false;
+                List<AssetInfo> assets=null;
+                json.beginObject();
+                while(json.hasNext()){
+                    switch(json.nextName()){
+                        case "tag_name" -> tag=optionalString(json);
+                        case "published_at" -> publishedAt=optionalString(json);
+                        case "draft" -> draft=json.nextBoolean();
+                        case "prerelease" -> prerelease=json.nextBoolean();
+                        case "assets" -> assets=readAssets(json);
+                        default -> json.skipValue();
+                    }
+                }
+                json.endObject();
+                releases.add(new ReleaseInfo(tag,publishedAt,draft,prerelease,assets));
+            }
+            json.endArray();
+            // Fail closed on trailing data rather than accepting a truncated,
+            // adversarial or ambiguously parsed release listing.
+            if(json.peek()!=JsonToken.END_DOCUMENT)
+                throw new IOException("Unexpected content after GitHub release feed");
+            return new ReleasePage(count,releases);
+        }finally{connection.disconnect();}
+    }
+
     private static HttpURLConnection connect(String url) throws IOException {
         URI current = UpdatePolicy.allowedUrl(url);
         for (int redirects = 0; redirects <= 5; redirects++) {
