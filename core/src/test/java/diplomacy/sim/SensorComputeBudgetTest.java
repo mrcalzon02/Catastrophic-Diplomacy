@@ -121,7 +121,7 @@ public final class SensorComputeBudgetTest {
         require(receivedShutdown,"Shutdown photons never entered fire-control workload");
         System.out.println("PASS historical ghost hypotheses spend finite processing and shutdown refunds only after light delay");
     }
-    private static void finiteFCMCommandPool(){
+    private static void finiteFCMCommandPool()throws Exception{
         var catalog=diplomacy.tech.TechnologyCatalog.loadDefault();
         var bare=Shipyard.bareHull(Battle.Faction.TERRAN,
                 Shipyard.Hull.DREADNOUGHT);
@@ -192,7 +192,7 @@ public final class SensorComputeBudgetTest {
                 "Dead command power granted an unearned processor credit");
         System.out.println("PASS finite paid FCM work, two-way signal delay, allied competition, power loss and replay");
     }
-    public static void main(String[] args){
+    public static void main(String[] args)throws Exception{
         finiteOneTick();
         hardwareDifferentiation();
         historicalFalseComputeBudget();
