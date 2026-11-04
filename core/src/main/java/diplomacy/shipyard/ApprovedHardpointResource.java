@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -48,9 +47,15 @@ public final class ApprovedHardpointResource {
                 throw new IllegalStateException("Hardpoint resource signature missing");
             String body=record.substring(0,digestAt);
             String expected=record.substring(digestAt+7,record.length()-1);
-            String actual=HexFormat.of().formatHex(
-                    MessageDigest.getInstance("SHA-256").digest(
-                            body.getBytes(StandardCharsets.UTF_8)));
+            byte[] checksum=MessageDigest.getInstance("SHA-256").digest(
+                    body.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex=new StringBuilder(checksum.length*2);
+            for(byte value:checksum){
+                int unsigned=value&0xff;
+                hex.append(Character.forDigit(unsigned>>>4,16));
+                hex.append(Character.forDigit(unsigned&15,16));
+            }
+            String actual=hex.toString();
             if(!actual.equals(expected))
                 throw new IllegalStateException("Approved hardpoint map checksum mismatch");
             String[] lines=body.split("\n");
