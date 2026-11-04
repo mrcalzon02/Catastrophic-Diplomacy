@@ -176,6 +176,11 @@ public final class CombatAudio implements AutoCloseable {
         hullVoice.reset();
     }
 
+    /** Presentation pitch only; never changes sound-event tick scheduling. */
+    public void setSimulationSpeed(float displayedSpeed){
+        spatial.setSimulationSpeed(displayedSpeed);
+    }
+
     /**
      * Camera-aware mixer: proximity, zoom and event priority replace global,
      * identical-volume sounds. Music remains independent of combat SFX.
