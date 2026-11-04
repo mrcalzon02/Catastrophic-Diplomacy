@@ -35,18 +35,25 @@ public final class GameMenuFlowTest {
         check(GrittyUiChrome.stateVariant(-1,true,true)
                         ==GrittyUiChrome.SECONDARY,
                 "Disabled buttons use subdued authored chrome, never hover/press");
-        check(Math.abs(CombatPace.DEFAULT-0.20f)<0.0001f,
-                "Normal battle must start five times slower than legacy full speed");
-        check(Math.abs(CombatPace.faster(CombatPace.DEFAULT)-0.40f)<0.0001f,
-                "FAST must double fractional pacing, not jump to legacy 1x");
-        check(Math.abs(CombatPace.slower(CombatPace.DEFAULT)-0.10f)<0.0001f,
-                "SLOW must permit actual sub-1x tactical pacing");
+        check(Math.abs(CombatPace.DEFAULT-1f)<0.0001f,
+                "Tactical combat must start at displayed 1x");
+        check(Math.abs(CombatPace.simulationMultiplier(CombatPace.DEFAULT)-.10f)<0.0001f,
+                "Displayed 1x must map to half the existing .20 presentation pace");
+        check(Math.abs(CombatPace.simulationMultiplier(2f)-.20f)<0.0001f,
+                "Existing perceived combat pace must now be displayed as 2x");
+        check(Math.abs(CombatPace.faster(CombatPace.DEFAULT)-1.5f)<0.0001f,
+                "FAST must advance one discrete half-step");
+        check(Math.abs(CombatPace.slower(CombatPace.DEFAULT)-.5f)<0.0001f,
+                "SLOW must advance one discrete half-step");
         check(Math.abs(CombatPace.slower(CombatPace.MINIMUM)-CombatPace.MINIMUM)<0.0001f,
                 "SLOW must clamp to minimum safe pace");
         check(Math.abs(CombatPace.faster(CombatPace.MAXIMUM)-CombatPace.MAXIMUM)<0.0001f,
                 "FAST must retain maximum bounded simulation pace");
-        check("x0.20".equals(CombatPace.label(CombatPace.DEFAULT)),
-                "HUD must disclose real simulation pacing");
+        check("x1.0".equals(CombatPace.label(CombatPace.DEFAULT)),
+                "HUD must disclose real requested tactical pace");
+        for(int i=0;i<4;i++)
+            check(CatastrophicGame.tacticalAction(920,500-60*i)==12+i,
+                    "Performance menu mobile touch action "+i);
         // Background selection must not replace simulation-owned battle or map content.
         check("blank_armor_bulkhead".equals(GrittyMenuBackgrounds.nameFor(
                         GameMenuPanel.Screen.HOME)),
