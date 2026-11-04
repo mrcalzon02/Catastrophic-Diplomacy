@@ -76,6 +76,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final SensorContactOverlay sensorContacts=new SensorContactOverlay();
     private CombatAudio audio;
     private final RenderPerformanceCounters renderProfile=new RenderPerformanceCounters();
+    private final AdaptiveCombatPace paceGovernor=new AdaptiveCombatPace();
+    private final CombatDiagnosticRecorder diagnosticRecorder=new CombatDiagnosticRecorder();
+    private boolean diagnosticsHud;
+    private String diagnosticNotice="";
+    private long diagnosticNoticeUntilNs;
+    private static final String PERFORMANCE_PREFS="catastrophic-diplomacy-performance";
     private int voiceSliderPointer=-1, menuButtonPointer=-1;
     private int tacticalHovered=-1, tacticalPressed=-1;
     private long tacticalPressUntilNs;
@@ -301,6 +307,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
         restoreOrderPresets();
         restoreCampaign();
         restoreCampaignFleet();
+        if(!verifyDemo){
+            try {
+                var preferences=Gdx.app.getPreferences(PERFORMANCE_PREFS);
+                speed=CombatPace.clamp(preferences.getFloat("requestedSpeed",CombatPace.DEFAULT));
+                diagnosticsHud=preferences.getBoolean("hud",false);
+                paceGovernor.request(speed);
+                paceGovernor.setEnabled(preferences.getBoolean("adaptive",true));
+            }catch(RuntimeException failure){
+                Gdx.app.error("CD-PERF","Performance preferences unavailable",failure);
+            }
+        }
         campaignDesign=restoreCampaignBlueprint();
         shipyard = new ShipyardPanel(technology,(team,design)->{
             if(shipyard.usage()==ShipyardPanel.Usage.CAMPAIGN){
@@ -391,6 +408,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else if(key==Input.Keys.RIGHT)wiki.pageList(1);
                     return true;
                 }
+                if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE){
+                    if(key==Input.Keys.F2){toggleDiagnosticsHud();return true;}
+                    if(key==Input.Keys.F3){toggleDiagnosticsCapture();return true;}
+                    if(key==Input.Keys.F4){exportDiagnostics();return true;}
+                    if(key==Input.Keys.F5){toggleAdaptivePacing();return true;}
+                }
                 if(screensaverMode){
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         stopScreensaver();
@@ -403,9 +426,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }else if(key==Input.Keys.X){
                         screensaverCamera.manualScale(1f/1.35f);
                     }else if(key==Input.Keys.PLUS||key==Input.Keys.EQUALS){
-                        speed=CombatPace.faster(speed);
+                        changePace(1);
                     }else if(key==Input.Keys.MINUS){
-                        speed=CombatPace.slower(speed);
+                        changePace(-1);
                     }else if(key==Input.Keys.P){
                         running=!running;
                     }
@@ -611,8 +634,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.C) { resetBattleView(); return true; }
                 if (key == Input.Keys.LEFT_BRACKET) { changeFleetSize(-1); return true; }
                 if (key == Input.Keys.RIGHT_BRACKET) { changeFleetSize(1); return true; }
-                if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { speed = CombatPace.faster(speed); return true; }
-                if (key == Input.Keys.MINUS) { speed = CombatPace.slower(speed); return true; }
+                if (key == Input.Keys.PLUS || key == Input.Keys.EQUALS) { changePace(1); return true; }
+                if (key == Input.Keys.MINUS) { changePace(-1); return true; }
                 if (key == Input.Keys.P) { togglePd(0); return true; }
                 if (key == Input.Keys.O) { togglePd(1); return true; }
                 if (key == Input.Keys.Q) { changeFaction(0); return true; }
@@ -762,8 +785,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else if (world.x >= 990) changeFleetSize(-1);
                     else if (world.x < 125) running = !running;
                     else if (world.x < 250) reset();
-                    else if (world.x < 365) speed = CombatPace.slower(speed);
-                    else if (world.x < 475) speed = CombatPace.faster(speed);
+                    else if (world.x < 365) changePace(-1);
+                    else if (world.x < 475) changePace(1);
                     else if (world.x < 745) changeFaction(0);
                     else changeFaction(1);
                     return true;
@@ -2385,13 +2408,73 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Battle.Faction[] values = Battle.Faction.values();
         return values[(f.ordinal() + 1) % values.length];
     }
+    private void savePerformancePreferences(){
+        if(verifyDemo||Gdx.app==null)return;
+        try{
+            var preferences=Gdx.app.getPreferences(PERFORMANCE_PREFS);
+            preferences.putFloat("requestedSpeed",CombatPace.clamp(speed));
+            preferences.putBoolean("adaptive",paceGovernor.enabled());
+            preferences.putBoolean("hud",diagnosticsHud);
+            preferences.flush();
+        }catch(RuntimeException failure){Gdx.app.error("CD-PERF","Cannot save preferences",failure);}
+    }
+    private void performanceNotice(String text){
+        diagnosticNotice=text;
+        diagnosticNoticeUntilNs=System.nanoTime()+5_000_000_000L;
+    }
+    private void changePace(int direction){
+        if(verifyDemo)return;
+        speed=direction<0?CombatPace.slower(speed):CombatPace.faster(speed);
+        paceGovernor.request(speed);
+        diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),"USER SPEED");
+        performanceNotice("SPEED "+CombatPace.label(speed));
+        savePerformancePreferences();
+    }
+    private void toggleAdaptivePacing(){
+        paceGovernor.setEnabled(!paceGovernor.enabled());
+        diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),
+                paceGovernor.enabled()?"AUTO ENABLED":"AUTO DISABLED");
+        performanceNotice(paceGovernor.enabled()?"ADAPTIVE ON":"ADAPTIVE OFF");
+        savePerformancePreferences();
+    }
+    private void toggleDiagnosticsHud(){
+        diagnosticsHud=!diagnosticsHud;
+        performanceNotice(diagnosticsHud?"PERFORMANCE HUD ON":"PERFORMANCE HUD OFF");
+        savePerformancePreferences();
+    }
+    private void toggleDiagnosticsCapture(){
+        if(diagnosticRecorder.recording()){
+            diagnosticRecorder.stop();
+            performanceNotice("CAPTURE STOPPED - EXPORT TO SAVE");
+        }else{
+            diagnosticRecorder.start();
+            diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),"CAPTURE START");
+            performanceNotice("PERFORMANCE CAPTURE RECORDING");
+        }
+    }
+    private void exportDiagnostics(){
+        String path="diagnostics/cd-performance-"+System.currentTimeMillis()+".zip";
+        try{
+            var output=Gdx.files.local(path);
+            output.parent().mkdirs();
+            diagnosticRecorder.export(output.write(false),
+                    Gdx.app.getType().name(),speed,paceGovernor.effective(),
+                    battle==null?0:battle.tick);
+            performanceNotice("EXPORTED "+path);
+            Gdx.app.log("CD-PERF-EXPORT",output.file().getAbsolutePath()+
+                    " bytes="+output.length());
+        }catch(Exception error){
+            performanceNotice("PERFORMANCE EXPORT FAILED: "+error.getMessage());
+            Gdx.app.error("CD-PERF-EXPORT","Capture export failed",error);
+        }
+    }
     private void tapScreensaverControl(float x){
         String action;
         if(x<135){screensaverCamera.manualScale(1.4f);action="ZOOM OUT";}
         else if(x<270){screensaverCamera.manualScale(1f/1.4f);action="ZOOM IN";}
         else if(x<405){running=!running;action=running?"RESUME":"PAUSE";}
-        else if(x<535){speed=CombatPace.slower(speed);action="SLOW";}
-        else if(x<665){speed=CombatPace.faster(speed);action="FAST";}
+        else if(x<535){changePace(-1);action="SLOW";}
+        else if(x<665){changePace(1);action="FAST";}
         else if(x<805){screensaverCamera.resumeAuto();action="AUTO CAM";}
         else if(x<955){nextScreensaverRound();action="NEXT";}
         else if(x<1095){screensaverControlsVisible=false;action="HIDE";}
@@ -2583,8 +2666,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         long renderStartNs=System.nanoTime();
         int drawCallsBefore=batch.totalRenderCalls;
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
+        long tickBeforeRender=battle.tick;
         if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
-            accumulator += delta * speed;
+            float pace=verifyDemo?speed:CombatPace.simulationMultiplier(paceGovernor.effective());
+            accumulator += delta * pace;
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
                 renderPoses.beforeStep(battle);
