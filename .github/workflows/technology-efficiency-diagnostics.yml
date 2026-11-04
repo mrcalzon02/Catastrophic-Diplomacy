@@ -35,6 +35,18 @@ jobs:
         run: |
           set -o pipefail
           gradle --no-daemon :game:wikiProfile 2>&1 | tee wiki-profile.log
+      - name: Profile 32 MiB technology catalog for comparison
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon -PcdProfileHeap=32m :core:technologyProfile 2>&1 | tee technology-profile-32m.log
+      - name: Profile 32 MiB wiki search for comparison
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon -PcdProfileHeap=32m :game:wikiProfile 2>&1 | tee wiki-profile-32m.log
       - name: Upload timings, heap diagnostics and any failed workload stack traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -43,5 +55,7 @@ jobs:
           path: |
             technology-profile.log
             wiki-profile.log
+            technology-profile-32m.log
+            wiki-profile-32m.log
           if-no-files-found: warn
           retention-days: 14
