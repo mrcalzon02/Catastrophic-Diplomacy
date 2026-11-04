@@ -218,15 +218,20 @@ public final class TechnologyCatalog {
         // Canonical identities are disjoint; exhaustive smoke tests verify both.
         Upgrade found=sixStages.get(id);
         if(found!=null)return found;
-        Upgrade virtual=survivalVariantUpgrade(id);
+        // Parse a virtual ID at most once. Each resolver previously allocated
+        // a fresh five-part String[] (and backing substrings) for the same
+        // requested node, compounding heap pressure on all 73k wiki queries.
+        String[] parts=id!=null&&id.startsWith("TECH-")?
+                id.split("-",5):null;
+        Upgrade virtual=survivalVariantUpgrade(id,parts);
         if(virtual!=null)return virtual;
-        virtual=networkVariantUpgrade(id);
+        virtual=networkVariantUpgrade(id,parts);
         if(virtual!=null)return virtual;
-        virtual=sensingVariantUpgrade(id);
+        virtual=sensingVariantUpgrade(id,parts);
         if(virtual!=null)return virtual;
-        virtual=survivalFamilyUpgrade(id);
+        virtual=survivalFamilyUpgrade(id,parts);
         if(virtual!=null)return virtual;
-        virtual=supportFamilyUpgrade(id);
+        virtual=supportFamilyUpgrade(id,parts);
         if(virtual!=null)return virtual;
         if(!deferredHigherStages||id==null||id.length()<4)return null;
         int end=id.length();
@@ -265,9 +270,8 @@ public final class TechnologyCatalog {
 
     /** All nine ranks have their own IDs, costs and precursor chain while
      * inheriting the original branch's balanced physical multiplier curve. */
-    private Upgrade survivalVariantUpgrade(String id){
-        if(!deferredHigherStages||id==null)return null;
-        String[] parts=id.split("-",5);
+    private Upgrade survivalVariantUpgrade(String id,String[] parts){
+        if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !parts[4].matches("0[1-9]"))return null;
@@ -300,9 +304,8 @@ public final class TechnologyCatalog {
 
     /** Network hardware generations have their own independent IX-rank
      * research paths, resolved lazily to protect small Android heaps. */
-    private Upgrade networkVariantUpgrade(String id){
-        if(!deferredHigherStages||id==null)return null;
-        String[] parts=id.split("-",5);
+    private Upgrade networkVariantUpgrade(String id,String[] parts){
+        if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !parts[4].matches("0[1-9]"))return null;
@@ -338,9 +341,8 @@ public final class TechnologyCatalog {
      * Stage I–IX costs and physical modifiers, while its separate name,
      * prerequisite and tradeoff remain identical to the former cloned rows.
      */
-    private Upgrade sensingVariantUpgrade(String id){
-        if(!deferredHigherStages||id==null)return null;
-        String[] parts=id.split("-",5);
+    private Upgrade sensingVariantUpgrade(String id,String[] parts){
+        if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !parts[4].matches("0[1-9]"))return null;
@@ -371,9 +373,8 @@ public final class TechnologyCatalog {
 
     /** Native survival hardware retains unique fitted identities without
      * retaining its cloned six-stage research rows on a small Android heap. */
-    private Upgrade survivalFamilyUpgrade(String id){
-        if(!deferredHigherStages||id==null)return null;
-        String[] parts=id.split("-",5);
+    private Upgrade survivalFamilyUpgrade(String id,String[] parts){
+        if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !parts[4].matches("0[1-9]"))return null;
@@ -402,9 +403,8 @@ public final class TechnologyCatalog {
      * their real DRN/XFR source, not independently invented stats. Keep all
      * stages visible while avoiding 2,904 cloned startup research rows.
      */
-    private Upgrade supportFamilyUpgrade(String id){
-        if(!deferredHigherStages||id==null)return null;
-        String[] parts=id.split("-",5);
+    private Upgrade supportFamilyUpgrade(String id,String[] parts){
+        if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !parts[4].matches("0[1-9]"))return null;
