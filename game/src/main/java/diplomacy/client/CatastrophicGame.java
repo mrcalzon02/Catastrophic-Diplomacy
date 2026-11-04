@@ -2471,7 +2471,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         paceGovernor.request(speed);
         diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),"USER SPEED");
         performanceNotice("SPEED "+CombatPace.label(speed));
-        savePerformancePreferences();
+        // Exhibition-only changes are temporary. Do not overwrite the saved
+        // player combat speed when browsing unattended screensaver battles.
+        if(!screensaverMode)savePerformancePreferences();
     }
     private void toggleAdaptivePacing(){
         paceGovernor.setEnabled(!paceGovernor.enabled());
