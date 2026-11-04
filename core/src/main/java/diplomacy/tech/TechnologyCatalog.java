@@ -53,6 +53,45 @@ public final class TechnologyCatalog {
             String expected = "TECH-" + faction + "-" + subsystem + "-" + track + "-" + String.format(java.util.Locale.ROOT, "%02d", stage);
             if (!expected.equals(id)) throw new IllegalArgumentException("Noncanonical technology ID: " + id);
         }
+        /**
+         * Exact numeric-copy route for a cloned research lineage. Its source
+         * modifiers have already passed positive/finite and six-decimal CSV
+         * validation. Formatting and reparsing ten identical modifiers into
+         * a temporary 20-cell row per lookup adds avoidable Java heap pressure
+         * on the 16 MiB Android runtime.
+         */
+        private Upgrade(Upgrade source,String id,String subsystem,
+                        String name,String prerequisite,int researchCost,
+                        int industryCost,String tradeoff){
+            this.id=id;
+            faction=source.faction;
+            this.subsystem=subsystem;
+            track=source.track;
+            stage=source.stage;
+            this.name=name;
+            this.prerequisite=prerequisite;
+            this.researchCost=researchCost;
+            this.industryCost=industryCost;
+            mass=source.mass;
+            power=source.power;
+            heat=source.heat;
+            output=source.output;
+            accuracy=source.accuracy;
+            integrity=source.integrity;
+            shield=source.shield;
+            thrust=source.thrust;
+            cooling=source.cooling;
+            maintenance=source.maintenance;
+            this.tradeoff=tradeoff;
+            if(!FACTIONS.contains(faction)||!TRACKS.contains(track)||
+                    stage<1||stage>9||subsystem.isBlank()||name.isBlank()||
+                    tradeoff.isBlank()||researchCost<=0||industryCost<=0)
+                throw new IllegalArgumentException("Invalid upgrade metadata: "+id);
+            String expected="TECH-"+faction+"-"+subsystem+"-"+track+"-"+
+                    String.format(Locale.ROOT,"%02d",stage);
+            if(!expected.equals(id))
+                throw new IllegalArgumentException("Noncanonical technology ID: "+id);
+        }
     }
 
     /** Quantified base machinery, including the engineering category used for slot fitting. */
@@ -310,17 +349,12 @@ public final class TechnologyCatalog {
                         String.format(Locale.ROOT,"%02d",stage-1);
         String name=family.name()+" "+parts[3]+" "+
                 (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
-        ArrayList<String> cells=new ArrayList<>(COLS);
-        Collections.addAll(cells,id,parts[1],family.code(),parts[3],
-                Integer.toString(stage),name,prerequisite,
-                Integer.toString(parent.researchCost),
-                Integer.toString(parent.industryCost));
-        for(double value:new double[]{parent.mass,parent.power,parent.heat,
-                parent.output,parent.accuracy,parent.integrity,parent.shield,
-                parent.thrust,parent.cooling,parent.maintenance})
-            cells.add(ratio(value,1));
-        cells.add(family.name()+": "+parent.tradeoff);
-        return new Upgrade(cells);
+        // Parent numbers are already canonical six-decimal values. Copying
+        // them directly is numerically identical to ratio(value,1) + parse,
+        // and avoids ten Formatter objects and temporary CSV cell strings.
+        return new Upgrade(parent,id,family.code(),name,prerequisite,
+                parent.researchCost,parent.industryCost,
+                family.name()+": "+parent.tradeoff);
     }
 
     /**
