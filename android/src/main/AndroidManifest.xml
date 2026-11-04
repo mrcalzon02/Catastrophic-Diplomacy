@@ -5,7 +5,7 @@
     <application android:allowBackup="false" android:label="Catastrophic Diplomacy"
         android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
-        android:usesCleartextTraffic="false">
+        android:usesCleartextTraffic="false" android:largeHeap="true">
         <activity android:name="diplomacy.android.AndroidLauncher" android:exported="true"
             android:screenOrientation="landscape" android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout">
             <intent-filter>
