@@ -41,6 +41,9 @@ jobs:
         id: ladder
         continue-on-error: true
         run: gradle --no-daemon :core:rocketPdBalanceDiagnostic
+      - name: Verify real AP missile and micro-swarm salvo launches
+        id: ap_micro
+        run: gradle --no-daemon :core:pdGuidedLaunchSmoke
       - name: Test every other physically interceptable threat against researched PD
         id: matrix
         continue-on-error: true
@@ -64,6 +67,7 @@ jobs:
             echo "No P0 metrics produced. Inspect the testClasses JavaExec logs." >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "## All physically interceptable threats versus point defense" >> "$GITHUB_STEP_SUMMARY"
+          echo "AP missile and micro-swarm functional launches: ${{ steps.ap_micro.outcome }} (required)" >> "$GITHUB_STEP_SUMMARY"
           echo "Other threats: ${{ steps.matrix.outcome }} (advisory only)" >> "$GITHUB_STEP_SUMMARY"
           if [ -f core/test-output/pd-interception-matrix/summary.md ]; then
             cat core/test-output/pd-interception-matrix/summary.md >> "$GITHUB_STEP_SUMMARY"

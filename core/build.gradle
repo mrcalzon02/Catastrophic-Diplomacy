@@ -662,6 +662,15 @@ tasks.register('rocketPdBalanceDiagnostic', JavaExec) {
     dependsOn testClasses
     maxHeapSize = '512m'
 }
+// Required physical salvo launch verification, independent of balance ratios.
+tasks.register('pdGuidedLaunchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify AP and micro-swarm real launches, finite ammunition and paired physical point defense.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PointDefenseThreatMatrixDiagnostic'
+    args '--ap-micro'
+}
 // ADVISORY physical interception performance measurements, never a release gate.
 // Complements rocket-specific saturation with shells, guided bodies/decoys,
 // cluster micro-ordnance and fighter/drone target classes.

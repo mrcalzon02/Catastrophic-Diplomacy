@@ -215,15 +215,24 @@ public final class PointDefenseThreatMatrixDiagnostic {
         Set<Integer> craftTerminal=new HashSet<>();
         int craftLostBefore=battle.craftLosses;
         final int observationTicks=600;
+        boolean firstSalvoScheduled=false;
         for(int tick=0;tick<observationTicks;tick++){
             battle.step();
             if(tick==0){
-                // Let only the initial full guided volley fire through the
-                // real queued launcher. No later automatic volleys.
-                attacker.missileReload=attacker.torpedoReload=10000;
+                // Only the auxiliary stock is suppressed at first tick.
+                // Guided launch authorization needs arrived historical
+                // photons, which may not exist until several ticks later.
                 attacker.fighterReserve=0;
                 attacker.droneReserve=0;
                 attacker.repairDroneReserve=0;
+            }
+            if(threat.guided()&&!firstSalvoScheduled&&battle.salvosStarted>0){
+                // Stop SECOND volleys only after the first real fire-control
+                // solution has scheduled a salvo. Existing PendingLaunch
+                // bodies continue with their original measured targeting
+                // data, paid ammo, physical missile travel and PD exposure.
+                attacker.missileReload=attacker.torpedoReload=10000;
+                firstSalvoScheduled=true;
             }
             if(tick==65&&threat.kinetic())
                 attacker.kineticDamage=0; // End realistic initial gun train.
@@ -296,7 +305,13 @@ public final class PointDefenseThreatMatrixDiagnostic {
         double protectionLoss=Math.max(0,initialShield-defender.shields)+
                 Math.max(0,initialArmor-defender.armor)+
                 Math.max(0,initialHull-defender.hull);
-        require(primary>0,"Real projectile/craft did not launch for "+threat);
+        require(primary>0,"Real projectile/craft did not launch for "+threat+
+                " at rank="+tier+" mounts="+mounts+" seed="+seed+
+                " range="+separation+" family="+pdFamily+
+                " pd="+pdMode+" tick="+battle.tick+
+                " salvos="+battle.salvosStarted+
+                " rounds="+battle.roundsFiredBySalvos+
+                " ammoLeft="+attacker.missileAmmo+"/"+attacker.torpedoAmmo);
         if(pdMode==BattleOrders.PointDefense.HOLD_FIRE)
             require(pdShots==0&&primaryIntercepts==0&&craftKilled==0,
                     "Disabled PD still intercepted "+threat);
@@ -527,8 +542,56 @@ public final class PointDefenseThreatMatrixDiagnostic {
         System.out.print(summary);
         System.out.println("PD_FAMILY_P0_ROWS="+(csv.size()-1));
     }
+    /** Focused functional proof before attempting the giant optional P0 /
+     * threat-matrix balance tables. No synthetic missiles or fake PD rolls. */
+    static void armorPiercingAndMicroSwarmSmoke(TechnologyCatalog catalog){
+        for(Threat threat:new Threat[]{
+                Threat.MISSILE_WARHEAD_ARMOR_PIERCING,
+                Threat.MISSILE_MICRO_SWARM}){
+            int expected=threat==Threat.MISSILE_MICRO_SWARM?8:1;
+            for(int tier:new int[]{0,9})
+                for(int mounts:new int[]{1,4})
+                    for(int seed=0;seed<2;seed++){
+                        Result control=run(catalog,threat,tier,mounts,seed,
+                                BattleOrders.PointDefense.HOLD_FIRE);
+                        Result active=run(catalog,threat,tier,mounts,seed,
+                                BattleOrders.PointDefense.BALANCED);
+                        require(control.primaryLaunched()==expected&&
+                                active.primaryLaunched()==expected,
+                                "Initial causal salvo launch mismatch for "+threat+
+                                " rank="+tier+" mounts="+mounts+" seed="+seed+
+                                " control="+control.primaryLaunched()+
+                                " active="+active.primaryLaunched());
+                        require(control.paidRounds()==expected&&
+                                active.paidRounds()==expected,
+                                "Salvo used free ammo or changed paid magazine for "+
+                                threat+" seed="+seed);
+                        require(control.shots()==0&&
+                                control.primaryIntercepted()==0,
+                                "HOLD_FIRE intercepted actual "+threat+" objects");
+                        require(active.primaryIntercepted()<=expected&&
+                                active.primaryIntercepted()>=0&&
+                                control.primaryHits()<=expected,
+                                "Physical PD or impact accounting out of range");
+                        if(threat==Threat.MISSILE_MICRO_SWARM)
+                            require(active.childrenLaunched()==0&&
+                                    control.childrenLaunched()==0,
+                                    "Micro-swarm falsely reclassified as a cluster child");
+                        System.out.println("PASS "+threat+" rank="+tier+
+                                " mounts="+mounts+" seed="+seed+
+                                " real="+expected+" pdShots="+active.shots()+
+                                " intercepted="+active.primaryIntercepted()+
+                                " holdHits="+control.primaryHits()+
+                                " defendedHits="+active.primaryHits());
+                    }
+        }
+        System.out.println("PASS AP warhead and 8-body micro swarm: 32 matched active/hold-fire real-physics trials");
+    }
     public static void main(String[] args)throws IOException{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        if(args.length==1&&"--ap-micro".equals(args[0])){
+            armorPiercingAndMicroSwarmSmoke(catalog);return;
+        }
         if(args.length==1&&"--p0".equals(args[0])){familyP0(catalog);return;}
         require(args.length==0,"Unrecognized point-defense diagnostic argument");
         Path output=Path.of("test-output","pd-interception-matrix");

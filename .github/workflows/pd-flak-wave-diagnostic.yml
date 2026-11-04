@@ -25,6 +25,7 @@ on:
       - 'core/src/test/java/diplomacy/sim/FighterInfraredSeekerTest.java'
       - 'core/src/test/java/diplomacy/sim/FighterCraftTest.java'
       - 'core/src/test/java/diplomacy/sim/FighterCountermeasureTest.java'
+      - 'core/src/test/java/diplomacy/sim/PointDefenseThreatMatrixDiagnostic.java'
       - 'core/src/main/java/diplomacy/sim/GuidedTrajectoryPrediction.java'
       - 'core/src/test/java/diplomacy/sim/GuidedTrajectoryPredictionTest.java'
       - 'core/src/test/java/diplomacy/sim/OrdnanceSeekerTest.java'
@@ -83,7 +84,7 @@ jobs:
         with: { gradle-version: '8.11.1' }
       - name: Verify objective sensor, weapons, rocket trajectory and game-client functionality
         id: mechanics
-        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:fighterCraftSmoke :core:rocketBarrageSmoke :game:guidedShipyardSmoke :game:compileJava
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:pdGuidedLaunchSmoke :core:fighterCraftSmoke :core:rocketBarrageSmoke :game:guidedShipyardSmoke :game:compileJava
       - name: Measure optional PD/flak simultaneous fighter-wave balance
         id: wave
         continue-on-error: true
