@@ -3282,7 +3282,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Emulator performance diagnostics do not replace or reduce any
         // acceptance criteria. A heartbeat distinguishes slow simulation
         // progress from an initialization hang or frozen GL render loop.
-        if(verifiedFrames==1||verifiedFrames%30==0)
+        // Report every five actually drawn GL frames. A software-emulated
+        // Android GPU may need minutes for 480 simulated ticks, so its live
+        // progression must remain visible rather than appearing frozen until
+        // a nonexistent thirtieth framebuffer.
+        if(verifiedFrames==1||verifiedFrames%5==0)
             Gdx.app.log("CD-DEMO-VERIFY","PROGRESS tick="+battle.tick+
                     " frames="+verifiedFrames+" shots="+verifiedShots+
                     " impacts="+verifiedImpacts+" hits="+battle.hitCount+
