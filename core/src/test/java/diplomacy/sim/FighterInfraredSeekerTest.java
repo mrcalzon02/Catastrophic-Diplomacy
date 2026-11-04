@@ -115,8 +115,13 @@ public final class FighterInfraredSeekerTest {
             for(Battle.Missile m:battle.missiles())if(m.targetCraftId>0){
                 missileSeen=true;
                 check(m.fighterIrHead!=null&&m.targetId>0&&
-                        m.targetCraftId!=m.targetId,
+                        m.targetCraftId>0,
                         "Air-to-air missile lacked physical target class or seeker package");
+                // Craft and ship identities are independent integer namespaces:
+                // the same number may name both, without type confusion.
+                check(battle.crafts().stream().anyMatch(c->
+                        c.id==m.targetCraftId&&c.fighter&&c.team!=m.team),
+                        "Interceptor target ID does not resolve to hostile physical fighter");
                 if(m.lastFighterConsumedTick>=0){
                     receivedDelayedPhotons=true;
                     check(m.lastObservationTick<=battle.tick&&
