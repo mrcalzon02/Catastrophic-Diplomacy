@@ -21,6 +21,13 @@ public final class AndroidLauncher extends AndroidApplication {
         // the existing GL3 instanced renderer when available, otherwise let
         // CatastrophicGame use its already-implemented GLES2 hull/FX fallback.
         ActivityManager manager=(ActivityManager)getSystemService(Context.ACTIVITY_SERVICE);
+        // The Android 10 campaign regression uses a 16 MiB default heap.
+        // Log the actual manifest-selected limit to distinguish GPU stalls
+        // from Java resource-decoder OOMs on older phones and emulators.
+        Log.i(LIFECYCLE_TAG,"HEAP_CLASS normalMiB="+
+                (manager==null?-1:manager.getMemoryClass())+
+                " largeMiB="+(manager==null?-1:manager.getLargeMemoryClass())+
+                " runtimeMaxMiB="+(Runtime.getRuntime().maxMemory()/(1024*1024)));
         boolean gl3=manager!=null&&manager.getDeviceConfigurationInfo()!=null
                 &&manager.getDeviceConfigurationInfo().reqGlEsVersion>=0x30000;
         config.useGL30 = gl3;
