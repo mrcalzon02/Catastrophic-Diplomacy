@@ -3272,7 +3272,7 @@ public final class Battle {
         ShipResourceOrders fuelOrder=ship.standingOrders.resources();
         double economy=fuelOrder.thrustSpeedFactor(ship);
         SublightPropulsion.advance(ship,wantedX*economy,wantedY*economy,DT,
-                fuelOrder.protectedFuel(ship));
+                fuelOrder.protectedFuel(ship),economy);
     }
     private void steerToward(Ship ship,double x,double y){
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
