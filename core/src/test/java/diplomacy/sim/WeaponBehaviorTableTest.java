@@ -101,12 +101,19 @@ public final class WeaponBehaviorTableTest {
                 check(gun.guidancePerTick()>0&&gun.flightSeconds()>0,
                         "Guided rounds have real fuel and changing direction");
             }
-            Battle actual=oneWeapon(type,gun.minimumRange()+60);
-            actual.step();
-            check(actual.visualEvents().stream().anyMatch(e->
-                            e.phase()==Battle.VisualPhase.FIRE && e.weapon().equals(type.name())
-                                &&e.team()==0),
-                    "Real simulation must use configured firing law for "+type);
+            double spacing=gun.minimumRange()+60;
+            Battle actual=oneWeapon(type,spacing);
+            // A physically measured contact, not the hidden target position,
+            // authorizes real firing. Include active radar's return trip.
+            int contactWindow=2*SensorLightTimeHistory.propagationTicks(spacing)+35;
+            boolean fired=false;
+            for(int i=0;i<contactWindow&&!fired;i++){
+                actual.step();
+                fired=actual.visualEvents().stream().anyMatch(e->
+                        e.phase()==Battle.VisualPhase.FIRE
+                        &&e.weapon().equals(type.name())&&e.team()==0);
+            }
+            check(fired,"Real sensor-authorized simulation must use firing law for "+type);
         }
         same(530,WeaponBehaviorTable.gun(Battle.DamageType.LASER).maximumRange(),"Laser baseline reach");
         same(445,WeaponBehaviorTable.gun(Battle.DamageType.KINETIC).maximumRange(),"Kinetic baseline reach");
