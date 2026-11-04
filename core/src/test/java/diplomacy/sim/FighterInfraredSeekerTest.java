@@ -67,7 +67,7 @@ public final class FighterInfraredSeekerTest {
                 fighter.id,1,0,100,0,100,250,0,2).flareId()==0,
                 "Radar chaff emitted fictitious infrared photons");
         check(FighterInfraredSeeker.receive(fixed,history,List.of(flare),
-                fighter.id,1,0,100,0,100,250,0,45)==null,
+                fighter.id,1,0,100,0,100,250,0,90)==null,
                 "Already-passed emissions reappeared as current target telemetry");
     }
     private static Battle realFighterCombat(TechnologyCatalog tech,long seed,
