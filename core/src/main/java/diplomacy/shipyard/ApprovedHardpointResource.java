@@ -37,8 +37,19 @@ public final class ApprovedHardpointResource {
     private static Map<String,List<Shipyard.Slot>> read(){
         try(InputStream stream=ApprovedHardpointResource.class.getResourceAsStream(FILE)){
             if(stream==null)return null;
-            byte[] bytes=stream.readAllBytes();
-            if(bytes.length<2000||bytes.length>2_000_000)
+            // Android API 26-32 has no InputStream.readAllBytes(). Read the
+            // resource in bounded chunks to support older devices and reject
+            // oversized or damaged baked maps before allocating more memory.
+            java.io.ByteArrayOutputStream output=new java.io.ByteArrayOutputStream(65536);
+            byte[] buffer=new byte[8192];
+            int read;
+            while((read=stream.read(buffer))!=-1){
+                if(output.size()+read>2_000_000)
+                    throw new IllegalStateException("Invalid approved hardpoint resource size");
+                output.write(buffer,0,read);
+            }
+            byte[] bytes=output.toByteArray();
+            if(bytes.length<2000)
                 throw new IllegalStateException("Invalid approved hardpoint resource size");
             String record=new String(bytes,StandardCharsets.UTF_8);
             int digestAt=record.lastIndexOf("SHA256:");
