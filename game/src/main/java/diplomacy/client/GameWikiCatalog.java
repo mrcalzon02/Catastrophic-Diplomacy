@@ -544,15 +544,23 @@ final class GameWikiCatalog {
             return feed(number(value));
         }
     }
-    private static boolean hasNonAscii(String source){
-        for(int i=0;i<source.length();i++)if(source.charAt(i)>127)return true;
+    private static boolean needsUnicodeCaseFold(String source){
+        // Existing authored technology uses U+2014 em-dashes extensively.
+        // Punctuation does not change under Locale.ROOT case folding and
+        // must NOT force a 7-line Article allocation for every research row
+        // on a 16 MiB Android/Java heap. Custom uppercase Unicode letters
+        // still use the authoritative whole-article formatter.
+        for(int i=0;i<source.length();i++){
+            char c=source.charAt(i);
+            if(c>127&&Character.toLowerCase(c)!=c)return true;
+        }
         return false;
     }
     private static boolean matchesUpgradeText(TechnologyCatalog.Upgrade u,
                                               String needle,UpgradeTextProbe m){
         if(u==null)throw new IllegalStateException("Missing wiki technology");
-        if(hasNonAscii(u.name)||hasNonAscii(u.tradeoff)||
-                hasNonAscii(u.prerequisite))
+        if(needsUnicodeCaseFold(u.name)||needsUnicodeCaseFold(u.tradeoff)||
+                needsUnicodeCaseFold(u.prerequisite))
             return upgradeArticle(u).searchable.contains(needle);
         m.reset();
         // Order and punctuation intentionally reproduce exactly:
