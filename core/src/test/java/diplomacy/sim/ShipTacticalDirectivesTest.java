@@ -17,14 +17,17 @@ public final class ShipTacticalDirectivesTest {
         rejects(()->d.withDefendSlot(0,200));
         rejects(()->d.withDefendSlot(0,2).withDefendSlot(1,2));
         var policy=ShipStandingOrders.DEFAULT;
-        // New resource fields append to the 24-field tactical layout;
-        // legacy V1/V2 compatibility is exercised by ShipStandingOrdersTest.
-        String v3=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,Map.of(0L,policy));
-        String[] lines=v3.split("\\n");
+        // V4 appends six ammunition and three fuel-order fields to the
+        // original 24; V1/V2/V3 migration is tested by ShipStandingOrdersTest.
+        var fuelPolicy=policy.adjust(29,3).adjust(30,1).adjust(31,1);
+        String v4=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,Map.of(0L,fuelPolicy));
+        String[] lines=v4.split("\\n");
         String[] values=lines[2].split(",");
-        ok(values.length==30,"Missing six saved resource-fire fields");
-        ok(ShipStandingOrdersCodec.decode(v3).policies().get(0L).equals(policy),
-                "Extended orders lost in round trip");
+        ok(values.length==33&&"WITHDRAW_AT_RESERVE".equals(values[30])&&
+                        "30".equals(values[31])&&"65".equals(values[32]),
+                "V4 failed to persist fuel posture, withdrawal reserve or economy threshold");
+        ok(ShipStandingOrdersCodec.decode(v4).policies().get(0L).equals(fuelPolicy),
+                "Extended fuel and tactical orders lost in round trip");
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         Shipyard.Design ally=ScenarioCatalog.defaultDesign(ScenarioCatalog.Preset.DUEL,
                 Battle.Faction.TERRAN,true,tech);
