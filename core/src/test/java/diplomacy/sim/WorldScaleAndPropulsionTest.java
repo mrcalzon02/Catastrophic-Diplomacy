@@ -122,7 +122,25 @@ public final class WorldScaleAndPropulsionTest {
         SublightPropulsion.advance(rationed,100,0,Battle.DT);
         ok(rationed.vx<=.000001/rationed.propulsion.fuelPerDeltaV+1e-9,
                 "Final partial fuel unit provided more delta-V than physically available");
-        System.out.println("PASS bounded impulse, one-tank fuel reserve, exact delta-V budget and coast");
+
+        // Economy must physically spend LESS fuel even before a low-gee ship
+        // reaches its speed cap. A cosmetic speed setting is not sufficient.
+        Battle.Ship unrestricted=b.addShip(0,Battle.Faction.TERRAN,300,450);
+        Battle.Ship economical=b.addShip(0,Battle.Faction.TERRAN,300,480);
+        unrestricted.speed=160;economical.speed=160;
+        unrestricted.maxFuel=100;economical.maxFuel=100;
+        unrestricted.fuel=20;economical.fuel=20;
+        double fraction=ShipResourceOrders.DEFAULT
+                .withFuelPolicy(ShipResourceOrders.FuelPolicy.ECONOMY)
+                .withEconomyStart(60).thrustSpeedFactor(economical);
+        ok(fraction<1&&fraction>.3,"Economy posture did not throttle low fuel");
+        for(int i=0;i<120;i++){
+            SublightPropulsion.advance(unrestricted,100,0,Battle.DT);
+            SublightPropulsion.advance(economical,100*fraction,0,Battle.DT,0,fraction);
+        }
+        ok(economical.fuel>unrestricted.fuel&&economical.vx<unrestricted.vx,
+                "Economy posture failed to save actual reaction mass during acceleration");
+        System.out.println("PASS bounded impulse, one-tank reserve, paid economy thrust and coast");
     }
     private static void halfGeometry() throws Exception {
         Battle b=new Battle(88611);
