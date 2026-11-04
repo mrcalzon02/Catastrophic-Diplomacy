@@ -624,11 +624,30 @@ battle fingerprints. The short worldline segment is physically sampled at
 30 Hz and does not pretend to solve continuously moving multi-light-minute
 relativistic photon trajectories or give the missile future coordinates.
 
+**Finite FCM compute donation (2026-11-03):** A paid powered fleet command
+module owns one dedicated per-tick command-compute reserve, independent of
+every individual ship's RES/TRK/ACU local processor pool. FCM assistance
+no longer multiplies local capacity on all linked hulls. Instead, a finite
+command reserve is consumed in deterministic recipient order, after the
+recipient observation is at least two physical light-speed command hops old.
+Real fitted command capacity and operational radius bound recipients.
+Main beams, kinetics and rocket fire all consume the same actual local
+and shared work pools; multiple recipients cannot duplicate shared credits.
+The donor's spent credits, assigned donor IDs and recipient allocations
+participate in replay fingerprints. This is a first finite shared-compute
+model, not a full distributed Bayesian filter or peer-to-peer multi-FCM
+allocation optimizer.
+
+**Kinetic spoof causality:** Unguided kinetic rounds now derive false
+holographic aim bearings from the same historically received emitter
+profile and measured position as their real fire-control solution, not
+the enemy's current fake-ship geometry.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 higher-resolution sub-tick receiver paths, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
 envelopes with future onboard scan updates, complete
-200v200 balance/performance, maneuver covariance, fleet FCM shared-compute
+200v200 balance/performance, maneuver covariance, more elaborate multi-FCM shared-compute
 arbitration, point-defense/fighter beam travel delay and persisted scan
 doctrine controls. The rocket prediction is a constant-velocity TARGET hypothesis
 over the real rocket thrust schedule, not a guarantee against maneuver.

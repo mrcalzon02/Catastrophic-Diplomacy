@@ -180,6 +180,8 @@ public final class Battle {
         public Shipyard.Network network=new Shipyard.Network(
                 0,0,1,0,0,0,0,0,0,0,0,1);
         public double commandAssist;
+        /** The ONE selected, powered FCM compute donor, if any. */
+        public int commandSourceId;
         /** Only contacts actually acquired during this battle are recorded.
          * Never refresh these coordinates from a currently invisible enemy. */
         public final Map<Integer,ContactTrack> knownTracks=new HashMap<>();
@@ -195,6 +197,9 @@ public final class Battle {
         public final SensorActiveScan.State scan=new SensorActiveScan.State();
         /** Finite per-tick RES/TRK/ACU compute workload; CAP is not CPU. */
         public final SensorComputeBudget.State targetCompute=new SensorComputeBudget.State();
+        /** Shared FCM processor cycles reside only on their owner and are
+         * debited by competing allied target-solving requests. */
+        public final SensorComputeBudget.State fleetCompute=new SensorComputeBudget.State();
         /** Actual kinetic, beam and fighter shots and physical guided seekers
          * fooled by this emitter, not fictional effects counters. */
         public int holoShotsDiverted,holoSeekersDiverted;
@@ -2378,7 +2383,10 @@ public final class Battle {
     /** Command cores assist only allied ships physically inside a functioning
      * powered local command cell. Each center has a finite recipient budget. */
     private void refreshCommandAssistance(){
-        for(Ship ship:ships)ship.commandAssist=0;
+        for(Ship ship:ships){
+            ship.commandAssist=0;
+            ship.commandSourceId=0;
+        }
         Ship[] recipients=new Ship[40];
         double[] closest=new double[40];
         for(Ship command:ships){
@@ -2390,8 +2398,11 @@ public final class Battle {
             double power=StrictMath.min(command.commandCondition,command.sensorsCondition);
             double radius=command.network.fusionRange()*power;
             if(radius<=0)continue;
-            command.commandAssist=StrictMath.max(command.commandAssist,
-                    command.network.fusionStrength()*power);
+            double selfAssist=command.network.fusionStrength()*power;
+            if(selfAssist>command.commandAssist){
+                command.commandAssist=selfAssist;
+                command.commandSourceId=command.id;
+            }
             Arrays.fill(recipients,0,slots,null);
             Arrays.fill(closest,0,slots,Double.POSITIVE_INFINITY);
             for(Ship friend:ships){
@@ -2411,8 +2422,11 @@ public final class Battle {
                 Ship recipient=recipients[k];
                 if(recipient.power<=3||recipient.crewReadiness()<.05)continue;
                 double link=1-.25*StrictMath.sqrt(closest[k])/radius;
-                recipient.commandAssist=StrictMath.max(recipient.commandAssist,
-                        command.network.fusionStrength()*power*link);
+                double assist=command.network.fusionStrength()*power*link;
+                if(assist>recipient.commandAssist){
+                    recipient.commandAssist=assist;
+                    recipient.commandSourceId=command.id;
+                }
             }
         }
     }
@@ -3123,6 +3137,19 @@ public final class Battle {
         double bow=point.x()*25.0,port=point.y()*19.0;
         return new SurfaceAim(target.x+bow*c-port*s,target.y+bow*s+port*c);
     }
+    /** Main/kinetic/rocket weapons use one actual on-hull processor pool.
+     * A fitted FCM may additionally lend finite shared work after a
+     * round-trip command delay, never future target evidence or free CPU. */
+    private SensorComputeBudget.Allocation targetWork(Ship observer,
+            SensorLightTimeHistory.Observation received,double range,
+            double bestPrecision,int competing){
+        Ship command=observer.commandSourceId>0?
+                findShip(observer.commandSourceId):null;
+        return SensorComputeBudget.solveWithCommand(
+                observer.targetCompute,observer,received,tick,range,
+                bestPrecision,competing,command);
+    }
+
     /** Count alternative hypotheses from the ACTUALLY MEASURED emission
      * epoch. Present emitter power/ECM cannot adjust earlier solve cost.
      * The generated workload is capped independently of CAP engagement slots. */
@@ -3145,9 +3172,8 @@ public final class Battle {
             long shotId,WeaponMuzzles.Origin muzzle,DamageType family,
             double maximumRange,double rawDamage,double lockChance,
             String label,LaserFamilies.Type laserType){
-        SensorComputeBudget.Allocation allocation=SensorComputeBudget.solve(
-                shooter.targetCompute,shooter,track,tick,observedRange,
-                tacticalPrecision(shooter),
+        SensorComputeBudget.Allocation allocation=targetWork(
+                shooter,track,observedRange,tacticalPrecision(shooter),
                 targetingHypothesisLoad(shooter,intended,track));
         SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                 track,tick,muzzle.x(),muzzle.y(),
@@ -3382,9 +3408,8 @@ public final class Battle {
             long shotId=nextVisualShotId++;
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.KINETIC,shotId);
             ProjectileModel.Spec body=shell.physical(s.kineticProjectile);
-            SensorComputeBudget.Allocation work=SensorComputeBudget.solve(
-                    s.targetCompute,s,firingFix,tick,distance,
-                    tacticalPrecision(s),
+            SensorComputeBudget.Allocation work=targetWork(
+                    s,firingFix,distance,tacticalPrecision(s),
                     targetingHypothesisLoad(s,target,firingFix));
             SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                     firingFix,tick,muzzle.x(),muzzle.y(),body.speed(),
@@ -3396,13 +3421,16 @@ public final class Battle {
             boolean onTarget=random.nextDouble()<kinetic.aim(
                     s.accuracy,s.weapons.kineticTracking(),weatherAim,lock);
             if(!onTarget){
-                int phantoms=DeceptionProjection.falseContacts(target);
+                var emitted=target.sensorHistory.profileAt(firingFix.measuredTick());
+                int phantoms=DeceptionProjection.falseContacts(emitted);
                 if(phantoms>0){
                     target.holoShotsDiverted++;
                     int phantom=(int)Math.floorMod(shotId,phantoms);
                     angle=StrictMath.atan2(
-                            DeceptionProjection.ghostY(target,phantom,tick)-muzzle.y(),
-                            DeceptionProjection.ghostX(target,phantom,tick)-muzzle.x());
+                            DeceptionProjection.ghostY(target.id,firingFix.sample(),
+                                    target.visualScale(),phantom)-muzzle.y(),
+                            DeceptionProjection.ghostX(target.id,firingFix.sample(),
+                                    target.visualScale(),phantom)-muzzle.x());
                 }else angle+=(shotId%2==0?1:-1)*WeaponBehaviorTable.BALLISTIC_MISS_ANGLE_RADIANS;
             }
             ballistics.add(new Ballistic(shotId,tick,s.id,s.team,target.id,
@@ -3487,9 +3515,8 @@ public final class Battle {
             // Rocket flight lead uses the same discrete motor thrust as
             // the actual unguided body, not its terminal speed as a constant.
             // A committed salvo will NOT reacquire or alter its bearing.
-            SensorComputeBudget.Allocation budget=SensorComputeBudget.solve(
-                    ship.targetCompute,ship,firingFix,tick,distance,
-                    tacticalPrecision(ship),
+            SensorComputeBudget.Allocation budget=targetWork(
+                    ship,firingFix,distance,tacticalPrecision(ship),
                     targetingHypothesisLoad(ship,target,firingFix));
             long solutionId=1L+ship.id*1_000_003L+
                     ((long)rack.slot)*137L+tick*31L;
@@ -6329,6 +6356,8 @@ public final class Battle {
             hash = mix(hash,s.falsePackets.fingerprint());
             hash = mix(hash,s.trackPackets.fingerprint());
             hash = mix(hash,s.targetCompute.fingerprint());
+            hash = mix(hash,s.fleetCompute.fingerprint());
+            hash = mix(hash,s.commandSourceId);
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));

@@ -121,9 +121,81 @@ public final class SensorComputeBudgetTest {
         require(receivedShutdown,"Shutdown photons never entered fire-control workload");
         System.out.println("PASS historical ghost hypotheses spend finite processing and shutdown refunds only after light delay");
     }
+    private static void finiteFCMCommandPool(){
+        var catalog=diplomacy.tech.TechnologyCatalog.loadDefault();
+        var bare=Shipyard.bareHull(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        int support=-1;
+        for(Shipyard.Slot slot:bare.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){support=slot.index();break;}
+        require(support>=0,"No real FCM support mounting socket");
+        var fitted=bare.install(support,"BASE-TER-FCM");
+        require(Shipyard.inspect(fitted,catalog).valid(),"Actual FCM fitting invalid");
+        var fcm=Shipyard.fit(fitted,catalog).network();
+
+        Battle battle=new Battle(93782);
+        Battle.Ship flagship=battle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship first=battle.addShip(0,Battle.Faction.TERRAN,180,100);
+        Battle.Ship second=battle.addShip(0,Battle.Faction.TERRAN,200,110);
+        Battle.Ship hostile=battle.addShip(1,Battle.Faction.DRAXIAN,680,100);
+        for(Battle.Ship ship:battle.ships()){
+            battle.registerDiagnosticStationaryTarget(ship.id);
+            ship.power=ship.maxPower=500;
+        }
+        flagship.network=fcm;
+        battle.step();
+        require(first.commandSourceId==flagship.id&&
+                second.commandSourceId==flagship.id,
+                "Fitted finite command cell did not assign nearby allies");
+        double capacity=SensorComputeBudget.fleetCapacity(flagship);
+        require(capacity>0,"Powered FCM has no finite processor bank");
+        var sample=new SensorLightTimeHistory.Sample(0,680,100,0,0,true);
+        var report=new SensorLightTimeHistory.Observation(
+                0,0,1,Battle.CONTACT_RADAR,sample);
+        long initialPool=flagship.fleetCompute.fingerprint();
+        var premature=SensorComputeBudget.solveWithCommand(
+                new SensorComputeBudget.State(),first,report,battle.tick,
+                1100,1,0,flagship);
+        require(flagship.fleetCompute.fingerprint()==initialPool,
+                "FCM processed target data before reciprocal photon hops");
+        require(premature.limited(),"Early solve obtained free perfect guidance");
+        for(int i=0;i<4;i++)battle.step();
+        var local=SensorComputeBudget.solve(
+                new SensorComputeBudget.State(),first,report,battle.tick,1100,1,0);
+        var improved=SensorComputeBudget.solveWithCommand(
+                new SensorComputeBudget.State(),first,report,battle.tick,1100,1,0,
+                flagship);
+        require(improved.precision()>local.precision()&&
+                improved.spent()>local.spent(),
+                "Valid historical FCM datalink failed to lend processor credits");
+        var follow=SensorComputeBudget.solveWithCommand(
+                new SensorComputeBudget.State(),second,report,battle.tick,1100,1,0,
+                flagship);
+        double granted=improved.spent()-local.spent()+
+                follow.spent()-local.spent();
+        require(granted<=capacity+1e-8,
+                "FCM duplicated the same shared processor pool per recipient");
+        require(flagship.fleetCompute.allocations==2,
+                "Allies did not debit the same authoritative command computer");
+        require(flagship.fleetCompute.fingerprint()!=initialPool,
+                "Shared physical compute missing from deterministic replay");
+        flagship.power=0;
+        battle.step();
+        require(first.commandSourceId==0&&second.commandSourceId==0,
+                "Unpowered command core continued directing allied CPU");
+        var noFCM=SensorComputeBudget.solveWithCommand(
+                new SensorComputeBudget.State(),first,report,battle.tick,1100,1,0,
+                flagship);
+        var bareLocal=SensorComputeBudget.solve(
+                new SensorComputeBudget.State(),first,report,battle.tick,1100,1,0);
+        require(noFCM.precision()==bareLocal.precision(),
+                "Dead command power granted an unearned processor credit");
+        System.out.println("PASS finite paid FCM work, two-way signal delay, allied competition, power loss and replay");
+    }
     public static void main(String[] args){
         finiteOneTick();
         hardwareDifferentiation();
         historicalFalseComputeBudget();
+        finiteFCMCommandPool();
     }
 }
