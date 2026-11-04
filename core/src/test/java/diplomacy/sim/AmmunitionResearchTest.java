@@ -1,5 +1,6 @@
 package diplomacy.sim;
 
+import diplomacy.shipyard.OrdnanceFitting;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
 import java.util.Set;
@@ -107,8 +108,16 @@ public final class AmmunitionResearchTest {
 
         Shipyard.Hull hull=Shipyard.Hull.DREADNOUGHT;
         int missileSlot=weapon(hull,1);
+        // A real socket fires its researched, saved rack fitting; the legacy
+        // family-wide runtime mode is not an override for a mounted rack.
         var left=Shipyard.starter(Battle.Faction.TERRAN,hull)
-                .stage(missileSlot,Shipyard.Track.EFFICIENCY,5);
+                .stage(missileSlot,Shipyard.Track.EFFICIENCY,5)
+                .withGuidedOrdnance(Battle.DamageType.MISSILE,
+                        new OrdnanceFitting.Guided(OrdnanceDoctrine.Mode.RIPPLE,
+                                OrdnancePropulsion.Mode.CONSTANT_BURN,
+                                OrdnanceGuidance.Mode.PURSUIT))
+                .withGuidedWarhead(Battle.DamageType.MISSILE,
+                        AmmunitionTable.Warhead.EMP);
         var right=Shipyard.starter(Battle.Faction.CARNELIAN,hull);
         Battle arena=Battle.duel(4417,1,left,right,catalog);
         var launcher=arena.ships().get(0);
@@ -121,10 +130,21 @@ public final class AmmunitionResearchTest {
         refused(()->arena.setShipWarhead(launcher.id,Battle.DamageType.MISSILE,
                 AmmunitionTable.Warhead.SHIELD_BREAKER),
                 "Specialist/output payload may not load in Efficiency launch rack");
-        arena.setShipWarhead(launcher.id,Battle.DamageType.MISSILE,AmmunitionTable.Warhead.EMP);
-        arena.setShipLaunchMode(launcher.id,Battle.DamageType.MISSILE,OrdnanceDoctrine.Mode.RIPPLE);
-        arena.step();
-        check(arena.pendingSalvoCount()>0,"A multi-round salvo must actually be queued");
+        check(launcher.launcher(missileSlot)!=null
+                        &&launcher.launcher(missileSlot).fitting.guided().salvo()
+                                ==OrdnanceDoctrine.Mode.RIPPLE
+                        &&launcher.launcher(missileSlot).fitting.warhead()
+                                ==AmmunitionTable.Warhead.EMP,
+                "Researched missile rack must carry its real multi-round EMP fitting");
+        // Photon-limited contacts cannot authorize a launch at tick zero.
+        // Exercise the live targeting/launcher path, with a bounded physical
+        // sensor-arrival window rather than granting the fixture oracle vision.
+        check(!arena.hasTargetContact(launcher,target,310),
+                "A fresh fitted ship cannot fire on an undelivered target observation");
+        int contactWindow=2*SensorLightTimeHistory.propagationTicks(310)+30;
+        for(int i=0;i<contactWindow&&arena.pendingSalvoCount()==0;i++)arena.step();
+        check(arena.pendingSalvoCount()>0,
+                "After a physically received contact, a researched RIPPLE rack must queue a real salvo");
         arena.setShipWarhead(launcher.id,Battle.DamageType.MISSILE,AmmunitionTable.Warhead.STANDARD);
         for(int i=0;i<12;i++)arena.step();
         check(arena.missiles().stream().filter(m->m.sourceId==launcher.id).count()>=2,
@@ -143,7 +163,11 @@ public final class AmmunitionResearchTest {
                 AmmunitionTable.Kinetic.ARMOR_PIERCING),
                 "Off-branch AP shell on OUTPUT-only gun");
         shells.setShipKineticAmmunition(gunner.id,AmmunitionTable.Kinetic.RELATIVISTIC);
-        shells.step();
+        int shellWindow=2*SensorLightTimeHistory.propagationTicks(280)+30;
+        for(int i=0;i<shellWindow
+                &&shells.ballistics().stream().noneMatch(b->b.sourceId==gunner.id
+                        &&b.ammunition==AmmunitionTable.Kinetic.RELATIVISTIC);i++)
+            shells.step();
         check(shells.ballistics().stream().anyMatch(b->b.sourceId==gunner.id
                         &&b.ammunition==AmmunitionTable.Kinetic.RELATIVISTIC),
                 "Specialized approved ammunition must spawn real fast physical shells");
