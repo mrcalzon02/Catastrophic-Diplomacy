@@ -59,8 +59,8 @@ public final class CombatPerformanceControlTest {
         auto.frame(.016,5_000_000L,1_000_000L,false);
 
         CombatDiagnosticRecorder recorder=new CombatDiagnosticRecorder();
-        recorder.start();
-        recorder.event(0,1f,1f,"START");
+        recorder.start(20261104L,17L,400);
+        recorder.event(17,1f,1f,"START");
         for(int i=0;i<3900;i++)
             recorder.frame(i,.033,11_000_000L,4_000_000L,32,2f,1.5f,
                     400,100,500,100,15);
@@ -89,6 +89,10 @@ public final class CombatPerformanceControlTest {
         }catch(java.io.IOException expected){incompleteRejected=true;}
         check(incompleteRejected,"Invalid/truncated ZIP must never be reported as exported");
         check(files.get("metadata.json").contains("\"finalTick\": 3900"),"Metadata readback");
+        check(files.get("metadata.json").contains("\"battleSeed\": 20261104") &&
+                files.get("metadata.json").contains("\"captureStartTick\": 17") &&
+                files.get("metadata.json").contains("\"shipsAtCaptureStart\": 400"),
+                "Export must preserve original battle seed and capture starting state");
         String csv=files.get("frame-samples.csv");
         check(csv.startsWith("frame,tick")&&csv.contains("300,300,")&&
                 csv.contains("3899,3899,"),"Ring capture chronological readback");
