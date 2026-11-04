@@ -124,6 +124,13 @@ public final class ScreensaverBattleTest {
                 SpaceWeather.Kind.NEBULA,SpaceWeather.Kind.CLEAR,1));
         scout.speed=85;hunter.speed=85;
         scout.sensorRange=600;hunter.sensorRange=600;
+        // These two captains were already closing with physically valid
+        // sublight inertia before the fog obscured their target bearings.
+        // Engine acceleration alone cannot close 1880 units in 1300 ticks.
+        scout.vx=-20;hunter.vx=20;
+        check(StrictMath.abs(scout.vx)<=SublightPropulsion.maximumSpeed(scout)
+                        &&StrictMath.abs(hunter.vx)<=SublightPropulsion.maximumSpeed(hunter),
+                "Fog search fixture started with superluminal/unfitted velocity");
         double initialGap=StrictMath.hypot(scout.x-hunter.x,scout.y-hunter.y);
         boolean reacquired=false;
         for(int tick=0;tick<1300&&!lost.finished();tick++){
@@ -180,7 +187,7 @@ public final class ScreensaverBattleTest {
         // missile and torpedo inventories must not create phantom reach.
         Battle reachBattle=new Battle(0xC105EF1E1DL);
         Battle.Ship laserOnly=reachBattle.addShip(0,Battle.Faction.TERRAN,200,335);
-        Battle.Ship immobileTarget=reachBattle.addShip(1,Battle.Faction.DRAXIAN,900,335);
+        Battle.Ship immobileTarget=reachBattle.addShip(1,Battle.Faction.DRAXIAN,740,335);
         laserOnly.missileDamage=0;laserOnly.torpedoDamage=0;
         laserOnly.kineticDamage=0;laserOnly.plasmaDamage=0;laserOnly.particleDamage=0;
         laserOnly.orders=BattleOrders.DEFAULT
@@ -190,7 +197,9 @@ public final class ScreensaverBattleTest {
         immobileTarget.laserDamage=0;immobileTarget.missileDamage=0;
         immobileTarget.kineticDamage=0;immobileTarget.plasmaDamage=0;
         immobileTarget.particleDamage=0;immobileTarget.torpedoDamage=0;
-        for(int tick=0;tick<260&&!reachBattle.finished();tick++)
+        // Acceleration is now bounded by actual gee, not the former
+        // near-lightspeed instant-position adjustment.
+        for(int tick=0;tick<2600&&!reachBattle.finished();tick++)
             reachBattle.step();
         check(StrictMath.hypot(laserOnly.x-immobileTarget.x,
                 laserOnly.y-immobileTarget.y)<530,
@@ -206,7 +215,8 @@ public final class ScreensaverBattleTest {
         watcher.sensorsCondition=0;silhouette.sensorsCondition=0;
         opticalBattle.configureWeather(new SpaceWeather.Preset(2,17,
                 SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.CLEAR,1));
-        opticalBattle.step();
+        for(int tick=0;tick<2*SensorLightTimeHistory.propagationTicks(155)+12
+                &&watcher.lastTargetId!=silhouette.id;tick++)opticalBattle.step();
         check(watcher.lastTargetId==silhouette.id,
                 "Destroyed radar concealed an enemy at direct optical range");
 
@@ -231,7 +241,8 @@ public final class ScreensaverBattleTest {
         near.sensorsCondition=0;far.sensorsCondition=0;
         dense.configureWeather(new SpaceWeather.Preset(198,17,
                 SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
-        dense.step();
+        for(int tick=0;tick<2*SensorLightTimeHistory.propagationTicks(260)+12
+                &&near.lastTargetId!=far.id;tick++)dense.step();
         check(near.lastTargetId==far.id,
                 "Double-interference weather hid an enemy at optical range");
         Battle hidden=new Battle(0x10ABC2L);
@@ -240,7 +251,8 @@ public final class ScreensaverBattleTest {
         blind.sensorsCondition=0;unseen.sensorsCondition=0;
         hidden.configureWeather(new SpaceWeather.Preset(198,17,
                 SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
-        hidden.step();
+        for(int tick=0;tick<2*SensorLightTimeHistory.propagationTicks(450)+12;tick++)
+            hidden.step();
         check(blind.lastTargetId==0,
                 "Optical detection leaked enemy position through 450 units of nebula");
 
@@ -248,7 +260,7 @@ public final class ScreensaverBattleTest {
         // and are counted as escaped, never silently killed. In ordinary
         // battles the identical unarmed ship stays available to the player.
         Battle exhibition=new Battle(0xE7A51L);
-        Battle.Ship pacifist=exhibition.addShip(0,Battle.Faction.TERRAN,350,335);
+        Battle.Ship pacifist=exhibition.addShip(0,Battle.Faction.TERRAN,5,335);
         exhibition.addShip(1,Battle.Faction.DRAXIAN,1100,335);
         pacifist.laserDamage=0;pacifist.missileDamage=0;
         pacifist.kineticDamage=0;pacifist.plasmaDamage=0;
@@ -261,7 +273,7 @@ public final class ScreensaverBattleTest {
         check(exhibition.escaped(0)==1 && exhibition.destroyed(0)==0,
                 "Voluntary exhibition withdrawal counted as a destroyed ship");
         Battle manual=new Battle(0xE7A52L);
-        Battle.Ship manualShip=manual.addShip(0,Battle.Faction.TERRAN,350,335);
+        Battle.Ship manualShip=manual.addShip(0,Battle.Faction.TERRAN,5,335);
         manual.addShip(1,Battle.Faction.DRAXIAN,1100,335);
         manualShip.laserDamage=0;manualShip.missileDamage=0;
         manualShip.kineticDamage=0;manualShip.plasmaDamage=0;
@@ -284,7 +296,9 @@ public final class ScreensaverBattleTest {
         contact.sensorsCondition=0;
         net.configureWeather(new SpaceWeather.Preset(198,17,
                 SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
-        net.step();
+        // Optical observation and local radio packets take nonzero time.
+        for(int tick=0;tick<40&&squadmate.lastTargetId!=contact.id;tick++)
+            net.step();
         check(spotter.lastTargetId==contact.id,
                 "Actual nearby spotter never detected the target");
         check(squadmate.lastTargetId==contact.id,
@@ -298,7 +312,7 @@ public final class ScreensaverBattleTest {
         noSpotter.sensorsCondition=0;distant.sensorsCondition=0;
         alone.configureWeather(new SpaceWeather.Preset(198,17,
                 SpaceWeather.Kind.ION_STORM,SpaceWeather.Kind.NEBULA,1));
-        alone.step();
+        for(int tick=0;tick<40;tick++)alone.step();
         check(noSpotter.lastTargetId==0,
                 "Fleet network fabricated contact without a detecting ally");
 
