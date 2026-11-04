@@ -28,6 +28,42 @@ public final class TechnologyCatalogTest {
                                 String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
                                 "Missing nine-stage ordnance research "+faction+"/"+code);
             }
+            // The last three point-defense families are generated from a
+            // fixed FLK source range. Changing the expansion to avoid a
+            // full List.copyOf snapshot must not change their complete
+            // faction/branch/stage lineage or physical research modifiers.
+            for(String pd:new String[]{"RCW","RPD","PPD"})
+                for(String branch:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int stage=1;stage<=9;stage++){
+                        String suffix="-"+branch+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",stage);
+                        var candidate=c.get("TECH-"+faction+"-"+pd+suffix);
+                        var source=c.get("TECH-"+faction+"-FLK"+suffix);
+                        require(candidate!=null&&source!=null&&
+                                candidate.faction.equals(faction)&&
+                                candidate.subsystem.equals(pd)&&
+                                candidate.track.equals(branch)&&
+                                candidate.stage==stage,
+                                "PD stage identity drift after source-bound snapshot removal: "+
+                                        faction+"/"+pd+"/"+branch+"/"+stage);
+                        String prior=stage==1?"BASE-"+faction+"-"+pd:
+                                "TECH-"+faction+"-"+pd+"-"+branch+"-"+
+                                        String.format(java.util.Locale.ROOT,"%02d",stage-1);
+                        require(candidate.prerequisite.equals(prior)&&
+                                candidate.researchCost==source.researchCost&&
+                                candidate.industryCost==source.industryCost&&
+                                Double.compare(candidate.mass,source.mass)==0&&
+                                Double.compare(candidate.power,source.power)==0&&
+                                Double.compare(candidate.heat,source.heat)==0&&
+                                Double.compare(candidate.output,source.output)==0&&
+                                Double.compare(candidate.accuracy,source.accuracy)==0&&
+                                Double.compare(candidate.integrity,source.integrity)==0&&
+                                Double.compare(candidate.shield,source.shield)==0&&
+                                Double.compare(candidate.thrust,source.thrust)==0&&
+                                Double.compare(candidate.cooling,source.cooling)==0&&
+                                Double.compare(candidate.maintenance,source.maintenance)==0,
+                                "PD stage economic/physics drift: "+candidate.id);
+                    }
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
                 require(c.base("BASE-"+faction+"-"+role)!=null
