@@ -63,8 +63,20 @@ public final class SublightPropulsion {
      * Fuel is spent on actual delta-V rather than on passive coasting. */
     public static void advance(Battle.Ship ship,double wantedX,double wantedY,
                                double dt){
+        advance(ship,wantedX,wantedY,dt,0);
+    }
+
+    /**
+     * A captain can protect part of the ONE existing tank for an eventual
+     * withdrawal. Only discretionary thrust is constrained; escape orders
+     * supply zero protectedFuel and may burn the entire physical tank.
+     * Actual thrust is always limited to fuel physically remaining.
+     */
+    public static void advance(Battle.Ship ship,double wantedX,double wantedY,
+                               double dt,double protectedFuel){
         if(ship==null||!Double.isFinite(wantedX)||!Double.isFinite(wantedY)||
-                !Double.isFinite(dt)||dt<=0)throw new IllegalArgumentException("Invalid thrust demand");
+                !Double.isFinite(dt)||dt<=0||!Double.isFinite(protectedFuel)||protectedFuel<0)
+            throw new IllegalArgumentException("Invalid thrust demand or reserve");
         double maxSpeed=maximumSpeed(ship);
         double requested=StrictMath.hypot(wantedX,wantedY);
         if(requested>maxSpeed&&requested>0){
@@ -76,7 +88,9 @@ public final class SublightPropulsion {
                 WorldScale.accelerationUnitsPerSimSecondSquared(
                         ship.propulsion.accelerationGee)*dt*
                         ship.engineCondition*ship.crewReadiness():0;
-        double applied=StrictMath.min(difference,maxStep);
+        double spendable=StrictMath.max(0,ship.fuel-protectedFuel);
+        double fuelStep=spendable/ship.propulsion.fuelPerDeltaV;
+        double applied=StrictMath.min(difference,StrictMath.min(maxStep,fuelStep));
         if(applied>0&&difference>0){
             ship.vx+=differenceX*applied/difference;
             ship.vy+=differenceY*applied/difference;
