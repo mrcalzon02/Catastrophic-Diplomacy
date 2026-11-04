@@ -33,8 +33,11 @@ final class AdaptiveCombatPace {
     static double targetFrameMs(){return TARGET_FRAME_MS;}
 
     void request(float speed){
+        // An explicit speed-up takes effect immediately when the governor was
+        // not already holding the prior request below its cap.
+        boolean previouslyAtCap=effective>=requested-.001f;
         requested=CombatPace.clamp(speed);
-        if(effective>requested||!enabled)effective=requested;
+        if(previouslyAtCap||effective>requested||!enabled)effective=requested;
         if(!enabled)reason="MANUAL";
         else if(effective==requested)reason="REQUESTED";
         stableSeconds=0;
