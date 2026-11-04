@@ -795,8 +795,9 @@ tasks.register('technologyHeapSmoke', JavaExec) {
 }
 // HotSpot -Xmx16m is a portability diagnostic, not a proxy for Android ART.
 // Real Android OOM/crash regression is release-blocking in the emulator shards.
-// Verify all guided salvos and physical flight during functional releases.
-tasks.named('gameFlowSmoke') { finalizedBy(tasks.named('ordnanceDoctrineSmoke')) }
+// Keep the ordnance doctrine chain in the functional release dependency DAG.
+// A finalizer creates a cycle: gameFlow -> sensing -> seeker -> doctrine -> gameFlow.
+tasks.named('gameFlowSmoke') { dependsOn(tasks.named('ordnanceDoctrineSmoke')) }
 
 tasks.register('screensaverSmoke', JavaExec) {
     group = 'verification'
