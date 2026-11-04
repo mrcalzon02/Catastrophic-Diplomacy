@@ -140,7 +140,7 @@ final class ShipDeathTimeline {
     void advance(Battle current,float delta,boolean running){
         sync(current);
         if(!running)return;
-        float dt=Float.isFinite(delta)?Math.max(0,Math.min(.08f,delta)):0;
+        float dt=Float.isFinite(delta)?/* 3x tactical playback at a clamped 80ms real frame may advance 240ms. */ Math.max(0,Math.min(.24f,delta)):0;
         for(Burst burst:active)burst.age+=dt;
         for(Wreck wreck:wrecks)wreck.age+=dt;
         while(!active.isEmpty()&&active.peekFirst().age>=LIFETIME)
