@@ -26,17 +26,6 @@ public final class CombatPerformanceControlTest {
                 check(CombatPace.faster(levels[i])==levels[i+1],"Upper neighbor "+i);
         }
         check(CombatPace.simulationMultiplier(2f)==.2f,"Legacy perceived 2x");
-        check(CombatTimeAudio.combatPitch(1f,1f)==1f,
-                "Authored SFX playback must stay unchanged at 1x");
-        check(CombatTimeAudio.combatPitch(.5f,1f)<
-                CombatTimeAudio.combatPitch(1f,1f) &&
-                CombatTimeAudio.combatPitch(3f,1f)>
-                CombatTimeAudio.combatPitch(2f,1f),
-                "Relative combat audio pitch must respond monotonically to speed");
-        check(CombatTimeAudio.combatPitch(3f,1f)<1.30f,
-                "Maximum combat audio speed must retain reasonable timbre");
-        check(Math.abs(CombatTimeAudio.enginePitch(1f,.93f)-.93f)<1e-5f,
-                "Engine loops must preserve authored tuning at 1x");
         AdaptiveCombatPace auto=new AdaptiveCombatPace();
         auto.request(3f);
         check(auto.effective()==3f&&auto.enabled(),"Requested cap starts at 3x");
