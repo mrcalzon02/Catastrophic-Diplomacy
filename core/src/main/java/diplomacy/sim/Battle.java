@@ -4972,7 +4972,8 @@ public final class Battle {
     }
 
     private record FlakAim(double x,double y,double vx,double vy,
-                           int sourceId,int targetId,double priority) { }
+                           int sourceId,int targetId,double priority,
+                           long cloudId) { }
 
     /** Each real flak module independently loads and fires one finite shell.
      * Leading uses current physical velocity, not perfect future tracking.
@@ -5000,13 +5001,21 @@ public final class Battle {
                                 mount.nominalRange,defender.sensorsCondition,
                                 weather.sensorFactor(),mount.profile,craft.radarProfile()))
                             continue;
-                        if(d<bestPriority){
-                            bestPriority=d;
-                            // Flak preferentially interrupts aircraft before
-                            // targeting smaller, more elusive physical bodies.
-                            best=new FlakAim(craft.x,craft.y,
-                                             craft.observedVx,craft.observedVy,
-                                             craft.sourceId,craft.targetId,d);
+                        var chaff=radarFighterGhost(craft,defender,mount.nominalRange);
+                        double signal=chaff==null?0:
+                                chaff.signal(FighterCountermeasures.Kind.CHAFF,tick);
+                        double priority=d/(1+signal*.35);
+                        if(priority<bestPriority){
+                            bestPriority=priority;
+                            // This is an actual independently moving radar
+                            // return. Even if the sight aims at chaff,
+                            // real fragments may still strike nearby craft.
+                            best=new FlakAim(chaff==null?craft.x:chaff.xAt(tick),
+                                    chaff==null?craft.y:chaff.yAt(tick),
+                                    chaff==null?craft.observedVx:chaff.vx(),
+                                    chaff==null?craft.observedVy:chaff.vy(),
+                                    craft.sourceId,craft.targetId,priority,
+                                    chaff==null?0:chaff.id());
                         }
                     }
                 }
@@ -5027,7 +5036,7 @@ public final class Battle {
                                 m.x,m.y,m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
                         double priority=defensiveScore(defender,d,eta);
                         if(priority<bestPriority){bestPriority=priority;
-                            best=new FlakAim(m.x,m.y,m.vx,m.vy,m.sourceId,m.targetId,priority);}
+                            best=new FlakAim(m.x,m.y,m.vx,m.vy,m.sourceId,m.targetId,priority,0);}
                     }
                     for(Rocket r:rockets){
                         if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
@@ -5041,7 +5050,7 @@ public final class Battle {
                                 r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
                         double priority=defensiveScore(defender,d,eta);
                         if(priority<bestPriority){bestPriority=priority;
-                            best=new FlakAim(r.x,r.y,r.vx,r.vy,r.sourceId,r.targetId,priority);}
+                            best=new FlakAim(r.x,r.y,r.vx,r.vy,r.sourceId,r.targetId,priority,0);}
                     }
                     for(Ballistic p:ballistics){
                         if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
@@ -5054,7 +5063,7 @@ public final class Battle {
                                 p.x,p.y,p.vx,p.vy,p.spec.speed());
                         double priority=defensiveScore(defender,d,eta);
                         if(priority<bestPriority){bestPriority=priority;
-                            best=new FlakAim(p.x,p.y,p.vx,p.vy,p.sourceId,p.targetId,priority);}
+                            best=new FlakAim(p.x,p.y,p.vx,p.vy,p.sourceId,p.targetId,priority,0);}
                     }
                 }
                 if(best==null)continue;
@@ -5079,6 +5088,7 @@ public final class Battle {
                 defender.heat+=law.heatPerShot()*2;
                 mount.reload=law.reload(false,
                         mount.cycle*1.8,defender.pointDefenseCondition);
+                if(best.cloudId()>0)fighterChaffFlakDiversions++;
                 // One paid, unguided shell travels from this exact
                 // authoritative socket to its already-chosen airburst point.
                 // Target motion after launch cannot alter its bearing or fuze.
