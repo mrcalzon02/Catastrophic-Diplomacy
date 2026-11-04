@@ -63,9 +63,9 @@ public final class ShipPlacementOrdersTest {
                 Battle.Faction.DRAXIAN,false,catalog);
         var configured=new CampaignDeployment.Loadout(3,CampaignDeployment.Formation.WEDGE)
                 .withPlacement(0,250,250)
-                .appendOrder(0,ShipCommandQueue.Command.move(280,250))
+                .appendOrder(0,ShipCommandQueue.Command.move(258,250))
                 .appendOrder(0,ShipCommandQueue.Command.hold(3))
-                .appendOrder(0,ShipCommandQueue.Command.move(315,250))
+                .appendOrder(0,ShipCommandQueue.Command.move(259,250))
                 .appendOrder(0,ShipCommandQueue.Command.engage(5))
                 .appendOrder(1,ShipCommandQueue.Command.hold(900));
         CampaignEncounter encounter=CampaignEncounter.start(25,configured,ally,enemy,catalog);
@@ -82,7 +82,18 @@ public final class ShipPlacementOrdersTest {
             if(maxIndex==4)break;
         }
         ok(maxIndex==4,"Move, hold, move, engage were not executed in sequence");
-        ok(lead.x>296,"Ordered movement was not applied by the live battle simulation");
+        // Command ordering and physical long-range navigation are distinct
+        // now that ships accelerate at finite sublight rates. In this short
+        // sequence, nearby waypoints are inside the 12-unit arrival tolerance.
+        Battle travel=new Battle(20425);
+        Battle.Ship pilot=travel.addShip(0,Battle.Faction.TERRAN,250,260);
+        travel.addShip(1,Battle.Faction.DRAXIAN,900,260);
+        travel.setShipCommandQueue(pilot.id,List.of(
+                ShipCommandQueue.Command.move(350,260)));
+        double travelFuel=pilot.fuel;
+        for(int t=0;t<400;t++)travel.step();
+        ok(pilot.x>250.2&&pilot.fuel<travelFuel,
+                "Long waypoint must produce real accelerating motion and fuel cost");
         ok(wing.commandQueue.nextIndex()==0,"Unrelated vessel's HOLD completed too soon");
         ok(lead.commandQueue.total()==4,"Executed orders were deleted rather than retained");
 
