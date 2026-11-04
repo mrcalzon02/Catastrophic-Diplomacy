@@ -21,6 +21,9 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+        // Desugar Java 9+ collection factories (List.of/copyOf, Map.of/copyOf)
+        // used throughout gameplay for Android 10/API29 and minSdk26 devices.
+        coreLibraryDesugaringEnabled true
     }
     signingConfigs {
         release {
@@ -96,6 +99,7 @@ tasks.configureEach { task ->
 }
 
 dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
     implementation project(':game')
     implementation 'androidx.core:core:1.15.0'
     implementation 'com.badlogicgames.gdx:gdx-backend-android:1.14.2'
