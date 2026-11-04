@@ -878,7 +878,8 @@ public final class Battle {
     /** Genuine fighter-vs-fighter interceptor launches, IR seeker diversions
      * and physical near-flare fuzes (not inferred hit-rate bonuses). */
     public int fighterInterceptorsLaunched,fighterInterceptorsHit,
-               fighterFlareSeekerDiversions,fighterFlareFuzes;
+               fighterFlareSeekerDiversions,fighterFlareFuzes,
+               fighterChaffSeekerDiversions,fighterChaffFuzes;
     /** Diagnostic counters: real PD hits and kills of hostile craft, excluding
      * ordinary fuel expiry, voluntary docking or other combat losses. */
     public int pointDefenseCraftHits,pointDefenseCraftKills;
@@ -4367,6 +4368,26 @@ public final class Battle {
         }
         for(Craft craft:crafts)if(craft.fighter&&craft.chaffRemaining>0&&
                 craft.integrity>0&&tick>=craft.nextCountermeasureTick){
+            // Defend against the actual onboard radar band; unlike chaff
+            // against flak, the threat is a physically flying interceptor.
+            Missile radarThreat=null;
+            double radarRange=Double.POSITIVE_INFINITY;
+            for(Missile m:missiles)if(m.team!=craft.team&&
+                    m.targetCraftId==craft.id&&m.fighterRadarHead!=null&&m.fuel>0){
+                double dx=craft.x-m.x,dy=craft.y-m.y;
+                double range=StrictMath.hypot(dx,dy);
+                if(dx*m.vx+dy*m.vy>0&&range<radarRange&&
+                        range<=StrictMath.min(210,
+                                craft.profile.sensors()*weather.sensorFactor())){
+                    radarRange=range;radarThreat=m;
+                }
+            }
+            if(radarThreat!=null){
+                emitFighterCountermeasure(craft,
+                        FighterCountermeasures.Kind.CHAFF,
+                        radarThreat.x,radarThreat.y);
+                continue;
+            }
             Ship threat=null;
             double nearest=Double.POSITIVE_INFINITY;
             for(Ship defender:ships)if(defender.alive()&&
@@ -6013,24 +6034,47 @@ public final class Battle {
                 tick-m.spawnTick>BattleArena.MAX_GUIDED_SECONDS/DT||
                 !BattleArena.contains(m.x,m.y)){
             missiles.remove(index);
-            visual(m.visualId,VisualPhase.TIMEOUT,"FIGHTER_IR_INTERCEPTOR",
+            visual(m.visualId,VisualPhase.TIMEOUT,m.fighterRadarHead==null?
+                            "FIGHTER_IR_INTERCEPTOR":"FIGHTER_RADAR_INTERCEPTOR",
                     m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
             return;
         }
         m.flightTicks++;
-        var received=FighterInfraredSeeker.receive(m.fighterIrHead,
-                target.infraredHistory,fighterClouds,
-                target.id,m.team,m.seekerReceiverX,m.seekerReceiverY,
-                m.x,m.y,m.vx,m.vy,tick);
+        int scanTicks;
+        FighterInfraredSeeker.Reading received;
+        if(m.fighterRadarHead!=null){
+            var head=m.fighterRadarHead;
+            scanTicks=head.pulseTicks;
+            if((m.flightTicks-1)%head.pulseTicks==0&&
+                    m.radarBattery>=head.pulseCost){
+                // Outbound pulse comes from the missile's ACTUAL pose,
+                // and consumes a finite onboard battery charge.
+                m.radarPulses.emit(tick,m.x,m.y,m.vx,m.vy);
+                m.radarBattery-=head.pulseCost;
+            }
+            var echo=FighterRadarSeeker.receive(head,
+                    target.infraredHistory,target.profile.crossSection(),
+                    fighterClouds,m.radarPulses,target.id,m.team,
+                    m.seekerReceiverX,m.seekerReceiverY,m.x,m.y,
+                    m.vx,m.vy,tick);
+            received=echo==null?null:new FighterInfraredSeeker.Reading(
+                    echo.x(),echo.y(),echo.vx(),echo.vy(),
+                    echo.reflectedTick(),echo.receivedTick(),
+                    echo.chaffId(),echo.strength());
+        }else{
+            scanTicks=m.fighterIrHead.scanTicks;
+            received=FighterInfraredSeeker.receive(m.fighterIrHead,
+                    target.infraredHistory,fighterClouds,
+                    target.id,m.team,m.seekerReceiverX,m.seekerReceiverY,
+                    m.x,m.y,m.vx,m.vy,tick);
+        }
         m.seekerReceiverX=m.x;m.seekerReceiverY=m.y;
         m.seekerReceiverTick=tick;
         if(received!=null)m.lastFighterPhotons=received;
         if(m.lastFighterPhotons!=null&&
-                tick-m.lastFighterPhotons.receivedTick()<=
-                        m.fighterIrHead.scanTicks&&
+                tick-m.lastFighterPhotons.receivedTick()<=scanTicks&&
                 m.lastFighterPhotons.receivedTick()>m.lastFighterConsumedTick&&
-                (m.flightTicks+m.visualId%m.fighterIrHead.scanTicks)%
-                        m.fighterIrHead.scanTicks==0){
+                (m.flightTicks+m.visualId%scanTicks)%scanTicks==0){
             var reading=m.lastFighterPhotons;
             m.seekerLocked=true;
             m.lastKnownX=reading.x();m.lastKnownY=reading.y();
@@ -6038,12 +6082,15 @@ public final class Battle {
             m.lastObservationTick=reading.emittedTick();
             m.lastFighterConsumedTick=reading.receivedTick();
             m.seekerUncertainty=2+(tick-reading.emittedTick())*DT;
-            if(reading.flareId()>0&&reading.flareId()!=m.lastFlareId)
-                fighterFlareSeekerDiversions++;
+            if(reading.flareId()>0&&reading.flareId()!=m.lastFlareId){
+                if(m.fighterRadarHead!=null)fighterChaffSeekerDiversions++;
+                else fighterFlareSeekerDiversions++;
+            }
+            // Existing field retains the currently tracked false emission
+            // identity in either spectrum, not necessarily an IR flare.
             m.lastFlareId=reading.flareId();
         }else if(m.lastFighterPhotons==null||
-                tick-m.lastFighterPhotons.receivedTick()>
-                        m.fighterIrHead.scanTicks*2){
+                tick-m.lastFighterPhotons.receivedTick()>scanTicks*2){
             m.seekerLocked=false;
             m.seekerUncertainty=StrictMath.min(120,
                     m.seekerUncertainty+DT*(1+
@@ -6075,35 +6122,41 @@ public final class Battle {
         double nx=m.x+m.vx*DT,ny=m.y+m.vy*DT;
         double aircraftAt=segmentHit(m.x,m.y,nx,ny,
                 target.x,target.y,6.0);
-        double flareAt=Double.POSITIVE_INFINITY;
+        double decoyAt=Double.POSITIVE_INFINITY;
         FighterCountermeasures.Cloud fuze=null;
+        var fooledBand=m.fighterRadarHead!=null?
+                FighterCountermeasures.Kind.CHAFF:
+                FighterCountermeasures.Kind.FLARE;
         if(m.lastFlareId>0)for(var cloud:fighterClouds)
             if(cloud.id()==m.lastFlareId&&
-                    cloud.kind()==FighterCountermeasures.Kind.FLARE&&
-                    cloud.active(tick)){
+                    cloud.kind()==fooledBand&&cloud.active(tick)){
                 double arrival=segmentHit(m.x,m.y,nx,ny,
                         cloud.xAt(tick),cloud.yAt(tick),8.0);
-                if(arrival<flareAt){flareAt=arrival;fuze=cloud;}
+                if(arrival<decoyAt){decoyAt=arrival;fuze=cloud;}
             }
         // Real swept collision takes precedence if the warhead actually
         // intersects the fighter before reaching the false emission.
-        if(Double.isFinite(aircraftAt)&&aircraftAt<=flareAt){
+        if(Double.isFinite(aircraftAt)&&aircraftAt<=decoyAt){
             m.x+=(nx-m.x)*aircraftAt;m.y+=(ny-m.y)*aircraftAt;
             hitCraft(target,m.damage,findShip(m.sourceId),m.visualId,
-                    "FIGHTER_IR_INTERCEPTOR");
+                    m.fighterRadarHead!=null?
+                            "FIGHTER_RADAR_INTERCEPTOR":"FIGHTER_IR_INTERCEPTOR");
             fighterInterceptorsHit++;
             missiles.remove(index);
-        }else if(fuze!=null&&Double.isFinite(flareAt)){
-            m.x+=(nx-m.x)*flareAt;m.y+=(ny-m.y)*flareAt;
-            fighterFlareFuzes++;
+        }else if(fuze!=null&&Double.isFinite(decoyAt)){
+            m.x+=(nx-m.x)*decoyAt;m.y+=(ny-m.y)*decoyAt;
+            if(m.fighterRadarHead!=null)fighterChaffFuzes++;
+            else fighterFlareFuzes++;
             missiles.remove(index);
-            visual(m.visualId,VisualPhase.TIMEOUT,"FIGHTER_IR_FLARE_FUZE",
+            visual(m.visualId,VisualPhase.TIMEOUT,m.fighterRadarHead!=null?
+                            "FIGHTER_RADAR_CHAFF_FUZE":"FIGHTER_IR_FLARE_FUZE",
                     m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
         }else{
             m.x=nx;m.y=ny;
             if(!BattleArena.contains(nx,ny)){
                 missiles.remove(index);
-                visual(m.visualId,VisualPhase.TIMEOUT,"FIGHTER_IR_INTERCEPTOR",
+                visual(m.visualId,VisualPhase.TIMEOUT,m.fighterRadarHead==null?
+                                "FIGHTER_IR_INTERCEPTOR":"FIGHTER_RADAR_INTERCEPTOR",
                         m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
             }
         }
@@ -6915,6 +6968,8 @@ public final class Battle {
         hash=mix(hash,fighterInterceptorsHit);
         hash=mix(hash,fighterFlareSeekerDiversions);
         hash=mix(hash,fighterFlareFuzes);
+        hash=mix(hash,fighterChaffSeekerDiversions);
+        hash=mix(hash,fighterChaffFuzes);
         for(FighterCountermeasures.Cloud cloud:fighterClouds){
             hash=mix(hash,cloud.id());
             hash=mix(hash,cloud.kind().ordinal());
