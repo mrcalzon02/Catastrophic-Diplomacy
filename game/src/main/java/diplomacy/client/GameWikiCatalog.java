@@ -17,6 +17,7 @@ import diplomacy.sim.Battle;
 import java.util.ArrayList;
 import java.util.AbstractList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -43,6 +44,7 @@ final class GameWikiCatalog {
         }
     }
     private final List<Article> articles;
+    private final List<Article> upgradeArticles;
     private final List<Article> staticArticles;
     private final List<String> upgradeIds;
     private final TechnologyCatalog technology;
@@ -62,14 +64,69 @@ final class GameWikiCatalog {
         upgradeIds=List.copyOf(ids);
         if(upgradeIds.size()!=technology.upgradeCount())
             throw new IllegalStateException("Incomplete virtual research encyclopedia");
+        // Both ALL and UPGRADES pages retain only a compact canonical-ID index.
+        // Article text is generated for the selected/visible rows, not at load.
+        upgradeArticles=new AbstractList<>() {
+            @Override public int size(){return upgradeIds.size();}
+            @Override public Article get(int index){
+                return upgradeArticle(technology.get(upgradeIds.get(index)));
+            }
+        };
         articles=new AbstractList<>() {
             @Override public int size(){return staticArticles.size()+upgradeIds.size();}
             @Override public Article get(int index){
                 if(index<0||index>=size())throw new IndexOutOfBoundsException(index);
                 if(index<staticArticles.size())return staticArticles.get(index);
-                return upgradeArticle(technology.get(upgradeIds.get(index-staticArticles.size())));
+                return upgradeArticles.get(index-staticArticles.size());
             }
         };
+    }
+    /**
+     * Filtered results hold only IDs for generated research articles. A broad
+     * query such as "research" previously retained tens of thousands of
+     * formatted paragraphs and concatenated search strings in a tiny Android
+     * heap. Resolve a result only when a page row is actually requested.
+     */
+    private final class IndexedArticles extends AbstractList<Article> {
+        private final List<Article> fixed;
+        private final List<String> matchedIds;
+        IndexedArticles(List<Article> fixed,List<String> matchedIds){
+            this.fixed=List.copyOf(fixed);
+            this.matchedIds=List.copyOf(matchedIds);
+        }
+        @Override public int size(){return fixed.size()+matchedIds.size();}
+        @Override public Article get(int index){
+            if(index<0||index>=size())throw new IndexOutOfBoundsException(index);
+            if(index<fixed.size())return fixed.get(index);
+            return upgradeArticle(technology.get(matchedIds.get(index-fixed.size())));
+        }
+        int indexOfId(String id){
+            for(int i=0;i<fixed.size();i++)if(fixed.get(i).id.equals(id))return i;
+            if(id.startsWith("upgrade.")){
+                String key=id.substring("upgrade.".length());
+                // Matched IDs remain sorted because their source index is sorted.
+                int i=Collections.binarySearch(matchedIds,key);
+                if(i>=0)return fixed.size()+i;
+            }
+            return -1;
+        }
+    }
+    /** Selection restoration must never instantiate every virtual article. */
+    int indexOfId(List<Article> results,String id){
+        if(id==null||results==null)return -1;
+        if(results instanceof IndexedArticles indexed)return indexed.indexOfId(id);
+        if(results==articles||results==upgradeArticles){
+            if(id.startsWith("upgrade.")){
+                int index=Collections.binarySearch(upgradeIds,id.substring("upgrade.".length()));
+                if(index>=0)return results==articles?staticArticles.size()+index:index;
+            }
+            if(results==articles)
+                for(int i=0;i<staticArticles.size();i++)
+                    if(staticArticles.get(i).id.equals(id))return i;
+            return -1;
+        }
+        for(int i=0;i<results.size();i++)if(results.get(i).id.equals(id))return i;
+        return -1;
     }
     List<Article> articles(){return articles;}
     int size(){return articles.size();}
@@ -387,17 +444,12 @@ final class GameWikiCatalog {
     List<Article> search(String category,String query){
         String needle=(query==null?"":query.trim()).toLowerCase(Locale.ROOT).replace('_',' ');
         String selected=(category==null?"ALL":category);
-        // Unfiltered ALL/UPGRADES views are virtual paged lists: no forty
-        // thousand eagerly allocated article details, even if the UI shows
-        // "RESULTS 39600" and supports random list-page selection.
+        // Unfiltered views remain a virtual paginated index.
         if(needle.isEmpty()){
             if(selected.equals("ALL"))return articles;
-            if(selected.equals("UPGRADES"))
-                return articles.subList(staticArticles.size(),articles.size());
+            if(selected.equals("UPGRADES"))return upgradeArticles;
         }
-        // Exact technology identifiers are common shipyard lookups. Resolve
-        // directly instead of materializing and searching every research
-        // article on a memory-constrained Android handset.
+        // Preserve exact authoritative ID lookup without scanning every stage.
         if((selected.equals("ALL")||selected.equals("UPGRADES")) &&
                 needle.startsWith("tech-") && needle.length()>15 &&
                 Character.isDigit(needle.charAt(needle.length()-1))){
@@ -405,21 +457,29 @@ final class GameWikiCatalog {
                     needle.toUpperCase(Locale.ROOT));
             if(direct!=null)return List.of(upgradeArticle(direct));
         }
-        List<Article> hits=new ArrayList<>();
+        List<Article> fixed=new ArrayList<>();
         if(!selected.equals("UPGRADES"))
             for(Article article:staticArticles)
                 if((selected.equals("ALL")||article.category.equals(selected))
                         &&(needle.isEmpty()||article.searchable.contains(needle)))
-                    hits.add(article);
-        if(selected.equals("ALL")||selected.equals("UPGRADES"))
-            for(String id:upgradeIds){
-                // Avoid constructing the full text for an ID query when the
-                // searched ID itself matches; otherwise generate briefly,
-                // retain only actual matches, then release the Article.
-                Article article=upgradeArticle(technology.get(id));
-                if(needle.isEmpty()||article.searchable.contains(needle))
-                    hits.add(article);
+                    fixed.add(article);
+        if(!selected.equals("ALL")&&!selected.equals("UPGRADES"))return fixed;
+
+        List<String> matchedIds=new ArrayList<>();
+        for(String id:upgradeIds){
+            // Searching the canonical ID is a common case and requires no
+            // transient formatted research article or numeric formatting.
+            if(id.toLowerCase(Locale.ROOT).contains(needle)){
+                matchedIds.add(id);
+                continue;
             }
-        return hits;
+            // Preserve full-text search semantics, including tradeoffs and
+            // numeric stats: inspect transient text but retain only the ID.
+            // A separate indexed metadata stage can accelerate this later.
+            Article article=upgradeArticle(technology.get(id));
+            if(article.searchable.contains(needle))matchedIds.add(id);
+        }
+        return new IndexedArticles(fixed,matchedIds);
     }
+
 }
