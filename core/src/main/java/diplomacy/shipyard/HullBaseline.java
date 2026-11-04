@@ -86,7 +86,11 @@ public final class HullBaseline {
                 28+mass*.12+generation*1.5,
                 24+mass*.12+generation*1.4,
                 capacity,capacity,
-                120+mass*.48+generation*8,
+                // Carry 25% more integrated reaction mass for sustained
+                // maneuver, sensor-contact searches, and eventual retreat.
+                // Thrust, speed, finite delta-V debit, and paid refills are
+                // unchanged; optional fuel modules remain additive.
+                (120+mass*.48+generation*8)*1.25,
                 24+(int)(mass*.09),4+(int)(mass*.012),
                 2+(int)(mass*.004));
     }
