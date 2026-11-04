@@ -31,11 +31,21 @@ final class CombatDiagnosticRecorder {
     private int peakShips,peakCraft,peakOrdnance;
     private int frameCount,eventCount,framePosition,eventPosition;
     private long totalFrames,droppedFrames,startedMillis;
+    private long battleSeed,firstTick;
+    private int startingShips;
+    private boolean hasBattleMetadata;
     private boolean recording;
     boolean recording(){return recording;}
     long framesRecorded(){return totalFrames;}
     long framesOverwritten(){return droppedFrames;}
-    void start(){
+    void start(){start(0L,0L,0,false);}
+    /** Capture the original deterministic encounter identity, not a later restart. */
+    void start(long seed,long tick,int ships){start(seed,tick,ships,true);}
+    private void start(long seed,long tick,int ships,boolean hasMetadata){
+        battleSeed=seed;
+        firstTick=tick;
+        startingShips=Math.max(0,ships);
+        hasBattleMetadata=hasMetadata;
         frameCount=eventCount=framePosition=eventPosition=0;
         totalFrames=droppedFrames=0;
         peakShips=peakCraft=peakOrdnance=0;
@@ -142,6 +152,9 @@ final class CombatDiagnosticRecorder {
         try(ZipOutputStream zip=new ZipOutputStream(destination,StandardCharsets.UTF_8)){
             entry(zip,"metadata.json","{\n  \"schema\": 1,\n  \"platform\": \""+
                     p+"\",\n  \"startedEpochMillis\": "+startedMillis+
+                    ",\n  \"battleSeed\": "+(hasBattleMetadata?Long.toString(battleSeed):"null")+
+                    ",\n  \"captureStartTick\": "+(hasBattleMetadata?Long.toString(firstTick):"null")+
+                    ",\n  \"shipsAtCaptureStart\": "+startingShips+
                     ",\n  \"finalTick\": "+finalTick+
                     ",\n  \"requestedSpeed\": "+requested+
                     ",\n  \"effectiveSpeed\": "+effective+"\n}\n");
