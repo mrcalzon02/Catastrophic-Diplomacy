@@ -82,6 +82,10 @@ public final class TechnologyCatalog {
             "OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST");
     private static final int VIRTUAL_SURVIVAL_NODES=48*11*4*9;
     private static final int VIRTUAL_NETWORK_NODES=24*11*4*9;
+    // 36 sensing models share immutable numeric tier templates with their
+    // parent hardware, retaining all separate research identities on demand.
+    private static final int VIRTUAL_SENSING_NODES=SensingVariantCatalog.VARIANTS.size()
+            *VARIANT_FACTIONS.size()*VARIANT_TRACKS.size()*9;
     private final int upgradeTotal;
     private final Set<String> components;
     private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base,
@@ -100,7 +104,8 @@ public final class TechnologyCatalog {
                 finalBranches++;
             }
         upgradeTotal=Math.addExact(Math.addExact(map.size(),Math.multiplyExact(finalBranches,3)),
-                generateHigherStages?VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES:0);
+                generateHigherStages?VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES+
+                        VIRTUAL_SENSING_NODES:0);
         upgrades=generateHigherStages?Collections.unmodifiableMap(new LazyUpgrades()):
                 sixStages;
         baseComponents=Collections.unmodifiableMap(base);
@@ -112,6 +117,8 @@ public final class TechnologyCatalog {
         Upgrade virtual=survivalVariantUpgrade(id);
         if(virtual!=null)return virtual;
         virtual=networkVariantUpgrade(id);
+        if(virtual!=null)return virtual;
+        virtual=sensingVariantUpgrade(id);
         if(virtual!=null)return virtual;
         Upgrade found=sixStages.get(id);
         if(found!=null||!deferredHigherStages||id==null||id.length()<4)return found;
@@ -216,6 +223,42 @@ public final class TechnologyCatalog {
         return new Upgrade(cells);
     }
 
+    /**
+     * A model's own research identity retains the source family's exact
+     * Stage I–IX costs and physical modifiers, while its separate name,
+     * prerequisite and tradeoff remain identical to the former cloned rows.
+     */
+    private Upgrade sensingVariantUpgrade(String id){
+        if(!deferredHigherStages||id==null)return null;
+        String[] parts=id.split("-",5);
+        if(parts.length!=5||!"TECH".equals(parts[0])||
+                !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
+                !parts[4].matches("0[1-9]"))return null;
+        SensingVariantCatalog.Model model=SensingVariantCatalog.find(parts[2]);
+        if(model==null||!baseComponents.containsKey(
+                "BASE-"+parts[1]+"-"+model.code()))return null;
+        int stage=parts[4].charAt(1)-'0';
+        Upgrade parent=get("TECH-"+parts[1]+"-"+model.base()+"-"+
+                parts[3]+"-"+parts[4]);
+        if(parent==null)return null;
+        String prerequisite=stage==1?"BASE-"+parts[1]+"-"+model.code():
+                "TECH-"+parts[1]+"-"+model.code()+"-"+parts[3]+"-"+
+                        String.format(Locale.ROOT,"%02d",stage-1);
+        String name=model.name()+" "+parts[3]+" "+
+                (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
+        ArrayList<String> cells=new ArrayList<>(COLS);
+        Collections.addAll(cells,id,parts[1],model.code(),parts[3],
+                Integer.toString(stage),name,prerequisite,
+                Integer.toString(parent.researchCost),
+                Integer.toString(parent.industryCost));
+        for(double value:new double[]{parent.mass,parent.power,parent.heat,
+                parent.output,parent.accuracy,parent.integrity,parent.shield,
+                parent.thrust,parent.cooling,parent.maintenance})
+            cells.add(ratio(value,1));
+        cells.add(model.name()+": "+parent.tradeoff);
+        return new Upgrade(cells);
+    }
+
     public boolean hasBase(String id) { return components.contains(id); }
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
@@ -240,6 +283,13 @@ public final class TechnologyCatalog {
         if(deferredHigherStages)
             for(String faction:VARIANT_FACTIONS)
                 for(SensorNetworkCatalog.Model variant:SensorNetworkCatalog.VARIANTS)
+                    for(String track:VARIANT_TRACKS)
+                        for(int rank=1;rank<=9;rank++)
+                            ids.add("TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
+                                    String.format(Locale.ROOT,"%02d",rank));
+        if(deferredHigherStages)
+            for(String faction:VARIANT_FACTIONS)
+                for(SensingVariantCatalog.Model variant:SensingVariantCatalog.VARIANTS)
                     for(String track:VARIANT_TRACKS)
                         for(int rank=1;rank<=9;rank++)
                             ids.add("TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
@@ -274,7 +324,8 @@ public final class TechnologyCatalog {
                                 Upgrade test=branch.next();
                                 if(test.stage==6){nextBranch=test;higher=7;return true;}
                             }
-                            return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES;
+                            return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES+
+                                    VIRTUAL_NETWORK_NODES+VIRTUAL_SENSING_NODES;
                         }
                         @Override public Entry<String,Upgrade> next(){
                             if(early.hasNext())return early.next();
@@ -287,20 +338,27 @@ public final class TechnologyCatalog {
                             }
                             int index=virtualIndex++;
                             boolean survival=index<VIRTUAL_SURVIVAL_NODES;
-                            int n=survival?index:index-VIRTUAL_SURVIVAL_NODES;
+                            boolean network=!survival&&
+                                    index<VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES;
+                            int n=survival?index:network?index-VIRTUAL_SURVIVAL_NODES:
+                                    index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES;
                             int stage=n%9+1;
                             n/=9;
-                            String track=VARIANT_TRACKS.get(n%4);
-                            n/=4;
+                            String track=VARIANT_TRACKS.get(n%VARIANT_TRACKS.size());
+                            n/=VARIANT_TRACKS.size();
                             String code;
                             if(survival){
                                 code=SurvivalHardwareCatalog.VARIANTS.get(
                                         n%SurvivalHardwareCatalog.VARIANTS.size()).code();
                                 n/=SurvivalHardwareCatalog.VARIANTS.size();
-                            }else{
+                            }else if(network){
                                 code=SensorNetworkCatalog.VARIANTS.get(
                                         n%SensorNetworkCatalog.VARIANTS.size()).code();
                                 n/=SensorNetworkCatalog.VARIANTS.size();
+                            }else{
+                                code=SensingVariantCatalog.VARIANTS.get(
+                                        n%SensingVariantCatalog.VARIANTS.size()).code();
+                                n/=SensingVariantCatalog.VARIANTS.size();
                             }
                             String id="TECH-"+VARIANT_FACTIONS.get(n)+"-"+code+"-"+
                                     track+"-"+String.format(Locale.ROOT,"%02d",stage);
@@ -336,7 +394,7 @@ public final class TechnologyCatalog {
             addTenderFamilies(bases,rows);
             addArmorAndBulkheadFamilies(bases,rows);
             addSensingFamilies(bases,rows);
-            addSensingHardwareVariants(bases,rows);
+            addSensingHardwareVariants(bases);
             addSensorNetworkFamilies(bases,rows);
             addSensorNetworkVariants(bases);
             addSurvivalAndUnsafeFamilies(bases,rows);
@@ -817,10 +875,8 @@ public final class TechnologyCatalog {
 
     /** Each root sensor line gains four independent hardware research chains.
      * Clone six-stage root data, then pass through the existing IX-rank engine. */
-    private static void addSensingHardwareVariants(List<List<String>> bases,
-                                                   List<List<String>> upgrades) {
+    private static void addSensingHardwareVariants(List<List<String>> bases) {
         List<List<String>> roots=List.copyOf(bases);
-        List<List<String>> research=List.copyOf(upgrades);
         for(SensingVariantCatalog.Model model:SensingVariantCatalog.VARIANTS) {
             String parent=model.base(),code=model.code();
             for(int i=1;i<roots.size();i++) {
@@ -841,17 +897,7 @@ public final class TechnologyCatalog {
                         model.requiredTier()+" with mass, heat, power and efficiency tradeoffs");
                 bases.add(row);
             }
-            for(int i=1;i<research.size();i++) {
-                List<String> source=research.get(i);
-                if(!parent.equals(source.get(2)))continue;
-                List<String> row=new ArrayList<>(source);
-                row.set(0,row.get(0).replace("-"+parent+"-","-"+code+"-"));
-                row.set(2,code);row.set(5,model.name()+" "+row.get(3)+" "+row.get(4));
-                row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
-                        .replace("-"+parent,"-"+code));
-                row.set(19,model.name()+": "+row.get(19));
-                upgrades.add(row);
-            }
+
         }
     }
 
