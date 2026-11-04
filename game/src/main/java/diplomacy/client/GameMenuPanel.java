@@ -182,19 +182,19 @@ final class GameMenuPanel {
         }
         return result;
     }
-    /** Real hit routing: 0/1 select hull, 2..24 tune independent policies,
-     * 30 returns, 31 toggles doctrine page. */
+    /** Real hit routing: 0/1 select hull, 2..24 tune combat/support,
+     * 63+ tune resource/fuel policy, 30 returns and 31 cycles pages. */
     static int ordersAction(float x,float y){return ordersAction(x,y,0);}
     static int ordersAction(float x,float y,int page){
         if(hit(x,y,650,561,110,40))return 0;
         if(hit(x,y,1108,561,112,40))return 1;
         if(hit(x,y,785,561,296,40))return 31;
-        int first=page==0?0:page==1?13:23;
-        int end=page==0?13:page==1?23:ShipStandingOrders.SETTINGS.length;
+        int first=page==0?0:page==1?13:page==2?23:29;
+        int end=page==0?13:page==1?23:page==2?29:ShipStandingOrders.SETTINGS.length;
         for(int i=first;i<end;i++){
-            float rowY=page==2?519-(i-first)*62:519-(i-first)*29;
-            if(hit(x,y,650,rowY,570,page==2?54:27))
-                return page==2?40+i:2+i;
+            float rowY=page>=2?519-(i-first)*62:519-(i-first)*29;
+            if(hit(x,y,650,rowY,570,page>=2?54:27))
+                return page>=2?40+i:2+i;
         }
         if(hit(x,y,900,32,300,55))return 30;
         return -1;
@@ -658,11 +658,12 @@ final class GameMenuPanel {
                 button(shapes,650,561,110,40,false);
                 button(shapes,1108,561,112,40,false);
                 button(shapes,785,561,296,40,true);
-                int start=standingPage==0?0:standingPage==1?13:23;
-                int end=standingPage==0?13:standingPage==1?23:ShipStandingOrders.SETTINGS.length;
+                int start=standingPage==0?0:standingPage==1?13:standingPage==2?23:29;
+                int end=standingPage==0?13:standingPage==1?23:standingPage==2?29:
+                        ShipStandingOrders.SETTINGS.length;
                 for(int i=start;i<end;i++)
-                    button(shapes,650,standingPage==2?519-(i-start)*62:
-                            519-(i-start)*29,570,standingPage==2?54:27,false);
+                    button(shapes,650,standingPage>=2?519-(i-start)*62:
+                            519-(i-start)*29,570,standingPage>=2?54:27,false);
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
@@ -1123,11 +1124,13 @@ final class GameMenuPanel {
                 label(batch,font,"NEXT >",1122,584,Color.WHITE);
                 label(batch,font,standingPage==0?"PAGE 1: COMBAT / NEXT >":
                         standingPage==1?"PAGE 2: SUPPORT / NEXT >":
-                        "PAGE 3: FIRE / AMMO / NEXT >",799,585,Color.GOLD);
-                int start=standingPage==0?0:standingPage==1?13:23;
-                int end=standingPage==0?13:standingPage==1?23:ShipStandingOrders.SETTINGS.length;
+                        standingPage==2?"PAGE 3: FIRE / AMMO / NEXT >":
+                        "PAGE 4: FUEL / THRUST / NEXT >",799,585,Color.GOLD);
+                int start=standingPage==0?0:standingPage==1?13:standingPage==2?23:29;
+                int end=standingPage==0?13:standingPage==1?23:standingPage==2?29:
+                        ShipStandingOrders.SETTINGS.length;
                 for(int i=start;i<end;i++){
-                    float y=standingPage==2?538-(i-start)*62:538-(i-start)*29;
+                    float y=standingPage>=2?538-(i-start)*62:538-(i-start)*29;
                     label(batch,font,"< "+ShipStandingOrders.SETTINGS[i],661,y,MUTED);
                     label(batch,font,policy.display(i)+" >",1006,y,Color.WHITE);
                 }
