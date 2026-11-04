@@ -2748,6 +2748,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     Math.max(.08f,height/520f);
             battleCamera.update();
         }
+        if(audio!=null)audio.setSimulationSpeed(verifyDemo?
+                CombatPace.DEFAULT:paceGovernor.effective());
         if (audio != null) audio.advance(battle,battleCamera.position.x,
                 battleCamera.position.y,battleCamera.zoom,
                 running && !tacticalMenuOpen && !shipyard.open()
