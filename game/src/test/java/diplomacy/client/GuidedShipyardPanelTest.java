@@ -3,6 +3,7 @@ package diplomacy.client;
 import diplomacy.shipyard.OrdnanceFitting;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.sim.Battle;
+import diplomacy.sim.FighterModel;
 import diplomacy.sim.AmmunitionTable;
 import diplomacy.sim.OrdnanceDoctrine;
 import diplomacy.sim.OrdnanceGuidance;
@@ -47,6 +48,27 @@ public final class GuidedShipyardPanelTest {
                 ShipyardPanel.guidedOptionHit(985,98)==-1,
                 "Clicking outside the controls must not change a weapon");
         var catalog=TechnologyCatalog.loadDefault();
+        var interceptor=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CRUISER)
+                .withFighterHull(FighterModel.Hull.INTERCEPTOR);
+        int ftr=-1;
+        for(var slot:interceptor.placements())
+            if(slot.mount()==Shipyard.Mount.SUPPORT){ftr=slot.index();break;}
+        check(ftr>=0,"Missing physical FTR hangar");
+        var stockFtr=interceptor.install(ftr,"BASE-TER-FTR");
+        check(ShipyardPanel.chooseFighterSeeker(stockFtr).fighterSeeker==
+                FighterModel.Seeker.INFRARED,"Unpaid seeker displayed as selectable");
+        var advancedFtr=stockFtr.stage(ftr,Shipyard.Track.SPECIALIST,5);
+        var opticalFtr=ShipyardPanel.chooseFighterSeeker(advancedFtr);
+        var radarFtr=ShipyardPanel.chooseFighterSeeker(opticalFtr);
+        check(opticalFtr.fighterSeeker==FighterModel.Seeker.OPTICAL&&
+                radarFtr.fighterSeeker==FighterModel.Seeker.RADAR&&
+                ShipyardPanel.chooseFighterSeeker(radarFtr).fighterSeeker==
+                        FighterModel.Seeker.INFRARED,
+                "Fighter touch/key mode cycle did not honor fitted alternatives");
+        check(Shipyard.decode(Shipyard.encode(opticalFtr),catalog)
+                        .fighterSeeker==FighterModel.Seeker.OPTICAL,
+                "Panel-selected optical head was lost on blueprint reload");
+        System.out.println("PASS UI fighter seeker selection and saved design");
         var stock=Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.CORVETTE);
         // The real approved PNG is the primary view. These interaction tests
         // remain headless: the fallback schematic still accepts the same sockets.

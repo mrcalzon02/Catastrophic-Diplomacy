@@ -219,6 +219,7 @@ tasks.register('sensorNetworkSmoke', JavaExec) {
     dependsOn(tasks.named('fighterRadarSeekerSmoke'))
     dependsOn(tasks.named('fighterInfraredSeekerSmoke'))
     dependsOn(tasks.named('fighterOpticalSeekerSmoke'))
+    dependsOn(tasks.named('fighterSeekerBlueprintSmoke'))
     dependsOn(tasks.named('fighterCountermeasureSmoke'))
     dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
     dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
@@ -481,6 +482,14 @@ tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
 tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
 tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
 
+/** Research-licensed fighter seeker choice from saved shipyard to flying missile. */
+tasks.register('fighterSeekerBlueprintSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Fighter seeker licence, old blueprint compatibility, fleet export, real guided combat and replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterSeekerBlueprintTest'
+}
 /** Active fighter radar seeker reflections, chaff and physically fitted missiles. */
 tasks.register('fighterRadarSeekerSmoke', JavaExec) {
     group = 'verification'

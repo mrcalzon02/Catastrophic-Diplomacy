@@ -75,7 +75,7 @@ jobs:
         with: { gradle-version: '8.11.1' }
       - name: Verify objective sensor, weapons, rocket trajectory and game-client functionality
         id: mechanics
-        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:fighterCraftSmoke :core:rocketBarrageSmoke :game:compileJava
+        run: gradle --no-daemon :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:fighterCraftSmoke :core:rocketBarrageSmoke :game:guidedShipyardSmoke :game:compileJava
       - name: Measure optional PD/flak simultaneous fighter-wave balance
         id: wave
         continue-on-error: true

@@ -13,6 +13,8 @@ public final class FighterModel {
         MISSILE_FIGHTER, TORPEDO_BOMBER
     }
     public enum Weapon { CANNON, LASER, PARTICLE, MISSILE, TORPEDO }
+    /** The single fitted missile-head doctrine inherited by interceptor wings. */
+    public enum Seeker { INFRARED, OPTICAL, RADAR }
 
     /** HP, armor pool, speed, sensor reach, radar cross-section, emissions,
      * fuel seconds, weapon hit damage, range, cooldown seconds, and carried shots. */

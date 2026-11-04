@@ -1495,6 +1495,9 @@ public final class Battle {
         s.fighterReserve=machinery.fighterCapacity();
         s.fighterBays=Ship.baysFor(design);
         s.fighterLaunchBays=s.fighterBays.size();
+        // Actual researched blueprint policy, before paid craft launch.
+        s.fighterRadarSelected=design.fighterSeeker==FighterModel.Seeker.RADAR;
+        s.fighterOpticalSelected=design.fighterSeeker==FighterModel.Seeker.OPTICAL;
         s.droneReserve=machinery.droneCapacity();
         s.repairDroneReserve=machinery.support().repairDroneCapacity();
         s.maxKineticAmmo=core.kineticStores()+machinery.magazineCapacity()*4

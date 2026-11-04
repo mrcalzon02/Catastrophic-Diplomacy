@@ -275,6 +275,30 @@ final class ShipyardPanel {
         notice="Fighter hangars now carry "+draft.fighterHull.name().replace('_',' ')
                 +"; APPLY to launch the new fighter loadout";
     }
+    /** Pure selection logic shared by mouse, touch and keyboard. */
+    static Shipyard.Design chooseFighterSeeker(Shipyard.Design design){
+        if(design==null)throw new IllegalArgumentException("Missing fighter design");
+        FighterModel.Seeker[] options=FighterModel.Seeker.values();
+        for(int offset=1;offset<=options.length;offset++){
+            var next=options[(design.fighterSeeker.ordinal()+offset)%options.length];
+            try{return design.withFighterSeeker(next);}
+            catch(IllegalArgumentException unavailable){/* Skip unfitted rank. */}
+        }
+        return design;
+    }
+    private void cycleFighterSeeker(){
+        Shipyard.Installed module=draft.at(selectedSlot);
+        if(module==null||!module.component.endsWith("-FTR")||
+                draft.fighterHull!=FighterModel.Hull.INTERCEPTOR){
+            notice="Select an installed interceptor FTR hangar";return;
+        }
+        Shipyard.Design next=chooseFighterSeeker(draft);
+        if(next.fighterSeeker==draft.fighterSeeker){
+            notice="FTR rank 3 unlocks OPTICAL, rank 5 unlocks RADAR";return;
+        }
+        draft=next;
+        notice="Fighter seeker "+draft.fighterSeeker+" saved; APPLY to use in combat";
+    }
     /** A shared-family controller can use only ammunition researched by all
      * of its installed guns. The blueprint stores this exact choice. */
     private void cycleAmmunition(){
@@ -531,6 +555,7 @@ final class ShipyardPanel {
         if(code==com.badlogic.gdx.Input.Keys.ENTER){apply();return true;}
         if(code==com.badlogic.gdx.Input.Keys.P&&playerOnly){purchaseCampaignHull();return true;}
         if(code==com.badlogic.gdx.Input.Keys.K){cycleFighter();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.Y){cycleFighterSeeker();return true;}
         if(code==com.badlogic.gdx.Input.Keys.V){cyclePattern();return true;}
         if(code==com.badlogic.gdx.Input.Keys.B){cycleMark();return true;}
         if(code==com.badlogic.gdx.Input.Keys.A){cycleAmmunition();return true;}
@@ -844,9 +869,12 @@ final class ShipyardPanel {
                 &&diplomacy.shipyard.HullBaseline.builtInFighterCapacity(draft.hull)>0){
             cycleFighter();return true;
         }
-        if(x>=335&&x<=796&&y>=107&&y<=131
+        if(x>=335&&x<=796&&y>=102&&y<=131
                 &&draft.at(selectedSlot)!=null){
-            cycleAmmunition();return true;
+            if(draft.at(selectedSlot).component.endsWith("-FTR"))
+                cycleFighterSeeker();
+            else cycleAmmunition();
+            return true;
         }
         if(x>=335&&x<=796&&y>=110&&y<=580){
             int hit=hitHardpoint(x,y);
@@ -1416,6 +1444,9 @@ final class ShipyardPanel {
                         "  ARMOR "+units(profile.armor()),342,158);
                 font.draw(batch,"SCAN "+units(profile.sensors())+"  SPEED "+units(profile.speed())+
                         "  AMMO "+profile.ammunition(),342,137);
+                font.setColor(Color.CYAN);
+                font.draw(batch,"SEEKER "+draft.fighterSeeker+
+                        " [Y / TAP] OPT FTR3 / RAD FTR5",342,115);
             }else if(projectile!=null){
                 font.draw(batch,String.format(Locale.ROOT,
                         "PROJECTILE SPEED %.0f  |  HEALTH %.2f",projectile.speed(),

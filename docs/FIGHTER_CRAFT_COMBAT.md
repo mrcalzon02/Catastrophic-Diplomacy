@@ -110,5 +110,16 @@ Focused objective test: `gradle :core:fighterOpticalSeekerSmoke`. It is also a
 dependency of `:core:sensorNetworkSmoke` and tests real fitted interceptor
 engagements, research/selection exclusivity, band isolation, future emissions,
 old light-front expiry, glare angular separation and deterministic replay.
-Optical guidance is not yet a selectable persistent hangar doctrine in campaign
-save files or the shipyard client UI. No hybrid/remote handoff is implied.
+Optical seeker choice now persists in a backward-compatible, append-only
+`CD-SHIP-7` blueprint header when a researched non-default head is selected.
+Existing CD-SHIP-1..6 data retains its exact infrared default. FTR specialist
+rank 3 permits OPTICAL, rank 5 permits RADAR, with only one fitted seeker
+family per interceptor. A hangar removed or downgraded below the selected
+head's research requirement is rejected rather than silently granting gear.
+
+The FTR shipyard control cycles researched options by touch/Y; the saved
+design automatically configures a physically launched fighter missile.
+Changing other approved components, exporting fleets or importing a saved
+ship preserves the selection. The existing campaign refit/purchase authority
+remains unchanged; no unpaid ships or upgrade hardware is created.
+Hybrid/remote handoff remains a separate future integration stage.

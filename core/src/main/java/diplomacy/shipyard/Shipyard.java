@@ -218,6 +218,7 @@ public final class Shipyard {
         private final List<Installed> parts;
         /** Hangar payload is a separately chosen launch loadout, not a cosmetic sprite. */
         public final FighterModel.Hull fighterHull;
+        public final FighterModel.Seeker fighterSeeker;
         public final AmmoSelection ammoSelection;
         public final OrdnanceFitting.Guided missileOrdnance,torpedoOrdnance;
         /** Explicit rack loadouts only; absent slot inherits family configuration. */
@@ -241,7 +242,7 @@ public final class Shipyard {
             if(setting.equals(RocketBarrage.defaults(size)))next.remove(slot);
             else next.put(slot,setting);
             return new Design(faction,hull,name,parts,fighterHull,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,launcherFittings,next).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,launcherFittings,next,fighterSeeker).verifyAmmo();
         }
         public OrdnanceFitting.Mounted launcher(int slot){
             Installed installed=at(slot);
@@ -261,7 +262,7 @@ public final class Shipyard {
             Map<Integer,OrdnanceFitting.Mounted> next=new java.util.TreeMap<>(launcherFittings);
             next.put(slot,selection);
             return new Design(faction,hull,name,parts,fighterHull,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,next,rocketFittings).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,next,rocketFittings,fighterSeeker).verifyAmmo();
         }
         public OrdnanceFitting.Guided ordnance(Battle.DamageType family){
             if(family==Battle.DamageType.MISSILE)return missileOrdnance;
@@ -291,7 +292,16 @@ public final class Shipyard {
                        OrdnanceFitting.Guided missile,OrdnanceFitting.Guided torpedo,
                        Map<Integer,OrdnanceFitting.Mounted> rackFittings,
                        Map<Integer,RocketBarrage.Fitting> rocketPrograms){
-            if(rackFittings==null||rocketPrograms==null)
+            this(group,frame,callSign,mounted,craftType,loadout,
+                    missile,torpedo,rackFittings,rocketPrograms,FighterModel.Seeker.INFRARED);
+        }
+        private Design(Battle.Faction group,Hull frame,String callSign,List<Installed> mounted,
+                       FighterModel.Hull craftType,AmmoSelection loadout,
+                       OrdnanceFitting.Guided missile,OrdnanceFitting.Guided torpedo,
+                       Map<Integer,OrdnanceFitting.Mounted> rackFittings,
+                       Map<Integer,RocketBarrage.Fitting> rocketPrograms,
+                       FighterModel.Seeker seeker){
+            if(rackFittings==null||rocketPrograms==null||seeker==null)
                 throw new IllegalArgumentException("Missing launcher fittings");
             if(group==null||frame==null||callSign==null||callSign.isBlank()||callSign.length()>70)
                 throw new IllegalArgumentException("Invalid vessel identity");
@@ -300,12 +310,29 @@ public final class Shipyard {
             if(craftType==null||loadout==null||missile==null||torpedo==null)
                 throw new IllegalArgumentException("Ship equipment selections required");
             faction=group;hull=frame;name=callSign;fighterHull=craftType;
+            fighterSeeker=seeker;
             ammoSelection=loadout;missileOrdnance=missile;torpedoOrdnance=torpedo;
             parts=Collections.unmodifiableList(new ArrayList<>(mounted));
             launcherFittings=Map.copyOf(rackFittings);
             rocketFittings=Map.copyOf(rocketPrograms);
         }
+        /** Only physically fitted FTR research grants advanced heads. */
+        public int fighterSeekerTier(){
+            int stage=0;
+            for(Installed p:parts)
+                if(p!=null&&p.component.endsWith("-FTR")&&p.branch()!=null)
+                    stage=StrictMath.max(stage,p.stage(p.branch()));
+            return stage;
+        }
         private Design verifyAmmo(){
+            if(fighterSeeker!=FighterModel.Seeker.INFRARED){
+                if(fighterHull!=FighterModel.Hull.INTERCEPTOR)
+                    throw new IllegalArgumentException("Advanced seeker requires interceptor craft");
+                int required=fighterSeeker==FighterModel.Seeker.OPTICAL?3:5;
+                if(fighterSeekerTier()<required)
+                    throw new IllegalArgumentException("Fitted FTR rank "+required+
+                            " required for "+fighterSeeker);
+            }
             AmmunitionResearch.Access available=Shipyard.ammunitionAccess(this);
             if(!available.allows(ammoSelection.kinetic())
                     ||!available.allows(Battle.DamageType.MISSILE,ammoSelection.missile())
@@ -328,11 +355,11 @@ public final class Shipyard {
             OrdnanceFitting.suffix(family);
             return new Design(faction,hull,name,parts,fighterHull,ammoSelection,
                     family==Battle.DamageType.MISSILE?choice:missileOrdnance,
-                    family==Battle.DamageType.TORPEDO?choice:torpedoOrdnance,launcherFittings,rocketFittings).verifyAmmo();
+                    family==Battle.DamageType.TORPEDO?choice:torpedoOrdnance,launcherFittings,rocketFittings,fighterSeeker).verifyAmmo();
         }
         public Design withAmmoSelection(AmmoSelection selected){
             return new Design(faction,hull,name,parts,fighterHull,selected,
-                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings,fighterSeeker).verifyAmmo();
         }
         public Design withKineticAmmunition(AmmunitionTable.Kinetic selected){
             return withAmmoSelection(new AmmoSelection(selected,
@@ -355,11 +382,20 @@ public final class Shipyard {
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(existing.component,existing.stages,pattern,mark));
             return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings,fighterSeeker).verifyAmmo();
         }
         public Design withFighterHull(FighterModel.Hull type) {
+            FighterModel.Seeker next=type==FighterModel.Hull.INTERCEPTOR?
+                    fighterSeeker:FighterModel.Seeker.INFRARED;
             return new Design(faction,hull,name,parts,type,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings,
+                    next).verifyAmmo();
+        }
+        public Design withFighterSeeker(FighterModel.Seeker selected){
+            if(selected==null)throw new IllegalArgumentException("Missing missile head");
+            return new Design(faction,hull,name,parts,fighterHull,ammoSelection,
+                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings,
+                    selected).verifyAmmo();
         }
         public Installed at(int slot) { return parts.get(slot); }
         public int slots() { return parts.size(); }
@@ -388,7 +424,7 @@ public final class Shipyard {
                 guided.remove(slot);
             }
             return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,guided,programs).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,guided,programs,fighterSeeker).verifyAmmo();
         }
         public Design stage(int slot, Track track, int level) {
             if(level<0||level>9||track==null) throw new IllegalArgumentException("Upgrade stage must be 0..9");
@@ -404,7 +440,7 @@ public final class Shipyard {
             List<Installed> changed=new ArrayList<>(parts);
             changed.set(slot,new Installed(current.component,updated,current.pattern,current.mark));
             return new Design(faction,hull,name,changed,fighterHull,ammoSelection,
-                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings).verifyAmmo();
+                    missileOrdnance,torpedoOrdnance,launcherFittings,rocketFittings,fighterSeeker).verifyAmmo();
         }
     }
     public static String factionId(Battle.Faction faction) {
@@ -1290,9 +1326,11 @@ public final class Shipyard {
         boolean specializedAmmo=!design.ammoSelection.equals(AmmoSelection.STANDARD);
         boolean customRack=!design.launcherFittings.isEmpty();
         boolean customRocket=!design.rocketFittings.isEmpty();
+        boolean customSeeker=design.fighterSeeker!=FighterModel.Seeker.INFRARED;
         boolean customGuided=!design.missileOrdnance.equals(OrdnanceFitting.Guided.STANDARD)
                 ||!design.torpedoOrdnance.equals(OrdnanceFitting.Guided.STANDARD);
-        StringBuilder out=new StringBuilder(customRocket?"CD-SHIP-6|":
+        StringBuilder out=new StringBuilder(customSeeker?"CD-SHIP-7|":
+                customRocket?"CD-SHIP-6|":
                 customRack?"CD-SHIP-5|":
                 customGuided?"CD-SHIP-4|":
                 specializedAmmo?"CD-SHIP-3|"
@@ -1302,18 +1340,19 @@ public final class Shipyard {
                 .append(Base64.getUrlEncoder().withoutPadding()
                         .encodeToString(design.name.getBytes(StandardCharsets.UTF_8)));
         // Preserve exact legacy CD-SHIP-1/2 when no purpose-loaded ammo.
-        if(specializedAmmo||customGuided||customRack||customRocket){
+        if(specializedAmmo||customGuided||customRack||customRocket||customSeeker){
             out.append('|').append(design.fighterHull.name())
                     .append('|').append(design.ammoSelection.kinetic().name())
                     .append('|').append(design.ammoSelection.missile().name())
                     .append('|').append(design.ammoSelection.torpedo().name());
-            if(customGuided||customRack||customRocket){
+            if(customGuided||customRack||customRocket||customSeeker){
                 for(OrdnanceFitting.Guided fit:new OrdnanceFitting.Guided[]{
                         design.missileOrdnance,design.torpedoOrdnance})
                     out.append('|').append(fit.salvo().name())
                             .append('|').append(fit.motor().name())
                             .append('|').append(fit.guidance().name());
             }
+            if(customSeeker)out.append('|').append(design.fighterSeeker.name());
         }
         else if(design.fighterHull!=FighterModel.Hull.ASSAULT_GUNSHIP)
             out.append('|').append(design.fighterHull.name());
@@ -1323,7 +1362,8 @@ public final class Shipyard {
             if(installed==null)continue;
             out.append(i).append('|').append(installed.component);
             for(Track track:Track.values())out.append('|').append(installed.stage(track));
-            if(newer||specializedAmmo||customGuided||customRack||customRocket)out.append('|').append(installed.pattern.name())
+            if(newer||specializedAmmo||customGuided||customRack||customRocket||customSeeker)
+                out.append('|').append(installed.pattern.name())
                     .append('|').append(installed.mark);
             out.append('\n');
         }
@@ -1348,12 +1388,13 @@ public final class Shipyard {
         String[] lines=encoded.split("\\n",-1);
         if(lines.length<2||lines.length>70)throw new IllegalArgumentException("Invalid blueprint lines");
         String[] header=lines[0].split("\\|",-1);
-        boolean hasRockets=header.length>=1&&"CD-SHIP-6".equals(header[0]);
+        boolean hasSeeker=header.length>=1&&"CD-SHIP-7".equals(header[0]);
+        boolean hasRockets=hasSeeker||header.length>=1&&"CD-SHIP-6".equals(header[0]);
         boolean hasRacks=hasRockets||header.length>=1&&"CD-SHIP-5".equals(header[0]);
         boolean hasGuided=hasRacks||header.length>=1&&"CD-SHIP-4".equals(header[0]);
         boolean hasAmmo=hasGuided||header.length>=1&&"CD-SHIP-3".equals(header[0]);
         boolean hasVersions=hasAmmo||header.length>=1&&"CD-SHIP-2".equals(header[0]);
-        if((hasGuided?header.length!=14:hasAmmo?header.length!=8:
+        if((hasSeeker?header.length!=15:hasGuided?header.length!=14:hasAmmo?header.length!=8:
                 (header.length!=4&&header.length!=5))
                 ||(!hasVersions&&!"CD-SHIP-1".equals(header[0])))
             throw new IllegalArgumentException("Wrong ship file version");
@@ -1481,6 +1522,14 @@ public final class Shipyard {
         for(var rocket:rocketRows.entrySet())
             design=design.withRocketBarrage(rocket.getKey(),
                     rocket.getValue().count(),rocket.getValue().motor());
+        if(hasSeeker){
+            try{design=design.withFighterSeeker(
+                    FighterModel.Seeker.valueOf(header[14]));}
+            catch(RuntimeException invalid){
+                throw new IllegalArgumentException(
+                        "Invalid or unlicensed interceptor missile head",invalid);
+            }
+        }
         if(!inspect(design,catalog).valid())throw new IllegalArgumentException("Blueprint is not battle ready: "+inspect(design,catalog).explanation());
         return design;
     }
