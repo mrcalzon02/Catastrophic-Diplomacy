@@ -2,7 +2,8 @@
 """Functional Android minSdk 26 gate: reject unsupported Java runtime APIs.
 
 Android 14/API34 supplies some newer Java APIs; Android 10/API29 does not.
-Our build intentionally targets both without installing desugar_jdk_libs 2.1.5.
+Java 9+ collection factories are supported through desugar_jdk_libs 2.1.5,
+but InputStream.readAllBytes/readNBytes remain unavailable on API 29.
 """
 from pathlib import Path
 import re
