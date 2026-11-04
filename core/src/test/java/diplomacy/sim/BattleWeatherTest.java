@@ -10,10 +10,17 @@ public final class BattleWeatherTest {
         var nebula=Battle.duel(3781L,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         nebula.configureWeather(new SpaceWeather.Preset(2,991,SpaceWeather.Kind.NEBULA,
                 SpaceWeather.Kind.CLEAR,1));
-        clear.step();
-        nebula.step();
-        check(clear.missiles().size()>0,"Clear visibility permits first-volley missiles");
-        check(nebula.missiles().isEmpty(),"Nebula blocks initial target acquisition");
+        // Both battles begin without arrived light from the distant target.
+        // Advance in lockstep until the clear-weather fleet actually launches;
+        // the nebula must not gain a free early fire-control observation.
+        for(int i=0;i<110 && clear.missiles().isEmpty();i++){
+            clear.step();
+            nebula.step();
+        }
+        check(!clear.missiles().isEmpty(),
+                "Clear visibility permits missiles after a physical sensor delay");
+        check(nebula.missiles().isEmpty(),
+                "Nebula blocks the corresponding first clear-weather salvo");
         check(nebula.weather().sensorFactor()<1&&nebula.weather().accuracyFactor()<1,
                 "Weather modifies sensors and aim");
         // Repeated encounters with identical weather and seeds must be bit-for-bit reproducible.
