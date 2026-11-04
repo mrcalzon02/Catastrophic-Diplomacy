@@ -27,8 +27,19 @@ public final class ProjectileModuleTest {
                 =defended.particleDamage=defended.missileDamage=defended.torpedoDamage=0;
         defended.pdRange=140;
         defended.pointDefenseProfile=ProjectileModel.STANDARD_PD;
-        test.step(); // missile spawns at 230; hostile PD acquires at 250 distance
-        return defended.pdReload>0;
+        // Missile launch first needs a causally received target observation.
+        // A strong signature must trigger a *real PD shot* while the missile
+        // is still outside nominal range, not merely after it reaches 140.
+        for(int frame=0;frame<160;frame++){
+            test.step();
+            for(Battle.VisualEvent event:test.visualEvents())
+                if(event.team()==1&&event.phase()==Battle.VisualPhase.FIRE&&
+                        event.weapon().equals("POINT_DEFENSE")&&
+                        StrictMath.hypot(event.targetX()-defended.x,
+                                event.targetY()-defended.y)>140)
+                    return true;
+        }
+        return false;
     }
     /** Different fighter launchers intentionally create alternate missile specs.
      * Validate ONLY the fitted ship's main battery, not armed fighter payloads. */
