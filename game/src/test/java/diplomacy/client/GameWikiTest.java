@@ -114,6 +114,27 @@ public final class GameWikiTest {
                 "No-match full text search must not fabricate an entry");
         System.out.println("PROFILE wiki broad full-text search ms="+broadSearchMillis+
                 " matchingIds="+broad.size());
+        // Oracle parity for arbitrary FULL-TEXT searches. These intentionally
+        // compare every entry against the authoritative Article.searchable text,
+        // not a hand-picked list of expected IDs or a reduced search corpus.
+        // Include metadata, physical numeric formatting and branch prose.
+        for(String needle:new String[]{"plasma","power x1.00",
+                "research branch purpose: increases"}){
+            var matches=catalog.search("UPGRADES",needle);
+            java.util.Set<String> returned=new java.util.HashSet<>();
+            for(var article:matches)
+                check(returned.add(article.id),"Duplicate free-text search result "+article.id);
+            int expectedCount=0;
+            for(int i=0;i<stages;i++){
+                var article=catalog.articles().get(firstResearchArticle+i);
+                boolean shouldMatch=article.searchable.contains(needle);
+                if(shouldMatch)expectedCount++;
+                check(shouldMatch==returned.contains(article.id),
+                        "Full-text search parity drift for '"+needle+"' on "+article.id);
+            }
+            check(matches.size()==expectedCount,
+                    "Full-text search result count drift for "+needle);
+        }
         GameWikiPanel ui=new GameWikiPanel(catalog,true);
         check(ui.resultCount()>8&&ui.categoryIndex()==1,"Mobile guide landing page absent");
         ui.setCategory(0);
