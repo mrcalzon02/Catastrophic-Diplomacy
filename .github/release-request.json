@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 6,
-  "note": "User-requested Windows MSI and Android APK release blocker repairs completed through source 722a4fb756b06595b89ed3e340517066a27c9673. Focused functional release blocker gate 41892139339 passed all seven failed Windows/Linux regressions and Android source API compatibility. Require new signed APK with Android 10 desugaring, API29 11-faction campaign and actual upgrade tests, API34 rendered combat and upgrade tests; required real Windows MSI install/launch/uninstall, Linux launch and checksums. Do not publish on functional failures. Real physical device certification not claimed."
+  "revision": 7,
+  "note": "User requested updated signed Android APK and Windows MSI. Release 679 uncovered valid Windows 400-ship view bounds fixture and Linux 200-vs-200 mixed fleet short-range weapons fixture errors; repaired on main 45e73659deeac2faf11600c8054faab524e93dd0, focused regression run 41893720052 passed including actual 400-ship culling and two deterministic 480-tick 200v200 all-six-weapon/fighter battles. Android signed build completed and initial API29 campaigns passed on previous attempt, but full fresh API29/API34 and real Windows MSI install/launch/uninstall/Linux launch/updates/checksums must pass. Do not publish on any functional failure."
 }
