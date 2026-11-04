@@ -69,10 +69,37 @@ public final class TechnologyCatalogTest {
                 require(c.base(id).category.equals(c.base("BASE-"+faction+"-"+model.base()).category),
                         "Variant changed required physical socket: "+id);
                 for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
-                    for(int rank=1;rank<=9;rank++)
-                        require(c.get("TECH-"+faction+"-"+model.code()+"-"+track+"-"+
-                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
-                                "Missing variant research "+id+" "+track+" "+rank);
+                    for(int rank=1;rank<=9;rank++){
+                        String stage=String.format(java.util.Locale.ROOT,"%02d",rank);
+                        var variant=c.get("TECH-"+faction+"-"+model.code()+"-"+track+"-"+stage);
+                        var parent=c.get("TECH-"+faction+"-"+model.base()+"-"+track+"-"+stage);
+                        require(variant!=null&&parent!=null,
+                                "Missing virtual sensing tier "+id+" "+track+" "+rank);
+                        require(variant.stage==rank&&variant.faction.equals(faction)&&
+                                variant.subsystem.equals(model.code())&&variant.track.equals(track),
+                                "Variant identity changed "+variant.id);
+                        require(variant.prerequisite.equals(rank==1?id:
+                                "TECH-"+faction+"-"+model.code()+"-"+track+"-"+
+                                        String.format(java.util.Locale.ROOT,"%02d",rank-1)),
+                                "Virtual sensing prerequisite changed "+variant.id);
+                        require(variant.researchCost==parent.researchCost &&
+                                variant.industryCost==parent.industryCost &&
+                                Double.compare(variant.mass,parent.mass)==0 &&
+                                Double.compare(variant.power,parent.power)==0 &&
+                                Double.compare(variant.heat,parent.heat)==0 &&
+                                Double.compare(variant.output,parent.output)==0 &&
+                                Double.compare(variant.accuracy,parent.accuracy)==0 &&
+                                Double.compare(variant.integrity,parent.integrity)==0 &&
+                                Double.compare(variant.shield,parent.shield)==0 &&
+                                Double.compare(variant.thrust,parent.thrust)==0 &&
+                                Double.compare(variant.cooling,parent.cooling)==0 &&
+                                Double.compare(variant.maintenance,parent.maintenance)==0,
+                                "Virtual sensing stats drift from identical source "+variant.id);
+                        require(variant.name.equals(model.name()+" "+track+" "+
+                                (rank<=6?rank:"6 / Stage "+rank)) &&
+                                variant.tradeoff.equals(model.name()+": "+parent.tradeoff),
+                                "Virtual sensing descriptive fields changed "+variant.id);
+                    }
             }
 
             for(var variant:SurvivalHardwareCatalog.VARIANTS){
