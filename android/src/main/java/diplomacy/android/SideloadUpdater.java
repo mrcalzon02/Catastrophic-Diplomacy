@@ -40,7 +40,7 @@ import org.json.JSONObject;
 /** User-initiated, HTTPS-only GitHub release installer for sideloaded Android builds. */
 final class SideloadUpdater {
     private static final String RELEASE_API = "https://api.github.com/repos/" +
-            UpdatePolicy.REPOSITORY + "/releases?per_page=100&page=";
+            UpdatePolicy.REPOSITORY + "/releases?per_page=" + PER_PAGE + "&page=";
     // A single 100-release JSON page previously allocated a contiguous 2 MiB
     // array while the game was launching on a 16 MiB Android 10 VM. Scan in
     // small pages with the SAME 2000-release horizon and newest-published
