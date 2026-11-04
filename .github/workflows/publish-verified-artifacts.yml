@@ -1,0 +1,157 @@
+# Recover a fully tested three-platform release after an authorization-only
+# failure. This never bypasses game tests and never rebuilds or retags binaries.
+name: Publish previously verified three-platform artifacts
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: 'Completed three-platform release run whose only failed job was publish'
+        required: true
+        default: '41908916178'
+
+# Source artifacts use the short-lived Actions read token. Release publishing
+# deliberately uses a separate user-configured fine-grained repo token.
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish-verified:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.CD_RELEASE_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      CD_SOURCE_RUN: ${{ inputs.source_run_id }}
+    steps:
+      - name: Require release authorization and independently audit original functional jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo 'BLOCKED: configure repository secret CD_RELEASE_TOKEN with Contents: write and Workflows: write, limited to this repository'
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/main" || ! "$CD_SOURCE_RUN" =~ ^[0-9]+$ ]]; then
+            echo 'BLOCKED: publish recovery must be dispatched from main with a numeric source run ID'
+            exit 1
+          fi
+          gh api "repos/$GH_REPO/actions/runs/$CD_SOURCE_RUN" > source-run.json
+          gh api "repos/$GH_REPO/actions/runs/$CD_SOURCE_RUN/jobs?per_page=100" > source-jobs.json
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          run=json.loads(pathlib.Path('source-run.json').read_text())
+          jobs=json.loads(pathlib.Path('source-jobs.json').read_text())['jobs']
+          if (run.get('name')!='Manual verified three-platform release' or
+              run.get('head_branch')!='main' or run.get('event')!='push' or
+              run.get('status')!='completed' or run.get('conclusion')!='failure'):
+              raise SystemExit('BLOCKED: source is not a completed failed main-branch release run')
+          sha=run.get('head_sha','')
+          number=run.get('run_number')
+          if not re.fullmatch(r'[0-9a-f]{40}',sha) or not isinstance(number,int) or number<=0:
+              raise SystemExit('BLOCKED: source run identity invalid')
+          required=['linux','windows','android-build','android-runtime']
+          required += [f'android-campaign-runtime ({i}, {i})' for i in range(11)]
+          for name in required:
+              matches=[j for j in jobs if j.get('name')==name]
+              if len(matches)!=1 or matches[0].get('conclusion')!='success':
+                  raise SystemExit(f'BLOCKED: required original functional job not successful: {name}')
+          failed=[j for j in jobs if j.get('conclusion')=='failure']
+          if len(failed)!=1 or failed[0].get('name')!='publish':
+              raise SystemExit('BLOCKED: original failure was not exclusively release publication')
+          version=f'0.1.5-dev.{number}'
+          pathlib.Path('source-meta.env').write_text(
+              f'CD_SOURCE_SHA={sha}\nCD_BUILD_SEQUENCE={number}\n'
+              f'CD_RELEASE_TAG=cd-v{version}\nCD_ANDROID_VERSION_NAME={version}\n')
+          print(f'PASS: 15 required original jobs succeeded at {sha}; only publication failed')
+          PY
+          cat source-meta.env >> "$GITHUB_ENV"
+          source source-meta.env
+          relation="$(gh api "repos/$GH_REPO/compare/$CD_SOURCE_SHA...main" --jq .status)"
+          if [[ "$relation" != "identical" && "$relation" != "ahead" ]]; then
+            echo "BLOCKED: tested source is no longer an ancestor of main ($relation)"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: cd-linux-${{ inputs.source_run_id }}
+          path: dist
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: cd-windows-${{ inputs.source_run_id }}
+          path: dist
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: cd-android-${{ inputs.source_run_id }}
+          path: dist
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify original packages, publish draft and independently verify public release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c Catastrophic-Diplomacy-Linux-x64.zip.sha256
+          sha256sum -c Catastrophic-Diplomacy-Windows-x64.msi.sha256
+          sha256sum -c SHA256SUMS.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          manifest=json.loads(Path('release-manifest.json').read_text())
+          assert manifest['version']==os.environ['CD_ANDROID_VERSION_NAME']
+          assert manifest['versionCode']==1000+int(os.environ['CD_BUILD_SEQUENCE'])
+          assert manifest['apk']['name']=='Catastrophic-Diplomacy-Android.apk'
+          for filename in ('Catastrophic-Diplomacy-Windows-x64.msi',
+                           'Catastrophic-Diplomacy-Linux-x64.zip',
+                           'Catastrophic-Diplomacy-Android.apk'):
+              assert Path(filename).stat().st_size>1000000,filename
+          PY
+          if gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" >/dev/null 2>&1; then
+            echo 'BLOCKED: tag already has a release; never overwrite existing assets'
+            exit 1
+          fi
+          sha256sum Catastrophic-Diplomacy-Android.apk Catastrophic-Diplomacy-Windows-x64.msi Catastrophic-Diplomacy-Linux-x64.zip > FULL-SHA256SUMS.txt
+          cat > notes.md <<EOF
+          Catastrophic Diplomacy verified Windows/Linux/Android prerelease.
+          Source commit: $CD_SOURCE_SHA.
+          Original full functional test run: https://github.com/$GH_REPO/actions/runs/$CD_SOURCE_RUN.
+          The original run passed all 15 functional/build jobs; only GitHub release authorization failed.
+          Windows MSI installed/launched/uninstalled; Linux bundled Java app launched.
+          Android 14 200-vs-200 battle and all 11 Android 10 faction campaign/combat/resume shards passed.
+          Physical-device 30 FPS and optional visual quality are not certified by emulator checks.
+          EOF
+          gh release create "$CD_RELEASE_TAG" -R "$GH_REPO" --target "$CD_SOURCE_SHA" \
+            --title "Catastrophic Diplomacy $CD_ANDROID_VERSION_NAME — Windows Linux Android" \
+            --draft --prerelease --notes-file notes.md \
+            Catastrophic-Diplomacy-Windows-x64.msi Catastrophic-Diplomacy-Linux-x64.zip \
+            Catastrophic-Diplomacy-Android.apk release-manifest.json package-identity.txt \
+            signature-verification.txt FULL-SHA256SUMS.txt
+          gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" \
+            --json tagName,targetCommitish,isDraft,isPrerelease,assets \
+            | jq -e --arg tag "$CD_RELEASE_TAG" --arg sha "$CD_SOURCE_SHA" '
+              .tagName==$tag and .targetCommitish==$sha and
+              .isDraft==true and .isPrerelease==true and
+              ([.assets[].name] |
+                index("Catastrophic-Diplomacy-Windows-x64.msi")!=null and
+                index("Catastrophic-Diplomacy-Linux-x64.zip")!=null and
+                index("Catastrophic-Diplomacy-Android.apk")!=null)'
+          relation="$(gh api "repos/$GH_REPO/compare/$CD_SOURCE_SHA...main" --jq .status)"
+          if [[ "$relation" != "identical" && "$relation" != "ahead" ]]; then
+            echo "BLOCKED: source diverged during upload; draft retained ($relation)"
+            exit 1
+          fi
+          gh release edit "$CD_RELEASE_TAG" -R "$GH_REPO" --draft=false
+          gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" \
+            --json tagName,targetCommitish,isDraft,isPrerelease,assets \
+            | jq -e --arg tag "$CD_RELEASE_TAG" --arg sha "$CD_SOURCE_SHA" '
+              .tagName==$tag and .targetCommitish==$sha and
+              .isDraft==false and .isPrerelease==true and
+              ([.assets[].name] |
+                index("Catastrophic-Diplomacy-Windows-x64.msi")!=null and
+                index("Catastrophic-Diplomacy-Linux-x64.zip")!=null and
+                index("Catastrophic-Diplomacy-Android.apk")!=null)'
+          echo 'PASS: previously verified source and three public packages independently read back'
