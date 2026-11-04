@@ -216,6 +216,7 @@ tasks.register('sensorFalseContactRelaySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('fighterCountermeasureSmoke'))
     dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
     dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
     dependsOn(tasks.named('guidedSalvoCausalitySmoke'))
@@ -477,6 +478,14 @@ tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
 tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
 tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
 
+/** Fighter-owned finite IR and radar cartridges with real flak targeting. */
+tasks.register('fighterCountermeasureSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Real fighter flare/chaff magazines, radar flak diversion, lifetimes and replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterCountermeasureTest'
+}
 /** Armed aircraft profiles and each live nested weapon family, device-free. */
 tasks.register('fighterCraftSmoke', JavaExec) {
     group = 'verification'

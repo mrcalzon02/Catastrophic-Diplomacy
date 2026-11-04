@@ -652,6 +652,25 @@ a lack of requests is reported as evidence, not fabricated into success.
 The CSV and summary remain optional and never impose runtime speed or
 target kill-ratio release gates.
 
+**Finite fighter flare/chaff countermeasures (2026-11-03):** Six fighter
+hull families now have model-specific flare/chaff magazines and research-scaled
+upgrade quantities/cooldowns from actual fitted FTR modules; existing saved
+fighter IDs and ship designs remain unchanged. An emitted countermeasure is a
+bounded, individually moving and decaying, replay-fingerprinted world-space
+object with exclusive infrared (FLARE) or radar (CHAFF) signature.
+Working radar-controlled flak and rotary CIWS may aim physical shots at
+adjacent fighter-owned chaff emissions, expending real ammunition/power while
+the fighter continues to exist and is physically vulnerable to nearby blasts.
+Actual flak and rotary diversions are counted only after a shot fires.
+Optical laser/particle PD does not become blind because of radar-only chaff.
+Flares are physically deployable from a finite per-craft magazine via the
+battle command API, but IR autodeployment and guided missile diversion
+require fighter-targeting infrared missile seekers that do not yet exist.
+No fictional anti-missile flare effectiveness or renderer artwork is claimed.
+A focused real-world flak test and deterministic replay are included in
+the objective sensor-network smoke tests; visual quality and balance remain
+advisory.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 higher-resolution sub-tick receiver paths, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory

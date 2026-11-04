@@ -7,6 +7,8 @@ on:
       - 'core/src/main/java/diplomacy/sim/Battle.java'
       - 'core/src/main/java/diplomacy/sim/SensorLightTimeHistory.java'
       - 'core/src/main/java/diplomacy/sim/OrdnanceSeeker.java'
+      - 'core/src/main/java/diplomacy/sim/FighterCountermeasures.java'
+      - 'core/src/test/java/diplomacy/sim/FighterCountermeasureTest.java'
       - 'core/src/main/java/diplomacy/sim/GuidedTrajectoryPrediction.java'
       - 'core/src/test/java/diplomacy/sim/GuidedTrajectoryPredictionTest.java'
       - 'core/src/test/java/diplomacy/sim/OrdnanceSeekerTest.java'
