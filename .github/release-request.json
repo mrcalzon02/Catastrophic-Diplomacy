@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 3,
-  "note": "User-requested Android APK refresh from current main. Rebuild through existing retained-signer verified release pipeline, including Android 10/14 functional upgrades, published updater manifest, and essential multiplatform smoke gates. Require release readback; do not publish a failed candidate."
+  "revision": 4,
+  "note": "User-requested Windows release failure repair retry after focused CI passed on source 1ceeb23485c1f3100b87dc17c3c3f37d785688ad. Build the current main with retained Android signing, required Windows MSI install/launch/uninstall, Linux launch, Android API29/API34 gameplay and upgrade checks, checksums and public release readback. Do not publish on any functional failure."
 }
