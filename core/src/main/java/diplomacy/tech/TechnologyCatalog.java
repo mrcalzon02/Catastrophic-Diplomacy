@@ -86,6 +86,12 @@ public final class TechnologyCatalog {
     // parent hardware, retaining all separate research identities on demand.
     private static final int VIRTUAL_SENSING_NODES=SensingVariantCatalog.VARIANTS.size()
             *VARIANT_FACTIONS.size()*VARIANT_TRACKS.size()*9;
+    // The twelve native survival/retrofit families also clone unchanged
+    // parent research coefficients. Keep their component bases, resolve all
+    // four nine-stage research branches by ID only when needed.
+    private static final int VIRTUAL_SURVIVAL_FAMILY_NODES=
+            SurvivalHardwareCatalog.FAMILIES.size()*VARIANT_FACTIONS.size()
+                    *VARIANT_TRACKS.size()*9;
     private final int upgradeTotal;
     private final Set<String> components;
     private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base,
@@ -105,7 +111,7 @@ public final class TechnologyCatalog {
             }
         upgradeTotal=Math.addExact(Math.addExact(map.size(),Math.multiplyExact(finalBranches,3)),
                 generateHigherStages?VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES+
-                        VIRTUAL_SENSING_NODES:0);
+                        VIRTUAL_SENSING_NODES+VIRTUAL_SURVIVAL_FAMILY_NODES:0);
         upgrades=generateHigherStages?Collections.unmodifiableMap(new LazyUpgrades()):
                 sixStages;
         baseComponents=Collections.unmodifiableMap(base);
@@ -119,6 +125,8 @@ public final class TechnologyCatalog {
         virtual=networkVariantUpgrade(id);
         if(virtual!=null)return virtual;
         virtual=sensingVariantUpgrade(id);
+        if(virtual!=null)return virtual;
+        virtual=survivalFamilyUpgrade(id);
         if(virtual!=null)return virtual;
         Upgrade found=sixStages.get(id);
         if(found!=null||!deferredHigherStages||id==null||id.length()<4)return found;
@@ -259,6 +267,39 @@ public final class TechnologyCatalog {
         return new Upgrade(cells);
     }
 
+    /** Native survival hardware retains unique fitted identities without
+     * retaining its cloned six-stage research rows on a small Android heap. */
+    private Upgrade survivalFamilyUpgrade(String id){
+        if(!deferredHigherStages||id==null)return null;
+        String[] parts=id.split("-",5);
+        if(parts.length!=5||!"TECH".equals(parts[0])||
+                !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
+                !parts[4].matches("0[1-9]"))return null;
+        SurvivalHardwareCatalog.Family family=SurvivalHardwareCatalog.find(parts[2]);
+        if(family==null||!baseComponents.containsKey(
+                "BASE-"+parts[1]+"-"+family.code()))return null;
+        int stage=parts[4].charAt(1)-'0';
+        Upgrade parent=get("TECH-"+parts[1]+"-"+family.parent()+"-"+
+                parts[3]+"-"+parts[4]);
+        if(parent==null)return null;
+        String prerequisite=stage==1?"BASE-"+parts[1]+"-"+family.code():
+                "TECH-"+parts[1]+"-"+family.code()+"-"+parts[3]+"-"+
+                        String.format(Locale.ROOT,"%02d",stage-1);
+        String name=family.name()+" "+parts[3]+" "+
+                (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
+        ArrayList<String> cells=new ArrayList<>(COLS);
+        Collections.addAll(cells,id,parts[1],family.code(),parts[3],
+                Integer.toString(stage),name,prerequisite,
+                Integer.toString(parent.researchCost),
+                Integer.toString(parent.industryCost));
+        for(double value:new double[]{parent.mass,parent.power,parent.heat,
+                parent.output,parent.accuracy,parent.integrity,parent.shield,
+                parent.thrust,parent.cooling,parent.maintenance})
+            cells.add(ratio(value,1));
+        cells.add(family.name()+": "+parent.tradeoff);
+        return new Upgrade(cells);
+    }
+
     public boolean hasBase(String id) { return components.contains(id); }
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
@@ -294,6 +335,13 @@ public final class TechnologyCatalog {
                         for(int rank=1;rank<=9;rank++)
                             ids.add("TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
                                     String.format(Locale.ROOT,"%02d",rank));
+        if(deferredHigherStages)
+            for(String faction:VARIANT_FACTIONS)
+                for(SurvivalHardwareCatalog.Family family:SurvivalHardwareCatalog.FAMILIES)
+                    for(String track:VARIANT_TRACKS)
+                        for(int rank=1;rank<=9;rank++)
+                            ids.add("TECH-"+faction+"-"+family.code()+"-"+track+"-"+
+                                    String.format(Locale.ROOT,"%02d",rank));
         if(ids.size()!=upgradeTotal)
             throw new IllegalStateException("Virtual stage count mismatch");
         return ids;
@@ -325,7 +373,8 @@ public final class TechnologyCatalog {
                                 if(test.stage==6){nextBranch=test;higher=7;return true;}
                             }
                             return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES+
-                                    VIRTUAL_NETWORK_NODES+VIRTUAL_SENSING_NODES;
+                                    VIRTUAL_NETWORK_NODES+VIRTUAL_SENSING_NODES+
+                                    VIRTUAL_SURVIVAL_FAMILY_NODES;
                         }
                         @Override public Entry<String,Upgrade> next(){
                             if(early.hasNext())return early.next();
@@ -340,8 +389,13 @@ public final class TechnologyCatalog {
                             boolean survival=index<VIRTUAL_SURVIVAL_NODES;
                             boolean network=!survival&&
                                     index<VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES;
+                            boolean sensing=!survival&&!network&&index<
+                                    VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES+
+                                    VIRTUAL_SENSING_NODES;
                             int n=survival?index:network?index-VIRTUAL_SURVIVAL_NODES:
-                                    index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES;
+                                    sensing?index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES:
+                                    index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES-
+                                            VIRTUAL_SENSING_NODES;
                             int stage=n%9+1;
                             n/=9;
                             String track=VARIANT_TRACKS.get(n%VARIANT_TRACKS.size());
@@ -355,10 +409,14 @@ public final class TechnologyCatalog {
                                 code=SensorNetworkCatalog.VARIANTS.get(
                                         n%SensorNetworkCatalog.VARIANTS.size()).code();
                                 n/=SensorNetworkCatalog.VARIANTS.size();
-                            }else{
+                            }else if(sensing){
                                 code=SensingVariantCatalog.VARIANTS.get(
                                         n%SensingVariantCatalog.VARIANTS.size()).code();
                                 n/=SensingVariantCatalog.VARIANTS.size();
+                            }else{
+                                code=SurvivalHardwareCatalog.FAMILIES.get(
+                                        n%SurvivalHardwareCatalog.FAMILIES.size()).code();
+                                n/=SurvivalHardwareCatalog.FAMILIES.size();
                             }
                             String id="TECH-"+VARIANT_FACTIONS.get(n)+"-"+code+"-"+
                                     track+"-"+String.format(Locale.ROOT,"%02d",stage);
@@ -397,7 +455,7 @@ public final class TechnologyCatalog {
             addSensingHardwareVariants(bases);
             addSensorNetworkFamilies(bases,rows);
             addSensorNetworkVariants(bases);
-            addSurvivalAndUnsafeFamilies(bases,rows);
+            addSurvivalAndUnsafeFamilies(bases);
             addSurvivalHardwareVariants(bases);
             addDumbfireRocketFamilies(bases,rows);
             addRotaryPointDefenseFamilies(bases,rows);
@@ -969,10 +1027,8 @@ public final class TechnologyCatalog {
     /** Native, socket-bound damage control and unsafe retrofit families.
      * Clone root equipment and its independent four engineering tracks.
      * Existing components and saved design IDs are not modified. */
-    private static void addSurvivalAndUnsafeFamilies(List<List<String>> bases,
-                                                     List<List<String>> upgrades) {
+    private static void addSurvivalAndUnsafeFamilies(List<List<String>> bases) {
         List<List<String>> sourceBases=List.copyOf(bases);
-        List<List<String>> sourceUpgrades=List.copyOf(upgrades);
         for(SurvivalHardwareCatalog.Family family:SurvivalHardwareCatalog.FAMILIES) {
             String code=family.code(),parent=family.parent();
             for(int i=1;i<sourceBases.size();i++){
@@ -992,17 +1048,7 @@ public final class TechnologyCatalog {
                 row.set(12,"Physical survival or risky retrofit equipment; real fitting budget");
                 bases.add(row);
             }
-            for(int i=1;i<sourceUpgrades.size();i++){
-                List<String> source=sourceUpgrades.get(i);
-                if(!parent.equals(source.get(2)))continue;
-                List<String> row=new ArrayList<>(source);
-                row.set(0,row.get(0).replace("-"+parent+"-","-"+code+"-"));
-                row.set(2,code);row.set(5,family.name()+" "+row.get(3)+" "+row.get(4));
-                row.set(6,row.get(6).replace("-"+parent+"-","-"+code+"-")
-                        .replace("-"+parent,"-"+code));
-                row.set(19,family.name()+": "+row.get(19));
-                upgrades.add(row);
-            }
+
         }
     }
 
