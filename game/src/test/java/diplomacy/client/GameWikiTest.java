@@ -22,6 +22,20 @@ public final class GameWikiTest {
         check(catalog.size()>=stages+modules+hulls+
                 ModuleVersions.Pattern.values().length*4+
                 ShipStandingOrders.SETTINGS.length,"Reference coverage is incomplete");
+        // Capture the exact established lexicographic order before swapping
+        // the 73k-ID resident list for compact component-derived paging.
+        // Counts alone cannot detect dropped/reordered rank or track entries.
+        check(stages==modules*4*9,
+                "Every base component must own exactly four nine-stage research paths");
+        java.util.List<String> expectedIds=new java.util.ArrayList<>(technology.upgradeIds());
+        expectedIds.sort(String::compareTo);
+        int firstResearchArticle=catalog.size()-stages;
+        for(int index=0;index<stages;index++){
+            String actual=catalog.articles().get(firstResearchArticle+index).id;
+            check(actual.equals("upgrade."+expectedIds.get(index)),
+                    "Research index ordering/canonical identity changed at "+index+
+                            ": expected="+expectedIds.get(index)+" actual="+actual);
+        }
         // Every persistent captain setting must open a real article. New ammo
         // and fuel rows must never break the encyclopedia on game startup.
         var orderArticles=catalog.search("ORDERS","");
