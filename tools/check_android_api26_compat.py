@@ -17,10 +17,12 @@ for root in roots:
         for line_number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
             if (re.search(r"(?<!Collectors)\.toList\s*\(\s*\)", line) or
                 re.search(r"\b(?:java\.util\.)?HexFormat\b", line) or
-                re.search(r"\.longValueExact\s*\(", line)) and not line.lstrip().startswith(("//", "*", "/*")):
+                re.search(r"\.longValueExact\s*\(", line) or
+                re.search(r"\.readAllBytes\s*\(", line) or
+                re.search(r"\.readNBytes\s*\(", line)) and not line.lstrip().startswith(("//", "*", "/*")):
                 bad.append(f"{source}:{line_number}: {line.strip()}")
 if bad:
-    print("FAIL Android minSdk26 forbidden Java runtime APIs (Stream.toList / HexFormat / longValueExact):", file=sys.stderr)
+    print("FAIL Android minSdk26 forbidden Java runtime APIs (Stream.toList / HexFormat / longValueExact / InputStream.readAllBytes / readNBytes):", file=sys.stderr)
     print("\n".join(bad), file=sys.stderr)
     sys.exit(1)
-print("PASS runtime sources avoid Android-incompatible Stream.toList, java.util.HexFormat and BigInteger.longValueExact")
+print("PASS runtime sources avoid Android-incompatible Stream.toList, java.util.HexFormat and BigInteger.longValueExact, InputStream.readAllBytes/readNBytes")
