@@ -102,7 +102,14 @@ public final class OrdnanceRacksTest {
         check(initial==allocated,"Rack magazines must partition finite shared ammunition");
         check(src.launchers.get(0).slot!=src.launchers.get(1).slot,
                 "Each rack must retain its original fitted socket");
-        one.step();two.step();
+        var hostile=one.ships().get(1);
+        double separation=StrictMath.hypot(hostile.x-src.x,hostile.y-src.y);
+        check(!one.hasTargetContact(src,hostile,separation),
+                "Physical fitted rack fire control must not start with an oracle lock");
+        int acquisitionWindow=2*SensorLightTimeHistory.propagationTicks(separation)+30;
+        for(int tick=0;tick<acquisitionWindow&&src.launched<2;tick++){
+            one.step();two.step();
+        }
         check(src.launched==2&&one.salvosStarted==2,
                 "Two independent rack controllers must fire simultaneously"
                 +" launched="+src.launched+" salvos="+one.salvosStarted
