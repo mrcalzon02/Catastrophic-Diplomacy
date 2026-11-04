@@ -2860,6 +2860,39 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(!view.circle(pose.x(),pose.y(),3))continue;
             shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(2.1f),6);
         }
+        // Real expendable fighter emissions, not invented effect sprites:
+        // one compact heated flare versus several dispersing radar-reflective
+        // chaff flecks. Expired photon-history objects are NOT visible; they
+        // remain in the simulation only so delayed seekers can receive light
+        // already emitted while these cartridges were physically active.
+        // Keep luminous extent local rather than illuminating a capital hull.
+        for(var cloud:battle.fighterCountermeasures()){
+            if(!cloud.active(battle.tick))continue;
+            float age=(float)(battle.tick-cloud.bornTick())/
+                    (float)cloud.lifetimeTicks();
+            float fade=StrictMath.max(0.0f,1.0f-age);
+            float cx=(float)cloud.xAt(battle.tick);
+            float cy=(float)cloud.yAt(battle.tick);
+            if(!view.circle(cx,cy,17))continue;
+            if(cloud.kind()==diplomacy.sim.FighterCountermeasures.Kind.FLARE){
+                shapes.setColor(1.0f,.49f,.17f,.31f*fade);
+                shapes.circle(cx,cy,CombatEffectScale.of(2.8f),10);
+                shapes.setColor(1.0f,.83f,.48f,.78f*fade);
+                shapes.circle(cx,cy,CombatEffectScale.of(1.25f),8);
+            }else{
+                float spread=2.0f+9.0f*age;
+                shapes.setColor(.66f,.76f,.87f,.49f*fade);
+                for(int fleck=0;fleck<6;fleck++){
+                    // Fixed per-emitter phase: no renderer RNG and no
+                    // artificial updates to the underlying missile physics.
+                    double angle=(cloud.id()%17)*.31+
+                            fleck*(StrictMath.PI*2/6);
+                    float x=cx+(float)(StrictMath.cos(angle)*spread);
+                    float y=cy+(float)(StrictMath.sin(angle)*spread);
+                    shapes.circle(x,y,CombatEffectScale.of(.95f),6);
+                }
+            }
+        }
         shapes.end();
         // Final additive world-space pass illuminates actual ship and projectile
         // pixels as well as space around real weapon and engine light sources.
