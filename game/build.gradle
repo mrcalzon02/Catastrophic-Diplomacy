@@ -388,3 +388,14 @@ tasks.register('wikiProfile', JavaExec) {
     mainClass = 'diplomacy.client.WikiMemoryProfile'
     maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
 }
+
+// Explicitly optional: exercise non-universal and broad wiki queries under
+// 16/32 MiB heaps. Failures are logged, never used as release score gates.
+tasks.register('wikiArbitrarySearchProfile', JavaExec) {
+    group = 'verification'
+    description = 'Diagnostic-only constrained-heap arbitrary wiki search workload'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.WikiArbitrarySearchProfile'
+    maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
+}
