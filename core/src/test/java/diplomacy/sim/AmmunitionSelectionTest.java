@@ -101,7 +101,11 @@ public final class AmmunitionSelectionTest {
         check(attacker.warhead(Battle.DamageType.MISSILE)==AmmunitionTable.Warhead.EMP
                         &&enemy.warhead(Battle.DamageType.MISSILE)==AmmunitionTable.Warhead.EMP,
                 "AI and player share saved physical payloads and the same module research rules");
-        for(int i=0;i<5;i++)battle.step();
+        // The saved warhead may fire only after real target photons arrive;
+        // five ticks at 305 world units is too early for a causal sighting.
+        for(int i=0;i<2*SensorLightTimeHistory.propagationTicks(305)+30&&
+                battle.missiles().stream().noneMatch(m->m.sourceId==attacker.id);i++)
+            battle.step();
         check(battle.missiles().stream().anyMatch(m->m.sourceId==attacker.id
                         &&m.warhead==AmmunitionTable.Warhead.EMP),
                 "Runtime fires a real guided body with the saved researched warhead");

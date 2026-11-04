@@ -44,8 +44,9 @@ public final class OrdnanceDoctrineTest {
                 Battle world=scenario(family,mode,40);
                 Battle.Ship attacker=world.ships().get(0);
                 double power=attacker.power;
-                world.step();
-                // The first round fires immediately, not when its graphics loads.
+                // Launch only when physically propagated target photons have
+                // reached the fire-control sensors, not on arbitrary tick one.
+                for(int i=0;i<80&&attacker.launched==0;i++)world.step();
                 check(attacker.launched==1&&power>attacker.power,
                         "First physical launch must consume energy for "+family+"/"+mode);
                 check(world.pendingSalvoCount()<=1,"Only one family launch sequence at a time");
@@ -85,7 +86,9 @@ public final class OrdnanceDoctrineTest {
     }
     private static void coldIgnition(){
         Battle world=scenario(Battle.DamageType.MISSILE,OrdnanceDoctrine.Mode.COLD_LAUNCH,4);
-        world.step();
+        for(int i=0;i<80&&world.missiles().isEmpty();i++)world.step();
+        check(!world.missiles().isEmpty(),
+                "Cold-start missile never launched after causal sensor acquisition");
         Battle.Missile m=world.missiles().get(0);
         double x=m.x,y=m.y,vx=m.vx,vy=m.vy;
         for(int i=0;i<8;i++)world.step();
@@ -99,7 +102,7 @@ public final class OrdnanceDoctrineTest {
     }
     private static void insufficientAmmo(){
         Battle world=scenario(Battle.DamageType.MISSILE,OrdnanceDoctrine.Mode.DECOY_CLOUD,4);
-        world.step();
+        for(int i=0;i<80;i++)world.step();
         check(world.missiles().isEmpty()&&world.salvosStarted==0,
                 "Launchers cannot invent four decoys and a warhead from four rounds");
     }
