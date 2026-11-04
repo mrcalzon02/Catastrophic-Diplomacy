@@ -32,7 +32,9 @@ public final class BattleRetreatTest {
 
         Battle first=Battle.duel(991,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship ship=first.ships().get(0);
-        ship.x=42;ship.y=320;ship.hull=ship.maxHull*.40;
+        // Start near the friendly edge to validate a physical crossing
+        // within this finite smoke-test budget under gee-limited thrust.
+        ship.x=5;ship.y=320;ship.hull=ship.maxHull*.40;
         first.setShipStandingOrders(ship.id,hullPolicy(.5));
         first.setShipCommandQueue(ship.id,List.of(ShipCommandQueue.Command.move(1100,320),
                 ShipCommandQueue.Command.hold(300)));
@@ -55,7 +57,7 @@ public final class BattleRetreatTest {
         // captain can burn its last fuel fleeing thousands of units away.
         Battle cautious=Battle.duel(994,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship cautiousHull=cautious.ships().get(0);
-        cautiousHull.x=52;cautiousHull.y=315;
+        cautiousHull.x=5;cautiousHull.y=315;
         cautious.setShipOrders(cautiousHull.id,BattleOrders.DEFAULT
                 .withPosition(BattleOrders.Position.CAUTIOUS).withRetreat(.65));
         cautiousHull.hull=cautiousHull.maxHull*.42;
@@ -67,7 +69,7 @@ public final class BattleRetreatTest {
 
         Battle rightBattle=Battle.duel(992,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship right=rightBattle.ships().get(1);
-        right.x=1238;right.y=320;
+        right.x=1275;right.y=320;
         rightBattle.setShipStandingOrders(right.id,
                 new ShipStandingOrders(BattleOrders.DEFAULT,50,50,70));
         right.defense.disruptShields(right.maxShields*.7);
@@ -100,6 +102,7 @@ public final class BattleRetreatTest {
                 ally,enemy,catalog);
         Battle combat=encounter.battle();
         Battle.Ship casualty=combat.ships().get(0);
+        casualty.x=5; // Position is only for extraction mechanics, not deployment.
         casualty.hull=casualty.maxHull*.4;
         escapes(combat,casualty,800);
         ok(combat.alive(0)==1&&combat.escaped(0)==1&&combat.engaged(0)==1,
@@ -134,7 +137,7 @@ public final class BattleRetreatTest {
                         .withStanding(0,hullPolicy(.85)),ally,enemy,catalog);
         Battle lone=withdrawn.battle();
         Battle.Ship last=lone.ships().get(0);
-        last.x=40;last.hull=last.maxHull*.4;
+        last.x=5;last.hull=last.maxHull*.4;
         escapes(lone,last,800);
         ok(withdrawn.advance()==CampaignEncounter.Advance.DEFEAT,
                 "Total fleet evacuation incorrectly won campaign mission");
