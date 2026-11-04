@@ -18,7 +18,8 @@ for root in roots:
             if (re.search(r"(?<!Collectors)\.toList\s*\(\s*\)", line) or
                 re.search(r"\b(?:java\.util\.)?HexFormat\b", line) or
                 re.search(r"\.longValueExact\s*\(", line) or
-                re.search(r"\.readAllBytes\s*\(", line) or
+                # java.nio.file.Files.readAllBytes is valid on Android API 26.
+                re.search(r"(?<!Files)\.readAllBytes\s*\(", line) or
                 re.search(r"\.readNBytes\s*\(", line)) and not line.lstrip().startswith(("//", "*", "/*")):
                 bad.append(f"{source}:{line_number}: {line.strip()}")
 if bad:
