@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.Arrays;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -22,6 +23,8 @@ final class CombatDiagnosticRecorder {
             "frame,tick,requested_speed,effective_speed,reason\n";
     private final String[] frames=new String[MAX_FRAMES];
     private final String[] events=new String[MAX_EVENTS];
+    private final double[] frameTimes=new double[MAX_FRAMES];
+    private int peakShips,peakCraft,peakOrdnance;
     private int frameCount,eventCount,framePosition,eventPosition;
     private long totalFrames,droppedFrames,startedMillis;
     private boolean recording;
@@ -31,6 +34,7 @@ final class CombatDiagnosticRecorder {
     void start(){
         frameCount=eventCount=framePosition=eventPosition=0;
         totalFrames=droppedFrames=0;
+        peakShips=peakCraft=peakOrdnance=0;
         startedMillis=System.currentTimeMillis();
         recording=true;
     }
@@ -47,6 +51,10 @@ final class CombatDiagnosticRecorder {
                 (cpuNs-simNs)/1e6,p95Ms,requested,effective,
                 ships,craft,ordnance,draws,binds);
         frames[framePosition]=line;
+        frameTimes[framePosition]=wallSeconds*1000.0;
+        peakShips=Math.max(peakShips,ships);
+        peakCraft=Math.max(peakCraft,craft);
+        peakOrdnance=Math.max(peakOrdnance,ordnance);
         framePosition=(framePosition+1)%MAX_FRAMES;
         if(frameCount<MAX_FRAMES)frameCount++;
         else droppedFrames++;
@@ -78,6 +86,14 @@ final class CombatDiagnosticRecorder {
         for(int i=0;i<eventCount;i++)b.append(events[(start+i)%MAX_EVENTS]);
         return b.toString();
     }
+    private double percentile(double proportion){
+        if(frameCount==0)return 0;
+        double[] data=new double[frameCount];
+        int start=(framePosition-frameCount+MAX_FRAMES)%MAX_FRAMES;
+        for(int i=0;i<frameCount;i++)data[i]=frameTimes[(start+i)%MAX_FRAMES];
+        Arrays.sort(data);
+        return data[Math.max(0,(int)Math.ceil(data.length*proportion)-1)];
+    }
     void export(OutputStream destination,String platform,float requested,float effective,
                 long finalTick) throws IOException{
         if(destination==null)throw new IllegalArgumentException("Destination required");
@@ -95,7 +111,14 @@ final class CombatDiagnosticRecorder {
             entry(zip,"summary.json","{\n  \"recordedFrames\": "+totalFrames+
                     ",\n  \"retainedFrames\": "+frameCount+
                     ",\n  \"overwrittenFrames\": "+droppedFrames+
+                    ",\n  \"wallFrameP50Ms\": "+percentile(.50)+
+                    ",\n  \"wallFrameP95Ms\": "+percentile(.95)+
+                    ",\n  \"wallFrameWorstMs\": "+percentile(1.0)+
+                    ",\n  \"peakShips\": "+peakShips+
+                    ",\n  \"peakCraft\": "+peakCraft+
+                    ",\n  \"peakOrdnance\": "+peakOrdnance+
                     ",\n  \"speedEventsRetained\": "+eventCount+"\n}\n");
+            entry(zip,"diagnostic.log",eventCsv());
         }
     }
 }
