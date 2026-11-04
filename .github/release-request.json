@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 7,
-  "note": "User requested updated signed Android APK and Windows MSI. Release 679 uncovered valid Windows 400-ship view bounds fixture and Linux 200-vs-200 mixed fleet short-range weapons fixture errors; repaired on main 45e73659deeac2faf11600c8054faab524e93dd0, focused regression run 41893720052 passed including actual 400-ship culling and two deterministic 480-tick 200v200 all-six-weapon/fighter battles. Android signed build completed and initial API29 campaigns passed on previous attempt, but full fresh API29/API34 and real Windows MSI install/launch/uninstall/Linux launch/updates/checksums must pass. Do not publish on any functional failure."
+  "revision": 8,
+  "note": "User requested continuation of verified Windows MSI and Android APK release blocker repairs. Last release 680 failed Windows/Linux game wiki due missing ammo/fuel doctrine rows, Android 10 16 MiB startup OOM from whole-file hardpoint copy, and Android 14 200v200 emulator timeout. Fixed on main 0bc7589f21d861e5f4dc777333d763dc58604cd8: live wiki rows 23-31, SHA-256 verified line-by-line bounded original-art hardpoint parser with no whole-resource copies, Android emulator 5-frame progress telemetry and 10-minute bound retaining all 480 ticks and stall detection. Focused gate 41898623646 PASSED all 506/9515 hardpoints with -Xmx16m, wiki 75475 articles, every prior functional regression and deterministic 200v200 twice. Require fresh actual MSI install/launch/uninstall, Linux runtime and API29/API34 Android runtime; publish only on objective success. Do not claim shipping before readback."
 }
