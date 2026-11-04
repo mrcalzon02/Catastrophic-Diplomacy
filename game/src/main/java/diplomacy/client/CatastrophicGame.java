@@ -531,11 +531,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             selectDoctrineCaptain(Math.floorMod(selectedDeploymentShip+
                                     (key==Input.Keys.A?-1:1),deployment.ships()));
                         if(key==Input.Keys.TAB||key==Input.Keys.PAGE_UP||
-                                key==Input.Keys.PAGE_DOWN)standingPage=(standingPage+1)%3;
+                                key==Input.Keys.PAGE_DOWN)standingPage=(standingPage+1)%4;
                         if(key==Input.Keys.UP||key==Input.Keys.DOWN){
                             selectedStandingSetting=Math.floorMod(selectedStandingSetting+
                                     (key==Input.Keys.UP?-1:1),ShipStandingOrders.SETTINGS.length);
-                            standingPage=selectedStandingSetting<13?0:selectedStandingSetting<23?1:2;
+                            standingPage=selectedStandingSetting<13?0:selectedStandingSetting<23?1:
+                                    selectedStandingSetting<29?2:3;
                         }
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT)
                             adjustStandingOrders(selectedStandingSetting,key==Input.Keys.LEFT?-1:1);
@@ -1960,14 +1961,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             int action=GameMenuPanel.ordersAction(x,y,standingPage);
             if(action==0)selectDoctrineCaptain(Math.floorMod(selectedDeploymentShip-1,deployment.ships()));
             else if(action==1)selectDoctrineCaptain((selectedDeploymentShip+1)%deployment.ships());
-            else if(action>=2&&action<2+ShipStandingOrders.SETTINGS.length){
+            else if(action>=2&&action<25){
                 selectedStandingSetting=action-2;
                 adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
-            }else if(action>=63&&action<=68){
+            }else if(action>=63&&action<40+ShipStandingOrders.SETTINGS.length){
                 selectedStandingSetting=action-40;
                 adjustStandingOrders(selectedStandingSetting,x<970?-1:1);
             }else if(action==30)screen=GameMenuPanel.Screen.DEPLOYMENT;
-            else if(action==31)standingPage=(standingPage+1)%3;
+            else if(action==31)standingPage=(standingPage+1)%4;
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
