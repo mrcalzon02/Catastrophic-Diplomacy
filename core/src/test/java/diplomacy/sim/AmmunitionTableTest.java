@@ -34,8 +34,8 @@ public final class AmmunitionTableTest {
         check(AmmunitionTable.kinetics().size()==5,"Five distinct ballistic payloads");
         check(AmmunitionTable.warheads().size()==6,"Six distinct guided warheads");
         var physical=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
-        var ap=AmmunitionTable.warhead(AmmunitionTable.Warhead.ARMOR_PIERCING);
-        var legacyAp=ap.physical(physical);
+        var apWarhead=AmmunitionTable.warhead(AmmunitionTable.Warhead.ARMOR_PIERCING);
+        var legacyAp=apWarhead.physical(physical);
         var fasterMissile=AmmunitionTable.guidedPhysical(
                 Battle.DamageType.MISSILE,AmmunitionTable.Warhead.ARMOR_PIERCING,physical);
         var unchangedTorpedo=AmmunitionTable.guidedPhysical(
