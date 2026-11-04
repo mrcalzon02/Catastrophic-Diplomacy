@@ -143,8 +143,14 @@ public final class FighterWingLinkTest {
             notAutoLocked|=craft.targetCraftId==0;
             check(craft.sharedWingContact.sentTick()==a.tick-1,
                     "Wingman got a future sighting instead of delayed radio");
-            check(craft.lastLocalWingContact==null,
-                    "A received sensor report was rebroadcast as local detection");
+            // An independent ship sighting is legitimate. Never forward
+            // somebody else's historical sensor report as a new one.
+            var transmitted=craft.lastLocalWingContact;
+            check(transmitted==null||
+                    transmitted.sourceId()==craft.id&&
+                    transmitted.observedTick()==a.tick&&
+                    transmitted.sentTick()==a.tick,
+                    "Wingman rebroadcast somebody else's historical sensor report");
         }
         check(received&&notAutoLocked&&a.fighterWingReceipts>0,
                 "Live wingmen did not use a nearby scout's fighter-only cue");
