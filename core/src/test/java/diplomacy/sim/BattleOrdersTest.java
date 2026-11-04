@@ -35,6 +35,11 @@ public final class BattleOrdersTest {
             launcher.crewBerths=24;
             launcher.lifeSupport=24;
             launcher.crewCount=24;
+            // Isolate anti-aircraft doctrine: a cannon fighter fires physical
+            // bullets which INTERCEPT_ONLY correctly engages as ordnance.
+            // The laser-armed craft cannot pollute this craft-only fixture
+            // with independent interceptable missile or ballistic projectiles.
+            launcher.fighterProfile=FighterModel.standard(FighterModel.Hull.LASER_FIGHTER);
         }
         launcher.fighterLaunchBays=launcher.fighterBays.size();
         defender.laserDamage=defender.missileDamage=0;
