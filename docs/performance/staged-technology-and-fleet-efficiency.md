@@ -3,6 +3,16 @@
 Status: **In progress**. Scope: Java 17/libGDX Android 10+, Windows, Linux. Branch: `main`.
 This is an execution ledger, not permission to skip production correctness tests.
 
+## Implementation ledger (2026-11-04)
+
+- Stage 0 / diagnostic instrumentation: committed `TechnologyMemoryProfile` and `WikiMemoryProfile` plus optional `technology-efficiency-diagnostics.yml`. Runs 16 MiB and 32 MiB headless profiles without building APK/MSI, without suppressing stack traces, and without gating release on optional performance.
+- Stage 1 / wiki: committed virtual filtered search results and canonical-ID selection restoration. Focused objective regression **41914420404 passed**.
+- Stage 2a / sensing: removed 9,504 eagerly cloned Stage I–VI rows and resolved all 14,256 sensing-model IDs on demand. Exhaustive multiplier/prerequisite checks. Focused objective regression **41915528624 passed**.
+- Stage 2b / survival: removed another 3,168 eagerly cloned Stage I–VI research rows from twelve survival/retrofit families, resolving all 4,752 family stages by canonical ID. Exhaustive new parity tests are **pending** in focused CI. Survival *variant* research remains separate and virtual as before.
+- Baseline 16 MiB HotSpot before Stage 2a: catalog initialization OOM in `addSensingHardwareVariants`. After Stage 2a: OOM moved to `addSurvivalAndUnsafeFamilies`; 32 MiB catalog loaded in 973 ms with ~14.03 MB heap retained after GC, wiki broad search took ~3,627 ms and ~22.69 MB was retained after GC. These JVM diagnostics are **not** equivalent to ART performance on actual Android hardware.
+- Following Stage 2b, inspect the optional 16 MiB profile **41916324356** and the focused functional regression before changing another family. Never report a green diagnostics workflow alone as proof that its `continue-on-error` profiling steps passed; inspect Java logs for OOM or exceptions.
+- Release run **41908916178** passed all game packaging and emulator functional jobs but failed its publication job due GitHub HTTP 403 permissions. Publication remains a separate unresolved repository authorization problem.
+
 ## Non-negotiable invariants
 
 - Keep `TechnologyCatalog.get(id)`, `upgrades()`, `baseComponents()` and canonical technology IDs stable. Preserve every faction's nine stages, four mutually exclusive tracks, costs, tradeoffs, and prerequisites.
