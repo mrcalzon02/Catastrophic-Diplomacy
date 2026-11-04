@@ -10,6 +10,7 @@ on:
       - 'core/src/main/java/diplomacy/sim/FighterCountermeasures.java'
       - 'core/src/main/java/diplomacy/sim/FighterInfraredSeeker.java'
       - 'core/src/test/java/diplomacy/sim/FighterInfraredSeekerTest.java'
+      - 'core/src/test/java/diplomacy/sim/FighterCraftTest.java'
       - 'core/src/test/java/diplomacy/sim/FighterCountermeasureTest.java'
       - 'core/src/main/java/diplomacy/sim/GuidedTrajectoryPrediction.java'
       - 'core/src/test/java/diplomacy/sim/GuidedTrajectoryPredictionTest.java'
