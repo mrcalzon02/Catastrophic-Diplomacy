@@ -28,6 +28,9 @@ final class SpatialAudioRuntime implements AutoCloseable {
     private final Set<Integer> seenDead = new HashSet<>();
     private long lastSequence = 0, fleetLoop = -1;
     private int lastDestructions = 0;
+    private float presentationSpeed=CombatPace.DEFAULT;
+
+    void setSimulationSpeed(float speed){presentationSpeed=CombatPace.clamp(speed);}
 
     private static final class EngineVoice {
         long voice, lastThrusterTick = -999999;
@@ -201,7 +204,8 @@ final class SpatialAudioRuntime implements AutoCloseable {
             long previous=lastCueTick.getOrDefault(p.key,Long.MIN_VALUE/2);
             if(p.tick-previous<p.cooldown)continue;
             try{
-                float pitch=pitchVariants.nextSample(p.sound,AudioPitchVariants.Profile.COMBAT);
+                float pitch=CombatTimeAudio.combatPitch(presentationSpeed,
+                        pitchVariants.nextSample(p.sound,AudioPitchVariants.Profile.COMBAT));
                 long voice=p.sound.play(clip(master*p.gain),pitch,p.pan);
                 if(voice<0)continue;
                 lastCueTick.put(p.key,p.tick);total++;
@@ -253,15 +257,21 @@ final class SpatialAudioRuntime implements AutoCloseable {
             try {
                 if(voice==null){
                     long id=hum.loop(gain,
-                            AudioPitchVariants.engineLoopPitch(ship.id,ship.visualScale()),
+                            CombatTimeAudio.enginePitch(presentationSpeed,
+                                    AudioPitchVariants.engineLoopPitch(ship.id,ship.visualScale())),
                             m.pan());
                     if(id!=-1){voice=new EngineVoice(id,ship.facing);localEngines.put(ship.id,voice);}
-                }else hum.setPan(voice.voice,m.pan(),gain);
+                }else{
+                    hum.setPan(voice.voice,m.pan(),gain);
+                    hum.setPitch(voice.voice,CombatTimeAudio.enginePitch(presentationSpeed,
+                            AudioPitchVariants.engineLoopPitch(ship.id,ship.visualScale())));
+                }
                 if(voice!=null&&wrappedAngle(ship.facing,voice.facing)>0.11
                         &&battle.tick-voice.lastThrusterTick>=14) {
                     Sound burst=synth.get("thruster");
                     if(burst!=null)burst.play(clip(volume*0.35f*m.gain()),
-                            pitchVariants.nextSample(burst,AudioPitchVariants.Profile.THRUSTER),
+                            CombatTimeAudio.combatPitch(presentationSpeed,
+                                    pitchVariants.nextSample(burst,AudioPitchVariants.Profile.THRUSTER)),
                             m.pan());
                     voice.lastThrusterTick=battle.tick;
                 }
