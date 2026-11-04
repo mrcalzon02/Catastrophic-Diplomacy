@@ -20,15 +20,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      GH_TOKEN: ${{ secrets.CD_RELEASE_TOKEN }}
+      # Built-in token reads Actions job results without granting a publisher
+      # token access to Actions. Only the final step receives the write token.
+      GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       CD_SOURCE_RUN: ${{ inputs.source_run_id }}
     steps:
       - name: Require release authorization and independently audit original functional jobs
+        env:
+          CD_RELEASE_TOKEN: ${{ secrets.CD_RELEASE_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${GH_TOKEN:-}" ]]; then
+          if [[ -z "${CD_RELEASE_TOKEN:-}" ]]; then
             echo 'BLOCKED: configure repository secret CD_RELEASE_TOKEN with Contents: write and Workflows: write, limited to this repository'
             exit 1
           fi
@@ -91,6 +95,8 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ github.token }}
       - name: Verify original packages, publish draft and independently verify public release
+        env:
+          GH_TOKEN: ${{ secrets.CD_RELEASE_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
