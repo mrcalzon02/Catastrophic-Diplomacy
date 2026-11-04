@@ -19,6 +19,7 @@ public final class OrdnanceConfigurationTest {
             s.maxPower=s.power=20000;s.powerRegen=0;s.maxHeat=20000;s.heat=0;
         }
         a.missileAmmo=32;a.missileDamage=30;
+        a.sensorRange=1000; // Provide real radar for this distant guided-weapon fixture.
         t.maxHull=t.hull=100000;
         return b;
     }
@@ -31,8 +32,10 @@ public final class OrdnanceConfigurationTest {
                 OrdnancePropulsion.Mode.SILENT_GHOST);
         b.setShipGuidanceMode(a.id,Battle.DamageType.MISSILE,
                 OrdnanceGuidance.Mode.PINCER);
-        b.step();
-        check(b.pendingSalvoCount()==1,"swarm has a physical queued launch");
+        int lockWindow=2*SensorLightTimeHistory.propagationTicks(560)+30;
+        for(int i=0;i<lockWindow&&b.pendingSalvoCount()==0;i++)b.step();
+        check(b.pendingSalvoCount()==1,
+                "A real radar contact must queue the sixteen-body swarm");
         check(b.missiles().size()==1,"first salvo body immediately launches");
         check(b.missiles().get(0).propulsionMode==OrdnancePropulsion.Mode.SILENT_GHOST,
                 "swarm motor independent of original pulse-burn default");
@@ -44,10 +47,11 @@ public final class OrdnanceConfigurationTest {
         b.setShipGuidanceMode(a.id,Battle.DamageType.MISSILE,
                 OrdnanceGuidance.Mode.PURSUIT);
         a.missileReload=100000;
-        for(int i=0;i<12;i++)b.step();
-        check(a.launched==8&&a.missileAmmo==24,
-                "all eight micro projectiles actually paid and launched");
-        check(b.missiles().size()==8,"queued swarm missiles still physically exist");
+        for(int i=0;i<18;i++)b.step();
+        check(a.launched==16&&a.missileAmmo==16,
+                "all sixteen micro projectiles must launch and consume sixteen rounds");
+        check(b.missiles().size()==16,
+                "all sixteen queued micro-missiles must exist as physical bodies");
         for(var m:b.missiles()){
             check(m.propulsionMode==OrdnancePropulsion.Mode.SILENT_GHOST
                     &&m.guidanceMode==OrdnanceGuidance.Mode.PINCER
@@ -64,7 +68,9 @@ public final class OrdnanceConfigurationTest {
                 OrdnanceDoctrine.Mode.SINGLE);
         b.setShipPropulsionMode(a.id,Battle.DamageType.MISSILE,
                 OrdnancePropulsion.Mode.COLD_START);
-        b.step();
+        for(int i=0;i<2*SensorLightTimeHistory.propagationTicks(560)+30
+                &&b.missiles().isEmpty();i++)b.step();
+        check(!b.missiles().isEmpty(),"Cold-start missile failed to acquire target");
         check(b.missiles().get(0).ignitionDelayTicks==14
                 &&b.missiles().get(0).thrustPhase==OrdnancePropulsion.Phase.COLD_EJECT,
                 "ordinary single launcher can cold eject without cold-launch salvo");
@@ -74,7 +80,9 @@ public final class OrdnanceConfigurationTest {
                 OrdnanceDoctrine.Mode.COLD_LAUNCH);
         c.setShipPropulsionMode(src.id,Battle.DamageType.MISSILE,
                 OrdnancePropulsion.Mode.CONSTANT_BURN);
-        c.step();
+        for(int i=0;i<2*SensorLightTimeHistory.propagationTicks(560)+30
+                &&c.missiles().isEmpty();i++)c.step();
+        check(!c.missiles().isEmpty(),"Constant-burn missile failed to acquire target");
         check(c.missiles().get(0).ignitionDelayTicks==0,
                 "old cold salvo can override motor and use immediate ignition");
         c.ships().get(0).resetPropulsionMode(Battle.DamageType.MISSILE);
