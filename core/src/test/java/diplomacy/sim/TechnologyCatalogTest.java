@@ -14,9 +14,20 @@ public final class TechnologyCatalogTest {
     }
     public static void main(String[] args) throws Exception {
         TechnologyCatalog c = TechnologyCatalog.loadDefault();
-        require(c.upgradeCount() == 72468, "full technology count including fleet sensor networks");
-        require(c.componentCount() == 2013, "all base components including fleet sensor networks");
+        require(c.upgradeCount() == 75240, "full technology count including fleet sensor networks");
+        require(c.componentCount() == 2090, "all base components including fleet sensor networks");
         for (String faction : Set.of("TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB")) {
+            // Four physical dumbfire racks, rotary CIWS, rail and particle
+            // point defense each add an independently researchable 9-stage lineage.
+            for(String code:new String[]{"RKS","RKM","RKL","RKG","RCW","RPD","PPD"}){
+                require(c.base("BASE-"+faction+"-"+code)!=null,
+                        "Missing physically distinct mounted ordnance "+faction+"/"+code);
+                for(String branch:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
+                    for(int rank=1;rank<=9;rank++)
+                        require(c.get("TECH-"+faction+"-"+code+"-"+branch+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
+                                "Missing nine-stage ordnance research "+faction+"/"+code);
+            }
             for(String role: new String[]{"HPR","APR","PWR","DHL","DSH","DAR","DPW",
                     "AHL","ASH","AAR","APW"}){
                 require(c.base("BASE-"+faction+"-"+role)!=null
@@ -137,7 +148,7 @@ public final class TechnologyCatalogTest {
             }
             enumerated++;
         }
-        require(enumerated==c.upgradeCount() && highestStages==24156,
+        require(enumerated==c.upgradeCount() && highestStages==25080,
                 "Lazy technology enumeration missed or duplicated a stage");
         TechnologyCatalog.Upgrade sixth=c.get("TECH-TER-KIN-OUTPUT-06");
         TechnologyCatalog.Upgrade ninth=c.get("TECH-TER-KIN-OUTPUT-09");
