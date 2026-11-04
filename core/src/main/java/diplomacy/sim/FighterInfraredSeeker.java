@@ -56,7 +56,7 @@ public final class FighterInfraredSeeker {
             frames[(int)(tick%CAPACITY)]=new Frame(tick,
                     craft.x,craft.y,craft.observedVx,craft.observedVy,
                     craft.profile.signature(),
-                    StrictMath.sqrt(craft.profile.crossSection()));
+                    craft.profile.opticalContrast());
         }
         public Frame at(long tick){
             if(tick<0)return null;

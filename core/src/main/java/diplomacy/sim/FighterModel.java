@@ -31,6 +31,19 @@ public final class FighterModel {
                 ||ammunition<0||ammunition>1000||!finite(accuracy,0.05,1))
                 throw new IllegalArgumentException("Invalid autonomous fighter profile");
         }
+        /** Photometric hull silhouette is distinct from radar cross-section
+         * and thermal engine output. Radar stealth cannot turn a visibly
+         * unchanged fighter into an optical stealth craft. */
+        public double opticalContrast(){
+            return switch(hull){
+                case INTERCEPTOR -> .55;
+                case LASER_FIGHTER -> .61;
+                case PARTICLE_FIGHTER -> .66;
+                case MISSILE_FIGHTER -> .74;
+                case ASSAULT_GUNSHIP -> .82;
+                case TORPEDO_BOMBER -> 1.15;
+            };
+        }
         /** Radar and PD use the same fourth-root detection logic as missiles. */
         public ProjectileModel.Spec radarProfile() {
             return new ProjectileModel.Spec(speed,health+armor,crossSection,signature);

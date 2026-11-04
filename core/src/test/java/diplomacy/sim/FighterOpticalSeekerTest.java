@@ -27,6 +27,24 @@ public final class FighterOpticalSeekerTest {
         // Target has a recorded visible silhouette independent of engine heat.
         fighter.infraredHistory.capture(0,fighter);
         var history=fighter.infraredHistory;
+        // Optical pixels cannot be inferred from radar stealth or engine IR.
+        // Change both fitted radar area and heat on the same silhouette.
+        var standard=fighter.profile;
+        parent.fighterProfile=new FighterModel.Profile(
+                standard.hull(),standard.weapon(),standard.health(),
+                standard.armor(),standard.speed(),standard.sensors(),
+                standard.crossSection()*.5,standard.signature()*.5,
+                standard.fuel(),standard.damage(),standard.range(),
+                standard.cooldown(),standard.ammunition(),standard.accuracy());
+        var stealth=new Battle.Craft(21,parent,true,0);
+        stealth.x=150;stealth.y=100;
+        stealth.infraredHistory.capture(0,stealth);
+        var original=history.at(0);
+        var alternate=stealth.infraredHistory.at(0);
+        require(original.opticalContrast()==alternate.opticalContrast()&&
+                original.heat()!=alternate.heat()&&
+                original.opticalContrast()>0,
+                "Radar/thermal signature was incorrectly substituted for optical silhouette");
         var narrow=FighterOpticalSeeker.Head.NARROW_TELESCOPIC;
         var wide=FighterOpticalSeeker.Head.WIDE_FIELD;
         require(FighterOpticalSeeker.installed(3)==narrow&&
