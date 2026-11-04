@@ -671,6 +671,22 @@ A focused real-world flak test and deterministic replay are included in
 the objective sensor-network smoke tests; visual quality and balance remain
 advisory.
 
+**Fighter infrared seeker integration (2026-11-03):** An actual interceptor
+fighter now launches a finite rack of independently damageable, independently
+guided short-range air-to-air missiles, alongside its retained cannon.
+Real fitted FTR research increases the interceptor magazine and exchanges
+longer-reach narrow fixed-front IR heads for wide-angle short-range heads at
+higher stages. Fighter infrared emission history is held in bounded per-body
+rings. Seeker photon returns must cross the moving missile's receiver
+worldline; current fighter coordinates are consulted ONLY for real physical
+collision. Own-carried flare clouds compete in the same delayed IR band and
+can capture the seeker or cause a proximity fuze; chaff has no infrared return.
+Defending fighters deploy finite flares when their local warning sensor sees
+an incoming actual fighter-targeting IR missile. Ships' pre-existing missile
+targeting model is unchanged. Separately addressed active radar and optical
+fighter seeker heads, command guidance and sensor-dependent chaff vs missile
+remain pending. This slice carries focused full-battle tests and replay checks.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 higher-resolution sub-tick receiver paths, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
