@@ -223,6 +223,8 @@ public final class Battle {
         public ProjectileModel.Defense pointDefenseProfile=ProjectileModel.STANDARD_PD;
         public double pdCycle=1;
         public FighterModel.Profile fighterProfile=FighterModel.standard(FighterModel.Hull.ASSAULT_GUNSHIP);
+        /** Highest purchased FTR avionics research stage. */
+        public int fighterCountermeasureTier;
         public Shipyard.Weapons weapons=new Shipyard.Weapons(
                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);
         public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
@@ -604,6 +606,9 @@ public final class Battle {
         public boolean reusable,returning;
         public double serviceRange,servicePulse,serviceMaxCharge;
         public int targetId,targetCraftId,ammunition,shotsFired;
+        /** Per-airframe finite dispensers; drones carry neither. */
+        public int flareRemaining,chaffRemaining;
+        public long nextCountermeasureTick;
         /** Null for legacy defense and repair drones; non-null for autonomous fighters. */
         public final FighterModel.Profile profile;
         public ProjectileModel.Spec radarProfile(){
@@ -618,6 +623,11 @@ public final class Battle {
             id=identifier;sourceId=source.id;team=source.team;
             fighter=offensive;repair=service;targetId=target;x=source.x;y=source.y;
             profile=offensive?source.fighterProfile:null;
+            if(offensive){
+                var pack=FighterCountermeasures.forHull(profile.hull(),
+                        source.fighterCountermeasureTier);
+                flareRemaining=pack.flares();chaffRemaining=pack.chaff();
+            }
             integrity=offensive?profile.health():service?20:15;
             maxIntegrity=integrity;armor=offensive?profile.armor():0;
             fuel=offensive?profile.fuel():service?52:22;
@@ -789,6 +799,10 @@ public final class Battle {
     /** Actual in-flight deployments, not fictitious visual particle counts. */
     public int carriersSplit,submunitionsDeployed;
     private final List<Craft> crafts = new ArrayList<>();
+    private static final int MAX_FIGHTER_CLOUDS=512;
+    private final List<FighterCountermeasures.Cloud> fighterClouds=new ArrayList<>();
+    public int fighterChaffDeployed,fighterFlaresDeployed;
+    public int fighterChaffFlakDiversions,fighterChaffRotaryDiversions;
     private int nextCraftId=1;
     private final List<Beam> beams = new ArrayList<>();
     /** Real wavefronts; never store future hull hit decisions. */
@@ -1055,6 +1069,10 @@ public final class Battle {
         return Collections.unmodifiableList(railPenetrators);
     }
     public List<Craft> crafts() { return Collections.unmodifiableList(crafts); }
+    /** Actual, independently aging physical decoy emissions. */
+    public List<FighterCountermeasures.Cloud> fighterCountermeasures(){
+        return Collections.unmodifiableList(fighterClouds);
+    }
     public List<Beam> beams() { return Collections.unmodifiableList(beams); }
     public List<SupportLink> supportLinks(){return Collections.unmodifiableList(supportLinks);}
     public List<String> events() { return Collections.unmodifiableList(events); }
@@ -1311,6 +1329,14 @@ public final class Battle {
             }
         }
         s.fighterProfile=FighterModel.forFaction(design.fighterHull,design.faction);
+        // An actual installed FTR socket supplies the upgrade; organic
+        // carrier defaults retain the baseline expendable magazines.
+        for(int i=0;i<design.slots();i++){
+            Shipyard.Installed part=design.at(i);
+            if(part!=null&&part.component.endsWith("-FTR")&&part.branch()!=null)
+                s.fighterCountermeasureTier=StrictMath.max(
+                        s.fighterCountermeasureTier,part.stage(part.branch()));
+        }
         s.fittedCrewSystems=true;
         s.crewRequired=machinery.crew().minimum();
         s.crewBerths=machinery.crew().berths();
