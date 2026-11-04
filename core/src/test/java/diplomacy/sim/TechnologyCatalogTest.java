@@ -125,10 +125,36 @@ public final class TechnologyCatalogTest {
                 require(c.base(baseId)!=null&&c.base(baseId).category.equals(family.category()),
                         "Missing survival module "+baseId);
                 for(String track:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
-                    for(int rank=1;rank<=9;rank++)
-                        require(c.get("TECH-"+faction+"-"+family.code()+"-"+track+"-"+
-                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
-                                "Missing independent survival research "+baseId);
+                    for(int rank=1;rank<=9;rank++){
+                        String rankId=String.format(java.util.Locale.ROOT,"%02d",rank);
+                        String name="TECH-"+faction+"-"+family.code()+"-"+track+"-"+rankId;
+                        var actual=c.get(name);
+                        var parent=c.get("TECH-"+faction+"-"+family.parent()+"-"+track+"-"+rankId);
+                        require(actual!=null&&parent!=null&&actual.stage==rank,
+                                "Missing independent survival research "+name);
+                        require(actual.faction.equals(faction)&&actual.subsystem.equals(family.code())&&
+                                actual.track.equals(track)&&actual.prerequisite.equals(rank==1?baseId:
+                                        "TECH-"+faction+"-"+family.code()+"-"+track+"-"+
+                                        String.format(java.util.Locale.ROOT,"%02d",rank-1)),
+                                "Virtual survival family identity or prerequisite drift "+name);
+                        require(actual.researchCost==parent.researchCost&&
+                                actual.industryCost==parent.industryCost&&
+                                Double.compare(actual.mass,parent.mass)==0&&
+                                Double.compare(actual.power,parent.power)==0&&
+                                Double.compare(actual.heat,parent.heat)==0&&
+                                Double.compare(actual.output,parent.output)==0&&
+                                Double.compare(actual.accuracy,parent.accuracy)==0&&
+                                Double.compare(actual.integrity,parent.integrity)==0&&
+                                Double.compare(actual.shield,parent.shield)==0&&
+                                Double.compare(actual.thrust,parent.thrust)==0&&
+                                Double.compare(actual.cooling,parent.cooling)==0&&
+                                Double.compare(actual.maintenance,parent.maintenance)==0,
+                                "Virtual native survival family stats changed "+name);
+                        require(actual.name.equals(family.name()+" "+track+" "+
+                                (rank<=6?rank:"6 / Stage "+rank))&&
+                                actual.tradeoff.equals(family.name()+": "+parent.tradeoff),
+                                "Virtual survival research description changed "+name);
+                    }
             }
             for(String module:new String[]{"KTS","MTS","TTS","FTS"}){
                 require(c.base("BASE-"+faction+"-"+module)!=null &&
