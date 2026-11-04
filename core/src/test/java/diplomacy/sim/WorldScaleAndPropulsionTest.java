@@ -99,7 +99,30 @@ public final class WorldScaleAndPropulsionTest {
             SublightPropulsion.advance(ship,0,0,Battle.DT);
         close(ship.vx,speedBefore,1e-10,"Fuel-starved ship got free brakes");
         ok(ship.x>position,"Fuel-starved ship failed to coast inertially");
-        System.out.println("PASS bounded impulse, delta-V fuel consumption and powerless coast");
+
+        // A protected threshold is a spending limit on the SAME tank.
+        // Thrust cannot borrow even the final fractional unit of fuel.
+        Battle.Ship rationed=b.addShip(0,Battle.Faction.TERRAN,300,420);
+        rationed.propulsion=SublightPropulsion.Drive.FUSION_TORCH;
+        rationed.engineCondition=1;rationed.speed=160;
+        rationed.maxFuel=100;rationed.fuel=25.001;
+        for(int i=0;i<3000;i++)
+            SublightPropulsion.advance(rationed,100,0,Battle.DT,25);
+        ok(rationed.fuel>=25-1e-9&&rationed.fuel<25.001,
+                "Discretionary thrust crossed the standing fuel reserve");
+        double stoppedVelocity=rationed.vx;
+        for(int i=0;i<300;i++)
+            SublightPropulsion.advance(rationed,100,0,Battle.DT,25);
+        close(rationed.vx,stoppedVelocity,1e-9,
+                "Protected reserve permitted free delta-V once fuel budget was exhausted");
+        SublightPropulsion.advance(rationed,-100,0,Battle.DT);
+        ok(rationed.fuel<25,"Physical withdrawal thrust could not access protected fuel");
+
+        rationed.vx=0;rationed.vy=0;rationed.fuel=.000001;
+        SublightPropulsion.advance(rationed,100,0,Battle.DT);
+        ok(rationed.vx<=.000001/rationed.propulsion.fuelPerDeltaV+1e-9,
+                "Final partial fuel unit provided more delta-V than physically available");
+        System.out.println("PASS bounded impulse, one-tank fuel reserve, exact delta-V budget and coast");
     }
     private static void halfGeometry() throws Exception {
         Battle b=new Battle(88611);
