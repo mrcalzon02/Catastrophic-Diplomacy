@@ -553,6 +553,18 @@ public final class PointDefenseThreatMatrixDiagnostic {
             }else selected=selected.install(slot,null);
         }
         require(retained>=0,"No fitted missile hardpoint for swarm test");
+        // A sixteen-body salvo requires sixteen real stocked rounds. The
+        // dreadnought's stock missile stores hold eleven: install an actual
+        // support MAG socket instead of conjuring extra ammunition.
+        boolean magazineInstalled=false;
+        for(Shipyard.Slot socket:selected.hull.slots)
+            if(socket.mount()==Shipyard.Mount.SUPPORT&&
+                    selected.at(socket.index())==null){
+                selected=selected.install(socket.index(),"BASE-TER-MAG");
+                magazineInstalled=true;
+                break;
+            }
+        require(magazineInstalled,"No physical support socket for an ordnance magazine");
         selected=selected.withGuidedOrdnance(Battle.DamageType.MISSILE,
                 new diplomacy.shipyard.OrdnanceFitting.Guided(
                     OrdnanceDoctrine.Mode.MICRO_SWARM,
