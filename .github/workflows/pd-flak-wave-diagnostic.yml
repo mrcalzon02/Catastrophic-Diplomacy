@@ -33,6 +33,8 @@ on:
       - 'core/src/test/java/diplomacy/sim/DemonstrationBattleTest.java'
       - 'core/src/main/java/diplomacy/sim/DemonstrationBattle.java'
       - 'core/src/main/java/diplomacy/sim/SublightPropulsion.java'
+      - 'core/src/main/java/diplomacy/shipyard/HullBaseline.java'
+      - 'core/src/test/java/diplomacy/sim/HullFoundationTest.java'
       - 'core/src/test/java/diplomacy/sim/ScreensaverBattleTest.java'
       - 'core/src/test/java/diplomacy/sim/ShipPlacementOrdersTest.java'
       - 'core/src/test/java/diplomacy/sim/BattleRetreatTest.java'
