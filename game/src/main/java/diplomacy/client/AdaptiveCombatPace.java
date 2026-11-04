@@ -56,7 +56,10 @@ final class AdaptiveCombatPace {
     }
     /** Returns true exactly when the *effective* speed changed. */
     boolean frame(double realDeltaSeconds,long cpuFrameNs,long simFrameNs,boolean active){
-        if(!active || !enabled){
+        // Manual speed disables only speed *adjustment*, never measurement.
+        // Otherwise the diagnostics HUD/CSV would report stale percentiles
+        // exactly when the player needs to compare fixed-speed performance.
+        if(!active){
             clearWindow();
             stableSeconds=0;
             return false;
@@ -83,6 +86,11 @@ final class AdaptiveCombatPace {
         cpuMeanMs=frameCpuNs/1_000_000.0/samples;
         double simFraction=frameCpuNs==0?0:simulationNs/frameCpuNs;
         clearWindow();
+        if(!enabled){
+            stableSeconds=0;
+            reason="MANUAL";
+            return false;
+        }
         if(wallP95Ms>SLOW_FRAME_MS){
             stableSeconds=0;
             if(simFraction>=.20 || simMeanMs>=6.0){
