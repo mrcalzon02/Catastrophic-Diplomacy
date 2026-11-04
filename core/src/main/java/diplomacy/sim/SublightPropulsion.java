@@ -74,8 +74,18 @@ public final class SublightPropulsion {
      */
     public static void advance(Battle.Ship ship,double wantedX,double wantedY,
                                double dt,double protectedFuel){
+        advance(ship,wantedX,wantedY,dt,protectedFuel,1);
+    }
+
+    /**
+     * Reduced thrust fraction is an actual acceleration/propellant-spend
+     * restriction, not merely a speed cap that low-gee ships never reach.
+     */
+    public static void advance(Battle.Ship ship,double wantedX,double wantedY,
+                               double dt,double protectedFuel,double thrustFraction){
         if(ship==null||!Double.isFinite(wantedX)||!Double.isFinite(wantedY)||
-                !Double.isFinite(dt)||dt<=0||!Double.isFinite(protectedFuel)||protectedFuel<0)
+                !Double.isFinite(dt)||dt<=0||!Double.isFinite(protectedFuel)||protectedFuel<0||
+                !Double.isFinite(thrustFraction)||thrustFraction<=0||thrustFraction>1)
             throw new IllegalArgumentException("Invalid thrust demand or reserve");
         double maxSpeed=maximumSpeed(ship);
         double requested=StrictMath.hypot(wantedX,wantedY);
@@ -87,7 +97,7 @@ public final class SublightPropulsion {
         double maxStep=ship.fuel>0&&ship.engineCondition>.01&&ship.crewReadiness()>0?
                 WorldScale.accelerationUnitsPerSimSecondSquared(
                         ship.propulsion.accelerationGee)*dt*
-                        ship.engineCondition*ship.crewReadiness():0;
+                        ship.engineCondition*ship.crewReadiness()*thrustFraction:0;
         double spendable=StrictMath.max(0,ship.fuel-protectedFuel);
         double fuelStep=spendable/ship.propulsion.fuelPerDeltaV;
         double applied=StrictMath.min(difference,StrictMath.min(maxStep,fuelStep));
