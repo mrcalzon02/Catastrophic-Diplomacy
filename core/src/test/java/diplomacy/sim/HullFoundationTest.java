@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import diplomacy.shipyard.HullBaseline;
 import diplomacy.shipyard.Shipyard;
+import diplomacy.shipyard.ShipLineages;
 import diplomacy.tech.TechnologyCatalog;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,6 +33,12 @@ public final class HullFoundationTest {
             check(technology.hasBase(weaponId),"Each civilization owns its weapon family "+code);
             for(Shipyard.Hull hull:Shipyard.Hull.values()){
                 HullBaseline.Stats intrinsic=HullBaseline.forHull(faction,hull);
+                HullBaseline.CoreSystems chassis=HullBaseline.core(hull);
+                double oldChassisFuel=120+hull.massCapacity*.48
+                        +ShipLineages.of(hull).generation()*8;
+                check(chassis.fuel()>=oldChassisFuel*1.25-1e-9
+                                &&Double.isFinite(chassis.fuel()),
+                        "All 47 physical chassis require a genuine 25% finite fuel reserve: "+hull);
                 check(intrinsic.structure()>0&&intrinsic.armor()>0&&intrinsic.speed()>0
                         &&intrinsic.power()>0&&intrinsic.sensorRange()>0
                         &&intrinsic.radarCrossSection()>0,"Physical hull has real intrinsic stats");
@@ -71,6 +78,9 @@ public final class HullFoundationTest {
                 check(actual.sensorRange==intrinsic.sensorRange()
                         &&actual.radarCrossSection==intrinsic.radarCrossSection(),
                         "Native sensors and signature reach the world simulation");
+                check(actual.maxFuel>=chassis.fuel()
+                                &&actual.fuel==actual.maxFuel,
+                        "Player and AI must deploy with the entire enlarged, finite chassis tank: "+hull);
                 hulls++;
             }
             var nativeBase=technology.base(weaponId);
@@ -90,8 +100,25 @@ public final class HullFoundationTest {
         var battles=Battle.duel(992,2,design,design,technology);
         var one=battles.ships().get(0);var other=battles.ships().get(2);
         check(one.maxHull==other.maxHull&&one.maxShields==other.maxShields
-                        &&one.laserDamage==other.laserDamage&&one.sensorRange==other.sensorRange,
-                "No private enemy-only guns or stat overrides");
+                        &&one.laserDamage==other.laserDamage&&one.sensorRange==other.sensorRange
+                        &&one.maxFuel==other.maxFuel&&one.fuel==other.fuel,
+                "No private enemy-only guns, fuel tanks or stat overrides");
+        // Use real finite gee/delta-V for one prolonged combat maneuver and
+        // the reverse burn needed to begin a withdrawal. Tank capacity may
+        // rise, but free engines or infinite fuel must never be introduced.
+        double tank=one.maxFuel;
+        double x=one.x,initialFuel=one.fuel;
+        for(int i=0;i<6000;i++)
+            SublightPropulsion.advance(one,
+                    SublightPropulsion.maximumSpeed(one),0,Battle.DT);
+        check(one.x>x&&one.fuel<initialFuel&&one.fuel>0,
+                "A stock cruiser must move with actual paid, sublight thrust");
+        double beforeReturn=one.fuel;
+        for(int i=0;i<6000;i++)
+            SublightPropulsion.advance(one,
+                    -SublightPropulsion.maximumSpeed(one),0,Battle.DT);
+        check(one.fuel<beforeReturn&&one.fuel>tank*.25,
+                "A prolonged battle maneuver must leave a finite withdrawal margin");
         System.out.println("PASS physical hull baseline: "+hulls+" chassis/faction combinations, 11 native module rosters, "+technology.upgradeCount()+" tech upgrades, unarmed fits, symmetric combat");
     }
 }
