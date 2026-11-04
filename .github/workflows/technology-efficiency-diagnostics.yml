@@ -12,6 +12,8 @@ on:
       - game/src/main/java/diplomacy/client/GameWikiCatalog.java
       - game/src/main/java/diplomacy/client/GameWikiPanel.java
       - game/src/test/java/diplomacy/client/WikiMemoryProfile.java
+      - game/src/test/java/diplomacy/client/WikiArbitrarySearchProfile.java
+      - game/build.gradle
 
 permissions:
   contents: read
@@ -64,6 +66,20 @@ jobs:
         run: |
           set -o pipefail
           gradle --no-daemon -PcdProfileHeap=32m :game:wikiProfile 2>&1 | tee wiki-profile-32m.log
+      - name: Profile arbitrary and broad wiki searches at 16 MiB
+        id: arbitrary16
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :game:wikiArbitrarySearchProfile 2>&1 | tee wiki-arbitrary-16m.log
+      - name: Profile arbitrary and broad wiki searches at 32 MiB
+        id: arbitrary32
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon -PcdProfileHeap=32m :game:wikiArbitrarySearchProfile 2>&1 | tee wiki-arbitrary-32m.log
       - name: Summarize actual diagnostic results (not release gates)
         if: always()
         shell: bash
@@ -73,6 +89,8 @@ jobs:
           INTEGRITY16: ${{ steps.integrity16.outcome }}
           CATALOG32: ${{ steps.catalog32.outcome }}
           WIKI32: ${{ steps.wiki32.outcome }}
+          ARBITRARY16: ${{ steps.arbitrary16.outcome }}
+          ARBITRARY32: ${{ steps.arbitrary32.outcome }}
         run: |
           {
             echo "### Measured technology and wiki workloads"
@@ -84,6 +102,8 @@ jobs:
             echo "| Catalog integrity / 16 MiB | $INTEGRITY16 |"
             echo "| Catalog / 32 MiB | $CATALOG32 |"
             echo "| Wiki / 32 MiB | $WIKI32 |"
+            echo "| Arbitrary wiki searches / 16 MiB | $ARBITRARY16 |"
+            echo "| Arbitrary wiki searches / 32 MiB | $ARBITRARY32 |"
             echo ""
             echo "For precise heap/time values or stack traces, inspect uploaded logs."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -98,5 +118,7 @@ jobs:
             technology-profile-32m.log
             wiki-profile-32m.log
             technology-integrity-16m.log
+            wiki-arbitrary-16m.log
+            wiki-arbitrary-32m.log
           if-no-files-found: warn
           retention-days: 14
