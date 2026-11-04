@@ -358,8 +358,11 @@ jobs:
     needs: [linux, windows, android-runtime, android-campaign-runtime]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # GitHub's release API may require Workflows:write when the tested commit
+    # differs from current main in .github/workflows. GITHUB_TOKEN cannot have
+    # that permission, so prefer an explicitly authorized repository token.
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.CD_RELEASE_TOKEN || github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/download-artifact@v4
