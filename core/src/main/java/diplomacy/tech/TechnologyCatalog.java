@@ -289,17 +289,13 @@ public final class TechnologyCatalog {
         long industry=Math.round(source.industryCost*v.price());
         if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
             throw new IllegalArgumentException("Technology cost overflow "+id);
-        ArrayList<String> cells=new ArrayList<>(COLS);
-        Collections.addAll(cells,id,parts[1],v.code(),parts[3],
-                Integer.toString(stage),v.name()+" / "+parts[3]+" "+stage,
-                predecessor,Long.toString(Math.max(1,research)),
-                Long.toString(Math.max(1,industry)));
-        for(double multiplier:new double[]{source.mass,source.power,source.heat,
-                source.output,source.accuracy,source.integrity,source.shield,
-                source.thrust,source.cooling,source.maintenance})
-            cells.add(ratio(multiplier,1));
-        cells.add(v.name()+": "+source.tradeoff);
-        return new Upgrade(cells);
+        // The source modifiers are already validated six-decimal values.
+        // Preserve price multiplication and independent prerequisite IDs,
+        // but skip the ten expensive stringify/parse cycles.
+        return new Upgrade(source,id,v.code(),
+                v.name()+" / "+parts[3]+" "+stage,predecessor,
+                (int)Math.max(1,research),(int)Math.max(1,industry),
+                v.name()+": "+source.tradeoff);
     }
 
     /** Network hardware generations have their own independent IX-rank
