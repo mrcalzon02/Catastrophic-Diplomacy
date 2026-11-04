@@ -259,7 +259,17 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.error("CRAFT-ART","Fighter render resources unavailable",unavailable);
             craftSprites = null;
         }
-        try {
+        // LibGDX decodes this optional 1024x768 atlas through a whole-file
+        // Java PNG buffer. API29 launch logs prove some VMs expose only a 16 MiB
+        // effective heap even when Android reports a larger memory class.
+        // Never risk a fatal Java OOM before the campaign menu for turret art.
+        // Normal-heap Android and desktop still render the exact authored atlas.
+        boolean tinyAndroidHeap=Gdx.app.getType()==
+                com.badlogic.gdx.Application.ApplicationType.Android &&
+                Runtime.getRuntime().maxMemory()<=32L*1024*1024;
+        if(tinyAndroidHeap){
+            Gdx.app.log("CAPITAL-TURRETS","Skipping optional turret overlay on constrained Java heap; hulls and weapon mechanics remain intact");
+        }else try {
             capitalTurrets = new CapitalTurretSprites();
         } catch (RuntimeException unavailable) {
             // Optional art cannot block combat, launch or updates.
