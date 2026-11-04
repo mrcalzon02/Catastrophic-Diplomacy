@@ -120,6 +120,11 @@ public final class TechnologyCatalog {
     public int upgradeCount() { return upgradeTotal; }
     public int componentCount() { return components.size(); }
     public Upgrade get(String id) {
+        // Common fitted/early-stage technology is resident. Resolve it before
+        // parsing the names of all four families of virtual higher-tier nodes.
+        // Canonical identities are disjoint; exhaustive smoke tests verify both.
+        Upgrade found=sixStages.get(id);
+        if(found!=null)return found;
         Upgrade virtual=survivalVariantUpgrade(id);
         if(virtual!=null)return virtual;
         virtual=networkVariantUpgrade(id);
@@ -128,8 +133,7 @@ public final class TechnologyCatalog {
         if(virtual!=null)return virtual;
         virtual=survivalFamilyUpgrade(id);
         if(virtual!=null)return virtual;
-        Upgrade found=sixStages.get(id);
-        if(found!=null||!deferredHigherStages||id==null||id.length()<4)return found;
+        if(!deferredHigherStages||id==null||id.length()<4)return null;
         int end=id.length();
         char tens=id.charAt(end-2),unit=id.charAt(end-1);
         if(tens!='0'||unit<'7'||unit>'9')return null;
