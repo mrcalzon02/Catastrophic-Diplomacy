@@ -269,7 +269,7 @@ public final class TechnologyCatalogTest {
         // Enumerating the virtual catalog is used by the live field wiki.
         // Its size, prerequisites and exact IDs must remain complete even
         // though ranks VII–IX are now generated only when actually requested.
-        int enumerated=0,highestStages=0;
+        int enumerated=0,highestStages=0,verifiedExtrapolated=0;
         for(var entry:c.upgrades().entrySet()){
             TechnologyCatalog.Upgrade upgrade=entry.getValue();
             require(entry.getKey().equals(upgrade.id),
@@ -282,11 +282,52 @@ public final class TechnologyCatalogTest {
                 require(upgrade.researchCost>0&&upgrade.industryCost>0 &&
                         c.get(upgrade.prerequisite)!=null,
                         "Virtual upgrade has invalid cost or missing actual prerequisite");
+
+                // Pin the CURRENT six-decimal formatter's exact outcomes
+                // before replacing its Formatter->CSV parse allocations.
+                // Restrict to stages named by the Stage-VI source lineage.
+                String stem=upgrade.id.substring(0,upgrade.id.length()-2);
+                var sixth=c.get(stem+"06");
+                if(sixth!=null&&upgrade.name.equals(sixth.name+
+                        " / Stage "+upgrade.stage)){
+                    var fifth=c.get(stem+"05");
+                    require(fifth!=null,"Missing numerical source "+stem);
+                    long expectedResearch=Math.round(sixth.researchCost*
+                            StrictMath.pow(upgrade.stage/6.0,2));
+                    long expectedIndustry=Math.round(sixth.industryCost*
+                            StrictMath.pow(upgrade.stage/6.0,2));
+                    require(upgrade.researchCost==Math.max(1,expectedResearch)&&
+                            upgrade.industryCost==Math.max(1,expectedIndustry),
+                            "Higher-stage research cost drift "+upgrade.id);
+                    double[] current={sixth.mass,sixth.power,sixth.heat,sixth.output,
+                            sixth.accuracy,sixth.integrity,sixth.shield,sixth.thrust,
+                            sixth.cooling,sixth.maintenance};
+                    double[] previous={fifth.mass,fifth.power,fifth.heat,fifth.output,
+                            fifth.accuracy,fifth.integrity,fifth.shield,fifth.thrust,
+                            fifth.cooling,fifth.maintenance};
+                    double[] actual={upgrade.mass,upgrade.power,upgrade.heat,
+                            upgrade.output,upgrade.accuracy,upgrade.integrity,
+                            upgrade.shield,upgrade.thrust,upgrade.cooling,
+                            upgrade.maintenance};
+                    for(int metric=0;metric<actual.length;metric++){
+                        double expected=Double.parseDouble(String.format(
+                                java.util.Locale.ROOT,"%.6f",Math.max(.05,
+                                        current[metric]+(current[metric]-previous[metric])*
+                                                (upgrade.stage-6))));
+                        require(Double.compare(expected,actual[metric])==0,
+                                "Higher-stage six-decimal numeric drift "+upgrade.id+
+                                        " metric "+metric+" expected "+expected+
+                                        " actual "+actual[metric]);
+                    }
+                    verifiedExtrapolated++;
+                }
             }
             enumerated++;
         }
         require(enumerated==c.upgradeCount() && highestStages==24420,
                 "Lazy technology enumeration missed or duplicated a stage: actual stages="+highestStages+" enumerated="+enumerated);
+        require(verifiedExtrapolated>1000,
+                "Insufficient higher-stage numeric parity coverage: "+verifiedExtrapolated);
         TechnologyCatalog.Upgrade sixth=c.get("TECH-TER-KIN-OUTPUT-06");
         TechnologyCatalog.Upgrade ninth=c.get("TECH-TER-KIN-OUTPUT-09");
         require(ninth!=null && ninth.stage==9 &&
