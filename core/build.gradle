@@ -398,6 +398,14 @@ tasks.register('massBattleSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.MassBattleCampaignTest'
     dependsOn testClasses
 }
+tasks.register('massMixedOnlySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Exercise just the real 200v200 six-weapon all-fighter combined-arms battle twice for determinism.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.MassBattleCampaignTest'
+    args '--mixed-only'
+    dependsOn testClasses
+}
 tasks.register('battleViewSmoke', JavaExec) {
     group = 'verification'
     description = 'Validate live vessel positions under the HUD in 1v1..200v200 and moving battles.'
