@@ -430,7 +430,7 @@ public final class Battle {
         public int targetCraftId;
         public FighterInfraredSeeker.Head fighterIrHead;
         public FighterInfraredSeeker.Reading lastFighterPhotons;
-        public long lastFlareId;
+        public long lastFlareId,lastFighterConsumedTick=-1;
         /** vx/vy are world-units/second, never normalized heading components. */
         public double x, y, vx, vy, fuel, damage, integrity, propellant;
         /** Physical body position at the start of the current 30Hz step. */
@@ -5960,6 +5960,115 @@ public final class Battle {
         return ready;
     }
 
+    /** Physically flying fighter interceptor: its passive seeker consumes
+     * only arrived historical IR photons; fighter current coordinates are
+     * consulted only for physical contact/impact, NEVER for guidance.
+     * Flare clouds remain independent objects with finite decaying emission.
+     */
+    private void updateFighterInterceptorMissile(Missile m,int index){
+        Craft target=null;
+        for(Craft craft:crafts)if(craft.id==m.targetCraftId&&
+                craft.fighter&&craft.integrity>0){target=craft;break;}
+        if(target==null||(m.fuel-=DT)<=0||
+                tick-m.spawnTick>BattleArena.MAX_GUIDED_SECONDS/DT||
+                !BattleArena.contains(m.x,m.y)){
+            missiles.remove(index);
+            visual(m.visualId,VisualPhase.TIMEOUT,"FIGHTER_IR_INTERCEPTOR",
+                    m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+            return;
+        }
+        m.flightTicks++;
+        var received=FighterInfraredSeeker.receive(m.fighterIrHead,
+                target.infraredHistory,fighterClouds,
+                target.id,m.team,m.seekerReceiverX,m.seekerReceiverY,
+                m.x,m.y,m.vx,m.vy,tick);
+        m.seekerReceiverX=m.x;m.seekerReceiverY=m.y;
+        m.seekerReceiverTick=tick;
+        if(received!=null)m.lastFighterPhotons=received;
+        if(m.lastFighterPhotons!=null&&
+                tick-m.lastFighterPhotons.receivedTick()<=
+                        m.fighterIrHead.scanTicks&&
+                m.lastFighterPhotons.receivedTick()>m.lastFighterConsumedTick&&
+                (m.flightTicks+m.visualId%m.fighterIrHead.scanTicks)%
+                        m.fighterIrHead.scanTicks==0){
+            var reading=m.lastFighterPhotons;
+            m.seekerLocked=true;
+            m.lastKnownX=reading.x();m.lastKnownY=reading.y();
+            m.lastKnownVX=reading.vx();m.lastKnownVY=reading.vy();
+            m.lastObservationTick=reading.emittedTick();
+            m.lastFighterConsumedTick=reading.receivedTick();
+            m.seekerUncertainty=2+(tick-reading.emittedTick())*DT;
+            if(reading.flareId()>0&&reading.flareId()!=m.lastFlareId)
+                fighterFlareSeekerDiversions++;
+            m.lastFlareId=reading.flareId();
+        }else if(m.lastFighterPhotons==null||
+                tick-m.lastFighterPhotons.receivedTick()>
+                        m.fighterIrHead.scanTicks*2){
+            m.seekerLocked=false;
+            m.seekerUncertainty=StrictMath.min(120,
+                    m.seekerUncertainty+DT*(1+
+                            StrictMath.hypot(m.lastKnownVX,m.lastKnownVY)*.08));
+        }
+        double extrapolation=StrictMath.max(0,tick-m.lastObservationTick)*DT;
+        double aimedX=m.lastKnownX+m.lastKnownVX*extrapolation;
+        double aimedY=m.lastKnownY+m.lastKnownVY*extrapolation;
+        double range=StrictMath.hypot(aimedX-m.x,aimedY-m.y);
+        m.thrustPhase=OrdnancePropulsion.phase(m.propulsionMode,
+                m.flightTicks,m.ignitionDelayTicks,range,false);
+        if(m.ignitionDelayTicks>0)m.ignitionDelayTicks--;
+        if(m.propellant<=1e-9&&OrdnancePropulsion.burning(m.thrustPhase))
+            m.thrustPhase=OrdnancePropulsion.Phase.COAST;
+        var aim=OrdnanceGuidance.aim(m.guidanceMode,m.x,m.y,m.vx,m.vy,
+                aimedX,aimedY,m.lastKnownVX,m.lastKnownVY,
+                m.flightTicks,m.approachSide);
+        double turning=m.seekerLocked?
+                StrictMath.min(.35,WeaponBehaviorTable.gun(DamageType.MISSILE)
+                        .guidancePerTick()*m.guidanceQuality*
+                        weather.guidanceFactor()*
+                        OrdnancePropulsion.guidanceMultiplier(m.thrustPhase)):0;
+        var velocity=OrdnancePropulsion.advanceVelocity(
+                m.vx,m.vy,aim.dx(),aim.dy(),m.spec.speed(),
+                turning,m.thrustPhase,DT,m.propellant);
+        m.propellant=StrictMath.max(0,m.propellant-
+                StrictMath.hypot(velocity.vx()-m.vx,velocity.vy()-m.vy));
+        m.vx=velocity.vx();m.vy=velocity.vy();
+        double nx=m.x+m.vx*DT,ny=m.y+m.vy*DT;
+        double aircraftAt=segmentHit(m.x,m.y,nx,ny,
+                target.x,target.y,6.0);
+        double flareAt=Double.POSITIVE_INFINITY;
+        FighterCountermeasures.Cloud fuze=null;
+        if(m.lastFlareId>0)for(var cloud:fighterClouds)
+            if(cloud.id()==m.lastFlareId&&
+                    cloud.kind()==FighterCountermeasures.Kind.FLARE&&
+                    cloud.active(tick)){
+                double arrival=segmentHit(m.x,m.y,nx,ny,
+                        cloud.xAt(tick),cloud.yAt(tick),8.0);
+                if(arrival<flareAt){flareAt=arrival;fuze=cloud;}
+            }
+        // Real swept collision takes precedence if the warhead actually
+        // intersects the fighter before reaching the false emission.
+        if(Double.isFinite(aircraftAt)&&aircraftAt<=flareAt){
+            m.x+=(nx-m.x)*aircraftAt;m.y+=(ny-m.y)*aircraftAt;
+            hitCraft(target,m.damage,findShip(m.sourceId),m.visualId,
+                    "FIGHTER_IR_INTERCEPTOR");
+            fighterInterceptorsHit++;
+            missiles.remove(index);
+        }else if(fuze!=null&&Double.isFinite(flareAt)){
+            m.x+=(nx-m.x)*flareAt;m.y+=(ny-m.y)*flareAt;
+            fighterFlareFuzes++;
+            missiles.remove(index);
+            visual(m.visualId,VisualPhase.TIMEOUT,"FIGHTER_IR_FLARE_FUZE",
+                    m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+        }else{
+            m.x=nx;m.y=ny;
+            if(!BattleArena.contains(nx,ny)){
+                missiles.remove(index);
+                visual(m.visualId,VisualPhase.TIMEOUT,"FIGHTER_IR_INTERCEPTOR",
+                        m.team,m.sourceId,m.targetId,m.x,m.y,m.x,m.y);
+            }
+        }
+    }
+
     private void updateMissiles() {
         resolveFlakBursts();
         firePhysicalFlak();
@@ -6248,6 +6357,10 @@ public final class Battle {
         }
         for (int i = missiles.size() - 1; i >= 0; i--) {
             Missile m = missiles.get(i);
+            if(m.targetCraftId>0){
+                updateFighterInterceptorMissile(m,i);
+                continue;
+            }
             Ship target = findShip(m.targetId);
             if (target == null || !target.alive() || (m.fuel -= DT) <= 0
                     || tick-m.spawnTick>BattleArena.MAX_GUIDED_SECONDS/DT
@@ -6707,6 +6820,7 @@ public final class Battle {
             hash=mix(hash,m.targetCraftId);
             hash=mix(hash,m.fighterIrHead==null?-1:m.fighterIrHead.ordinal());
             hash=mix(hash,m.lastFlareId);
+            hash=mix(hash,m.lastFighterConsumedTick);
             if(m.lastFighterPhotons!=null){
                 hash=mix(hash,m.lastFighterPhotons.emittedTick());
                 hash=mix(hash,m.lastFighterPhotons.receivedTick());
