@@ -3129,8 +3129,9 @@ public final class Battle {
                 return true;
             }
             case HOLD -> {
-                SublightPropulsion.advance(ship,0,0,DT);
-                // Coasting remains physical if fuel is depleted.
+                // HOLD with zero ordered thrust is inertial coasting, not
+                // an active reverse burn toward zero velocity.
+                SublightPropulsion.coast(ship,DT);
                 ship.commandQueue.tickTimed();
                 return true;
             }
