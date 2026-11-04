@@ -38,9 +38,11 @@ final class GameWikiPanel {
         hits=catalog.search(GameWikiCatalog.CATEGORIES[category],query);
         chosen=null;
         int chosenIndex=0;
-        if(previous!=null)for(int i=0;i<hits.size();i++){
-            GameWikiCatalog.Article candidate=hits.get(i);
-            if(candidate.id.equals(previous)){chosen=candidate;chosenIndex=i;break;}
+        if(previous!=null){
+            // Never instantiate the entire virtual 73k-entry encyclopedia
+            // merely to reselect a previously visible article.
+            int index=catalog.indexOfId(hits,previous);
+            if(index>=0){chosen=hits.get(index);chosenIndex=index;}
         }
         if(chosen==null&&!hits.isEmpty())chosen=hits.get(0);
         listPage=chosen==null?0:chosenIndex/ROWS;
