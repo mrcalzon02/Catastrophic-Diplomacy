@@ -23,6 +23,8 @@ on:
       - game/src/test/java/diplomacy/client/GameMenuFlowTest.java
       - game/src/main/java/diplomacy/client/CombatPace.java
       - game/src/main/java/diplomacy/client/AdaptiveCombatPace.java
+      - game/src/main/java/diplomacy/client/CombatDiagnosticRecorder.java
+      - game/src/test/java/diplomacy/client/CombatPerformanceControlTest.java
       - game/src/main/java/diplomacy/client/CatastrophicGame.java
       - game/src/main/java/diplomacy/client/GameWikiCatalog.java
       - core/src/test/java/diplomacy/sim/ApprovedHardpointsTest.java
