@@ -77,7 +77,7 @@ public final class CombatPerformanceControlTest {
                 files.put(entry.getName(),data.toString(StandardCharsets.UTF_8));
             }
         }
-        check(files.size()==4,"ZIP must contain metadata, frames, events, and summary");
+        check(files.size()==5,"ZIP must contain metadata, frames, events, log and summary");
         check(files.get("metadata.json").contains("\"finalTick\": 3900"),"Metadata readback");
         String csv=files.get("frame-samples.csv");
         check(csv.startsWith("frame,tick")&&csv.contains("300,300,")&&
@@ -87,6 +87,11 @@ public final class CombatPerformanceControlTest {
                 "Performance transition missing from export");
         check(files.get("summary.json").contains("\"overwrittenFrames\": 300"),
                 "Bounded export must disclose overwritten frames");
+        check(files.get("summary.json").contains("\"wallFrameP95Ms\": 33.0")&&
+                files.get("summary.json").contains("\"peakShips\": 400"),
+                "Export summary must carry truthful performance and fleet metrics");
+        check(files.get("diagnostic.log").contains("SIMULATION PRESSURE"),
+                "Diagnostic log export missing speed transitions");
         System.out.println("PASS discrete combat speeds, adaptive governor and ZIP telemetry readback");
     }
 }
