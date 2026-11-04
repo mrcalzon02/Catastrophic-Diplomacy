@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.RandomAccess;
 
 /**
  * Read-only, searchable field encyclopedia sourced from live Java rules and the
@@ -49,6 +50,32 @@ final class GameWikiCatalog {
     private static final String RESEARCH_COST_LABEL="Research cost ";
     private static final String RESEARCH_COST_SEARCH=
             RESEARCH_COST_LABEL.toLowerCase(Locale.ROOT);
+    // Every ordinary component has four independently researched branches
+    // and nine stages. A 73,260-entry index can be represented by only 2,035
+    // canonical base identities without losing lexicographic ordering.
+    private static final String[] SORTED_RESEARCH_TRACKS={
+            "EFFICIENCY","OUTPUT","RESILIENCE","SPECIALIST"};
+    private static final int RESEARCH_STAGES=9;
+    private static final int RESEARCH_PER_COMPONENT=
+            SORTED_RESEARCH_TRACKS.length*RESEARCH_STAGES;
+    private static final class CompactUpgradeIds extends AbstractList<String>
+            implements RandomAccess {
+        private final List<TechnologyCatalog.Component> components;
+        CompactUpgradeIds(List<TechnologyCatalog.Component> ordered){
+            components=List.copyOf(ordered);
+        }
+        @Override public int size(){return components.size()*RESEARCH_PER_COMPONENT;}
+        @Override public String get(int index){
+            if(index<0||index>=size())throw new IndexOutOfBoundsException(index);
+            TechnologyCatalog.Component base=
+                    components.get(index/RESEARCH_PER_COMPONENT);
+            int remainder=index%RESEARCH_PER_COMPONENT;
+            String track=SORTED_RESEARCH_TRACKS[remainder/RESEARCH_STAGES];
+            int rank=remainder%RESEARCH_STAGES+1;
+            return "TECH-"+base.faction+"-"+base.subsystem+"-"+track+"-0"+rank;
+        }
+    }
+
     private final List<Article> articles;
     private final List<Article> upgradeArticles;
     private final List<Article> staticArticles;
@@ -59,15 +86,23 @@ final class GameWikiCatalog {
                 .thenComparing(e->e.title).thenComparing(e->e.id));
         staticArticles=List.copyOf(list);
         this.technology=technology;
-        // A full encyclopedia contains 39,600 research entries. On a 16MiB
-        // Android runtime, pre-rendering all eight-line Article objects and
-        // concatenated search text can exhaust memory without opening a page.
-        // Only their canonical IDs are retained; details use the same live
-        // TechnologyCatalog on demand and never become a second permanent copy.
-        List<String> ids=new ArrayList<>(technology.upgradeCount());
-        ids.addAll(technology.upgradeIds());
-        ids.sort(String::compareTo);
-        upgradeIds=List.copyOf(ids);
+        // Derive nine-stage research IDs from a 2,035-element sorted base
+        // index instead of retaining 73,260 formatted String objects. This
+        // preserves the exact previous lexicographic encyclopedia order and
+        // O(log n) binary-search selection (RandomAccess is essential).
+        // For imported/nonstandard catalogs that do not obey the uniform
+        // nine-stage rule, retain the pre-existing explicit-ID fallback.
+        if(technology.upgradeCount()==
+                technology.componentCount()*RESEARCH_PER_COMPONENT){
+            List<TechnologyCatalog.Component> bases=
+                    new ArrayList<>(technology.baseComponents().values());
+            bases.sort(Comparator.comparing(c->c.id));
+            upgradeIds=new CompactUpgradeIds(bases);
+        }else{
+            List<String> ids=technology.upgradeIds();
+            ids.sort(String::compareTo);
+            upgradeIds=List.copyOf(ids);
+        }
         if(upgradeIds.size()!=technology.upgradeCount())
             throw new IllegalStateException("Incomplete virtual research encyclopedia");
         // Both ALL and UPGRADES pages retain only a compact canonical-ID index.
