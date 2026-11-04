@@ -449,6 +449,10 @@ public final class Battle {
         /** Bounded uncertainty of the last historical seeker estimate. A
          * lost lock continues to age; CAP never grants perfect missile data. */
         public double seekerUncertainty;
+        /** The missile's own last sampled receiver pose: no future enemy
+         * telemetry and no costly full history allocated per missile. */
+        public double seekerReceiverX,seekerReceiverY;
+        public long seekerReceiverTick;
         /** Last physically received seeker sample, not target truth. */
         public long lastObservationTick;
         void setPropulsion(OrdnancePropulsion.Mode mode){
@@ -486,7 +490,10 @@ public final class Battle {
                 OrdnanceDoctrine.Payload launchPayload,int ignitionTicks,
                 AmmunitionTable.Warhead warheadType) {
             this.visualId=visualId;this.spawnTick=spawnTick;sourceId = source; team = owner; targetId = target; x = sx; y = sy;
-            previousX=sx;previousY=sy;torpedo=heavy;
+            previousX=sx;previousY=sy;
+            seekerReceiverX=sx;seekerReceiverY=sy;
+            seekerReceiverTick=spawnTick;
+            torpedo=heavy;
             double magnitude = StrictMath.hypot(dx, dy);
             vx = magnitude == 0 ? 1 : dx / magnitude;
             vy = magnitude == 0 ? 0 : dy / magnitude;
@@ -6006,8 +6013,15 @@ public final class Battle {
             // decisions consume a delayed onboard photon measurement.
             double physicalDx=target.x-m.x,physicalDy=target.y-m.y;
             double physicalRange=StrictMath.hypot(physicalDx,physicalDy);
-            OrdnanceSeeker.Return sensed=OrdnanceSeeker.passiveReturn(
-                    target,m.x,m.y,tick);
+            // Receipt uses the same physical missile worldline over the
+            // preceding tick. A body launched THIS tick has no earlier
+            // physical trajectory and uses its just-created receiver pose.
+            OrdnanceSeeker.Return sensed=m.seekerReceiverTick==tick-1?
+                    OrdnanceSeeker.passiveReturn(target,
+                            m.seekerReceiverX,m.seekerReceiverY,m.x,m.y,tick):
+                    OrdnanceSeeker.passiveReturn(target,m.x,m.y,tick);
+            m.seekerReceiverX=m.x;m.seekerReceiverY=m.y;
+            m.seekerReceiverTick=tick;
             double measuredRange=sensed!=null?sensed.distance():
                     StrictMath.hypot(m.lastKnownX-m.x,m.lastKnownY-m.y);
             m.flightTicks++;
@@ -6446,6 +6460,9 @@ public final class Battle {
             hash=mix(hash,m.approachSide);
             hash=mix(hash,m.thrustPhase.ordinal());
             hash=mix(hash,m.seekerLocked?1:0);
+            hash=mix(hash,m.seekerReceiverTick);
+            hash=mix(hash,Double.doubleToLongBits(m.seekerReceiverX));
+            hash=mix(hash,Double.doubleToLongBits(m.seekerReceiverY));
             hash=mix(hash,m.lastObservationTick);
             hash=mix(hash,Double.doubleToLongBits(m.seekerUncertainty));
             hash=mix(hash,m.falseContactIndex);

@@ -613,8 +613,19 @@ PD/flak workflow performs this heavy test only on explicit
 `[sensor-scale]` integration commits or manual dispatch; outputs are
 CSV/Markdown artifacts, not packaged applications.
 
+**Moving missile receiver timing (2026-11-03):** Each flying missile now
+retains its immediately preceding own-ship receiver pose and timestamp
+(three bounded scalar fields). Photon-arrived onboard seeker returns must
+cross the expanding historical emitter wavefront between the receiver's
+previous and current sample; already-passed pulses cannot be reacquired
+by repositioning the missile. Launch-tick fallback uses the new body's
+actual launch pose. The receiver's own history participates in deterministic
+battle fingerprints. The short worldline segment is physically sampled at
+30 Hz and does not pretend to solve continuously moving multi-light-minute
+relativistic photon trajectories or give the missile future coordinates.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
-measured receiver-position histories, probabilistic multi-hypothesis
+higher-resolution sub-tick receiver paths, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
 envelopes with future onboard scan updates, complete
 200v200 balance/performance, maneuver covariance, fleet FCM shared-compute

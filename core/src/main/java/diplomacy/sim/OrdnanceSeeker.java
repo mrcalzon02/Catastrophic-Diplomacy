@@ -22,11 +22,11 @@ public final class OrdnanceSeeker {
         return distance<=reach*(reacquiring?.8:1);
     }
 
-    /** Photon-limited passive seeker return from the original assigned hull.
-     * Missile location is its local known receiver pose; target location,
-     * velocity, RCS and ECM are from the SAME historical emission tick.
-     * This returns a measured fix, not a guaranteed lock or omniscient target.
-     * The moving-receiver's historical light cone will be refined separately. */
+    /** Photon-limited passive seeker return from the assigned emitter.
+     * The target position, RCS and ECM come from one historical emission.
+     * The moving receiver tests the light-front crossing over its own
+     * LAST observed movement segment, never the enemy's future position.
+     * The returned range is measured at receipt, not launch. */
     public record Return(long measuredTick,long receivedTick,double distance,
                          SensorLightTimeHistory.Sample sample,
                          SensorLightTimeHistory.Profile profile){
@@ -37,25 +37,53 @@ public final class OrdnanceSeeker {
                 throw new IllegalArgumentException("Invalid delayed seeker return");
         }
     }
+    /** Stationary-receiver compatibility for sensor fixtures and consoles.
+     * A real flying missile uses the overload with its prior receiver pose. */
     public static Return passiveReturn(Battle.Ship target,double receiverX,
                                        double receiverY,long now){
-        if(target==null||now<0||!Double.isFinite(receiverX)||
-                !Double.isFinite(receiverY))
-            throw new IllegalArgumentException("Invalid seeker receiver");
+        return passiveReturn(target,receiverX,receiverY,
+                receiverX,receiverY,now);
+    }
+    /**
+     * The receiver's finite one-tick worldline intersects an expanding
+     * light sphere emitted by the target at an earlier recorded tick.
+     * A pulse which had ALREADY passed the receiver at the previous
+     * observation cannot be observed again merely by moving/repositioning.
+     *
+     * No per-missile ring allocation: the actual past and present receiver
+     * poses delimit the arrival step. All earlier target epochs come from
+     * the existing fixed-capacity immutable ship history.
+     */
+    public static Return passiveReturn(Battle.Ship target,
+            double fromX,double fromY,double toX,double toY,long now){
+        if(target==null||now<0||
+                !Double.isFinite(fromX)||!Double.isFinite(fromY)||
+                !Double.isFinite(toX)||!Double.isFinite(toY))
+            throw new IllegalArgumentException("Invalid seeker receiver worldline");
         int horizon=StrictMath.min(SensorLightTimeHistory.CAPACITY-1,
                 SensorLightTimeHistory.propagationTicks(
                         WorldScale.DIAGONAL_WORLD_UNITS)+2);
+        final double lightStep=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
         for(int age=0;age<=horizon&&age<=now;age++){
-            long reflectedTick=now-age;
+            long emittedTick=now-age;
             SensorLightTimeHistory.Sample measured=
-                    target.sensorHistory.at(reflectedTick);
+                    target.sensorHistory.at(emittedTick);
             SensorLightTimeHistory.Profile profile=
-                    target.sensorHistory.profileAt(reflectedTick);
+                    target.sensorHistory.profileAt(emittedTick);
             if(measured==null||profile==null||!measured.alive())continue;
-            double range=StrictMath.hypot(measured.x()-receiverX,
-                    measured.y()-receiverY);
-            if(SensorLightTimeHistory.propagationTicks(range)==age)
-                return new Return(reflectedTick,now,range,measured,profile);
+            double range=StrictMath.hypot(measured.x()-toX,measured.y()-toY);
+            if(age==0){
+                if(range<=1e-9)
+                    return new Return(emittedTick,now,range,measured,profile);
+                continue;
+            }
+            double priorRange=StrictMath.hypot(measured.x()-fromX,
+                    measured.y()-fromY);
+            // The front must be outside at tick N-1 and must have reached
+            // the receiver by N. This also rejects already-passed pulses.
+            if(priorRange>lightStep*(age-1)+1e-9&&
+                    range<=lightStep*age+1e-9)
+                return new Return(emittedTick,now,range,measured,profile);
         }
         return null;
     }

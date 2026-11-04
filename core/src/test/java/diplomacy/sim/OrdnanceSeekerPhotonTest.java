@@ -47,6 +47,36 @@ public final class OrdnanceSeekerPhotonTest {
         require(changed,"Later movement and ECM never propagated to onboard seeker");
         System.out.println("PASS seeker optical light-cone delay, historical movement and delayed ECM");
     }
+    private static void movingReceiverWorldline(){
+        Battle battle=new Battle(461234);
+        Battle.Ship receiver=battle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship emitter=battle.addShip(1,Battle.Faction.DRAXIAN,750,100);
+        battle.registerDiagnosticStationaryTarget(receiver.id);
+        battle.registerDiagnosticStationaryTarget(emitter.id);
+        // Four emitted/arriving ticks with stable historical source location.
+        for(int i=0;i<4;i++)battle.step();
+        int delay=SensorLightTimeHistory.propagationTicks(550);
+        require(delay==4,"Fixture no longer spans exactly four light ticks");
+        var approaching=OrdnanceSeeker.passiveReturn(emitter,
+                200,100,250,100,battle.tick);
+        require(approaching!=null&&approaching.measuredTick()==0,
+                "Moving receiver missed first actual incoming historical wavefront");
+        // A discontinuous/superluminal reposition is not permission to
+        // rediscover a pulse which passed the old receiver last frame.
+        var staticOracle=OrdnanceSeeker.passiveReturn(emitter,200,100,battle.tick);
+        require(staticOracle!=null&&staticOracle.measuredTick()==0,
+                "Static control receiver fixture did not observe the pulse");
+        var alreadyPassed=OrdnanceSeeker.passiveReturn(emitter,
+                700,100,200,100,battle.tick);
+        require(alreadyPassed==null,
+                "Moved receiver rediscovered previously passed historical photons");
+        // Same visible target now, different physically sampled receiver
+        // trajectory: the delayed photons must not magically be identical.
+        require(OrdnanceSeeker.passiveReturn(emitter,
+                200,100,250,100,battle.tick).equals(approaching),
+                "Moving photon arrival was nondeterministic");
+        System.out.println("PASS finite moving receiver light-front intersection, prior passage and replay");
+    }
     private static void deterministicCausalReplay(){
         Battle a=new Battle(461231),b=new Battle(461231);
         for(Battle scene:new Battle[]{a,b}){
@@ -176,6 +206,7 @@ public final class OrdnanceSeekerPhotonTest {
     }
     public static void main(String[] args){
         delayedPositionAndEcm();emittedHologramCannotChangeInFlight();
+        movingReceiverWorldline();
         boundedSeekerNoise();deterministicCausalReplay();
     }
 }
