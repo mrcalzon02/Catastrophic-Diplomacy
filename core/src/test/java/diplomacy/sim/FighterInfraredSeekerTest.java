@@ -66,6 +66,12 @@ public final class FighterInfraredSeekerTest {
         check(FighterInfraredSeeker.receive(fixed,history,List.of(chaff),
                 fighter.id,1,0,100,0,100,250,0,2).flareId()==0,
                 "Radar chaff emitted fictitious infrared photons");
+        var lastEmission=FighterInfraredSeeker.receive(fixed,history,
+                List.of(flare),fighter.id,1,
+                0,100,0,100,250,0,49);
+        check(lastEmission!=null&&lastEmission.flareId()==flare.id()&&
+                lastEmission.emittedTick()==47&&!flare.active(49),
+                "Sped-down flare emissions disappeared before photons arrived");
         check(FighterInfraredSeeker.receive(fixed,history,List.of(flare),
                 fighter.id,1,0,100,0,100,250,0,90)==null,
                 "Already-passed emissions reappeared as current target telemetry");
@@ -150,6 +156,13 @@ public final class FighterInfraredSeekerTest {
         check(battle.fighterFlareSeekerDiversions>0,
                 "Flare photons never actually deceived any onboard missile seeker");
         System.out.println("PASS actual fitted fighter interceptors, passive photon tracks, finite flare competition");
+        System.out.println("IR_COMBAT_PROFILE interceptor_launches="+
+                battle.fighterInterceptorsLaunched+
+                " protected_flare_launches="+battle.fighterFlaresDeployed+
+                " ir_decoy_acquisitions="+battle.fighterFlareSeekerDiversions+
+                " flare_proximity_fuzes="+battle.fighterFlareFuzes+
+                " protected_real_hits="+battle.fighterInterceptorsHit+
+                " unprotected_real_hits="+noFlares.fighterInterceptorsHit);
         Battle a=realFighterCombat(tech,815023L,false);
         Battle b=realFighterCombat(tech,815023L,false);
         for(int tick=0;tick<110;tick++){
