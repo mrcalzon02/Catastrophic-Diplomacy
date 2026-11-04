@@ -105,7 +105,16 @@ public final class FleetSensorPhotonScaleDiagnostic {
                     default -> throw new IllegalStateException("Unknown fleet role");
                 };
                 double cy=95+role*160;
-                sim.spawnWing(team,design,catalog,part,cx,cy);
+                // Reserve ONE rearward FCM anchor per side for the
+                // non-omniscient datalink proof. Other fitted FCM hulls
+                // remain active combatants beside their supported ships,
+                // rather than sitting inert and consuming one another's
+                // limited command-recipient slots.
+                if(role==2&&part>1){
+                    sim.spawnWing(team,design,catalog,1,cx,cy);
+                    sim.spawnWing(team,design,catalog,part-1,
+                            team==0?450:830,cy);
+                }else sim.spawnWing(team,design,catalog,part,cx,cy);
                 allocated+=part;
             }
             check(allocated==count,"Incomplete real fitted deployment");
@@ -122,7 +131,8 @@ public final class FleetSensorPhotonScaleDiagnostic {
             // Keep the command center in its designated rearward plotting
             // station. This is a sensor/relay diagnostic, not an AI pursuit
             // trial; the other fully armed line vessels still maneuver.
-            if(ship.network.commandCapacity()>0){
+            if(ship.network.commandCapacity()>0&&
+                    ship==sim.tacticalViewer(ship.team)){
                 sim.registerDiagnosticStationaryTarget(ship.id);
                 // The FCM remains powered and can receive SHR/LNK, but its
                 // local radar/IR/X-ray/gravity receiver is offline. This
@@ -312,9 +322,11 @@ public final class FleetSensorPhotonScaleDiagnostic {
                 "Two identical-seed independently executed replays per size. "+
                 "SHR, RES, TRK, LNK, FCM and CAP modules are installed in real "+
                 "paid DREADNOUGHT sockets; RDR radars arm the forward scouts "+
-                "and tracking line while the rear FCM has its local receivers "+
-                "offline as a deliberate remote-datalink failure-mode "+
-                "test. LAS/MSL guns are fitted on every vessel. "+
+                "and tracking line while ONE rear FCM per side has local receivers "+
+                "offline to prove remote datalinks. Other fitted FCMs "+
+                "remain active near armed combatants rather than "+
+                "absorbing all command slots while inert. "+
+                "LAS/MSL guns are fitted on every vessel. "+
                 "One sensor family includes real HLP hologram hardware. "+
                 "Forward SHR scouts lose power at midpoint; the separate "+
                 "TRK/LNK archive must preserve aged tracks. Innate fighter "+
