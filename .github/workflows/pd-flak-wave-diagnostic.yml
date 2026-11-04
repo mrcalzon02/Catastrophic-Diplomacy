@@ -9,6 +9,8 @@ on:
       - 'core/src/main/java/diplomacy/sim/OrdnanceSeeker.java'
       - 'core/src/main/java/diplomacy/sim/FighterCountermeasures.java'
       - 'core/src/main/java/diplomacy/sim/FighterInfraredSeeker.java'
+      - 'core/src/main/java/diplomacy/sim/FighterRadarSeeker.java'
+      - 'core/src/test/java/diplomacy/sim/FighterRadarSeekerTest.java'
       - 'core/src/test/java/diplomacy/sim/FighterInfraredSeekerTest.java'
       - 'core/src/test/java/diplomacy/sim/FighterCraftTest.java'
       - 'core/src/test/java/diplomacy/sim/FighterCountermeasureTest.java'

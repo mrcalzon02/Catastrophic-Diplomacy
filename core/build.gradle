@@ -216,6 +216,7 @@ tasks.register('sensorFalseContactRelaySmoke', JavaExec) {
     dependsOn testClasses
 }
 tasks.register('sensorNetworkSmoke', JavaExec) {
+    dependsOn(tasks.named('fighterRadarSeekerSmoke'))
     dependsOn(tasks.named('fighterInfraredSeekerSmoke'))
     dependsOn(tasks.named('fighterCountermeasureSmoke'))
     dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
@@ -479,6 +480,14 @@ tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
 tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
 tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
 
+/** Active fighter radar seeker reflections, chaff and physically fitted missiles. */
+tasks.register('fighterRadarSeekerSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Active emitted/returned radar photons, real fighter chaff and seeded replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterRadarSeekerTest'
+}
 /** Fighter-targeting autonomous infrared missiles with causal light-fronts. */
 tasks.register('fighterInfraredSeekerSmoke', JavaExec) {
     group = 'verification'
