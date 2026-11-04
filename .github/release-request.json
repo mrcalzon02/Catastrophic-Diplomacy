@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 4,
-  "note": "User-requested Windows release failure repair retry after focused CI passed on source 1ceeb23485c1f3100b87dc17c3c3f37d785688ad. Build the current main with retained Android signing, required Windows MSI install/launch/uninstall, Linux launch, Android API29/API34 gameplay and upgrade checks, checksums and public release readback. Do not publish on any functional failure."
+  "revision": 5,
+  "note": "User explicitly requested updated Android APK and Windows MSI after fuel-order implementation and completed focused gameplay/functionality verification (source 80ab83d501bd6345a3ae5e11c02d141a144c886f). Build current main and require signed Android upgrade continuity, Android API29/API34 gameplay/campaign tests, Windows MSI install/launch/uninstall, Linux launch, checksums, and public release readback. Do not publish on functional failures."
 }
