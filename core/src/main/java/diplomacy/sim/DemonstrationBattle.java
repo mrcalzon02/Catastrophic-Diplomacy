@@ -40,7 +40,11 @@ public final class DemonstrationBattle {
             if(!Shipyard.inspect(design,catalog).valid())
                 throw new IllegalStateException("Invalid weapon demonstration fitting: "+faction+" "+hull);
             int quantity=33+(group<2?1:0); // 34+34+33+33+33+33 = 200 each
-            double x=(team==0?220:880)+(group%3)*95;
+            // The 200v200 demonstration must physically bring short-range
+            // plasma batteries into contact without overlapping enemy fleets.
+            // The closest cross-fleet wing centers remain 200 world units apart,
+            // above the missile and torpedo minimum standoff distances.
+            double x=(team==0?330:720)+(group%3)*95;
             double y=238+(group/3)*190;
             if(group==0){
                 // Fighter carrier formation is not a repair/shield-relay fleet.
