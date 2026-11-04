@@ -14,7 +14,7 @@ public final class ShipStandingOrdersTest {
     }
     public static void main(String[] args)throws Exception {
         ShipStandingOrders policy=ShipStandingOrders.DEFAULT;
-        check(ShipStandingOrders.SETTINGS.length==29,"Missing persistent resource-fire policy controls");
+        check(ShipStandingOrders.SETTINGS.length==32,"Missing persistent fuel policy controls");
         for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
             check(!policy.display(i).isBlank(),"Invisible standing policy row "+i);
         ShipStandingOrders attack=policy.adjust(0,4).adjust(1,-3);
@@ -62,17 +62,27 @@ public final class ShipStandingOrdersTest {
         Map<Long,ShipStandingOrders> saved=new HashMap<>();
         for(int slot=0;slot<200;slot++)
             saved.put((long)slot,slot%3==0?advanced:slot%2==0?attack:retreat);
+        ShipStandingOrders fuelCaptain=policy.adjust(29,3).adjust(30,2).adjust(31,1);
+        check(fuelCaptain.resources().fuelPolicy()==ShipResourceOrders.FuelPolicy.WITHDRAW_AT_RESERVE
+                        &&fuelCaptain.resources().fuelReservePercent()==35
+                        &&fuelCaptain.resources().economyStartPercent()==65
+                        &&fuelCaptain.display(29).contains("WITHDRAW"),
+                "Fuel posture, protected fraction or economy threshold editor inert");
+        check(policy.resources().fuelPolicy()==ShipResourceOrders.FuelPolicy.UNRESTRICTED,
+                "Existing captains should retain unrestricted historical thrust by default");
         String encoded=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
         ShipStandingOrdersCodec.File decoded=ShipStandingOrdersCodec.decode(encoded);
         check(decoded.faction()==Battle.Faction.TERRAN&&decoded.policies().equals(saved),
                 "200-hull standing orders failed checksum round-trip");
         check(encoded.equals(ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved)),
                 "Nondeterministic doctrine save serialization");
-        check(encoded.startsWith("CD-STANDING-3"+(char)10),
+        check(encoded.startsWith("CD-STANDING-4"+(char)10),
                 "New versioned policy format not written");
         ShipResourceOrders ration=ShipResourceOrders.DEFAULT
                 .withAmmunition(ShipResourceOrders.AmmoPolicy.AUTO_RATION)
-                .withRationStart(60).withReserve(10,1).withSpacingTicks(45);
+                .withRationStart(60).withReserve(10,1).withSpacingTicks(45)
+                .withFuelPolicy(ShipResourceOrders.FuelPolicy.WITHDRAW_AT_RESERVE)
+                .withFuelReserve(35).withEconomyStart(65);
         ShipStandingOrders rationCaptain=advanced.withResources(ration);
         check(rationCaptain.adjust(1,1).resources().equals(ration),
                 "Editing old standing rows discarded separate resource policy");
@@ -80,17 +90,14 @@ public final class ShipStandingOrdersTest {
         String resourceSave=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
         check(ShipStandingOrdersCodec.decode(resourceSave).policies().get(7L)
                         .resources().equals(ration),
-                "CD-STANDING-3 lost rationing, reserve or minimum salvo spacing");
-        // Reconstruct a genuine V2 payload with its own checksum by decoding
-        // the v3 layout in a separate fixture; old decode remains supported
-        // even when policies were written without resource fields.
-        // Rebuild authentic older files with their own valid SHA-256
-        // checksums: a label-only substitution would correctly be rejected.
-        for(int previous=1;previous<=2;previous++){
+                "CD-STANDING-4 lost ammunition rationing or fuel withdrawal policy");
+        // Authentic V1/V2/V3 checksummed migration: V3 retains ammunition
+        // policy but inherits unrestricted fuel orders; V1/V2 retain defaults.
+        for(int previous=1;previous<=3;previous++){
             String[] rows=resourceSave.split("\\n",-1);
             StringBuilder older=new StringBuilder("CD-STANDING-").append(previous)
                     .append('\n').append("TERRAN").append('\n');
-            int fields=previous==1?14:24;
+            int fields=previous==1?14:previous==2?24:30;
             for(int i=2;i<rows.length-2;i++){
                 String[] values=rows[i].split(",",-1);
                 older.append(String.join(",",java.util.Arrays.copyOf(values,fields)))
@@ -104,17 +111,29 @@ public final class ShipStandingOrdersTest {
             }
             older.append('\n');
             var migrated=ShipStandingOrdersCodec.decode(older.toString());
-            check(migrated.policies().size()==200&&migrated.policies().get(7L)
-                            .resources().equals(ShipResourceOrders.DEFAULT),
-                    "CD-STANDING-"+previous+" migration lost captain or old unlimited defaults");
+            var priorResource=migrated.policies().get(7L).resources();
+            check(migrated.policies().size()==200
+                            &&priorResource.fuelPolicy()==ShipResourceOrders.FuelPolicy.UNRESTRICTED
+                            &&priorResource.fuelReservePercent()==25
+                            &&priorResource.economyStartPercent()==60
+                            &&(previous==3?priorResource.ammunition()==ShipResourceOrders.AmmoPolicy.AUTO_RATION
+                                    :priorResource.equals(ShipResourceOrders.DEFAULT)),
+                    "CD-STANDING-"+previous+" migration lost captain or legacy fuel defaults");
         }
         reject(()->ShipStandingOrdersCodec.decode(resourceSave.replace("AUTO_RATION","ENERGY_ONLY")),
                 "An edited resource order bypassed the doctrine checksum");
+        reject(()->ShipStandingOrdersCodec.decode(resourceSave.replace(
+                        "WITHDRAW_AT_RESERVE","PROTECT_RESERVE")),
+                "Tampering with saved fuel orders bypassed the doctrine checksum");
         reject(()->new ShipResourceOrders(null,ShipResourceOrders.AmmoPolicy.UNRESTRICTED,
                 50,0,0,0),"Null fire control accepted");
         reject(()->new ShipResourceOrders(ShipResourceOrders.FireIntent.IMMEDIATE,
                 ShipResourceOrders.AmmoPolicy.UNRESTRICTED,50,100,0,0),
                 "Invalid ammunition reserve over 95% accepted");
+        reject(()->ShipResourceOrders.DEFAULT.withFuelReserve(100),
+                "A fuel reserve over 95% was accepted");
+        reject(()->ShipResourceOrders.DEFAULT.withEconomyStart(0),
+                "An invalid economy threshold was accepted");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replace("TERRAN","DRAXIAN")),
                 "Tampered faction save accepted");
         reject(()->ShipStandingOrdersCodec.decode(encoded.replaceFirst("90,20","30,20")),
