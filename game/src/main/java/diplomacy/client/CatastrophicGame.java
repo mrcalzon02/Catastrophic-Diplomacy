@@ -2490,7 +2490,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             diagnosticRecorder.stop();
             performanceNotice("CAPTURE STOPPED - EXPORT TO SAVE");
         }else{
-            diagnosticRecorder.start();
+            if(battle!=null)
+                diagnosticRecorder.start(battle.seed(),battle.tick,battle.ships().size());
+            else diagnosticRecorder.start();
             diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),"CAPTURE START");
             performanceNotice("PERFORMANCE CAPTURE RECORDING");
         }
