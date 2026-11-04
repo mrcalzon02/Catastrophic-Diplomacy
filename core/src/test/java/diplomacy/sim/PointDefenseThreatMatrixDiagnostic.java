@@ -218,14 +218,9 @@ public final class PointDefenseThreatMatrixDiagnostic {
         boolean firstSalvoScheduled=false;
         for(int tick=0;tick<observationTicks;tick++){
             battle.step();
-            if(tick==0){
-                // Only the auxiliary stock is suppressed at first tick.
-                // Guided launch authorization needs arrived historical
-                // photons, which may not exist until several ticks later.
-                attacker.fighterReserve=0;
-                attacker.droneReserve=0;
-                attacker.repairDroneReserve=0;
-            }
+            if(attacker.fightersLaunched>0)attacker.fighterReserve=0;
+            if(attacker.dronesLaunched>0)attacker.droneReserve=0;
+            if(attacker.repairDronesLaunched>0)attacker.repairDroneReserve=0;
             if(threat.guided()&&!firstSalvoScheduled&&battle.salvosStarted>0){
                 // Stop SECOND volleys only after the first real fire-control
                 // solution has scheduled a salvo. Existing PendingLaunch
