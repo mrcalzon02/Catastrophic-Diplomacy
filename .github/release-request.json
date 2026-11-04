@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 5,
-  "note": "User explicitly requested updated Android APK and Windows MSI after fuel-order implementation and completed focused gameplay/functionality verification (source 80ab83d501bd6345a3ae5e11c02d141a144c886f). Build current main and require signed Android upgrade continuity, Android API29/API34 gameplay/campaign tests, Windows MSI install/launch/uninstall, Linux launch, checksums, and public release readback. Do not publish on functional failures."
+  "revision": 6,
+  "note": "User-requested Windows MSI and Android APK release blocker repairs completed through source 722a4fb756b06595b89ed3e340517066a27c9673. Focused functional release blocker gate 41892139339 passed all seven failed Windows/Linux regressions and Android source API compatibility. Require new signed APK with Android 10 desugaring, API29 11-faction campaign and actual upgrade tests, API34 rendered combat and upgrade tests; required real Windows MSI install/launch/uninstall, Linux launch and checksums. Do not publish on functional failures. Real physical device certification not claimed."
 }
