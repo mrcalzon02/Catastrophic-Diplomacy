@@ -40,6 +40,10 @@ public final class CombatPerformanceControlTest {
         auto.setEnabled(false);
         check(auto.effective()==3f&&!auto.frame(.05,34_000_000L,20_000_000L,true),
                 "Manual mode must hold requested speed");
+        // Turning off the automatic governor must NEVER turn off diagnostics.
+        for(int i=0;i<45;i++)auto.frame(.05,33_000_000L,17_000_000L,true);
+        check(auto.effective()==3f&&auto.p95Ms()>36&&"MANUAL".equals(auto.reason()),
+                "Manual mode must retain accurate timing telemetry without changing pace");
         auto.setEnabled(true);
         for(int i=0;i<50;i++)auto.frame(.05,30_000_000L,500_000L,true);
         check(auto.effective()==3f&&auto.reason().contains("RENDER"),
