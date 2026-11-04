@@ -123,3 +123,24 @@ Changing other approved components, exporting fleets or importing a saved
 ship preserves the selection. The existing campaign refit/purchase authority
 remains unchanged; no unpaid ships or upgrade hardware is created.
 Hybrid/remote handoff remains a separate future integration stage.
+
+## Environmental optical obscuration
+
+Passive optical missiles now sample the actual `SpaceWeather.Preset` of
+their encounter when photons reach their camera. Nebula optical depth
+attenuates historical visible contrast as a function of the photon path
+length and severity; weak distant images can fall below the sensor's
+threshold while near targets remain visible. Solar bursts reduce passive
+optical contrast at their exact arrival ticks and also affect photons
+historically emitted during the burst. The existing 30 Hz emission/receipt
+timing and light-front intersection still determine whether any optical
+measurement is possible. Weather never creates spoofed coordinates.
+
+Infrared and radar retain independent spectra; the new environmental
+contrast factor is not applied to their receiver. A physically arriving
+flare uses the same visible path attenuation as the observed fighter, so
+weather cannot grant a decoy free, unattenuated optical light. The
+`:core:fighterOpticalSeekerSmoke` verifies static/dynamic visibility,
+pre-arrival isolation, normal IR under solar glare, and weathered combat
+replay. This stage does not claim asteroid-body line-of-sight occlusion,
+which would require actual physical occluding geometry.

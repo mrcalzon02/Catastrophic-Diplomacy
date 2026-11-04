@@ -57,7 +57,19 @@ public final class FighterOpticalSeeker {
             int targetCraftId,int missileTeam,
             double priorX,double priorY,double currentX,double currentY,
             double headingX,double headingY,long tick){
-        if(head==null||history==null||clouds==null||
+        return receive(head,history,clouds,targetCraftId,missileTeam,
+                priorX,priorY,currentX,currentY,headingX,headingY,tick,
+                SpaceWeather.clear());
+    }
+    /** Live battle variant: use the current encounter's own weather, NEVER
+     * the environment or fighter pose from a future tick. */
+    public static FighterInfraredSeeker.Reading receive(Head head,
+            FighterInfraredSeeker.History history,
+            List<FighterCountermeasures.Cloud> clouds,
+            int targetCraftId,int missileTeam,
+            double priorX,double priorY,double currentX,double currentY,
+            double headingX,double headingY,long tick,SpaceWeather.Preset environment){
+        if(head==null||history==null||clouds==null||environment==null||
                 targetCraftId<=0||(missileTeam!=0&&missileTeam!=1)||tick<0||
                 !Double.isFinite(priorX)||!Double.isFinite(priorY)||
                 !Double.isFinite(currentX)||!Double.isFinite(currentY)||
@@ -80,7 +92,9 @@ public final class FighterOpticalSeeker {
             if(!arrived(r0,r1,age,c))continue;
             // Target silhouette, not IR heat or radar cross-section from a
             // future tick; finite visible-light contrast attenuates with range.
-            double signal=sample.opticalContrast()/(1+r1*r1/30000);
+            double signal=sample.opticalContrast()/(1+r1*r1/30000)
+                    *SpaceWeather.opticalTransmission(
+                            environment,emission,tick,r1);
             if(signal<.035)continue;
             if(best==null||signal>best.strength())
                 best=new FighterInfraredSeeker.Reading(
@@ -117,8 +131,11 @@ public final class FighterOpticalSeeker {
                 double fx=x-currentX,fy=y-currentY;
                 double dot=(dx*fx+dy*fy)/(targetRange*r1);
                 double sin=StrictMath.abs(dx*fy-dy*fx)/(targetRange*r1);
+                double flareSignal=luminous/(1+r1*r1/30000)
+                        *SpaceWeather.opticalTransmission(
+                                environment,emission,tick,r1);
                 if(dot>0&&sin<.075&&
-                        luminous/(1+r1*r1/30000)>=best.strength()*1.25)
+                        flareSignal>=best.strength()*1.25)
                     return null;
             }
         }

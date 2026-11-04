@@ -6101,7 +6101,7 @@ public final class Battle {
             received=FighterOpticalSeeker.receive(m.fighterOpticalHead,
                     target.infraredHistory,fighterClouds,
                     target.id,m.team,m.seekerReceiverX,m.seekerReceiverY,
-                    m.x,m.y,m.vx,m.vy,tick);
+                    m.x,m.y,m.vx,m.vy,tick,weather.preset());
         }else{
             scanTicks=m.fighterIrHead.scanTicks;
             received=FighterInfraredSeeker.receive(m.fighterIrHead,

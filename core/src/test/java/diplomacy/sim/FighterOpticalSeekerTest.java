@@ -105,6 +105,91 @@ public final class FighterOpticalSeekerTest {
                 "Wide-field optical hardware inherited narrow telescope reach");
         System.out.println("PASS independent optical range/cone, real photon age, glare alignment and band isolation");
     }
+    /** Physical nebula path attenuation and solar-glare scheduling apply
+     * only to a photon which has actually reached its receiver. */
+    private static void atmosphericVisibility(){
+        var parent=new Battle(815811).addShip(0,Battle.Faction.TERRAN,200,200);
+        parent.fighterProfile=FighterModel.standard(FighterModel.Hull.INTERCEPTOR);
+        var fighter=new Battle.Craft(20,parent,true,0);
+        fighter.x=265;fighter.y=100;
+        fighter.infraredHistory.capture(4,fighter);
+        long arrival=4+SensorLightTimeHistory.propagationTicks(265);
+        var clear=SpaceWeather.clear();
+        var lightFog=new SpaceWeather.Preset(
+                2,13,SpaceWeather.Kind.NEBULA,SpaceWeather.Kind.CLEAR,.25);
+        var dense=new SpaceWeather.Preset(
+                2,13,SpaceWeather.Kind.NEBULA,SpaceWeather.Kind.CLEAR,1.5);
+        var telescope=FighterOpticalSeeker.Head.NARROW_TELESCOPIC;
+        var clearFix=FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,arrival,clear);
+        var weakFog=FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,arrival,lightFog);
+        var denseFog=FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,arrival,dense);
+        require(clearFix!=null&&weakFog!=null&&
+                weakFog.strength()<clearFix.strength()&&denseFog==null,
+                "Nebula optical depth did not weaken/dismiss a distant real image");
+        require(FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,arrival-1,dense)==null,
+                "Fogged optics acquired an unarrived future photon");
+        fighter.x=75;
+        fighter.infraredHistory.capture(10,fighter);
+        var near=FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,11,dense);
+        require(near!=null&&near.emittedTick()==10,
+                "Dense fog became absolute blindness even at near range");
+        // SOLAR receiver glare begins exactly at tick 300; there are no
+        // retroactive pre-burst outages and no magical new target tracks.
+        var solar=new SpaceWeather.Preset(
+                4,77,SpaceWeather.Kind.SOLAR_FLARE,SpaceWeather.Kind.CLEAR,2);
+        fighter.x=150;
+        fighter.infraredHistory.capture(297,fighter);
+        fighter.infraredHistory.capture(298,fighter);
+        var before=FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,299,solar);
+        var during=FighterOpticalSeeker.receive(telescope,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,300,solar);
+        require(before!=null&&before.emittedTick()==297&&during==null,
+                "Solar optical flare affected photons before its actual arrival");
+        var infrared=FighterInfraredSeeker.receive(
+                FighterInfraredSeeker.Head.FIXED_FORWARD,
+                fighter.infraredHistory,List.of(),20,1,
+                0,100,0,100,250,0,300);
+        require(infrared!=null&&infrared.emittedTick()==298,
+                "Visible-only solar glare was incorrectly applied to infrared");
+        require(SpaceWeather.opticalTransmission(solar,388,390,150)<
+                SpaceWeather.opticalTransmission(solar,299,390,150),
+                "Historical flare emission forgot its source-time glare");
+        require(SpaceWeather.opticalTransmission(solar,297,299,150)==1,
+                "Solar glare was retroactively sampled before the burst");
+        boolean rejected=false;
+        try{SpaceWeather.opticalTransmission(solar,302,300,150);}
+        catch(IllegalArgumentException expected){rejected=true;}
+        require(rejected,"Optical weather accepted a future emission as the past");
+        System.out.println("PASS optical nebula path attenuation, solar burst edges, spectral isolation, photon causality");
+    }
+    private static void weatherBattleReplay(TechnologyCatalog tech){
+        var preset=new SpaceWeather.Preset(
+                5,448,SpaceWeather.Kind.NEBULA,
+                SpaceWeather.Kind.CLEAR,.75);
+        Battle a=fitted(tech,815812,true),b=fitted(tech,815812,true);
+        a.configureWeather(preset);b.configureWeather(preset);
+        for(int i=0;i<125;i++){
+            a.step();b.step();
+            require(a.fingerprint()==b.fingerprint(),
+                    "Environmental optical seeker replay diverged");
+        }
+        require(a.fighterInterceptorsLaunched>0,
+                "Actual nebula fighter interceptors did not fire");
+        System.out.println("PASS real fitted optical wing in seeded nebula weather");
+    }
     private static int support(Shipyard.Hull hull){
         for(var slot:hull.slots)
             if(slot.mount()==Shipyard.Mount.SUPPORT)return slot.index();
@@ -210,8 +295,10 @@ public final class FighterOpticalSeekerTest {
     }
     public static void main(String[] args)throws Exception{
         opticalPhotonAndBandIsolation();
+        atmosphericVisibility();
         var tech=TechnologyCatalog.loadDefault();
         selectedHardware(tech);
         live(tech);
+        weatherBattleReplay(tech);
     }
 }

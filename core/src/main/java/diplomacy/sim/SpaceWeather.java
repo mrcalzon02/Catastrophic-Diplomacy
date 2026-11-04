@@ -88,6 +88,31 @@ public final class SpaceWeather {
         return factor;
     }
     public double guidanceFactor() { return Math.max(0.35,sensorFactor()); }
+    /** Passive visible-light propagation only; not radar or thermal detection.
+     * A static nebula absorbs/scatters photons along their traveled range.
+     * A solar burst changes the received image at the CURRENT receiver tick,
+     * and light emitted during the burst retains its weaker historical
+     * contrast after the burst ends. No current hostile position is sampled.
+     * Pure, deterministic and independent of the weather RNG state. */
+    public static double opticalTransmission(Preset environment,
+            long emittedTick,long receivedTick,double worldDistance){
+        if(environment==null||emittedTick<0||receivedTick<emittedTick||
+                !Double.isFinite(worldDistance)||worldDistance<0)
+            throw new IllegalArgumentException("Invalid optical travel history");
+        double factor=1;
+        if(environment.includes(Kind.NEBULA))
+            factor*=StrictMath.exp(-environment.severity()*worldDistance/160.0);
+        if(environment.includes(Kind.SOLAR_FLARE)){
+            if(solarActiveAt(emittedTick))
+                factor*=.68/(1+.15*environment.severity());
+            if(solarActiveAt(receivedTick))
+                factor*=.18/(1+.40*environment.severity());
+        }
+        return factor;
+    }
+    private static boolean solarActiveAt(long atTick){
+        return atTick%540>=300&&atTick%540<390;
+    }
     public double coolingFactor() {
         return solarActive()?0.70:preset.includes(Kind.NEBULA)?0.89:1.0;
     }
@@ -102,7 +127,7 @@ public final class SpaceWeather {
     }
     /** Solar activity: three seconds of flare per eighteen-second cycle. */
     public boolean solarActive() {
-        return preset.includes(Kind.SOLAR_FLARE) && tick%540>=300 && tick%540<390;
+        return preset.includes(Kind.SOLAR_FLARE) && solarActiveAt(tick);
     }
     /** Nine seconds of neutron sweep per twenty-four-second cycle. */
     public boolean neutronActive() {
