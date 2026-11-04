@@ -30,7 +30,8 @@ public record ShipStandingOrders(
             "FIGHTER OPERATIONS", "DEFEND TARGET 1", "DEFEND TARGET 2",
             "DEFEND TARGET 3", "DEFEND TARGET 4", "ESCORT ASSIGNMENT", "ESCORT DISTANCE",
             "OFFENSIVE FIRE", "AMMUNITION DOCTRINE", "RATION BELOW", "HARD RESERVE",
-            "MINIMUM ROUNDS", "VOLLEY SPACING"
+            "MINIMUM ROUNDS", "VOLLEY SPACING",
+            "FUEL POSTURE", "FUEL RESERVE", "ECONOMY BELOW"
     };
     private static final BattleOrders.Position[] MOVEMENTS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
@@ -112,6 +113,12 @@ public record ShipStandingOrders(
                     moved(resource.minimumRounds(),step,1,0,10000));
             case 28 -> resource=resource.withSpacingTicks(
                     moved(resource.spacingTicks(),step,30,0,900));
+            case 29 -> resource=resource.withFuelPolicy(cycle(resource.fuelPolicy(),step,
+                    ShipResourceOrders.FuelPolicy.values()));
+            case 30 -> resource=resource.withFuelReserve(
+                    moved(resource.fuelReservePercent(),step,5,0,95));
+            case 31 -> resource=resource.withEconomyStart(
+                    moved(resource.economyStartPercent(),step,5,10,95));
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         }
         return new ShipStandingOrders(next,a,c,shield,d,resource);
@@ -140,6 +147,9 @@ public record ShipStandingOrders(
             case 26 -> resources.reservePercent()+"%";
             case 27 -> resources.minimumRounds()+" rounds";
             case 28 -> (resources.spacingTicks()/30.0)+" seconds";
+            case 29 -> resources.fuelPolicy().name().replace('_',' ');
+            case 30 -> resources.fuelReservePercent()+"%";
+            case 31 -> resources.economyStartPercent()+"% remaining";
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         };
     }
@@ -162,7 +172,8 @@ public record ShipStandingOrders(
     public boolean mustWithdraw(Battle.Ship ship){
         if(ship==null)throw new IllegalArgumentException("Ship required");
         if(tactics.position()==BattleOrders.Position.LAST_STAND)return false;
-        return (tactics.retreatAtHullFraction()>0&&
+        return resources.withdrawForFuel(ship)||
+                (tactics.retreatAtHullFraction()>0&&
                     ship.hull<=ship.maxHull*tactics.retreatAtHullFraction())
                 ||(shieldWithdrawPercent>0&&ship.maxShields>0&&
                     ship.shields<=ship.maxShields*shieldWithdrawPercent/100.0);
