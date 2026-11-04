@@ -2037,7 +2037,7 @@ public final class Battle {
         } else {
             // Braking is powered thrust, never free drag in vacuum.
             // A depleted hull coasts on the last real momentum.
-            SublightPropulsion.advance(ship,0,0,DT);
+            thrust(ship,0,0);
         }
     }
 
@@ -3122,7 +3122,7 @@ public final class Battle {
             case MOVE -> {
                 double distance=StrictMath.hypot(command.x()-ship.x,command.y()-ship.y);
                 if(distance<=12) {
-                    SublightPropulsion.advance(ship,0,0,DT);
+                    thrust(ship,0,0);
                     if(StrictMath.hypot(ship.vx,ship.vy)<.15)
                         ship.commandQueue.complete();
                 }else steerToward(ship,command.x(),command.y());
@@ -3156,14 +3156,14 @@ public final class Battle {
         double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
         s.facing = wrap(s.facing + change);
         double rated=SublightPropulsion.maximumSpeed(s);
-        SublightPropulsion.advance(s,StrictMath.cos(s.facing)*rated,
-                StrictMath.sin(s.facing)*rated,DT);
+        thrust(s,StrictMath.cos(s.facing)*rated,
+                StrictMath.sin(s.facing)*rated);
     }
 
     private void orderedSteer(Ship ship,Ship target) {
         BattleOrders.Orders orders=ship.orders;
         if(orders.position()==BattleOrders.Position.HOLD){
-            SublightPropulsion.advance(ship,0,0,DT);
+            thrust(ship,0,0);
             return;
         }
         Ship dedicated=findShip(ship.escortShipId);
@@ -3201,7 +3201,7 @@ public final class Battle {
         double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
         if(orders.position()!=BattleOrders.Position.KEEP_MOVING
                 &&distance>=preferredRange*0.5&&distance<=preferredRange){
-            SublightPropulsion.advance(ship,0,0,DT);
+            thrust(ship,0,0);
             return;
         }
         if(distance<preferredRange*0.5){
@@ -3259,6 +3259,21 @@ public final class Battle {
             radio(ship,CrewChatter.Event.ESCAPE);
         }
     }
+    /**
+     * All autonomous, queued and standing-order maneuvers share one finite
+     * thrust budget. Tactical withdrawal is exempt from the discretionary
+     * reserve and economy cap, but still spends the same physical fuel.
+     */
+    private static void thrust(Ship ship,double wantedX,double wantedY){
+        if(ship.standingOrders==null){
+            SublightPropulsion.advance(ship,wantedX,wantedY,DT);
+            return;
+        }
+        ShipResourceOrders fuelOrder=ship.standingOrders.resources();
+        double economy=fuelOrder.thrustSpeedFactor(ship);
+        SublightPropulsion.advance(ship,wantedX*economy,wantedY*economy,DT,
+                fuelOrder.protectedFuel(ship));
+    }
     private void steerToward(Ship ship,double x,double y){
         double desired=StrictMath.atan2(y-ship.y,x-ship.x);
         double change=Math.max(-2.8*DT,Math.min(2.8*DT,wrap(desired-ship.facing)));
@@ -3266,8 +3281,8 @@ public final class Battle {
         double speedCap=ship.standingOrders==null?1:
                 ship.standingOrders.directives().speedPercent()/100.0;
         double velocity=SublightPropulsion.maximumSpeed(ship)*speedCap;
-        SublightPropulsion.advance(ship,StrictMath.cos(ship.facing)*velocity,
-                StrictMath.sin(ship.facing)*velocity,DT);
+        thrust(ship,StrictMath.cos(ship.facing)*velocity,
+                StrictMath.sin(ship.facing)*velocity);
     }
 
      /** Cost transfer occurs only for real FIRE events. All costs and rates
