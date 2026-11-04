@@ -35,8 +35,13 @@ public final class FighterWingLinkTest {
                 nearby.kind()==FighterWingLink.Kind.FIGHTER&&
                 nearby.observedTick()==4,
                 "Direct one-tick 60-unit fighter data was not delivered");
-        check(net.receive(17,0,160.001,100,5)==null,
-                "Fighter radio leaked beyond the short-range hard limit");
+        var isolated=new FighterWingLink.Network();
+        isolated.index(List.of(fighter),5);
+        check(isolated.receive(17,0,159.999,100,5)!=null&&
+                isolated.receive(17,0,160.001,100,5)==null,
+                "A single fighter transmitter exceeded the 60-unit hard limit");
+        check(net.receive(17,0,162.001,100,5)==null,
+                "The combined fighter wing radio leaked past all transmitters");
         check(net.receive(17,1,110,100,5)==hostile,
                 "Opposing teams consumed one another's wing data");
         check(net.receive(15,0,100,100,5)==ship,
