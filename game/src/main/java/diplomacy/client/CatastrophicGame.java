@@ -79,6 +79,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final AdaptiveCombatPace paceGovernor=new AdaptiveCombatPace();
     private final CombatDiagnosticRecorder diagnosticRecorder=new CombatDiagnosticRecorder();
     private boolean diagnosticsHud;
+    private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
     private static final String PERFORMANCE_PREFS="catastrophic-diplomacy-performance";
@@ -2715,6 +2716,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Includes actual simulation and all battle render passes, not menu time.
         long renderStartNs=System.nanoTime();
         int drawCallsBefore=batch.totalRenderCalls;
+        diagnosticTicksLastFrame=0;
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
         if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
             float pace=verifyDemo?speed:CombatPace.simulationMultiplier(paceGovernor.effective());
@@ -2725,7 +2727,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 deathTimeline.beforeStep(battle);
                 hitFeedback.beforeStep(battle);
                 shieldFx.beforeStep(battle);
-                battle.step(); accumulator -= Battle.DT;
+                battle.step(); diagnosticTicksLastFrame++; accumulator -= Battle.DT;
                 // Capture every real missile pose and motor transition here.
                 // Rendering may skip ticks at 4x/8x without losing exhaust.
                 if(lighting!=null)lighting.captureTick(battle);
@@ -3268,6 +3270,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     "  MISSILES "+battle.missiles().size()+
                     "  CAPTURE "+(diagnosticRecorder.recording()?"REC":"OFF")+
                     "  (F2 HUD F3 REC F4 ZIP F5 AUTO)",22,86);
+            long heapBytes=Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();
+            font.draw(batch,"CPU "+String.format(java.util.Locale.ROOT,"%.1f",paceGovernor.meanCpuMs())+
+                    "ms  GPU N/A  DRAW "+diagnosticDrawCallsLastFrame+
+                    "  BINDS "+diagnosticBindsLastFrame+"  HEAP "+(heapBytes/(1024*1024))+
+                    " MiB  SIM TICKS/FRAME "+diagnosticTicksLastFrame,22,62);
         }
         if(System.nanoTime()<diagnosticNoticeUntilNs){
             font.setColor(Color.GOLD);
@@ -3305,6 +3312,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         int frameDrawCalls=Math.max(0,batch.totalRenderCalls-drawCallsBefore);
         int frameBinds=(terranSprites==null?0:terranSprites.materialTextureBindings())+
                 (craftSprites==null?0:craftSprites.materialTextureBindings());
+        diagnosticDrawCallsLastFrame=frameDrawCalls;
+        diagnosticBindsLastFrame=frameBinds;
         renderProfile.sample(cpuFrameNs,simulationNs,lightingOverlayNs,
                 frameDrawCalls,frameBinds);
         boolean activeForPacing=running&&!tacticalMenuOpen&&!shipyard.open()
