@@ -34,7 +34,9 @@ public final class LaserFamiliesTest {
         source.weaponEmitters=List.of(
                 new WeaponMuzzles.Emitter(13,WeaponMuzzles.Family.LASER,0,37));
         source.laserFittings=Map.of(13,type);
-        battle.step();
+        // A target at 300 world units needs a real finite-light-speed
+        // observation before its first fitted laser can engage.
+        for(int frame=0;frame<90 && source.laserReload<=0;frame++)battle.step();
         var fire=battle.visualEvents().stream()
                 .filter(e->e.sourceId()==source.id && e.phase()==Battle.VisualPhase.FIRE)
                 .findFirst().orElseThrow(()->new AssertionError(type+" did not fire"));
