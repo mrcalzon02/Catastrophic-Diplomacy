@@ -63,6 +63,23 @@ public final class GameWikiTest {
         check(catalog.search("UPGRADES","TECH-TER-EPDA-SPECIALIST-09").stream()
                 .anyMatch(a->a.id.equals("upgrade.TECH-TER-EPDA-SPECIALIST-09")),
                 "Virtual Tech IX rescue research cannot be browsed by exact ID");
+        // A broad text query must keep the complete index, but must not
+        // retain 73k formatted Article instances in the returned result set.
+        long broadSearchStart=System.nanoTime();
+        List<GameWikiCatalog.Article> broad=catalog.search("UPGRADES","research");
+        long broadSearchMillis=(System.nanoTime()-broadSearchStart)/1_000_000;
+        check(broad.size()==stages,"Broad research search lost authored upgrades");
+        check(!(broad instanceof java.util.ArrayList),
+                "Large filtered upgrade search must be a virtual ID-backed list");
+        String lastUpgrade=broad.get(broad.size()-1).id;
+        check(catalog.indexOfId(broad,lastUpgrade)==broad.size()-1,
+                "Research search selection must index by ID without listing every article");
+        check(catalog.indexOfId(catalog.articles(),lastUpgrade)>=modules,
+                "Complete wiki selection must resolve canonical ID without materialization");
+        check(catalog.search("UPGRADES","x_an_impossible_token").isEmpty(),
+                "No-match full text search must not fabricate an entry");
+        System.out.println("PROFILE wiki broad full-text search ms="+broadSearchMillis+
+                " matchingIds="+broad.size());
         GameWikiPanel ui=new GameWikiPanel(catalog,true);
         check(ui.resultCount()>8&&ui.categoryIndex()==1,"Mobile guide landing page absent");
         ui.setCategory(0);
