@@ -2005,19 +2005,19 @@ public final class Battle {
         double rallyX=480+(phaseX%6)*65;
         double rallyY=145+(phaseY%7)*75;
         if(tick>6000){
-            // Any autonomous tactical fleet must search beyond its starting
-            // rally box. This remains a non-omniscient deterministic patrol,
-            // not a read of hidden hostile coordinates.
-            // A long, genuine loss of contact calls for a wider search,
-            // not perpetual orbiting of the initial 325-unit rally strip.
-            // Each physical captain patrols an independent, bounded lane;
-            // enemy positions are never consulted to choose destinations.
-            // Twenty/thirty-second legs give engines time to actually arrive.
-            double expansion=StrictMath.min(4.0,1+(tick-6000)/4200.0);
-            long legX=ship.id*7L+tick/600L;
-            long legY=ship.id*11L+tick/900L;
-            rallyX=640+((legX%9)-4)*145*expansion;
-            rallyY=565+((legY%7)-3)*140*expansion;
+            // Ships now accelerate at physical gee, so a 20-second change of
+            // rally point made distant searches futile: they turned again
+            // before reaching any new sector. Hold each distant patrol leg
+            // for five simulation minutes, then move to the next sector.
+            // These are fixed map coordinates (not unseen hostile positions).
+            // Different ship IDs begin in different sectors to cover the arena
+            // in parallel without giving a fleet omniscient target knowledge.
+            final double[] sectorX={1330,600,-300,-950,-950,0,1200,2200};
+            final double[] sectorY={1310,1310,1200,600,-440,-440,-440,600};
+            long leg=(tick-6001)/9000L;
+            int sector=(int)Math.floorMod((long)ship.id-1+leg,sectorX.length);
+            rallyX=sectorX[sector];
+            rallyY=sectorY[sector];
         }
         ContactTrack lastFix=newestValidTrack(ship);
         if(lastFix!=null){
