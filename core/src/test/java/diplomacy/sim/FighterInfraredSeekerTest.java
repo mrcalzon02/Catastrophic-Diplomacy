@@ -109,9 +109,14 @@ public final class FighterInfraredSeekerTest {
         Battle noFlares=realFighterCombat(tech,815022L,true);
         boolean missileSeen=false;
         boolean receivedDelayedPhotons=false;
+        java.util.Set<Long> staleOnNextUpdate=new java.util.HashSet<>();
         for(int tick=0;tick<190;tick++){
             battle.step();
             noFlares.step();
+            for(Battle.Missile m:battle.missiles())
+                check(!staleOnNextUpdate.contains(m.visualId),
+                        "Missile kept a destroyed aircraft alive past the next update");
+            staleOnNextUpdate.clear();
             for(Battle.Missile m:battle.missiles())if(m.targetCraftId>0){
                 missileSeen=true;
                 check(m.fighterIrHead!=null&&m.targetId>0&&
@@ -119,9 +124,12 @@ public final class FighterInfraredSeekerTest {
                         "Air-to-air missile lacked physical target class or seeker package");
                 // Craft and ship identities are independent integer namespaces:
                 // the same number may name both, without type confusion.
-                check(battle.crafts().stream().anyMatch(c->
-                        c.id==m.targetCraftId&&c.fighter&&c.team!=m.team),
-                        "Interceptor target ID does not resolve to hostile physical fighter");
+                // A fighter may die later in THIS step during craft combat,
+                // after missile updates. It must disappear next missile step,
+                // not retroactively revise a previous physical observation.
+                if(battle.crafts().stream().noneMatch(c->
+                        c.id==m.targetCraftId&&c.fighter&&c.team!=m.team))
+                    staleOnNextUpdate.add(m.visualId);
                 if(m.lastFighterConsumedTick>=0){
                     receivedDelayedPhotons=true;
                     check(m.lastObservationTick<=battle.tick&&
