@@ -484,6 +484,108 @@ final class GameWikiCatalog {
             default -> throw new IllegalArgumentException("Unknown doctrine row");
         };
     }
+    /**
+     * Search the exact same ordered text fragments that Article.searchable
+     * concatenates, but never construct its large formatted Article object
+     * just to test a candidate. KMP state persists across fragment boundaries
+     * so arbitrary multi-word/number matches remain exact.
+     *
+     * The built-in catalog uses ASCII identifiers/metadata; non-ASCII names
+     * and tradeoffs fall back to the authoritative article formatter to
+     * preserve Locale.ROOT Unicode context-sensitive folding.
+     */
+    private static final class UpgradeTextProbe {
+        private final String needle;
+        private final int[] prefix;
+        private final boolean digits;
+        private final boolean decimals;
+        private int matched;
+        UpgradeTextProbe(String needle){
+            this.needle=needle;
+            prefix=new int[needle.length()];
+            for(int i=1,k=0;i<needle.length();i++){
+                while(k>0&&needle.charAt(i)!=needle.charAt(k))
+                    k=prefix[k-1];
+                if(needle.charAt(i)==needle.charAt(k))k++;
+                prefix[i]=k;
+            }
+            boolean hasDigit=false;
+            for(int i=0;i<needle.length();i++)
+                if(needle.charAt(i)>='0'&&needle.charAt(i)<='9'){
+                    hasDigit=true;break;
+                }
+            digits=hasDigit;
+            decimals=hasDigit||needle.indexOf('.')>=0;
+        }
+        void reset(){matched=0;}
+        boolean feed(String part){
+            // Avoid transient lowercase strings for the overwhelmingly
+            // ASCII canonical research rows. The uncommon Unicode case is
+            // handled by the exact Article fallback above.
+            for(int i=0;i<part.length();i++){
+                char c=part.charAt(i);
+                if(c>='A'&&c<='Z')c=(char)(c+('a'-'A'));
+                else if(c=='_')c=' ';
+                while(matched>0&&needle.charAt(matched)!=c)
+                    matched=prefix[matched-1];
+                if(needle.charAt(matched)==c)matched++;
+                if(matched==needle.length())return true;
+            }
+            return false;
+        }
+        boolean integer(int value){
+            if(!digits){matched=0;return false;}
+            return feed(Integer.toString(value));
+        }
+        boolean decimal(double value){
+            // A fixed 2-decimal number always contains ASCII digits and '.'.
+            // A query without either cannot match across that fragment.
+            if(!decimals){matched=0;return false;}
+            return feed(number(value));
+        }
+    }
+    private static boolean hasNonAscii(String source){
+        for(int i=0;i<source.length();i++)if(source.charAt(i)>127)return true;
+        return false;
+    }
+    private static boolean matchesUpgradeText(TechnologyCatalog.Upgrade u,
+                                              String needle,UpgradeTextProbe m){
+        if(u==null)throw new IllegalStateException("Missing wiki technology");
+        if(hasNonAscii(u.name)||hasNonAscii(u.tradeoff)||
+                hasNonAscii(u.prerequisite))
+            return upgradeArticle(u).searchable.contains(needle);
+        m.reset();
+        // Order and punctuation intentionally reproduce exactly:
+        // id + category + title + each of the seven article lines.
+        return m.feed("upgrade.")||m.feed(u.id)||
+                m.feed(" UPGRADES ")||m.feed(u.name)||m.feed(" / ")||m.feed(u.id)||
+                m.feed(" Exact technology ID: ")||m.feed(u.id)||
+                m.feed(". Faction ")||m.feed(u.faction)||
+                m.feed(", subsystem ")||m.feed(u.subsystem)||
+                m.feed(", branch ")||m.feed(u.track)||
+                m.feed(", stage ")||m.integer(u.stage)||m.feed(" of 9.")||
+                m.feed(" Prerequisite: ")||m.feed(u.prerequisite)||
+                m.feed(". ")||m.feed(RESEARCH_COST_LABEL)||
+                m.integer(u.researchCost)||m.feed("; industry cost ")||
+                m.integer(u.industryCost)||m.feed(".")||
+                m.feed(" Physical multipliers: mass x")||m.decimal(u.mass)||
+                m.feed(", power x")||m.decimal(u.power)||
+                m.feed(", heat x")||m.decimal(u.heat)||
+                m.feed(", output x")||m.decimal(u.output)||
+                m.feed(", accuracy x")||m.decimal(u.accuracy)||
+                m.feed(". Additional multipliers: integrity x")||
+                m.decimal(u.integrity)||m.feed(", shields x")||
+                m.decimal(u.shield)||m.feed(", thrust x")||
+                m.decimal(u.thrust)||m.feed(", cooling x")||
+                m.decimal(u.cooling)||m.feed(", maintenance x")||
+                m.decimal(u.maintenance)||m.feed(".")||
+                m.feed(" Research branch purpose: ")||
+                m.feed(branchExplanation(u.track))||
+                m.feed(" Authoritative design tradeoff: ")||
+                m.feed(u.tradeoff)||
+                m.feed(" The fitted module must own the appropriate branch and stage. This is not a whole-ship automatic buff.");
+    }
+
     List<Article> search(String category,String query){
         String needle=(query==null?"":query.trim()).toLowerCase(Locale.ROOT).replace('_',' ');
         String selected=(category==null?"ALL":category);
@@ -516,18 +618,14 @@ final class GameWikiCatalog {
             return fixed.isEmpty()?upgradeArticles:new IndexedArticles(fixed,upgradeIds);
 
         List<String> matchedIds=new ArrayList<>();
+        UpgradeTextProbe probe=new UpgradeTextProbe(needle);
         for(String id:upgradeIds){
-            // Searching the canonical ID is a common case and requires no
-            // transient formatted research article or numeric formatting.
-            if(id.toLowerCase(Locale.ROOT).contains(needle)){
+            // ID matches can skip all expensive virtual technology metadata.
+            // Other queries stream the exact authored article text without
+            // allocating its 7-line searchable paragraph and formatted page.
+            if(id.toLowerCase(Locale.ROOT).contains(needle)||
+                    matchesUpgradeText(technology.get(id),needle,probe))
                 matchedIds.add(id);
-                continue;
-            }
-            // Preserve full-text search semantics, including tradeoffs and
-            // numeric stats: inspect transient text but retain only the ID.
-            // A separate indexed metadata stage can accelerate this later.
-            Article article=upgradeArticle(technology.get(id));
-            if(article.searchable.contains(needle))matchedIds.add(id);
         }
         return new IndexedArticles(fixed,matchedIds);
     }
