@@ -73,13 +73,25 @@ public final class WeaponFxPipelineTest {
             lastSequence=e.sequence();
             if(e.phase()==Battle.VisualPhase.FIRE && e.weapon().equals("LASER")){
                 fireIds.add(e.shotId());
-                firedAt.put(e.shotId(),new double[]{e.targetX(),e.targetY()});
+                firedAt.put(e.shotId(),new double[]{e.x(),e.y(),e.targetX(),e.targetY(),e.tick()});
             }
             if(e.phase()==Battle.VisualPhase.IMPACT && e.weapon().equals("LASER")){
                 require(fireIds.contains(e.shotId()),"impact must reference its earlier firing");
                 double[] aimed=firedAt.get(e.shotId());
-                require(aimed!=null&&e.x()==aimed[0]&&e.y()==aimed[1],
-                        "damage must land exactly where the beam actually aimed");
+                require(aimed!=null,"physical beam impact lacked its launch ray");
+                // A beam is a fixed historical RAY. It strikes the first
+                // moving hull surface on that ray, usually well BEFORE the
+                // original maximum-range aim endpoint. Checking endpoint
+                // equality incorrectly rejects proper swept collisions.
+                double dx=aimed[2]-aimed[0],dy=aimed[3]-aimed[1];
+                double lengthSq=dx*dx+dy*dy;
+                double vx=e.x()-aimed[0],vy=e.y()-aimed[1];
+                double t=(vx*dx+vy*dy)/lengthSq;
+                double missDistance=StrictMath.abs(vx*dy-vy*dx)/StrictMath.sqrt(lengthSq);
+                require(lengthSq>0&&t>0&&t<=1.00000001&&missDistance<1e-5,
+                        "actual beam damage must intersect its immutable emitted ray");
+                require(e.tick()>aimed[4],
+                        "an impact cannot precede physical photon travel");
                 double radial=StrictMath.hypot(e.x()-e.targetX(),e.y()-e.targetY());
                 require(radial>1e-5 && radial<=32,
                         "impact must hit a local surface module, not empty space or center mass");
