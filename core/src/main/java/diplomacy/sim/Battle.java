@@ -225,6 +225,9 @@ public final class Battle {
         public FighterModel.Profile fighterProfile=FighterModel.standard(FighterModel.Hull.ASSAULT_GUNSHIP);
         /** Highest purchased FTR avionics research stage. */
         public int fighterCountermeasureTier;
+        /** Pre-engagement real fighter seeker selection, inherited by every
+         * fighter launched from this ship's existing paid catapult stock. */
+        public boolean fighterRadarSelected;
         public Shipyard.Weapons weapons=new Shipyard.Weapons(
                 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1);
         public Shipyard.Support support=new Shipyard.Support(0,0,180,0,175,false,0,1,1,0);
@@ -429,6 +432,11 @@ public final class Battle {
          * craft identity and never consult a ship's live seeker solution. */
         public int targetCraftId;
         public FighterInfraredSeeker.Head fighterIrHead;
+        /** Active radar is a distinct, optional fitted technology; no
+         * instantaneous contacts or shared parent-ship fire-control. */
+        public FighterRadarSeeker.Head fighterRadarHead;
+        public FighterRadarSeeker.PulseHistory radarPulses;
+        public double radarBattery;
         public FighterInfraredSeeker.Reading lastFighterPhotons;
         public long lastFlareId,lastFighterConsumedTick=-1;
         /** vx/vy are world-units/second, never normalized heading components. */
@@ -618,6 +626,7 @@ public final class Battle {
         /** Independent paid short-range interceptor missiles (cannon ammo
          * and guided ordnance never share an infinite magazine). */
         public int interceptorMissileAmmo;
+        public boolean radarSeekerSelected;
         public long nextInterceptorTick;
         public final FighterInfraredSeeker.History infraredHistory=
                 new FighterInfraredSeeker.History();
@@ -641,6 +650,7 @@ public final class Battle {
                 flareRemaining=pack.flares();chaffRemaining=pack.chaff();
                 interceptorMissileAmmo=FighterInfraredSeeker.interceptorMagazine(
                         profile.hull(),source.fighterCountermeasureTier);
+                radarSeekerSelected=source.fighterRadarSelected;
             }
             integrity=offensive?profile.health():service?20:15;
             maxIntegrity=integrity;armor=offensive?profile.armor():0;
@@ -916,6 +926,22 @@ public final class Battle {
         Ship ship=findShip(shipId);
         if(ship==null||!ship.alive())throw new IllegalArgumentException("Missing scanner");
         ship.scan.configure(mode,focusTargetId);
+    }
+    /** Paid FTR research unlocks an actual active missile radar head.
+     * The default passive IR interceptor and saved blueprint format remain
+     * unchanged. This pre-battle order does not modify other weapon families. */
+    public void configureFighterRadar(int shipId,boolean selected){
+        if(tick!=0)throw new IllegalArgumentException(
+                "Fighter seeker changes require pre-engagement orders");
+        Ship ship=findShip(shipId);
+        if(ship==null||!ship.alive()||
+                ship.fighterProfile.hull()!=FighterModel.Hull.INTERCEPTOR)
+            throw new IllegalArgumentException("Missing physical interceptor carrier");
+        if(selected&&(ship.fighterCountermeasureTier<5||
+                ship.fighterLaunchBays<=0))
+            throw new IllegalArgumentException(
+                    "Fitted FTR specialist tier 5 is required for active radar");
+        ship.fighterRadarSelected=selected;
     }
 
     /** Optional physical precision-CIWS lock-time sweep. It changes how
@@ -4440,7 +4466,12 @@ public final class Battle {
                     intercept.sourceId,craft.x,craft.y,
                     tx-craft.x,ty-craft.y,9.0,false,hardware,1.15);
             missile.targetCraftId=intercept.id;
-            missile.fighterIrHead=FighterInfraredSeeker.installed(tier);
+            if(craft.radarSeekerSelected){
+                missile.fighterRadarHead=FighterRadarSeeker.installed(tier);
+                missile.radarPulses=new FighterRadarSeeker.PulseHistory();
+                // Finite missile battery shared by actual active radar pings.
+                missile.radarBattery=16;
+            }else missile.fighterIrHead=FighterInfraredSeeker.installed(tier);
             missile.seekerLocked=false;
             missile.lastKnownX=tx;missile.lastKnownY=ty;
             missile.lastKnownVX=intercept.observedVx;
@@ -4450,7 +4481,8 @@ public final class Battle {
             craft.interceptorMissileAmmo--;
             craft.nextInterceptorTick=tick+45;
             fighterInterceptorsLaunched++;
-            visual(launched,VisualPhase.FIRE,"FIGHTER_IR_INTERCEPTOR",
+            visual(launched,VisualPhase.FIRE,craft.radarSeekerSelected?
+                    "FIGHTER_RADAR_INTERCEPTOR":"FIGHTER_IR_INTERCEPTOR",
                     craft.team,craft.sourceId,intercept.sourceId,
                     craft.x,craft.y,tx,ty);
         }
@@ -6704,6 +6736,7 @@ public final class Battle {
             hash = mix(hash,s.targetCompute.fingerprint());
             hash = mix(hash,s.fleetCompute.fingerprint());
             hash=mix(hash,s.fighterCountermeasureTier);
+            hash=mix(hash,s.fighterRadarSelected?1:0);
             hash = mix(hash,s.commandSourceId);
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
@@ -6827,6 +6860,10 @@ public final class Battle {
             hash=mix(hash,m.targetId);
             hash=mix(hash,m.targetCraftId);
             hash=mix(hash,m.fighterIrHead==null?-1:m.fighterIrHead.ordinal());
+            hash=mix(hash,m.fighterRadarHead==null?-1:m.fighterRadarHead.ordinal());
+            hash=mix(hash,Double.doubleToLongBits(m.radarBattery));
+            if(m.radarPulses!=null)
+                hash=mix(hash,m.radarPulses.fingerprint(tick));
             hash=mix(hash,m.lastFlareId);
             hash=mix(hash,m.lastFighterConsumedTick);
             if(m.lastFighterPhotons!=null){
@@ -6900,6 +6937,7 @@ public final class Battle {
             hash=mix(hash,craft.chaffRemaining);
             hash=mix(hash,craft.nextCountermeasureTick);
             hash=mix(hash,craft.interceptorMissileAmmo);
+            hash=mix(hash,craft.radarSeekerSelected?1:0);
             hash=mix(hash,craft.nextInterceptorTick);
             hash=mix(hash,craft.profile==null?-1:craft.profile.hull().ordinal());
             hash=mix(hash,Double.doubleToLongBits(craft.integrity));
