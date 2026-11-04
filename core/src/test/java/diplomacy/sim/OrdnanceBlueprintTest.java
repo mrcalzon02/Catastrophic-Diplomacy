@@ -57,7 +57,7 @@ public final class OrdnanceBlueprintTest {
         check(next.missileOrdnance.equals(selected),"Other shipyard edits must preserve missiles");
         Battle world=new Battle(71417L);
         world.spawnWing(0,restored,catalog,1,200,320);
-        world.spawnWing(1,old,catalog,1,690,320);
+        world.spawnWing(1,old,catalog,1,500,320);
         var s=world.ships().get(0);
         check(s.launchMode(Battle.DamageType.MISSILE)==selected.salvo()
                     &&s.propulsionMode(Battle.DamageType.MISSILE)==selected.motor()
@@ -69,8 +69,11 @@ public final class OrdnanceBlueprintTest {
         reject(()->stock.setPropulsionMode(Battle.DamageType.MISSILE,
                 OrdnancePropulsion.Mode.SILENT_GHOST),
                 "Live fitted ships must not bypass the technology gate");
-        // Both sides are deployed, so the real missile controller has a target.
-        for(int i=0;i<35;i++)world.step();
+        // Check the first genuinely sensor-authorized launch, rather than
+        // inspecting a fixed late frame after missiles may already have hit.
+        int photonWindow=2*SensorLightTimeHistory.propagationTicks(300)+35;
+        for(int i=0;i<photonWindow&&world.missiles().stream().noneMatch(
+                m->m.sourceId==s.id);i++)world.step();
         check(s.launched>0&&world.missiles().stream().anyMatch(m->
                     m.sourceId==s.id
                     &&m.propulsionMode==selected.motor()
