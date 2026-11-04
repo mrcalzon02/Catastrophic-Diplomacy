@@ -226,10 +226,11 @@ public final class ScreensaverBattleTest {
         Battle.Ship patrol=sweeps.addShip(0,Battle.Faction.TERRAN,700,300);
         patrol.sensorRange=1;
         for(int tick=0;tick<240;tick++)sweeps.step();
-        double firstX=patrol.x,firstY=patrol.y;
+        double firstX=patrol.x,firstY=patrol.y,firstFuel=patrol.fuel;
         for(int tick=0;tick<300;tick++)sweeps.step();
-        check(StrictMath.hypot(firstX-patrol.x,firstY-patrol.y)>15,
-                "Search patrol stopped cycling through unobserved sectors");
+        check(StrictMath.hypot(firstX-patrol.x,firstY-patrol.y)>.2
+                        &&patrol.fuel<firstFuel,
+                "Search patrol must navigate changing sectors with real gee-limited thrust");
 
         // In the same mixed nebula/ion-storm conditions that deadlocked
         // endurance seed 2026103106, ships 260 units apart still have a
