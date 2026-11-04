@@ -1,12 +1,16 @@
 package diplomacy.client;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import java.util.zip.ZipInputStream;
 
 /**
  * Opt-in, bounded, platform-independent combat performance capture.
@@ -94,6 +98,41 @@ final class CombatDiagnosticRecorder {
         Arrays.sort(data);
         return data[Math.max(0,(int)Math.ceil(data.length*proportion)-1)];
     }
+    /**
+     * Streaming on-device readback. Android launchers may have a 16 MiB heap;
+     * do not materialize the full ZIP to verify a written trace.
+     * Each expected entry must be readable, nonempty, and CRC-valid.
+     */
+    static void verifyArchive(InputStream source) throws IOException{
+        if(source==null)throw new IllegalArgumentException("ZIP source required");
+        Set<String> expected=Set.of("metadata.json","frame-samples.csv",
+                "speed-events.csv","summary.json","diagnostic.log");
+        Set<String> found=new HashSet<>();
+        byte[] chunk=new byte[4096];
+        long archiveBytes=0;
+        try(ZipInputStream zip=new ZipInputStream(source,StandardCharsets.UTF_8)){
+            ZipEntry entry;
+            while((entry=zip.getNextEntry())!=null){
+                if(entry.isDirectory() || !expected.contains(entry.getName()) ||
+                        !found.add(entry.getName()))
+                    throw new IOException("Unexpected or duplicated diagnostics entry: "+
+                            entry.getName());
+                long entryBytes=0;
+                int n;
+                while((n=zip.read(chunk))!=-1){
+                    entryBytes+=n;
+                    archiveBytes+=n;
+                    if(archiveBytes>8_000_000L)
+                        throw new IOException("Performance diagnostics archive exceeds safe limit");
+                }
+                if(entryBytes==0)throw new IOException("Empty diagnostics entry: "+entry.getName());
+                zip.closeEntry();
+            }
+        }
+        if(!found.equals(expected))
+            throw new IOException("Missing diagnostics entries: "+expected.toString());
+    }
+
     void export(OutputStream destination,String platform,float requested,float effective,
                 long finalTick) throws IOException{
         if(destination==null)throw new IllegalArgumentException("Destination required");
