@@ -82,6 +82,12 @@ public final class CombatPerformanceControlTest {
             }
         }
         check(files.size()==5,"ZIP must contain metadata, frames, events, log and summary");
+        CombatDiagnosticRecorder.verifyArchive(new ByteArrayInputStream(bytes.toByteArray()));
+        boolean incompleteRejected=false;
+        try{
+            CombatDiagnosticRecorder.verifyArchive(new ByteArrayInputStream(new byte[]{80,75,3,4}));
+        }catch(java.io.IOException expected){incompleteRejected=true;}
+        check(incompleteRejected,"Invalid/truncated ZIP must never be reported as exported");
         check(files.get("metadata.json").contains("\"finalTick\": 3900"),"Metadata readback");
         String csv=files.get("frame-samples.csv");
         check(csv.startsWith("frame,tick")&&csv.contains("300,300,")&&
