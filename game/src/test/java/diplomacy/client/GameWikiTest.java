@@ -22,6 +22,17 @@ public final class GameWikiTest {
         check(catalog.size()>=stages+modules+hulls+
                 ModuleVersions.Pattern.values().length*4+
                 ShipStandingOrders.SETTINGS.length,"Reference coverage is incomplete");
+        // Every persistent captain setting must open a real article. New ammo
+        // and fuel rows must never break the encyclopedia on game startup.
+        var orderArticles=catalog.search("ORDERS","");
+        for(int index=0;index<ShipStandingOrders.SETTINGS.length;index++){
+            String expectedId="order."+index;
+            var order=orderArticles.stream().filter(a->a.id.equals(expectedId))
+                    .findFirst().orElseThrow(()->new AssertionError(
+                            "Wiki lost standing-order article "+expectedId));
+            check(order.lines.size()>0&&order.lines.get(0).length()>30,
+                    "Missing meaningful gameplay explanation for "+expectedId);
+        }
         for(Shipyard.Hull hull:Shipyard.Hull.values()){
             List<GameWikiCatalog.Article> matches=catalog.search("HULLS",hull.name());
             check(matches.stream().anyMatch(e->e.id.equals("hull."+hull.name())),
