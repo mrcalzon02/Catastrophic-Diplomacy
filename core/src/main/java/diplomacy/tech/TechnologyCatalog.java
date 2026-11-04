@@ -80,6 +80,19 @@ public final class TechnologyCatalog {
             "TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB");
     private static final List<String> VARIANT_TRACKS=List.of(
             "OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST");
+    private static final String[][] SUPPORT_FAMILY_TYPES={
+            {"HPR","Long-Range Hull Restoration Projector","XFR"},
+            {"APR","Armor Restoration Projector","XFR"},
+            {"PWR","Power Transfer Projector","XFR"},
+            {"DHL","Hull Service Drone Bay","DRN"},
+            {"DSH","Shield Service Drone Bay","DRN"},
+            {"DAR","Armor Service Drone Bay","DRN"},
+            {"DPW","Power Service Drone Bay","DRN"},
+            {"AHL","Hull Restoration Aura","XFR"},
+            {"ASH","Shield Restoration Aura","XFR"},
+            {"AAR","Armor Restoration Aura","XFR"},
+            {"APW","Power Restoration Aura","XFR"}
+        };
     private static final int VIRTUAL_SURVIVAL_NODES=48*11*4*9;
     private static final int VIRTUAL_NETWORK_NODES=24*11*4*9;
     // 36 sensing models share immutable numeric tier templates with their
@@ -92,6 +105,9 @@ public final class TechnologyCatalog {
     private static final int VIRTUAL_SURVIVAL_FAMILY_NODES=
             SurvivalHardwareCatalog.FAMILIES.size()*VARIANT_FACTIONS.size()
                     *VARIANT_TRACKS.size()*9;
+    private static final int VIRTUAL_SUPPORT_FAMILY_NODES=
+            SUPPORT_FAMILY_TYPES.length*VARIANT_FACTIONS.size()*
+                    VARIANT_TRACKS.size()*9;
     private final int upgradeTotal;
     private final Set<String> components;
     private TechnologyCatalog(Map<String, Upgrade> map, Map<String, Component> base,
@@ -111,7 +127,8 @@ public final class TechnologyCatalog {
             }
         upgradeTotal=Math.addExact(Math.addExact(map.size(),Math.multiplyExact(finalBranches,3)),
                 generateHigherStages?VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES+
-                        VIRTUAL_SENSING_NODES+VIRTUAL_SURVIVAL_FAMILY_NODES:0);
+                        VIRTUAL_SENSING_NODES+VIRTUAL_SURVIVAL_FAMILY_NODES+
+                        VIRTUAL_SUPPORT_FAMILY_NODES:0);
         upgrades=generateHigherStages?Collections.unmodifiableMap(new LazyUpgrades()):
                 sixStages;
         baseComponents=Collections.unmodifiableMap(base);
@@ -132,6 +149,8 @@ public final class TechnologyCatalog {
         virtual=sensingVariantUpgrade(id);
         if(virtual!=null)return virtual;
         virtual=survivalFamilyUpgrade(id);
+        if(virtual!=null)return virtual;
+        virtual=supportFamilyUpgrade(id);
         if(virtual!=null)return virtual;
         if(!deferredHigherStages||id==null||id.length()<4)return null;
         int end=id.length();
@@ -304,6 +323,45 @@ public final class TechnologyCatalog {
         return new Upgrade(cells);
     }
 
+    /**
+     * Eleven socket-bound support families share research coefficients with
+     * their real DRN/XFR source, not independently invented stats. Keep all
+     * stages visible while avoiding 2,904 cloned startup research rows.
+     */
+    private Upgrade supportFamilyUpgrade(String id){
+        if(!deferredHigherStages||id==null)return null;
+        String[] parts=id.split("-",5);
+        if(parts.length!=5||!"TECH".equals(parts[0])||
+                !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
+                !parts[4].matches("0[1-9]"))return null;
+        String[] family=null;
+        for(String[] entry:SUPPORT_FAMILY_TYPES)
+            if(entry[0].equals(parts[2])){family=entry;break;}
+        if(family==null||!baseComponents.containsKey(
+                "BASE-"+parts[1]+"-"+family[0]))return null;
+        int stage=parts[4].charAt(1)-'0';
+        Upgrade source=get("TECH-"+parts[1]+"-"+family[2]+"-"+
+                parts[3]+"-"+parts[4]);
+        if(source==null)return null;
+        String predecessor=stage==1?"BASE-"+parts[1]+"-"+family[0]:
+                "TECH-"+parts[1]+"-"+family[0]+"-"+parts[3]+"-"+
+                        String.format(Locale.ROOT,"%02d",stage-1);
+        String sourceName=family[2].equals("DRN")?
+                "Drone Controller":"Shield Transfer Projector";
+        ArrayList<String> cells=new ArrayList<>(COLS);
+        Collections.addAll(cells,id,parts[1],family[0],parts[3],
+                Integer.toString(stage),
+                source.name.replace(sourceName,family[1]),predecessor,
+                Integer.toString(source.researchCost),
+                Integer.toString(source.industryCost));
+        for(double value:new double[]{source.mass,source.power,source.heat,
+                source.output,source.accuracy,source.integrity,source.shield,
+                source.thrust,source.cooling,source.maintenance})
+            cells.add(ratio(value,1));
+        cells.add(family[1]+": "+source.tradeoff);
+        return new Upgrade(cells);
+    }
+
     public boolean hasBase(String id) { return components.contains(id); }
     public Component base(String id) { return baseComponents.get(id); }
     public Map<String, Component> baseComponents() { return baseComponents; }
@@ -346,6 +404,13 @@ public final class TechnologyCatalog {
                         for(int rank=1;rank<=9;rank++)
                             ids.add("TECH-"+faction+"-"+family.code()+"-"+track+"-"+
                                     String.format(Locale.ROOT,"%02d",rank));
+        if(deferredHigherStages)
+            for(String faction:VARIANT_FACTIONS)
+                for(String[] family:SUPPORT_FAMILY_TYPES)
+                    for(String track:VARIANT_TRACKS)
+                        for(int rank=1;rank<=9;rank++)
+                            ids.add("TECH-"+faction+"-"+family[0]+"-"+track+"-"+
+                                    String.format(Locale.ROOT,"%02d",rank));
         if(ids.size()!=upgradeTotal)
             throw new IllegalStateException("Virtual stage count mismatch");
         return ids;
@@ -378,7 +443,8 @@ public final class TechnologyCatalog {
                             }
                             return deferredHigherStages&&virtualIndex<VIRTUAL_SURVIVAL_NODES+
                                     VIRTUAL_NETWORK_NODES+VIRTUAL_SENSING_NODES+
-                                    VIRTUAL_SURVIVAL_FAMILY_NODES;
+                                    VIRTUAL_SURVIVAL_FAMILY_NODES+
+                                    VIRTUAL_SUPPORT_FAMILY_NODES;
                         }
                         @Override public Entry<String,Upgrade> next(){
                             if(early.hasNext())return early.next();
@@ -396,10 +462,15 @@ public final class TechnologyCatalog {
                             boolean sensing=!survival&&!network&&index<
                                     VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES+
                                     VIRTUAL_SENSING_NODES;
+                            boolean family=!survival&&!network&&!sensing&&index<
+                                    VIRTUAL_SURVIVAL_NODES+VIRTUAL_NETWORK_NODES+
+                                    VIRTUAL_SENSING_NODES+VIRTUAL_SURVIVAL_FAMILY_NODES;
                             int n=survival?index:network?index-VIRTUAL_SURVIVAL_NODES:
                                     sensing?index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES:
+                                    family?index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES-
+                                            VIRTUAL_SENSING_NODES:
                                     index-VIRTUAL_SURVIVAL_NODES-VIRTUAL_NETWORK_NODES-
-                                            VIRTUAL_SENSING_NODES;
+                                            VIRTUAL_SENSING_NODES-VIRTUAL_SURVIVAL_FAMILY_NODES;
                             int stage=n%9+1;
                             n/=9;
                             String track=VARIANT_TRACKS.get(n%VARIANT_TRACKS.size());
@@ -417,10 +488,13 @@ public final class TechnologyCatalog {
                                 code=SensingVariantCatalog.VARIANTS.get(
                                         n%SensingVariantCatalog.VARIANTS.size()).code();
                                 n/=SensingVariantCatalog.VARIANTS.size();
-                            }else{
+                            }else if(family){
                                 code=SurvivalHardwareCatalog.FAMILIES.get(
                                         n%SurvivalHardwareCatalog.FAMILIES.size()).code();
                                 n/=SurvivalHardwareCatalog.FAMILIES.size();
+                            }else{
+                                code=SUPPORT_FAMILY_TYPES[n%SUPPORT_FAMILY_TYPES.length][0];
+                                n/=SUPPORT_FAMILY_TYPES.length;
                             }
                             String id="TECH-"+VARIANT_FACTIONS.get(n)+"-"+code+"-"+
                                     track+"-"+String.format(Locale.ROOT,"%02d",stage);
@@ -452,7 +526,7 @@ public final class TechnologyCatalog {
             expandNativeFactions(bases,rows);
             addHabitatFamilies(bases,rows);
             addShieldTransferProjectors(bases,rows);
-            addSpecializedSupportFamilies(bases,rows);
+            addSpecializedSupportFamilies(bases);
             addTenderFamilies(bases,rows);
             addArmorAndBulkheadFamilies(bases,rows);
             addSensingFamilies(bases,rows);
@@ -715,25 +789,11 @@ public final class TechnologyCatalog {
      * independent six-stage upgrades per track and civilization.
      * Legacy SHD and REP remain distinct and do not acquire these abilities.
      */
-    private static void addSpecializedSupportFamilies(List<List<String>> bases,
-                                                       List<List<String>> upgrades){
-        String[][] types={
-            {"HPR","Long-Range Hull Restoration Projector","XFR"},
-            {"APR","Armor Restoration Projector","XFR"},
-            {"PWR","Power Transfer Projector","XFR"},
-            {"DHL","Hull Service Drone Bay","DRN"},
-            {"DSH","Shield Service Drone Bay","DRN"},
-            {"DAR","Armor Service Drone Bay","DRN"},
-            {"DPW","Power Service Drone Bay","DRN"},
-            {"AHL","Hull Restoration Aura","XFR"},
-            {"ASH","Shield Restoration Aura","XFR"},
-            {"AAR","Armor Restoration Aura","XFR"},
-            {"APW","Power Restoration Aura","XFR"}
-        };
+    private static void addSpecializedSupportFamilies(List<List<String>> bases){
+
         // Include already-generated native families and XFR projectors.
         List<List<String>> sourceBases=List.copyOf(bases);
-        List<List<String>> sourceUpgrades=List.copyOf(upgrades);
-        for(String[] type:types){
+        for(String[] type:SUPPORT_FAMILY_TYPES){
             String code=type[0],parent=type[2];
             for(int i=1;i<sourceBases.size();i++){
                 List<String> source=sourceBases.get(i);
@@ -751,19 +811,7 @@ public final class TechnologyCatalog {
                 entry.set(12,"Physical specialized service module; no passive hull-wide transfer");
                 bases.add(entry);
             }
-            for(int i=1;i<sourceUpgrades.size();i++){
-                List<String> source=sourceUpgrades.get(i);
-                if(!parent.equals(source.get(2)))continue;
-                List<String> entry=new ArrayList<>(source);
-                entry.set(0,entry.get(0).replace("-"+parent+"-","-"+code+"-"));
-                entry.set(2,code);
-                entry.set(5,entry.get(5).replace(parent.equals("DRN")?"Drone Controller":
-                        "Shield Transfer Projector",type[1]));
-                entry.set(6,entry.get(6).replace("-"+parent+"-","-"+code+"-")
-                        .replace("-"+parent,"-"+code));
-                entry.set(19,type[1]+": "+entry.get(19));
-                upgrades.add(entry);
-            }
+
         }
     }
 
