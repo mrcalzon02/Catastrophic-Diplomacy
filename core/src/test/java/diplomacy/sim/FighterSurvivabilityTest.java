@@ -139,7 +139,7 @@ public final class FighterSurvivabilityTest {
         for(var survivor:first.fighterEscapeRecords())
             check(survivor.craftId()==a.id&&
                     survivor.carrierId()==a.sourceId&&
-                    survivor.team==a.team&&survivor.tick()==first.tick,
+                    survivor.team()==a.team&&survivor.tick()==first.tick,
                     "A survivor was assigned to the wrong aircraft or future tick");
         first.hitCraft(a,10000,shooterA,18,"FLAK");
         check(first.fighterPilotsEjected==survivors&&
