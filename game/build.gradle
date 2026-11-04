@@ -386,5 +386,5 @@ tasks.register('wikiProfile', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.WikiMemoryProfile'
-    maxHeapSize = '16m'
+    maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
 }
