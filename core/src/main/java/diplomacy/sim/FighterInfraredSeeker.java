@@ -121,15 +121,27 @@ public final class FighterInfraredSeeker {
                     }
                 }
             }
-            for(var cloud:clouds){
-                if(cloud.kind()!=FighterCountermeasures.Kind.FLARE||
-                        cloud.team()==missileTeam||
-                        cloud.craftId()!=targetCraftId||
-                        !cloud.active(emission))continue;
+        }
+        // Fleet-scale cost: filter the global cloud list ONCE for this
+        // assigned fighter. Only actual matching flare emitters require a
+        // bounded historical worldline scan. Complexity is O(history +
+        // clouds + matchingFlareHistory), not O(history * allClouds).
+        for(var cloud:clouds){
+            if(cloud.kind()!=FighterCountermeasures.Kind.FLARE||
+                    cloud.team()==missileTeam||
+                    cloud.craftId()!=targetCraftId)continue;
+            int minAge=(int)StrictMath.max(1,
+                    tick-(cloud.bornTick()+cloud.lifetimeTicks()-1));
+            int maxAge=(int)StrictMath.min(StrictMath.min(limit,tick),
+                    tick-cloud.bornTick());
+            for(int age=minAge;age<=maxAge;age++){
+                long emission=tick-age;
                 double power=cloud.signal(FighterCountermeasures.Kind.FLARE,emission);
                 if(power<=0)continue;
                 double cx=cloud.xAt(emission),cy=cloud.yAt(emission);
-                if(!inView(head,currentX,currentY,cx,cy,headingX,headingY))continue;
+                if(!BattleArena.contains(cx,cy)||
+                        !inView(head,currentX,currentY,cx,cy,
+                                headingX,headingY))continue;
                 double r0=StrictMath.hypot(cx-priorX,cy-priorY);
                 double r1=StrictMath.hypot(cx-currentX,cy-currentY);
                 if(r0<=lightStep*(age-1)+1e-9||
