@@ -1692,6 +1692,7 @@ public final class Battle {
         for(Missile body:missiles){body.previousX=body.x;body.previousY=body.y;}
         for(Rocket body:rockets){body.previousX=body.x;body.previousY=body.y;}
         for(Ballistic body:ballistics){body.previousX=body.x;body.previousY=body.y;}
+        updateFighterCountermeasures();
         updateMissiles();
         updateRockets();
         updateBallistics();
@@ -4222,6 +4223,107 @@ public final class Battle {
                         ship.team,ship.id,needy.id,ship.x,ship.y,needy.x,needy.y);
                 break;
             }
+    }
+
+    /** Fire a real finite cartridge; this is also a future IR missile
+     * countermeasure command entrypoint. Infrared-only threats are not
+     * yet automatically classified by the current ship-targeting missiles. */
+    public boolean deployFighterCountermeasure(
+            int craftId,FighterCountermeasures.Kind kind){
+        if(kind==null)throw new IllegalArgumentException("Missing cartridge type");
+        Craft craft=null;
+        for(Craft c:crafts)if(c.id==craftId){craft=c;break;}
+        if(craft==null||!craft.fighter||craft.integrity<=0)return false;
+        Ship threat=null;
+        double best=Double.POSITIVE_INFINITY;
+        for(Ship ship:ships)if(ship.alive()&&ship.team!=craft.team){
+            double range=StrictMath.hypot(ship.x-craft.x,ship.y-craft.y);
+            if(range<best){best=range;threat=ship;}
+        }
+        return emitFighterCountermeasure(craft,kind,threat);
+    }
+    private boolean emitFighterCountermeasure(
+            Craft craft,FighterCountermeasures.Kind kind,Ship threat){
+        if(!craft.fighter||craft.integrity<=0||
+                tick<craft.nextCountermeasureTick||
+                fighterClouds.size()>=MAX_FIGHTER_CLOUDS||
+                (kind==FighterCountermeasures.Kind.CHAFF?
+                        craft.chaffRemaining:craft.flareRemaining)<=0)return false;
+        Ship parent=findShip(craft.sourceId);
+        int tier=parent==null?0:parent.fighterCountermeasureTier;
+        var pack=FighterCountermeasures.forHull(craft.profile.hull(),tier);
+        long shot=nextVisualShotId++;
+        var cloud=FighterCountermeasures.release(shot,kind,
+                craft.id,craft.sourceId,craft.team,
+                craft.x,craft.y,craft.observedVx,craft.observedVy,
+                threat==null?craft.x-1:threat.x,
+                threat==null?craft.y:threat.y,tick,tier);
+        fighterClouds.add(cloud);
+        if(kind==FighterCountermeasures.Kind.CHAFF){
+            craft.chaffRemaining--;fighterChaffDeployed++;
+        }else{craft.flareRemaining--;fighterFlaresDeployed++;}
+        craft.nextCountermeasureTick=tick+pack.cooldownTicks();
+        visual(shot,VisualPhase.FIRE,kind.name(),craft.team,craft.sourceId,
+                craft.targetId,craft.x,craft.y,cloud.xAt(tick),cloud.yAt(tick));
+        return true;
+    }
+    /**
+     * Only real working radar-controlled flak and rotary mounts trigger
+     * chaff. Optical laser/particle systems do NOT trigger false radar
+     * countermeasures. Flares await a genuine fighter-targeting IR seeker.
+     */
+    private void updateFighterCountermeasures(){
+        for(int i=fighterClouds.size()-1;i>=0;i--){
+            var cloud=fighterClouds.get(i);
+            if(!cloud.active(tick)||
+                    !BattleArena.contains(cloud.xAt(tick),cloud.yAt(tick))){
+                fighterClouds.remove(i);
+                visual(cloud.id(),VisualPhase.TIMEOUT,cloud.kind().name(),
+                        cloud.team(),cloud.sourceId(),0,
+                        cloud.xAt(tick),cloud.yAt(tick),
+                        cloud.xAt(tick),cloud.yAt(tick));
+            }
+        }
+        for(Craft craft:crafts)if(craft.fighter&&craft.chaffRemaining>0&&
+                craft.integrity>0&&tick>=craft.nextCountermeasureTick){
+            Ship threat=null;
+            double nearest=Double.POSITIVE_INFINITY;
+            for(Ship defender:ships)if(defender.alive()&&
+                    defender.team!=craft.team&&defender.power>4&&
+                    defender.pointDefenseCondition>.2&&
+                    defender.orders.pointDefense().craft()){
+                double reach=0;
+                for(Ship.FlakMount mount:defender.flakMounts)
+                    reach=StrictMath.max(reach,mount.nominalRange);
+                for(RotaryPointDefense.Mount mount:defender.rotaryMounts)
+                    reach=StrictMath.max(reach,mount.nominalRange);
+                double dist=StrictMath.hypot(defender.x-craft.x,
+                        defender.y-craft.y);
+                if(reach>0&&dist<nearest&&
+                        dist<=reach*weather.sensorFactor()){
+                    nearest=dist;threat=defender;
+                }
+            }
+            if(threat!=null)emitFighterCountermeasure(craft,
+                    FighterCountermeasures.Kind.CHAFF,threat);
+        }
+    }
+    /** One physically adjacent radar cloud can compete with its parent
+     * aircraft, but cannot fabricate a new target ID or fool optics. */
+    private FighterCountermeasures.Cloud radarFighterGhost(
+            Craft craft,Ship radar,double range){
+        FighterCountermeasures.Cloud best=null;
+        double strength=0;
+        for(var cloud:fighterClouds){
+            if(cloud.team()==radar.team||
+                    !cloud.spoofsRadar(craft.id,craft.x,craft.y,
+                            craft.radarProfile().crossSection(),tick))continue;
+            if(StrictMath.hypot(cloud.xAt(tick)-radar.x,
+                    cloud.yAt(tick)-radar.y)>range)continue;
+            double level=cloud.signal(FighterCountermeasures.Kind.CHAFF,tick);
+            if(level>strength){strength=level;best=cloud;}
+        }
+        return best;
     }
 
     /** Small craft maintain independent sensor locks and fire real projectiles. */
