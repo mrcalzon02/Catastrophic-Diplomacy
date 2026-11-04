@@ -2190,6 +2190,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     /** Shared tactical menu hit contract, identical for desktop and touch. */
     static int tacticalAction(float x,float y){
+        if(x>=895&&x<=1250){
+            for(int i=0;i<4;i++){
+                float low=490-60*i;
+                if(y>=low&&y<low+48)return 12+i;
+            }
+        }
         if(x<420||x>860)return -1;
         for(int n=0;n<12;n++){
             float low=550-40*n;
@@ -2219,6 +2225,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 9 -> audio.toggleEffects();
                 case 10 -> audio.toggleTrack();
                 case 11 -> {tacticalMenuOpen=false;running=false;screen=GameMenuPanel.Screen.HOME;}
+                case 12 -> toggleDiagnosticsHud();
+                case 13 -> toggleAdaptivePacing();
+                case 14 -> toggleDiagnosticsCapture();
+                case 15 -> exportDiagnostics();
         }
     }
     private void drawTacticalMenu() {
@@ -2226,6 +2236,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(0.008f,0.014f,0.034f,0.97f);
         shapes.rect(408,88,464,559);
+        shapes.setColor(0.008f,0.014f,0.034f,0.97f);
+        shapes.rect(880,282,380,281);
         shapes.setColor(0.10f,0.20f,0.32f,1);
         shapes.rect(421,621,438,2);
         shapes.end();
@@ -2254,6 +2266,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
             font.setColor(Color.WHITE);
             font.draw(batch,labels[n],480,y+25);
+        }
+        font.setColor(Color.LIGHT_GRAY);
+        String[] performanceLabels={
+                "DIAGNOSTICS: "+(diagnosticsHud?"HUD ON":"HUD OFF")+" (F2)",
+                "ADAPTIVE: "+(paceGovernor.enabled()?"ON":"OFF")+" (F5)",
+                diagnosticRecorder.recording()?"STOP CAPTURE (F3)":"START CAPTURE (F3)",
+                "EXPORT ZIP (F4)"};
+        font.setColor(Color.CYAN);
+        font.draw(batch,"PERFORMANCE",908,549);
+        for(int i=0;i<performanceLabels.length;i++){
+            float y=490-60*i;
+            if(uiIcons!=null)uiIcons.drawButton(batch,i==2?"special":"secondary",895,y,355,48);
+            font.setColor(Color.WHITE);
+            font.draw(batch,performanceLabels[i],908,y+31);
         }
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"P/O: point defense  |  F: fleet orders  |  U/I/J: audio",439,99);
@@ -2494,7 +2520,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         screensaverMode=true;playedCampaign=false;
         battlePanX=battlePanY=0f;battleTouch.cancel();
         screen=GameMenuPanel.Screen.BATTLE;
-        speed=CombatPace.DEFAULT;manualZoom=1f;focusedShipId=-1;
+        speed=CombatPace.DEFAULT;paceGovernor.request(speed);
+        manualZoom=1f;focusedShipId=-1;
         nextScreensaverRound();
         Gdx.app.log("CD-SCREENSAVER","START seed="+screensaverRound.seed());
     }
@@ -2523,7 +2550,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         screensaverControlPointer=-1;
         screensaverMode=false;screensaverRound=null;
         screen=GameMenuPanel.Screen.HOME;running=false;battle=null;
-        speed=previousSpeed;manualZoom=previousZoom;focusedShipId=previousFocusedId;
+        speed=previousSpeed;paceGovernor.request(speed);
+        manualZoom=previousZoom;focusedShipId=previousFocusedId;
         battlePanX=battlePanY=0f;battleTouch.cancel();
         battlefieldLevel=previousLevel;
         if(starfield!=null)starfield.useLevel(battlefieldLevel);
@@ -2691,9 +2719,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
         long lightingOverlayNs=0;
         // Simulation death detection is tick-exact; fragments evolve only while
         // combat runs (and through the four-second post-battle victory pause).
-        deathTimeline.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
-        hitFeedback.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
-        shieldFx.advance(battle,delta,running && !tacticalMenuOpen && !shipyard.open());
+        float advancedSimSeconds=(float)((battle.tick-tickBeforeRender)*Battle.DT);
+        // Effects follow simulated combat seconds, not real-world wall time.
+        // Permit final effects to wind down during the post-battle result pause.
+        float effectsDelta=battle.finished()?delta*(verifyDemo?speed:
+                CombatPace.simulationMultiplier(paceGovernor.effective())):advancedSimSeconds;
+        deathTimeline.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
+        hitFeedback.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
+        shieldFx.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
         // Shared visual clock: current authoritative state minus one fixed-tick.
         // Paused battles draw the exact state, not an old snapshot.
         renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
@@ -3198,6 +3231,24 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         }
         font.setColor(Color.LIGHT_GRAY);
+        if(diagnosticsHud){
+            font.setColor(Color.CYAN);
+            font.draw(batch,"PERF "+Gdx.graphics.getFramesPerSecond()+" FPS  p95 "+
+                    String.format(java.util.Locale.ROOT,"%.1f",paceGovernor.p95Ms())+
+                    "ms  SIM "+String.format(java.util.Locale.ROOT,"%.1f",paceGovernor.meanSimMs())+
+                    "ms  SPEED "+CombatPace.label(speed)+" / "+
+                    CombatPace.label(paceGovernor.effective()),22,110);
+            font.draw(batch,"AUTO "+(paceGovernor.enabled()?"ON":"OFF")+" "+
+                    paceGovernor.reason()+"  CRAFT "+battle.crafts().size()+
+                    "  MISSILES "+battle.missiles().size()+
+                    "  CAPTURE "+(diagnosticRecorder.recording()?"REC":"OFF")+
+                    "  (F2 HUD F3 REC F4 ZIP F5 AUTO)",22,86);
+        }
+        if(System.nanoTime()<diagnosticNoticeUntilNs){
+            font.setColor(Color.GOLD);
+            font.draw(batch,diagnosticNotice,22,143);
+        }
+        font.setColor(Color.LIGHT_GRAY);
         font.draw(batch, "FLEETS " + battle.alive(0) + " / " + battle.alive(1)
                 + "   ESCAPED " + battle.escaped(0) + " / " + battle.escaped(1)
                 + "   T+" + (battle.tick / 30) + "s   HITS " + battle.hitCount
@@ -3224,14 +3275,32 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipInspector.draw(battle,shapes,batch,font);
         }
         if (tacticalMenuOpen) drawTacticalMenu();
-        renderProfile.sample(System.nanoTime()-renderStartNs,
-                simulationEndNs-renderStartNs,lightingOverlayNs,
-                Math.max(0,batch.totalRenderCalls-drawCallsBefore),
-                (terranSprites==null?0:terranSprites.materialTextureBindings())+
-                (craftSprites==null?0:craftSprites.materialTextureBindings()));
+        long cpuFrameNs=System.nanoTime()-renderStartNs;
+        long simulationNs=simulationEndNs-renderStartNs;
+        int frameDrawCalls=Math.max(0,batch.totalRenderCalls-drawCallsBefore);
+        int frameBinds=(terranSprites==null?0:terranSprites.materialTextureBindings())+
+                (craftSprites==null?0:craftSprites.materialTextureBindings());
+        renderProfile.sample(cpuFrameNs,simulationNs,lightingOverlayNs,
+                frameDrawCalls,frameBinds);
+        boolean activeForPacing=running&&!tacticalMenuOpen&&!shipyard.open()
+                &&!battle.finished()&&!verifyDemo;
+        if(paceGovernor.frame(Gdx.graphics.getDeltaTime(),cpuFrameNs,simulationNs,
+                activeForPacing)){
+            diagnosticRecorder.event(battle.tick,speed,paceGovernor.effective(),
+                    paceGovernor.reason());
+            Gdx.app.log("CD-PERF-SPEED","requested="+speed+
+                    " effective="+paceGovernor.effective()+" "+paceGovernor.reason());
+        }
+        diagnosticRecorder.frame(battle.tick,Gdx.graphics.getDeltaTime(),
+                cpuFrameNs,simulationNs,paceGovernor.p95Ms(),speed,
+                paceGovernor.effective(),battle.alive(0)+battle.alive(1),
+                battle.crafts().size(),
+                battle.missiles().size()+battle.ballistics().size(),
+                frameDrawCalls,frameBinds);
         if(renderProfile.ready()){
             var frame=renderProfile.report();
-            if(Gdx.app!=null)Gdx.app.log("CD-RENDER-PERF",
+            if((diagnosticsHud||diagnosticRecorder.recording())&&Gdx.app!=null)
+                Gdx.app.log("CD-RENDER-PERF",
                     "samples="+frame.samples()+" avgCpuMs="+frame.meanCpuMs()+
                     " worstCpuMs="+frame.worstCpuMs()+
                     " simCpuAvgMs="+frame.meanSimulationMs()+
