@@ -76,11 +76,13 @@ public final class FighterOpticalSeekerTest {
         // A long-range narrow telescope can see a target outside wide optics.
         fighter.x=265;
         fighter.infraredHistory.capture(7,fighter);
-        // Receiver worldline must cross the light front of tick 7 at tick 10.
+        // The real arena photon step is about 147 units/tick. Do not
+        // hardcode a third tick after the 265-unit light front has passed.
+        long photonArrival=7+SensorLightTimeHistory.propagationTicks(265);
         var far=FighterOpticalSeeker.receive(narrow,history,List.of(),20,1,
-                0,100,0,100,250,0,10);
+                0,100,0,100,250,0,photonArrival);
         var tooFar=FighterOpticalSeeker.receive(wide,history,List.of(),20,1,
-                0,100,0,100,250,0,10);
+                0,100,0,100,250,0,photonArrival);
         require(far!=null&&far.emittedTick()==7&&tooFar==null,
                 "Wide-field optical hardware inherited narrow telescope reach");
         System.out.println("PASS independent optical range/cone, real photon age, glare alignment and band isolation");
