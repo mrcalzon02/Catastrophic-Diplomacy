@@ -263,6 +263,17 @@ tasks.register('approvedHardpointsSmoke', JavaExec) {
     dependsOn testClasses
 }
 
+// Reproduce the constrained Android 10 16 MiB Java heap without any
+// emulator startup or asset build. This is an objective loader functional gate.
+tasks.register('hardpointsLowHeapSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify every authenticated hardpoint under the Android 10 16 MiB Java heap limit.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.ApprovedHardpointsTest'
+    maxHeapSize = '16m'
+    dependsOn testClasses
+}
+
 tasks.register('hullLayoutsSmoke', JavaExec) {
     dependsOn(tasks.named('approvedHardpointsSmoke'))
     group = 'verification'
