@@ -425,6 +425,12 @@ public final class Battle {
         public final long visualId, spawnTick;
         public final int sourceId, team;
         public int targetId;
+        /** Zero for ship-strike ordnance. Interceptors retain a distinct
+         * craft identity and never consult a ship's live seeker solution. */
+        public int targetCraftId;
+        public FighterInfraredSeeker.Head fighterIrHead;
+        public FighterInfraredSeeker.Reading lastFighterPhotons;
+        public long lastFlareId;
         /** vx/vy are world-units/second, never normalized heading components. */
         public double x, y, vx, vy, fuel, damage, integrity, propellant;
         /** Physical body position at the start of the current 30Hz step. */
@@ -609,6 +615,12 @@ public final class Battle {
         /** Per-airframe finite dispensers; drones carry neither. */
         public int flareRemaining,chaffRemaining;
         public long nextCountermeasureTick;
+        /** Independent paid short-range interceptor missiles (cannon ammo
+         * and guided ordnance never share an infinite magazine). */
+        public int interceptorMissileAmmo;
+        public long nextInterceptorTick;
+        public final FighterInfraredSeeker.History infraredHistory=
+                new FighterInfraredSeeker.History();
         /** Null for legacy defense and repair drones; non-null for autonomous fighters. */
         public final FighterModel.Profile profile;
         public ProjectileModel.Spec radarProfile(){
@@ -627,6 +639,8 @@ public final class Battle {
                 var pack=FighterCountermeasures.forHull(profile.hull(),
                         source.fighterCountermeasureTier);
                 flareRemaining=pack.flares();chaffRemaining=pack.chaff();
+                interceptorMissileAmmo=FighterInfraredSeeker.interceptorMagazine(
+                        profile.hull(),source.fighterCountermeasureTier);
             }
             integrity=offensive?profile.health():service?20:15;
             maxIntegrity=integrity;armor=offensive?profile.armor():0;
@@ -851,6 +865,10 @@ public final class Battle {
     /** Proof counters distinguish launched fighter rounds from mere animation. */
     public int fighterGunShots,fighterLaserShots,fighterParticleShots,
                fighterMissilesLaunched,fighterTorpedoesLaunched,craftLosses;
+    /** Genuine fighter-vs-fighter interceptor launches, IR seeker diversions
+     * and physical near-flare fuzes (not inferred hit-rate bonuses). */
+    public int fighterInterceptorsLaunched,fighterInterceptorsHit,
+               fighterFlareSeekerDiversions,fighterFlareFuzes;
     /** Diagnostic counters: real PD hits and kills of hostile craft, excluding
      * ordinary fuel expiry, voluntary docking or other combat losses. */
     public int pointDefenseCraftHits,pointDefenseCraftKills;
@@ -1708,6 +1726,8 @@ public final class Battle {
         for(Craft craft:crafts){
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
+            if(craft.fighter&&craft.integrity>0)
+                craft.infraredHistory.capture(tick,craft);
         }
         captureSensorHistory(tick);
         updateTermination();
@@ -6626,6 +6646,16 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(m.releaseRange));
             hash=mix(hash,Double.doubleToLongBits(m.damage));
             hash=mix(hash,m.targetId);
+            hash=mix(hash,m.targetCraftId);
+            hash=mix(hash,m.fighterIrHead==null?-1:m.fighterIrHead.ordinal());
+            hash=mix(hash,m.lastFlareId);
+            if(m.lastFighterPhotons!=null){
+                hash=mix(hash,m.lastFighterPhotons.emittedTick());
+                hash=mix(hash,m.lastFighterPhotons.receivedTick());
+                hash=mix(hash,m.lastFighterPhotons.flareId());
+                hash=mix(hash,Double.doubleToLongBits(
+                        m.lastFighterPhotons.strength()));
+            }
             hash=mix(hash,m.warhead.ordinal());
             hash=mix(hash,m.ignitionDelayTicks);
             hash=mix(hash,m.flightTicks);
@@ -6664,6 +6694,10 @@ public final class Battle {
         hash=mix(hash,fighterFlaresDeployed);
         hash=mix(hash,fighterChaffFlakDiversions);
         hash=mix(hash,fighterChaffRotaryDiversions);
+        hash=mix(hash,fighterInterceptorsLaunched);
+        hash=mix(hash,fighterInterceptorsHit);
+        hash=mix(hash,fighterFlareSeekerDiversions);
+        hash=mix(hash,fighterFlareFuzes);
         for(FighterCountermeasures.Cloud cloud:fighterClouds){
             hash=mix(hash,cloud.id());
             hash=mix(hash,cloud.kind().ordinal());
@@ -6685,11 +6719,25 @@ public final class Battle {
             hash=mix(hash,craft.flareRemaining);
             hash=mix(hash,craft.chaffRemaining);
             hash=mix(hash,craft.nextCountermeasureTick);
+            hash=mix(hash,craft.interceptorMissileAmmo);
+            hash=mix(hash,craft.nextInterceptorTick);
             hash=mix(hash,craft.profile==null?-1:craft.profile.hull().ordinal());
             hash=mix(hash,Double.doubleToLongBits(craft.integrity));
             hash=mix(hash,Double.doubleToLongBits(craft.armor));
             hash=mix(hash,Double.doubleToLongBits(craft.fuel));
             hash=mix(hash,Double.doubleToLongBits(craft.reload));
+            if(craft.fighter){
+                // Even historical fighter emissions affect future photons
+                // and are part of this saved deterministic combat state.
+                for(int age=0;age<FighterInfraredSeeker.History.CAPACITY;age++){
+                    var frame=craft.infraredHistory.at(tick-age);
+                    if(frame==null)continue;
+                    hash=mix(hash,frame.tick());
+                    hash=mix(hash,Double.doubleToLongBits(frame.x()));
+                    hash=mix(hash,Double.doubleToLongBits(frame.y()));
+                    hash=mix(hash,Double.doubleToLongBits(frame.heat()));
+                }
+            }
         }
         return hash;
     }
