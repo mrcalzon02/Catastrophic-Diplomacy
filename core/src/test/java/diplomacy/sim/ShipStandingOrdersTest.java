@@ -70,6 +70,17 @@ public final class ShipStandingOrdersTest {
                 "Fuel posture, protected fraction or economy threshold editor inert");
         check(policy.resources().fuelPolicy()==ShipResourceOrders.FuelPolicy.UNRESTRICTED,
                 "Existing captains should retain unrestricted historical thrust by default");
+        Battle.Ship rationSample=new Battle(78901).addShip(0,Battle.Faction.TERRAN,200,320);
+        rationSample.maxFuel=100;rationSample.fuel=20;
+        rationSample.orders=fuelCaptain.tactics();
+        check(fuelCaptain.resources().protectedFuel(rationSample)==35&&
+                        fuelCaptain.resources().thrustSpeedFactor(rationSample)<1,
+                "Low fuel did not protect reserves and throttle discretionary thrust");
+        ShipStandingOrders fuelLastStand=fuelCaptain.adjust(4,4);
+        rationSample.orders=fuelLastStand.tactics();
+        check(fuelLastStand.resources().protectedFuel(rationSample)==0&&
+                        fuelLastStand.resources().thrustSpeedFactor(rationSample)==1,
+                "An explicit last-stand order must be able to spend all remaining fuel");
         String encoded=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
         ShipStandingOrdersCodec.File decoded=ShipStandingOrdersCodec.decode(encoded);
         check(decoded.faction()==Battle.Faction.TERRAN&&decoded.policies().equals(saved),
