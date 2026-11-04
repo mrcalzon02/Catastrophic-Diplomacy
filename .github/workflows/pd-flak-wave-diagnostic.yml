@@ -29,10 +29,12 @@ on:
       - 'core/src/main/java/diplomacy/sim/AmmunitionTable.java'
       - 'core/src/main/java/diplomacy/sim/OrdnanceDoctrine.java'
       - 'core/src/test/java/diplomacy/sim/AmmunitionTableTest.java'
+      - 'core/src/test/java/diplomacy/sim/WeaponBehaviorTableTest.java'
+      - 'core/src/test/java/diplomacy/sim/DemonstrationBattleTest.java'
+      - 'core/src/main/java/diplomacy/sim/DemonstrationBattle.java'
       - 'core/src/test/java/diplomacy/sim/OrdnanceDoctrineTest.java'
 
       - 'core/src/test/java/diplomacy/sim/AmmunitionResearchTest.java'
-      - 'core/src/test/java/diplomacy/sim/AmmunitionTableTest.java'
       - 'core/src/test/java/diplomacy/sim/AmmunitionSelectionTest.java'
       - 'core/src/test/java/diplomacy/sim/OrdnanceConfigurationTest.java'
       - 'core/src/test/java/diplomacy/sim/OrdnanceBlueprintTest.java'
