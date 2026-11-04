@@ -5437,23 +5437,30 @@ public final class Battle {
         if(best==null&&defender.orders.pointDefense().craft())for(Craft body:crafts){
             if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
             gun.aircraftVisibleFrames++;
+            var chaff=radarFighterGhost(body,defender,gun.nominalRange);
             ProjectileModel.Spec radar=body.radarProfile();
-            double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
+            double tx=chaff==null?body.x:chaff.xAt(tick);
+            double ty=chaff==null?body.y:chaff.yAt(tick);
+            double tvx=chaff==null?body.observedVx:chaff.vx();
+            double tvy=chaff==null?body.observedVy:chaff.vy();
+            double d=StrictMath.hypot(tx-defender.x,ty-defender.y);
             if(d<RotaryPointDefense.MIN_RANGE||d>
                     RotaryPointDefense.acquisitionRange(defender,gun,radar,
                             weather.sensorFactor(),1.0))continue;
             double closingTime=approachEta(defender.x,defender.y,
-                    body.x,body.y,body.observedVx,body.observedVy,
-                    StrictMath.hypot(body.observedVx,body.observedVy));
+                    tx,ty,tvx,tvy,StrictMath.hypot(tvx,tvy));
             // Aircraft can hold station at gun range while firing. They
             // remain legitimate ANTI_CRAFT tracks even with zero closing
             // velocity: an infinite impact ETA is not a missing contact.
             // Keep imminent ordnance ahead of loitering aircraft without
             // changing the captain's EARLY/CLOSE/FASTEST doctrine.
             if(!Double.isFinite(closingTime))closingTime=1000+d/100.0;
-            double score=defensiveScore(defender,d,closingTime);
-            if(score<rank){rank=score;best=new RotaryTrack(-(long)body.id,
-                    body.x,body.y,body.observedVx,body.observedVy,body.targetId,
+            double signal=chaff==null?0:
+                    chaff.signal(FighterCountermeasures.Kind.CHAFF,tick);
+            double score=defensiveScore(defender,d,closingTime)/(1+signal*.35);
+            if(score<rank){rank=score;best=new RotaryTrack(
+                    chaff==null?-(long)body.id:-1_000_000_000L-chaff.id(),
+                    tx,ty,tvx,tvy,body.targetId,
                     body.sourceId,radar,1.0);}
         }
         return best;
@@ -5498,6 +5505,8 @@ public final class Battle {
                         gun.bearing+scatter,
                         gun.profile.damage()*.98,gun.nominalRange));
                 gun.fired(defender.pointDefenseCondition);
+                if(target.bodyId<=-1_000_000_000L)
+                    fighterChaffRotaryDiversions++;
                 defender.kineticAmmo--;
                 defender.power-=.44;defender.heat+=.52;
                 visual(id,VisualPhase.FIRE,"ROTARY_CIWS",defender.team,defender.id,
