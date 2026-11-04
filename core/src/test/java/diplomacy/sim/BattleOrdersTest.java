@@ -88,8 +88,12 @@ public final class BattleOrdersTest {
                 .withEngagement(BattleOrders.Size.ESCORT,0,210)
                 .withEngagement(BattleOrders.Size.CAPITAL,100,400);
         b.setShipOrders(attacker.id,antiCapital);
-        b.step();
-        check(attacker.lastTargetId==capital.id,"category zero priority disables smaller targets");
+        // Category priorities apply to contacts the ship actually receives.
+        // A capital at 290 world units cannot be selected from omniscient
+        // first-tick enemy coordinates before its sensor photons arrive.
+        for(int frame=0;frame<100&&attacker.lastTargetId!=capital.id;frame++)b.step();
+        check(attacker.lastTargetId==capital.id,
+                "category zero priority must select the first causally acquired capital");
         check(nearby.orders.equals(BattleOrders.DEFAULT),"ship order must not overwrite enemy policies");
         check(capital.orders.equals(BattleOrders.DEFAULT),"unchanged ship orders remain default");
         // Friendly escort links are validated rather than silently allowing enemy anchors.
