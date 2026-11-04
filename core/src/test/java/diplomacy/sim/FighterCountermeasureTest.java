@@ -44,13 +44,20 @@ public final class FighterCountermeasureTest {
                 "IR flare falsely spoofed fitted radar countermeasures");
     }
     private static Battle fixture(TechnologyCatalog tech,long seed,boolean disabled){
+        return fixture(tech,seed,disabled,"FLK");
+    }
+    private static Battle fixture(TechnologyCatalog tech,long seed,
+                                  boolean disabled,String defenseKind){
+        if(!defenseKind.equals("FLK")&&!defenseKind.equals("RCW"))
+            throw new IllegalArgumentException("Only real fitted radar guns");
         var hull=Shipyard.Hull.CRUISER;
         var carrier=Shipyard.starter(Battle.Faction.TERRAN,hull)
                 .install(socket(hull,Shipyard.Mount.SUPPORT),"BASE-TER-FTR")
                 .withFighterHull(FighterModel.Hull.INTERCEPTOR);
         var flakHull=Shipyard.Hull.DREADNOUGHT;
         var flak=Shipyard.bareHull(Battle.Faction.DRAXIAN,flakHull)
-                .install(socket(flakHull,Shipyard.Mount.WEAPON),"BASE-DRA-FLK");
+                .install(socket(flakHull,Shipyard.Mount.WEAPON),
+                        "BASE-DRA-"+defenseKind);
         check(Shipyard.inspect(carrier,tech).valid()&&
                 Shipyard.inspect(flak,tech).valid(),
                 "Fighter and flak must be physically legal installed hardware");
@@ -125,7 +132,24 @@ public final class FighterCountermeasureTest {
         check(!manual.deployFighterCountermeasure(
                         craft.id,FighterCountermeasures.Kind.FLARE),
                 "One fighter bypassed the finite dispenser cooldown");
-        System.out.println("PASS physical chaff diverts real flak, flare spectra stay distinct, finite magazines/cooldowns");
+
+        Battle rotary=fixture(tech,810414L,false,"RCW");
+        Battle withoutChaff=fixture(tech,810414L,true,"RCW");
+        for(int step=0;step<180;step++){
+            rotary.step();
+            withoutChaff.step();
+        }
+        check(rotary.fighterChaffDeployed>0&&
+                rotary.fighterChaffRotaryDiversions>0,
+                "Fitted rotary radar did not fire actual rounds on chaff instead of a fighter");
+        check(withoutChaff.fighterChaffDeployed==0&&
+                withoutChaff.fighterChaffRotaryDiversions==0,
+                "Rotary sight fabricated false radar returns without cartridges");
+        check(rotary.visualEvents().stream().anyMatch(event->
+                        event.weapon().equals("ROTARY_CIWS")&&
+                        event.phase()==Battle.VisualPhase.FIRE),
+                "Rotary chaff diversion test did not physically discharge CIWS");
+        System.out.println("PASS independent real flak and rotary CHAFF diversions, flare spectra, finite ammo/cooldowns");
     }
     public static void main(String[] args)throws Exception{
         spectralHardware();
