@@ -29,6 +29,18 @@ public final class AudioPitchVariantsTest {
         require(restarted>=lo&&restarted<=hi,"Battle reset must retain a usable pitch bag");
     }
     public static void main(String[] args){
+        require(CombatTimeAudio.combatPitch(1f,1f)==1f,
+                "Authored SFX playback must stay unchanged at 1x");
+        require(CombatTimeAudio.combatPitch(.5f,1f)<
+                CombatTimeAudio.combatPitch(1f,1f) &&
+                CombatTimeAudio.combatPitch(3f,1f)>
+                CombatTimeAudio.combatPitch(2f,1f),
+                "Relative combat audio pitch must respond monotonically to speed");
+        require(CombatTimeAudio.combatPitch(3f,1f)<1.30f,
+                "Maximum combat audio speed must retain reasonable timbre");
+        require(Math.abs(CombatTimeAudio.enginePitch(1f,.93f)-.93f)<1e-5f,
+                "Engine loops must preserve authored tuning at 1x");
+
         exercise(AudioPitchVariants.Profile.COMBAT,.86f,1.14f);
         exercise(AudioPitchVariants.Profile.UI,.95f,1.05f);
         exercise(AudioPitchVariants.Profile.RADIO,.96f,1.04f);
