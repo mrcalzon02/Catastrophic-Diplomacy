@@ -222,6 +222,7 @@ tasks.register('sensorNetworkSmoke', JavaExec) {
     dependsOn(tasks.named('fighterSeekerBlueprintSmoke'))
     dependsOn(tasks.named('fighterWingLinkSmoke'))
     dependsOn(tasks.named('fighterSurvivabilitySmoke'))
+    dependsOn(tasks.named('fighterEscapePodSmoke'))
     dependsOn(tasks.named('fighterCountermeasureSmoke'))
     dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
     dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
@@ -484,6 +485,14 @@ tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
 tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
 tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
 
+/** Real capsule drift and recovery, finite lifetimes, and no free campaign crew. */
+tasks.register('fighterEscapePodSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Real fighter ejection capsules, friendly pickup, paid crew debit, after-action settlement and campaign replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterEscapePodTest'
+}
 /** One-cell fighter armor/shield, researched ejection seat and replay regression. */
 tasks.register('fighterSurvivabilitySmoke', JavaExec) {
     group = 'verification'

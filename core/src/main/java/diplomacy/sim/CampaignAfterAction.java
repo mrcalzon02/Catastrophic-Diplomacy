@@ -20,8 +20,24 @@ public final class CampaignAfterAction {
                 throw new IllegalArgumentException("Invalid postbattle ship entry");
         }
     }
-    public record Report(List<Entry> entries) {
+    /** Explicitly distinguishes rescued pilots from live aircraft crews
+     * and from uncollected escape capsules. Missing personnel cannot return
+     * to the roster through a visual ejection effect alone. */
+    public record PilotSummary(int deployed,int recovered,int airborne,
+                               int adrift,int missing){
+        public PilotSummary {
+            if(deployed<0||recovered<0||airborne<0||adrift<0||missing<0||
+                    recovered+airborne+adrift+missing!=deployed)
+                throw new IllegalArgumentException("Inconsistent pilot after-action tally");
+        }
+    }
+    public record Report(List<Entry> entries,PilotSummary pilots) {
+        /** Previous consumers using the ship-only report remain compatible. */
+        public Report(List<Entry> entries){
+            this(entries,new PilotSummary(0,0,0,0,0));
+        }
         public Report {
+            if(pilots==null)throw new IllegalArgumentException("Missing personnel settlement");
             if(entries==null||entries.size()>200)
                 throw new IllegalArgumentException("Invalid fleet battle report");
             entries=List.copyOf(entries);
@@ -62,13 +78,43 @@ public final class CampaignAfterAction {
             var before=prior.stores();
             int pct=(int)Math.round(100*Math.max(0,Math.min(1,
                     now.maxHull<=0?0:now.hull/now.maxHull)));
+            int returnedCrew=0;
+            if(now.hull>0)for(Battle.Craft craft:battle.crafts())
+                if(craft.fighter&&craft.crewEmbarked&&craft.integrity>0&&
+                        craft.fuel>0&&craft.team==now.team&&craft.sourceId==now.id)
+                    returnedCrew+=craft.crewSeats;
             entries.add(new Entry(prior.id(),prior.name(),prior.fitting().hull,outcome,pct,
-                    (int)Math.ceil(Math.max(0,before.crew()-now.crewCount-now.evacuatedCrew)),
+                    (int)Math.ceil(Math.max(0,before.crew()-now.crewCount
+                            -now.evacuatedCrew-returnedCrew)),
                     Math.max(0,before.kinetic()-now.kineticAmmo),
                     Math.max(0,before.missiles()-now.missileAmmo),
                     Math.max(0,before.torpedoes()-now.torpedoAmmo),
                     (int)Math.ceil(Math.max(0,before.fuel()-now.fuel))));
         }
-        return new Report(entries);
+        int deployed=0,airborne=0,adrift=0,recovered=0;
+        for(Battle.Ship ship:participants)
+            deployed+=ship.fighterPilotsCommitted;
+        for(Battle.Craft craft:battle.crafts())
+            if(craft.fighter&&craft.crewEmbarked&&craft.team==0&&
+                    craft.integrity>0&&craft.fuel>0){
+                Battle.Ship parent=null;
+                for(Battle.Ship ship:participants)
+                    if(ship.id==craft.sourceId){parent=ship;break;}
+                if(parent!=null&&parent.hull>0)airborne+=craft.crewSeats;
+            }
+        for(FighterEscapePod pod:battle.fighterEscapePods())
+            if(pod.campaignCrew&&pod.team==0&&pod.active())adrift++;
+        for(Battle.FighterRecovery pickup:battle.fighterRecoveryRecords())
+            if(pickup.rosterCrew()&&pickup.team()==0){
+                for(Battle.Ship ship:participants)
+                    if(ship.id==pickup.rescuerShipId()&&ship.hull>0){
+                        recovered++;break;
+                    }
+            }
+        int missing=deployed-airborne-adrift-recovered;
+        if(missing<0)
+            throw new IllegalArgumentException("Crew records manufactured rescue personnel");
+        return new Report(entries,new PilotSummary(
+                deployed,recovered,airborne,adrift,missing));
     }
 }

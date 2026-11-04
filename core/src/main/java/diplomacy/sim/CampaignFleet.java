@@ -40,6 +40,15 @@ public final class CampaignFleet {
                     Math.addExact(drones,additionalDrones),
                     Math.addExact(repairDrones,additionalRepair),fuel);
         }
+        /** Bring home only the crews aboard surviving, physically deployed
+         * aircraft. Lost aircraft and unrecovered pods return zero pilots. */
+        public Stores restoreFlightCrew(int crewReturned,double berthCapacity){
+            if(crewReturned<0||!Double.isFinite(berthCapacity)||berthCapacity<0)
+                throw new IllegalArgumentException("Invalid recovered flight crews");
+            double result=StrictMath.min(berthCapacity,crew+crewReturned);
+            return new Stores(hull,integrity,machinery,result,kinetic,missiles,
+                    torpedoes,fighters,drones,repairDrones,fuel);
+        }
         public void apply(Battle.Ship ship){
             if(hull>ship.maxHull+1e-6||crew>Math.min(ship.crewBerths,ship.lifeSupport)+1e-6||
                     kinetic>ship.kineticAmmo||missiles>ship.missileAmmo||
@@ -425,11 +434,17 @@ public final class CampaignFleet {
                     // Escaped or committed-to-escape hulls are preserved but
                     // placed in RESERVE, never silently reactivated/replaced.
                     boolean active=prior.deployed()&&!s.escaped&&!s.withdrawing;
-                    int fighters=0,drones=0,repairs=0;
+                    int fighters=0,drones=0,repairs=0,flightCrewReturned=0;
                     for(Battle.Craft craft:battle.crafts()){
                         if(craft.sourceId!=s.id||craft.integrity<=0||craft.fuel<=0)continue;
-                        if(craft.fighter)fighters++;
-                        else if(craft.repair)repairs++;
+                        if(craft.fighter){
+                            fighters++;
+                            // A carrier debited actual personnel at launch.
+                            // Recover only the crew still aboard a living
+                            // fighter belonging to THIS hull.
+                            if(craft.crewEmbarked&&craft.team==s.team)
+                                flightCrewReturned+=craft.crewSeats;
+                        }else if(craft.repair)repairs++;
                         else drones++;
                     }
                     // Only craft that actually survive in the battle can be
@@ -437,7 +452,9 @@ public final class CampaignFleet {
                     Stores supplies=Stores.capture(s).recover(
                             Math.min(fighters,s.fightersLaunched),
                             Math.min(drones,s.dronesLaunched),
-                            Math.min(repairs,s.repairDronesLaunched));
+                            Math.min(repairs,s.repairDronesLaunched))
+                            .restoreFlightCrew(flightCrewReturned,
+                                    StrictMath.min(s.crewBerths,s.lifeSupport));
                     result.add(new Vessel(prior.id(),prior.name(),prior.fitting(),active,supplies));
                 }
             }

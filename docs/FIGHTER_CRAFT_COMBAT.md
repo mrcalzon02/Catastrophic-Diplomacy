@@ -210,3 +210,43 @@ events, not yet a rendered recoverable escape-pod actor.
 through nine, monotonic probabilistic pilot survival, finite whole-craft
 shield depletion/recharge, fatal hit exact-once accounting, researched
 carrier inheritance and deterministic replay.
+
+## Physical fighter escape pods and campaign pilot recovery
+
+Surviving fighter ejections now spawn **actual, drifting crew capsules** in the
+simulation, each recording the craft ID, seat, original carrier/team, original
+position and birth tick. Each capsule coasts at 15% of its original fighter's
+recorded velocity and expires after 45 simulated seconds or when it exits the
+battlefield. No craft, ammo, shields, modules, or replacement airframes are
+created by an ejection.
+
+A live, non-withdrawing **friendly ship** can collect a capsule only by
+moving within **28 world units** of its actual current position and possessing
+an unoccupied berth and available life-support capacity. Pickup checks occur
+every five ticks; capsule physics advances every tick. Enemy ships cannot
+automatically collect friendly escapees. Recovery produces a timestamped
+`FighterRecovery` record; unrecovered pods stay adrift and do not become
+crew in campaign stores. These mechanics are headless simulation, not yet
+custom escape-pod sprite art, direct rescue orders or pilot-name rosters.
+
+To avoid inventing personnel, launching a fighter now **debits one, two or
+three crew** from the carrier's existing occupied crew berths. The carrier
+must retain its minimum operating complement. Rescuing a pilot restores one
+crew member to the actual rescuer's ship, including an allied ship other than
+the launching carrier, subject to free berths. At the end of a campaign
+sortie, surviving aircraft return their physically embarked crews to their
+surviving launching ship exactly once through immutable fleet reconciliation.
+Destroyed or missing fighters and uncollected pods return no aircrew.
+
+`CampaignAfterAction.Report.pilots()` exposes five distinct categories:
+deployed, physically recovered, still flying, still adrift, and missing.
+Only rescue aboard a surviving commissioned friendly hull counts as settled
+recovery. Old ship-only after-action callers remain compatible. The existing
+atomic campaign ledger persists these figures indirectly through the real
+ship crew stores; the save format does not need a second speculative crew
+wallet or a destructive migration.
+
+`:core:fighterEscapePodSmoke` verifies real FTR launch crew debit,
+physical pickup, strict friendly range/berths, time-limited capsule drift,
+safe crew returns with surviving aircraft, no credit for adrift ejections,
+and existing campaign save/reconciliation behavior.

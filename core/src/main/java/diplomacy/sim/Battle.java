@@ -211,6 +211,8 @@ public final class Battle {
         public double hazardInstability,hazardSeverity;
         public int unsafeFlags,lastFaultOrigin;
         public int escapePods,evacuatedCrew,hazardFailures;
+        /** Crew physically assigned to launched fighters, not extra crew. */
+        public int fighterPilotsCommitted;
         /** Real simulation ticks for visible engineering faults and repairs. */
         public long lastHazardTick=-10000,lastRepairTick=-10000;
         public boolean recoveryBeacon,recoveryBeaconActivated;
@@ -621,6 +623,8 @@ public final class Battle {
         public long lastShieldHitTick=-10000;
         /** Every fighter crew seat attempts a single ranked ejection on loss. */
         public int crewSeats;
+        /** True ONLY after a real carrier debits its boarded crew on launch. */
+        public boolean crewEmbarked;
         public double pilotEjectionChance;
         public boolean pilotEjectionResolved;
         /** Measured physical travel from the preceding completed simulation tick.
@@ -913,7 +917,21 @@ public final class Battle {
     public List<FighterEscape> fighterEscapeRecords(){
         return Collections.unmodifiableList(fighterEscapeRecords);
     }
+    /** Physical capsules in flight; historical outcomes are retained in
+     * ejection and recovery records, not as immortal map entities. */
+    private final List<FighterEscapePod> fighterEscapePods=new ArrayList<>();
+    public List<FighterEscapePod> fighterEscapePods(){
+        return Collections.unmodifiableList(fighterEscapePods);
+    }
+    public record FighterRecovery(int craftId,int seat,int originalCarrierId,
+                                  int rescuerShipId,int team,long tick,
+                                  boolean rosterCrew){}
+    private final List<FighterRecovery> fighterRecoveryRecords=new ArrayList<>();
+    public List<FighterRecovery> fighterRecoveryRecords(){
+        return Collections.unmodifiableList(fighterRecoveryRecords);
+    }
     public int fighterPilotsEjected,fighterPilotsLost,fighterAbandoned;
+    public int fighterPilotsRecovered,fighterPodsExpired;
     public double fighterShieldDamageAbsorbed;
     /** Kill attribution is recorded only after a real hostile body is
      * removed. These counters do not alter fire control, armor, probabilities,
@@ -1808,6 +1826,7 @@ public final class Battle {
         advanceRotaryRounds();
         advanceRailPenetrators();
         advanceBeamPhotons();
+        updateFighterEscapePods();
         for(Craft craft:crafts){
             craft.observedVx=(craft.x-craft.lastObservedX)/DT;
             craft.observedVy=(craft.y-craft.lastObservedY)/DT;
@@ -4278,7 +4297,15 @@ public final class Battle {
                 if(launched>=slots)break;
                 if(!bay.operational())continue;
                 if(ship.power<7||ship.heat+3>ship.maxHeat*0.9)break;
+                int seats=FighterSurvivability.installed(
+                        ship.fighterProfile,ship.fighterCountermeasureTier).crew();
+                // Pilots must leave a real occupied berth to board a sortie,
+                // and enough crew stays aboard to operate the carrier.
+                if(ship.crewCount<seats+StrictMath.max(1,ship.crewRequired*.05))break;
                 Craft launchedCraft=new Craft(nextCraftId++,ship,true,fighterTarget.id);
+                launchedCraft.crewEmbarked=true;
+                ship.crewCount-=seats;
+                ship.fighterPilotsCommitted+=seats;
                 launchedCraft.launchBayId=bay.id;
                 crafts.add(launchedCraft);
                 visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",
@@ -4711,6 +4738,10 @@ public final class Battle {
                 fighterEscapeRecords.add(new FighterEscape(
                         craft.id,seat,craft.sourceId,craft.team,
                         craft.x,craft.y,tick));
+                fighterEscapePods.add(new FighterEscapePod(
+                        craft.id,seat,craft.sourceId,craft.team,tick,
+                        craft.x,craft.y,craft.observedVx,craft.observedVy,
+                        craft.crewEmbarked));
                 fighterPilotsEjected++;
                 visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER_EJECTION",
                         craft.team,craft.sourceId,0,craft.x,craft.y,craft.x,craft.y);
@@ -4718,6 +4749,39 @@ public final class Battle {
         }
     }
 
+    /** Drifting seat capsules require physical friendly pickup. Rescue does
+     * not resurrect an airframe, and only a crew member actually debited
+     * from the original carrier can add one occupied berth elsewhere. */
+    private void updateFighterEscapePods(){
+        for(int i=fighterEscapePods.size()-1;i>=0;i--){
+            FighterEscapePod pod=fighterEscapePods.get(i);
+            pod.advance(tick);
+            if(pod.expired()){
+                fighterPodsExpired++;
+                fighterEscapePods.remove(i);
+                continue;
+            }
+            // Five-tick pickup cadence limits cost in 200v200 battles;
+            // timestamps and pod movement still advance every tick.
+            if(tick<=pod.bornTick||tick%5!=0)continue;
+            for(Ship s:ships){
+                if(s.team!=pod.team||!s.alive()||s.escaped||s.withdrawing||
+                        StrictMath.abs(s.x-pod.x)>FighterEscapePod.PICKUP_RANGE||
+                        StrictMath.abs(s.y-pod.y)>FighterEscapePod.PICKUP_RANGE)
+                    continue;
+                if(!pod.inReach(s))continue;
+                pod.collect(s);
+                fighterPilotsRecovered++;
+                fighterRecoveryRecords.add(new FighterRecovery(
+                        pod.craftId,pod.seat,pod.sourceShipId,s.id,pod.team,tick,
+                        pod.campaignCrew));
+                visual(nextVisualShotId++,VisualPhase.IMPACT,"FIGHTER_RESCUE",
+                        s.team,s.id,pod.sourceShipId,pod.x,pod.y,pod.x,pod.y);
+                fighterEscapePods.remove(i);
+                break;
+            }
+        }
+    }
     private void updateCraft() {
         // Snapshot the prior tick before any new local sensing; iteration
         // order cannot create an instantaneous, zero-delay radio relay.
@@ -6916,7 +6980,22 @@ public final class Battle {
         hash = mix(hash, weather.meteorHits()); hash = mix(hash, weather.meteorMisses());
         hash=mix(hash,fighterWingBroadcasts);hash=mix(hash,fighterWingReceipts);
         hash=mix(hash,fighterPilotsEjected);hash=mix(hash,fighterPilotsLost);
+        hash=mix(hash,fighterPilotsRecovered);hash=mix(hash,fighterPodsExpired);
         hash=mix(hash,fighterAbandoned);
+        for(FighterEscapePod pod:fighterEscapePods){
+            hash=mix(hash,pod.craftId);hash=mix(hash,pod.seat);
+            hash=mix(hash,pod.sourceShipId);hash=mix(hash,pod.team);
+            hash=mix(hash,pod.bornTick);
+            hash=mix(hash,pod.campaignCrew?1:0);
+            hash=mix(hash,Double.doubleToLongBits(pod.x));
+            hash=mix(hash,Double.doubleToLongBits(pod.y));
+        }
+        for(FighterRecovery rescue:fighterRecoveryRecords){
+            hash=mix(hash,rescue.craftId());hash=mix(hash,rescue.seat());
+            hash=mix(hash,rescue.originalCarrierId());
+            hash=mix(hash,rescue.rescuerShipId());hash=mix(hash,rescue.tick());
+            hash=mix(hash,rescue.rosterCrew()?1:0);
+        }
         hash=mix(hash,Double.doubleToLongBits(fighterShieldDamageAbsorbed));
         for(FighterEscape e:fighterEscapeRecords){
             hash=mix(hash,e.craftId());hash=mix(hash,e.seat());
@@ -6995,6 +7074,7 @@ public final class Battle {
                 hash=mix(hash,Double.doubleToLongBits(rack.reload));
             }
             hash = mix(hash,s.fighterReserve);hash=mix(hash,s.droneReserve);
+            hash=mix(hash,s.fighterPilotsCommitted);
             for(Ship.HangarBay bay:s.fighterBays){
                 hash=mix(hash,bay.id.hashCode());
                 hash=mix(hash,Double.doubleToLongBits(bay.condition));
@@ -7157,6 +7237,7 @@ public final class Battle {
             hash=mix(hash,craft.radarSeekerSelected?1:0);
             hash=mix(hash,craft.nextInterceptorTick);
             hash=mix(hash,craft.crewSeats);
+            hash=mix(hash,craft.crewEmbarked?1:0);
             hash=mix(hash,Double.doubleToLongBits(craft.pilotEjectionChance));
             hash=mix(hash,craft.pilotEjectionResolved?1:0);
             hash=mix(hash,Double.doubleToLongBits(craft.shields));
