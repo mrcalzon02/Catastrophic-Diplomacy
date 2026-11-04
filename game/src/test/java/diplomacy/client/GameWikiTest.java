@@ -71,6 +71,26 @@ public final class GameWikiTest {
         check(broad.size()==stages,"Broad research search lost authored upgrades");
         check(!(broad instanceof java.util.ArrayList),
                 "Large filtered upgrade search must be a virtual ID-backed list");
+        // The "Research cost " phrase is literally emitted by every
+        // upgrade article. Its search must return the canonical virtual
+        // index without scanning or formatting the research catalogue.
+        check(broad==catalog.search("UPGRADES",""),
+                "Universal research search must reuse the immutable upgrade index");
+        check(catalog.search("UPGRADES","COST").size()==stages,
+                "Case-insensitive research cost lookup lost an upgrade");
+        for(int sample:new int[]{0,stages/2,stages-1})
+            check(broad.get(sample).searchable.contains("research"),
+                    "Universal research keyword must occur in every sampled article");
+        var allResearch=catalog.search("ALL","research");
+        int staticMatching=0;
+        for(String kind:GameWikiCatalog.CATEGORIES)
+            if(!kind.equals("ALL")&&!kind.equals("UPGRADES"))
+                staticMatching+=catalog.search(kind,"research").size();
+        check(allResearch.size()==stages+staticMatching,
+                "ALL-category research search dropped static or virtual results");
+        check(catalog.indexOfId(allResearch,broad.get(stages-1).id)==
+                allResearch.size()-1,
+                "Mixed-category research search lost canonical ID ordering");
         String lastUpgrade=broad.get(broad.size()-1).id;
         check(catalog.indexOfId(broad,lastUpgrade)==broad.size()-1,
                 "Research search selection must index by ID without listing every article");
