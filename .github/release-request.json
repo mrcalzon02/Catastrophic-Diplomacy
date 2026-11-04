@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 9,
-  "note": "User requested active campaign release-error analysis/repair. Run 41899188004 passed signed Android build and Windows/Linux but reproducibly failed API29 Carnelian startup (java.lang.OutOfMemoryError, 16 MiB heap) while libGDX decoded capital_turrets_atlas in CatastrophicGame.create. Actual failure was a different eagerly loaded sprite atlas than the prior low-heap hardpoint parsing fix. Request build after enabling Android manifest largeHeap and AndroidLauncher heap-class instrumentation; require real API29 all 11 faction campaign map/dock/deployment/combat/resume, API34 200v200, MSI install/launch/uninstall, Linux package smoke and signed APK continuity. No waiver on functional blockers; publish only after all pass."
+  "revision": 10,
+  "note": "User requested release blocker repair and continuation. Release run 41900924845 confirmed signed Android APK packaging success, but Windows :game:menuFlowSmoke was blocked by stale test expecting old CombatPace.DEFAULT=0.20 and x0.20, despite now mandated default 1.0x and existing cadence at displayed 2.0x. Current main commit 856da41fc1f9 updated the functional menu tests for six discrete speeds and diagnostic touch controls; require new pin including this test repair. Also retains Android manifest largeHeap and actual heap logging to address API29 Carnelian startup 16MiB OutOfMemoryError. Run full Windows MSI, Linux, 11-faction API29 campaign/resume and API34 400-ship functional gates. Keep real functionality blocking and visual diagnostics optional; publish only after all jobs succeed."
 }
