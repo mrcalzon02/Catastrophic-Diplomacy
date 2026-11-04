@@ -86,11 +86,20 @@ public final class FighterCountermeasures {
         else{ax/=n;ay/=n;}
         double side=(id&1)==0?1:-1;
         double px=-side*ay,py=side*ax;
-        double offset=kind==Kind.CHAFF?24:29;
+        // Fighter flares must separate transversely from the actual hull.
+        // Ejecting a flare almost directly BEHIND the target produced valid
+        // seeker diversions but allowed the missile to fly through the real
+        // fighter before reaching the brighter emission. Only physical
+        // displacement/velocity changes here: no arbitrary to-hit penalty.
+        // Radar chaff retains its previously verified cloud geometry.
+        double offset=kind==Kind.CHAFF?24:12;
+        double lateral=kind==Kind.CHAFF?8:32;
+        double transverseSpeed=kind==Kind.CHAFF?13:70;
         return new Cloud(id,kind,craftId,sourceId,team,
-                aircraftX+ax*offset+px*8,aircraftY+ay*offset+py*8,
-                aircraftVX*.28+ax*15+px*13,
-                aircraftVY*.28+ay*15+py*13,
+                aircraftX+ax*offset+px*lateral,
+                aircraftY+ay*offset+py*lateral,
+                aircraftVX*.28+ax*15+px*transverseSpeed,
+                aircraftVY*.28+ay*15+py*transverseSpeed,
                 tick,kind==Kind.CHAFF?66:48,
                 (kind==Kind.CHAFF?7.5:11)*(1+.06*tier));
     }
