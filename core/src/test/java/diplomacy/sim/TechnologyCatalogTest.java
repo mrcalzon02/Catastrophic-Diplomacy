@@ -202,6 +202,31 @@ public final class TechnologyCatalogTest {
                                         "TECH-"+faction+"-"+variant.code()+"-"+track+"-"+
                                         String.format(java.util.Locale.ROOT,"%02d",stage-1)),
                                 "Broken independent survival research "+tech);
+                        var source=c.get("TECH-"+faction+"-"+variant.root()+"-"+
+                                track+"-"+String.format(java.util.Locale.ROOT,"%02d",stage));
+                        require(source!=null&&value.faction.equals(faction)&&
+                                value.subsystem.equals(variant.code())&&
+                                value.track.equals(track),
+                                "Survival variant lineage identity drift "+tech);
+                        require(value.researchCost==Math.max(1,Math.round(
+                                    source.researchCost*variant.price()))&&
+                                value.industryCost==Math.max(1,Math.round(
+                                    source.industryCost*variant.price())),
+                                "Survival variant pricing drift "+tech);
+                        require(Double.compare(value.mass,source.mass)==0&&
+                                Double.compare(value.power,source.power)==0&&
+                                Double.compare(value.heat,source.heat)==0&&
+                                Double.compare(value.output,source.output)==0&&
+                                Double.compare(value.accuracy,source.accuracy)==0&&
+                                Double.compare(value.integrity,source.integrity)==0&&
+                                Double.compare(value.shield,source.shield)==0&&
+                                Double.compare(value.thrust,source.thrust)==0&&
+                                Double.compare(value.cooling,source.cooling)==0&&
+                                Double.compare(value.maintenance,source.maintenance)==0,
+                                "Survival variant modifier drift "+tech);
+                        require(value.name.equals(variant.name()+" / "+track+" "+stage)&&
+                                value.tradeoff.equals(variant.name()+": "+source.tradeoff),
+                                "Survival variant description drift "+tech);
                     }
             }
             for(var family:SurvivalHardwareCatalog.FAMILIES){
