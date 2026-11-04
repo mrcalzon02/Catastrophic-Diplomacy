@@ -145,7 +145,7 @@ public final class FighterWingLinkTest {
                 "Live wingmen did not use a nearby scout's fighter-only cue");
         System.out.println("PASS real close-formation fighter scout contact, no remote weapon lock and replay");
     }
-    public static void main(String[] args){
+    public static void main(String[] args)throws Exception{
         localRadioRules();
         wingmanReacquisition(TechnologyCatalog.loadDefault());
     }
