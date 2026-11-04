@@ -477,6 +477,11 @@ public final class TechnologyCatalog {
             Component part = new Component(bases.get(i));
             if (baseMap.putIfAbsent(part.id, part) != null)
                 throw new IllegalArgumentException("Duplicate base component ID: " + part.id);
+            // The validated Component owns its parsed immutable fields, not
+            // the temporary CSV row. Release the thirteen-cell staging copy
+            // before converting the much larger upgrade table. On Android's
+            // constrained heap both tables otherwise remain live at once.
+            bases.set(i, null);
         }
         Set<String> baseIds = baseMap.keySet();
         Map<String, Upgrade> upgrades = new LinkedHashMap<>();
