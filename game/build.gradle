@@ -38,6 +38,16 @@ tasks.register('menuFlowSmoke', JavaExec) {
     mainClass = 'diplomacy.client.GameMenuFlowTest'
 }
 
+// Isolated behavioral UI verification: do not drag the unrelated audio,
+// shaders or optional art diagnostics into the fuel-order integration gate.
+tasks.register('fuelOrdersTouchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify real ship-orders pages, fuel-policy hitboxes and Back/Next controls.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.GameMenuFlowTest'
+}
+
 // Read-only native encyclopedia is a functional screen, not a cosmetic gate.
 // Ensure the entire live module/research/hull index is available and searchable.
 tasks.register('wikiSmoke', JavaExec) {
