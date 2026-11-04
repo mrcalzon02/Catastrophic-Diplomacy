@@ -323,8 +323,9 @@ public final class ScreensaverBattleTest {
         Battle fringe=new Battle(0xF21A6EL);
         Battle.Ship searcher=fringe.addShip(0,Battle.Faction.TERRAN,640,335);
         // A replay of endurance seed 2026103103's isolated LAST_STAND
-        // captain, whose actual last observed position was (1257,1448).
-        Battle.Ship sentry=fringe.addShip(1,Battle.Faction.DRAXIAN,1257,1448);
+        // captain, whose observed location was (1257,1448). Stage the
+        // ship just inside the current fixed arena's 1440-unit top edge.
+        Battle.Ship sentry=fringe.addShip(1,Battle.Faction.DRAXIAN,1257,1435);
         searcher.sensorRange=1;sentry.sensorRange=1;
         // This fixture represents a long-range scout with enough *finite*
         // reaction mass for 24000 actual search ticks; default legacy ships
