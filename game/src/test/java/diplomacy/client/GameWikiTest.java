@@ -134,6 +134,24 @@ public final class GameWikiTest {
             }
             check(matches.size()==expectedCount,
                     "Full-text search result count drift for "+needle);
+            if(!matches.isEmpty()){
+                for(int resultIndex:new int[]{0,matches.size()/2,matches.size()-1}){
+                    String selectedId=matches.get(resultIndex).id;
+                    check(catalog.indexOfId(matches,selectedId)==resultIndex,
+                            "Filtered wiki selection index drift "+needle+
+                                    " at "+resultIndex);
+                }
+            }
+        }
+        // This phrase occurs in every canonical ID. Large filtered results
+        // must remain complete and selectable, not retain 73k duplicate IDs.
+        List<GameWikiCatalog.Article> broadTech=catalog.search("UPGRADES","tech");
+        check(broadTech.size()==stages,"Broad technology search truncated upgrades");
+        for(int index:new int[]{0,stages/2,stages-1}){
+            var selected=broadTech.get(index);
+            check(selected.searchable.contains("tech")&&
+                    catalog.indexOfId(broadTech,selected.id)==index,
+                    "Broad technology results lost index "+index);
         }
         GameWikiPanel ui=new GameWikiPanel(catalog,true);
         check(ui.resultCount()>8&&ui.categoryIndex()==1,"Mobile guide landing page absent");
