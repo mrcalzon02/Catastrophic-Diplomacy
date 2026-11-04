@@ -1184,5 +1184,5 @@ tasks.register('technologyProfile', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.TechnologyMemoryProfile'
-    maxHeapSize = '16m'
+    maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
 }
