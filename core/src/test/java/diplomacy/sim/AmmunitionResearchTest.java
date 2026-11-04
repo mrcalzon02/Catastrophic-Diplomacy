@@ -110,14 +110,16 @@ public final class AmmunitionResearchTest {
         int missileSlot=weapon(hull,1);
         // A real socket fires its researched, saved rack fitting; the legacy
         // family-wide runtime mode is not an override for a mounted rack.
+        var ripple=new OrdnanceFitting.Guided(OrdnanceDoctrine.Mode.RIPPLE,
+                OrdnancePropulsion.Mode.CONSTANT_BURN,
+                OrdnanceGuidance.Mode.PURSUIT);
         var left=Shipyard.starter(Battle.Faction.TERRAN,hull)
                 .stage(missileSlot,Shipyard.Track.EFFICIENCY,5)
-                .withGuidedOrdnance(Battle.DamageType.MISSILE,
-                        new OrdnanceFitting.Guided(OrdnanceDoctrine.Mode.RIPPLE,
-                                OrdnancePropulsion.Mode.CONSTANT_BURN,
-                                OrdnanceGuidance.Mode.PURSUIT))
+                .withGuidedOrdnance(Battle.DamageType.MISSILE,ripple)
                 .withGuidedWarhead(Battle.DamageType.MISSILE,
-                        AmmunitionTable.Warhead.EMP);
+                        AmmunitionTable.Warhead.EMP)
+                .withLauncher(missileSlot,new OrdnanceFitting.Mounted(
+                        ripple,AmmunitionTable.Warhead.EMP));
         var right=Shipyard.starter(Battle.Faction.CARNELIAN,hull);
         Battle arena=Battle.duel(4417,1,left,right,catalog);
         var launcher=arena.ships().get(0);
