@@ -376,3 +376,15 @@ tasks.register('shipDamageCaptureSmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.ShipSurfaceDamageCaptureTest'
 }
+
+
+// Standalone performance profile, intentionally NOT a dependency of build,
+// menuFlowSmoke or any release gate. Only actual functional failures may block.
+tasks.register('wikiProfile', JavaExec) {
+    group = 'verification'
+    description = 'Nonblocking 16MiB encyclopedia virtual page/search heap profile'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.WikiMemoryProfile'
+    maxHeapSize = '16m'
+}
