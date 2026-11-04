@@ -1137,10 +1137,11 @@ public final class TechnologyCatalog {
      * The initial source CSV and old blueprint IDs are preserved untouched. */
     private static void addRotaryPointDefenseFamilies(List<List<String>> bases,
                                                         List<List<String>> upgrades){
-        List<List<String>> originals=List.copyOf(bases);
-        List<List<String>> research=List.copyOf(upgrades);
-        for(int i=1;i<originals.size();i++){
-            List<String> source=originals.get(i);
+        // Capture the pre-expansion bounds rather than copying every source
+        // row reference. Appended nodes stay outside these fixed ranges.
+        final int baseCount=bases.size(), researchCount=upgrades.size();
+        for(int i=1;i<baseCount;i++){
+            List<String> source=bases.get(i);
             if(!"FLK".equals(source.get(2)))continue;
             List<String> row=new ArrayList<>(source);
             row.set(0,source.get(0).replace("-FLK","-RCW"));
@@ -1157,8 +1158,8 @@ public final class TechnologyCatalog {
             row.set(12,"Finite per-round kinetic stock; close-in lead, spool, recoil and tracers");
             bases.add(row);
         }
-        for(int i=1;i<research.size();i++){
-            List<String> source=research.get(i);
+        for(int i=1;i<researchCount;i++){
+            List<String> source=upgrades.get(i);
             if(!"FLK".equals(source.get(2)))continue;
             List<String> row=new ArrayList<>(source);
             row.set(0,source.get(0).replace("-FLK-","-RCW-"));
@@ -1176,10 +1177,11 @@ public final class TechnologyCatalog {
      * separate sensor envelope and expensive power/ammo in live combat. */
     private static void addRailPointDefenseFamilies(List<List<String>> bases,
                                                       List<List<String>> upgrades){
-        List<List<String>> originals=List.copyOf(bases);
-        List<List<String>> research=List.copyOf(upgrades);
-        for(int i=1;i<originals.size();i++){
-            List<String> src=originals.get(i);
+        // Capture the pre-expansion bounds rather than copying every source
+        // row reference. Appended nodes stay outside these fixed ranges.
+        final int baseCount=bases.size(), researchCount=upgrades.size();
+        for(int i=1;i<baseCount;i++){
+            List<String> src=bases.get(i);
             if(!"FLK".equals(src.get(2)))continue;
             List<String> row=new ArrayList<>(src);
             row.set(0,src.get(0).replace("-FLK","-RPD"));
@@ -1195,8 +1197,8 @@ public final class TechnologyCatalog {
             row.set(12,"Expensive solid sabot; charged capacitor, recoil and minimum safe bore range");
             bases.add(row);
         }
-        for(int i=1;i<research.size();i++){
-            List<String> src=research.get(i);
+        for(int i=1;i<researchCount;i++){
+            List<String> src=upgrades.get(i);
             if(!"FLK".equals(src.get(2)))continue;
             List<String> row=new ArrayList<>(src);
             row.set(0,src.get(0).replace("-FLK-","-RPD-"));
@@ -1214,9 +1216,9 @@ public final class TechnologyCatalog {
      * with turret dwell and thermal quenching, never explosive fragmentation. */
     private static void addParticlePointDefenseFamilies(List<List<String>> bases,
                                                           List<List<String>> upgrades){
-        List<List<String>> original=List.copyOf(bases),research=List.copyOf(upgrades);
-        for(int i=1;i<original.size();i++){
-            List<String> src=original.get(i);
+        final int baseCount=bases.size(), researchCount=upgrades.size();
+        for(int i=1;i<baseCount;i++){
+            List<String> src=bases.get(i);
             if(!"FLK".equals(src.get(2)))continue;
             List<String> row=new ArrayList<>(src);
             row.set(0,src.get(0).replace("-FLK","-PPD"));
@@ -1232,8 +1234,8 @@ public final class TechnologyCatalog {
             row.set(12,"No kinetic cartridges; sustained reactor draw, target dwell and overheating");
             bases.add(row);
         }
-        for(int i=1;i<research.size();i++){
-            List<String> src=research.get(i);
+        for(int i=1;i<researchCount;i++){
+            List<String> src=upgrades.get(i);
             if(!"FLK".equals(src.get(2)))continue;
             List<String> row=new ArrayList<>(src);
             row.set(0,src.get(0).replace("-FLK-","-PPD-"));
