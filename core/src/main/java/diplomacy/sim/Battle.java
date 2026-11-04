@@ -4299,16 +4299,24 @@ public final class Battle {
      * countermeasures. Flares await a genuine fighter-targeting IR seeker.
      */
     private void updateFighterCountermeasures(){
+        final int photonLinger=SensorLightTimeHistory.propagationTicks(
+                WorldScale.DIAGONAL_WORLD_UNITS)+1;
         for(int i=fighterClouds.size()-1;i>=0;i--){
             var cloud=fighterClouds.get(i);
-            if(!cloud.active(tick)||
-                    !BattleArena.contains(cloud.xAt(tick),cloud.yAt(tick))){
-                fighterClouds.remove(i);
+            long emissionEnd=cloud.bornTick()+cloud.lifetimeTicks();
+            // Emit the renderer's lifetime event when the visible flare
+            // expires, NOT when its already-emitted photons finally arrive.
+            if(tick==emissionEnd){
                 visual(cloud.id(),VisualPhase.TIMEOUT,cloud.kind().name(),
                         cloud.team(),cloud.sourceId(),0,
                         cloud.xAt(tick),cloud.yAt(tick),
                         cloud.xAt(tick),cloud.yAt(tick));
             }
+            // An emitted photon remains in flight after the cartridge
+            // burns out. Retain source history for one maximum light trip;
+            // stale clouds cannot spoof PD because their live signal is 0.
+            if(tick>emissionEnd+photonLinger)
+                fighterClouds.remove(i);
         }
         // Passive missile warning is local to the fighter's own short-range
         // sensors; no flare is spent against laser PD, radar flak, or a
