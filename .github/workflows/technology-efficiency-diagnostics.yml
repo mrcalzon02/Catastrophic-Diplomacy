@@ -35,6 +35,12 @@ jobs:
         run: |
           set -o pipefail
           gradle --no-daemon :game:wikiProfile 2>&1 | tee wiki-profile.log
+      - name: Validate all-current-tier identifiers in the 16 MiB JVM
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :core:technologyHeapSmoke 2>&1 | tee technology-integrity-16m.log
       - name: Profile 32 MiB technology catalog for comparison
         continue-on-error: true
         shell: bash
@@ -57,5 +63,6 @@ jobs:
             wiki-profile.log
             technology-profile-32m.log
             wiki-profile-32m.log
+            technology-integrity-16m.log
           if-no-files-found: warn
           retention-days: 14
