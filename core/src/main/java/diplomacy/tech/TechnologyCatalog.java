@@ -319,17 +319,11 @@ public final class TechnologyCatalog {
         long industry=Math.round(source.industryCost*v.price());
         if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
             throw new IllegalArgumentException("Network research overflows "+id);
-        ArrayList<String> cells=new ArrayList<>(COLS);
-        Collections.addAll(cells,id,parts[1],v.code(),parts[3],
-                Integer.toString(stage),v.name()+" / "+parts[3]+" "+stage,
-                predecessor,Long.toString(Math.max(1,research)),
-                Long.toString(Math.max(1,industry)));
-        for(double multiplier:new double[]{source.mass,source.power,source.heat,
-                source.output,source.accuracy,source.integrity,source.shield,
-                source.thrust,source.cooling,source.maintenance})
-            cells.add(ratio(multiplier,1));
-        cells.add(v.name()+": "+source.tradeoff);
-        return new Upgrade(cells);
+        // Exact immutable parent modifier values, without roundtrip CSV parsing.
+        return new Upgrade(source,id,v.code(),
+                v.name()+" / "+parts[3]+" "+stage,predecessor,
+                (int)Math.max(1,research),(int)Math.max(1,industry),
+                v.name()+": "+source.tradeoff);
     }
 
     /**
@@ -354,17 +348,11 @@ public final class TechnologyCatalog {
                         String.format(Locale.ROOT,"%02d",stage-1);
         String name=model.name()+" "+parts[3]+" "+
                 (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
-        ArrayList<String> cells=new ArrayList<>(COLS);
-        Collections.addAll(cells,id,parts[1],model.code(),parts[3],
-                Integer.toString(stage),name,prerequisite,
-                Integer.toString(parent.researchCost),
-                Integer.toString(parent.industryCost));
-        for(double value:new double[]{parent.mass,parent.power,parent.heat,
-                parent.output,parent.accuracy,parent.integrity,parent.shield,
-                parent.thrust,parent.cooling,parent.maintenance})
-            cells.add(ratio(value,1));
-        cells.add(model.name()+": "+parent.tradeoff);
-        return new Upgrade(cells);
+        // The model changes its research identity, not its parent's physical
+        // multipliers or economics. Preserve all ten values bit-for-bit.
+        return new Upgrade(parent,id,model.code(),name,prerequisite,
+                parent.researchCost,parent.industryCost,
+                model.name()+": "+parent.tradeoff);
     }
 
     /** Native survival hardware retains unique fitted identities without
@@ -418,18 +406,12 @@ public final class TechnologyCatalog {
                         String.format(Locale.ROOT,"%02d",stage-1);
         String sourceName=family[2].equals("DRN")?
                 "Drone Controller":"Shield Transfer Projector";
-        ArrayList<String> cells=new ArrayList<>(COLS);
-        Collections.addAll(cells,id,parts[1],family[0],parts[3],
-                Integer.toString(stage),
+        // Retain the source's ten validated numeric modifiers and its exact
+        // costs; only the support-family identity and description differ.
+        return new Upgrade(source,id,family[0],
                 source.name.replace(sourceName,family[1]),predecessor,
-                Integer.toString(source.researchCost),
-                Integer.toString(source.industryCost));
-        for(double value:new double[]{source.mass,source.power,source.heat,
-                source.output,source.accuracy,source.integrity,source.shield,
-                source.thrust,source.cooling,source.maintenance})
-            cells.add(ratio(value,1));
-        cells.add(family[1]+": "+source.tradeoff);
-        return new Upgrade(cells);
+                source.researchCost,source.industryCost,
+                family[1]+": "+source.tradeoff);
     }
 
     public boolean hasBase(String id) { return components.contains(id); }
