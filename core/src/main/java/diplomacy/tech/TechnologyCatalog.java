@@ -210,6 +210,12 @@ public final class TechnologyCatalog {
         baseComponents=Collections.unmodifiableMap(base);
         components=Collections.unmodifiableSet(base.keySet());
     }
+    /** Equivalent to the former 0[1-9] regex, with no regex compilation
+     * per virtual technology lookup on the constrained Java heap. */
+    private static boolean isStageSuffix(String rank){
+        return rank.length()==2&&rank.charAt(0)=='0'&&
+                rank.charAt(1)>='1'&&rank.charAt(1)<='9';
+    }
     public int upgradeCount() { return upgradeTotal; }
     public int componentCount() { return components.size(); }
     public Upgrade get(String id) {
@@ -274,7 +280,7 @@ public final class TechnologyCatalog {
         if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
-                !parts[4].matches("0[1-9]"))return null;
+                !isStageSuffix(parts[4]))return null;
         SurvivalHardwareCatalog.Variant v=SurvivalHardwareCatalog.findVariant(parts[2]);
         if(v==null||!baseComponents.containsKey("BASE-"+parts[1]+"-"+v.code()))
             return null;
@@ -304,7 +310,7 @@ public final class TechnologyCatalog {
         if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
-                !parts[4].matches("0[1-9]"))return null;
+                !isStageSuffix(parts[4]))return null;
         SensorNetworkCatalog.Model v=SensorNetworkCatalog.variant(parts[2]);
         if(v==null||!baseComponents.containsKey("BASE-"+parts[1]+"-"+v.code()))
             return null;
@@ -335,7 +341,7 @@ public final class TechnologyCatalog {
         if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
-                !parts[4].matches("0[1-9]"))return null;
+                !isStageSuffix(parts[4]))return null;
         SensingVariantCatalog.Model model=SensingVariantCatalog.find(parts[2]);
         if(model==null||!baseComponents.containsKey(
                 "BASE-"+parts[1]+"-"+model.code()))return null;
@@ -361,7 +367,7 @@ public final class TechnologyCatalog {
         if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
-                !parts[4].matches("0[1-9]"))return null;
+                !isStageSuffix(parts[4]))return null;
         SurvivalHardwareCatalog.Family family=SurvivalHardwareCatalog.find(parts[2]);
         if(family==null||!baseComponents.containsKey(
                 "BASE-"+parts[1]+"-"+family.code()))return null;
@@ -391,7 +397,7 @@ public final class TechnologyCatalog {
         if(!deferredHigherStages||parts==null)return null;
         if(parts.length!=5||!"TECH".equals(parts[0])||
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
-                !parts[4].matches("0[1-9]"))return null;
+                !isStageSuffix(parts[4]))return null;
         String[] family=null;
         for(String[] entry:SUPPORT_FAMILY_TYPES)
             if(entry[0].equals(parts[2])){family=entry;break;}
