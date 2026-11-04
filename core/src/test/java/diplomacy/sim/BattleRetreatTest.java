@@ -83,6 +83,48 @@ public final class BattleRetreatTest {
         ok(rightBattle.escaped(1)==1&&rightBattle.destroyed(1)==0&&rightBattle.alive(0)==1,
                 "Right-side shield withdrawal failed");
 
+        // Protected fuel is an order controlling thrust, not another tank.
+        Battle fuelGuard=Battle.duel(995,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
+        Battle.Ship guard=fuelGuard.ships().get(0);
+        guard.weaponsCondition=0;fuelGuard.ships().get(1).weaponsCondition=0;
+        guard.fuel=25.03;guard.maxFuel=100;
+        guard.propulsion=SublightPropulsion.Drive.FUSION_TORCH;
+        var guardOrder=ShipStandingOrders.DEFAULT.withResources(
+                ShipResourceOrders.DEFAULT
+                        .withFuelPolicy(ShipResourceOrders.FuelPolicy.PROTECT_RESERVE)
+                        .withFuelReserve(25).withEconomyStart(60));
+        fuelGuard.setShipStandingOrders(guard.id,guardOrder);
+        fuelGuard.setShipCommandQueue(guard.id,
+                List.of(ShipCommandQueue.Command.move(1100,320)));
+        for(int t=0;t<1200&&guard.alive();t++)fuelGuard.step();
+        ok(guard.fuel>=25-1e-7&&guard.fuel<25.03,
+                "Real navigation ignored the protected fuel fraction");
+        ok(!guard.withdrawing,
+                "A hold-reserve order incorrectly forced automatic withdrawal");
+        ok(guardOrder.resources().thrustSpeedFactor(guard)<1,
+                "Economy band was not enforced during low-fuel navigation");
+
+        // Auto-withdraw uses the saved threshold, aborts waypoint pursuit,
+        // and unlocks the SAME protected tank to cross the friendly boundary.
+        Battle fuelEscape=Battle.duel(996,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
+        Battle.Ship escapeFuel=fuelEscape.ships().get(0);
+        escapeFuel.x=5;escapeFuel.y=320;
+        escapeFuel.maxFuel=100;escapeFuel.fuel=25;
+        var autoFuel=ShipStandingOrders.DEFAULT.withResources(
+                ShipResourceOrders.DEFAULT
+                        .withFuelPolicy(ShipResourceOrders.FuelPolicy.WITHDRAW_AT_RESERVE)
+                        .withFuelReserve(25));
+        fuelEscape.setShipStandingOrders(escapeFuel.id,autoFuel);
+        fuelEscape.setShipCommandQueue(escapeFuel.id,
+                List.of(ShipCommandQueue.Command.move(1100,320)));
+        fuelEscape.step();
+        ok(escapeFuel.withdrawing&&escapeFuel.withdrawalTick==1
+                        &&escapeFuel.fuel<25,
+                "Fuel threshold did not commit an immediate paid physical retreat");
+        escapes(fuelEscape,escapeFuel,800);
+        ok(escapeFuel.commandQueue.nextIndex()==0,
+                "Fuel-triggered retreat executed an abandoned waypoint");
+
         Battle stand=Battle.duel(993,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship defender=stand.ships().get(0);
         stand.setShipStandingOrders(defender.id,hullPolicy(.95).adjust(4,4));
