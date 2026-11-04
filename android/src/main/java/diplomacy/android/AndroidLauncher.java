@@ -3,6 +3,10 @@ package diplomacy.android;
 import android.os.Bundle;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
+import androidx.core.content.FileProvider;
+import java.io.File;
 import android.util.Log;
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
@@ -44,10 +48,32 @@ public final class AndroidLauncher extends AndroidApplication {
         boolean updateDialogReview=debug && getIntent()!=null &&
                 getIntent().getBooleanExtra("cd.verify_update_dialog",false);
         Log.i(LIFECYCLE_TAG,"BEFORE_GDX_INITIALIZE gl3="+gl3);
-        initialize(new CatastrophicGame(updater::checkForUpdates,verify,review), config);
+        initialize(new CatastrophicGame(updater::checkForUpdates,verify,review,
+                this::sharePerformanceCapture), config);
         Log.i(LIFECYCLE_TAG,"AFTER_GDX_INITIALIZE");
         if(updateDialogReview)updater.showVerificationDialog();
         else if(!verify && !review)updater.checkForUpdates(false); // prereleases eligible
+    }
+    /** Share the verified app-private ZIP using the existing read-grant FileProvider. */
+    private void sharePerformanceCapture(String relativePath){
+        if(relativePath==null||!relativePath.startsWith("diagnostics/")||
+                !relativePath.endsWith(".zip"))return;
+        runOnUiThread(()->{
+            try{
+                File file=new File(getFilesDir(),relativePath);
+                if(!file.isFile())throw new java.io.IOException("Performance archive missing");
+                Uri uri=FileProvider.getUriForFile(this,getPackageName()+".updates",file);
+                Intent share=new Intent(Intent.ACTION_SEND);
+                share.setType("application/zip");
+                share.putExtra(Intent.EXTRA_STREAM,uri);
+                share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                startActivity(Intent.createChooser(share,"Share performance capture"));
+            }catch(Exception failure){
+                Log.e("CD-PERF-EXPORT","Cannot share capture",failure);
+                android.widget.Toast.makeText(this,"Performance export could not be shared",
+                        android.widget.Toast.LENGTH_LONG).show();
+            }
+        });
     }
     @Override protected void onDestroy(){
         Log.i(LIFECYCLE_TAG,"ON_DESTROY");
