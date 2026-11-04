@@ -92,6 +92,43 @@ public final class TechnologyCatalog {
             if(!expected.equals(id))
                 throw new IllegalArgumentException("Noncanonical technology ID: "+id);
         }
+        /**
+         * Direct numeric Stage VII–IX construction. Source Stage V and VI
+         * multipliers are canonical 6-place values; the caller rounds the
+         * extrapolation to those same six decimal places without allocating
+         * a Formatter, 20-element CSV list or parseable numeric strings.
+         */
+        private Upgrade(Upgrade stageSix,String id,int stage,String name,
+                        String prerequisite,int researchCost,int industryCost,
+                        double[] modifiers,String tradeoff){
+            if(modifiers==null||modifiers.length!=10)
+                throw new IllegalArgumentException("Expected ten physical modifiers");
+            this.id=id;
+            faction=stageSix.faction;
+            subsystem=stageSix.subsystem;
+            track=stageSix.track;
+            this.stage=stage;
+            this.name=name;
+            this.prerequisite=prerequisite;
+            this.researchCost=researchCost;
+            this.industryCost=industryCost;
+            mass=modifiers[0];power=modifiers[1];heat=modifiers[2];
+            output=modifiers[3];accuracy=modifiers[4];integrity=modifiers[5];
+            shield=modifiers[6];thrust=modifiers[7];cooling=modifiers[8];
+            maintenance=modifiers[9];
+            this.tradeoff=tradeoff;
+            if(!FACTIONS.contains(faction)||!TRACKS.contains(track)||
+                    stage<1||stage>9||subsystem.isBlank()||name.isBlank()||
+                    tradeoff.isBlank()||researchCost<=0||industryCost<=0)
+                throw new IllegalArgumentException("Invalid upgrade metadata: "+id);
+            for(double value:modifiers)
+                if(!Double.isFinite(value)||value<=0)
+                    throw new IllegalArgumentException("Unsafe physical modifier: "+id);
+            String expected="TECH-"+faction+"-"+subsystem+"-"+track+"-"+
+                    String.format(Locale.ROOT,"%02d",stage);
+            if(!expected.equals(id))
+                throw new IllegalArgumentException("Noncanonical technology ID: "+id);
+        }
     }
 
     /** Quantified base machinery, including the engineering category used for slot fitting. */
@@ -210,17 +247,20 @@ public final class TechnologyCatalog {
         double[] previous={stageFive.mass,stageFive.power,stageFive.heat,stageFive.output,
                 stageFive.accuracy,stageFive.integrity,stageFive.shield,stageFive.thrust,
                 stageFive.cooling,stageFive.maintenance};
-        ArrayList<String> cells=new ArrayList<>(COLS);
-        Collections.addAll(cells,id,stageSix.faction,stageSix.subsystem,
-                stageSix.track,Integer.toString(stage),
+        // Both source stages are already six-decimal canonical values, so
+        // linear extrapolation remains in integer micro-units. Math.round
+        // preserves the old %.6f + Double.parseDouble result at every stage
+        // while avoiding ten heavy Formatter allocations per virtual lookup.
+        for(int i=0;i<current.length;i++){
+            double evolved=Math.max(.05,
+                    current[i]+(current[i]-previous[i])*(stage-6));
+            current[i]=Math.round(evolved*1_000_000d)/1_000_000d;
+        }
+        return new Upgrade(stageSix,id,stage,
                 stageSix.name+" / Stage "+stage,
                 stem+"0"+(stage-1),
-                Long.toString(Math.max(1,research)),
-                Long.toString(Math.max(1,industry)));
-        for(int i=0;i<current.length;i++)
-            cells.add(ratio(Math.max(.05,current[i]+(current[i]-previous[i])*(stage-6)),1));
-        cells.add(stageSix.tradeoff+"; higher-stage engineering and upkeep");
-        return new Upgrade(cells);
+                (int)Math.max(1,research),(int)Math.max(1,industry),
+                current,stageSix.tradeoff+"; higher-stage engineering and upkeep");
     }
 
     /** All nine ranks have their own IDs, costs and precursor chain while
