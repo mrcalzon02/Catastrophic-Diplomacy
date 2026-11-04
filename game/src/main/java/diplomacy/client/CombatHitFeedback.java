@@ -135,7 +135,7 @@ final class CombatHitFeedback {
     void advance(Battle battle,float delta,boolean running){
         sync(battle);
         if(!running||!Float.isFinite(delta))return;
-        float dt=Math.max(0,Math.min(.08f,delta));
+        float dt=/* 3x tactical playback at a clamped 80ms real frame may advance 240ms. */ Math.max(0,Math.min(.24f,delta));
         for(Pulse pulse:active)pulse.age+=dt;
         for(Afterglow hot:aftermath)hot.age+=dt;
         while(!active.isEmpty()&&active.peekFirst().age>=LIFETIME)
