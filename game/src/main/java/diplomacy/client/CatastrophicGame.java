@@ -2713,7 +2713,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
         long renderStartNs=System.nanoTime();
         int drawCallsBefore=batch.totalRenderCalls;
         float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
-        long tickBeforeRender=battle.tick;
         if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
             float pace=verifyDemo?speed:CombatPace.simulationMultiplier(paceGovernor.effective());
             accumulator += delta * pace;
@@ -2738,11 +2737,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         long lightingOverlayNs=0;
         // Simulation death detection is tick-exact; fragments evolve only while
         // combat runs (and through the four-second post-battle victory pause).
-        float advancedSimSeconds=(float)((battle.tick-tickBeforeRender)*Battle.DT);
-        // Effects follow simulated combat seconds, not real-world wall time.
-        // Permit final effects to wind down during the post-battle result pause.
-        float effectsDelta=battle.finished()?delta*(verifyDemo?speed:
-                CombatPace.simulationMultiplier(paceGovernor.effective())):advancedSimSeconds;
+        // Present effects continuously between fixed physics ticks. Tying the
+        // age clock to the integer count of Battle.step() calls previously left
+        // flashes frozen for many frames at the new 0.5x/1x tactical speeds.
+        // At displayed 1.0x, visual effects retain their authored duration;
+        // 0.5x/3.0x slow/accelerate them without changing authoritative state.
+        float visualPace=verifyDemo?Math.min(3f,speed):paceGovernor.effective();
+        float effectsDelta=delta*visualPace;
         deathTimeline.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
         hitFeedback.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
         shieldFx.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
