@@ -19,6 +19,9 @@ on:
       - core/src/test/java/diplomacy/sim/MassBattleCampaignTest.java
       - core/build.gradle
       - game/src/test/java/diplomacy/client/CombatViewBoundsTest.java
+      - game/src/test/java/diplomacy/client/GameWikiTest.java
+      - game/src/main/java/diplomacy/client/GameWikiCatalog.java
+      - core/src/test/java/diplomacy/sim/ApprovedHardpointsTest.java
       - tools/check_android_api26_compat.py
 
 concurrency:
@@ -44,4 +47,5 @@ jobs:
             :core:combatMachinerySmoke :core:battleWeatherSmoke \
             :core:weaponFxSmoke :core:battleOrdersSmoke \
             :core:projectileModuleSmoke :game:combatVisibilitySmoke \
-            :core:massMixedOnlySmoke
+            :core:massMixedOnlySmoke :core:hardpointsLowHeapSmoke \
+            :game:wikiSmoke
