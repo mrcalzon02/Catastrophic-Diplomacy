@@ -616,6 +616,13 @@ public final class Battle {
         /** Physical bay that launched this craft; empty for non-fighter drones. */
         public String launchBayId="";
         public double x, y, integrity, maxIntegrity,armor,fuel,reload,repairReserve;
+        /** Whole-craft protection only: one capacitor and one armor cell. */
+        public double shields,maxShields,shieldRechargePerSecond;
+        public long lastShieldHitTick=-10000;
+        /** Every fighter crew seat attempts a single ranked ejection on loss. */
+        public int crewSeats;
+        public double pilotEjectionChance;
+        public boolean pilotEjectionResolved;
         /** Measured physical travel from the preceding completed simulation tick.
          * Flak uses this actual motion, not perfect future course knowledge. */
         public double lastObservedX,lastObservedY,observedVx,observedVy;
@@ -659,6 +666,13 @@ public final class Battle {
                         profile.hull(),source.fighterCountermeasureTier);
                 radarSeekerSelected=source.fighterRadarSelected;
                 opticalSeekerSelected=source.fighterOpticalSelected;
+                var survival=FighterSurvivability.installed(
+                        profile,source.fighterCountermeasureTier);
+                crewSeats=survival.crew();
+                pilotEjectionChance=survival.ejectionChance();
+                maxShields=survival.shieldCapacity();
+                shields=maxShields;
+                shieldRechargePerSecond=survival.shieldRechargePerSecond();
             }
             integrity=offensive?profile.health():service?20:15;
             maxIntegrity=integrity;armor=offensive?profile.armor():0;
@@ -891,6 +905,16 @@ public final class Battle {
     /** Diagnostic counters: real PD hits and kills of hostile craft, excluding
      * ordinary fuel expiry, voluntary docking or other combat losses. */
     public int pointDefenseCraftHits,pointDefenseCraftKills;
+    /** Crew events do not grant replacement aircraft or automatic rescue.
+     * Successfully ejected pilots are recorded separately from lost aircraft. */
+    public record FighterEscape(int craftId,int seat,int carrierId,int team,
+                                double x,double y,long tick){}
+    private final List<FighterEscape> fighterEscapeRecords=new ArrayList<>();
+    public List<FighterEscape> fighterEscapeRecords(){
+        return Collections.unmodifiableList(fighterEscapeRecords);
+    }
+    public int fighterPilotsEjected,fighterPilotsLost,fighterAbandoned;
+    public double fighterShieldDamageAbsorbed;
     /** Kill attribution is recorded only after a real hostile body is
      * removed. These counters do not alter fire control, armor, probabilities,
      * ammunition or RNG. Decoys are distinct from damaging guided bodies. */
@@ -4664,13 +4688,34 @@ public final class Battle {
                 target==null?0:target.id,craft.x,craft.y,observedShotX,observedShotY);
     }
 
-    private void hitCraft(Craft target,double damage,Ship shooter,long shot,String weapon){
+    /** All fighter damage, including five PD families and missile impacts,
+     * passes through the same ONE scalar shield and ONE scalar armor pool.
+     * Package access permits a headless damage-path verification. */
+    void hitCraft(Craft target,double damage,Ship shooter,long shot,String weapon){
         if(target.integrity<=0)return;
-        double absorbed=Math.min(target.armor,damage*0.48);
-        target.armor-=absorbed;
-        target.integrity-=Math.max(0,damage-absorbed);
+        var hit=FighterSurvivability.absorb(target,damage,tick);
+        if(target.fighter)fighterShieldDamageAbsorbed+=hit.shieldAbsorbed();
+        if(target.integrity<=0)resolveFighterCrewLoss(target);
         visual(shot,VisualPhase.IMPACT,weapon,shooter==null?-1:shooter.team,
                 shooter==null?0:shooter.id,target.sourceId,target.x,target.y,target.x,target.y);
+    }
+    /** Called on the actual fatal hit, or on flight fuel exhaustion.
+     * Only one attempt per crew seat. Uses isolated deterministic rolls, so
+     * balancing pilot survival cannot alter weapons or AI RNG sequences. */
+    private void resolveFighterCrewLoss(Craft craft){
+        if(!craft.fighter||craft.pilotEjectionResolved)return;
+        craft.pilotEjectionResolved=true;
+        for(int seat=0;seat<craft.crewSeats;seat++){
+            if(FighterSurvivability.survived(
+                    seed,craft.id,seat,craft.pilotEjectionChance)){
+                fighterEscapeRecords.add(new FighterEscape(
+                        craft.id,seat,craft.sourceId,craft.team,
+                        craft.x,craft.y,tick));
+                fighterPilotsEjected++;
+                visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER_EJECTION",
+                        craft.team,craft.sourceId,0,craft.x,craft.y,craft.x,craft.y);
+            }else fighterPilotsLost++;
+        }
     }
 
     private void updateCraft() {
@@ -4681,10 +4726,15 @@ public final class Battle {
         for(int i=crafts.size()-1;i>=0;i--) {
             Craft craft=crafts.get(i);
             if((craft.fuel-=DT)<=0 || craft.integrity<=0){
+                if(craft.fighter){
+                    resolveFighterCrewLoss(craft);
+                    if(craft.integrity>0)fighterAbandoned++;
+                }
                 if(craft.integrity<=0)craftLosses++;
                 crafts.remove(i);continue;
             }
             if(craft.fighter) {
+                FighterSurvivability.recharge(craft,tick,DT);
                 updateArmedFighter(craft);
             } else if(craft.repair){
                 Ship source=findShip(craft.sourceId);
@@ -6865,6 +6915,16 @@ public final class Battle {
         hash = mix(hash,fighterTorpedoesLaunched);hash=mix(hash,craftLosses);
         hash = mix(hash, weather.meteorHits()); hash = mix(hash, weather.meteorMisses());
         hash=mix(hash,fighterWingBroadcasts);hash=mix(hash,fighterWingReceipts);
+        hash=mix(hash,fighterPilotsEjected);hash=mix(hash,fighterPilotsLost);
+        hash=mix(hash,fighterAbandoned);
+        hash=mix(hash,Double.doubleToLongBits(fighterShieldDamageAbsorbed));
+        for(FighterEscape e:fighterEscapeRecords){
+            hash=mix(hash,e.craftId());hash=mix(hash,e.seat());
+            hash=mix(hash,e.carrierId());hash=mix(hash,e.team());
+            hash=mix(hash,e.tick());
+            hash=mix(hash,Double.doubleToLongBits(e.x()));
+            hash=mix(hash,Double.doubleToLongBits(e.y()));
+        }
         for(FighterWingLink.Contact contact:wingBroadcasts)
             hash=mix(hash,contact.fingerprint());
         hash = mix(hash, weather.neutronHits());
@@ -7096,6 +7156,13 @@ public final class Battle {
             hash=mix(hash,craft.interceptorMissileAmmo);
             hash=mix(hash,craft.radarSeekerSelected?1:0);
             hash=mix(hash,craft.nextInterceptorTick);
+            hash=mix(hash,craft.crewSeats);
+            hash=mix(hash,Double.doubleToLongBits(craft.pilotEjectionChance));
+            hash=mix(hash,craft.pilotEjectionResolved?1:0);
+            hash=mix(hash,Double.doubleToLongBits(craft.shields));
+            hash=mix(hash,Double.doubleToLongBits(craft.maxShields));
+            hash=mix(hash,Double.doubleToLongBits(craft.shieldRechargePerSecond));
+            hash=mix(hash,craft.lastShieldHitTick);
             hash=mix(hash,craft.profile==null?-1:craft.profile.hull().ordinal());
             hash=mix(hash,Double.doubleToLongBits(craft.integrity));
             hash=mix(hash,Double.doubleToLongBits(craft.armor));

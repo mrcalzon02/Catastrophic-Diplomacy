@@ -172,3 +172,41 @@ replaced each tick and cannot become permanent ghost contacts.
 `:core:fighterWingLinkSmoke` verifies strict range boundaries, radio latency,
 team isolation, sender exclusion, no retransmission, and real aircraft in a
 seeded battle. This is distinct from long-range capital-ship network modules.
+
+## Fighter crew ejection and compact hull protection
+
+All **six** physical fighter families now have crew ejection systems, including
+baseline craft. Every crew seat has a nonzero and less-than-certain chance
+of surviving actual fighter loss. The chance improves with fitted FTR research
+from rank zero through rank nine; a heavier crew compartment provides a small
+additional survival bonus. Single-seat interceptors, laser and particle
+fighters, dual-crew assault gunships and missile fighters, and three-crew
+torpedo bombers resolve every seat independently. An ejection is attempted
+**once**, when the aircraft is destroyed or abandons flight after exhausting
+its fuel. Survival rolls are stable per battle seed, craft identity and crew
+seat and do not consume the weapons/weather/combat random stream.
+
+From **FTR rank six**, a fighter receives its own compact regenerative shield.
+A fighter has precisely **one scalar shield pool and one scalar armor pool**:
+no shield facings, direction-based armor cells, sprite masks, or local-geometry
+critical zones. Each physical projectile, PD family, flak burst or missile
+strike now meets that same shield pool before the original one-cell armor
+and structural integrity. The shield has finite capacity and cannot recharge
+until 60 ticks (two seconds) after a hit. Rank nine improves shielding
+capacity and regeneration over rank six. Earlier aircraft retain their
+original unshielded armor/health, so legacy interception remains unchanged.
+
+Surviving ejections are exposed via `Battle.fighterEscapeRecords()` with
+craft/seat/carrier/team identity and the original ejection position/tick;
+`fighterPilotsEjected`, `fighterPilotsLost`, and `fighterAbandoned`
+distinguish crew survival, deaths and fuel-end sorties. Crew ejection does
+**not** return the destroyed airframe, replenish fighter inventory, or
+automatically rescue personnel. Records reserve the event for later real
+rescue and campaign manpower reconciliation. The battle replay fingerprint
+covers shields, crew outcomes and ejection records. These are simulation
+events, not yet a rendered recoverable escape-pod actor.
+
+`:core:fighterSurvivabilitySmoke` tests all fighter families, FTR rank zero
+through nine, monotonic probabilistic pilot survival, finite whole-craft
+shield depletion/recharge, fatal hit exact-once accounting, researched
+carrier inheritance and deterministic replay.
