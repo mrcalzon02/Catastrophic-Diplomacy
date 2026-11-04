@@ -379,16 +379,25 @@ public final class GameMenuFlowTest {
             check(GameMenuPanel.ordersAction(1150,y,1)==2+i,
                     "Cannot increase advanced behavior "+i);
         }
-        for(int i=23;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
+        for(int i=23;i<29;i++){
             float y=544-(i-23)*62;
             check(GameMenuPanel.ordersAction(700,y,2)==40+i,
                     "Touch-sized resource order cannot decrease setting "+i);
             check(GameMenuPanel.ordersAction(1150,y,2)==40+i,
                     "Touch-sized resource order cannot increase setting "+i);
         }
+        for(int i=29;i<diplomacy.sim.ShipStandingOrders.SETTINGS.length;i++){
+            float y=544-(i-29)*62;
+            check(GameMenuPanel.ordersAction(700,y,3)==40+i,
+                    "Fuel order decrease hitbox missing for setting "+i);
+            check(GameMenuPanel.ordersAction(1150,y,3)==40+i,
+                    "Fuel order increase hitbox missing for setting "+i);
+        }
         check(GameMenuPanel.ordersAction(1040,60,2)==30&&
-                        GameMenuPanel.ordersAction(900,580,2)==31,
-                "Third resource page swallowed Back or Next navigation");
+                        GameMenuPanel.ordersAction(900,580,2)==31&&
+                        GameMenuPanel.ordersAction(1040,60,3)==30&&
+                        GameMenuPanel.ordersAction(900,580,3)==31,
+                "Fuel or ammunition page swallowed Back or Next navigation");
         check(GameMenuPanel.ordersAction(1120,505,0)==3,
                 "Original doctrine page no longer handles persistent caution");
         check(GameMenuPanel.ordersAction(385,376)==-1,
