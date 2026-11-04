@@ -5,6 +5,15 @@ on:
     paths:
       - 'core/src/test/java/diplomacy/sim/PointDefenseWaveDiagnostic.java'
       - 'core/src/main/java/diplomacy/sim/Battle.java'
+      - 'core/src/main/java/diplomacy/sim/ShipResourceOrders.java'
+      - 'core/src/main/java/diplomacy/sim/ShipStandingOrders.java'
+      - 'core/src/main/java/diplomacy/sim/ShipStandingOrdersCodec.java'
+      - 'core/src/test/java/diplomacy/sim/ShipStandingOrdersTest.java'
+      - 'core/src/test/java/diplomacy/sim/ShipTacticalDirectivesTest.java'
+      - 'core/src/test/java/diplomacy/sim/WorldScaleAndPropulsionTest.java'
+      - 'game/src/main/java/diplomacy/client/GameMenuPanel.java'
+      - 'game/src/test/java/diplomacy/client/GameMenuFlowTest.java'
+      - 'game/build.gradle'
       - 'core/src/main/java/diplomacy/sim/SensorLightTimeHistory.java'
       - 'core/src/main/java/diplomacy/sim/OrdnanceSeeker.java'
       - 'core/src/main/java/diplomacy/sim/FighterCountermeasures.java'
@@ -103,7 +112,7 @@ jobs:
         with: { gradle-version: '8.11.1' }
       - name: Verify objective sensor, weapons, rocket trajectory and game-client functionality
         id: mechanics
-        run: gradle --continue --no-daemon :core:gameFlowSmoke :core:ammunitionTypesSmoke :core:ammunitionResearchSmoke :core:ammunitionSelectionSmoke :core:ordnanceDoctrineSmoke :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:pdGuidedLaunchSmoke :core:fighterCraftSmoke :core:rocketBarrageSmoke :game:guidedShipyardSmoke :game:compileJava
+        run: gradle --continue --no-daemon :core:gameFlowSmoke :core:ammunitionTypesSmoke :core:ammunitionResearchSmoke :core:ammunitionSelectionSmoke :core:ordnanceDoctrineSmoke :core:weaponMuzzleSmoke :core:sensorNetworkSmoke :core:pdGuidedLaunchSmoke :core:fighterCraftSmoke :core:rocketBarrageSmoke :game:guidedShipyardSmoke :game:fuelOrdersTouchSmoke :game:compileJava
       - name: Measure optional PD/flak simultaneous fighter-wave balance
         id: wave
         continue-on-error: true
