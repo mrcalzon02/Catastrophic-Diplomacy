@@ -70,7 +70,8 @@ public record ShipResourceOrders(FireIntent fireIntent,AmmoPolicy ammunition,
 
     /** A standing order, not an additional compartment or fuel allocation. */
     public double protectedFuel(Battle.Ship ship){
-        if(ship.withdrawing||fuelPolicy==FuelPolicy.UNRESTRICTED||
+        if(ship.withdrawing||ship.orders.position()==BattleOrders.Position.LAST_STAND||
+                fuelPolicy==FuelPolicy.UNRESTRICTED||
                 fuelPolicy==FuelPolicy.ECONOMY)return 0;
         return Math.max(0,ship.maxFuel)*fuelReservePercent/100.0;
     }
@@ -81,7 +82,8 @@ public record ShipResourceOrders(FireIntent fireIntent,AmmoPolicy ammunition,
     }
     /** Gradually reduce ordered velocity as fuel falls below the economy band. */
     public double thrustSpeedFactor(Battle.Ship ship){
-        if(ship.withdrawing||fuelPolicy==FuelPolicy.UNRESTRICTED||ship.maxFuel<=0)return 1;
+        if(ship.withdrawing||ship.orders.position()==BattleOrders.Position.LAST_STAND||
+                fuelPolicy==FuelPolicy.UNRESTRICTED||ship.maxFuel<=0)return 1;
         double percent=100.0*Math.max(0,ship.fuel)/ship.maxFuel;
         if(percent>=economyStartPercent)return 1;
         return .4+.6*percent/economyStartPercent;
