@@ -16,6 +16,8 @@ on:
       - core/src/test/java/diplomacy/sim/WeaponFxPipelineTest.java
       - core/src/test/java/diplomacy/sim/BattleOrdersTest.java
       - core/src/test/java/diplomacy/sim/ProjectileModuleTest.java
+      - core/src/test/java/diplomacy/sim/MassBattleCampaignTest.java
+      - core/build.gradle
       - game/src/test/java/diplomacy/client/CombatViewBoundsTest.java
       - tools/check_android_api26_compat.py
 
@@ -41,4 +43,5 @@ jobs:
             :core:laserFamiliesSmoke :core:technologySmoke \
             :core:combatMachinerySmoke :core:battleWeatherSmoke \
             :core:weaponFxSmoke :core:battleOrdersSmoke \
-            :core:projectileModuleSmoke :game:combatVisibilitySmoke
+            :core:projectileModuleSmoke :game:combatVisibilitySmoke \
+            :core:massMixedOnlySmoke
