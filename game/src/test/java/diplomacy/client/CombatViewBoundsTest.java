@@ -23,8 +23,14 @@ public final class CombatViewBoundsTest {
         // a tight camera draws only nearby vessels rather than all 400 quads.
         diplomacy.sim.Battle live=new diplomacy.sim.Battle(779L);
         for(int i=0;i<200;i++){
-            live.addShip(0,diplomacy.sim.Battle.Faction.TERRAN,i*25,50);
-            live.addShip(1,diplomacy.sim.Battle.Faction.DRAXIAN,7000+i*25,50);
+            // The arena is fixed at -1280..2560 by -720..1440. Exercise
+            // 200-vs-200 culling with real, valid but widely separated
+            // formations, not impossible ships placed thousands outside it.
+            double y=-220+(i/20)*75;
+            live.addShip(0,diplomacy.sim.Battle.Faction.TERRAN,
+                    -1000+(i%20)*45,y);
+            live.addShip(1,diplomacy.sim.Battle.Faction.DRAXIAN,
+                    1750+(i%20)*35,y);
         }
         int visible=0;
         var camera=new CombatViewBounds(100,50,600,400);
@@ -33,8 +39,12 @@ public final class CombatViewBoundsTest {
         for(var ship:live.ships())if(camera.ship(poses.ship(ship),ship.visualScale()))visible++;
         ok(visible>0 && visible<60,"tight camera should not draw 400 distant hulls");
         ok(live.ships().size()==400,"visual culling must not delete combat ships");
-        ok(new CombatViewBounds(7000,50,600,400).circle(7000,50,2),
-                "panned camera sees alternate fleet");
+        var alternate=new CombatViewBounds(2000,50,600,400);
+        int enemiesInFrame=0;
+        for(var ship:live.ships())if(ship.team==1&&
+                alternate.ship(poses.ship(ship),ship.visualScale()))enemiesInFrame++;
+        ok(enemiesInFrame>0&&enemiesInFrame<200,
+                "panned camera must reveal actual enemy vessels in the fixed arena");
         System.out.println("PASS combat view bounds: edge-safe hulls, long beams, zoom and pan");
     }
 }
