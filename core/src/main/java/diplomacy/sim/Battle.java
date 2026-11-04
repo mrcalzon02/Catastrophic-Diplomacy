@@ -623,6 +623,10 @@ public final class Battle {
         public boolean reusable,returning;
         public double serviceRange,servicePulse,serviceMaxCharge;
         public int targetId,targetCraftId,ammunition,shotsFired;
+        /** One physically received wingman track, only a navigation cue. */
+        public FighterWingLink.Contact sharedWingContact;
+        /** Captured by the fighter's own sensors, never a relayed track. */
+        public FighterWingLink.Contact lastLocalWingContact;
         /** Per-airframe finite dispensers; drones carry neither. */
         public int flareRemaining,chaffRemaining;
         public long nextCountermeasureTick;
@@ -906,6 +910,10 @@ public final class Battle {
                 missile.torpedo?DefensiveTarget.TORPEDO:DefensiveTarget.MISSILE;
     }
     private SpaceWeather weather = new SpaceWeather(SpaceWeather.clear());
+    private final FighterWingLink.Network fighterWingRadio=new FighterWingLink.Network();
+    /** Previous tick's actual local fighter sensor broadcasts. */
+    private final ArrayList<FighterWingLink.Contact> wingBroadcasts=new ArrayList<>();
+    public int fighterWingBroadcasts,fighterWingReceipts;
     /** Physical TRK memory stores received historical samples only. */
     public static final class ContactTrack {
         public double x,y,vx,vy;
@@ -4487,9 +4495,41 @@ public final class Battle {
                 if(range>Math.max(600,profile.sensors()*weather.sensorFactor()*2))target=null;
             }
         }
-        if(target==null&&intercept==null)return;
-        double tx=intercept!=null?intercept.x:target.x;
-        double ty=intercept!=null?intercept.y:target.y;
+        // A carrier's coarse course is not a locally detected contact.
+        boolean localShipLock=target!=null&&
+                StrictMath.hypot(target.x-craft.x,target.y-craft.y)<=
+                        DeceptionProjection.fighterContactRange(
+                                target,profile.sensors(),weather.sensorFactor());
+        if(intercept!=null){
+            craft.lastLocalWingContact=new FighterWingLink.Contact(
+                    craft.id,craft.team,FighterWingLink.Kind.FIGHTER,
+                    intercept.id,tick,tick,craft.x,craft.y,
+                    intercept.x,intercept.y,
+                    intercept.observedVx,intercept.observedVy);
+        }else if(localShipLock){
+            craft.lastLocalWingContact=new FighterWingLink.Contact(
+                    craft.id,craft.team,FighterWingLink.Kind.SHIP,
+                    target.id,tick,tick,craft.x,craft.y,
+                    target.x,target.y,target.vx,target.vy);
+        }else craft.lastLocalWingContact=null;
+        if(craft.lastLocalWingContact!=null){
+            wingBroadcasts.add(craft.lastLocalWingContact);
+            fighterWingBroadcasts++;
+        }
+        // Only previous-tick reports enter this 60-unit physical bubble.
+        // Received contacts cannot be used as new transmissions.
+        FighterWingLink.Contact shared=intercept==null?
+                fighterWingRadio.receive(craft.id,craft.team,
+                        craft.x,craft.y,tick):null;
+        if(shared!=null&&shared.kind()==FighterWingLink.Kind.SHIP&&
+                localShipLock)shared=null;
+        craft.sharedWingContact=shared;
+        if(shared!=null)fighterWingReceipts++;
+        if(target==null&&intercept==null&&shared==null)return;
+        double tx=intercept!=null?intercept.x:
+                shared!=null?shared.x():target.x;
+        double ty=intercept!=null?intercept.y:
+                shared!=null?shared.y():target.y;
         double distance=StrictMath.hypot(tx-craft.x,ty-craft.y);
         // Standoff craft do not fly through targets at their maximum thrust.
         double desired=profile.range()*0.68;
@@ -4539,6 +4579,8 @@ public final class Battle {
                     craft.team,craft.sourceId,intercept.sourceId,
                     craft.x,craft.y,tx,ty);
         }
+        // A wingman's shared track guides positioning, never a weapon lock.
+        if(shared!=null)return;
         if(craft.reload>0 || distance>profile.range()
                 || (target!=null && distance>DeceptionProjection.fighterContactRange(
                         target,profile.sensors(),weather.sensorFactor()))
@@ -4632,6 +4674,10 @@ public final class Battle {
     }
 
     private void updateCraft() {
+        // Snapshot the prior tick before any new local sensing; iteration
+        // order cannot create an instantaneous, zero-delay radio relay.
+        fighterWingRadio.index(wingBroadcasts,tick);
+        wingBroadcasts.clear();
         for(int i=crafts.size()-1;i>=0;i--) {
             Craft craft=crafts.get(i);
             if((craft.fuel-=DT)<=0 || craft.integrity<=0){
@@ -6818,6 +6864,9 @@ public final class Battle {
         hash = mix(hash,fighterParticleShots);hash=mix(hash,fighterMissilesLaunched);
         hash = mix(hash,fighterTorpedoesLaunched);hash=mix(hash,craftLosses);
         hash = mix(hash, weather.meteorHits()); hash = mix(hash, weather.meteorMisses());
+        hash=mix(hash,fighterWingBroadcasts);hash=mix(hash,fighterWingReceipts);
+        for(FighterWingLink.Contact contact:wingBroadcasts)
+            hash=mix(hash,contact.fingerprint());
         hash = mix(hash, weather.neutronHits());
         for (SpaceWeather.Meteor meteor : weather.meteors()) {
             hash = mix(hash, meteor.targetId()); hash = mix(hash, meteor.strikeTick());
@@ -7037,6 +7086,10 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(craft.repairReserve));
             hash=mix(hash,craft.targetId);
             hash=mix(hash,craft.targetCraftId);hash=mix(hash,craft.ammunition);
+            hash=mix(hash,craft.lastLocalWingContact==null?0:
+                    craft.lastLocalWingContact.fingerprint());
+            hash=mix(hash,craft.sharedWingContact==null?0:
+                    craft.sharedWingContact.fingerprint());
             hash=mix(hash,craft.flareRemaining);
             hash=mix(hash,craft.chaffRemaining);
             hash=mix(hash,craft.nextCountermeasureTick);

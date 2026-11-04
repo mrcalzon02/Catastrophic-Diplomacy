@@ -220,6 +220,7 @@ tasks.register('sensorNetworkSmoke', JavaExec) {
     dependsOn(tasks.named('fighterInfraredSeekerSmoke'))
     dependsOn(tasks.named('fighterOpticalSeekerSmoke'))
     dependsOn(tasks.named('fighterSeekerBlueprintSmoke'))
+    dependsOn(tasks.named('fighterWingLinkSmoke'))
     dependsOn(tasks.named('fighterCountermeasureSmoke'))
     dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
     dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
@@ -482,6 +483,14 @@ tasks.named('skySmoke') { finalizedBy(tasks.named('spaceWeatherSmoke')) }
 tasks.named('spaceWeatherSmoke') { finalizedBy(tasks.named('battleWeatherSmoke')) }
 tasks.named('battleWeatherSmoke') { finalizedBy(tasks.named('levelEnvironmentSmoke')) }
 
+/** Real 60-unit fighter-to-fighter sharing with finite one-tick delivery. */
+tasks.register('fighterWingLinkSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Direct same-team fighter telemetry, one-tick latency, 60-unit reach, no remote lock, full-battle replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterWingLinkTest'
+}
 /** Research-licensed fighter seeker choice from saved shipyard to flying missile. */
 tasks.register('fighterSeekerBlueprintSmoke', JavaExec) {
     group = 'verification'

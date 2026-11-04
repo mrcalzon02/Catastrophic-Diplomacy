@@ -144,3 +144,31 @@ weather cannot grant a decoy free, unattenuated optical light. The
 pre-arrival isolation, normal IR under solar glare, and weathered combat
 replay. This stage does not claim asteroid-body line-of-sight occlusion,
 which would require actual physical occluding geometry.
+
+## Very-short-range fighter-wing sensor exchange
+
+Every autonomous fighter can broadcast at most one **locally detected**
+fighter or ship contact per simulation tick. A nearby same-team wingman
+receives that immutable observation after **one full simulation tick** only
+if the recorded transmitter was within **60 world units** of the receiving
+aircraft. The direct radio bubble is far shorter than even the smallest
+fighter's onboard sensor reach. Pilots from separate carrier wings may exchange
+their actual observations only while flying together inside that bubble.
+
+Packets carry the original target identity, observed coordinates, velocity,
+source aircraft identity/position and emission tick. They cannot be forwarded
+through a second aircraft, reused without a new local sighting, transferred to
+the fleet sensor network, or delivered to enemy wings. Each receiver selects
+one nearest valid report, prioritizing hostile fighter sightings; a cell-based
+spatial index checks only the immediate nine 60-unit neighboring cells and
+keeps fleet-scale cost bounded. No hardware is silently added to missile bodies.
+
+A received contact can **cue fighter movement and local reacquisition**, but
+does not set `targetCraftId`, authorize cannon fire or missile launches,
+install a target lock, or reveal a hostile's current position. The target's
+own sensors still determine firing authority and an interceptor missile still
+needs its autonomous infrared, optical or radar measurements. Reports are
+replaced each tick and cannot become permanent ghost contacts.
+`:core:fighterWingLinkSmoke` verifies strict range boundaries, radio latency,
+team isolation, sender exclusion, no retransmission, and real aircraft in a
+seeded battle. This is distinct from long-range capital-ship network modules.
