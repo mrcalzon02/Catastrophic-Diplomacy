@@ -1,0 +1,43 @@
+# Focused objective release-blocker reproduction; deliberately does not package APK/MSI.
+name: Release blocker focused functional regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-blocker-smoke.yml
+      - core/src/main/java/diplomacy/shipyard/ApprovedHardpointResource.java
+      - core/src/main/java/diplomacy/sim/Battle.java
+      - core/src/main/java/diplomacy/tech/TechnologyCatalog.java
+      - core/src/test/java/diplomacy/sim/LaserFamiliesTest.java
+      - core/src/test/java/diplomacy/sim/TechnologyCatalogTest.java
+      - core/src/test/java/diplomacy/sim/CombatMachineryTest.java
+      - core/src/test/java/diplomacy/sim/BattleWeatherTest.java
+      - core/src/test/java/diplomacy/sim/WeaponFxPipelineTest.java
+      - core/src/test/java/diplomacy/sim/BattleOrdersTest.java
+      - core/src/test/java/diplomacy/sim/ProjectileModuleTest.java
+      - tools/check_android_api26_compat.py
+
+concurrency:
+  group: cd-release-blockers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  objective-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Reject Java APIs unavailable on Android 10
+        run: python3 tools/check_android_api26_compat.py
+      - name: Reproduce every failed Windows and Linux functionality gate
+        run: |
+          gradle --no-daemon --continue \
+            :core:laserFamiliesSmoke :core:technologySmoke \
+            :core:combatMachinerySmoke :core:battleWeatherSmoke \
+            :core:weaponFxSmoke :core:battleOrdersSmoke \
+            :core:projectileModuleSmoke
