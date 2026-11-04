@@ -253,6 +253,17 @@ tasks.register('renderPerformanceSmoke', JavaExec) {
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('renderPerformanceSmoke') }
 
+// Gameplay functional regression: pace controls, adaptive transitions, and
+// valid ZIP/CSV export readback. No APK packaging or GPU timing gate.
+tasks.register('combatPerformanceSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify six player speeds, 30 FPS governor hysteresis and bounded ZIP diagnostics.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatPerformanceControlTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatPerformanceSmoke') }
+
 tasks.register('radioVoiceProximitySmoke', JavaExec) {
     group = 'verification'
     description = 'Headless camera-pan proximity and smooth radio-voice envelope checks.'
