@@ -29,6 +29,12 @@ public final class BattleOrdersTest {
             if(socket<0)throw new AssertionError("Cruiser missing FTR support socket");
             launcher.fighterBays=Battle.Ship.baysFor(
                     deck.install(socket,"BASE-TER-FTR"));
+            // Unlike missile ammo, a fighter must carry an actual pilot.
+            // Manually created legacy ships do not come with crew onboard.
+            launcher.crewRequired=16;
+            launcher.crewBerths=24;
+            launcher.lifeSupport=24;
+            launcher.crewCount=24;
         }
         launcher.fighterLaunchBays=launcher.fighterBays.size();
         defender.laserDamage=defender.missileDamage=0;
