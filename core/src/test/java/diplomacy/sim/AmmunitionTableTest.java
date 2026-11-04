@@ -77,8 +77,16 @@ public final class AmmunitionTableTest {
             Battle.Ship firing=world.ships().get(0);
             world.setShipKineticAmmunition(firing.id,round);
             int before=firing.kineticAmmo;
-            world.step();
-            check(firing.kineticAmmo==before-1,"Each real shell consumes ammunition: "+round);
+            int elapsed=0;
+            int contactWindow=2*SensorLightTimeHistory.propagationTicks(295)+30;
+            check(!world.hasTargetContact(firing,world.ships().get(1),295),
+                    "Fresh ships cannot fire at unreceived sensor contact");
+            while(elapsed<contactWindow&&firing.kineticAmmo==before){
+                world.step();
+                elapsed++;
+            }
+            check(firing.kineticAmmo==before-1,
+                    "Each sensor-authorized real shell consumes ammunition: "+round);
             check(world.ballistics().stream().allMatch(b->b.ammunition==round),
                     "The physical round retains its chosen ammo identity: "+round);
             check(world.ballistics().stream().allMatch(b->
@@ -89,7 +97,7 @@ public final class AmmunitionTableTest {
                     "Shot must be a real FIRE event: "+round);
             Battle mirror=scenario(true,false);
             mirror.setShipKineticAmmunition(mirror.ships().get(0).id,round);
-            fly(world,60);fly(mirror,61);
+            fly(world,60);fly(mirror,elapsed+60);
             check(world.fingerprint()==mirror.fingerprint(),
                     "Ammunition and physical impacts replay deterministically: "+round);
         }
@@ -98,13 +106,22 @@ public final class AmmunitionTableTest {
             Battle world=scenario(false,false);
             Battle.Ship source=world.ships().get(0);
             world.setShipWarhead(source.id,Battle.DamageType.MISSILE,warhead);
-            world.step();
-            check(world.missiles().stream().allMatch(m->
-                    m.warhead==warhead&&m.spec.equals(profile.physical(source.missileProjectile))),
+            int before=source.missileAmmo,elapsed=0;
+            int contactWindow=2*SensorLightTimeHistory.propagationTicks(295)+30;
+            while(elapsed<contactWindow&&source.missileAmmo==before){
+                world.step();
+                elapsed++;
+            }
+            check(source.missileAmmo==before-1,
+                    "A sensor-authorized guided warhead must consume actual ammunition: "+warhead);
+            check(world.missiles().stream().anyMatch(m->m.sourceId==source.id
+                    &&m.warhead==warhead&&m.spec.equals(
+                        AmmunitionTable.guidedPhysical(Battle.DamageType.MISSILE,
+                                warhead,source.missileProjectile))),
                     "Actual missile body must carry warhead's signature and integrity: "+warhead);
             Battle same=scenario(false,false);
             same.setShipWarhead(same.ships().get(0).id,Battle.DamageType.MISSILE,warhead);
-            fly(world,80);fly(same,81);
+            fly(world,80);fly(same,elapsed+80);
             check(world.fingerprint()==same.fingerprint(),"Warhead must replay exactly: "+warhead);
         }
         Battle blast=scenario(true,true);
