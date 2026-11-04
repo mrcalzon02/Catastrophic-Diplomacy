@@ -79,4 +79,18 @@ public final class AmmunitionTable {
         if(p==null)throw new IllegalArgumentException("Unknown guided payload: "+kind);
         return p;
     }
+    /** Missile-specific AP motor tuning. The AP warhead is also available
+     * to torpedoes, whose motor/speed must not be changed by missile balance.
+     * The historic 1.08 warhead speed factor remains intact for torpedoes. */
+    public static ProjectileModel.Spec guidedPhysical(Battle.DamageType family,
+            Warhead kind,ProjectileModel.Spec source){
+        if(family!=Battle.DamageType.MISSILE&&family!=Battle.DamageType.TORPEDO)
+            throw new IllegalArgumentException("Only guided hull-mounted bodies carry warheads");
+        ProjectileModel.Spec fitted=warhead(kind).physical(source);
+        if(family!=Battle.DamageType.MISSILE||kind!=Warhead.ARMOR_PIERCING)
+            return fitted;
+        return new ProjectileModel.Spec(
+                StrictMath.min(1500,fitted.speed()*1.20),
+                fitted.health(),fitted.crossSection(),fitted.signature());
+    }
 }

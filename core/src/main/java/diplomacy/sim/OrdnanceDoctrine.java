@@ -25,7 +25,7 @@ public final class OrdnanceDoctrine {
                           double durabilityMultiplier,double crossSectionMultiplier,
                           double signatureMultiplier,Payload payload) {
         public Pattern {
-            if(mode==null||payload==null||real<1||real>12||decoys<0||decoys>12
+            if(mode==null||payload==null||real<1||real>16||decoys<0||decoys>12
                 ||real+decoys>16||intervalTicks<0||intervalTicks>90
                 ||ignitionDelayTicks<0||ignitionDelayTicks>90
                 ||!finite(reloadMultiplier,.5,15)
@@ -53,7 +53,7 @@ public final class OrdnanceDoctrine {
         insert(m,new Pattern(Mode.SINGLE,1,0,0,0,1,1,1,1,1,1,Payload.STANDARD));
         insert(m,new Pattern(Mode.RIPPLE,3,0,5,0,3.2,.78,1,1,1,1,Payload.STANDARD));
         insert(m,new Pattern(Mode.SATURATION,5,0,2,0,5.5,.60,.96,.9,1.02,1.1,Payload.STANDARD));
-        insert(m,new Pattern(Mode.MICRO_SWARM,8,0,1,0,4.0,.23,1.32,.42,.38,.63,Payload.MICRO));
+        insert(m,new Pattern(Mode.MICRO_SWARM,heavy?8:16,0,1,0,4.0,.23,1.32,.42,.38,.63,Payload.MICRO));
         insert(m,new Pattern(Mode.HEAVY_STRIKE,heavy?2:2,0,7,0,3.4,1.45,.78,1.85,1.52,1.55,Payload.HEAVY));
         insert(m,new Pattern(Mode.COLD_LAUNCH,1,0,0,15,1.22,1,1,1,.90,.56,Payload.STANDARD));
         insert(m,new Pattern(Mode.DECOY_CLOUD,1,4,2,0,2.7,1,.94,1,1,1.06,Payload.STANDARD));

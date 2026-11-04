@@ -3851,7 +3851,7 @@ public final class Battle {
             // the next salvo's selection while these bodies are still queued.
             AmmunitionTable.Warhead warhead=order.loadedWarhead;
             AmmunitionTable.Profile payload=AmmunitionTable.warhead(warhead);
-            if(!decoy)actual=payload.physical(actual);
+            if(!decoy)actual=AmmunitionTable.guidedPhysical(order.family,warhead,actual);
             OrdnanceDoctrine.Payload subtype=decoy?OrdnanceDoctrine.Payload.DECOY
                     :order.pattern.payload();
             double spread=(index-(order.pattern.count()-1)*0.5)*0.045;

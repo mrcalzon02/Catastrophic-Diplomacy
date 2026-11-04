@@ -13,7 +13,7 @@ Every launched body consumes **one real round from the fitted magazine and the w
 | SINGLE | 1 guided warhead | immediate | 1.00 | ×1.00 | Existing behavior unchanged |
 | RIPPLE | 3 guided warheads | 5 ticks / 0.167 s | 3.20 | ×0.78 each | Separate targetable bodies; spaced pressure |
 | SATURATION | 5 guided warheads | 2 ticks / 0.067 s | 5.50 | ×0.60 each | Large barrage, consumes 5 actual ammunition units |
-| MICRO_SWARM | 8 micro-warheads | 1 tick / 0.033 s | 4.00 | ×0.23 each | ×1.32 velocity, ×0.42 health, ×0.38 cross-section, ×0.63 emissions |
+| MICRO_SWARM | **16 micro-missiles** / 8 micro-torpedoes | 1 tick / 0.033 s | 4.00 | ×0.23 each | ×1.32 velocity, ×0.42 health, ×0.38 cross-section, ×0.63 emissions; every round consumes a real ammunition unit |
 | HEAVY_STRIKE | 2 armored warheads | 7 ticks / 0.233 s | 3.40 | ×1.45 each | ×0.78 velocity, ×1.85 health, ×1.52 cross-section, ×1.55 emissions |
 | COLD_LAUNCH | 1 guided warhead | 15 ticks / 0.5 s ignition delay | 1.22 | ×1.00 | Physical canister exists immediately, stationary and PD-interceptable until propulsion engages; less detectable signature ×0.56 |
 | DECOY_CLOUD | 1 real warhead + 4 decoys | 2 ticks / 0.067 s | 2.70 | ×1.00 actual warhead | Four *physical* zero-damage decoys, each consumes a magazine round, with high RCS and emissions to compete for PD attention |
@@ -46,3 +46,5 @@ The existing **single aggregated firing/reload timer per weapon family on each s
 `gradle :core:ordnanceDoctrineSmoke` tests all **14** guided-family/pattern combinations with physical shot IDs, finite ammunition/power, boost delays, micro/heavy body signatures, actual zero-damage decoys, point-defense competition, launch interruption, and deterministic replay. Chained into the `massBattleCampaign` suite alongside `weaponBehaviorSmoke`, `projectileModuleSmoke`, `supportSystemsSmoke`, `fighterCraftSmoke`, `moduleResearchSmoke` and the crew and module-version suites.
 
 **Release state:** This is a feature branch, **not** merged into `main` or included in the existing signed Android RC1. The larger alien ship sprite archive is separately missing required binary commits and must not be silently reported complete.
+
+**2026-11-04 rebalance:** missile-only micro-swarm salvos double from eight to sixteen physically interceptable rounds per launch (15 ticks / 0.5 s from first to final round); micro-torpedo salvos remain eight. A missile arm must have sixteen stocked rounds to begin this pattern. Armor-piercing missile warhead speed is increased 20% relative to the former AP fitting (×1.08 → ×1.296 of the standard missile), leaving armor bypass, kinetic AP rounds, and other warheads unchanged. These figures describe production physics, not cosmetic missile effects.

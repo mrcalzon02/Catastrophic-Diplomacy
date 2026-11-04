@@ -17,7 +17,7 @@ Four implemented propulsion modes are `CONSTANT_BURN`, `COLD_START`, `BOOST_COAS
 4. Swarm weapons are multiple distinct missiles but have no swarm coordination, distribution or cooperative terminal attack.
 5. No independent seeker type, waypoint/dogleg, pincer, loiter, terminal retargeting, home-on-jam, submunition bus, interceptor or evasive steering profile.
 6. The `OrdnanceDoctrineTest.coldIgnition` assertion expects a static canister despite the current `COLD_EJECT` phase moving at 0.20x base speed. Reconcile expected physics and the test before claiming it passes. `OrdnancePropulsionTest` exists, but no explicit task registration was found in `core/build.gradle`.
-7. Existing `OrdnanceDoctrine.Mode` maps one salvo to one motor schedule. This prevents mixing, for example, an eight-body swarm with a cold-coast-sprint flight plan.
+7. Existing `OrdnanceDoctrine.Mode` maps one salvo to one motor schedule. This prevents mixing, for example, a sixteen-body missile swarm with a cold-coast-sprint flight plan.
 
 These are gaps, not grounds for falsely describing the current system as broken in every respect. Preserve existing real hit detection, physical PD, deterministic seeded replay, ammunition, emitter-origin events and faction/technology modifiers.
 
@@ -41,7 +41,7 @@ These presets are *design targets*, not claims of existing functionality. Defaul
 | Standard seeker | 1 | Continuous burn, lead intercept | Baseline guided attack |
 | Ripple volley | 3+ | Staggered, target-persistent pursuit | Sustainable PD pressure |
 | Saturation salvo | 5+ | Dense timed salvo, varied offsets | Overload a local defense battery |
-| Micro Swarm | 6–12 | Tiny independent motors; **cooperative target selection** and staggered impact windows | Difficult allocation problem for PD; individually fragile |
+| Micro Swarm | 16 missiles (8 micro-torpedoes) | Tiny independent motors; **cooperative target selection** and staggered impact windows | Difficult allocation problem for PD; individually fragile |
 | Needle Dart | 1–2 | Small cross section, high terminal agility, modest warhead | Anti-escort precision missile |
 | Heavy Payload / Siege Torpedo | 1–2 | Slow, armored, long burn or boost/coast | Threatens capital hulls; very interceptable if spotted early |
 | Cold-Ejected Canister | 1 | Unpowered eject, delayed safe-distance ignition | Minimize launch flash; early phase interceptable |
@@ -114,7 +114,7 @@ In **battle and battle screensaver**, renderer reads authoritative phases: eject
 ## 7. Acceptance scenarios
 
 - **Cold-to-ghost:** cold eject -> quiet coast for measured distance -> timed terminal light. Confirm invariant velocity when unpowered, lower *observed* signature than burning, still detectability from cross section, real PD kill possible.
-- **Micro defense:** eight true bodies; PD may destroy some and let others through; exact ammo/heat; independent IDs and finite collisions; outcome repeatable with same seed.
+- **Micro defense:** sixteen true missile bodies (eight for micro-torpedo salvos); PD may destroy some and let others through; exact ammo/heat; independent IDs and finite collisions; outcome repeatable with same seed.
 - **Pincer shields:** two routes are actually spatially distinct and reach separate defenders' sectors; finite steering cost and real tactical coverage effect.
 - **Heavy siege:** slower torpedo has demonstrably greater physical durability, is detected sooner when burning, requires several actual PD hits, and never teleports across a target.
 - **Decoy screen:** decoys consume ammo and can be acquired/intercepted, but they never inflict warhead damage, even when overlapping the hull.

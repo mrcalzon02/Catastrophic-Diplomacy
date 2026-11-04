@@ -537,13 +537,85 @@ public final class PointDefenseThreatMatrixDiagnostic {
         System.out.print(summary);
         System.out.println("PD_FAMILY_P0_ROWS="+(csv.size()-1));
     }
+    /** Ensure a researched physical shipyard launcher—not just the
+     * unmounted balance fixture—has sixteen real missiles in its magazine,
+     * can launch them under actual power/heat limits, and pays all sixteen. */
+    private static void fittedMicroSwarmSmoke(TechnologyCatalog catalog){
+        Shipyard.Design selected=Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        int retained=-1;
+        for(int slot=0;slot<selected.slots();slot++){
+            Shipyard.Installed component=selected.at(slot);
+            if(component==null||!component.component.endsWith("-MSL"))continue;
+            if(retained<0){
+                retained=slot;
+                selected=selected.stage(slot,Shipyard.Track.SPECIALIST,3);
+            }else selected=selected.install(slot,null);
+        }
+        require(retained>=0,"No fitted missile hardpoint for swarm test");
+        selected=selected.withGuidedOrdnance(Battle.DamageType.MISSILE,
+                new diplomacy.shipyard.OrdnanceFitting.Guided(
+                    OrdnanceDoctrine.Mode.MICRO_SWARM,
+                    OrdnancePropulsion.Mode.CONSTANT_BURN,
+                    OrdnanceGuidance.Mode.PURSUIT));
+        require(Shipyard.inspect(selected,catalog).valid(),
+                "Physical researched micro-missile design is invalid");
+        Battle fight=new Battle(129375L);
+        fight.spawnWing(0,selected,catalog,1,180,330);
+        Battle.Ship launcher=fight.ships().get(0);
+        Battle.Ship target=fight.addShip(1,Battle.Faction.DRAXIAN,560,330);
+        launcher.speed=launcher.vx=launcher.vy=0;
+        launcher.laserDamage=launcher.kineticDamage=0;
+        launcher.torpedoDamage=launcher.plasmaDamage=launcher.particleDamage=0;
+        launcher.fighterReserve=launcher.droneReserve=launcher.repairDroneReserve=0;
+        target.speed=target.vx=target.vy=0;
+        target.maxHull=target.hull=1000000;
+        target.laserDamage=target.missileDamage=target.kineticDamage=0;
+        target.torpedoDamage=target.plasmaDamage=target.particleDamage=0;
+        target.pdRange=0;
+        int initial=launcher.missileAmmo;
+        require(initial>=16,"Fitted swarm launcher lacks sixteen real ammunition units");
+        for(int i=0;i<180;i++){
+            fight.step();
+            if(fight.salvosStarted>0)launcher.missileReload=10000;
+            if(launcher.launched==16)break;
+        }
+        require(launcher.launched==16&&initial-launcher.missileAmmo==16,
+                "Fitted micro-swarm could not launch/pay sixteen rounds: fired="+
+                launcher.launched+" paid="+(initial-launcher.missileAmmo)+
+                " power="+launcher.power+" heat="+launcher.heat+
+                " magazines="+launcher.launchers.size());
+        long visualShots=fight.visualEvents().stream().filter(e->
+                e.sourceId()==launcher.id&&e.team()==0&&
+                e.phase()==Battle.VisualPhase.FIRE&&
+                "MISSILE".equals(e.weapon())).count();
+        require(visualShots==16,"Real micro-swarm needs sixteen unique FIRE events");
+        System.out.println("PASS actual fitted technology-3 launcher, 16 physical micro-missiles, paid power/heat/ammo");
+    }
     /** Focused functional proof before attempting the giant optional P0 /
      * threat-matrix balance tables. No synthetic missiles or fake PD rolls. */
     static void armorPiercingAndMicroSwarmSmoke(TechnologyCatalog catalog){
+        var missileBase=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
+        var previousAp=AmmunitionTable.warhead(
+                AmmunitionTable.Warhead.ARMOR_PIERCING).physical(missileBase);
+        var newAp=AmmunitionTable.guidedPhysical(Battle.DamageType.MISSILE,
+                AmmunitionTable.Warhead.ARMOR_PIERCING,missileBase);
+        require(StrictMath.abs(newAp.speed()/previousAp.speed()-1.20)<1e-12,
+                "Actual AP missile motor did not gain 20% speed");
+        require(AmmunitionTable.guidedPhysical(Battle.DamageType.TORPEDO,
+                AmmunitionTable.Warhead.ARMOR_PIERCING,missileBase)
+                .equals(previousAp),
+                "Missile motor buff changed unrelated AP torpedo physics");
+        require(OrdnanceDoctrine.forWeapon(Battle.DamageType.MISSILE,
+                OrdnanceDoctrine.Mode.MICRO_SWARM).count()==16,
+                "Micro missile launch doctrine is not sixteen individual bodies");
+        require(OrdnanceDoctrine.forWeapon(Battle.DamageType.TORPEDO,
+                OrdnanceDoctrine.Mode.MICRO_SWARM).count()==8,
+                "Missile-specific increase unexpectedly changed torpedo swarms");
         for(Threat threat:new Threat[]{
                 Threat.MISSILE_WARHEAD_ARMOR_PIERCING,
                 Threat.MISSILE_MICRO_SWARM}){
-            int expected=threat==Threat.MISSILE_MICRO_SWARM?8:1;
+            int expected=threat==Threat.MISSILE_MICRO_SWARM?16:1;
             for(int tier:new int[]{0,9})
                 for(int mounts:new int[]{1,4})
                     for(int seed=0;seed<2;seed++){
@@ -580,7 +652,8 @@ public final class PointDefenseThreatMatrixDiagnostic {
                                 " defendedHits="+active.primaryHits());
                     }
         }
-        System.out.println("PASS AP warhead and 8-body micro swarm: 32 matched active/hold-fire real-physics trials");
+        fittedMicroSwarmSmoke(catalog);
+        System.out.println("PASS faster AP missile and 16-body micro swarm: 32 matched active/hold-fire real-physics trials");
     }
     public static void main(String[] args)throws IOException{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();

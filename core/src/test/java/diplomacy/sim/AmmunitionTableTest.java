@@ -33,6 +33,25 @@ public final class AmmunitionTableTest {
     public static void main(String[] args){
         check(AmmunitionTable.kinetics().size()==5,"Five distinct ballistic payloads");
         check(AmmunitionTable.warheads().size()==6,"Six distinct guided warheads");
+        var physical=ProjectileModel.standard(ProjectileModel.Kind.MISSILE);
+        var ap=AmmunitionTable.warhead(AmmunitionTable.Warhead.ARMOR_PIERCING);
+        var legacyAp=ap.physical(physical);
+        var fasterMissile=AmmunitionTable.guidedPhysical(
+                Battle.DamageType.MISSILE,AmmunitionTable.Warhead.ARMOR_PIERCING,physical);
+        var unchangedTorpedo=AmmunitionTable.guidedPhysical(
+                Battle.DamageType.TORPEDO,AmmunitionTable.Warhead.ARMOR_PIERCING,physical);
+        check(StrictMath.abs(fasterMissile.speed()/legacyAp.speed()-1.20)<1e-12,
+                "AP missile flight speed must rise 20% relative to its old motor");
+        check(unchangedTorpedo.equals(legacyAp),
+                "Missile-only AP speed change modified existing AP torpedo physics");
+        check(fasterMissile.health()==legacyAp.health()&&
+                fasterMissile.crossSection()==legacyAp.crossSection()&&
+                fasterMissile.signature()==legacyAp.signature(),
+                "AP missile speed tuning unexpectedly changed HP, radar size or emissions");
+        check(AmmunitionTable.guidedPhysical(Battle.DamageType.MISSILE,
+                AmmunitionTable.Warhead.STANDARD,physical).equals(
+                AmmunitionTable.warhead(AmmunitionTable.Warhead.STANDARD).physical(physical)),
+                "Standard missiles must retain original physical statistics");
         check(AmmunitionTable.kinetic(AmmunitionTable.Kinetic.RELATIVISTIC).speed()>2,
                 "Relativistic-style mass driver requires real additional velocity");
         check(AmmunitionTable.kinetic(AmmunitionTable.Kinetic.RELATIVISTIC).heatCost()>2,

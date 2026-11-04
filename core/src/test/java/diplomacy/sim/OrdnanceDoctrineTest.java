@@ -64,6 +64,8 @@ public final class OrdnanceDoctrineTest {
                 check(world.decoysLaunched==p.decoys(),
                         "Countermeasure records match actual launched bodies");
                 if(mode==OrdnanceDoctrine.Mode.MICRO_SWARM){
+                    check(p.real()==(family==Battle.DamageType.MISSILE?16:8),
+                            "Micro-missiles must launch sixteen separate rounds; torpedo pattern unchanged");
                     check(world.missiles().stream().allMatch(m->
                             m.payload==OrdnanceDoctrine.Payload.MICRO
                             &&m.spec.health()<attacker.missileProjectile.health()
