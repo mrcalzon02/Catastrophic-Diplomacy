@@ -200,7 +200,10 @@ public final class MassBattleCampaignTest {
                 if(Shipyard.inspect(support,catalog).valid())design=support;
             }
             int qty=33+(group<2?1:0); // 34+34+33+33+33+33 = 200
-            double centerX=(team==0?220:880)+(group%3)*95;
+            // Actual close-range combined arms: opposing gun lines must enter
+            // fitted KIN and PLA engagement envelopes while all 400 hulls
+            // remain within the fixed 1280x720 initial battle viewport.
+            double centerX=(team==0?385:745)+(group%3)*95;
             double centerY=238+(group/3)*190;
             // At least one real carrier of EVERY fighter hull on EACH team.
             // Keep the other 32/33 ships' original mixed weapon/support outfits.
@@ -251,6 +254,15 @@ public final class MassBattleCampaignTest {
 
     public static void main(String[] args)throws IOException {
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        // Fast focused repeat of the real 400-ship final release exercise.
+        // Preserve its unchanged full escalation/replay gate for releases.
+        if(args.length==1&&"--mixed-only".equals(args[0])){
+            long first=mixedFleet(catalog,762244L,480);
+            long replay=mixedFleet(catalog,762244L,480);
+            check(first==replay,"200v200 mixed-fleet replay deterministic");
+            System.out.println("PASS focused real 200v200 all-weapon mixed replay");
+            return;
+        }
         int configurations=weaponProof(catalog);
         List<String> csv=new ArrayList<>();
         csv.add("ships_per_team,total_ships,ticks,elapsed_ms,hits,missile_intercepts,destructions,missiles_in_flight,craft_in_flight,fingerprint");
