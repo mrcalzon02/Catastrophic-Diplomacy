@@ -28,6 +28,16 @@ public final class OrdnanceBlueprintTest {
         reject(()->old.withGuidedOrdnance(Battle.DamageType.MISSILE,selected),
                 "Basic missiles may not use advanced propulsion");
         var upgraded=old.stage(socket,Shipyard.Track.SPECIALIST,4);
+        // Sixteen independently launched missiles require a real magazine;
+        // the starter dreadnought has eleven intrinsic missile rounds.
+        boolean magazineInstalled=false;
+        for(Shipyard.Slot support:upgraded.hull.slots)
+            if(support.mount()==Shipyard.Mount.SUPPORT&&
+                    upgraded.at(support.index())==null){
+                upgraded=upgraded.install(support.index(),"BASE-TER-MAG");
+                magazineInstalled=true;break;
+            }
+        check(magazineInstalled,"No physical magazine socket for sixteen micro-missiles");
         check(Shipyard.inspect(upgraded,catalog).valid(),
                 "Installed tier-4 missile research must still fit within the hull");
         var configured=upgraded.withGuidedOrdnance(Battle.DamageType.MISSILE,selected);
