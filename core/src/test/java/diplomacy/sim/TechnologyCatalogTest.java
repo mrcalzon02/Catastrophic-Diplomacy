@@ -69,11 +69,59 @@ public final class TechnologyCatalogTest {
                 require(c.base("BASE-"+faction+"-"+role)!=null
                         && "support".equals(c.base("BASE-"+faction+"-"+role).category),
                         "Missing physical support module "+faction+"/"+role);
+                // Capture the existing fully resident support-family behavior
+                // before virtualizing its cloned research. This cross-check
+                // covers all factions, all nine stages, exact research economics,
+                // upgrade identity, name, tradeoff and physical multipliers.
+                String parentCode=(role.equals("DHL")||role.equals("DSH")||
+                        role.equals("DAR")||role.equals("DPW"))?"DRN":"XFR";
+                String title=switch(role){
+                    case "HPR" -> "Long-Range Hull Restoration Projector";
+                    case "APR" -> "Armor Restoration Projector";
+                    case "PWR" -> "Power Transfer Projector";
+                    case "DHL" -> "Hull Service Drone Bay";
+                    case "DSH" -> "Shield Service Drone Bay";
+                    case "DAR" -> "Armor Service Drone Bay";
+                    case "DPW" -> "Power Service Drone Bay";
+                    case "AHL" -> "Hull Restoration Aura";
+                    case "ASH" -> "Shield Restoration Aura";
+                    case "AAR" -> "Armor Restoration Aura";
+                    case "APW" -> "Power Restoration Aura";
+                    default -> throw new IllegalStateException("Unknown support family");
+                };
+                String sourceName=parentCode.equals("DRN")?
+                        "Drone Controller":"Shield Transfer Projector";
                 for(String branch:Set.of("OUTPUT","EFFICIENCY","RESILIENCE","SPECIALIST"))
-                    for(int rank=1;rank<=9;rank++)
-                        require(c.get("TECH-"+faction+"-"+role+"-"+branch+"-"+
-                                String.format(java.util.Locale.ROOT,"%02d",rank))!=null,
-                                "Support evolution research missing "+faction+"/"+role);
+                    for(int rank=1;rank<=9;rank++){
+                        String suffix="-"+branch+"-"+
+                                String.format(java.util.Locale.ROOT,"%02d",rank);
+                        var actual=c.get("TECH-"+faction+"-"+role+suffix);
+                        var parent=c.get("TECH-"+faction+"-"+parentCode+suffix);
+                        require(actual!=null&&parent!=null&&
+                                actual.stage==rank&&actual.faction.equals(faction)&&
+                                actual.subsystem.equals(role)&&actual.track.equals(branch),
+                                "Support evolution identity missing "+faction+"/"+role+"/"+suffix);
+                        require(actual.prerequisite.equals(rank==1?"BASE-"+faction+"-"+role:
+                                "TECH-"+faction+"-"+role+"-"+branch+"-"+
+                                        String.format(java.util.Locale.ROOT,"%02d",rank-1)),
+                                "Support family prerequisite drift "+actual.id);
+                        require(actual.researchCost==parent.researchCost&&
+                                actual.industryCost==parent.industryCost&&
+                                Double.compare(actual.mass,parent.mass)==0&&
+                                Double.compare(actual.power,parent.power)==0&&
+                                Double.compare(actual.heat,parent.heat)==0&&
+                                Double.compare(actual.output,parent.output)==0&&
+                                Double.compare(actual.accuracy,parent.accuracy)==0&&
+                                Double.compare(actual.integrity,parent.integrity)==0&&
+                                Double.compare(actual.shield,parent.shield)==0&&
+                                Double.compare(actual.thrust,parent.thrust)==0&&
+                                Double.compare(actual.cooling,parent.cooling)==0&&
+                                Double.compare(actual.maintenance,parent.maintenance)==0,
+                                "Support family economic/physical drift "+actual.id);
+                        require(actual.name.equals(parent.name.replace(sourceName,title))&&
+                                actual.tradeoff.equals(title+": "+parent.tradeoff),
+                                "Support family description drift "+actual.id);
+                    }
             }
             for(String module:new String[]{"CMP","ABL","DEN","RAC","BLK"}){
                 require(c.base("BASE-"+faction+"-"+module)!=null &&
