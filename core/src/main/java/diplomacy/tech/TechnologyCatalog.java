@@ -29,6 +29,24 @@ public final class TechnologyCatalog {
     private static final Set<String> FACTIONS = Set.of(
             "TER","DRA","CAR","ZIP","UZI","MAN","VAE","ZEL","AUR","NYX","UMB");
 
+    /** Check exact canonical Stage I-IX IDs without building a formatted
+     * expectation string for every on-demand research lookup. */
+    private static boolean canonicalUpgradeId(String id,String faction,
+                                               String subsystem,String track,int stage){
+        if(id==null||stage<1||stage>9||!id.startsWith("TECH-"))return false;
+        int offset=5;
+        if(!id.regionMatches(offset,faction,0,faction.length()))return false;
+        offset+=faction.length();
+        if(offset>=id.length()||id.charAt(offset++)!='-')return false;
+        if(!id.regionMatches(offset,subsystem,0,subsystem.length()))return false;
+        offset+=subsystem.length();
+        if(offset>=id.length()||id.charAt(offset++)!='-')return false;
+        if(!id.regionMatches(offset,track,0,track.length()))return false;
+        offset+=track.length();
+        return offset+3==id.length()&&id.charAt(offset)=='-'&&
+                id.charAt(offset+1)=='0'&&id.charAt(offset+2)=='0'+stage;
+    }
+
     public static final class Upgrade {
         public final String id, faction, subsystem, track, name, prerequisite, tradeoff;
         public final int stage, researchCost, industryCost;
@@ -50,8 +68,8 @@ public final class TechnologyCatalog {
                     || subsystem.isBlank() || name.isBlank() || tradeoff.isBlank()
                     || researchCost <= 0 || industryCost <= 0)
                 throw new IllegalArgumentException("Invalid upgrade metadata: " + id);
-            String expected = "TECH-" + faction + "-" + subsystem + "-" + track + "-" + String.format(java.util.Locale.ROOT, "%02d", stage);
-            if (!expected.equals(id)) throw new IllegalArgumentException("Noncanonical technology ID: " + id);
+            if (!canonicalUpgradeId(id,faction,subsystem,track,stage))
+                throw new IllegalArgumentException("Noncanonical technology ID: " + id);
         }
         /**
          * Exact numeric-copy route for a cloned research lineage. Its source
@@ -87,9 +105,7 @@ public final class TechnologyCatalog {
                     stage<1||stage>9||subsystem.isBlank()||name.isBlank()||
                     tradeoff.isBlank()||researchCost<=0||industryCost<=0)
                 throw new IllegalArgumentException("Invalid upgrade metadata: "+id);
-            String expected="TECH-"+faction+"-"+subsystem+"-"+track+"-"+
-                    String.format(Locale.ROOT,"%02d",stage);
-            if(!expected.equals(id))
+            if(!canonicalUpgradeId(id,faction,subsystem,track,stage))
                 throw new IllegalArgumentException("Noncanonical technology ID: "+id);
         }
         /**
@@ -124,9 +140,7 @@ public final class TechnologyCatalog {
             for(double value:modifiers)
                 if(!Double.isFinite(value)||value<=0)
                     throw new IllegalArgumentException("Unsafe physical modifier: "+id);
-            String expected="TECH-"+faction+"-"+subsystem+"-"+track+"-"+
-                    String.format(Locale.ROOT,"%02d",stage);
-            if(!expected.equals(id))
+            if(!canonicalUpgradeId(id,faction,subsystem,track,stage))
                 throw new IllegalArgumentException("Noncanonical technology ID: "+id);
         }
     }
@@ -290,7 +304,7 @@ public final class TechnologyCatalog {
         if(source==null)return null;
         String predecessor=stage==1?"BASE-"+parts[1]+"-"+v.code():
                 "TECH-"+parts[1]+"-"+v.code()+"-"+parts[3]+"-"+
-                        String.format(Locale.ROOT,"%02d",stage-1);
+                        ("0"+(stage-1));
         long research=Math.round(source.researchCost*v.price());
         long industry=Math.round(source.industryCost*v.price());
         if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
@@ -320,7 +334,7 @@ public final class TechnologyCatalog {
         if(source==null)return null;
         String predecessor=stage==1?"BASE-"+parts[1]+"-"+v.code():
                 "TECH-"+parts[1]+"-"+v.code()+"-"+parts[3]+"-"+
-                        String.format(Locale.ROOT,"%02d",stage-1);
+                        ("0"+(stage-1));
         long research=Math.round(source.researchCost*v.price());
         long industry=Math.round(source.industryCost*v.price());
         if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
@@ -351,7 +365,7 @@ public final class TechnologyCatalog {
         if(parent==null)return null;
         String prerequisite=stage==1?"BASE-"+parts[1]+"-"+model.code():
                 "TECH-"+parts[1]+"-"+model.code()+"-"+parts[3]+"-"+
-                        String.format(Locale.ROOT,"%02d",stage-1);
+                        ("0"+(stage-1));
         String name=model.name()+" "+parts[3]+" "+
                 (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
         // The model changes its research identity, not its parent's physical
@@ -377,7 +391,7 @@ public final class TechnologyCatalog {
         if(parent==null)return null;
         String prerequisite=stage==1?"BASE-"+parts[1]+"-"+family.code():
                 "TECH-"+parts[1]+"-"+family.code()+"-"+parts[3]+"-"+
-                        String.format(Locale.ROOT,"%02d",stage-1);
+                        ("0"+(stage-1));
         String name=family.name()+" "+parts[3]+" "+
                 (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
         // Parent numbers are already canonical six-decimal values. Copying
@@ -409,7 +423,7 @@ public final class TechnologyCatalog {
         if(source==null)return null;
         String predecessor=stage==1?"BASE-"+parts[1]+"-"+family[0]:
                 "TECH-"+parts[1]+"-"+family[0]+"-"+parts[3]+"-"+
-                        String.format(Locale.ROOT,"%02d",stage-1);
+                        ("0"+(stage-1));
         String sourceName=family[2].equals("DRN")?
                 "Drone Controller":"Shield Transfer Projector";
         // Retain the source's ten validated numeric modifiers and its exact
