@@ -6504,6 +6504,7 @@ public final class Battle {
             hash = mix(hash,s.trackPackets.fingerprint());
             hash = mix(hash,s.targetCompute.fingerprint());
             hash = mix(hash,s.fleetCompute.fingerprint());
+            hash=mix(hash,s.fighterCountermeasureTier);
             hash = mix(hash,s.commandSourceId);
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
@@ -6659,6 +6660,20 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(p.y));
             hash=mix(hash,Double.doubleToLongBits(p.integrity));
         }
+        hash=mix(hash,fighterChaffDeployed);
+        hash=mix(hash,fighterFlaresDeployed);
+        hash=mix(hash,fighterChaffFlakDiversions);
+        hash=mix(hash,fighterChaffRotaryDiversions);
+        for(FighterCountermeasures.Cloud cloud:fighterClouds){
+            hash=mix(hash,cloud.id());
+            hash=mix(hash,cloud.kind().ordinal());
+            hash=mix(hash,cloud.craftId());
+            hash=mix(hash,cloud.bornTick());
+            hash=mix(hash,Double.doubleToLongBits(cloud.x()));
+            hash=mix(hash,Double.doubleToLongBits(cloud.y()));
+            hash=mix(hash,Double.doubleToLongBits(cloud.vx()));
+            hash=mix(hash,Double.doubleToLongBits(cloud.vy()));
+        }
         for (Craft craft : crafts) {
             hash=mix(hash,craft.id);hash=mix(hash,Double.doubleToLongBits(craft.x));
             hash=mix(hash,Double.doubleToLongBits(craft.y));
@@ -6667,6 +6682,9 @@ public final class Battle {
             hash=mix(hash,Double.doubleToLongBits(craft.repairReserve));
             hash=mix(hash,craft.targetId);
             hash=mix(hash,craft.targetCraftId);hash=mix(hash,craft.ammunition);
+            hash=mix(hash,craft.flareRemaining);
+            hash=mix(hash,craft.chaffRemaining);
+            hash=mix(hash,craft.nextCountermeasureTick);
             hash=mix(hash,craft.profile==null?-1:craft.profile.hull().ordinal());
             hash=mix(hash,Double.doubleToLongBits(craft.integrity));
             hash=mix(hash,Double.doubleToLongBits(craft.armor));
