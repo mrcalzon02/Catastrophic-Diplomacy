@@ -36,6 +36,7 @@ on:
       - 'core/src/test/java/diplomacy/sim/BeamRayGeometryTest.java'
       - 'core/src/test/java/diplomacy/sim/RocketBarrageTest.java'
       - 'game/src/main/java/diplomacy/client/SensorContactOverlay.java'
+      - 'game/src/main/java/diplomacy/client/CatastrophicGame.java'
       - 'core/src/main/java/diplomacy/sim/SensorRelayBuffer.java'
       - 'core/src/main/java/diplomacy/sim/SensorFalseContactRelay.java'
       - 'core/src/test/java/diplomacy/sim/SensorFalseContactRelayTest.java'

@@ -687,6 +687,27 @@ targeting model is unchanged. Separately addressed active radar and optical
 fighter seeker heads, command guidance and sensor-dependent chaff vs missile
 remain pending. This slice carries focused full-battle tests and replay checks.
 
+**Active fighter radar missile and visual countermeasure integration
+(2026-11-03):** Per paid carrier's FTR specialist stage 5+, a pre-engage
+choice fits either the existing passive infrared seeker or a real active
+radar head to its interceptor fighters. Stage 5-7 radar heads are narrow-
+beam and longer-reach; stages 8-9 are wide-area and shorter-reach. Radar
+missiles pay a finite onboard electrical budget for pulses and retain
+bounded, physical transmitter-position history. Detection requires
+the pulse to travel outbound, intersect a historical fighter/chaff state,
+and return to the moving missile receiver; no instantaneous present-day
+fighter knowledge is granted. Only radar chaff competes as a radar echo.
+Passive infrared missiles instead see physical infrared flares. Radar
+defensive release is triggered by the actual approaching radar missile.
+Countermeasures may cause actual proximity fuzes but remain unable to
+grant a hit-rate immunity to other damage or physical nearby flak.
+The real battle renderer now draws finite active infrared cartridges
+as tiny warm emission spots and radar chaff as independently aging,
+dim dispersing flecks. Long-lived historical light-source objects do
+not remain visible after cartridge expiry. Color/spacing/readability
+are advisory and never release-blocking. The tested core radar and
+fighter smoke plus game-client compilation are required functionality.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 higher-resolution sub-tick receiver paths, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
