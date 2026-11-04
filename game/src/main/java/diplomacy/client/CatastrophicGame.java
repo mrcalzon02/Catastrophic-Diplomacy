@@ -2504,6 +2504,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             diagnosticRecorder.export(output.write(false),
                     Gdx.app.getType().name(),speed,paceGovernor.effective(),
                     battle==null?0:battle.tick);
+            // Verify from the actual platform filesystem before telling the
+            // player an artifact exists or invoking Android's share chooser.
+            CombatDiagnosticRecorder.verifyArchive(output.read());
             performanceNotice("EXPORTED "+path);
             Gdx.app.log("CD-PERF-EXPORT",output.file().getAbsolutePath()+
                     " bytes="+output.length());
