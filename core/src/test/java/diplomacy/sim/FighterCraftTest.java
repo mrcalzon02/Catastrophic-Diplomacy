@@ -131,6 +131,19 @@ public final class FighterCraftTest {
                                 java.util.List.of("ORG:0","ORG:1","ORG:2")),
                 "Legacy carrier save must reconstruct stable native bay identities");
     }
+    /** A fighter launch requires real resolved enemy contact. Light-travel
+     * acquisition cannot authorize a first-tick magical carrier sortie.
+     * Wait only up to four sim seconds; all inventory/bay assertions remain
+     * exact once the actual launch occurs. */
+    private static void awaitPhysicalSorties(Battle battle,
+                                             Battle.Ship parent,int required){
+        for(int t=0;t<120&&parent.fightersLaunched<required;t++)
+            battle.step();
+        check(parent.fightersLaunched>=required,
+                "Real sensor acquisition never enabled purchased fighter sorties"
+                +" expected="+required+" actual="+parent.fightersLaunched
+                +" tick="+battle.tick);
+    }
     /** Physical aviation is hull capacity plus fitted modular hangars. */
     private static void hangarCapacityAndSorties(TechnologyCatalog tech){
         Shipyard.Design fleetCarrier=Shipyard.starter(Battle.Faction.TERRAN,
@@ -183,7 +196,7 @@ public final class FighterCraftTest {
         check(!modular.fighterBay(damagedId).operational()
                         &&modular.fighterReserve==paid,
                 "Disabling one bay must not erase purchased fighter stock");
-        moduleBattle.step();
+        awaitPhysicalSorties(moduleBattle,modular,modules-1);
         check(modular.fightersLaunched==modules-1
                         &&modular.fighterReserve==paid-(modules-1),
                 "Damaged FTR bay must block only its own launch lane");
@@ -216,7 +229,7 @@ public final class FighterCraftTest {
                         &&parent.fighterBay("ORG:1")!=null
                         &&parent.fighterBay("ORG:2")!=null,
                 "Carrier must expose three independent native catapult identities");
-        battle.step();
+        awaitPhysicalSorties(battle,parent,3);
         check(parent.fightersLaunched==3&&parent.fighterReserve==initial-3,
                 "Carrier initial launch must deploy exactly one craft per bay");
         check(battle.crafts().stream().filter(c->c.fighter
