@@ -6076,12 +6076,20 @@ public final class Battle {
                 m.lastFighterPhotons.receivedTick()>m.lastFighterConsumedTick&&
                 (m.flightTicks+m.visualId%scanTicks)%scanTicks==0){
             var reading=m.lastFighterPhotons;
+            // The arrived optical/radar-band measurement is not a perfect
+            // coordinate oracle: field of view, signal strength, delay,
+            // seeker hardware and the paid guidance quality set finite error.
+            // Physics/collision still uses the real fighter and cloud bodies.
+            var estimate=FighterSeekerEstimate.from(reading,m.visualId,
+                    target.id,m.guidanceQuality,m.fighterIrHead,
+                    m.fighterRadarHead,m.x,m.y);
             m.seekerLocked=true;
-            m.lastKnownX=reading.x();m.lastKnownY=reading.y();
-            m.lastKnownVX=reading.vx();m.lastKnownVY=reading.vy();
+            m.lastKnownX=estimate.x();m.lastKnownY=estimate.y();
+            m.lastKnownVX=estimate.vx();m.lastKnownVY=estimate.vy();
             m.lastObservationTick=reading.emittedTick();
             m.lastFighterConsumedTick=reading.receivedTick();
-            m.seekerUncertainty=2+(tick-reading.emittedTick())*DT;
+            m.seekerUncertainty=estimate.uncertaintyRadius()+
+                    (tick-reading.emittedTick())*DT;
             if(reading.flareId()>0&&reading.flareId()!=m.lastFlareId){
                 if(m.fighterRadarHead!=null)fighterChaffSeekerDiversions++;
                 else fighterFlareSeekerDiversions++;

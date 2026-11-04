@@ -136,8 +136,68 @@ public final class FighterRadarSeekerTest {
         }
         System.out.println("PASS fitted radar fighter missiles, chaff, IR isolation, replay");
     }
+    private static void finiteSpectralEstimates(){
+        // Two bands may receive the SAME delayed coordinate and still
+        // resolve it differently. No fresh position is permitted as input.
+        var reading=new FighterInfraredSeeker.Reading(
+                150,100,14,-5,10,14,0,1.4);
+        var narrow=FighterSeekerEstimate.from(reading,91,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        var replay=FighterSeekerEstimate.from(reading,91,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        var wide=FighterSeekerEstimate.from(reading,91,20,1.2,
+                null,FighterRadarSeeker.Head.WIDE_AREA,0,100);
+        var fixedIr=FighterSeekerEstimate.from(reading,91,20,1.2,
+                FighterInfraredSeeker.Head.FIXED_FORWARD,null,0,100);
+        var wideIr=FighterSeekerEstimate.from(reading,91,20,1.2,
+                FighterInfraredSeeker.Head.WIDE_ANGLE,null,0,100);
+        require(narrow.equals(replay)&&
+                narrow.uncertaintyRadius()<wide.uncertaintyRadius()&&
+                fixedIr.uncertaintyRadius()<wideIr.uncertaintyRadius(),
+                "Narrow/wide spectral seeker resolutions collapsed or replay changed");
+        require(StrictMath.hypot(narrow.x()-reading.x(),
+                narrow.y()-reading.y())<=narrow.uncertaintyRadius()+1e-9&&
+                StrictMath.hypot(narrow.x()-reading.x(),
+                narrow.y()-reading.y())>1e-9,
+                "Radar seeker falsely used perfect target coordinates");
+        var skilled=FighterSeekerEstimate.from(reading,91,20,2.0,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        var weaker=FighterSeekerEstimate.from(
+                new FighterInfraredSeeker.Reading(
+                        150,100,14,-5,10,14,0,.15),91,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        var distant=FighterSeekerEstimate.from(reading,91,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,-200,100);
+        var stale=FighterSeekerEstimate.from(
+                new FighterInfraredSeeker.Reading(
+                        150,100,14,-5,1,14,0,1.4),91,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        var otherMissile=FighterSeekerEstimate.from(reading,92,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        require(skilled.uncertaintyRadius()<narrow.uncertaintyRadius()&&
+                weaker.uncertaintyRadius()>narrow.uncertaintyRadius()&&
+                distant.uncertaintyRadius()>narrow.uncertaintyRadius()&&
+                stale.uncertaintyRadius()>narrow.uncertaintyRadius()&&
+                !otherMissile.equals(narrow),
+                "Signal, range, latency, paid guidance or missile-specific noise had no effect");
+        var ghost=new FighterInfraredSeeker.Reading(
+                180,125,0,0,10,14,991,9);
+        var ghostFix=FighterSeekerEstimate.from(ghost,91,20,1.2,
+                null,FighterRadarSeeker.Head.NARROW_BEAM,0,100);
+        require(StrictMath.hypot(ghostFix.x()-ghost.x(),
+                ghostFix.y()-ghost.y())<=ghostFix.uncertaintyRadius()+1e-9,
+                "Measured chaff coordinates were silently replaced by real aircraft truth");
+        boolean rejected=false;
+        try{FighterSeekerEstimate.from(reading,91,20,1.2,
+                FighterInfraredSeeker.Head.WIDE_ANGLE,
+                FighterRadarSeeker.Head.NARROW_BEAM,0,100);}
+        catch(IllegalArgumentException ok){rejected=true;}
+        require(rejected,"Invalid simultaneous spectral hardware bypassed classification");
+        System.out.println("PASS finite IR/radar seeker error, spectral resolution, signal, delay and replay");
+    }
     public static void main(String[] args)throws Exception{
         photonChronology();
+        finiteSpectralEstimates();
         live(TechnologyCatalog.loadDefault());
     }
 }
