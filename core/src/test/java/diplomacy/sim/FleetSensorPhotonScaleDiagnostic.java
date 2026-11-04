@@ -143,14 +143,16 @@ public final class FleetSensorPhotonScaleDiagnostic {
                           int direct,int relayed,int historical,int ghosts,
                           int peakMissiles,int peakBeams,
                           long solverAllocations,long solverExhausted,
+                          long fcmAllocations,long fcmExhausted,
                           int aliveA,int aliveB){
         String csv(){
             return count+","+count+","+ticks+","+
                     String.format(Locale.ROOT,"%.1f",wallNs/1e6)+","+
                     peakHeap+","+shots+","+hits+","+direct+","+relayed+","+
                     historical+","+ghosts+","+peakMissiles+","+peakBeams+","+
-                    solverAllocations+","+solverExhausted+","+aliveA+","+aliveB+","+
-                    Long.toHexString(checksum);
+                    solverAllocations+","+solverExhausted+","+
+                    fcmAllocations+","+fcmExhausted+","+
+                    aliveA+","+aliveB+","+Long.toHexString(checksum);
         }
     }
     private static Result measure(TechnologyCatalog catalog,int count,int steps,
@@ -234,19 +236,23 @@ public final class FleetSensorPhotonScaleDiagnostic {
             }
         }
         alive0=battle.alive(0);alive1=battle.alive(1);
-        long allocated=0,exhausted=0;
+        long allocated=0,exhausted=0,shared=0,sharedExhausted=0;
         for(Battle.Ship ship:battle.ships()){
             allocated+=ship.targetCompute.allocations;
             exhausted+=ship.targetCompute.exhausted;
+            shared+=ship.fleetCompute.allocations;
+            sharedExhausted+=ship.fleetCompute.exhausted;
         }
-        check(allocated>=0&&exhausted<=allocated,
+        check(allocated>=0&&exhausted<=allocated&&
+                shared>=sharedExhausted,
                 "Invalid physically funded fire-control compute counters");
         Battle.Ship command=battle.tacticalViewer(0);
         System.out.println("PROFILE_ROUTE_TRACE "+count+"v"+count+
                 " direct="+direct+" relayed="+relayed+
                 " historical="+historical+" ghosts="+ghosts+
                 " fire="+shots+" beams="+peakBeams+
-                " compute="+allocated+
+                " compute="+allocated+" FCM_credits="+shared+
+                " FCM_limited="+sharedExhausted+
                 " command="+(command==null?"NONE":command.id+
                         "/FCM="+command.network.commandCapacity()+
                         "/SHR="+command.network.sharingCapacity()+
@@ -265,7 +271,7 @@ public final class FleetSensorPhotonScaleDiagnostic {
         return new Result(count,steps,System.nanoTime()-begin,peak,
                 battle.fingerprint(),shots,battle.hitCount,direct,relayed,
                 historical,ghosts,peakMissiles,peakBeams,allocated,exhausted,
-                alive0,alive1);
+                shared,sharedExhausted,alive0,alive1);
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
@@ -279,7 +285,8 @@ public final class FleetSensorPhotonScaleDiagnostic {
         rows.add("ships_0,ships_1,ticks,wall_ms,peak_heap_bytes,weapon_fire_events,"+
                 "physical_hits,direct_reports,relayed_reports,historical_reports,"+
                 "false_hypotheses,peak_missiles,peak_inflight_beam_fronts,"+
-                "target_compute_allocations,target_compute_limited,alive0,alive1,hash");
+                "target_compute_allocations,target_compute_limited,"+
+                "fcm_shared_requests,fcm_shared_limited,alive0,alive1,hash");
         List<Result> results=new ArrayList<>();
         for(int i=0;i<SIZES.length;i++){
             int count=SIZES[i],ticks=TICKS[i];
@@ -317,14 +324,15 @@ public final class FleetSensorPhotonScaleDiagnostic {
                 "|Per side|Ticks|Wall ms|Peak heap bytes|Real FIRE events|Hits|"+
                 "Direct reports|Relayed|Historical|False samples|"+
                 "Peak missiles|Peak beam fronts|Compute allocations|Limited|"+
+                "FCM shared requests|FCM limited|"+
                 "Alive side 0|Alive side 1|Replay hash|\n"+
                 "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"+
-                "---:|---:|---:|---:|---:|---:|---|\n");
+                "---:|---:|---:|---:|---:|---:|---:|---:|---|\n");
         for(Result value:results)
             report.append("|").append(value.csv().replace(",", "|")
                     .replaceFirst("^\\d+\\|", "")).append("|\n");
         report.append("\nPerformance, peak memory, weapon balance and the "+
-                "number of received hypotheses are advisory diagnostics, "+
+                "number of received hypotheses and pooled FCM cycles are advisory diagnostics, "+
                 "NOT build or release limits. Replays, physical state "+
                 "validity, fitted equipment and real weapon emission are "+
                 "objective functionality checks inside this optional job. "+

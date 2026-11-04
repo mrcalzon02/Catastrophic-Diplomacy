@@ -643,6 +643,15 @@ holographic aim bearings from the same historically received emitter
 profile and measured position as their real fire-control solution, not
 the enemy's current fake-ship geometry.
 
+**Post-FCM fleet-scale evidence:** The existing opt-in 16v16/200v200
+sensor-photon diagnostic additionally records donor FCM requests and
+exhausted shared-credit attempts separately from intrinsic ship compute
+allocations. This permits testing whether real-world command coverage
+and received-track age actually trigger sharing in the larger battle;
+a lack of requests is reported as evidence, not fabricated into success.
+The CSV and summary remain optional and never impose runtime speed or
+target kill-ratio release gates.
+
 **Still pending:** multi-hypothesis weapon fire-control arbitration,
 higher-resolution sub-tick receiver paths, probabilistic multi-hypothesis
 seeker filtering and compute arbitration, higher-fidelity guided trajectory
