@@ -1,0 +1,47 @@
+# Diagnostic-only; compiles Java and executes headless workloads, never APK/MSI.
+name: Optional technology and wiki memory diagnostics
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/technology-efficiency-diagnostics.yml
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Profile 16 MiB authoritative technology catalog
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :core:technologyProfile 2>&1 | tee technology-profile.log
+      - name: Profile 16 MiB wiki search and paging
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon :game:wikiProfile 2>&1 | tee wiki-profile.log
+      - name: Upload timings, heap diagnostics and any failed workload stack traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: technology-efficiency-profile-${{ github.run_id }}
+          path: |
+            technology-profile.log
+            wiki-profile.log
+          if-no-files-found: warn
+          retention-days: 14
