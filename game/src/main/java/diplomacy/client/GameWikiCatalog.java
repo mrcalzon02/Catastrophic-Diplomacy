@@ -372,6 +372,15 @@ final class GameWikiCatalog {
             case 17,18,19,20 -> "Bind one of four distinct defend-target vessel slots; each must refer to a real permitted deployment ally.";
             case 21 -> "Assign a real escort target vessel; the captain then adjusts course to protect it.";
             case 22 -> "Configure the escort formation range relative to the assigned real vessel.";
+            case 23 -> "Select immediate offensive fire or hold the captain\u0027s offensive weapons while defensive interception remains available.";
+            case 24 -> "Choose unrestricted ammunition, automatic rationing, protected reserve, spaced volleys or energy weapons only. Installed magazines and launchers still govern physical availability.";
+            case 25 -> "Configure the remaining-ammunition percentage at which automatic rationing begins, without creating additional shells.";
+            case 26 -> "Protect a chosen percentage of the actual ammunition magazine from discretionary salvos.";
+            case 27 -> "Protect at least this many real rounds when the ammunition reserve policy applies.";
+            case 28 -> "Space successive salvos by a minimum number of simulation ticks; do not fabricate additional barrels or ammunition.";
+            case 29 -> "Select unrestricted thrust, economy, protected fuel reserve or automatic withdrawal at reserve. All modes use one actual fuel tank.";
+            case 30 -> "Specify the fraction of physical onboard fuel reserved from discretionary thrust or used as the automatic withdrawal threshold. It is not a separate fuel tank.";
+            case 31 -> "Start reducing acceleration and target speed below this remaining fuel percentage when the chosen fuel policy economizes.";
             default -> throw new IllegalArgumentException("Unknown doctrine row");
         };
     }
