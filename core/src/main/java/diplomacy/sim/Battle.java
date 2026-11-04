@@ -4264,6 +4264,13 @@ public final class Battle {
     }
     private boolean emitFighterCountermeasure(
             Craft craft,FighterCountermeasures.Kind kind,Ship threat){
+        return emitFighterCountermeasure(craft,kind,
+                threat==null?craft.x-1:threat.x,
+                threat==null?craft.y:threat.y);
+    }
+    private boolean emitFighterCountermeasure(
+            Craft craft,FighterCountermeasures.Kind kind,
+            double threatX,double threatY){
         if(!craft.fighter||craft.integrity<=0||
                 tick<craft.nextCountermeasureTick||
                 fighterClouds.size()>=MAX_FIGHTER_CLOUDS||
@@ -4276,8 +4283,7 @@ public final class Battle {
         var cloud=FighterCountermeasures.release(shot,kind,
                 craft.id,craft.sourceId,craft.team,
                 craft.x,craft.y,craft.observedVx,craft.observedVy,
-                threat==null?craft.x-1:threat.x,
-                threat==null?craft.y:threat.y,tick,tier);
+                threatX,threatY,tick,tier);
         fighterClouds.add(cloud);
         if(kind==FighterCountermeasures.Kind.CHAFF){
             craft.chaffRemaining--;fighterChaffDeployed++;
@@ -4303,6 +4309,27 @@ public final class Battle {
                         cloud.xAt(tick),cloud.yAt(tick),
                         cloud.xAt(tick),cloud.yAt(tick));
             }
+        }
+        // Passive missile warning is local to the fighter's own short-range
+        // sensors; no flare is spent against laser PD, radar flak, or a
+        // missile assigned to another aircraft. Launch early enough that
+        // the flare photons still have time to reach the hostile seeker.
+        for(Craft craft:crafts)if(craft.fighter&&craft.flareRemaining>0&&
+                craft.integrity>0&&tick>=craft.nextCountermeasureTick){
+            Missile incoming=null;
+            double closest=Double.POSITIVE_INFINITY;
+            for(Missile m:missiles)if(m.team!=craft.team&&
+                    m.targetCraftId==craft.id&&m.fighterIrHead!=null&&m.fuel>0){
+                double dx=craft.x-m.x,dy=craft.y-m.y;
+                double d=StrictMath.hypot(dx,dy);
+                double closing=dx*m.vx+dy*m.vy;
+                if(closing>0&&d<closest&&d<=StrictMath.min(185,
+                        craft.profile.sensors()*weather.sensorFactor())){
+                    incoming=m;closest=d;
+                }
+            }
+            if(incoming!=null)emitFighterCountermeasure(craft,
+                    FighterCountermeasures.Kind.FLARE,incoming.x,incoming.y);
         }
         for(Craft craft:crafts)if(craft.fighter&&craft.chaffRemaining>0&&
                 craft.integrity>0&&tick>=craft.nextCountermeasureTick){
@@ -4387,6 +4414,37 @@ public final class Battle {
             double movement=Math.min(distance-desired,profile.speed()*DT);
             craft.x+=(tx-craft.x)/distance*movement;
             craft.y+=(ty-craft.y)/distance*movement;
+        }
+        // Interceptors have a separate finite short-range IR missile rack,
+        // independent of the cannon's conventional ammunition and reload.
+        // This launches a REAL PD-interceptable ordnance body; its seeker
+        // must acquire the fighter independently after photon propagation.
+        if(intercept!=null&&intercept.fighter&&
+                craft.interceptorMissileAmmo>0&&
+                tick>=craft.nextInterceptorTick&&distance<=155&&
+                missiles.size()<MAX_GUIDED_BODIES){
+            Ship carrier=findShip(craft.sourceId);
+            int tier=carrier==null?0:carrier.fighterCountermeasureTier;
+            long launched=nextVisualShotId++;
+            ProjectileModel.Spec hardware=new ProjectileModel.Spec(
+                    270,1.35,.32,.76);
+            Missile missile=new Missile(launched,tick,craft.sourceId,craft.team,
+                    intercept.sourceId,craft.x,craft.y,
+                    tx-craft.x,ty-craft.y,9.0,false,hardware,1.15);
+            missile.targetCraftId=intercept.id;
+            missile.fighterIrHead=FighterInfraredSeeker.installed(tier);
+            missile.seekerLocked=false;
+            missile.lastKnownX=tx;missile.lastKnownY=ty;
+            missile.lastKnownVX=intercept.observedVx;
+            missile.lastKnownVY=intercept.observedVy;
+            missile.lastObservationTick=tick;
+            missiles.add(missile);
+            craft.interceptorMissileAmmo--;
+            craft.nextInterceptorTick=tick+45;
+            fighterInterceptorsLaunched++;
+            visual(launched,VisualPhase.FIRE,"FIGHTER_IR_INTERCEPTOR",
+                    craft.team,craft.sourceId,intercept.sourceId,
+                    craft.x,craft.y,tx,ty);
         }
         if(craft.reload>0 || distance>profile.range()
                 || (target!=null && distance>DeceptionProjection.fighterContactRange(
