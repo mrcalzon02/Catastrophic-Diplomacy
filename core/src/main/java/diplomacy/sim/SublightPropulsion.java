@@ -50,6 +50,15 @@ public final class SublightPropulsion {
                 *StrictMath.min(1,ship.engineCondition)*ship.crewReadiness();
     }
 
+    /** A zero-thrust HOLD command coasts on existing momentum in vacuum.
+     * This changes position but not velocity or finite reaction-mass fuel. */
+    public static void coast(Battle.Ship ship,double dt){
+        if(ship==null||!Double.isFinite(dt)||dt<=0)
+            throw new IllegalArgumentException("Invalid coast timestep");
+        ship.x+=ship.vx*dt;
+        ship.y+=ship.vy*dt;
+    }
+
     /** Applies acceleration-limited thrust vector, never instant braking.
      * Fuel is spent on actual delta-V rather than on passive coasting. */
     public static void advance(Battle.Ship ship,double wantedX,double wantedY,
