@@ -83,3 +83,32 @@ survive live campaign refit, deployment, launch, recovery or client save.
 Those operations must be wired to one authoritative manifest owner before
 switching the client save format; do not silently discard paid aircraft
 from an occupied bay during a refit.
+
+## Passive optical fighter seeker integration (November 2026)
+
+Fitted FTR tier 3 unlocks a narrow passive optical interceptor head; tier 7
+can choose a shorter-range wide-angle camera. Selection is a pre-engagement
+ship order `Battle.configureFighterOptical(shipId,true)`, exclusive with the
+older tier-five active radar choice and the default infrared seeker. The
+existing fighter magazine, cartridge counts, physical interceptor body,
+fitting costs and blueprint serialization are preserved.
+
+The optical missile receives only historical visible-light contrast and motion
+from the fighter's recorded one-way photon emission. Optical contrast is a
+separate timestamped signature, NOT infrared heat or a new radar ping. Actual
+receiver worldline crossings, field of view and finite scan schedules apply.
+Visible-light targeting has deterministic finite error that depends on
+installed angular optics, signal quality, photon age and paid guidance.
+
+Radar chaff cannot emit a counterfeit visual aircraft. Bright flares may cause
+temporarily lost camera acquisition only when their own historical photons
+actually reach the camera within the aircraft's angular image. Even then the
+seeker receives no invented decoy coordinates, proximity fuzes or free hit
+modifiers. Physical swept impact geometry is unchanged.
+
+Focused objective test: `gradle :core:fighterOpticalSeekerSmoke`. It is also a
+dependency of `:core:sensorNetworkSmoke` and tests real fitted interceptor
+engagements, research/selection exclusivity, band isolation, future emissions,
+old light-front expiry, glare angular separation and deterministic replay.
+Optical guidance is not yet a selectable persistent hangar doctrine in campaign
+save files or the shipyard client UI. No hybrid/remote handoff is implied.

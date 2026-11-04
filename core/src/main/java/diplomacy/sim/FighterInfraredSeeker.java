@@ -29,13 +29,21 @@ public final class FighterInfraredSeeker {
             throw new IllegalArgumentException("Invalid interceptor fitting");
         return hull==FighterModel.Hull.INTERCEPTOR?2+tier/3:0;
     }
+    /** One immutable historical fighter emission and motion sample. Optical
+     * contrast is recorded separately from thermal heat: optical seekers
+     * never use the craft's current live state or its infrared signature. */
     public record Frame(long tick,double x,double y,double vx,double vy,
-                        double heat){
+                        double heat,double opticalContrast){
         public Frame {
             if(tick<0||!Double.isFinite(x)||!Double.isFinite(y)||
                     !Double.isFinite(vx)||!Double.isFinite(vy)||
-                    !Double.isFinite(heat)||heat<=0)
-                throw new IllegalArgumentException("Invalid historical fighter infrared");
+                    !Double.isFinite(heat)||heat<=0||
+                    !Double.isFinite(opticalContrast)||opticalContrast<0)
+                throw new IllegalArgumentException("Invalid historical fighter emission");
+        }
+        /** Existing deterministic infrared-only test fixtures remain valid. */
+        public Frame(long tick,double x,double y,double vx,double vy,double heat){
+            this(tick,x,y,vx,vy,heat,1.0);
         }
     }
     public static final class History {
@@ -47,7 +55,8 @@ public final class FighterInfraredSeeker {
             // Engines and craft fittings set the physical relative emission.
             frames[(int)(tick%CAPACITY)]=new Frame(tick,
                     craft.x,craft.y,craft.observedVx,craft.observedVy,
-                    craft.profile.signature());
+                    craft.profile.signature(),
+                    StrictMath.sqrt(craft.profile.crossSection()));
         }
         public Frame at(long tick){
             if(tick<0)return null;

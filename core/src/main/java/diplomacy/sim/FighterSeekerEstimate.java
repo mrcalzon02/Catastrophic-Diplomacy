@@ -38,8 +38,20 @@ public final class FighterSeekerEstimate {
                            FighterInfraredSeeker.Head infrared,
                            FighterRadarSeeker.Head radar,
                            double receiverX,double receiverY){
+        return from(reading,missileId,targetCraftId,guidanceQuality,
+                infrared,radar,null,receiverX,receiverY);
+    }
+    public static Fix from(FighterInfraredSeeker.Reading reading,
+                           long missileId,int targetCraftId,
+                           double guidanceQuality,
+                           FighterInfraredSeeker.Head infrared,
+                           FighterRadarSeeker.Head radar,
+                           FighterOpticalSeeker.Head optical,
+                           double receiverX,double receiverY){
+        int installed=(infrared==null?0:1)+(radar==null?0:1)+
+                (optical==null?0:1);
         if(reading==null||missileId<=0||targetCraftId<=0||
-                (infrared==null)==(radar==null)||
+                installed!=1||
                 !Double.isFinite(guidanceQuality)||guidanceQuality<=0||
                 !Double.isFinite(receiverX)||!Double.isFinite(receiverY))
             throw new IllegalArgumentException("Invalid onboard seeker measurement");
@@ -52,7 +64,9 @@ public final class FighterSeekerEstimate {
         // IR retains its own, generally noisier, thermal contrast response.
         double angular=radar!=null
                 ?(.85+radar.halfAngleRadians)
-                :(1.15+.75*infrared.halfAngleRadians);
+                :optical!=null
+                    ?(.62+.80*optical.halfAngleRadians)
+                    :(1.15+.75*infrared.halfAngleRadians);
         double signal=StrictMath.max(.15,
                 StrictMath.min(4.0,reading.strength()));
         double quality=StrictMath.max(.5,
@@ -67,7 +81,8 @@ public final class FighterSeekerEstimate {
                 (long)targetCraftId*0xbf58476d1ce4e5b9L ^
                 (reading.emittedTick()/6L)*0x94d049bb133111ebL ^
                 reading.flareId()*0x632be59bd9b4e019L ^
-                (radar==null?0x2545f4914f6cdd1dL:0x7cc4f3a74f33df61L));
+                (radar!=null?0x7cc4f3a74f33df61L:
+                    optical!=null?0x36ad3ed075abd949L:0x2545f4914f6cdd1dL));
         double angle=2*StrictMath.PI*unit(seed);
         double radial=sigma*StrictMath.sqrt(
                 unit(mix(seed^0x4f1bbcdc676fc3d3L)));

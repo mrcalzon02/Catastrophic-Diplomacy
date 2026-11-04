@@ -218,6 +218,7 @@ tasks.register('sensorFalseContactRelaySmoke', JavaExec) {
 tasks.register('sensorNetworkSmoke', JavaExec) {
     dependsOn(tasks.named('fighterRadarSeekerSmoke'))
     dependsOn(tasks.named('fighterInfraredSeekerSmoke'))
+    dependsOn(tasks.named('fighterOpticalSeekerSmoke'))
     dependsOn(tasks.named('fighterCountermeasureSmoke'))
     dependsOn(tasks.named('sensorFalseContactRelaySmoke'))
     dependsOn(tasks.named('guidedTrajectoryPredictionSmoke'))
@@ -487,6 +488,14 @@ tasks.register('fighterRadarSeekerSmoke', JavaExec) {
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.sim.FighterRadarSeekerTest'
+}
+/** Passive optical interceptor heads, actual delayed visible photons and glare. */
+tasks.register('fighterOpticalSeekerSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Fitted optical fighter missiles, finite visible glare, spectra isolation and deterministic physical replay.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.FighterOpticalSeekerTest'
 }
 /** Fighter-targeting autonomous infrared missiles with causal light-fronts. */
 tasks.register('fighterInfraredSeekerSmoke', JavaExec) {
