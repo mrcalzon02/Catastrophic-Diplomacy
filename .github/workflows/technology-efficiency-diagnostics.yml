@@ -6,6 +6,12 @@ on:
     branches: [main]
     paths:
       - .github/workflows/technology-efficiency-diagnostics.yml
+      - core/src/main/java/diplomacy/tech/TechnologyCatalog.java
+      - core/src/test/java/diplomacy/sim/TechnologyCatalogTest.java
+      - core/src/test/java/diplomacy/sim/TechnologyMemoryProfile.java
+      - game/src/main/java/diplomacy/client/GameWikiCatalog.java
+      - game/src/main/java/diplomacy/client/GameWikiPanel.java
+      - game/src/test/java/diplomacy/client/WikiMemoryProfile.java
 
 permissions:
   contents: read
@@ -24,35 +30,63 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Profile 16 MiB authoritative technology catalog
+        id: catalog16
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           gradle --no-daemon :core:technologyProfile 2>&1 | tee technology-profile.log
       - name: Profile 16 MiB wiki search and paging
+        id: wiki16
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           gradle --no-daemon :game:wikiProfile 2>&1 | tee wiki-profile.log
       - name: Validate all-current-tier identifiers in the 16 MiB JVM
+        id: integrity16
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           gradle --no-daemon :core:technologyHeapSmoke 2>&1 | tee technology-integrity-16m.log
       - name: Profile 32 MiB technology catalog for comparison
+        id: catalog32
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           gradle --no-daemon -PcdProfileHeap=32m :core:technologyProfile 2>&1 | tee technology-profile-32m.log
       - name: Profile 32 MiB wiki search for comparison
+        id: wiki32
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
           gradle --no-daemon -PcdProfileHeap=32m :game:wikiProfile 2>&1 | tee wiki-profile-32m.log
+      - name: Summarize actual diagnostic results (not release gates)
+        if: always()
+        shell: bash
+        env:
+          CATALOG16: ${{ steps.catalog16.outcome }}
+          WIKI16: ${{ steps.wiki16.outcome }}
+          INTEGRITY16: ${{ steps.integrity16.outcome }}
+          CATALOG32: ${{ steps.catalog32.outcome }}
+          WIKI32: ${{ steps.wiki32.outcome }}
+        run: |
+          {
+            echo "### Measured technology and wiki workloads"
+            echo "These are diagnostic steps; a green workflow does not mean each workload passed."
+            echo "| Workload | Raw step outcome |"
+            echo "|---|---|"
+            echo "| Catalog / 16 MiB | $CATALOG16 |"
+            echo "| Wiki / 16 MiB | $WIKI16 |"
+            echo "| Catalog integrity / 16 MiB | $INTEGRITY16 |"
+            echo "| Catalog / 32 MiB | $CATALOG32 |"
+            echo "| Wiki / 32 MiB | $WIKI32 |"
+            echo ""
+            echo "For precise heap/time values or stack traces, inspect uploaded logs."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload timings, heap diagnostics and any failed workload stack traces
         if: always()
         uses: actions/upload-artifact@v4
