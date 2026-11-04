@@ -194,7 +194,7 @@ final class ShieldFxTimeline {
     void advance(Battle battle,float delta,boolean running){
         sync(battle);
         if(!running||!Float.isFinite(delta))return;
-        float dt=Math.min(.08f,Math.max(0f,delta));
+        float dt=/* 3x tactical playback at a clamped 80ms real frame may advance 240ms. */ Math.min(.24f,Math.max(0f,delta));
         for(Facings state:states.values())for(int i=0;i<4;i++){
             state.flash[i]=Math.max(0,state.flash[i]-dt*3.3f);
             state.regen[i]=Math.max(0,state.regen[i]-dt*.95f);
