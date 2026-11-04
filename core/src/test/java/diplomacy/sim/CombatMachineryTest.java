@@ -61,9 +61,18 @@ public final class CombatMachineryTest {
         Battle torpedoTest=new Battle(403);
         torpedoTest.spawnWing(0,torpedo,catalog,1,300,300);
         torpedoTest.spawnWing(1,cruiser,catalog,1,800,300);
-        for(int i=0;i<3;i++)torpedoTest.step();
-        require(torpedoTest.ships().get(0).torpedoAmmo<3,"fitted torpedo tube fires finite ammunition");
-        require(torpedoTest.missiles().stream().anyMatch(m->m.torpedo),"heavy torpedoes use own speed/integrity");
+        int loaded=torpedoTest.ships().get(0).torpedoAmmo;
+        require(loaded>0,"fitted torpedo tube has finite physical rounds");
+        boolean torpedoInFlight=false;
+        // Real scanner echoes and fire-control observations do not arrive on
+        // tick one. Require a live launched body after causal acquisition.
+        for(int i=0;i<110 && !torpedoInFlight;i++){
+            torpedoTest.step();
+            torpedoInFlight=torpedoTest.missiles().stream().anyMatch(m->m.torpedo);
+        }
+        require(torpedoTest.ships().get(0).torpedoAmmo<loaded,
+                "fitted torpedo tube fires finite ammunition after sensor contact");
+        require(torpedoInFlight,"heavy torpedoes use own speed/integrity");
         System.out.println("PASS combat machinery: fighters, defense drones, magazines, ECM, four distinct weapon branches and deterministic replay");
     }
 }
