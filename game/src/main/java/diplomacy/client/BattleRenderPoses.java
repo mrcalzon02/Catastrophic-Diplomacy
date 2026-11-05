@@ -14,6 +14,16 @@ final class BattleRenderPoses {
         }
     }
     private final Map<Integer,Pose> ships=new HashMap<>(),crafts=new HashMap<>();
+    /** At 0.5x almost every screen frame shares one authoritative tick.
+     * Reuse each interpolated hull pose across camera, art, mounts and HUD
+     * instead of allocating it repeatedly in every render pass. */
+    private static final class CachedShip {
+        long epoch=-1;
+        float x,y,heading,vx,vy;
+        Pose shown;
+    }
+    private final Map<Integer,CachedShip> renderedShips=new HashMap<>();
+    private long renderEpoch;
     private final Map<Long,Pose> missiles=new HashMap<>(),rockets=new HashMap<>(),shells=new HashMap<>();
     private final Map<Long,Pose> flak=new HashMap<>(),rotary=new HashMap<>(),rails=new HashMap<>();
     private Battle source;
@@ -29,12 +39,15 @@ final class BattleRenderPoses {
     void sync(Battle battle){
         if(source==battle)return;
         source=battle;ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
+        renderedShips.clear();
+        renderEpoch++;
         sampledTick=Long.MIN_VALUE;
         fraction=1f;
     }
     void beforeStep(Battle battle){
         sync(battle);ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
         sampledTick=battle.tick;
+        renderEpoch++;
         for(Battle.Ship s:battle.ships())if(s.alive())
             ships.put(s.id,new Pose((float)s.x,(float)s.y,(float)s.facing,
                     (float)s.vx,(float)s.vy));
@@ -67,10 +80,12 @@ final class BattleRenderPoses {
         ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
         sampledTick=Long.MIN_VALUE;
         fraction=1f;
+        renderEpoch++;
     }
     void fraction(Battle battle,float value){
         sync(battle);
         fraction=Float.isFinite(value)?Math.max(0f,Math.min(1f,value)):1f;
+        renderEpoch++;
     }
     /** Camera framing must use the very same interpolated poses as hulls.
      * The deterministic BattleView.of(battle) stays available to headless clients. */
@@ -127,8 +142,21 @@ final class BattleRenderPoses {
         return new Pose((float)muzzleX,(float)muzzleY,now.angle(),now.vx(),now.vy());
     }
     Pose ship(Battle.Ship s){
-        return blend(ships.get(s.id),new Pose((float)s.x,(float)s.y,(float)s.facing,
-                (float)s.vx,(float)s.vy));
+        float x=(float)s.x,y=(float)s.y,heading=(float)s.facing;
+        float vx=(float)s.vx,vy=(float)s.vy;
+        CachedShip old=renderedShips.get(s.id);
+        if(old!=null&&old.epoch==renderEpoch&&old.x==x&&old.y==y&&
+                old.heading==heading&&old.vx==vx&&old.vy==vy)
+            return old.shown;
+        Pose shown=blend(ships.get(s.id),new Pose(x,y,heading,vx,vy));
+        if(old==null){
+            old=new CachedShip();
+            renderedShips.put(s.id,old);
+        }
+        old.epoch=renderEpoch;
+        old.x=x;old.y=y;old.heading=heading;old.vx=vx;old.vy=vy;
+        old.shown=shown;
+        return shown;
     }
     Pose craft(Battle.Craft c){
         Pose current=new Pose((float)c.x,(float)c.y,0,

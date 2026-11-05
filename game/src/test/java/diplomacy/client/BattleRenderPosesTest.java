@@ -12,15 +12,23 @@ public final class BattleRenderPosesTest {
         p.fraction(b,.5f);
         close(p.ship(ship).x(),120,"half tick x");
         close(p.ship(ship).y(),210,"half tick y");
+        BattleRenderPoses.Pose shared=p.ship(ship);
+        check(shared==p.ship(ship),
+                "Camera, hull and turret passes must share one ship pose per frame");
         close(ship.x,140,"simulation state unchanged");
         p.fraction(b,0);close(p.ship(ship).x(),100,"step beginning");
+        check(p.ship(ship)!=shared,
+                "New presentation fraction reused a stale ship pose");
         p.fraction(b,1);close(p.ship(ship).x(),140,"step end");
         p.beforeStep(b);ship.facing=(float)Math.toRadians(-179);
         p.fraction(b,.5f);check(Math.abs(p.ship(ship).angle())>3,"wrap uses short rotation");
         p.beforeStep(b);
         Battle.Ship newcomer=b.addShip(1,Battle.Faction.DRAXIAN,850,25);
         p.fraction(b,.2f);close(p.ship(newcomer).x(),850,"new entity has no ghost trail");
+        BattleRenderPoses.Pose cachedBeforeRelocation=p.ship(ship);
         ship.x=5000;close(p.ship(ship).x(),5000,"teleport snaps");
+        check(p.ship(ship)!=cachedBeforeRelocation,
+                "Real physical change within one frame reused stale cached pose");
         Battle second=new Battle(7L);
         Battle.Ship recycled=second.addShip(0,Battle.Faction.TERRAN,-100,55);
         p.fraction(second,.2f);close(p.ship(recycled).x(),-100,"battle switch clears old ids");

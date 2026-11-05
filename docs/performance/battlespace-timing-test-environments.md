@@ -158,3 +158,19 @@ appearing before the visible projectile arrives.
 
 The shared `:game:renderPosesSmoke` covers a real segment's endpoints,
 intermediate position, orphan terminal rejection and tick expiry.
+
+## Stage 6 — reuse hull interpolation within a displayed frame
+
+At low tactical speeds the renderer may draw many frames for each real
+physics tick. Camera bounds, ship art, hardpoints, shields and overlays
+repeatedly request the same ship's smoothed coordinates during a single
+frame. `BattleRenderPoses` now memoizes each hull's rendered pose once
+per presentation fraction. Caches invalidate on physics steps, battle
+changes, pause/snap and each rendered fraction, and recheck raw physical
+coordinates even within one frame so legitimate teleports cannot be
+stuck behind a cached visual.
+
+This reduces repeated cubic calculations and per-pass Pose allocation.
+It is a rendering optimization only: **do not claim an FPS gain until a
+comparable device trace is captured**. The headless smoke suite checks
+same-frame identity, fraction invalidation and real midframe relocation.
