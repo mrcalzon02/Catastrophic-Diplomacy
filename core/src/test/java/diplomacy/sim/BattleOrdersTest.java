@@ -225,8 +225,62 @@ public final class BattleOrdersTest {
         check(StrictMath.hypot(captain.x-x,captain.y-y)<1e-6,
                 "Explicit HOLD doctrine moved the ship");
     }
+    /** Every autonomous posture must keep moving after entering gun range. */
+    private static void checkMobilePostures(){
+        check(BattleOrders.DEFAULT.position()==BattleOrders.Position.FREE,
+                "Free maneuver must be the default order");
+        for(BattleOrders.Position posture:new BattleOrders.Position[]{
+                BattleOrders.Position.FREE,BattleOrders.Position.KEEP_MOVING,
+                BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND}){
+            Battle b=new Battle(7020+posture.ordinal());
+            Battle.Ship mover=b.addShip(0,Battle.Faction.TERRAN,390,330);
+            Battle.Ship contact=b.addShip(1,Battle.Faction.DRAXIAN,560,330);
+            b.setShipOrders(mover.id,BattleOrders.DEFAULT.withPosition(posture));
+            b.setShipCommandQueue(contact.id,
+                    java.util.List.of(ShipCommandQueue.Command.hold(1000)));
+            mover.laserDamage=mover.kineticDamage=mover.plasmaDamage=0;
+            mover.particleDamage=mover.missileDamage=mover.torpedoDamage=0;
+            contact.laserDamage=contact.kineticDamage=contact.plasmaDamage=0;
+            contact.particleDamage=contact.missileDamage=contact.torpedoDamage=0;
+            for(int t=0;t<250&&mover.lastTargetId!=contact.id;t++)b.step();
+            check(mover.lastTargetId==contact.id,
+                    "Autonomous posture failed to acquire target: "+posture);
+            mover.vx=0;mover.vy=0;
+            double x=mover.x,y=mover.y,fuel=mover.fuel;
+            for(int t=0;t<180;t++)b.step();
+            check(StrictMath.hypot(mover.x-x,mover.y-y)>.1,
+                    "Non-hold posture parked at weapon range: "+posture);
+            check(mover.fuel<fuel,"Autonomous maneuver used no reaction mass: "+posture);
+        }
+    }
+
+    /** Standing hold-range is different from the existing hold-position order. */
+    private static void checkHoldFiringRange(){
+        Battle b=new Battle(99231);
+        Battle.Ship keeper=b.addShip(0,Battle.Faction.TERRAN,360,330);
+        Battle.Ship contact=b.addShip(1,Battle.Faction.DRAXIAN,565,330);
+        keeper.laserDamage=keeper.kineticDamage=keeper.plasmaDamage=0;
+        keeper.particleDamage=keeper.missileDamage=keeper.torpedoDamage=0;
+        contact.laserDamage=contact.kineticDamage=contact.plasmaDamage=0;
+        contact.particleDamage=contact.missileDamage=contact.torpedoDamage=0;
+        b.setShipOrders(keeper.id,
+                BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD_RANGE));
+        b.setShipCommandQueue(contact.id,
+                java.util.List.of(ShipCommandQueue.Command.hold(1000)));
+        for(int t=0;t<180;t++)b.step();
+        check(keeper.lastTargetId==contact.id,"Hold-range did not acquire opponent");
+        check(StrictMath.hypot(keeper.x-360,keeper.y-330)<1e-6,
+                "HOLD_RANGE moved a vessel already within its stand-off band");
+        var original=BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD_RANGE);
+        check(BattleOrdersCodec.decode(BattleOrdersCodec.encode(original,BattleOrders.DEFAULT))
+                        .left().equals(original),
+                "Hold-firing-range policy failed fleet order save roundtrip");
+    }
+
     public static void main(String[] args){
         checkFreeMovement();
+        checkMobilePostures();
+        checkHoldFiringRange();
         checkResourceOrders();
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,

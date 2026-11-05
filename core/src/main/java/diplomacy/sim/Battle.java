@@ -1658,7 +1658,6 @@ public final class Battle {
         for(Ship ship:ships){
             if(!ship.alive()||ship.escaped||ship.withdrawing
                     ||ship.orders.position()==BattleOrders.Position.HOLD
-                    ||ship.orders.position()==BattleOrders.Position.LAST_STAND
                     ||ship.vx!=0||ship.vy!=0)continue;
             initializeEntryCruise(ship);
         }
@@ -2047,7 +2046,7 @@ public final class Battle {
      * accelerating blindly down its team's original heading and leaving the
      * battle by tens of thousands of units. No enemy identity or position is
      * leaked: each ship patrols an expanding, staggered sector until its own
-     * real sensors reacquire a target. HOLD/LAST_STAND ships remain stationary;
+     * real sensors reacquire a target. Only explicit hold orders arrest patrol;
      * mobile ships sweep broader sectors after prolonged loss of contact.
      */
     /** Prefer recent, nearby ACTUALLY OBSERVED fixes. Even an advanced
@@ -2136,7 +2135,7 @@ public final class Battle {
             rallyY=lastFix.y+lastFix.vy*age;
         }
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
-                ||ship.orders.position()==BattleOrders.Position.LAST_STAND;
+                ||ship.orders.position()==BattleOrders.Position.HOLD_RANGE;
         boolean thrust=!hold && ship.fuel>0 && ship.engineCondition>0.01
                 && ship.crewReadiness()>0 &&
                 StrictMath.hypot(rallyX-ship.x,rallyY-ship.y)>45;
@@ -3292,31 +3291,23 @@ public final class Battle {
         return false;
     }
     private static double wrap(double angle) { return StrictMath.atan2(StrictMath.sin(angle), StrictMath.cos(angle)); }
-    private void steer(Ship s, Ship target) {
-        if(s.standingOrders!=null||
-                !s.orders.equals(BattleOrders.DEFAULT.withPointDefense(s.orders.pointDefense()))){
-            orderedSteer(s,target);return;
-        }
-        double dx = target.x - s.x, dy = target.y - s.y;
-        double range = StrictMath.hypot(dx, dy);
-        double heading = StrictMath.atan2(dy, dx);
-        if (range < 210) heading += (s.team == 0 ? 1 : -1) * Math.PI * 0.48;
-        double change = Math.max(-2.8 * DT, Math.min(2.8 * DT, wrap(heading - s.facing)));
-        s.facing = wrap(s.facing + change);
-        double rated=SublightPropulsion.maximumSpeed(s);
-        thrust(s,StrictMath.cos(s.facing)*rated,
-                StrictMath.sin(s.facing)*rated);
+    /** One authoritative navigation policy in campaign, skirmish and screensaver.
+     * Weapon reach shapes the maneuver; it never implies a parking brake. */
+    private void steer(Ship ship,Ship target) {
+        orderedSteer(ship,target);
     }
 
     private void orderedSteer(Ship ship,Ship target) {
         BattleOrders.Orders orders=ship.orders;
-        if(orders.position()==BattleOrders.Position.HOLD){
+        BattleOrders.Position posture=orders.position();
+        if(posture==BattleOrders.Position.HOLD){
             thrust(ship,0,0);
             return;
         }
         Ship dedicated=findShip(ship.escortShipId);
         if(dedicated!=null&&dedicated.alive()&&dedicated.team==ship.team){
-            double radius=ship.standingOrders.directives().escortRange();
+            double radius=ship.standingOrders==null?orders.escortRadius():
+                    ship.standingOrders.directives().escortRange();
             if(StrictMath.hypot(dedicated.x-ship.x,dedicated.y-ship.y)>radius){
                 steerToward(ship,dedicated.x,dedicated.y);
                 return;
@@ -3324,12 +3315,12 @@ public final class Battle {
         }
         Ship parent=findShip(orders.anchorShipId());
         if(parent!=null&&parent.team==ship.team&&parent.alive()&&parent!=ship){
-            if(orders.position()==BattleOrders.Position.FORMATION){
+            if(posture==BattleOrders.Position.FORMATION){
                 steerToward(ship,parent.x+ship.anchorOffsetX,
                         parent.y+ship.anchorOffsetY);
                 return;
             }
-            if(orders.position()==BattleOrders.Position.ESCORT){
+            if(posture==BattleOrders.Position.ESCORT){
                 double d=StrictMath.hypot(parent.x-ship.x,parent.y-ship.y);
                 if(d>orders.escortRadius()){
                     steerToward(ship,parent.x,parent.y);
@@ -3340,37 +3331,36 @@ public final class Battle {
         BattleOrders.Engagement engage=orders.forSize(BattleOrders.size(target));
         double preferredRange=engage.range()*(ship.standingOrders==null?
                 1:ship.standingOrders.engagementRangeMultiplier());
-        // An autonomous captain must not indefinitely hold outside every
-        // remaining fitted weapon's physical reach. As ordnance is expended,
-        // recalculate the approach distance from surviving guns, not the
-        // historical maximum missile/torpedo range of an empty magazine.
+        // Never park at an empty long-range magazine's obsolete weapon reach.
         double reach=activeWeaponReach(ship);
         if(reach>0)preferredRange=StrictMath.min(preferredRange,reach*.80);
-        double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
-        if(orders.position()!=BattleOrders.Position.KEEP_MOVING
-                &&distance>=preferredRange*0.5&&distance<=preferredRange){
-            if(orders.position()==BattleOrders.Position.FREE){
-                // FREE is an active combat maneuver, not a disguised HOLD.
-                // Fly a tangential course inside the engagement band rather
-                // than braking every autonomous captain at weapon range.
-                // This uses the same physical thrust/fuel accounting as
-                // approach, retreat and queued orders.
-                double dx=target.x-ship.x,dy=target.y-ship.y;
-                double direction=ship.team==0?1:-1;
-                steerToward(ship,ship.x-direction*dy,ship.y+direction*dx);
-            }else thrust(ship,0,0);
+        double dx=target.x-ship.x,dy=target.y-ship.y;
+        double distance=StrictMath.hypot(dx,dy);
+
+        if(posture==BattleOrders.Position.HOLD_RANGE){
+            // Deliberate stand-off: correct distance, then brake inside band.
+            if(distance>=preferredRange*.92&&distance<=preferredRange*1.08){
+                thrust(ship,0,0);
+            }else if(distance<preferredRange*.92){
+                double length=StrictMath.max(1,distance);
+                steerToward(ship,ship.x-dx/length*preferredRange,
+                        ship.y-dy/length*preferredRange);
+            }else steerToward(ship,target.x,target.y);
             return;
         }
-        if(distance<preferredRange*0.5){
-            double dx=ship.x-target.x,dy=ship.y-target.y;
-            double denom=StrictMath.max(1,StrictMath.hypot(dx,dy));
-            steerToward(ship,ship.x+dx/denom*preferredRange,
-                    ship.y+dy/denom*preferredRange);
-        }else if(orders.position()==BattleOrders.Position.KEEP_MOVING
-                &&distance<preferredRange){
-            double dx=target.x-ship.x,dy=target.y-ship.y;
-            steerToward(ship,ship.x-dy,ship.y+dx);
-        }else steerToward(ship,target.x,target.y);
+
+        // All other postures continuously flank, approach, and disengage.
+        // Smooth radial/tangential blending avoids range-edge speed zeros.
+        double length=StrictMath.max(1,distance);
+        double towardX=dx/length,towardY=dy/length;
+        double hand=((ship.id&1)==0?1.0:-1.0)*(ship.team==0?1.0:-1.0);
+        double tangentX=-towardY*hand,tangentY=towardX*hand;
+        double radial=(distance/StrictMath.max(30,preferredRange)-.85)*3.0;
+        radial=StrictMath.max(-1.5,StrictMath.min(2.5,radial));
+        if(posture==BattleOrders.Position.CAUTIOUS)radial-=.35;
+        if(posture==BattleOrders.Position.KEEP_MOVING)radial+=.25;
+        steerToward(ship,ship.x+(tangentX+towardX*radial)*250,
+                ship.y+(tangentY+towardY*radial)*250);
     }
     /** Longest currently supplied main-battery range, in world units.
      * Support-only vessels retain their specified defensive standoff rather

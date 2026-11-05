@@ -35,8 +35,8 @@ public record ShipStandingOrders(
     };
     private static final BattleOrders.Position[] MOVEMENTS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
-            BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.CAUTIOUS,
-            BattleOrders.Position.LAST_STAND
+            BattleOrders.Position.HOLD_RANGE,BattleOrders.Position.KEEP_MOVING,
+            BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND
     };
     public ShipStandingOrders {
         if(tactics==null||aggression<0||aggression>100||caution<0||caution>100||
@@ -129,7 +129,12 @@ public record ShipStandingOrders(
             case 1 -> caution+"%";
             case 2 -> Math.round(tactics.retreatAtHullFraction()*100)+"% hull";
             case 3 -> shieldWithdrawPercent==0?"DISABLED":shieldWithdrawPercent+"% shields";
-            case 4 -> tactics.position().name().replace('_',' ');
+            case 4 -> switch(tactics.position()){
+                case FREE -> "FREE MANEUVER";
+                case HOLD -> "HOLD POSITION";
+                case HOLD_RANGE -> "HOLD FIRING RANGE";
+                default -> tactics.position().name().replace('_',' ');
+            };
             case 5 -> tactics.targeting().name().replace('_',' ');
             case 6 -> tactics.pointDefense().name().replace('_',' ');
             case 7,8,9 -> tactics.forSize(BattleOrders.Size.values()[setting-7]).priority()+"%";

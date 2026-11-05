@@ -18,8 +18,8 @@ final class FleetOrdersPanel {
     private static final int ROWS=10;
     private static final BattleOrders.Position[] TEAM_POSITIONS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
-            BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.CAUTIOUS,
-            BattleOrders.Position.LAST_STAND
+            BattleOrders.Position.HOLD_RANGE,BattleOrders.Position.KEEP_MOVING,
+            BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND
     };
     private final IntFunction<BattleOrders.Orders> get;
     private final BiConsumer<Integer,BattleOrders.Orders> apply;
@@ -97,7 +97,12 @@ final class FleetOrdersPanel {
         return new String[]{
                 o.pointDefense().name().replace('_',' '),
                 o.targeting().name().replace('_',' '),
-                o.position().name().replace('_',' '),
+                switch(o.position()){
+                    case FREE -> "FREE MANEUVER";
+                    case HOLD -> "HOLD POSITION";
+                    case HOLD_RANGE -> "HOLD FIRING RANGE";
+                    default -> o.position().name().replace('_',' ');
+                },
                 o.fighters().priority()+"%",
                 Math.round(o.fighters().range())+" units",
                 o.escorts().priority()+"%",

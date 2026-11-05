@@ -165,3 +165,26 @@ victory survivor rewards even if the final hostile hull is destroyed before
 they reach safety. The results page explicitly labels all three ship states.
 A final committed withdrawal concedes the mission even if the enemy is
 destroyed at the same moment.
+
+## Continuous maneuvering by default (2026-11-05)
+
+All battle modes use the same autonomous steering in `Battle.step()`. The default
+FREE posture is a physical orbit/approach/disengage course instead of an
+implicit stop at a preferred weapon range. CAUTIOUS and LAST_STAND continue
+maneuvering (while preserving their original retreat semantics), and
+KEEP_MOVING remains mobile. A depleted missile or torpedo magazine cannot
+lock a vessel outside its surviving guns' reach. The screensaver's random
+captain policies no longer assign stationary HOLD by default.
+
+**HOLD FIRING RANGE** is now a distinct, persistent individual and fleet
+standing order (`HOLD_RANGE`). It approaches/opens distance and brakes in a
+tolerance band around the captain's configured class engagement range.
+**HOLD POSITION** remains the deliberate zero-velocity order. Existing
+saved profiles remain compatible because positions are stored as enum names.
+Sequential waypoint commands, explicit escort/formation anchors, actual
+thrust acceleration, speed limits and propellant accounting are unchanged.
+
+Headless regression entry points `:core:battleOrdersSmoke` and
+`:core:shipStandingOrdersSmoke` cover movement and order persistence.
+Actual desktop/Android visual verification and captured battle metrics
+are still required before claiming smoothness or performance improvements.

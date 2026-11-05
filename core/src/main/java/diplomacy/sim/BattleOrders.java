@@ -6,8 +6,7 @@ import java.util.Objects;
  * Immutable fleet/ship captain orders. Original implementation of tactical
  * behavior concepts; not a port of any other game's data or code.
  *
- * Default orders are deliberately equivalent to the existing autonomous
- * skirmish. Updating the PD selector alone does not change navigation AI.
+ * Default FREE orders now select continuous combat maneuvering in every battle mode. Updating the PD selector alone does not change navigation AI.
  */
 public final class BattleOrders {
     private BattleOrders() { }
@@ -25,7 +24,7 @@ public final class BattleOrders {
     }
     public enum Size { FIGHTER, ESCORT, CAPITAL }
     public enum Targeting { NEAREST, COOPERATE, VULTURE, RETALIATE, PROTECT }
-    public enum Position { FREE, HOLD, KEEP_MOVING, ESCORT, FORMATION, CAUTIOUS, LAST_STAND }
+    public enum Position { FREE, HOLD, KEEP_MOVING, ESCORT, FORMATION, CAUTIOUS, LAST_STAND, HOLD_RANGE }
     public record Engagement(int priority,double range) {
         public Engagement {
             if(priority<0||priority>100||!Double.isFinite(range)||range<30||range>1500)

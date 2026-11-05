@@ -80,8 +80,8 @@ public final class ScreensaverBattle {
     private static void assignCaptainOrders(Random random,Battle battle){
         BattleOrders.Position[] movement={
                 BattleOrders.Position.FREE,BattleOrders.Position.FREE,
-                BattleOrders.Position.HOLD,BattleOrders.Position.KEEP_MOVING,
-                BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.CAUTIOUS,
+                BattleOrders.Position.FREE,BattleOrders.Position.FREE,
+                BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.KEEP_MOVING,
                 BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND
         };
         BattleOrders.PointDefense[] defenses={
