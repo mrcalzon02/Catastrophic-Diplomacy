@@ -28,7 +28,9 @@ final class CombatLightingModel {
     private final ArrayDeque<Smoke> smoke=new ArrayDeque<>();
     private final ArrayDeque<Flash> flashes=new ArrayDeque<>();
     private final ArrayDeque<Ignition> ignitions=new ArrayDeque<>();
+    /** Reuse both track tables instead of allocating a HashMap per tick. */
     private Map<Long,Position> previousMissiles=new HashMap<>();
+    private Map<Long,Position> scratchMissiles=new HashMap<>();
     private Battle trackedBattle;
     private long lastTick=-1;
     private long lastSequence;
@@ -42,7 +44,8 @@ final class CombatLightingModel {
 
     private void reset(Battle battle){
         trackedBattle=battle;lastTick=-1;lastSequence=0;
-        smoke.clear();flashes.clear();ignitions.clear();previousMissiles.clear();
+        smoke.clear();flashes.clear();ignitions.clear();
+        previousMissiles.clear();scratchMissiles.clear();
     }
     static int flashLife(Battle.VisualEvent event){
         if(event.phase()==Battle.VisualPhase.TIMEOUT)return 0;
@@ -71,7 +74,8 @@ final class CombatLightingModel {
 
         // The motor phase comes directly from Battle.updateMissiles. No engine
         // flare or smoke while ejecting, coasting, or after fuel exhaustion.
-        Map<Long,Position> current=new HashMap<>();
+        Map<Long,Position> current=scratchMissiles;
+        current.clear();
         for(Battle.Missile missile:battle.missiles()){
             if(current.size()>=MAX_TRACKED_MISSILES)break;
             float x=(float)missile.x,y=(float)missile.y;
@@ -106,7 +110,9 @@ final class CombatLightingModel {
                 }
             }
         }
+        Map<Long,Position> reusable=previousMissiles;
         previousMissiles=current;
+        scratchMissiles=reusable;
         while(!smoke.isEmpty()
                 && battle.tick-smoke.peekFirst().bornTick()>=SMOKE_LIFETIME_TICKS)
             smoke.removeFirst();

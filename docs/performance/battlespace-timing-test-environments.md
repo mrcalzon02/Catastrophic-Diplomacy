@@ -231,3 +231,12 @@ simulation tick in large engagements. New events still arrive in order,
 cursors remain independent across consumers, and combat physics is
 unchanged. Existing hit-layer and missile-lighting regressions verify
 functional behavior; a measured CPU gain requires paired workload tests.
+
+## Stage 11 — reuse missile visual tracking maps
+
+The combat lighting model previously allocated a fresh HashMap for missile
+exhaust state on every authoritative tick. It now swaps two persistent
+scratch maps and reuses the old backing table. The existing
+`:game:lightingSmoke` verifies ignition, phase changes, lingering smoke,
+battle resets and bounded effects. This reduces allocation and potential
+GC pauses without changing projectile physics or observed smoke positions.
