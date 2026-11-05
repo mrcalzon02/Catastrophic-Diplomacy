@@ -55,7 +55,6 @@ public final class ScreensaverBattle {
         List<Shipyard.Design> second=fleet(random,catalog,right,tierB,countB,
                 forcedShipsPerSide>0);
         Battle battle=Battle.duel(seed,first,second,catalog);
-        battle.enableUnattendedExhibition();
         FleetNames.Style[] traditions=FleetNames.Style.values();
         FleetNames.Style firstStyle=traditions[random.nextInt(traditions.length)];
         FleetNames.Style secondStyle=traditions[random.nextInt(traditions.length)];
@@ -95,6 +94,9 @@ public final class ScreensaverBattle {
             for(Battle.Ship ship:battle.ships())if(ship.team==team)allies.add(ship);
             for(int slot=0;slot<allies.size();slot++){
                 Battle.Ship ship=allies.get(slot);
+                // Captain-owned order input to the canonical Battle.step(), not a
+                // screensaver-specific branch in damage, thrust, weapons or AI.
+                ship.withdrawWhenDisarmed=true;
                 // Only an earlier friendly can lead this escort. No cycles,
                 // self-assignments or references to an opposing fleet.
                 int escort=slot>0&&random.nextInt(100)<25?random.nextInt(slot):-1;

@@ -42,6 +42,8 @@ public final class ScreensaverBattleTest {
                 Set<ShipStandingOrders> different=new HashSet<>();
                 for(int slot=0;slot<allies.size();slot++){
                     Battle.Ship ship=allies.get(slot);
+                    check(ship.withdrawWhenDisarmed,
+                            "Unattended extraction was not assigned to the physical captain");
                     check(ship.standingOrders!=null&&ship.orders.equals(ship.standingOrders.tactics()),
                             "Exhibition captain has no active individual doctrine");
                     different.add(ship.standingOrders);
@@ -283,6 +285,27 @@ public final class ScreensaverBattleTest {
         for(int tick=0;tick<15;tick++)manual.step();
         check(!manualShip.withdrawing && !manualShip.escaped,
                 "Autonomous exhibition withdrawal leaked into manual battles");
+
+        // Old exhibition opt-in and explicit per-ship orders must take precisely
+        // the same deterministic simulation path, tick for tick. A mode flag
+        // must never alter the physics, seeker, fighter or damage engine.
+        Battle legacyMode=new Battle(0xC0B471L);
+        Battle configuredShips=new Battle(0xC0B471L);
+        legacyMode.addShip(0,Battle.Faction.TERRAN,120,320);
+        legacyMode.addShip(1,Battle.Faction.DRAXIAN,1060,320);
+        for(Battle.Ship ship:configuredShips.ships())
+            throw new AssertionError("Unexpected predeployed ship " + ship.id);
+        configuredShips.addShip(0,Battle.Faction.TERRAN,120,320);
+        configuredShips.addShip(1,Battle.Faction.DRAXIAN,1060,320);
+        legacyMode.enableUnattendedExhibition();
+        for(Battle.Ship ship:configuredShips.ships())ship.withdrawWhenDisarmed=true;
+        check(legacyMode.fingerprint()==configuredShips.fingerprint(),
+                "Mode-based and captain-based combat start with different physics state");
+        for(int frame=0;frame<90;frame++){
+            legacyMode.step();configuredShips.step();
+            check(legacyMode.fingerprint()==configuredShips.fingerprint(),
+                    "Combat differs after equivalent fleet inputs at tick " + frame);
+        }
 
         // Fleet contact sharing requires a real active local spotter. A blind
         // squadmate can receive that identification, but a remote vessel and

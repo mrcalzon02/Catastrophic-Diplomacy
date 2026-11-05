@@ -51,6 +51,9 @@ public final class Battle {
         public String name;
         /** Per-hull doctrine. POINT DEFENSE is independent of main gun fire orders. */
         public BattleOrders.Orders orders=BattleOrders.DEFAULT;
+        /** Individual captain policy: choose physical extraction if the last friendly hull
+         * has no remaining attack capability. Valid in every battle mode. */
+        public boolean withdrawWhenDisarmed;
         /** Optional individual standing policy, continuously enforced, not consumed. */
         public ShipStandingOrders standingOrders;
         /** Explicit nondefault captain fire cadence, keyed by family or physical rack. */
@@ -1068,9 +1071,6 @@ public final class Battle {
         if(tick!=0)throw new IllegalStateException("Configure CIWS reservation before combat");
         diagnosticDisablePrecisionReservations=!enabled;
     }
-    /** Opt-in screensaver policy only. Player/campaign battles never make
-     * autonomous extraction decisions for the player's surviving ships. */
-    private boolean unattendedExhibition;
     /** Diagnostic-only crowding trial, disabled for all ordinary battles. */
     private double diagnosticRocketPdPressure;
     /** Laboratory-only propulsion sensitivity; production stays neutral. */
@@ -1127,9 +1127,11 @@ public final class Battle {
             throw new IllegalArgumentException("Invalid PD diagnostic configuration");
         diagnosticRocketPdPressure=pressure;
     }
+    /** Compatibility adapter: assign a per-ship captain policy, never a combat mode. */
+    @Deprecated
     public void enableUnattendedExhibition(){
-        if(tick!=0)throw new IllegalStateException("Set exhibition policy before combat");
-        unattendedExhibition=true;
+        if(tick!=0)throw new IllegalStateException("Assign extraction policy before combat");
+        for(Ship ship:ships)ship.withdrawWhenDisarmed=true;
     }
     /** Select weather before step 1; default is CLEAR for backward compatibility. */
     public void configureWeather(SpaceWeather.Preset preset) {
@@ -1752,11 +1754,11 @@ public final class Battle {
                 s.vx=0;s.vy=0;
                 continue;
             }
-            // A lone, unarmed exhibition captain with viable engines has no
-            // remaining offensive mission. Order a genuine physical extraction
-            // instead of leaving two opposing fleets alive indefinitely.
-            // No damage, simulated kills, teleport or invented terminal state.
-            if(unattendedExhibition && lastUnarmedExhibitionShip(s)){
+            // The same captain rule operates in EVERY battle mode. Unattended
+            // fleets opt ships into disarm extraction as part of their orders;
+            // campaign and manual ships keep control unless explicitly opted in.
+            // This still requires real fuel, thrust and rear-boundary escape.
+            if(s.withdrawWhenDisarmed && lastUnarmedFightingShip(s)){
                 s.withdrawing=true;
                 s.withdrawalTick=tick;
                 log(s.name+" disengaging: last ship has no offensive ordnance");
@@ -1895,10 +1897,9 @@ public final class Battle {
         for(Ship ship:ships)BattleArena.contain(ship);
     }
 
-    /** Voluntary disengagement is limited to a last armed-force survivor of a
-     * screensaver fleet. All ammunition and active attack craft count. Pure
-     * support ships remain in action while escorted allies still fight. */
-    private boolean lastUnarmedExhibitionShip(Ship candidate) {
+    /** The last friendly hull can withdraw on disarm when its captain was
+     * configured to do so. Live ammunition and attack craft still count. */
+    private boolean lastUnarmedFightingShip(Ship candidate) {
         if(candidate.withdrawing||candidate.fuel<=0||
                 candidate.engineCondition<=0.1||candidate.crewReadiness()<0.05)
             return false;
@@ -7028,7 +7029,8 @@ public final class Battle {
             hash = mix(hash, meteor.resolved() ? 1 : 0);
         }
         for (Ship s : ships) {
-            hash = mix(hash, s.id); hash = mix(hash, Double.doubleToLongBits(s.x));
+            hash = mix(hash, s.id); hash = mix(hash,s.withdrawWhenDisarmed?1:0);
+            hash = mix(hash, Double.doubleToLongBits(s.x));
             hash = mix(hash, Double.doubleToLongBits(s.y));
             hash = mix(hash,Double.doubleToLongBits(s.vx));
             hash = mix(hash,Double.doubleToLongBits(s.vy));
