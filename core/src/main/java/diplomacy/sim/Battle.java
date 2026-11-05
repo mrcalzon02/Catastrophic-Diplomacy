@@ -1650,6 +1650,19 @@ public final class Battle {
         ship.vx=(ship.team==0?1:-1)*speed;
         ship.vy=0;
     }
+    /** Explicit live deployment step. Headless fixture spawning remains at
+     * rest for stationary damage/aim regression tests; player and exhibition
+     * battles inherit realistic pre-engagement approach momentum only after
+     * orders and campaign stores have been installed. */
+    public void initializeBattleApproach(){
+        for(Ship ship:ships){
+            if(!ship.alive()||ship.escaped||ship.withdrawing
+                    ||ship.orders.position()==BattleOrders.Position.HOLD
+                    ||ship.orders.position()==BattleOrders.Position.LAST_STAND
+                    ||ship.vx!=0||ship.vy!=0)continue;
+            initializeEntryCruise(ship);
+        }
+    }
     public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
                           int count, double centerX, double centerY) {
         requireFleetCapacity(team,count);
@@ -1658,9 +1671,8 @@ public final class Battle {
         List<RocketBarrage.Rack> rocketTemplates=Shipyard.rocketRacks(design,catalog);
         for (int i=0;i<count;i++) {
             double[] point = formationPosition(i,count,centerX,centerY,random);
-            Ship deployed=addShip(team,design,machinery,doctrine,catalog,
+            addShip(team,design,machinery,doctrine,catalog,
                     rocketTemplates,point[0],point[1]);
-            initializeEntryCruise(deployed);
         }
         log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
     }
@@ -1683,9 +1695,8 @@ public final class Battle {
         }
         for(int i=0;i<designs.size();i++){
             double[] point=formationPosition(i,designs.size(),centerX,centerY,random);
-            Ship deployed=addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),catalog,
+            addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),catalog,
                     rocketsByHull.get(i),point[0],point[1]);
-            initializeEntryCruise(deployed);
         }
         log("Team "+team+" deployed "+designs.size()+" individual engineering configurations");
     }
