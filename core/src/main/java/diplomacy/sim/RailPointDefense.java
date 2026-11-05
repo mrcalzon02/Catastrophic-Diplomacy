@@ -67,6 +67,8 @@ public final class RailPointDefense {
          * actual in-flight projectile; it is not a guaranteed hit. */
         public final double reservedDamage;
         public final double vx,vy,damage;
+        /** Immutable actual launch point for render-only first-tick travel. */
+        public final double startX,startY;
         public double x,y,life;
         public Penetrator(long shot,long tick,int team,int source,int slot,
                           double x,double y,double bearing,
@@ -78,7 +80,7 @@ public final class RailPointDefense {
                     reach<MIN_ENGAGEMENT_RANGE)
                 throw new IllegalArgumentException("Invalid rail penetrator");
             visualId=shot;spawnTick=tick;this.team=team;sourceId=source;
-            slotId=slot;this.x=x;this.y=y;this.damage=damage;
+            slotId=slot;this.x=x;this.y=y;startX=x;startY=y;this.damage=damage;
             assignedBodyId=assignedBody;this.reservedDamage=reservedDamage;
             vx=PENETRATOR_SPEED*StrictMath.cos(bearing);
             vy=PENETRATOR_SPEED*StrictMath.sin(bearing);

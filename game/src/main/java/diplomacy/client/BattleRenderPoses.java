@@ -13,6 +13,8 @@ final class BattleRenderPoses {
     private final Map<Long,Pose> missiles=new HashMap<>(),rockets=new HashMap<>(),shells=new HashMap<>();
     private final Map<Long,Pose> flak=new HashMap<>(),rotary=new HashMap<>(),rails=new HashMap<>();
     private Battle source;
+    /** Snapshot source tick: birth poses are valid only during the next tick. */
+    private long sampledTick=Long.MIN_VALUE;
     private float fraction=1f;
     /** The caller counts real physics steps independently of render frames.
      * Only the last actual step contributes a previous pose to this frame.
@@ -23,10 +25,12 @@ final class BattleRenderPoses {
     void sync(Battle battle){
         if(source==battle)return;
         source=battle;ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
+        sampledTick=Long.MIN_VALUE;
         fraction=1f;
     }
     void beforeStep(Battle battle){
         sync(battle);ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
+        sampledTick=battle.tick;
         for(Battle.Ship s:battle.ships())if(s.alive())
             ships.put(s.id,new Pose((float)s.x,(float)s.y,(float)s.facing));
         for(Battle.Craft c:battle.crafts())
@@ -54,6 +58,7 @@ final class BattleRenderPoses {
     void snap(Battle battle){
         sync(battle);
         ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
+        sampledTick=Long.MIN_VALUE;
         fraction=1f;
     }
     void fraction(Battle battle,float value){
@@ -88,35 +93,61 @@ final class BattleRenderPoses {
         return new Pose(prior.x()+dx*fraction,prior.y()+dy*fraction,
                 prior.angle()+rotation*fraction);
     }
+    /** A fresh live projectile is already advanced within its birth tick.
+     * Start presentation at its real launch coordinate, not at its first
+     * post-physics position. This affects visuals only. */
+    private Pose birth(Pose prior,long spawnTick,double muzzleX,double muzzleY,Pose now){
+        if(prior!=null)return prior;
+        if(source==null||sampledTick!=source.tick-1||spawnTick!=source.tick)
+            return null;
+        if(!Double.isFinite(muzzleX)||!Double.isFinite(muzzleY))return null;
+        return new Pose((float)muzzleX,(float)muzzleY,now.angle());
+    }
     Pose ship(Battle.Ship s){
         return blend(ships.get(s.id),new Pose((float)s.x,(float)s.y,(float)s.facing));
     }
     Pose craft(Battle.Craft c){
-        return blend(crafts.get(c.id),new Pose((float)c.x,(float)c.y,0));
+        Pose current=new Pose((float)c.x,(float)c.y,0);
+        Pose previous=crafts.get(c.id);
+        if(previous==null&&source!=null&&sampledTick==source.tick-1&&
+                Double.isFinite(c.lastObservedX)&&Double.isFinite(c.lastObservedY))
+            previous=new Pose((float)c.lastObservedX,(float)c.lastObservedY,0);
+        return blend(previous,current);
     }
     Pose missile(Battle.Missile m){
-        return blend(missiles.get(m.visualId),new Pose((float)m.x,(float)m.y,
-                (float)Math.atan2(m.vy,m.vx)));
+        Pose current=new Pose((float)m.x,(float)m.y,
+                (float)Math.atan2(m.vy,m.vx));
+        return blend(birth(missiles.get(m.visualId),m.spawnTick,
+                m.previousX,m.previousY,current),current);
     }
     Pose rocket(Battle.Rocket r){
-        return blend(rockets.get(r.visualId),
-                new Pose((float)r.x,(float)r.y,(float)r.heading));
+        Pose current=new Pose((float)r.x,(float)r.y,(float)r.heading);
+        return blend(birth(rockets.get(r.visualId),r.spawnTick,
+                r.previousX,r.previousY,current),current);
     }
     Pose shell(Battle.Ballistic b){
-        return blend(shells.get(b.visualId),new Pose((float)b.x,(float)b.y,
-                (float)Math.atan2(b.vy,b.vx)));
+        Pose current=new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx));
+        return blend(birth(shells.get(b.visualId),b.spawnTick,
+                b.previousX,b.previousY,current),current);
     }
     Pose flak(Battle.FlakRound b){
-        return blend(flak.get(b.shotId),new Pose((float)b.x,(float)b.y,
-                (float)Math.atan2(b.vy,b.vx)));
+        Pose current=new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx));
+        return blend(birth(flak.get(b.shotId),b.spawnTick,
+                b.startX,b.startY,current),current);
     }
     Pose rotary(RotaryPointDefense.Round b){
-        return blend(rotary.get(b.visualId),new Pose((float)b.x,(float)b.y,
-                (float)Math.atan2(b.vy,b.vx)));
+        Pose current=new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx));
+        return blend(birth(rotary.get(b.visualId),b.spawnTick,
+                b.startX,b.startY,current),current);
     }
     Pose rail(RailPointDefense.Penetrator b){
-        return blend(rails.get(b.visualId),new Pose((float)b.x,(float)b.y,
-                (float)Math.atan2(b.vy,b.vx)));
+        Pose current=new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx));
+        return blend(birth(rails.get(b.visualId),b.spawnTick,
+                b.startX,b.startY,current),current);
     }
     int trackedShips(){return ships.size();}
     int trackedMissiles(){return missiles.size();}

@@ -55,6 +55,8 @@ public final class RotaryPointDefense {
         public final long visualId,spawnTick;
         public final int sourceId,team,slotId;
         public final double vx,vy,damage;
+        /** Immutable actual launch point for render-only first-tick travel. */
+        public final double startX,startY;
         public double x,y,life;
         public Round(long id,long tick,int source,int team,int slot,
                      double x,double y,double angle,double damage,double range){
@@ -62,7 +64,7 @@ public final class RotaryPointDefense {
                     !Double.isFinite(range)||range<=0)
                 throw new IllegalArgumentException("Invalid rotary projectile");
             visualId=id;spawnTick=tick;sourceId=source;this.team=team;slotId=slot;
-            this.x=x;this.y=y;this.damage=damage;
+            this.x=x;this.y=y;startX=x;startY=y;this.damage=damage;
             vx=BULLET_SPEED*StrictMath.cos(angle);
             vy=BULLET_SPEED*StrictMath.sin(angle);
             life=range/BULLET_SPEED;

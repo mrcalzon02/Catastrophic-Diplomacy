@@ -82,6 +82,35 @@ public final class BattleRenderPosesTest {
         close(p.flak(freshFlak).x(),100,"flak muzzle on spawn");
         close(p.rotary(freshRotary).x(),100,"rotary muzzle on spawn");
         close(p.rail(freshRail).x(),100,"rail muzzle on spawn");
-        System.out.println("PASS poses, pause/resume, camera, PD munition launches and multi-step interpolation");
+        // Simulate a real launch after beforeStep: the round travels within
+        // its birth tick and otherwise jumps from the muzzle to post-tick x.
+        Battle birth=new Battle(407L);
+        Battle.Ship source=birth.addShip(0,Battle.Faction.TERRAN,100,200);
+        BattleRenderPoses present=new BattleRenderPoses();
+        present.beforeStep(birth);
+        birth.tick++;
+        Battle.FlakRound flak=new Battle.FlakRound(0,source.id,0,701,birth.tick,
+                100,200,340,200,2,3);
+        flak.advance(Battle.DT);
+        diplomacy.sim.RotaryPointDefense.Round rotary=
+                new diplomacy.sim.RotaryPointDefense.Round(
+                        702,birth.tick,source.id,0,0,100,200,0,3,500);
+        rotary.x+=rotary.vx*Battle.DT;
+        diplomacy.sim.RailPointDefense.Penetrator rail=
+                new diplomacy.sim.RailPointDefense.Penetrator(
+                        703,birth.tick,0,source.id,0,100,200,0,500,3,101,3);
+        rail.x+=rail.vx*Battle.DT;
+        present.fraction(birth,0);
+        close(present.flak(flak).x(),100,"flak leaves real muzzle");
+        close(present.rotary(rotary).x(),100,"rotary leaves real muzzle");
+        close(present.rail(rail).x(),100,"rail leaves real muzzle");
+        present.fraction(birth,.5f);
+        close(present.flak(flak).x(),(100+flak.x)*.5,"flak birth half tick");
+        close(present.rotary(rotary).x(),(100+rotary.x)*.5,"rotary birth half tick");
+        close(present.rail(rail).x(),(100+rail.x)*.5,"rail birth half tick");
+        present.snap(birth);
+        present.fraction(birth,0);
+        close(present.rail(rail).x(),rail.x,"pause never rewinds launch");
+        System.out.println("PASS poses, first-tick projectile travel, pause/resume, camera and catch-up");
     }
 }

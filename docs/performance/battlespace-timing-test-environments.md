@@ -94,3 +94,18 @@ A production comparison also requires identical seeded 200v200 battles
 and a display-side histogram of 50th/95th/99th-percentile frame times,
 stutter/pose discontinuities, simulation debt, and actual physics ticks
 per real second on target Android and desktop hardware.
+
+## Stage 3 — first-frame flight
+
+At 0.5x/1x, missiles, rockets, kinetic rounds, flak, rotary CIWS and rail
+penetrators may be spawned and then advance one entire tick before the
+renderer sees them. No previous pose exists in this case, causing a visible
+muzzle-to-in-flight teleport.
+
+The renderer now reconstructs the birth-tick launch position from each
+live projectile's actual physical origin (not a fabricated weapon effect).
+Fighters/drones use their physical pre-advance observations when born.
+This is applied only if a real beforeStep snapshot belongs to the
+immediately preceding physics tick. Pausing, battle changes, and replay
+resets never reuse an old launch position. Live collisions and ship
+physics remain untouched.
