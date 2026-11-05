@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 14,
-  "note": "User explicitly authorizes a new public signed Android APK, Windows MSI and Linux ZIP after repairing omitted desktop ambient soundtrack, adding packaged-JAR verification, signed Android Options > Dev screenshot/toggle acceptance, and tick-normalized 200v200 performance telemetry. Run all existing objective functional gates (including Android runtime and campaign shards, exact signer continuity, MSI install/launch/uninstall, Linux executable, archive checksums and readback); keep cosmetic/performance targets diagnostic and disclose measurements. Publish this exact source only on success, never overwrite/retag or invent credentials."
+  "revision": 15,
+  "note": "User requested continued performance improvements. Publish the newest verified 3-platform build with deterministic, A/B-measured 200v200 causal sensor observation reuse (60-tick JVM measurement), final-per-frame pose capture (no redundant 8x snapshots), reused hit/shield visual lookup maps, and a new Android stress trace breaking out authoritative Battle.step versus client visual bookkeeping. Preserve all standard objective release gates, Android signer continuity, upgrade/install checks, campaign shards, and Windows MSI/Linux native launch. Performance/FPS remains diagnostic only; read back exact source commit, signing/checksums, and all public artifacts. Never replace tags or loosen tests."
 }
