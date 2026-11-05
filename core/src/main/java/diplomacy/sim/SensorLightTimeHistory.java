@@ -9,6 +9,43 @@ public final class SensorLightTimeHistory {
     private static final int ONE_WAY_SEARCH_LIMIT=
             StrictMath.min(CAPACITY-1,
                     propagationTicks(WorldScale.DIAGONAL_WORLD_UNITS)+2);
+    /**
+     * A photon can arrive on exactly one integer tick. For candidate age N,
+     * distance must be approximately ((N-1),N] * arenaDiagonal/30.
+     * Reject clearly impossible pairs by squared distance before invoking
+     * StrictMath.hypot. A generous 1mm-in-world-units guard preserves the
+     * original exact ceiling around every propagation boundary.
+     */
+    private static final double WORLD_DISTANCE_PER_PHOTON_TICK=
+            WorldScale.DIAGONAL_WORLD_UNITS/30.0;
+    private static final double ARRIVAL_GUARD_UNITS=.001;
+    private static final double[] ARRIVAL_LOWER_DISTANCE_SQUARED=
+            new double[ONE_WAY_SEARCH_LIMIT+1];
+    private static final double[] ARRIVAL_UPPER_DISTANCE_SQUARED=
+            new double[ONE_WAY_SEARCH_LIMIT+1];
+    static {
+        for(int age=0;age<=ONE_WAY_SEARCH_LIMIT;age++){
+            double lower=StrictMath.max(0,
+                    (age-1)*WORLD_DISTANCE_PER_PHOTON_TICK-ARRIVAL_GUARD_UNITS);
+            double upper=age*WORLD_DISTANCE_PER_PHOTON_TICK+ARRIVAL_GUARD_UNITS;
+            ARRIVAL_LOWER_DISTANCE_SQUARED[age]=lower*lower;
+            ARRIVAL_UPPER_DISTANCE_SQUARED[age]=upper*upper;
+        }
+    }
+    /** The exact historical light-time expression remains final authority.
+     * NaN/overflow fall through to the original expression, never a new
+     * eligibility rule. Package visible for the exhaustive boundary smoke. */
+    static boolean arrivesAtAge(double dx,double dy,int age){
+        if(age>=0&&age<=ONE_WAY_SEARCH_LIMIT){
+            double squared=dx*dx+dy*dy;
+            if(Double.isFinite(squared) &&
+                    (squared<ARRIVAL_LOWER_DISTANCE_SQUARED[age]||
+                     squared>ARRIVAL_UPPER_DISTANCE_SQUARED[age]))
+                return false;
+        }
+        return propagationTicks(StrictMath.hypot(dx,dy))==age;
+    }
+
     private final Sample[] samples=new Sample[CAPACITY];
     /** Physical/EM sensor signatures and actual installed receiver capabilities
      * at the same tick as each motion sample. Never substituted with current
@@ -100,12 +137,11 @@ public final class SensorLightTimeHistory {
             long reflectedTick=sensorTick-age;
             Sample reflected=target.sensorHistory.at(reflectedTick);
             if(reflected==null||!reflected.alive())continue;
-            int returnTicks=propagationTicks(StrictMath.hypot(
-                    reflected.x()-sensorState.x(),
-                    reflected.y()-sensorState.y()));
-            // Each return is a specific immutable photon arrival, not a
-            // continuously available old radar fix until it is overwritten.
-            if(age!=returnTicks)continue;
+            // Most historical samples are outside this EXACT tick's light
+            // shell. Rejection avoids sqrt and never changes chronology.
+            if(!arrivesAtAge(reflected.x()-sensorState.x(),
+                    reflected.y()-sensorState.y(),age))continue;
+            int returnTicks=age;
             if(passive!=0&&passiveFix==null)passiveFix=reflected;
             if(active!=0&&activeFix==null){
                 long emittedTick=reflectedTick-returnTicks;

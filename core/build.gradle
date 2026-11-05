@@ -113,6 +113,20 @@ tasks.register('sensorLightTimeSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorLightTimeHistoryTest'
     dependsOn testClasses
 }
+tasks.register('photonArrivalPruningSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Exhaustively compare squared-shell pruning with exact photon delay at every time boundary.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PhotonArrivalPruningTest'
+    dependsOn testClasses
+}
+// The mandatory focused 200v200 regression executes both boundary tests
+// and unchanged full fleet fingerprints after light-time optimization.
+tasks.named('massMixedOnlySmoke') {
+    dependsOn(tasks.named('sensorLightTimeSmoke'))
+    dependsOn(tasks.named('photonArrivalPruningSmoke'))
+}
+
 
 tasks.register('sensorTacticalPictureSmoke', JavaExec) {
     dependsOn(tasks.named('sensorLightTimeSmoke'))
