@@ -2,6 +2,8 @@ package diplomacy.client;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import diplomacy.sim.Battle;
@@ -36,6 +38,8 @@ final class GameMenuPanel {
     private static final Color MUTED=MilitaryUiTheme.MUTED_TEXT;
     // No per-frame object allocation; one compact draw queue serves every menu.
     private final GrittyUiChrome grittyChrome=new GrittyUiChrome();
+    /** Reused: menu labels must never escape the background control artwork. */
+    private final GlyphLayout buttonTextLayout=new GlyphLayout();
     private final GrittyMenuBackgrounds backgrounds=new GrittyMenuBackgrounds();
     private final float[] chromeCommands=new float[512*5];
     private int chromeCount;
@@ -399,6 +403,28 @@ final class GameMenuPanel {
     private static void label(SpriteBatch batch,BitmapFont font,String text,float x,float y,Color color){
         font.setColor(color);font.draw(batch,text,x,y);
     }
+    /** Centers a single button label inside its painted and clickable bounds.
+     * The atlas border has a 10px inset; long names are shortened instead of
+     * painting beyond a button or making touch labels microscopic. */
+    private void buttonLabel(SpriteBatch batch,BitmapFont font,String text,
+                             float x,float y,float width,float height,Color color){
+        float sx=font.getData().scaleX,sy=font.getData().scaleY;
+        buttonTextLayout.setText(font,text);
+        float room=Math.max(1f,width-24f);
+        float fit=Math.min(1f,room/Math.max(1f,buttonTextLayout.width));
+        fit=Math.max(.86f,fit);
+        font.getData().setScale(sx*fit,sy*fit);
+        buttonTextLayout.setText(font,text,color,room,Align.center,false,"...");
+        font.setColor(color);
+        font.draw(batch,buttonTextLayout,x+12f,y+(height+buttonTextLayout.height)*.5f);
+        font.getData().setScale(sx,sy);
+    }
+    /** Truncates data-panel text to its panel, without inventing a button. */
+    private void fittedLabel(SpriteBatch batch,BitmapFont font,String text,
+                             float x,float y,float width,Color color){
+        buttonTextLayout.setText(font,text,color,Math.max(1,width),Align.left,false,"...");
+        font.setColor(color);font.draw(batch,buttonTextLayout,x,y);
+    }
     private static void title(SpriteBatch batch,BitmapFont font,String text,String subtitle){
         label(batch,font,text,37,680,Color.WHITE);
         label(batch,font,subtitle,38,650,MUTED);
@@ -485,13 +511,16 @@ final class GameMenuPanel {
                 rectangle(shapes,921,114,328,491,PANEL);
                 List<CampaignMap.SystemNode> nodes=CampaignMap.page(page);
                 shapes.setColor(.32f,.54f,.75f,1);
-                for(int i=1;i<nodes.size();i++){
-                    var a=nodes.get(i-1);var b=nodes.get(i);
+                for(var route:CampaignMap.links(page)){
+                    var a=nodes.get((route.from()-1)%CampaignMap.PAGE_SIZE);
+                    var b=nodes.get((route.to()-1)%CampaignMap.PAGE_SIZE);
+                    shapes.setColor(progress.completed(a.level())?
+                            MilitaryUiTheme.TELEMETRY:MilitaryUiTheme.FRAME_BRIGHT);
                     shapes.rectLine(a.x(),a.y(),b.x(),b.y(),2);
                 }
                 for(var node:nodes){
-                    Color c=node.level()<progress.unlocked()?Color.GREEN:
-                        node.level()==progress.unlocked()?Color.CYAN:MUTED;
+                    Color c=progress.completed(node.level())?Color.GREEN:
+                        progress.available(node.level())?Color.CYAN:MUTED;
                     shapes.setColor(node.level()==selectedLevel?Color.GOLD:c);
                     shapes.circle(node.x(),node.y(),node.level()==selectedLevel?19:
                             node.sectorFinale()?17:13,18);
@@ -940,14 +969,13 @@ final class GameMenuPanel {
                         "CONFIRM RESEARCH":"AUTHORIZE PROJECT",945,68,Color.WHITE);
             }
             case DOCK -> {
-                title(batch,font,"CAMPAIGN FLEET DOCK",
-                        "OWNED HULLS ARE PERSISTENT  |  SELECT ACTIVE SHIPS AND SERVICE RESERVES");
+                label(batch,font,"FLEET DOCK",37,680,Color.WHITE);
                 if(ownedFleet!=null){
                     label(batch,font,"OWNED "+ownedFleet.ships().size()+
                             "   ACTIVE "+ownedFleet.active().size()+
                             "   RESERVE "+ownedFleet.reserves().size(),44,594,Color.CYAN);
-                    label(batch,font,"<",573,592,Color.WHITE);
-                    label(batch,font,">",670,592,Color.WHITE);
+                    buttonLabel(batch,font,"<",548,566,86,43,Color.WHITE);
+                    buttonLabel(batch,font,">",642,566,86,43,Color.WHITE);
                     label(batch,font,"CREDITS: "+progress.credits(),842,609,Color.GOLD);
                     label(batch,font,"NAME STYLE: "+ownedFleet.style()+
                             "  |  RADIO: "+ownedFleet.radioTone(),842,581,MUTED);
@@ -955,9 +983,9 @@ final class GameMenuPanel {
                         int index=dockPage*9+i;
                         if(index>=ownedFleet.ships().size())break;
                         var ship=ownedFleet.ships().get(index);
-                        label(batch,font,(ship.deployed()?"ACTIVE":"RESERVE")+"  "+
+                        fittedLabel(batch,font,(ship.deployed()?"ACTIVE":"RESERVE")+"  "+
                                 ship.name()+"  ["+ship.fitting().hull+"]",
-                                53,547-i*43,index==dockSelected?Color.GOLD:
+                                53,547-i*43,726,index==dockSelected?Color.GOLD:
                                         ship.deployed()?Color.GREEN:Color.WHITE);
                         label(batch,font,"ID "+ship.id(),59,530-i*43,MUTED);
                         if(index==dockSelected&&dockCosts!=null){
@@ -970,34 +998,32 @@ final class GameMenuPanel {
                                     263,530-i*43,ready?Color.GREEN:Color.GOLD);
                         }
                     }
-                    String[] names={"TOGGLE ACTIVE / RESERVE","REPAIR HULL / ARMOR / SHIELDS",
-                            "RESTOCK CREW","RESTOCK AMMUNITION","REFILL FUEL",
-                            "REPLACE FIGHTERS / DRONES","BUY NEW FITTED HULL",
-                            "CHANGE NAME STYLE","GENERATE SHIP NAME","SERVICE ALL"};
+                    String[] names={"ACTIVE / RESERVE","REPAIR HULL / ARMOR / SHIELDS",
+                            "RESTOCK CREW","RESTOCK AMMO","REFILL FUEL",
+                            "REPLACE FIGHTERS / DRONES","BUY FITTED HULL",
+                            "NAME THEME","GENERATE NAME","SERVICE ALL"};
                     for(int i=0;i<names.length;i++){
                         String cost=i>=1&&i<=5&&dockCosts!=null?
-                                "  "+dockCosts[i-1]+" cr":
-                                i==6?"  "+purchaseCost+" cr":
-                                i==9&&dockCosts!=null?"  "+java.util.Arrays.stream(dockCosts).sum()+" cr":"";
-                        if(i==9){
-                            label(batch,font,"SERVICE ALL"+cost,847,553-i*46,Color.GOLD);
-                            label(batch,font,"REFIT HULL",1036,553-i*46,Color.WHITE);
-                        }else if(i==8){
-                            label(batch,font,"GENERATE NAME",847,553-i*46,Color.WHITE);
-                            label(batch,font,"MANUAL RENAME",1036,553-i*46,Color.WHITE);
-                        }else if(i==7){
-                            label(batch,font,"NAME THEME",847,553-i*46,Color.WHITE);
-                            label(batch,font,"RADIO VOICE",1036,553-i*46,Color.WHITE);
-                        }else label(batch,font,names[i]+cost,847,553-i*46,
-                                (i==6||i==9)?Color.GOLD:Color.WHITE);
+                                "  "+dockCosts[i-1]+" CR":
+                                i==6?"  "+purchaseCost+" CR":
+                                i==9&&dockCosts!=null?"  "+java.util.Arrays.stream(dockCosts).sum()+" CR":"";
+                        float by=525-i*46;
+                        if(i==7||i==8||i==9){
+                            buttonLabel(batch,font,names[i]+(i==9?cost:""),
+                                    840,by,180,42,i==9?Color.GOLD:Color.WHITE);
+                            buttonLabel(batch,font,i==7?"RADIO VOICE":
+                                            i==8?"MANUAL RENAME":"REFIT HULL",
+                                    1028,by,186,42,Color.WHITE);
+                        }else buttonLabel(batch,font,names[i]+cost,840,by,374,42,
+                                i==6?Color.GOLD:Color.WHITE);
                     }
                 }
-                label(batch,font,"BACK TO STAR MAP",54,67,Color.WHITE);
-                label(batch,font,"SHIPYARD",352,67,Color.WHITE);
-                label(batch,font,"RESEARCH",570,67,Color.WHITE);
-                label(batch,font,"SQUADRONS",772,67,Color.WHITE);
-                label(batch,font,"DEPLOY ACTIVE FLEET",1002,67,Color.WHITE);
-                label(batch,font,dockNotice,45,112,Color.CYAN);
+                buttonLabel(batch,font,"BACK",35,35,165,50,Color.WHITE);
+                buttonLabel(batch,font,"SHIPYARD",310,35,200,50,Color.WHITE);
+                buttonLabel(batch,font,"RESEARCH",530,35,210,50,Color.WHITE);
+                buttonLabel(batch,font,"SQUADRONS",751,35,201,50,Color.WHITE);
+                buttonLabel(batch,font,"DEPLOY FLEET",980,35,260,50,Color.WHITE);
+                fittedLabel(batch,font,dockNotice,45,112,740,Color.CYAN);
             }
             case SQUADRONS -> {
                 title(batch,font,"COMMISSIONED SQUADRONS",
@@ -1237,51 +1263,53 @@ final class GameMenuPanel {
             }
             default -> {}
         }
-        label(batch,font,"FIELD WIKI (F1)",897,670,Color.CYAN);
+        buttonLabel(batch,font,"FIELD WIKI (F1)",880,633,205,55,Color.CYAN);
         batch.end();
     }
     private static String shortLabel(String value,int max){
         return value.length()<=max?value:value.substring(0,max-3)+"...";
     }
-    private static void drawCampaign(SpriteBatch batch,BitmapFont font,
+    private void drawCampaign(SpriteBatch batch,BitmapFont font,
                                       CampaignProgress.State progress,int page,int selected){
         LevelEconomy.Level level=LevelEconomy.level(selected);
-        title(batch,font,"CAMPAIGN STAR MAP","SECTOR "+level.sector()+"  |  REACHABLE SYSTEMS AND FLEET MISSIONS");
-        label(batch,font,"CREDITS: "+progress.credits()+"   COMPLETED: "+progress.victories(),39,590,Color.GOLD);
+        var briefing=CampaignNarrative.forLevel(selected);
+        label(batch,font,"STAR MAP",37,680,Color.WHITE);
+        fittedLabel(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title()+
+                "  |  FRONT "+(page+1)+"/"+CampaignMap.PAGE_COUNT,
+                206,680,620,Color.CYAN);
+        label(batch,font,"CREDITS "+progress.credits()+"   VICTORIES "+progress.victories(),
+                47,588,Color.GOLD);
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
-            label(batch,font,""+node.level(),node.x()-12,node.y()+38,MUTED);
-        label(batch,font,"MISSION "+selected+": "+
-                shortLabel(CampaignStoryAtlas.nodeName(selected),19),
-                946,568,Color.WHITE);
-        label(batch,font,"SECTOR "+level.sector()+": "+
-                shortLabel(CampaignStoryAtlas.regionName(selected),21),
-                946,524,MUTED);
+            label(batch,font,""+node.level(),node.x()-11,node.y()+38,MUTED);
+        fittedLabel(batch,font,"MISSION "+selected+"  "+CampaignStoryAtlas.nodeName(selected),
+                946,575,290,Color.WHITE);
+        fittedLabel(batch,font,CampaignStoryAtlas.regionName(selected),
+                946,543,290,MUTED);
         var node=CampaignMap.page(CampaignMap.pageOf(selected))
                 .get((selected-1)%CampaignMap.PAGE_SIZE);
-        label(batch,font,"ENEMY: "+node.opponent().name(),946,482,MUTED);
-        label(batch,font,"OPERATION: "+node.operation().title.toUpperCase(java.util.Locale.ROOT),
-                946,460,Color.CYAN);
-        label(batch,font,"ENEMY TECH: "+node.enemyTier()+" / IX",946,439,Color.GOLD);
-        label(batch,font,"FLEET CAP: "+level.maximumFleet(),946,414,Color.WHITE);
-        label(batch,font,"WAVES PLANNED: "+level.waves(),946,389,MUTED);
-        label(batch,font,progress.available(selected)?"AVAILABLE":"LOCKED",946,343,
-              progress.available(selected)?Color.GREEN:Color.SCARLET);
+        label(batch,font,"ENEMY: "+node.opponent().name(),946,501,MUTED);
+        fittedLabel(batch,font,"OPERATION: "+node.operation().title.toUpperCase(java.util.Locale.ROOT),
+                946,475,286,Color.CYAN);
+        label(batch,font,"ENEMY TECH: "+node.enemyTier()+" / IX",946,447,Color.GOLD);
+        label(batch,font,"FLEET CAP: "+level.maximumFleet(),946,418,Color.WHITE);
+        label(batch,font,"WAVES: "+level.waves(),946,390,MUTED);
+        label(batch,font,progress.completed(selected)?"CLEARED / REPLAY":
+                        progress.available(selected)?"AVAILABLE":"LOCKED",
+                946,352,progress.completed(selected)?Color.GREEN:
+                        progress.available(selected)?Color.CYAN:Color.SCARLET);
         label(batch,font,progress.isReplay(selected)?
-                "CLEARED: 25% REPLAY CREDITS":"FIRST CLEAR: FULL CREDITS",
-                946,312,progress.isReplay(selected)?MUTED:Color.GOLD);
-        label(batch,font,"FACTION: "+progress.faction().name(),946,285,Color.WHITE);
-        var briefing=CampaignNarrative.forLevel(selected);
-        label(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title(),946,262,Color.CYAN);
-        label(batch,font,briefing.intelligence(),946,231,MUTED);
-        label(batch,font,shortLabel(CampaignStoryAtlas.frontObjective(selected),42),
-                946,202,Color.WHITE);
+                "REPLAY REWARD: 25%":"FIRST CLEAR: FULL CREDITS",
+                946,322,progress.isReplay(selected)?MUTED:Color.GOLD);
+        fittedLabel(batch,font,briefing.intelligence(),946,277,290,MUTED);
+        fittedLabel(batch,font,CampaignStoryAtlas.frontObjective(selected),
+                946,242,290,Color.WHITE);
         label(batch,font,"BASE HULLS: "+HullProgression.baseFamiliesAtTier(progress.researchRank())+
-                "/11 | TECH "+progress.researchRank(),946,167,Color.GOLD);
-        label(batch,font,"BACK",62,67,Color.WHITE);
-        label(batch,font,"PREV",248,67,Color.WHITE);
-        label(batch,font,"NEXT",402,67,Color.WHITE);
-        label(batch,font,"RESEARCH",560,67,Color.WHITE);
-        label(batch,font,"SHIPYARD",771,67,Color.WHITE);
-        label(batch,font,"DEPLOY FLEET",989,67,Color.WHITE);
+                "/11   TECH "+progress.researchRank(),946,188,Color.GOLD);
+        buttonLabel(batch,font,"BACK",35,35,165,50,Color.WHITE);
+        buttonLabel(batch,font,"PREV FRONT",214,35,136,50,Color.WHITE);
+        buttonLabel(batch,font,"NEXT FRONT",366,35,136,50,Color.WHITE);
+        buttonLabel(batch,font,"RESEARCH",525,35,200,50,Color.WHITE);
+        buttonLabel(batch,font,"SHIPYARD",741,35,190,50,Color.WHITE);
+        buttonLabel(batch,font,"FLEET DOCK",964,35,278,50,Color.WHITE);
     }
 }
