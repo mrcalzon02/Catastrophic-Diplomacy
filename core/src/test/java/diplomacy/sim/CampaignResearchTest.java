@@ -146,9 +146,9 @@ public final class CampaignResearchTest {
         check(CampaignProgress.decode(CampaignProgress.encode(branch)).equals(branch),
                 "Branch-specific clears did not survive a checksum save");
         // Crossing from the first lane to the center does not require the whole front.
-        branch=branch.complete(2,1,1).complete(3,1,1).complete(4,1,1);
+        branch=branch.complete(2,1,1).complete(3,1,1);
         check(!branch.available(10),"Convergence finale unlocked without enough sorties");
-        branch=branch.complete(5,1,1);
+        branch=branch.complete(4,1,1);
         check(branch.available(10),"Convergence finale remained locked after five clears");
         branch=branch.complete(10,1,1);
         check(branch.available(11)&&!branch.completed(9),
