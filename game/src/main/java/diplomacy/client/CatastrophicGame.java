@@ -1888,7 +1888,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
                     shipyard.show();
                 }
-                case 4 -> screen=GameMenuPanel.Screen.OPTIONS;
+                case 4 -> {
+                    screen=GameMenuPanel.Screen.OPTIONS;
+                    Gdx.app.log("CD-DEV","OPTIONS OPEN");
+                }
                 case 5 -> Gdx.app.exit();
                 case 6 -> {
                     try{multiplayer=new MultiplayerPanel(font,()->{multiplayer=null;screen=GameMenuPanel.Screen.HOME;},this::drawRemoteBattle);}
@@ -2034,7 +2037,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 2 -> audio.toggleEffects();
                 case 3 -> audio.toggleTrack();
                 case 4 -> {if(updateCheck!=null)updateCheck.run();}
-                case 5 -> {devReturnToBattle=false;screen=GameMenuPanel.Screen.DEV;}
+                case 5 -> {
+                    devReturnToBattle=false;
+                    screen=GameMenuPanel.Screen.DEV;
+                    Gdx.app.log("CD-DEV","OPEN FROM OPTIONS");
+                }
                 case 6 -> {screen=GameMenuPanel.Screen.HOME;audio.uiBack();menuButtonPointer=-1;}
                 default -> {}
             }
@@ -2207,6 +2214,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         tacticalMenuOpen=false;
         running=false;
         screen=GameMenuPanel.Screen.DEV;
+        Gdx.app.log("CD-DEV","OPEN FROM BATTLE");
     }
     private void closeDevOptions(){
         if(devReturnToBattle){
@@ -2214,7 +2222,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             screen=GameMenuPanel.Screen.BATTLE;
             tacticalMenuOpen=true;
             running=false;
-        }else screen=GameMenuPanel.Screen.OPTIONS;
+            Gdx.app.log("CD-DEV","BACK TO BATTLE");
+        }else {
+            screen=GameMenuPanel.Screen.OPTIONS;
+            Gdx.app.log("CD-DEV","BACK TO OPTIONS");
+        }
         if(audio!=null)audio.uiBack();
     }
     private void openTacticalMenu() {
@@ -2534,11 +2546,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void toggleFpsOverlay(){
         fpsOverlayEnabled=!fpsOverlayEnabled;
+        Gdx.app.log("CD-DEV","FPS "+(fpsOverlayEnabled?"ON":"OFF"));
         performanceNotice(fpsOverlayEnabled?"FPS COUNTER ON":"FPS COUNTER OFF");
         savePerformancePreferences();
     }
     private void toggleDiagnosticsHud(){
         diagnosticsHud=!diagnosticsHud;
+        Gdx.app.log("CD-DEV","HUD "+(diagnosticsHud?"ON":"OFF"));
         performanceNotice(diagnosticsHud?"PERFORMANCE HUD ON":"PERFORMANCE HUD OFF");
         savePerformancePreferences();
     }
