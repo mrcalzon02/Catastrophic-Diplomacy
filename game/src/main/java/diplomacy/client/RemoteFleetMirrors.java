@@ -13,14 +13,18 @@ import java.util.Map;
 final class RemoteFleetMirrors {
     private final Map<Integer,Battle.Ship> byHostId=new HashMap<>();
     private Battle battle;
+    private long appliedTick=Long.MIN_VALUE;
 
     Battle present(RemoteShipInterpolation interpolation,boolean newSession){
         var states=interpolation.ships();
-        boolean rebuild=newSession||battle==null||states.size()!=byHostId.size();
-        if(!rebuild)for(var state:states){
+        long networkTick=interpolation.tick();
+        boolean refresh=networkTick!=appliedTick;
+        boolean rebuild=newSession||battle==null;
+        if(!rebuild&&refresh)for(var state:states){
             Battle.Ship ship=byHostId.get(state.id());
-            if(ship==null||ship.team!=state.team()||
-                    ship.faction!=state.faction()){
+            if(ship!=null&&(ship.team!=state.team()||
+                    ship.faction!=state.faction())){
+                // A host ID cannot silently change sides or species.
                 rebuild=true;
                 break;
             }
@@ -28,10 +32,33 @@ final class RemoteFleetMirrors {
         if(rebuild){
             byHostId.clear();
             battle=new Battle(0L);
+            appliedTick=Long.MIN_VALUE;
+            refresh=true;
+        }
+        if(refresh){
+            java.util.Set<Integer> aliveIds=new java.util.HashSet<>();
             for(var state:states){
-                Battle.Ship ship=battle.addShip(state.team(),state.faction(),0,0);
-                byHostId.put(state.id(),ship);
+                aliveIds.add(state.id());
+                if(!byHostId.containsKey(state.id())){
+                    // Preserve every surviving ship. Creating a new vessel
+                    // must not reset positions or visual sprites of its peers.
+                    Battle.Ship ship=battle.addShip(state.team(),
+                            state.faction(),0,0);
+                    byHostId.put(state.id(),ship);
+                }
             }
+            java.util.Iterator<Map.Entry<Integer,Battle.Ship>> iter=
+                    byHostId.entrySet().iterator();
+            while(iter.hasNext()){
+                var entry=iter.next();
+                if(!aliveIds.contains(entry.getKey())){
+                    // Battle's render registry retains hull instances; hide
+                    // retired host IDs instead of reassigning survivors.
+                    entry.getValue().hull=0;
+                    iter.remove();
+                }
+            }
+            appliedTick=networkTick;
         }
         for(var state:states){
             Battle.Ship ship=byHostId.get(state.id());
@@ -48,10 +75,11 @@ final class RemoteFleetMirrors {
             ship.fuel=state.fuel();
             ship.hullClass=diplomacy.shipyard.Shipyard.Hull.CORVETTE;
         }
-        battle.tick=interpolation.tick();
+        battle.tick=networkTick;
         return battle;
     }
 
     Battle.Ship byHostId(int hostId){return byHostId.get(hostId);}
-    void reset(){battle=null;byHostId.clear();}
+    void reset(){battle=null;byHostId.clear();appliedTick=Long.MIN_VALUE;}
+
 }
