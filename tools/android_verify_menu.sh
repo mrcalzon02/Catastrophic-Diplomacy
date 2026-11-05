@@ -89,6 +89,60 @@ sleep 5
 dismiss_optional_updater first-launch
 capture main-menu
 assert_step MAIN_MENU
+
+# Capture the REAL signed Android Options -> Dev interface, not a static
+# recreation. Exercise both state changes and the actual Back navigation.
+touch_ui main-menu 350 265
+sleep 1
+capture options
+adb logcat -d -v time > "$report/dev-options-logcat.txt"
+grep -q 'CD-DEV.*OPTIONS OPEN' "$report/dev-options-logcat.txt" || {
+  echo "FAIL: signed APK did not open Options" >&2; exit 1;
+}
+touch_ui options 350 165
+sleep 1
+capture dev-menu-default
+adb logcat -d -v time > "$report/dev-menu-logcat.txt"
+grep -q 'CD-DEV.*OPEN FROM OPTIONS' "$report/dev-menu-logcat.txt" || {
+  echo "FAIL: signed APK did not open Options -> Dev" >&2; exit 1;
+}
+# Right-hand top-row button toggles the performance HUD; the left toggles FPS.
+touch_ui dev-menu-default 930 492
+sleep 1
+capture dev-hud-enabled
+touch_ui dev-hud-enabled 930 492
+sleep 1
+capture dev-hud-restored
+touch_ui dev-hud-restored 350 492
+sleep 1
+capture dev-fps-disabled
+touch_ui dev-fps-disabled 350 492
+sleep 1
+capture dev-fps-restored
+# Back from Dev is the bottom-right 112px-tall button; Back from
+# Options is the last bottom-right 94px button.
+touch_ui dev-fps-restored 930 207
+sleep 1
+capture dev-back-options
+touch_ui dev-back-options 930 165
+sleep 1
+capture dev-back-home
+adb logcat -d -v time > "$report/dev-toggles-logcat.txt"
+for signal in 'CD-DEV.*HUD ON' 'CD-DEV.*HUD OFF' \
+              'CD-DEV.*FPS OFF' 'CD-DEV.*FPS ON' \
+              'CD-DEV.*BACK TO OPTIONS'; do
+  grep -q "$signal" "$report/dev-toggles-logcat.txt" || {
+    echo "FAIL: signed APK Dev control did not emit $signal" >&2; exit 1;
+  }
+done
+if cmp -s "$report/options.png" "$report/dev-menu-default.png"; then
+  echo "FAIL: Dev menu framebuffer identical to Options" >&2; exit 1;
+fi
+if ! adb shell pidof "$package" >/dev/null 2>&1; then
+  echo "FAIL: app crashed navigating Options -> Dev" >&2; exit 1;
+fi
+echo "PASS: signed Android Options/Dev rendered, HUD/FPS toggled and restored, Back returned home; screenshots archived."
+
 # Exercise the ACTUAL native field encyclopedia from the signed APK.
 # The tap must be on the same visible header tile as the gameplay UI.
 touch_ui main-menu 965 662
