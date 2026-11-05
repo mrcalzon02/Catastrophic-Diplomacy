@@ -230,6 +230,43 @@ public final class TechnologyCatalog {
         return rank.length()==2&&rank.charAt(0)=='0'&&
                 rank.charAt(1)>='1'&&rank.charAt(1)<='9';
     }
+    private static final String[] STAGE_SUFFIXES={
+            "01","02","03","04","05","06","07","08","09"};
+
+    /** Parse the canonical virtual-ID shape with only a subsystem substring
+     * and a five-reference array. String.split allocated fresh copies of
+     * TECH, faction, track and stage for every virtual query and nested
+     * source lookup; all four are fixed canonical tokens.
+     *
+     * Malformed IDs still fall through to the existing late-stage resolver.
+     */
+    private static String[] virtualIdParts(String id){
+        if(id==null||!id.startsWith("TECH-"))return null;
+        int factionEnd=id.indexOf('-',5);
+        int subsystemEnd=factionEnd<0?-1:id.indexOf('-',factionEnd+1);
+        int trackEnd=subsystemEnd<0?-1:id.indexOf('-',subsystemEnd+1);
+        if(factionEnd<=5||subsystemEnd<=factionEnd+1||
+                trackEnd<=subsystemEnd+1||trackEnd+3!=id.length())
+            return null;
+        char rank=id.charAt(trackEnd+2);
+        if(id.charAt(trackEnd+1)!='0'||rank<'1'||rank>'9')
+            return null;
+        String faction=null,track=null;
+        for(String item:VARIANT_FACTIONS)
+            if(item.length()==factionEnd-5&&
+                    id.regionMatches(5,item,0,item.length())){
+                faction=item;break;
+            }
+        for(String item:VARIANT_TRACKS)
+            if(item.length()==trackEnd-subsystemEnd-1&&
+                    id.regionMatches(subsystemEnd+1,item,0,item.length())){
+                track=item;break;
+            }
+        if(faction==null||track==null)return null;
+        return new String[]{"TECH",faction,
+                id.substring(factionEnd+1,subsystemEnd),track,
+                STAGE_SUFFIXES[rank-'1']};
+    }
     public int upgradeCount() { return upgradeTotal; }
     public int componentCount() { return components.size(); }
     public Upgrade get(String id) {
@@ -238,11 +275,9 @@ public final class TechnologyCatalog {
         // Canonical identities are disjoint; exhaustive smoke tests verify both.
         Upgrade found=sixStages.get(id);
         if(found!=null)return found;
-        // Parse a virtual ID at most once. Each resolver previously allocated
-        // a fresh five-part String[] (and backing substrings) for the same
-        // requested node, compounding heap pressure on all 73k wiki queries.
-        String[] parts=id!=null&&id.startsWith("TECH-")?
-                id.split("-",5):null;
+        // Resolve known faction, track and stage tokens without String.split's
+        // duplicate Strings. Nested source lookups use the same parser.
+        String[] parts=virtualIdParts(id);
         Upgrade virtual=survivalVariantUpgrade(id,parts);
         if(virtual!=null)return virtual;
         virtual=networkVariantUpgrade(id,parts);
