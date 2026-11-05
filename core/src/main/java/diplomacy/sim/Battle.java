@@ -764,6 +764,17 @@ public final class Battle {
     private List<Ship> enemyShips(int team){
         return team==0?teamOneShips:teamZeroShips;
     }
+    /** The old full-fleet scan is retained solely for deterministic A/B.
+     * Normal games always traverse the indexed enemy list. */
+    private boolean indexedOpponents=true;
+    public void configureOpponentIndexForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Opponent index A/B must be configured before battle");
+        indexedOpponents=enabled;
+    }
+    private List<Ship> opponentCandidates(int team){
+        return indexedOpponents?enemyShips(team):ships;
+    }
     private List<Ship> friendlyShips(int team){
         return team==0?teamZeroShips:teamOneShips;
     }
@@ -3120,7 +3131,8 @@ public final class Battle {
             // target selection; do not recompute it for 200 enemy candidates.
             double uncertaintyDenominator=
                     1+actor.commanderSkill*.4+tacticalPrecision(actor);
-            for (Ship s : enemyShips(actor.team)) if (s.alive()) {
+            for (Ship s : opponentCandidates(actor.team))
+                if (s.team != actor.team && s.alive()) {
                 // The old current-position distance argument was ignored by
                 // liveContactSource. Avoid a costly, omniscient hypot that
                 // cannot authorize a causal contact anyway.
@@ -3162,7 +3174,8 @@ public final class Battle {
         }
         // Zero priority disables a class rather than silently turning it into
         // another target. PD continues according to its independent selector.
-        for(Ship candidate:enemyShips(actor.team))if(candidate.alive()){
+        for(Ship candidate:opponentCandidates(actor.team))
+            if(candidate.team!=actor.team&&candidate.alive()){
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
             // liveContactSource ignores the enemy's current position.
@@ -3498,8 +3511,8 @@ public final class Battle {
                     photon.ray.x1()+ux*end,photon.ray.y1()+uy*end);
             BeamRayGeometry.Intersection first=null;
             Ship struck=null;
-            for(Ship candidate:enemyShips(photon.team)){
-                if(!candidate.alive())continue;
+            for(Ship candidate:opponentCandidates(photon.team)){
+                if(!candidate.alive()||candidate.team==photon.team)continue;
                 double radius=12*candidate.visualScale();
                 if(candidate.x<StrictMath.min(segment.x1(),segment.x2())-radius||
                         candidate.x>StrictMath.max(segment.x1(),segment.x2())+radius||
@@ -5197,8 +5210,8 @@ public final class Battle {
             double minY=StrictMath.min(p.y,nextY);
             double maxY=StrictMath.max(p.y,nextY);
             Ship closest=null;double earliest=Double.POSITIVE_INFINITY;
-            for(Ship candidate:enemyShips(p.team)){
-                if(!candidate.alive())continue;
+            for(Ship candidate:opponentCandidates(p.team)){
+                if(candidate.team==p.team||!candidate.alive())continue;
                 double radius=12*candidate.visualScale();
                 if(!sweptAabbMayHit(minX,maxX,minY,maxY,
                         candidate.x,candidate.y,radius))continue;
