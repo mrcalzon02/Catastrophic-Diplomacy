@@ -87,6 +87,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
     /** One interpolation snapshot per displayed frame, not once per 8x catch-up tick. */
     private long renderPoseSnapshots;
+    /** Verification-only phase costs; normal games incur no nanoTime calls. */
+    private long verifyBattleStepNs,verifyClientTickNs;
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
     private static final String PERFORMANCE_PREFS="catastrophic-diplomacy-performance";
@@ -2737,6 +2739,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             verificationReported=false;verifiedTypes.clear();verifiedShotIds.clear();
             renderProfile.reset();
             renderPoseSnapshots=0;
+            verifyBattleStepNs=verifyClientTickNs=0;
             Gdx.app.log("CD-DEMO-VERIFY","START 200v200 module/weapon/service suite seed="+DemonstrationBattle.SEED);
         }
     }
@@ -2833,6 +2836,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             accumulator += delta * pace;
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
+                long tickStartNs=verifyDemo?System.nanoTime():0;
                 // Only the last completed physics step can be interpolated
                 // into this framebuffer. Earlier snapshots are immediately
                 // overwritten and can require thousands of map/pose objects
@@ -2844,13 +2848,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 deathTimeline.beforeStep(battle);
                 hitFeedback.beforeStep(battle);
                 shieldFx.beforeStep(battle);
-                battle.step(); diagnosticTicksLastFrame++; accumulator -= Battle.DT;
+                long battleStartNs=verifyDemo?System.nanoTime():0;
+                battle.step();
+                long battleEndNs=verifyDemo?System.nanoTime():0;
+                diagnosticTicksLastFrame++; accumulator -= Battle.DT;
                 // Capture every real missile pose and motor transition here.
                 // Rendering may skip ticks at 4x/8x without losing exhaust.
                 if(lighting!=null)lighting.captureTick(battle);
                 deathTimeline.afterStep(battle);
                 hitFeedback.afterStep(battle);
                 shieldFx.afterStep(battle);
+                if(verifyDemo){
+                    long physicsNs=battleEndNs-battleStartNs;
+                    verifyBattleStepNs+=physicsNs;
+                    verifyClientTickNs+=System.nanoTime()-tickStartNs-physicsNs;
+                }
             }
             if (turns >= 64) accumulator = 0; // Frame cannot create unbounded catch-up latency.
         }
@@ -3672,6 +3684,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         var perf=renderProfile.report();
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
             " poseSnapshots="+renderPoseSnapshots+
+            " coreBattleCpuMsPerTick="+
+                (verifyBattleStepNs/(1_000_000.0*Math.max(1,battle.tick)))+
+            " clientTickVisualCpuMsPerTick="+
+                (verifyClientTickNs/(1_000_000.0*Math.max(1,battle.tick)))+
             " forcedVerificationSpeed="+speed+"x"+
             " avgSimulationTicksPerFrame="+(battle.tick/(double)Math.max(1,verifiedFrames))+
             " avgSimulationCpuMsPerTick="+
