@@ -3509,15 +3509,21 @@ public final class Battle {
             BeamRayGeometry.Ray segment=new BeamRayGeometry.Ray(
                     photon.ray.x1()+ux*begin,photon.ray.y1()+uy*begin,
                     photon.ray.x1()+ux*end,photon.ray.y1()+uy*end);
+            // Exactly the same exclusion bounds, evaluated ONCE per photon
+            // segment rather than four StrictMath operations per target.
+            double segmentMinX=StrictMath.min(segment.x1(),segment.x2());
+            double segmentMaxX=StrictMath.max(segment.x1(),segment.x2());
+            double segmentMinY=StrictMath.min(segment.y1(),segment.y2());
+            double segmentMaxY=StrictMath.max(segment.y1(),segment.y2());
             BeamRayGeometry.Intersection first=null;
             Ship struck=null;
             for(Ship candidate:opponentCandidates(photon.team)){
                 if(!candidate.alive()||candidate.team==photon.team)continue;
                 double radius=12*candidate.visualScale();
-                if(candidate.x<StrictMath.min(segment.x1(),segment.x2())-radius||
-                        candidate.x>StrictMath.max(segment.x1(),segment.x2())+radius||
-                        candidate.y<StrictMath.min(segment.y1(),segment.y2())-radius||
-                        candidate.y>StrictMath.max(segment.y1(),segment.y2())+radius)
+                if(candidate.x<segmentMinX-radius||
+                        candidate.x>segmentMaxX+radius||
+                        candidate.y<segmentMinY-radius||
+                        candidate.y>segmentMaxY+radius)
                     continue;
                 BeamRayGeometry.Intersection found=BeamRayGeometry.intersect(
                         segment,candidate.x,candidate.y,radius);
@@ -5165,7 +5171,14 @@ public final class Battle {
             double minY=StrictMath.min(rocket.y,ny);
             double maxY=StrictMath.max(rocket.y,ny);
             Ship hit=null;double earliest=Double.POSITIVE_INFINITY;
-            for(Ship enemy:ships)if(enemy.team!=rocket.team&&enemy.alive()){
+            // Stable per-team insertion order equals the original global
+            // ship-order projection. Nonstandard diagnostic team values
+            // deliberately fall back to the complete original registry.
+            java.util.List<Ship> rocketCandidates=
+                    rocket.team==0||rocket.team==1
+                            ?opponentCandidates(rocket.team):ships;
+            for(Ship enemy:rocketCandidates)
+                if(enemy.team!=rocket.team&&enemy.alive()){
                 double radius=12*enemy.visualScale();
                 if(!sweptAabbMayHit(minX,maxX,minY,maxY,
                         enemy.x,enemy.y,radius))continue;
