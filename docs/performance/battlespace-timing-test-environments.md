@@ -56,3 +56,24 @@ Physics/collision and projectile IDs remain authoritative and unchanged.
 
 Headless tests cover launch presentation. Additional live pixel-motion capture
 at low FPS is still required; the scripted fixture does not certify GPU smoothness.
+
+## Stage 2 — doubled sublight position integration
+
+The live `SublightPropulsion.advance` now performs **two bounded
+half-DT velocity/position integrations** inside each existing 30 Hz tactical
+step. This is **60 Hz ship thrust/position integration**, not a 60 Hz
+`Battle.step()`, sensor, fire-control, fighter, or projectile update.
+
+`WorldScaleAndPropulsionTest.doublePositionAccuracy()` compares one
+full integration, two half integrations and a 32-substep reference over
+300 authoritative ticks, and requires the 60 Hz trajectory to reduce
+integration error while preserving final velocity and physical fuel spent.
+The same regression checks fuel-starved inertial coasting.
+
+`gradle --no-daemon :core:worldScaleAndPropulsionSmoke` runs this regression.
+This limited numerical improvement should **not** be treated as proof of
+smooth real-time display motion: at the existing speed mapping the renderer
+still receives only approximately three authoritative snapshots per wall
+second at 1x, and guided munitions still integrate within their old
+30 Hz world phase. Gameplay-fidelity measurements must precede expansion
+to projectile/collision substeps.

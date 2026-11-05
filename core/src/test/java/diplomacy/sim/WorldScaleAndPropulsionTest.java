@@ -145,6 +145,60 @@ public final class WorldScaleAndPropulsionTest {
     /** Enter an actual fitted fleet engagement with already established,
      * physically bounded pre-battle approach momentum. Slow acceleration
      * alone must not leave a newly deployed screen visually frozen. */
+    /**
+     * Compare 30 Hz one-step, 60 Hz two-step and finer reference integration
+     * under identical constant thrust. This measures positional accuracy,
+     * not graphical frame rate or twice as many AI decisions.
+     */
+    private static void doublePositionAccuracy(){
+        Battle sample=new Battle(606060);
+        Battle.Ship old=sample.addShip(0,Battle.Faction.TERRAN,300,200);
+        Battle.Ship doubled=sample.addShip(0,Battle.Faction.TERRAN,300,200);
+        Battle.Ship reference=sample.addShip(0,Battle.Faction.TERRAN,300,200);
+        for(Battle.Ship ship:new Battle.Ship[]{old,doubled,reference}){
+            ship.propulsion=SublightPropulsion.Drive.HIGH_ENERGY_TORCH;
+            ship.engineCondition=1;
+            ship.speed=10;
+            ship.fuel=500;
+            ship.maxFuel=500;
+            ship.vx=0;
+            ship.vy=0;
+        }
+        ok(SublightPropulsion.POSITION_SUBSTEPS==2,
+                "Live physics must evaluate two position steps per tactical tick");
+        for(int tick=0;tick<300;tick++){
+            SublightPropulsion.advanceSubstepped(old,1,0,Battle.DT,0,1,1);
+            SublightPropulsion.advance(doubled,1,0,Battle.DT);
+            SublightPropulsion.advanceSubstepped(reference,1,0,Battle.DT,0,1,32);
+        }
+        double errorOld=StrictMath.abs(reference.x-old.x);
+        double errorDouble=StrictMath.abs(reference.x-doubled.x);
+        ok(errorOld>1e-10,"Reference fixture did not resolve integration error");
+        ok(errorDouble<errorOld*.55,
+                "Two half-steps failed to reduce positional integration error: "+
+                errorOld+" -> "+errorDouble);
+        close(old.vx,doubled.vx,1e-11,
+                "Substeps changed available thrust or final velocity");
+        close(old.fuel,doubled.fuel,1e-10,
+                "Substeps changed propellant consumption");
+        close(reference.vx,doubled.vx,1e-11,
+                "Reference and 60 Hz thrust disagree");
+        // Constant-velocity coasting has an exact closed-form position; neither
+        // substeps nor no-fuel coast are allowed to introduce drag.
+        doubled.vx=1.25;
+        doubled.vy=-.5;
+        doubled.fuel=0;
+        double startX=doubled.x,startY=doubled.y;
+        SublightPropulsion.advance(doubled,0,0,Battle.DT);
+        close(doubled.x,startX+1.25*Battle.DT,1e-11,
+                "Fuel-starved x momentum changed during substepping");
+        close(doubled.y,startY-.5*Battle.DT,1e-11,
+                "Fuel-starved y momentum changed during substepping");
+        System.out.printf(java.util.Locale.ROOT,
+                "PASS 60 Hz ship-position substeps; 30Hz error %.9f, 60Hz error %.9f, fuel parity%n",
+                errorOld,errorDouble);
+    }
+
     private static void visibleDeploymentMovement() throws Exception {
         Shipyard.Design left=Shipyard.starter(
                 Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
@@ -205,6 +259,7 @@ public final class WorldScaleAndPropulsionTest {
         physicalScale();
         installedDrives();
         physicalMovement();
+        doublePositionAccuracy();
         visibleDeploymentMovement();
         halfGeometry();
         System.out.println("PASS half-scale ship physical geometry and sublight thrust integration");

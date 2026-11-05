@@ -9,6 +9,12 @@ import diplomacy.shipyard.Shipyard;
  */
 public final class SublightPropulsion {
     private SublightPropulsion(){}
+    /**
+     * Two 60 Hz physical integrations for every existing 30 Hz tactical tick.
+     * This increases positional integration fidelity without advancing AI,
+     * sensors, projectile firing, resource regeneration or tick counters twice.
+     */
+    public static final int POSITION_SUBSTEPS=2;
     public enum Drive {
         AUXILIARY_ELECTRIC(.001,0.3,0.65),
         FUSION_TORCH(.006,3.0,1.0),
@@ -83,33 +89,50 @@ public final class SublightPropulsion {
      */
     public static void advance(Battle.Ship ship,double wantedX,double wantedY,
                                double dt,double protectedFuel,double thrustFraction){
+        advanceSubstepped(ship,wantedX,wantedY,dt,protectedFuel,
+                thrustFraction,POSITION_SUBSTEPS);
+    }
+
+    /**
+     * Package-private A/B integrator for deterministic precision diagnostics.
+     * A substep may integrate POSITION only; the battle's authoritative tick
+     * and all systems outside ship thrust stay at the existing 30 Hz.
+     */
+    static void advanceSubstepped(Battle.Ship ship,double wantedX,double wantedY,
+                                  double dt,double protectedFuel,double thrustFraction,
+                                  int substeps){
         if(ship==null||!Double.isFinite(wantedX)||!Double.isFinite(wantedY)||
                 !Double.isFinite(dt)||dt<=0||!Double.isFinite(protectedFuel)||protectedFuel<0||
-                !Double.isFinite(thrustFraction)||thrustFraction<=0||thrustFraction>1)
-            throw new IllegalArgumentException("Invalid thrust demand or reserve");
+                !Double.isFinite(thrustFraction)||thrustFraction<=0||thrustFraction>1||
+                substeps<1||substeps>32)
+            throw new IllegalArgumentException("Invalid thrust demand, reserve or substeps");
         double maxSpeed=maximumSpeed(ship);
         double requested=StrictMath.hypot(wantedX,wantedY);
         if(requested>maxSpeed&&requested>0){
             wantedX*=maxSpeed/requested;wantedY*=maxSpeed/requested;
         }
-        double differenceX=wantedX-ship.vx,differenceY=wantedY-ship.vy;
-        double difference=StrictMath.hypot(differenceX,differenceY);
-        double maxStep=ship.fuel>0&&ship.engineCondition>.01&&ship.crewReadiness()>0?
-                WorldScale.accelerationUnitsPerSimSecondSquared(
-                        ship.propulsion.accelerationGee)*dt*
-                        ship.engineCondition*ship.crewReadiness()*thrustFraction:0;
-        double spendable=StrictMath.max(0,ship.fuel-protectedFuel);
-        double fuelStep=spendable/ship.propulsion.fuelPerDeltaV;
-        double applied=StrictMath.min(difference,StrictMath.min(maxStep,fuelStep));
-        if(applied>0&&difference>0){
-            ship.vx+=differenceX*applied/difference;
-            ship.vy+=differenceY*applied/difference;
-            ship.fuel=StrictMath.max(0,ship.fuel-
-                    applied*ship.propulsion.fuelPerDeltaV);
+        double halfDt=dt/substeps;
+        double acceleration=WorldScale.accelerationUnitsPerSimSecondSquared(
+                ship.propulsion.accelerationGee)*ship.engineCondition*
+                ship.crewReadiness()*thrustFraction;
+        for(int substep=0;substep<substeps;substep++){
+            double differenceX=wantedX-ship.vx,differenceY=wantedY-ship.vy;
+            double difference=StrictMath.hypot(differenceX,differenceY);
+            double maxStep=ship.fuel>0&&ship.engineCondition>.01&&ship.crewReadiness()>0?
+                    acceleration*halfDt:0;
+            double spendable=StrictMath.max(0,ship.fuel-protectedFuel);
+            double fuelStep=spendable/ship.propulsion.fuelPerDeltaV;
+            double applied=StrictMath.min(difference,StrictMath.min(maxStep,fuelStep));
+            if(applied>0&&difference>0){
+                ship.vx+=differenceX*applied/difference;
+                ship.vy+=differenceY*applied/difference;
+                ship.fuel=StrictMath.max(0,ship.fuel-
+                        applied*ship.propulsion.fuelPerDeltaV);
+            }
+            // Semi-implicit integration at half-DT reduces distance error
+            // without modifying the total physical time or creating fuel.
+            ship.x+=ship.vx*halfDt;
+            ship.y+=ship.vy*halfDt;
         }
-        // With no fuel the current inertia persists until a real physical
-        // boundary, rather than the old target-speed smoothing adding free brakes.
-        ship.x+=ship.vx*dt;
-        ship.y+=ship.vy*dt;
     }
 }

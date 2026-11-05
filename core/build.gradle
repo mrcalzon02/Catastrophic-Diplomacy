@@ -1250,3 +1250,14 @@ tasks.register('technologyProfile', JavaExec) {
     mainClass = 'diplomacy.sim.TechnologyMemoryProfile'
     maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
 }
+
+ 
+// Diagnostic-only explicit A/B speed/accuracy fixture. The existing
+// worldScaleAndPropulsionSmoke runs the fuel and integration parity assertions.
+tasks.register('positionFidelityDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Compare one versus two physics position substeps and fuel parity at 30 Hz tactical frequency.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.WorldScaleAndPropulsionTest'
+    dependsOn tasks.named('testClasses')
+}
