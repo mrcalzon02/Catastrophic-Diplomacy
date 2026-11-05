@@ -120,11 +120,19 @@ tasks.register('photonArrivalPruningSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.PhotonArrivalPruningTest'
     dependsOn testClasses
 }
+tasks.register('battlePhaseObserverSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify that opt-in combat phase tracing does not change battle determinism.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.BattleStepPhaseObserverTest'
+    dependsOn testClasses
+}
 // The mandatory focused 200v200 regression executes both boundary tests
 // and unchanged full fleet fingerprints after light-time optimization.
 tasks.matching { it.name == 'massMixedOnlySmoke' }.configureEach {
     dependsOn(tasks.named('sensorLightTimeSmoke'))
     dependsOn(tasks.named('photonArrivalPruningSmoke'))
+    dependsOn(tasks.named('battlePhaseObserverSmoke'))
 }
 
 

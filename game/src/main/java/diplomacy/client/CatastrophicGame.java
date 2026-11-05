@@ -89,6 +89,18 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private long renderPoseSnapshots;
     /** Verification-only phase costs; normal games incur no nanoTime calls. */
     private long verifyBattleStepNs,verifyClientTickNs;
+    /** Timing sink is installed only in explicit emulator performance checks. */
+    private final long[] verifyPhaseNs=new long[Battle.StepPhase.values().length];
+    private Battle.StepPhase verifyPreviousPhase;
+    private long verifyPreviousPhaseStartedNs;
+    private void recordVerificationPhase(Battle.StepPhase phase){
+        long now=System.nanoTime();
+        if(verifyPreviousPhase!=null)
+            verifyPhaseNs[verifyPreviousPhase.ordinal()]+=
+                    now-verifyPreviousPhaseStartedNs;
+        verifyPreviousPhase=phase==Battle.StepPhase.END?null:phase;
+        verifyPreviousPhaseStartedNs=now;
+    }
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
     private static final String PERFORMANCE_PREFS="catastrophic-diplomacy-performance";
@@ -2728,6 +2740,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         }
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
+        // Only explicit 200v200 verifier installs a timing callback. Regular
+        // campaign, skirmish, screensaver and network battles never do.
+        if(verifyDemo)battle.configureStepPhaseObserver(this::recordVerificationPhase);
         // The same validated stage index drives both GPU background and simulation.
         if (starfield != null) starfield.useLevel(environment.level());
         accumulator = 0;
@@ -2740,6 +2755,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             renderProfile.reset();
             renderPoseSnapshots=0;
             verifyBattleStepNs=verifyClientTickNs=0;
+            java.util.Arrays.fill(verifyPhaseNs,0);
+            verifyPreviousPhase=null;
+            verifyPreviousPhaseStartedNs=0;
             Gdx.app.log("CD-DEMO-VERIFY","START 200v200 module/weapon/service suite seed="+DemonstrationBattle.SEED);
         }
     }
@@ -3688,6 +3706,24 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 (verifyBattleStepNs/(1_000_000.0*Math.max(1,battle.tick)))+
             " clientTickVisualCpuMsPerTick="+
                 (verifyClientTickNs/(1_000_000.0*Math.max(1,battle.tick)))+
+            " prepCpuMsPerTick="+
+                (verifyPhaseNs[Battle.StepPhase.PREPARATION.ordinal()]/
+                        (1_000_000.0*Math.max(1,battle.tick)))+
+            " sensorCpuMsPerTick="+
+                (verifyPhaseNs[Battle.StepPhase.SENSOR_NETWORK.ordinal()]/
+                        (1_000_000.0*Math.max(1,battle.tick)))+
+            " captainsCpuMsPerTick="+
+                (verifyPhaseNs[Battle.StepPhase.CAPTAINS.ordinal()]/
+                        (1_000_000.0*Math.max(1,battle.tick)))+
+            " supportCpuMsPerTick="+
+                (verifyPhaseNs[Battle.StepPhase.SUPPORT.ordinal()]/
+                        (1_000_000.0*Math.max(1,battle.tick)))+
+            " projectilesCpuMsPerTick="+
+                (verifyPhaseNs[Battle.StepPhase.PROJECTILES.ordinal()]/
+                        (1_000_000.0*Math.max(1,battle.tick)))+
+            " craftCpuMsPerTick="+
+                (verifyPhaseNs[Battle.StepPhase.CRAFT_AND_CLEANUP.ordinal()]/
+                        (1_000_000.0*Math.max(1,battle.tick)))+
             " forcedVerificationSpeed="+speed+"x"+
             " avgSimulationTicksPerFrame="+(battle.tick/(double)Math.max(1,verifiedFrames))+
             " avgSimulationCpuMsPerTick="+

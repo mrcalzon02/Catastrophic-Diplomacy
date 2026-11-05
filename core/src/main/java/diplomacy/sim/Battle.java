@@ -1730,8 +1730,29 @@ public final class Battle {
         return unresolved()||alive(0)==0||alive(1)==0;
     }
 
+    /**
+     * Optional performance-marker observer for real combat: simulation uses
+     * no time source itself. Only external diagnostic clients measure markers.
+     * The null default adds no clock calls or allocation to normal battles.
+     */
+    public enum StepPhase {
+        PREPARATION, SENSOR_NETWORK, CAPTAINS, SUPPORT, PROJECTILES,
+        CRAFT_AND_CLEANUP, END
+    }
+    private java.util.function.Consumer<StepPhase> stepPhaseObserver;
+    public void configureStepPhaseObserver(
+            java.util.function.Consumer<StepPhase> observer){
+        if(tick!=0)throw new IllegalStateException(
+                "Simulation profiling must be configured before combat");
+        stepPhaseObserver=observer;
+    }
+    private void phase(StepPhase phase){
+        if(stepPhaseObserver!=null)stepPhaseObserver.accept(phase);
+    }
+
     public void step() {
         if(unresolved())return;
+        phase(StepPhase.PREPARATION);
         tick++;
         // All active vessels enter contact and environmental simulation in
         // the same immutable world, including externally issued coordinates.
@@ -1758,12 +1779,14 @@ public final class Battle {
             hitAt(victim, effect.damage(), null, kind, effect.fromX(), effect.fromY());
             environmentalHits++;
         }
+        phase(StepPhase.SENSOR_NETWORK);
         // Pulses spend actual reactor power and heat at their emission tick;
         // incoming echoes can only later appear in causal sensor history.
         for(Ship scanner:ships)SensorActiveScan.advance(scanner,tick);
         refreshCommandAssistance();
         refreshSharedContacts();
         broadcastTrackPackets();
+        phase(StepPhase.CAPTAINS);
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             if(!s.alive())continue;
@@ -1822,6 +1845,7 @@ public final class Battle {
             }
             launchAuxiliary(s,target);
         }
+        phase(StepPhase.SUPPORT);
         // Pursuit, inertia, patrol and queued waypoint movement never grow
         // the simulation; preserve existing rear-line extraction behavior.
         containFleet();
@@ -1829,6 +1853,7 @@ public final class Battle {
         updateTenderSupport();
         updateQueuedLaunches();
         updateRocketLaunches();
+        phase(StepPhase.PROJECTILES);
         // Snapshot real physical bodies before advancing all weapons.
         // Diagnostic swept relative intersections need BOTH endpoints, not
         // only a fast incoming body's end-of-tick position.
@@ -1843,6 +1868,7 @@ public final class Battle {
             craft.lastObservedX=craft.x;
             craft.lastObservedY=craft.y;
         }
+        phase(StepPhase.CRAFT_AND_CLEANUP);
         updateCraft();
         for(Craft craft:crafts)BattleArena.contain(craft);
         advanceRotaryRounds();
@@ -1857,6 +1883,7 @@ public final class Battle {
         }
         captureSensorHistory(tick);
         updateTermination();
+        phase(StepPhase.END);
     }
 
     /** No quantized wall clock or random result: only observed battle ticks,
