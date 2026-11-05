@@ -90,8 +90,12 @@ final class CombatHitFeedback {
         Map<Integer,Battle.Ship> byId=shipIndex;
         byId.clear();
         for(Battle.Ship ship:battle.ships())byId.put(ship.id,ship);
-        for(Battle.VisualEvent event:events){
-            if(event.sequence()<=sequence)continue;
+        // Combat event history is strictly ordered by sequence. Searching
+        // to its unseen suffix avoids scanning 8,192 previous impacts on
+        // every physical tick during large battles.
+        for(int i=CombatEventCursor.firstUnseen(events,sequence);
+                i<events.size();i++){
+            Battle.VisualEvent event=events.get(i);
             sequence=event.sequence();
             if(event.tick()!=battle.tick||event.phase()!=Battle.VisualPhase.IMPACT)
                 continue;

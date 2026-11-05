@@ -5,6 +5,7 @@ import diplomacy.sim.OrdnancePropulsion;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 
 /**
  * Render-only emissive/exhaust history, captured at every authoritative
@@ -54,8 +55,10 @@ final class CombatLightingModel {
         if(battle!=trackedBattle || (battle!=null && battle.tick<lastTick))reset(battle);
         if(battle==null || battle.tick==lastTick)return;
         // Event-sequenced: skipped frames cannot replay the same explosion.
-        for(Battle.VisualEvent event:battle.visualEvents()){
-            if(event.sequence()<=lastSequence)continue;
+        List<Battle.VisualEvent> history=battle.visualEvents();
+        for(int i=CombatEventCursor.firstUnseen(history,lastSequence);
+                i<history.size();i++){
+            Battle.VisualEvent event=history.get(i);
             lastSequence=event.sequence();
             int life=flashLife(event);
             if(life>0 && battle.tick>=event.tick()&&battle.tick-event.tick()<life)

@@ -221,3 +221,13 @@ across reordered wire rows, instead of accidentally assigning a different
 faction or hull's damage to an old array index. Rebuilding occurs only when
 the roster, server-side team/faction identity, or session changes. This
 is render-only. No host command, damage or battle-result semantics change.
+
+## Stage 10 — skip old effects events during physics ticks too
+
+The same chronological event cursor now powers post-step local hit-feedback
+generation and authoritative-tick lighting/exhaust capture. These paths
+previously rescanned up to 8,192 already-consumed combat events for every
+simulation tick in large engagements. New events still arrive in order,
+cursors remain independent across consumers, and combat physics is
+unchanged. Existing hit-layer and missile-lighting regressions verify
+functional behavior; a measured CPU gain requires paired workload tests.
