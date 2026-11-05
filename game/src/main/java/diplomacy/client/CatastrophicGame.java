@@ -211,6 +211,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private final ShipInspectionPanel shipInspector=new ShipInspectionPanel();
     private final BattleRenderPoses renderPoses=new BattleRenderPoses();
+    private Battle smoothedCameraBattle;
     private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
     private final CombatHitFeedback hitFeedback=new CombatHitFeedback();
     private final CombatHitRenderer hitRenderer=new CombatHitRenderer();
@@ -2915,7 +2916,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             battleCamera.zoom=cinematic.zoom();
             battleCamera.position.set(cinematic.centerX(),cinematic.centerY(),0);
             battleCamera.update();
-        }else updateBattleCamera();
+        }else updateBattleCamera(verifyDemo?0f:delta);
         if(currentArmorCapture!=null){
             // Same actual renderer and physical target: only zoom changes.
             Battle.Ship subject=currentArmorCapture.target();
@@ -3792,10 +3793,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-DEMO-VERIFY","ART_PENDING: real atlas PNGs not packaged; fallback is not quality approval");
     }
 
-    /** World camera follows the active engagement; UI coordinates never move. */
-    private void updateBattleCamera() {
+    /** World camera follows interpolated hulls. User drags and camera resets
+     * use the immediate version; automatic reframe is smooth over wall time. */
+    private void updateBattleCamera(){ updateBattleCamera(0f); }
+    private void updateBattleCamera(float frameSeconds){
         BattleView.Frame shot=renderPoses.frame(battle);
-        battleCamera.zoom=Math.max(0.16f,Math.min(8f,(float)shot.zoom()*manualZoom));
+        float desiredZoom=Math.max(0.16f,Math.min(8f,(float)shot.zoom()*manualZoom));
         double cx=shot.centerX(),cy=shot.centerY();
         if(focusedShipId>=0){
             Battle.Ship followed=null;
@@ -3806,7 +3809,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
             else {BattleRenderPoses.Pose pose=renderPoses.ship(followed);
                 cx=pose.x();cy=pose.y();}
         }
-        battleCamera.position.set((float)cx+battlePanX,(float)cy+battlePanY,0);
+        float desiredX=(float)cx+battlePanX,desiredY=(float)cy+battlePanY;
+        if(frameSeconds>0&&smoothedCameraBattle==battle){
+            battleCamera.zoom=CombatCameraSmoothing.toward(battleCamera.zoom,
+                    desiredZoom,frameSeconds);
+            battleCamera.position.set(
+                    CombatCameraSmoothing.toward(battleCamera.position.x,
+                            desiredX,frameSeconds),
+                    CombatCameraSmoothing.toward(battleCamera.position.y,
+                            desiredY,frameSeconds),0);
+        }else{
+            battleCamera.zoom=desiredZoom;
+            battleCamera.position.set(desiredX,desiredY,0);
+        }
+        smoothedCameraBattle=battle;
         battleCamera.update();
     }
 

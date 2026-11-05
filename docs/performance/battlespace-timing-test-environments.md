@@ -109,3 +109,15 @@ This is applied only if a real beforeStep snapshot belongs to the
 immediately preceding physics tick. Pausing, battle changes, and replay
 resets never reuse an old launch position. Live collisions and ship
 physics remain untouched.
+
+## Stage 3b — velocity-continuous ships and camera
+
+Presentation snapshots now retain actual velocity as well as position for
+ships, fighters, guided ordnance and defensive projectiles. A bounded cubic
+Hermite curve avoids abrupt apparent speed changes across 0.5x/1x snapshots;
+it never goes beyond the two authoritative endpoints, changes physics or
+hides a real large-distance relocation. Facing rotation is eased over the
+same physical interval. The ordinary battle camera uses a frame-rate
+independent smoothing response, including fleet-bounds changes on ship
+deaths. Manual pan/reset is immediate; exhibition mode keeps its existing
+separate cinematic director. The scripted CI verification camera is unchanged.

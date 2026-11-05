@@ -111,6 +111,31 @@ public final class BattleRenderPosesTest {
         present.snap(birth);
         present.fraction(birth,0);
         close(present.rail(rail).x(),rail.x,"pause never rewinds launch");
-        System.out.println("PASS poses, first-tick projectile travel, pause/resume, camera and catch-up");
+        // A real acceleration change has continuous render-frame positions,
+        // while frame-rate-independent camera easing avoids death/reframe snaps.
+        Battle smooth=new Battle(81L);
+        Battle.Ship turning=smooth.addShip(0,Battle.Faction.TERRAN,100,200);
+        BattleRenderPoses easing=new BattleRenderPoses();
+        easing.beforeStep(smooth);
+        turning.vx=60;
+        turning.x+=60*Battle.DT;
+        smooth.tick++;
+        easing.fraction(smooth,.25f);
+        double early=easing.ship(turning).x();
+        easing.fraction(smooth,.75f);
+        double late=easing.ship(turning).x();
+        check(early>=100&&late>early&&late<=turning.x,
+                "Accelerating ship must advance monotonically across rendered frames");
+        float camera=100;
+        for(int i=0;i<30;i++){
+            float next=CombatCameraSmoothing.toward(camera,400,1f/30f);
+            check(next>camera&&next<=400,"Camera must approach without teleporting");
+            camera=next;
+        }
+        check(camera>399&&camera<400.01,
+                "Camera must almost settle at target within a real second");
+        close(CombatCameraSmoothing.toward(100,400,0),400,
+                "Manual camera reframe must remain immediate");
+        System.out.println("PASS low-speed muzzle, Hermite ship continuity, camera easing, pause/resume and catch-up");
     }
 }
