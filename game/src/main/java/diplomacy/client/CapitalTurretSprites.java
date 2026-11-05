@@ -111,6 +111,11 @@ public final class CapitalTurretSprites implements AutoCloseable {
         if(battle==null||batch==null||poses==null||cameraZoom>2.3f)return;
         Map<Integer,Battle.Ship> ids=new HashMap<>();
         for(Battle.Ship ship:battle.ships())ids.put(ship.id,ship);
+        // The fighter material pass packs heading data in SpriteBatch RGB.
+        // Hardpoint artwork must always use its original untinted colors,
+        // independent of earlier LOD, shader, or sprite batching decisions.
+        batch.setShader(null);
+        batch.setColor(1f,1f,1f,1f);
         batch.begin();
         for(Battle.Ship ship:battle.ships()){
             if(!ship.alive()||!hullVisible.test(ship)
@@ -165,6 +170,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
             }
         }
         batch.end();
+        batch.setColor(1f,1f,1f,1f);
     }
     public int loaded(){return tiles.length;}
     @Override public void close(){atlas.dispose();}
