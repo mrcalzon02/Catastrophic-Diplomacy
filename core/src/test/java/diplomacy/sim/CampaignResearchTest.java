@@ -160,7 +160,7 @@ public final class CampaignResearchTest {
         check(optional.complete(9,1,1).credits()-optional.credits()==full9/4,
                 "Cleared branch incorrectly paid another first-clear reward");
         var v4=CampaignProgress.decode(seal("CD-CAMPAIGN-4",
-                "TERRAN\\n6\\n1000\\n5\\n0\\n5\\n0\\nNONE\\n0\\n"));
+                "TERRAN\n6\n1000\n5\n0\n5\n0\nNONE\n0\n"));
         check(v4.completed(1)&&v4.completed(5)&&!v4.completed(6),
                 "Legacy linear save did not migrate to mission-level clears");
         check(!CampaignProgress.start(Battle.Faction.TERRAN).available(494),
