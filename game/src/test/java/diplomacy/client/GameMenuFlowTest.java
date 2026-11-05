@@ -114,7 +114,6 @@ public final class GameMenuFlowTest {
                 "Android Dev layout must not accept touches in the column gutter");
         check(GameMenuPanel.Screen.valueOf("DEV")!=null,
                 "Options must expose an actual Dev submenu");
-                "Unavailable updater must be disabled on Android");
         check(GameMenuPanel.optionsAction(640,395,true,true)==-1,
                 "Android options gutter must not trigger anything");
         check(GameMenuPanel.voiceHit(640,500,true) &&
