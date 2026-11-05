@@ -10,6 +10,12 @@ final class BattleRenderPoses {
     private final Map<Long,Pose> missiles=new HashMap<>(),rockets=new HashMap<>(),shells=new HashMap<>();
     private Battle source;
     private float fraction=1f;
+    /** The caller counts real physics steps independently of render frames.
+     * Only the last actual step contributes a previous pose to this frame.
+     * Cast mirrors the float accumulator's subtraction in the combat loop. */
+    static boolean captureBeforeLastStep(float accumulatedSeconds,int step,int limit){
+        return step>=limit||(float)(accumulatedSeconds-Battle.DT)<Battle.DT;
+    }
     void sync(Battle battle){
         if(source==battle)return;
         source=battle;ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();

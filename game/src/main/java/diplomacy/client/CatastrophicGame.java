@@ -85,6 +85,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** Return to the paused tactical menu when Dev was opened during combat. */
     private boolean devReturnToBattle;
     private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
+    /** One interpolation snapshot per displayed frame, not once per 8x catch-up tick. */
+    private long renderPoseSnapshots;
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
     private static final String PERFORMANCE_PREFS="catastrophic-diplomacy-performance";
@@ -2734,6 +2736,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             verifiedSequence=0;verifiedFrames=verifiedShots=verifiedImpacts=peakAnimations=peakCraft=peakOrdnance=peakSpriteShips=0;
             verificationReported=false;verifiedTypes.clear();verifiedShotIds.clear();
             renderProfile.reset();
+            renderPoseSnapshots=0;
             Gdx.app.log("CD-DEMO-VERIFY","START 200v200 module/weapon/service suite seed="+DemonstrationBattle.SEED);
         }
     }
@@ -2830,7 +2833,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             accumulator += delta * pace;
             int turns = 0;
             while (accumulator >= Battle.DT && turns++ < 64) {
-                renderPoses.beforeStep(battle);
+                // Only the last completed physics step can be interpolated
+                // into this framebuffer. Earlier snapshots are immediately
+                // overwritten and can require thousands of map/pose objects
+                // per frame during 200v200 catch-up at 8x.
+                if(BattleRenderPoses.captureBeforeLastStep(accumulator,turns,64)){
+                    renderPoses.beforeStep(battle);
+                    renderPoseSnapshots++;
+                }
                 deathTimeline.beforeStep(battle);
                 hitFeedback.beforeStep(battle);
                 shieldFx.beforeStep(battle);
@@ -3661,6 +3671,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         verificationReported=true;
         var perf=renderProfile.report();
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
+            " poseSnapshots="+renderPoseSnapshots+
             " forcedVerificationSpeed="+speed+"x"+
             " avgSimulationTicksPerFrame="+(battle.tick/(double)Math.max(1,verifiedFrames))+
             " avgSimulationCpuMsPerTick="+

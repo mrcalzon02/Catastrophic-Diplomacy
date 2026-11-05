@@ -28,6 +28,36 @@ public final class BattleRenderPosesTest {
                 "old simulation poses must not leak to a new battle");
         p.beforeStep(second);recycled.x=-80;p.fraction(second,.5f);
         close(p.ship(recycled).x(),-90,"new battle interpolates");
-        System.out.println("PASS render-only interpolation, heading wrap, spawns, warps, battle reset");
+        // The actual catch-up loop can process up to 64 authoritative ticks
+        // for one displayed frame. Only the final tick needs a pose snapshot.
+        for(int requested:new int[]{1,2,19,80}){
+            float accumulated=(float)(Battle.DT*requested);
+            int steps=0,captures=0,lastCapture=0;
+            while(accumulated>=Battle.DT&&steps++<64){
+                if(BattleRenderPoses.captureBeforeLastStep(accumulated,steps,64)){
+                    captures++;
+                    lastCapture=steps;
+                }
+                accumulated-=Battle.DT;
+            }
+            int actualSteps=Math.min(steps,64);
+            check(captures==1&&lastCapture==actualSteps,
+                    "Multi-tick frame must capture only final step: requested="+requested+
+                    " actual="+actualSteps+" captured="+lastCapture);
+        }
+        Battle multi=new Battle(9L);
+        Battle.Ship moving=multi.addShip(0,Battle.Faction.TERRAN,100,200);
+        float accumulated=(float)(Battle.DT*19);
+        int advanced=0;
+        while(accumulated>=Battle.DT&&advanced++<64){
+            if(BattleRenderPoses.captureBeforeLastStep(accumulated,advanced,64))
+                p.beforeStep(multi);
+            moving.x+=10;
+            accumulated-=Battle.DT;
+        }
+        p.fraction(multi,.5f);
+        close(p.ship(moving).x(),100+10*(advanced-1)+5,
+                "Final-step-only interpolation must preserve half-tick movement");
+        System.out.println("PASS render-only interpolation, multi-tick snapshot limit, heading wrap, spawns and battle reset");
     }
 }

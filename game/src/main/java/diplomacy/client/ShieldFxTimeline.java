@@ -45,12 +45,16 @@ final class ShieldFxTimeline {
     }
     private Battle source;
     private final Map<Integer,Facings> states=new HashMap<>();
+    /** Reuse per-tick ship/contact lookup tables, never recreate 400 entries. */
+    private final Map<Integer,Battle.Ship> shipIndex=new HashMap<>();
+    private final Map<Integer,Battle.VisualEvent[]> contactIndex=new HashMap<>();
     private final ArrayDeque<Effect> events=new ArrayDeque<>();
     private long lastEventTick=-1;
     private final long[] observed=new long[Kind.values().length];
     void sync(Battle battle){
         if(source==battle)return;
-        source=battle;states.clear();events.clear();lastEventTick=-1;
+        source=battle;states.clear();shipIndex.clear();contactIndex.clear();
+        events.clear();lastEventTick=-1;
         java.util.Arrays.fill(observed,0);
     }
     void beforeStep(Battle battle){
@@ -69,9 +73,11 @@ final class ShieldFxTimeline {
         // in a single simulation tick. Resolve contact by the attacking ship's
         // approach direction (the exact rule used by DirectionalDefense), not
         // by whichever VisualEvent happened to be last for the whole target.
-        Map<Integer,Battle.Ship> byId=new HashMap<>();
+        Map<Integer,Battle.Ship> byId=shipIndex;
+        byId.clear();
         for(Battle.Ship ship:battle.ships())byId.put(ship.id,ship);
-        Map<Integer,Battle.VisualEvent[]> contacts=new HashMap<>();
+        Map<Integer,Battle.VisualEvent[]> contacts=contactIndex;
+        contacts.clear();
         for(int i=visualEvents.size()-1;i>=0;i--){
             Battle.VisualEvent e=visualEvents.get(i);
             if(e.tick()<battle.tick)break;

@@ -65,12 +65,14 @@ final class CombatHitFeedback {
     private Battle tracked;
     private long sequence;
     private final Map<Integer,Defense> before=new HashMap<>();
+    /** Render-thread scratch index: reuse backing table across 30 Hz ticks. */
+    private final Map<Integer,Battle.Ship> shipIndex=new HashMap<>();
     private final ArrayDeque<Pulse> active=new ArrayDeque<>();
     private final ArrayDeque<Afterglow> aftermath=new ArrayDeque<>();
 
     void sync(Battle battle){
         if(tracked==battle)return;
-        tracked=battle;sequence=0;before.clear();active.clear();
+        tracked=battle;sequence=0;before.clear();shipIndex.clear();active.clear();
         aftermath.clear();
     }
     void beforeStep(Battle battle){
@@ -85,7 +87,8 @@ final class CombatHitFeedback {
     /** Explicit event input enables deterministic headless tests. */
     void afterStep(Battle battle,List<Battle.VisualEvent> events){
         sync(battle);
-        Map<Integer,Battle.Ship> byId=new HashMap<>();
+        Map<Integer,Battle.Ship> byId=shipIndex;
+        byId.clear();
         for(Battle.Ship ship:battle.ships())byId.put(ship.id,ship);
         for(Battle.VisualEvent event:events){
             if(event.sequence()<=sequence)continue;
