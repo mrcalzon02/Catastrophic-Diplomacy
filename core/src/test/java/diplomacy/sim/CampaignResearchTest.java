@@ -136,6 +136,12 @@ public final class CampaignResearchTest {
         check(branch.available(1)&&!branch.available(2)&&!branch.available(5),
                 "An unstarted campaign exposed downstream branches");
         branch=branch.complete(1,1,1);
+        check(branch.available(11)&&branch.available(21)&&branch.available(31)
+                &&!branch.available(41),
+                "Chapter does not allow parallel fronts or gates its capital");
+        check(!new CampaignProgress.State(Battle.Faction.TERRAN,21,0,20).available(41)
+                &&new CampaignProgress.State(Battle.Faction.TERRAN,31,0,30).available(41),
+                "Capital-front entry must require three completed ordinary fronts");
         check(branch.available(2)&&branch.available(5)&&branch.available(8)
                 &&!branch.available(3)&&!branch.available(10),
                 "Entry mission failed to unlock three distinct playable paths");
