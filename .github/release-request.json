@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 12,
-  "note": "Continue release-blocker repairs on current main. Failed run 41901772296: Windows/Linux :game:combatPerformanceSmoke requested 3x cap regression (resolved in subsequent main, focused CI 41901957718 passed), Android API29 16 MiB heap crashed in optional CapitalTurretSprites and concurrent SideloadUpdater JSON allocation. Repairs: tiny-heap-only guard for optional 1024x768 turret atlas, fully streamed GitHub /releases JSON selecting latest published stable/prerelease over 2000 records, bounded page length, corrected PER_PAGE forward-reference initialization (compile-critical). Supersedes run 41908665236 which was pinned before the initialization-order correction. Require real 11 faction Android 10 campaign/start/dock/deployment/combat/resume, Android 14 400 ship sustained combat and update flow, signed APK continuity and MSI installation/Linux launch. No nonfunctional art-performance release blockers. Publish only when all objective jobs pass."
+  "revision": 13,
+  "note": "User requests public signed APK and Windows MSI/Linux release now. Trigger a fresh full three-platform release from current main (instead of older 685 commit blocked by GitHub Workflows permission on tag/release creation). Preserve all 15 functional gates: Android 14 runtime, 11 Android 10 campaign shards, signed APK signer continuity and upgrade, Windows installed MSI launch, Linux launch. No reduced tests, no overwrite/retag, no new credential. Publish only after all packages are verified and read back."
 }
