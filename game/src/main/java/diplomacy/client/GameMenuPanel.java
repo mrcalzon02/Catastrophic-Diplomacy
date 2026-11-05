@@ -383,6 +383,13 @@ final class GameMenuPanel {
             if(Math.hypot(x-node.x(),y-node.y())<=26)return node.level();
         return -1;
     }
+    /** Five explicit front tabs within the selected fifty-mission chapter. */
+    static int campaignFrontTabHit(float x,float y,int currentPage){
+        for(int i=0;i<5;i++)
+            if(hit(x,y,350+i*101,561,94,40))
+                return (currentPage/5)*5+i;
+        return -1;
+    }
     private static void rectangle(ShapeRenderer shapes,float x,float y,float w,float h,Color color){
         if(color==PANEL&&w>=200&&h>=80)
             MilitaryUiTheme.panel(shapes,x,y,w,h);
@@ -539,6 +546,8 @@ final class GameMenuPanel {
                     shapes.setColor(MilitaryUiTheme.BACKGROUND);
                     shapes.circle(node.x(),node.y(),6,12);
                 }
+                for(int local=0;local<5;local++)
+                    button(shapes,350+local*101,561,94,40,page%5==local);
                 button(shapes,35,35,165,50,false);
                 button(shapes,214,35,136,50,false);
                 button(shapes,366,35,136,50,false);
@@ -1332,10 +1341,13 @@ final class GameMenuPanel {
         var briefing=CampaignNarrative.forLevel(selected);
         label(batch,font,"STAR MAP",37,680,Color.WHITE);
         fittedLabel(batch,font,"CHAPTER "+briefing.chapter()+": "+briefing.title()+
-                "  |  FRONT "+(page+1)+"/"+CampaignMap.PAGE_COUNT,
+                "  |  FRONT "+(page%5+1)+"/5",
                 206,680,620,Color.CYAN);
         label(batch,font,"CREDITS "+progress.credits()+"   VICTORIES "+progress.victories(),
                 47,588,Color.GOLD);
+        for(int local=0;local<5;local++)
+            buttonLabel(batch,font,"FRONT "+(local+1),350+local*101,561,94,40,
+                    page%5==local?Color.GOLD:Color.WHITE);
         for(CampaignMap.SystemNode node:CampaignMap.page(page))
             label(batch,font,""+node.level(),node.x()-11,node.y()+38,MUTED);
         fittedLabel(batch,font,"MISSION "+selected+"  "+CampaignStoryAtlas.nodeName(selected),
