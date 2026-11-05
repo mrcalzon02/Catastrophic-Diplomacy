@@ -153,6 +153,9 @@ public final class WorldScaleAndPropulsionTest {
         Battle fight=Battle.duel(719912,1,left,right,
                 diplomacy.tech.TechnologyCatalog.loadDefault());
         Battle.Ship friendly=fight.ships().get(0), hostile=fight.ships().get(1);
+        ok(friendly.vx==0&&hostile.vx==0,
+                "Headless deployment fixtures should begin stationary");
+        fight.initializeBattleApproach();
         ok(friendly.vx>0&&hostile.vx<0,
                 "Opposing deployed fleets must retain incoming approach velocities");
         ok(StrictMath.abs(friendly.vx)<=SublightPropulsion.maximumSpeed(friendly)
