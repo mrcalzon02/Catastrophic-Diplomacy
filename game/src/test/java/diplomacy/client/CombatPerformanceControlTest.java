@@ -106,6 +106,15 @@ public final class CombatPerformanceControlTest {
                 "Export summary must carry truthful performance and fleet metrics");
         check(files.get("diagnostic.log").contains("SIMULATION PRESSURE"),
                 "Diagnostic log export missing speed transitions");
+        // F4 export stops the active writer; the development capture manager
+        // must be able to resume without losing samples after an I/O failure.
+        check(!recorder.recording(),"Export must stop active ZIP sample writer");
+        recorder.resume();
+        recorder.frame(3902,.033,11_000_000L,4_000_000L,32,2f,1.5f,
+                399,101,501,100,15);
+        check(recorder.recording()&&recorder.framesRecorded()==3901&&
+                        recorder.framesOverwritten()==301,
+                "Development recording must resume with rolling evidence intact");
         System.out.println("PASS discrete combat speeds, adaptive governor and ZIP telemetry readback");
     }
 }
