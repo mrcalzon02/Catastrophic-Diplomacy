@@ -241,8 +241,10 @@ public final class FighterCraftTest {
         check(parent.power>=0&&parent.heat<=parent.maxHeat,
                 "Fighter launch must respect power and thermal limits");
         for(int tick=0;tick<240;tick++)battle.step();
-        check(parent.fightersLaunched+parent.fighterReserve==initial,
-                "Hangar launches must not create or delete purchased inventory");
+        long airborne=battle.crafts().stream()
+                .filter(c->c.fighter&&c.sourceId==parent.id).count();
+        check(parent.fighterReserve+parent.dockedFighters.size()+airborne<=initial,
+                "Launched, docked and ready fighters must not duplicate purchased inventory");
         // Refitting other components cannot confiscate paid aircraft stored in
         // an organic carrier deck. Removing the added module is safe too.
         var original=CampaignFleet.startSolo(Battle.Faction.TERRAN,
@@ -358,6 +360,44 @@ public final class FighterCraftTest {
                 "Disabled physical lane must retain all three paid manifest aircraft");
     }
 
+    /** An expended fighter must actually disappear into a usable bay.
+     * A paid service queue, not a free infinite ammunition generator, feeds
+     * subsequent launches from the physical carrier magazines. */
+    private static void carrierRecoveryAndRearm(TechnologyCatalog tech){
+        Battle stocked=scenario(tech,FighterModel.Hull.MISSILE_FIGHTER,91142);
+        Battle.Ship carrier=stocked.ships().get(0);
+        int purchased=carrier.fighterReserve;
+        double originalCrew=carrier.crewCount;
+        carrier.missileAmmo=180;
+        carrier.maxMissileAmmo=180;
+        boolean sawRecovery=false,sawRearm=false;
+        for(int t=0;t<1800;t++){
+            stocked.step();
+            sawRecovery|=carrier.fightersRecovered>0;
+            sawRearm|=carrier.fightersRearmed>0;
+            long airborne=stocked.crafts().stream()
+                    .filter(c->c.fighter&&c.sourceId==carrier.id).count();
+            check(carrier.fighterReserve+carrier.dockedFighters.size()+airborne<=purchased,
+                    "Recovery must conserve the initial count of purchased airframes");
+            check(carrier.crewCount<=originalCrew+1e-8,
+                    "Landing pilots cannot create additional carrier crew");
+            if(sawRecovery&&sawRearm)break;
+        }
+        check(sawRecovery,"Expended fighters failed to return to a physical carrier bay");
+        check(sawRearm,"Returned fighter failed paid rearming with available missile stock");
+        check(carrier.missileAmmo<180,"Fighter rearming must debit real missile magazines");
+
+        Battle empty=scenario(tech,FighterModel.Hull.MISSILE_FIGHTER,91143);
+        Battle.Ship dry=empty.ships().get(0);
+        // The disarmed source has zero missile magazines; it must accept
+        // its returning aircraft without conjuring a new sortie's payload.
+        for(int t=0;t<1200&&dry.fightersRecovered==0;t++)empty.step();
+        check(dry.fightersRecovered>0,"Dry carrier failed to recover its aircraft");
+        for(int t=0;t<100;t++)empty.step();
+        check(dry.fightersRearmed==0&&!dry.dockedFighters.isEmpty(),
+                "No-magazine carrier must store aircraft rather than mint full missiles");
+    }
+
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         sensorAndArmor();
@@ -365,6 +405,7 @@ public final class FighterCraftTest {
         CampaignFlightWingCodecTest.run(tech);
         saves(tech);
         hangarCapacityAndSorties(tech);
+        carrierRecoveryAndRearm(tech);
         for(FighterModel.Hull hull:FighterModel.Hull.values()){
             check(Shipyard.inspect(carrier(hull),tech).valid(),"Carrier fitting "+hull);
             long a=run(tech,hull,2000+hull.ordinal());
