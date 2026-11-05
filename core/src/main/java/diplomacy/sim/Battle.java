@@ -216,6 +216,9 @@ public final class Battle {
         public int escapePods,evacuatedCrew,hazardFailures;
         /** Crew physically assigned to launched fighters, not extra crew. */
         public int fighterPilotsCommitted;
+        /** Landed but not yet fully serviced aircraft are physically aboard, not in flight. */
+        public final List<Craft> dockedFighters=new ArrayList<>();
+        public int fightersRecovered,fightersRearmed;
         /** Real simulation ticks for visible engineering faults and repairs. */
         public long lastHazardTick=-10000,lastRepairTick=-10000;
         public boolean recoveryBeacon,recoveryBeaconActivated;
@@ -635,6 +638,8 @@ public final class Battle {
         public double lastObservedX,lastObservedY,observedVx,observedVy;
         public SupportDoctrine.Channel serviceChannel;
         public boolean reusable,returning;
+        /** A docked airframe needs paid service time before it can sortie again. */
+        public long serviceReadyTick;
         public double serviceRange,servicePulse,serviceMaxCharge;
         public int targetId,targetCraftId,ammunition,shotsFired;
         /** One physically received wingman track, only a navigation cue. */
@@ -1814,6 +1819,7 @@ public final class Battle {
         for (Ship s : ships) if (s.alive()) {
             replenish(s);
             if(!s.alive())continue;
+            serviceReturnedFighters(s);
             if(diagnosticStationaryTargets.contains(s.id)){
                 // NO AI: skip captain/commands/retreat/fire/launch entirely.
                 // Keep real shields, armor, power, environmental effects,
@@ -4677,7 +4683,25 @@ public final class Battle {
                 double range=StrictMath.hypot(target.x-craft.x,target.y-craft.y);
                 // Carrier datalink supplies a coarse off-sensor intercept course.
                 // Local fighter sensors govern actual lock and firing below.
-                if(range>Math.max(600,profile.sensors()*weather.sensorFactor()*2))target=null;
+                if(range>Math.max(600,profile.sensors()*weather.sensorFactor()*2)){
+                    // A distant carrier-approved target is a navigation cue,
+                    // never an instant lock. Fly toward an actual remembered
+                    // carrier observation instead of idling on the launch deck.
+                    Ship parent=findShip(craft.sourceId);
+                    ContactTrack fix=parent==null?null:parent.knownTracks.get(target.id);
+                    if(fix!=null&&tick>=fix.tick&&tick-fix.tick<=300){
+                        double dx=fix.x-craft.x,dy=fix.y-craft.y;
+                        double distance=StrictMath.hypot(dx,dy);
+                        if(distance>profile.sensors()*.60&&distance>1){
+                            double step=StrictMath.min(distance-profile.sensors()*.60,
+                                    profile.speed()*DT);
+                            craft.x+=dx/distance*step;
+                            craft.y+=dy/distance*step;
+                        }
+                        return;
+                    }
+                    target=null;
+                }
             }
         }
         // A carrier's coarse course is not a locally detected contact.
@@ -4710,7 +4734,12 @@ public final class Battle {
                 localShipLock)shared=null;
         craft.sharedWingContact=shared;
         if(shared!=null)fighterWingReceipts++;
-        if(target==null&&intercept==null&&shared==null)return;
+        if(target==null&&intercept==null&&shared==null){
+            // Without a real target or wing track, do not loiter on the
+            // carrier indefinitely until the pilot dies from fuel exhaustion.
+            craft.returning=true;
+            return;
+        }
         double tx=intercept!=null?intercept.x:
                 shared!=null?shared.x():target.x;
         double ty=intercept!=null?intercept.y:
@@ -4916,6 +4945,93 @@ public final class Battle {
             }
         }
     }
+    /** A recovery is a physical return, not a replacement airframe or free reload.
+     * Damaged decks can use a surviving fitted bay; a fully disabled hangar
+     * cannot magically swallow a fighter. The pilot rejoins the original crew. */
+    private boolean recoverFighter(Craft craft,Ship source){
+        if(source==null||!source.alive()||source.escaped)return false;
+        Ship.HangarBay landingBay=source.fighterBay(craft.launchBayId);
+        if(landingBay==null||!landingBay.operational()){
+            landingBay=null;
+            for(Ship.HangarBay bay:source.fighterBays)
+                if(bay.operational()){landingBay=bay;break;}
+        }
+        double dx=source.x-craft.x,dy=source.y-craft.y;
+        double distance=StrictMath.hypot(dx,dy);
+        if(landingBay==null){
+            // Inoperable bays cannot accept an airframe. Keep a distinct
+            // holding orbit instead of drawing every fighter at the exact
+            // center of the carrier.
+            double phase=(craft.id%32)*2.0*StrictMath.PI/32.0;
+            double ox=source.x+StrictMath.cos(phase)*34;
+            double oy=source.y+StrictMath.sin(phase)*34;
+            double d=StrictMath.hypot(ox-craft.x,oy-craft.y);
+            if(d>1){
+                double step=StrictMath.min(d,craft.profile.speed()*DT);
+                craft.x+=(ox-craft.x)/d*step;
+                craft.y+=(oy-craft.y)/d*step;
+            }
+            return false;
+        }
+        if(distance>12){
+            double advance=StrictMath.min(distance-8,craft.profile.speed()*DT);
+            craft.x+=dx/distance*advance;
+            craft.y+=dy/distance*advance;
+            return false;
+        }
+        craft.launchBayId=landingBay.id;
+        craft.serviceReadyTick=tick+90;
+        source.dockedFighters.add(craft);
+        source.fightersRecovered++;
+        if(craft.crewEmbarked){
+            source.crewCount+=craft.crewSeats;
+            source.fighterPilotsCommitted=
+                    StrictMath.max(0,source.fighterPilotsCommitted-craft.crewSeats);
+            craft.crewEmbarked=false;
+        }
+        visual(nextVisualShotId++,VisualPhase.IMPACT,"FIGHTER_LANDING",
+                craft.team,source.id,0,craft.x,craft.y,source.x,source.y);
+        return true;
+    }
+
+    /** Only a real carrier magazine and usable reactor can service expended
+     * fighter weapons; an empty magazine leaves the airframe stored but
+     * unavailable for another sortie. No aircraft is manufactured. */
+    private void serviceReturnedFighters(Ship source){
+        if(source.dockedFighters.isEmpty()||source.hangarCondition<.20)return;
+        for(int i=source.dockedFighters.size()-1;i>=0;i--){
+            Craft craft=source.dockedFighters.get(i);
+            if(tick<craft.serviceReadyTick)continue;
+            Ship.HangarBay bay=source.fighterBay(craft.launchBayId);
+            if(bay==null||!bay.operational())continue;
+            int rounds=StrictMath.max(0,craft.profile.ammunition()-craft.ammunition);
+            int missiles=StrictMath.max(0,
+                    FighterInfraredSeeker.interceptorMagazine(craft.profile.hull(),
+                            source.fighterCountermeasureTier)-craft.interceptorMissileAmmo);
+            int kinetic=0,torpedoes=0;
+            switch(craft.profile.weapon()){
+                case CANNON -> kinetic=rounds;
+                case MISSILE -> missiles+=rounds;
+                case TORPEDO -> torpedoes=rounds;
+                case LASER,PARTICLE -> { }
+            }
+            if(source.kineticAmmo<kinetic||source.missileAmmo<missiles
+                    ||source.torpedoAmmo<torpedoes)continue;
+            double repair=StrictMath.max(0,craft.maxIntegrity-craft.integrity);
+            double cost=5+rounds*.25+missiles*.5+repair*.20;
+            if(source.power<cost+5||source.heat+cost*.14>source.maxHeat*.90)
+                continue;
+            source.power-=cost;
+            source.heat+=cost*.14;
+            source.kineticAmmo-=kinetic;
+            source.missileAmmo-=missiles;
+            source.torpedoAmmo-=torpedoes;
+            source.fighterReserve++;
+            source.fightersRearmed++;
+            source.dockedFighters.remove(i);
+        }
+    }
+
     private void updateCraft() {
         // Snapshot the prior tick before any new local sensing; iteration
         // order cannot create an instantaneous, zero-delay radio relay.
@@ -4933,7 +5049,17 @@ public final class Battle {
             }
             if(craft.fighter) {
                 FighterSurvivability.recharge(craft,tick,DT);
-                updateArmedFighter(craft);
+                Ship carrier=findShip(craft.sourceId);
+                if(carrier!=null&&carrier.alive()&&!craft.returning){
+                    double home=StrictMath.hypot(carrier.x-craft.x,carrier.y-craft.y);
+                    double reserve=6+home/StrictMath.max(1,craft.profile.speed());
+                    boolean empty=craft.profile.ammunition()>0&&craft.ammunition<=0;
+                    if(craft.fuel<=reserve||empty||carrier.withdrawing)
+                        craft.returning=true;
+                }
+                if(craft.returning){
+                    if(recoverFighter(craft,carrier))crafts.remove(i);
+                }else updateArmedFighter(craft);
             } else if(craft.repair){
                 Ship source=findShip(craft.sourceId);
                 if(source==null||!source.alive()){crafts.remove(i);continue;}
@@ -7153,6 +7279,16 @@ public final class Battle {
         hash=mix(hash,fighterPilotsEjected);hash=mix(hash,fighterPilotsLost);
         hash=mix(hash,fighterPilotsRecovered);hash=mix(hash,fighterPodsExpired);
         hash=mix(hash,fighterAbandoned);
+        for(Ship s:ships){
+            hash=mix(hash,s.fightersRecovered);hash=mix(hash,s.fightersRearmed);
+            for(Craft docked:s.dockedFighters){
+                hash=mix(hash,docked.id);hash=mix(hash,docked.launchBayId.hashCode());
+                hash=mix(hash,docked.serviceReadyTick);
+                hash=mix(hash,docked.ammunition);
+                hash=mix(hash,docked.interceptorMissileAmmo);
+                hash=mix(hash,Double.doubleToLongBits(docked.integrity));
+            }
+        }
         for(FighterEscapePod pod:fighterEscapePods){
             hash=mix(hash,pod.craftId);hash=mix(hash,pod.seat);
             hash=mix(hash,pod.sourceShipId);hash=mix(hash,pod.team);
@@ -7410,6 +7546,8 @@ public final class Battle {
             hash=mix(hash,craft.nextInterceptorTick);
             hash=mix(hash,craft.crewSeats);
             hash=mix(hash,craft.crewEmbarked?1:0);
+            hash=mix(hash,craft.returning?1:0);
+            hash=mix(hash,craft.serviceReadyTick);
             hash=mix(hash,Double.doubleToLongBits(craft.pilotEjectionChance));
             hash=mix(hash,craft.pilotEjectionResolved?1:0);
             hash=mix(hash,Double.doubleToLongBits(craft.shields));
