@@ -756,6 +756,17 @@ public final class Battle {
 
     private final Random random;
     private final List<Ship> ships = new ArrayList<>();
+    /** Physical ship order is stable both globally and within each faction.
+     * Maintain insertion-ordered team indexes for expensive hostile scans.
+     * Dead ships remain in each index, with existing alive filters unchanged. */
+    private final List<Ship> teamZeroShips=new ArrayList<>();
+    private final List<Ship> teamOneShips=new ArrayList<>();
+    private List<Ship> enemyShips(int team){
+        return team==0?teamOneShips:teamZeroShips;
+    }
+    private List<Ship> friendlyShips(int team){
+        return team==0?teamZeroShips:teamOneShips;
+    }
     /** Stable entity-ID index: fighter, missile and support loops frequently
      * resolve parent/target IDs; avoid 400-ship linear scans per craft/tick.
      * Ships remain in the battle registry after destruction, so historical
@@ -1361,8 +1372,7 @@ public final class Battle {
         checkTeam(team);
         if(requested<0||requested>BattleArena.MAX_SHIPS_PER_SIDE)
             throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
-        int placed=0;
-        for(Ship entry:ships)if(entry.team==team)placed++;
+        int placed=friendlyShips(team).size();
         if(placed+requested>BattleArena.MAX_SHIPS_PER_SIDE)
             throw new IllegalArgumentException("Fleet exceeds 200 ships per side");
     }
@@ -1375,7 +1385,10 @@ public final class Battle {
         Ship ship = new Ship(nextId++, team, faction, faction.name().substring(0, 3) + "-" + nextId);
         ship.x = x; ship.y = y; ship.facing = team == 0 ? 0 : Math.PI;
         ship.orders=teamOrders[team];
-        ships.add(ship); shipById.put(ship.id,ship); return ship;
+        ships.add(ship);
+        friendlyShips(team).add(ship);
+        shipById.put(ship.id,ship);
+        return ship;
     }
     /** Custom hull installations alter real combat stats; invalid fittings never enter battle. */
     private Ship addShip(int team, Shipyard.Design design, Shipyard.Fitted machinery,
@@ -3107,7 +3120,7 @@ public final class Battle {
             // target selection; do not recompute it for 200 enemy candidates.
             double uncertaintyDenominator=
                     1+actor.commanderSkill*.4+tacticalPrecision(actor);
-            for (Ship s : ships) if (s.team != actor.team && s.alive()) {
+            for (Ship s : enemyShips(actor.team)) if (s.alive()) {
                 // The old current-position distance argument was ignored by
                 // liveContactSource. Avoid a costly, omniscient hypot that
                 // cannot authorize a causal contact anyway.
@@ -3149,7 +3162,7 @@ public final class Battle {
         }
         // Zero priority disables a class rather than silently turning it into
         // another target. PD continues according to its independent selector.
-        for(Ship candidate:ships)if(candidate.team!=actor.team&&candidate.alive()){
+        for(Ship candidate:enemyShips(actor.team))if(candidate.alive()){
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
             // liveContactSource ignores the enemy's current position.
@@ -3485,8 +3498,8 @@ public final class Battle {
                     photon.ray.x1()+ux*end,photon.ray.y1()+uy*end);
             BeamRayGeometry.Intersection first=null;
             Ship struck=null;
-            for(Ship candidate:ships){
-                if(!candidate.alive()||candidate.team==photon.team)continue;
+            for(Ship candidate:enemyShips(photon.team)){
+                if(!candidate.alive())continue;
                 double radius=12*candidate.visualScale();
                 if(candidate.x<StrictMath.min(segment.x1(),segment.x2())-radius||
                         candidate.x>StrictMath.max(segment.x1(),segment.x2())+radius||
@@ -5160,8 +5173,8 @@ public final class Battle {
             }
             double nextX=p.x+p.vx*DT,nextY=p.y+p.vy*DT;
             Ship closest=null;double earliest=Double.POSITIVE_INFINITY;
-            for(Ship candidate:ships){
-                if(candidate.team==p.team||!candidate.alive())continue;
+            for(Ship candidate:enemyShips(p.team)){
+                if(!candidate.alive())continue;
                 double contact=segmentHit(p.x,p.y,nextX,nextY,candidate.x,candidate.y,
                         12*candidate.visualScale());
                 if(contact<earliest){earliest=contact;closest=candidate;}
