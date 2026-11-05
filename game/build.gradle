@@ -409,3 +409,11 @@ tasks.register('wikiArbitrarySearchProfile', JavaExec) {
     mainClass = 'diplomacy.client.WikiArbitrarySearchProfile'
     maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
 }
+
+// Diagnostic-only: cosmetic size ratios must not block APK or desktop releases.
+tasks.register('fighterScaleArtDiagnostic') {
+    group = 'verification'
+    description = 'Audit fighter-versus-interceptor dimensions and compact fighter munitions.'
+    dependsOn tasks.named('fighterArtBridgeDiagnostic'), tasks.named('guidedOrdnanceArtSmoke'),
+            tasks.named('kineticOrdnanceArtSmoke')
+}

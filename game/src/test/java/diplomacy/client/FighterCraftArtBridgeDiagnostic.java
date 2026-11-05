@@ -40,6 +40,15 @@ public final class FighterCraftArtBridgeDiagnostic {
             byFaction.put(faction,paths);
         }
         require(allSprites.size()==50,"Expected precisely 50 original specialist craft images");
+        float smallestShipInterceptor=34f*.78f*(float)diplomacy.sim.WorldScale.SHIP_WORLD_SCALE;
+        for(diplomacy.sim.FighterModel.Hull hull:diplomacy.sim.FighterModel.Hull.values()){
+            float h=FighterCraftSprites.fighterHeight(hull);
+            require(h>0&&h<smallestShipInterceptor/3f,
+                    hull+" fighter must remain below one third of a ship interceptor");
+        }
+        require(FighterCraftSprites.droneHeight()<FighterCraftSprites.fighterHeight(
+                diplomacy.sim.FighterModel.Hull.INTERCEPTOR),
+                "Support drones must remain smaller than fighter craft");
         // Specialized flight variants must resolve to their actual authored
         // recon and heavy-bomber art, not dormant archive entries.
         require(FighterCraftSprites.operationalRole(

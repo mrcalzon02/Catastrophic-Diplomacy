@@ -48,10 +48,19 @@ public final class FighterCraftTest {
                       &&c.ammunition>=0,"Fighter fuel, HP and magazine bounded");
                 deployed.add(c.profile.hull());
             }
-            if(kind==FighterModel.Hull.INTERCEPTOR || kind==FighterModel.Hull.ASSAULT_GUNSHIP)
+            if(kind==FighterModel.Hull.INTERCEPTOR || kind==FighterModel.Hull.ASSAULT_GUNSHIP){
                 physicalPayload|=!b.ballistics().isEmpty();
-            if(kind==FighterModel.Hull.MISSILE_FIGHTER || kind==FighterModel.Hull.TORPEDO_BOMBER)
+                for(Battle.Ballistic shot:b.ballistics())
+                    check(shot.fighterLaunched,"Fighter cannon must mark compact tracer origin");
+            }
+            if(kind==FighterModel.Hull.MISSILE_FIGHTER || kind==FighterModel.Hull.TORPEDO_BOMBER){
                 physicalPayload|=!b.missiles().isEmpty();
+                for(Battle.Missile shot:b.missiles())
+                    check(shot.fighterLaunched,"Fighter guided body must mark its launcher");
+            }
+            if(kind==FighterModel.Hull.LASER_FIGHTER || kind==FighterModel.Hull.PARTICLE_FIGHTER)
+                for(Battle.Beam shot:b.beams())
+                    check(shot.fighterLaunched,"Fighter beam must mark its launcher");
             for(Battle.VisualEvent e:b.visualEvents())if(e.phase()==Battle.VisualPhase.IMPACT
                     &&e.weapon().startsWith("FIGHTER_"))hit=true;
         }

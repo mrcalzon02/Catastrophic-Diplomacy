@@ -131,6 +131,8 @@ public final class WeaponBeamSprites implements Disposable {
             float thickness=CombatEffectScale.of(beam.pointDefense?2.8f:
                     beam.type==Battle.DamageType.LASER?beam.laserType.thickness:
                     beam.type==Battle.DamageType.KINETIC?4.0f:6.3f);
+            thickness=CombatEffectScale.forLauncher(thickness,
+                    beam.fighterLaunched,CombatEffectScale.FIGHTER_BEAM);
             float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
             batch.draw(image,(float)beam.x1,(float)beam.y1-thickness/2,
                     0,thickness/2,length,thickness,1,1,rotation,
@@ -161,7 +163,10 @@ public final class WeaponBeamSprites implements Disposable {
                     new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
             float angle=(float)StrictMath.toDegrees(pose.angle());
-            float length=CombatEffectScale.of(11.5f),thickness=CombatEffectScale.of(3.1f);
+            float length=CombatEffectScale.forLauncher(CombatEffectScale.of(11.5f),
+                    shell.fighterLaunched,CombatEffectScale.FIGHTER_KINETIC);
+            float thickness=CombatEffectScale.forLauncher(CombatEffectScale.of(3.1f),
+                    shell.fighterLaunched,CombatEffectScale.FIGHTER_KINETIC);
             if(view!=null&&!view.circle(pose.x(),pose.y(),length))continue;
             batch.draw(image,pose.x()-length/2,pose.y()-thickness/2,
                     length/2,thickness/2,length,thickness,1,1,angle,

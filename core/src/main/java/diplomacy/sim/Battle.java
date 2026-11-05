@@ -435,6 +435,8 @@ public final class Battle {
     public static final class Missile {
         public final long visualId, spawnTick;
         public final int sourceId, team;
+        /** Render-only launch provenance: sourceId is the carrier for aircraft ordnance. */
+        public boolean fighterLaunched;
         public int targetId;
         /** Zero for ship-strike ordnance. Interceptors retain a distinct
          * craft identity and never consult a ship's live seeker solution. */
@@ -565,6 +567,8 @@ public final class Battle {
         public final ProjectileModel.Spec spec;
         public final long visualId,spawnTick;
         public final int sourceId,team,targetId;
+        /** Visual origin only: no effect on ballistic hitbox or damage. */
+        public boolean fighterLaunched;
         public final double vx,vy,damage;
         public final AmmunitionTable.Kinetic ammunition;
         public double x,y,life,integrity;
@@ -718,6 +722,8 @@ public final class Battle {
         public boolean inFlight;
         public final int team;
         public final DamageType type;
+        /** Visual origin only: fighter beams must not be capital-ship thick. */
+        public boolean fighterLaunched;
         /** A distinct defensive emitter, not another full-sized main laser. */
         public final boolean pointDefense;
         public final LaserFamilies.Type laserType;
@@ -4768,6 +4774,7 @@ public final class Battle {
             Missile missile=new Missile(launched,tick,craft.sourceId,craft.team,
                     intercept.sourceId,craft.x,craft.y,
                     tx-craft.x,ty-craft.y,9.0,false,hardware,1.15);
+            missile.fighterLaunched=true;
             missile.targetCraftId=intercept.id;
             if(craft.radarSeekerSelected){
                 missile.fighterRadarHead=FighterRadarSeeker.installed(tier);
@@ -4833,8 +4840,10 @@ public final class Battle {
             ProjectileModel.Spec spec=ProjectileModel.module(
                     carrier==null?Faction.TERRAN:carrier.faction,
                     ProjectileModel.Kind.KINETIC,0.70,1,0.80);
-            ballistics.add(new Ballistic(shot,tick,craft.sourceId,craft.team,
-                    target==null?0:target.id,craft.x,craft.y,heading,profile.damage(),spec));
+            Ballistic fighterShell=new Ballistic(shot,tick,craft.sourceId,craft.team,
+                    target==null?0:target.id,craft.x,craft.y,heading,profile.damage(),spec);
+            fighterShell.fighterLaunched=true;
+            ballistics.add(fighterShell);
             fighterGunShots++;
         } else if(profile.weapon()==FighterModel.Weapon.LASER
                 || profile.weapon()==FighterModel.Weapon.PARTICLE){
@@ -4854,7 +4863,9 @@ public final class Battle {
                     beamY+=shot%3==0?35:-35;
                 }
             }
-            beams.add(new Beam(shot,tick,craft.x,craft.y,beamX,beamY,craft.team,kind));
+            Beam fighterBeam=new Beam(shot,tick,craft.x,craft.y,beamX,beamY,craft.team,kind);
+            fighterBeam.fighterLaunched=true;
+            beams.add(fighterBeam);
             observedShotX=beamX;observedShotY=beamY;
             if(landed){
                 if(intercept!=null)hitCraft(intercept,profile.damage(),carrier,shot,shotName);
@@ -4869,9 +4880,11 @@ public final class Battle {
                     carrier==null?Faction.TERRAN:carrier.faction,
                     heavy?ProjectileModel.Kind.TORPEDO:ProjectileModel.Kind.MISSILE,
                     0.84,1,0.88);
-            missiles.add(new Missile(shot,tick,craft.sourceId,craft.team,target.id,
+            Missile fighterPayload=new Missile(shot,tick,craft.sourceId,craft.team,target.id,
                     craft.x,craft.y,target.x-craft.x,target.y-craft.y,
-                    profile.damage(),heavy,spec,1));
+                    profile.damage(),heavy,spec,1);
+            fighterPayload.fighterLaunched=true;
+            missiles.add(fighterPayload);
             if(heavy)fighterTorpedoesLaunched++;else fighterMissilesLaunched++;
         }
         visual(shot,VisualPhase.FIRE,shotName,craft.team,craft.sourceId,
@@ -5456,6 +5469,7 @@ public final class Battle {
                     x,y,dx,dy,OrdnanceSubmunitions.childDamage(parent.damage,parent.payload),
                     false,childSpec,parent.guidanceQuality,type,0,parent.warhead);
             child.guidanceMode=parent.guidanceMode;
+            child.fighterLaunched=parent.fighterLaunched;
             child.approachSide=j%2==0?1:-1;
             child.setPropulsion(OrdnanceSubmunitions.ultra(parent.payload)
                     ?OrdnancePropulsion.Mode.PULSE_BURN

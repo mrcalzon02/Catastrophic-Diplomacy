@@ -24,8 +24,17 @@ final class GuidedPayloadVisual {
     private GuidedPayloadVisual(){}
 
     static Appearance forMissile(Battle.Missile missile){
-        return choose(missile.torpedo,missile.payload,missile.warhead,
-                missile.thrustPhase,missile.spec.crossSection());
+        return forLauncher(choose(missile.torpedo,missile.payload,missile.warhead,
+                missile.thrustPhase,missile.spec.crossSection()),missile.fighterLaunched);
+    }
+    /** Modern separated atlas, curated fallback, and plumes all use this footprint. */
+    static Appearance forLauncher(Appearance normal,boolean fighterLaunched){
+        if(!fighterLaunched)return normal;
+        return new Appearance(normal.image(),
+                normal.width()*CombatEffectScale.FIGHTER_GUIDED,
+                normal.height()*CombatEffectScale.FIGHTER_GUIDED,
+                normal.red(),normal.green(),normal.blue(),normal.alpha(),
+                normal.cell(),normal.fallback());
     }
 
     /** Physical size and fitted payload—not an image-only RNG—drive the look. */

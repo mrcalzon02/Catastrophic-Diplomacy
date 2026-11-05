@@ -42,6 +42,16 @@ public final class GuidedPayloadVisualTest {
                 CombatEffectScale.of(heavy.width())<5f &&
                 CombatEffectScale.of(torpedo.width())<5f,
                 "Guided projectile body art must stay far below an escort hull footprint");
+        var fighterMissile=GuidedPayloadVisual.forLauncher(standard,true);
+        var fighterTorpedo=GuidedPayloadVisual.forLauncher(torpedo,true);
+        check(GuidedPayloadVisual.forLauncher(standard,false)==standard &&
+                fighterMissile.width()<standard.width()*.3f &&
+                fighterTorpedo.width()<torpedo.width()*.3f &&
+                fighterMissile.width()>0 && fighterMissile.cell()==standard.cell(),
+                "Fighter missiles and torpedoes must shrink without changing ship payloads");
+        check(CombatEffectScale.of(fighterTorpedo.width())<FighterCraftSprites.fighterHeight(
+                diplomacy.sim.FighterModel.Hull.TORPEDO_BOMBER)/3f,
+                "Fighter torpedo must be visibly smaller than its bomber");
         check(decoy.alpha()<standard.alpha()&&decoy.width()!=standard.width(),
                 "Decoy must not be visually identical to a live guided warhead");
         var emp=look(false,OrdnanceDoctrine.Payload.STANDARD,

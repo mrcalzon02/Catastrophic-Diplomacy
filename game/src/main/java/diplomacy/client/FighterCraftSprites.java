@@ -6,6 +6,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
+import diplomacy.sim.WorldScale;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -149,6 +150,21 @@ public final class FighterCraftSprites implements Disposable {
             entries.remove();
         }
     }
+    /** Fighters keep their role-specific proportions, but remain far below ship interceptors. */
+    static float fighterHeight(FighterModel.Hull hull){
+        if(hull==null)throw new IllegalArgumentException("Missing fighter hull");
+        float original=switch(hull){
+            case INTERCEPTOR -> 13f;
+            case ASSAULT_GUNSHIP -> 17f;
+            case LASER_FIGHTER, PARTICLE_FIGHTER -> 14f;
+            case MISSILE_FIGHTER -> 15f;
+            case TORPEDO_BOMBER -> 18f;
+        };
+        return original*(float)WorldScale.SHIP_WORLD_SCALE*CombatEffectScale.FIGHTER_CRAFT;
+    }
+    static float droneHeight(){
+        return 11f*(float)WorldScale.SHIP_WORLD_SCALE*CombatEffectScale.FIGHTER_CRAFT;
+    }
     public int loaded() { return originals.size(); }
     public void render(Battle battle,SpriteBatch batch) {render(battle,batch,null,null);}
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses) {
@@ -172,13 +188,7 @@ public final class FighterCraftSprites implements Disposable {
             Texture picture=art(path);
             if(picture==null)continue;
             used.add(path);
-            float height=craft.fighter?switch(craft.profile.hull()) {
-                case INTERCEPTOR -> 13f;
-                case ASSAULT_GUNSHIP -> 17f;
-                case LASER_FIGHTER, PARTICLE_FIGHTER -> 14f;
-                case MISSILE_FIGHTER -> 15f;
-                case TORPEDO_BOMBER -> 18f;
-            }:11f;
+            float height=craft.fighter?fighterHeight(craft.profile.hull()):droneHeight();
             float width=height*picture.getWidth()/(float)picture.getHeight();
             Battle.Ship target=vesselById.get(craft.targetId);
             BattleRenderPoses.Pose position=poses==null?

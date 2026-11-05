@@ -299,7 +299,7 @@ final class ModularWeaponFxRenderer implements Disposable {
         TextureRegion[] shells=kineticBodies();
         for(Battle.Ballistic shell:battle.ballistics()){
             Clip clip=kinetic.payload();
-            KineticPayloadVisual.Appearance spec=KineticPayloadVisual.forType(shell.ammunition);
+            KineticPayloadVisual.Appearance spec=KineticPayloadVisual.forBallistic(shell);
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
@@ -312,7 +312,8 @@ final class ModularWeaponFxRenderer implements Disposable {
                 drawCentered(batch,shells[spec.cell()],pose.x(),pose.y(),
                         spec.width(),spec.height(),angle);
             else drawCentered(batch,fallback,pose.x(),pose.y(),
-                    clip.width(),clip.height(),angle);
+                    clip.width()*(shell.fighterLaunched?CombatEffectScale.FIGHTER_KINETIC:1f),
+                    clip.height()*(shell.fighterLaunched?CombatEffectScale.FIGHTER_KINETIC:1f),angle);
         }
         // Fitted flak now sends an honest, inertial proximity-fuze shell.
         // Render the live shell's coordinates from Battle, not an old

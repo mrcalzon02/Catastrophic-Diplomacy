@@ -3135,7 +3135,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
             BattleRenderPoses.Pose pose=renderPoses.missile(m);
             if(!view.circle(pose.x(),pose.y(),4))continue;
-            shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(m.torpedo?4.4f:2.8f),7);
+            shapes.circle(pose.x(),pose.y(),CombatEffectScale.forLauncher(
+                    CombatEffectScale.of(m.torpedo?4.4f:2.8f),
+                    m.fighterLaunched,CombatEffectScale.FIGHTER_GUIDED),7);
         }
         // Only when approved rocket body art is genuinely unavailable:
         // use bounded live projectile dots, never fabricate ship sprites.
@@ -3152,7 +3154,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shapes.setColor(Color.GOLD);
             BattleRenderPoses.Pose pose=renderPoses.shell(shell);
             if(!view.circle(pose.x(),pose.y(),3))continue;
-            shapes.circle(pose.x(),pose.y(),CombatEffectScale.of(2.1f),6);
+            shapes.circle(pose.x(),pose.y(),CombatEffectScale.forLauncher(
+                    CombatEffectScale.of(2.1f),shell.fighterLaunched,
+                    CombatEffectScale.FIGHTER_KINETIC),6);
         }
         // Real expendable fighter emissions, not invented effect sprites:
         // one compact heated flare versus several dispersing radar-reflective

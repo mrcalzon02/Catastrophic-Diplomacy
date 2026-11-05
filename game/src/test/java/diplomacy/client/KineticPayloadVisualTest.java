@@ -13,6 +13,12 @@ public final class KineticPayloadVisualTest {
                     "Kinetic sprite atlas index outside approved cuts");
             check(appearance.width()>0&&appearance.width()<50&&appearance.height()>0,
                     "Tiny shell sprites must not obscure ships");
+            var fighter=KineticPayloadVisual.forLauncher(appearance,true);
+            check(KineticPayloadVisual.forLauncher(appearance,false)==appearance &&
+                    fighter.width()<appearance.width()*.11f &&
+                    CombatEffectScale.of(fighter.width())<FighterCraftSprites.fighterHeight(
+                            diplomacy.sim.FighterModel.Hull.INTERCEPTOR)/2f,
+                    "Aircraft cannon shells must be sub-fighter sized");
         }
         check(seen.size()==5,"All five arsenal sprite cells must be used");
         System.out.println("PASS five real projectile sprites assigned to five kinetic ammunition types");
