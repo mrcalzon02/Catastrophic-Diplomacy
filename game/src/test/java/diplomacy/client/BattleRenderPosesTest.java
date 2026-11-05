@@ -165,6 +165,29 @@ public final class BattleRenderPosesTest {
         close(remote.pose(22).x(),400,"new ship spawns in correct host location");
         remote.advance(.05f);
         close(remote.pose(11).x(),37.5,"remote second midpoint");
+        RemoteFleetMirrors mirrors=new RemoteFleetMirrors();
+        Battle firstHostView=mirrors.present(remote,false);
+        Battle.Ship hosted11=mirrors.byHostId(11);
+        Battle.Ship hosted22=mirrors.byHostId(22);
+        check(hosted11!=null&&hosted22!=null&&
+                hosted11.team==0&&hosted22.team==1&&
+                hosted11.faction==Battle.Faction.TERRAN&&
+                hosted22.faction==Battle.Faction.DRAXIAN,
+                "Network mirror must respect authoritative team/faction by host ID");
+        close(hosted11.x,37.5,"Network visual mirror must use interpolated position");
+        // Repeating the same host tick must NOT rebuild source objects or
+        // reparse the entire 400-ship wire data every single graphics frame.
+        check(mirrors.present(remote,false)==firstHostView&&
+                mirrors.byHostId(11)==hosted11,
+                "Network mirror was rebuilt for an unchanged host snapshot");
+        remote.observe(9,java.util.List.of(
+                "SHIP|11|0|TERRAN|72|5|0|100|10|10|10|10",
+                "SHIP|22|1|DRAXIAN|420|20|0|100|10|10|10|10"));
+        mirrors.present(remote,false);
+        check(mirrors.byHostId(11)==hosted11&&mirrors.byHostId(22)==hosted22,
+                "Reordered snapshot changed ship identity");
+        check(remote.ships().size()==2&&remote.ships().get(0).id()==11,
+                "Parsed host ship roster not refreshed on new tick");
         remote.advance(.05f);
         close(remote.pose(11).x(),60,"remote endpoint");
         remote.observe(6,java.util.List.of(a0));

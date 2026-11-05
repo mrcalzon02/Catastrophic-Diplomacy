@@ -12,11 +12,16 @@ import java.util.Map;
  */
 final class RemoteShipInterpolation {
     record Pose(double x,double y,double facing){}
+    /** Parsed once per NEW trusted snapshot, not once per GL frame. */
+    record HostShip(int id,int team,Battle.Faction faction,
+                    double hull,double shields,double armor,double power,double fuel){}
     private static final class Track {
         final Pose from,to;
         Track(Pose first,Pose last){from=first;to=last;}
     }
     private final Map<Integer,Track> tracks=new HashMap<>();
+    private List<HostShip> ships=List.of();
+    List<HostShip> ships(){return ships;}
     private long tick=Long.MIN_VALUE;
     private float elapsed,duration;
 
@@ -32,9 +37,10 @@ final class RemoteShipInterpolation {
         if(reset)tracks.clear();
         float oldFraction=duration>0?Math.min(1f,elapsed/duration):1f;
         Map<Integer,Track> next=new HashMap<>(Math.max(16,shipRows.size()*2));
+        java.util.ArrayList<HostShip> parsed=new java.util.ArrayList<>(shipRows.size());
         for(String row:shipRows){
             String[] p=row.split("[|]",-1);
-            if(p.length<7||!"SHIP".equals(p[0]))
+            if(p.length!=12||!"SHIP".equals(p[0]))
                 throw new IllegalArgumentException("Invalid ship record");
             int id=Integer.parseInt(p[1]);
             Pose endpoint=new Pose(Double.parseDouble(p[4]),Double.parseDouble(p[5]),
@@ -46,7 +52,13 @@ final class RemoteShipInterpolation {
             Track old=tracks.get(id);
             Pose start=reset||old==null?endpoint:blend(old.from,old.to,oldFraction);
             next.put(id,new Track(start,endpoint));
+            parsed.add(new HostShip(id,Integer.parseInt(p[2]),
+                    Battle.Faction.valueOf(p[3]),
+                    Double.parseDouble(p[7]),Double.parseDouble(p[8]),
+                    Double.parseDouble(p[9]),Double.parseDouble(p[10]),
+                    Double.parseDouble(p[11])));
         }
+        ships=List.copyOf(parsed);
         long gap=reset?0:nextTick-tick;
         tracks.clear();
         tracks.putAll(next);
@@ -79,5 +91,6 @@ final class RemoteShipInterpolation {
         tick=Long.MIN_VALUE;
         elapsed=duration=0;
         tracks.clear();
+        ships=List.of();
     }
 }

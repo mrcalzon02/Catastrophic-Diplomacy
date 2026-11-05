@@ -207,3 +207,17 @@ diagnostic recorder or dev HUD is active. It does not drive movement or
 AI. The existing `:game:combatPerformanceSmoke` now validates ZIP
 readback, clipping and a deliberately introduced ship teleport, including
 camera-vs-hull separation. The six-speed fixture remains unchanged.
+
+## Stage 9 — multiplayer snapshot parsing and stable ship mirrors
+
+Host entities previously were filtered, split and parsed for every single
+graphics frame (up to 400 hull rows x 30-60 FPS), even when the authoritative
+network snapshot had not changed. The remote presentation now parses each
+new 10 Hz snapshot once and caches typed ship attributes and immutable
+host IDs. Interpolation still advances on every display frame.
+
+`RemoteFleetMirrors` persists the correct ship sprite by **host ship ID**
+across reordered wire rows, instead of accidentally assigning a different
+faction or hull's damage to an old array index. Rebuilding occurs only when
+the roster, server-side team/faction identity, or session changes. This
+is render-only. No host command, damage or battle-result semantics change.
