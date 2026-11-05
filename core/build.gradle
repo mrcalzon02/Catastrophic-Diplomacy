@@ -122,7 +122,7 @@ tasks.register('photonArrivalPruningSmoke', JavaExec) {
 }
 // The mandatory focused 200v200 regression executes both boundary tests
 // and unchanged full fleet fingerprints after light-time optimization.
-tasks.named('massMixedOnlySmoke') {
+tasks.matching { it.name == 'massMixedOnlySmoke' }.configureEach {
     dependsOn(tasks.named('sensorLightTimeSmoke'))
     dependsOn(tasks.named('photonArrivalPruningSmoke'))
 }
