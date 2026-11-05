@@ -466,6 +466,10 @@ public final class GameMenuFlowTest {
                 check(GameMenuPanel.mapHit(node.x(),node.y(),page)==node.level(),
                         "Map selection did not return the displayed mission: "+node.level());
         // Visual link geometry must correspond to real reachable branches.
+        check(GameMenuPanel.campaignFrontTabHit(395,581,0)==0
+                &&GameMenuPanel.campaignFrontTabHit(795,581,10)==14
+                &&GameMenuPanel.campaignFrontTabHit(500,620,0)==-1,
+                "Five chapter-front tabs do not map to visible touch controls");
         check(CampaignMap.PAGE_COUNT==50 && CampaignMap.page(0).size()==10,
                 "500 missions must be divided into fifty navigable fronts");
         check(CampaignMap.links(0).size()==13,
