@@ -28,6 +28,16 @@ public final class BattleRenderPosesTest {
                 "old simulation poses must not leak to a new battle");
         p.beforeStep(second);recycled.x=-80;p.fraction(second,.5f);
         close(p.ship(recycled).x(),-90,"new battle interpolates");
+        // A pause draws exact physics; resuming without a new tick must NOT
+        // return to the previously cached pose and travel backwards.
+        p.snap(second);
+        p.fraction(second,.2f);
+        close(p.ship(recycled).x(),-80,"resuming a frozen frame must not rewind");
+        p.beforeStep(second);recycled.x=-60;p.fraction(second,.5f);
+        close(p.ship(recycled).x(),-70,"post-resume movement interpolates");
+        close(p.frame(second).centerX(),-70,"camera uses same interpolated hull center");
+        close(diplomacy.sim.BattleView.of(second).centerX(),-60,
+                "authoritative framing stays exact for headless consumers");
         // The actual catch-up loop can process up to 64 authoritative ticks
         // for one displayed frame. Only the final tick needs a pose snapshot.
         for(int requested:new int[]{1,2,19,80}){
@@ -58,6 +68,6 @@ public final class BattleRenderPosesTest {
         p.fraction(multi,.5f);
         close(p.ship(moving).x(),100+10*(advanced-1)+5,
                 "Final-step-only interpolation must preserve half-tick movement");
-        System.out.println("PASS render-only interpolation, multi-tick snapshot limit, heading wrap, spawns and battle reset");
+        System.out.println("PASS pose interpolation, freeze/resume, interpolated camera, catch-up snapshots, heading wrap, spawns and battle reset");
     }
 }

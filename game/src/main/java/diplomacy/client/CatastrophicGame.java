@@ -2905,7 +2905,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shieldFx.advance(battle,effectsDelta,running && !tacticalMenuOpen && !shipyard.open());
         // Shared visual clock: current authoritative state minus one fixed-tick.
         // Paused battles draw the exact state, not an old snapshot.
-        renderPoses.fraction(battle,!running || battle.finished()?1f:(float)(accumulator/Battle.DT));
+        // A frozen frame must discard its pre-step interpolation history:
+        // otherwise resuming before the next tick visually rewinds ships.
+        if(!running || tacticalMenuOpen || shipyard.open() || battle.finished())
+            renderPoses.snap(battle);
+        else renderPoses.fraction(battle,(float)(accumulator/Battle.DT));
         if(screensaverMode){
             ScreensaverCameraDirector.Shot cinematic=screensaverCamera.update(battle,delta,renderPoses);
             battleCamera.zoom=cinematic.zoom();
@@ -3790,7 +3794,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     /** World camera follows the active engagement; UI coordinates never move. */
     private void updateBattleCamera() {
-        BattleView.Frame shot=BattleView.of(battle);
+        BattleView.Frame shot=renderPoses.frame(battle);
         battleCamera.zoom=Math.max(0.16f,Math.min(8f,(float)shot.zoom()*manualZoom));
         double cx=shot.centerX(),cy=shot.centerY();
         if(focusedShipId>=0){

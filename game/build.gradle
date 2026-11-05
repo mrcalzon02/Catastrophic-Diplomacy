@@ -426,3 +426,15 @@ tasks.register('fighterScaleArtDiagnostic') {
     dependsOn tasks.named('fighterArtBridgeDiagnostic'), tasks.named('guidedOrdnanceArtSmoke'),
             tasks.named('kineticOrdnanceArtSmoke')
 }
+
+ 
+// Standalone visual/timing diagnostic. Never blocks an otherwise functional
+// APK/desktop release; it creates reproducible frame-by-frame CSV evidence.
+tasks.register('combatTimelineDiagnostic', JavaExec) {
+    group = 'verification'
+    description = 'Nonblocking 0.5x-3x clock and interpolation traces at 15/30/60 FPS.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CombatTimelineDiagnostic'
+    workingDir = rootProject.projectDir
+}

@@ -1,5 +1,6 @@
 package diplomacy.client;
 import diplomacy.sim.Battle;
+import diplomacy.sim.BattleView;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,9 +37,35 @@ final class BattleRenderPoses {
             shells.put(b.visualId,new Pose((float)b.x,(float)b.y,
                     (float)Math.atan2(b.vy,b.vx)));
     }
+    /** Clear stale pre-tick samples when paused or otherwise frozen.
+     * A resumed frame before its next physics tick must never move backwards. */
+    void snap(Battle battle){
+        sync(battle);
+        ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();
+        fraction=1f;
+    }
     void fraction(Battle battle,float value){
         sync(battle);
         fraction=Float.isFinite(value)?Math.max(0f,Math.min(1f,value)):1f;
+    }
+    /** Camera framing must use the very same interpolated poses as hulls.
+     * The deterministic BattleView.of(battle) stays available to headless clients. */
+    BattleView.Frame frame(Battle battle){
+        sync(battle);
+        double lowX=Double.POSITIVE_INFINITY,highX=Double.NEGATIVE_INFINITY;
+        double lowY=Double.POSITIVE_INFINITY,highY=Double.NEGATIVE_INFINITY;
+        for(Battle.Ship ship:battle.ships())if(ship.alive()){
+            Pose shown=ship(ship);
+            double radius=14*ship.visualScale();
+            lowX=Math.min(lowX,shown.x()-radius);
+            highX=Math.max(highX,shown.x()+radius);
+            lowY=Math.min(lowY,shown.y()-radius);
+            highY=Math.max(highY,shown.y()+radius);
+        }
+        if(!Double.isFinite(lowX))return new BattleView.Frame(640,360,1);
+        double required=Math.max(1,Math.max((highX-lowX+64)/1180,
+                (highY-lowY+85)/555));
+        return new BattleView.Frame((lowX+highX)/2,(lowY+highY)/2,required);
     }
     private Pose blend(Pose prior,Pose now){
         if(prior==null)return now;

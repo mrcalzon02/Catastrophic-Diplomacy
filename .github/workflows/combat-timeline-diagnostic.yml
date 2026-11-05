@@ -1,0 +1,49 @@
+name: Battlespace timeline diagnostic
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'game/src/main/java/diplomacy/client/BattleRenderPoses.java'
+      - 'game/src/main/java/diplomacy/client/CatastrophicGame.java'
+      - 'game/src/test/java/diplomacy/client/BattleRenderPosesTest.java'
+      - 'game/src/test/java/diplomacy/client/CombatTimelineDiagnostic.java'
+      - 'game/build.gradle'
+      - '.github/workflows/combat-timeline-diagnostic.yml'
+
+concurrency:
+  group: cd-timeline-diag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headless-timeline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - name: Six-speed simulated motion and pause/camera regression
+        id: timeline
+        continue-on-error: true
+        run: |
+          gradle --no-daemon :game:renderPosesSmoke :game:combatTimelineDiagnostic
+      - name: Preserve timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-combat-timeline-${{ github.run_id }}
+          path: test-output/combat-timeline/
+          if-no-files-found: warn
+      - name: Report diagnostic result without blocking functional releases
+        if: always()
+        env:
+          OUTCOME: ${{ steps.timeline.outcome }}
+        run: |
+          if [ "$OUTCOME" != "success" ]; then
+            echo "::warning::Battlespace timeline diagnostic failed; inspect its log and evidence"
+          else
+            echo "PASS: scripted battlespace timing diagnostic"
+          fi
