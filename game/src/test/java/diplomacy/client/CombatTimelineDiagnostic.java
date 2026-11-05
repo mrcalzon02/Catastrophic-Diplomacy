@@ -115,6 +115,70 @@ public final class CombatTimelineDiagnostic {
                         "0.00000,0.00000,%.3f%n",discardedMs));
     }
 
+    /** A real device does not deliver perfectly spaced 15/30/60 FPS
+     * frames. Exercise uneven wall-clock intervals and an occasional
+     * quarter-second stall with the exact gameplay accumulator contract.
+     * No fake motion interpolation, rendering API, or independent engine. */
+    private static void diagnoseIrregularFrames(StringBuilder summary){
+        final float[] wallPattern={
+                1f/60,1f/28,1f/45,1f/22,1f/38,
+                1f/15,1f/56,.25f,1f/30,1f/50
+        };
+        for(float speed:SPEEDS){
+            Battle battle=new Battle(20261105L);
+            Battle.Ship moving=battle.addShip(0,Battle.Faction.TERRAN,START_X,250);
+            battle.addShip(1,Battle.Faction.DRAXIAN,STATIONARY_X,250);
+            moving.vx=VELOCITY;
+            BattleRenderPoses poses=new BattleRenderPoses();
+            float accumulator=0;
+            double previousX=Double.NaN,maximumJump=0,clippedMs=0;
+            double totalUsedSeconds=0;
+            int steps=0;
+            for(int frame=0;frame<480;frame++){
+                float wallDelta=wallPattern[frame%wallPattern.length];
+                float bounded=Math.min(.08f,wallDelta);
+                clippedMs+=(wallDelta-bounded)*1000;
+                totalUsedSeconds+=bounded;
+                accumulator+=bounded*CombatPace.simulationMultiplier(speed);
+                int turns=0;
+                while(accumulator>=Battle.DT&&turns++<64){
+                    if(BattleRenderPoses.captureBeforeLastStep(accumulator,turns,64))
+                        poses.beforeStep(battle);
+                    SublightPropulsion.coast(moving,Battle.DT);
+                    battle.tick++;
+                    steps++;
+                    accumulator-=Battle.DT;
+                }
+                require(turns<64,"Unbounded irregular frame catch-up at "+speed+"x");
+                poses.fraction(battle,accumulator/(float)Battle.DT);
+                BattleRenderPoses.Pose shown=poses.ship(moving);
+                double expectedCenter=(shown.x()+STATIONARY_X)/2.0;
+                require(Math.abs(poses.frame(battle).centerX()-expectedCenter)<.004,
+                        "Camera drifted from interpolated ship in jittered sequence");
+                if(Double.isFinite(previousX)&&steps>0){
+                    double step=Math.abs(shown.x()-previousX);
+                    maximumJump=Math.max(maximumJump,step);
+                    double permitted=VELOCITY*CombatPace.simulationMultiplier(speed)*
+                            bounded*1.7+.18;
+                    require(step<=permitted,
+                            "Variable-frame visible jump at "+speed+"x frame="+frame+
+                            " distance="+step+" allowed="+permitted);
+                }
+                previousX=shown.x();
+            }
+            double expected=START_X+VELOCITY*Math.max(0,
+                    totalUsedSeconds*CombatPace.simulationMultiplier(speed)-Battle.DT);
+            require(Math.abs(previousX-expected)<.35,
+                    "Irregular-frame pacing altered net motion at "+speed+
+                    "x: actual="+previousX+" expected="+expected);
+            require(clippedMs>0,"Stall clipping evidence was not recorded");
+            summary.append(String.format(Locale.ROOT,
+                    "%.1f,%d,%.6f,%.6f,%.3f%n",
+                    speed,steps,previousX,maximumJump,clippedMs));
+        }
+        System.out.println("PASS six variable-frame timeline tests with 250ms stalls");
+    }
+
     public static void main(String[] arguments)throws Exception{
         StringBuilder frames=new StringBuilder(850_000).append(HEADER);
         StringBuilder summaries=new StringBuilder(
@@ -130,11 +194,16 @@ public final class CombatTimelineDiagnostic {
             scenarios++;
         }
         diagnoseLargeFrame(frames);
+        StringBuilder jitter=new StringBuilder(
+                "speed,ticks,final_ship_x,max_frame_world_step,clipped_wall_ms\\n");
+        diagnoseIrregularFrames(jitter);
         Path folder=Path.of("test-output","combat-timeline");
         Files.createDirectories(folder);
         Files.writeString(folder.resolve("frames.csv"),frames,
                 StandardCharsets.UTF_8);
         Files.writeString(folder.resolve("scenarios.csv"),summaries,
+                StandardCharsets.UTF_8);
+        Files.writeString(folder.resolve("irregular-frame-scenarios.csv"),jitter,
                 StandardCharsets.UTF_8);
         System.out.println("PASS "+scenarios+
                 " fixed-step presentation environments (six speeds x three FPS); "+
