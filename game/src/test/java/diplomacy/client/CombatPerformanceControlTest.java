@@ -63,7 +63,7 @@ public final class CombatPerformanceControlTest {
         recorder.event(17,1f,1f,"START");
         for(int i=0;i<3900;i++)
             recorder.frame(i,.033,11_000_000L,4_000_000L,32,2f,1.5f,
-                    400,100,500,100,15);
+                    400,100,500,100,15,3);
         check(recorder.framesRecorded()==3900&&recorder.framesOverwritten()==300,
                 "Capture must retain a bounded rolling frame trace");
         recorder.event(3900,2f,1.5f,"SIMULATION PRESSURE");
@@ -96,6 +96,12 @@ public final class CombatPerformanceControlTest {
         String csv=files.get("frame-samples.csv");
         check(csv.startsWith("frame,tick")&&csv.contains("300,300,")&&
                 csv.contains("3899,3899,"),"Ring capture chronological readback");
+        check(csv.contains("sim_ticks,simulation_cpu_ms_per_tick") &&
+                csv.contains(",400,100,500,3,1.3333,100,15"),
+                "Trace must separate simulation ticks from rendered frames and preserve ms/tick");
+        check(files.get("summary.json").contains("\"simulationTicksRecorded\": 11700")
+                &&files.get("summary.json").contains("\"meanSimulationCpuMsPerTick\": 1.333"),
+                "Summary must reveal the actual physics-tick cost, not misleading forced-speed FPS");
         check(!csv.contains("\n299,299,"),"Oldest overwritten frame leaked");
         check(files.get("speed-events.csv").contains("SIMULATION PRESSURE"),
                 "Performance transition missing from export");
@@ -111,7 +117,7 @@ public final class CombatPerformanceControlTest {
         check(!recorder.recording(),"Export must stop active ZIP sample writer");
         recorder.resume();
         recorder.frame(3902,.033,11_000_000L,4_000_000L,32,2f,1.5f,
-                399,101,501,100,15);
+                399,101,501,100,15,2);
         check(recorder.recording()&&recorder.framesRecorded()==3901&&
                         recorder.framesOverwritten()==301,
                 "Development recording must resume with rolling evidence intact");
