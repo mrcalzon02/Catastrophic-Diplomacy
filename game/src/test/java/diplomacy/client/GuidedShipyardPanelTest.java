@@ -81,18 +81,28 @@ public final class GuidedShipyardPanelTest {
                 "Hardpoints must remain selectable in the schematic fallback");
         var alternatives=Shipyard.choices(catalog,stock.faction,stock.hull,chosen.index());
         check(!alternatives.isEmpty(),"Selected mount must offer compatible alternative modules");
-        editor.tap(43,502); // First visible module in the new left-hand fitting palette
+        String originalFitting=editor.draftDesign().at(chosen.index())==null?null:
+                editor.draftDesign().at(chosen.index()).component;
+        editor.tap(43,502); // Preview first compatible catalogue entry without fitting
         check(editor.selectedHardpoint()==chosen.index(),
-                "Choosing a module must not silently switch the selected hull mount");
-        check(editor.draftDesign().at(chosen.index())!=null&&
+                "Choosing a palette candidate must not switch the selected ship mount");
+        check(alternatives.get(0).id.equals(editor.previewedModuleId()),
+                "Palette selection must populate a real candidate preview");
+        check(java.util.Objects.equals(originalFitting,
+                editor.draftDesign().at(chosen.index())==null?null:
+                        editor.draftDesign().at(chosen.index()).component),
+                "Previewing a module changed the fitted hull without FIT confirmation");
+        editor.tap(100,245); // Explicit FIT SELECTED
+        check(editor.previewedModuleId()==null&&
+                editor.draftDesign().at(chosen.index())!=null&&
                 alternatives.get(0).id.equals(editor.draftDesign().at(chosen.index()).component),
-                "Palette tap must fit its compatible component to the selected hull mount");
-        editor.tap(75,246);
+                "FIT SELECTED must install only the previewed compatible component");
+        editor.tap(260,186); // Separate CLEAR action
         check(editor.draftDesign().at(chosen.index())==null,
                 "Clear mount must remove only the selected socket fitting");
-        editor.tap(43,502);
+        editor.tap(43,502);editor.tap(100,245);
         check(editor.draftDesign().at(chosen.index())!=null,
-                "Palette must restore a cleared module without switching sockets");
+                "Palette must restore a cleared fitting without switching sockets");
         editor.tap(715,597);
         check(!editor.prefersHullArt(),"Schematic toggle must remain available");
         editor.close();
