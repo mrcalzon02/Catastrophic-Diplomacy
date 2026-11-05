@@ -10,6 +10,10 @@ application { mainClass = 'diplomacy.desktop.DesktopLauncher' }
 // Internal libGDX file paths must resolve identically on desktop and Android.
 tasks.register('stageDesktopAssets', Sync) {
     dependsOn rootProject.tasks.named('prepareUiAssets')
+    // Required ambient soundtrack is reconstructed from four approved Git parts;
+    // the desktop ZIP/MSI must not stage assets before that producer has run.
+    dependsOn rootProject.tasks.named('prepareMusicAssets')
+    dependsOn rootProject.tasks.named('verifyBattleAudioResources')
     dependsOn rootProject.tasks.named('prepareStage1Art')
     dependsOn rootProject.tasks.named('prepareModularWeaponFx')
     dependsOn rootProject.tasks.named('prepareLaserRun01')
@@ -51,6 +55,23 @@ tasks.named('jar') {
     duplicatesStrategy = DuplicatesStrategy.FAIL
     manifest {
         attributes 'Main-Class': application.mainClass.get()
+    }
+    // Verify the actual distributable JAR, not only a staged source directory.
+    // An absent soundtrack previously logged an exception yet passed Linux's
+    // 20-second launch check because CombatAudio handles missing music.
+    doLast {
+        def packaged = archiveFile.get().asFile
+        new java.util.zip.ZipFile(packaged).withCloseable { zip ->
+            [
+                'audio/music/cold_unresolved_drone.mp3': 3558384L,
+                'audio/music/final_surge.mp3': 2686806L
+            ].each { name, expectedBytes ->
+                def entry = zip.getEntry(name)
+                if (entry == null || entry.size != expectedBytes)
+                    throw new GradleException('Desktop JAR missing required soundtrack: ' + name)
+            }
+        }
+        println 'PASS desktop JAR contains both original, source-verified soundtracks'
     }
 }
 
