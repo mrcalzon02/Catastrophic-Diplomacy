@@ -254,11 +254,11 @@ public final class BattleRenderPosesTest {
                     "Unchanged render frame redundantly refreshed effects");
         check(CombatEventCursor.needsRefresh(20,8291,21,history),
                 "New physics tick must advance animation expiry");
-        java.util.List<Battle.VisualEvent> late=new java.util.ArrayList<>(history);
-        late.add(new Battle.VisualEvent(8292,20000,20,Battle.VisualPhase.FIRE,
+        java.util.List<Battle.VisualEvent> laterEvents=new java.util.ArrayList<>(history);
+        laterEvents.add(new Battle.VisualEvent(8292,20000,20,Battle.VisualPhase.FIRE,
                 "KINETIC",0,1,2,200,300,240,300));
-        check(CombatEventCursor.needsRefresh(20,8291,20,late) &&
-                CombatEventCursor.firstUnseen(late,8291)==8192,
+        check(CombatEventCursor.needsRefresh(20,8291,20,laterEvents) &&
+                CombatEventCursor.firstUnseen(laterEvents,8291)==8192,
                 "Late event in the same simulation tick was skipped");
         System.out.println("PASS low-speed muzzle, network tween, real projectile replay, event history cursor and camera easing");
     }
