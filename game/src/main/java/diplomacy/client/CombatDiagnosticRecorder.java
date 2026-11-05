@@ -23,7 +23,9 @@ final class CombatDiagnosticRecorder {
     private static final String FRAME_HEADER=
             "frame,tick,wall_delta_ms,cpu_frame_ms,simulation_cpu_ms,non_sim_cpu_ms,"+
             "p95_wall_ms,requested_speed,effective_speed,ships,craft,ordnance,"+
-            "sim_ticks,simulation_cpu_ms_per_tick,draw_calls,material_binds\n";
+            "sim_ticks,simulation_cpu_ms_per_tick,draw_calls,material_binds,"+
+            "clipped_wall_ms,interpolation_alpha,max_ship_step_world,"+
+            "camera_step_world,ship_jump_flags,ships_compared\n";
     private static final String EVENTS_HEADER=
             "frame,tick,requested_speed,effective_speed,reason\n";
     private final String[] frames=new String[MAX_FRAMES];
@@ -33,6 +35,13 @@ final class CombatDiagnosticRecorder {
     private int frameCount,eventCount,framePosition,eventPosition;
     private long totalFrames,droppedFrames,startedMillis;
     private long totalSimulationTicks,measuredSimulationNs;
+    private double totalClippedWallMs,peakShipWorldStep,peakCameraWorldStep;
+    private long totalShipJumpFlags,shipComparisons;
+    record MotionStats(double clippedWallMs,double interpolationAlpha,
+                       double maxShipWorldStep,double cameraWorldStep,
+                       int shipJumpFlags,int shipsCompared){
+        static final MotionStats NONE=new MotionStats(0,1,0,0,0,0);
+    }
     private long battleSeed,firstTick;
     private int startingShips;
     private boolean hasBattleMetadata;
@@ -50,6 +59,8 @@ final class CombatDiagnosticRecorder {
         hasBattleMetadata=hasMetadata;
         frameCount=eventCount=framePosition=eventPosition=0;
         totalFrames=droppedFrames=totalSimulationTicks=measuredSimulationNs=0;
+        totalClippedWallMs=peakShipWorldStep=peakCameraWorldStep=0;
+        totalShipJumpFlags=shipComparisons=0;
         peakShips=peakCraft=peakOrdnance=0;
         startedMillis=System.currentTimeMillis();
         recording=true;
@@ -69,21 +80,38 @@ final class CombatDiagnosticRecorder {
     void frame(long tick,double wallSeconds,long cpuNs,long simNs,
                double p95Ms,float requested,float effective,
                int ships,int craft,int ordnance,int draws,int binds,int simTicks){
+        frame(tick,wallSeconds,cpuNs,simNs,p95Ms,requested,effective,
+                ships,craft,ordnance,draws,binds,simTicks,MotionStats.NONE);
+    }
+    /** Motion diagnostics are observational and intentionally nonblocking. */
+    void frame(long tick,double wallSeconds,long cpuNs,long simNs,
+               double p95Ms,float requested,float effective,
+               int ships,int craft,int ordnance,int draws,int binds,int simTicks,
+               MotionStats motion){
         if(!recording)return;
         if(!Double.isFinite(wallSeconds)||wallSeconds<0||simNs<0||
                 cpuNs<simNs||ships<0||craft<0||ordnance<0||simTicks< -1)return;
+        if(motion==null)motion=MotionStats.NONE;
         double msPerTick=simTicks>0?simNs/(1_000_000.0*simTicks):0.0;
         String line=String.format(Locale.ROOT,
-                "%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.1f,%.1f,%d,%d,%d,%d,%.4f,%d,%d\n",
+                "%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.1f,%.1f,%d,%d,%d,%d,%.4f,%d,%d,%.4f,%.5f,%.5f,%.5f,%d,%d\n",
                 totalFrames,tick,wallSeconds*1000,cpuNs/1e6,simNs/1e6,
                 (cpuNs-simNs)/1e6,p95Ms,requested,effective,
-                ships,craft,ordnance,simTicks,msPerTick,draws,binds);
+                ships,craft,ordnance,simTicks,msPerTick,draws,binds,
+                motion.clippedWallMs(),motion.interpolationAlpha(),
+                motion.maxShipWorldStep(),motion.cameraWorldStep(),
+                motion.shipJumpFlags(),motion.shipsCompared());
         if(simTicks>0){
             totalSimulationTicks+=simTicks;
             measuredSimulationNs+=simNs;
         }
         frames[framePosition]=line;
         frameTimes[framePosition]=wallSeconds*1000.0;
+        totalClippedWallMs+=Math.max(0,motion.clippedWallMs());
+        peakShipWorldStep=Math.max(peakShipWorldStep,motion.maxShipWorldStep());
+        peakCameraWorldStep=Math.max(peakCameraWorldStep,motion.cameraWorldStep());
+        totalShipJumpFlags+=motion.shipJumpFlags();
+        shipComparisons+=motion.shipsCompared();
         peakShips=Math.max(peakShips,ships);
         peakCraft=Math.max(peakCraft,craft);
         peakOrdnance=Math.max(peakOrdnance,ordnance);
@@ -190,6 +218,11 @@ final class CombatDiagnosticRecorder {
                     ",\n  \"peakShips\": "+peakShips+
                     ",\n  \"peakCraft\": "+peakCraft+
                     ",\n  \"peakOrdnance\": "+peakOrdnance+
+                    ",\n  \"totalClippedWallMs\": "+totalClippedWallMs+
+                    ",\n  \"peakDisplayedShipStepWorld\": "+peakShipWorldStep+
+                    ",\n  \"peakDisplayedCameraStepWorld\": "+peakCameraWorldStep+
+                    ",\n  \"shipJumpFlags\": "+totalShipJumpFlags+
+                    ",\n  \"shipFrameComparisons\": "+shipComparisons+
                     ",\n  \"speedEventsRetained\": "+eventCount+"\n}\n");
             entry(zip,"diagnostic.log",eventCsv());
         }

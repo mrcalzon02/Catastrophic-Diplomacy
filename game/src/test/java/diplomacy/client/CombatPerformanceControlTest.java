@@ -93,6 +93,34 @@ public final class CombatPerformanceControlTest {
                 files.get("metadata.json").contains("\"captureStartTick\": 17") &&
                 files.get("metadata.json").contains("\"shipsAtCaptureStart\": 400"),
                 "Export must preserve original battle seed and capture starting state");
+        // A large real frame must disclose lost wall time and actual
+        // onscreen pose discontinuities without changing combat simulation.
+        CombatDiagnosticRecorder motionCapture=new CombatDiagnosticRecorder();
+        motionCapture.start();
+        motionCapture.frame(1,.250,12_000_000,5_000_000,250,1f,1f,
+                400,1,12,100,2,0,
+                new CombatDiagnosticRecorder.MotionStats(170,.3,41,12,2,400));
+        ByteArrayOutputStream motionBytes=new ByteArrayOutputStream();
+        motionCapture.export(motionBytes,"Desktop",1f,1f,1);
+        String motionSummary="";
+        String motionCsv="";
+        try(ZipInputStream zip=new ZipInputStream(
+                new ByteArrayInputStream(motionBytes.toByteArray()))){
+            java.util.zip.ZipEntry entry;
+            while((entry=zip.getNextEntry())!=null){
+                if(entry.getName().equals("summary.json"))
+                    motionSummary=new String(zip.readAllBytes(),StandardCharsets.UTF_8);
+                else if(entry.getName().equals("frame-samples.csv"))
+                    motionCsv=new String(zip.readAllBytes(),StandardCharsets.UTF_8);
+            }
+        }
+        check(motionSummary.contains("\"totalClippedWallMs\": 170.0")&&
+                motionSummary.contains("\"shipJumpFlags\": 2")&&
+                motionSummary.contains("\"peakDisplayedCameraStepWorld\": 12.0"),
+                "Live motion continuity totals missing from performance ZIP");
+        check(motionCsv.contains("clipped_wall_ms,interpolation_alpha")&&
+                motionCsv.contains(",170.0000,0.30000,41.00000,12.00000,2,400"),
+                "Per-frame position and discarded time evidence missing");
         String csv=files.get("frame-samples.csv");
         check(csv.startsWith("frame,tick")&&csv.contains("300,300,")&&
                 csv.contains("3899,3899,"),"Ring capture chronological readback");
@@ -121,6 +149,26 @@ public final class CombatPerformanceControlTest {
         check(recorder.recording()&&recorder.framesRecorded()==3901&&
                         recorder.framesOverwritten()==301,
                 "Development recording must resume with rolling evidence intact");
+        // The probe must compare actual rendered world positions, not just
+        // raw physics snapshots. A physically teleported ship must be flagged.
+        diplomacy.sim.Battle jump=new diplomacy.sim.Battle(47L);
+        diplomacy.sim.Battle.Ship subject=jump.addShip(0,
+                diplomacy.sim.Battle.Faction.TERRAN,100,200);
+        BattleRenderPoses poses=new BattleRenderPoses();
+        CombatFrameContinuity probe=new CombatFrameContinuity();
+        poses.fraction(jump,1);
+        var baseline=probe.sample(jump,poses,0,0,1f/30f,.1);
+        check(baseline.comparedShips()==0,"First frame has no prior visible sample");
+        subject.x+=300;
+        poses.fraction(jump,1);
+        var discontinuity=probe.sample(jump,poses,10,0,1f/30f,.1);
+        check(discontinuity.comparedShips()==1&&discontinuity.shipJumpFlags()==1&&
+                discontinuity.maxShipWorldStep()>299&&
+                discontinuity.cameraWorldStep()==10,
+                "Visual teleport and camera movement must be separated");
+        probe.reset();
+        check(probe.sample(jump,poses,0,0,1f/30f,.1).shipJumpFlags()==0,
+                "Pause/new-battle probe reset must not invent teleport flags");
         System.out.println("PASS discrete combat speeds, adaptive governor and ZIP telemetry readback");
     }
 }

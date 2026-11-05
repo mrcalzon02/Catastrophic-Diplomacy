@@ -212,6 +212,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final BattleTouchNavigation battleTouch=new BattleTouchNavigation();
     private final ShipInspectionPanel shipInspector=new ShipInspectionPanel();
     private final BattleRenderPoses renderPoses=new BattleRenderPoses();
+    private final CombatFrameContinuity continuityProbe=new CombatFrameContinuity();
+    /** Raw wall-time omitted by the 80ms accumulator cap, recorded honestly. */
+    private double clippedWallMsLastFrame;
     private Battle smoothedCameraBattle;
     private final ShipDeathTimeline deathTimeline=new ShipDeathTimeline();
     private final CombatHitFeedback hitFeedback=new CombatHitFeedback();
@@ -2854,7 +2857,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         long renderStartNs=System.nanoTime();
         int drawCallsBefore=batch.totalRenderCalls;
         diagnosticTicksLastFrame=0;
-        float delta = Math.min(0.08f, Gdx.graphics.getDeltaTime());
+        float wallDelta=Gdx.graphics.getDeltaTime();
+        float delta=Math.min(.08f,wallDelta);
+        clippedWallMsLastFrame=Math.max(0.0,(wallDelta-delta)*1000.0);
         if (running && !tacticalMenuOpen && !shipyard.open() && !battle.finished()) {
             float pace=verifyDemo?speed:CombatPace.simulationMultiplier(paceGovernor.effective());
             accumulator += delta * pace;
@@ -3526,12 +3531,23 @@ public final class CatastrophicGame extends ApplicationAdapter {
             Gdx.app.log("CD-PERF-SPEED","requested="+speed+
                     " effective="+paceGovernor.effective()+" "+paceGovernor.reason());
         }
+        CombatFrameContinuity.Sample motion=
+                (diagnosticRecorder.recording()||diagnosticsHud)?
+                continuityProbe.sample(battle,renderPoses,
+                        battleCamera.position.x,battleCamera.position.y,
+                        Gdx.graphics.getDeltaTime(),
+                        verifyDemo?speed:CombatPace.simulationMultiplier(paceGovernor.effective())):
+                CombatFrameContinuity.Sample.EMPTY;
         diagnosticRecorder.frame(battle.tick,Gdx.graphics.getDeltaTime(),
                 cpuFrameNs,simulationNs,paceGovernor.p95Ms(),speed,
                 paceGovernor.effective(),battle.alive(0)+battle.alive(1),
                 battle.crafts().size(),
                 battle.missiles().size()+battle.ballistics().size(),
-                frameDrawCalls,frameBinds,diagnosticTicksLastFrame);
+                frameDrawCalls,frameBinds,diagnosticTicksLastFrame,
+                new CombatDiagnosticRecorder.MotionStats(clippedWallMsLastFrame,
+                        renderPoses.fraction(),motion.maxShipWorldStep(),
+                        motion.cameraWorldStep(),motion.shipJumpFlags(),
+                        motion.comparedShips()));
         if(renderProfile.ready()){
             var frame=renderProfile.report();
             if((diagnosticsHud||diagnosticRecorder.recording())&&Gdx.app!=null)

@@ -188,3 +188,22 @@ simulation history, projectile counts, or visual event ordering.
 The existing headless pose smoke test covers empty history, 8,192 retained
 events, no-new-event frames and trimmed-history offsets. A before/after
 device frame-time comparison is still needed before claiming an FPS gain.
+
+## Stage 8 — on-device continuity and lost-time recording
+
+The existing bounded performance ZIP now includes, for every captured
+render frame: **actual raw wall time clipped by the 80 ms cap**, physics
+interpolation alpha, maximum displayed ship movement (world units), actual
+camera movement (world units), a conservative suspected ship-jump count,
+and the number of ship comparisons. The summary includes accumulated
+clipped milliseconds, worst displayed ship/camera steps and jump counts.
+These are **observed GL presentation positions**, not unrendered Battle
+coordinates. The visual jump flag allows acceleration/turn changes and
+uses a loose velocity-and-wall-time threshold so it is a diagnostic, not
+an assertion or a new release gate.
+
+`CombatFrameContinuity` compares tracked ships only when the live
+diagnostic recorder or dev HUD is active. It does not drive movement or
+AI. The existing `:game:combatPerformanceSmoke` now validates ZIP
+readback, clipping and a deliberately introduced ship teleport, including
+camera-vs-hull separation. The six-speed fixture remains unchanged.
