@@ -180,14 +180,6 @@ public final class BattleRenderPosesTest {
         check(mirrors.present(remote,false)==firstHostView&&
                 mirrors.byHostId(11)==hosted11,
                 "Network mirror was rebuilt for an unchanged host snapshot");
-        remote.observe(9,java.util.List.of(
-                "SHIP|11|0|TERRAN|72|5|0|100|10|10|10|10",
-                "SHIP|22|1|DRAXIAN|420|20|0|100|10|10|10|10"));
-        mirrors.present(remote,false);
-        check(mirrors.byHostId(11)==hosted11&&mirrors.byHostId(22)==hosted22,
-                "Reordered snapshot changed ship identity");
-        check(remote.ships().size()==2&&remote.ships().get(0).id()==11,
-                "Parsed host ship roster not refreshed on new tick");
         remote.advance(.05f);
         close(remote.pose(11).x(),60,"remote endpoint");
         remote.observe(6,java.util.List.of(a0));
@@ -196,6 +188,18 @@ public final class BattleRenderPosesTest {
                 "SHIP|11|0|TERRAN|7|5|0|100|10|10|10|10"));
         close(remote.pose(11).x(),7,"session restart resets network tracking");
         check(remote.tracked()==1,"old ship tracks leaked across restarted session");
+        mirrors.present(remote,true);
+        Battle.Ship restarted11=mirrors.byHostId(11);
+        check(restarted11!=hosted11&&mirrors.byHostId(22)==null,
+                "New network session must rebuild the previous sprite identities");
+        remote.observe(9,java.util.List.of(
+                "SHIP|11|0|TERRAN|72|5|0|100|10|10|10|10",
+                "SHIP|22|1|DRAXIAN|420|20|0|100|10|10|10|10"));
+        mirrors.present(remote,false);
+        check(mirrors.byHostId(11)==restarted11&&mirrors.byHostId(22)!=null,
+                "Roster update altered surviving host ship identity");
+        check(remote.ships().size()==2&&remote.ships().get(0).id()==11,
+                "Parsed host ship roster not refreshed on new tick");
         // A short-lived real rail/kinetic shot can launch and impact inside
         // one 30Hz step: the live projectile list will never expose it.
         // Drive the visual path only from authoritative paired event positions.
