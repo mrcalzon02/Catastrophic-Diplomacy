@@ -77,3 +77,20 @@ still receives only approximately three authoritative snapshots per wall
 second at 1x, and guided munitions still integrate within their old
 30 Hz world phase. Gameplay-fidelity measurements must precede expansion
 to projectile/collision substeps.
+
+## Same-JVM 200v200 position cost A/B
+
+Run `gradle --no-daemon :core:positionSubstepAB` to compare one versus
+two propulsion substeps for **400 ships**, 600 simulated ticks per run,
+two warmup pairs and five measured pairs with alternating order. The
+results are saved to `test-output/position-fidelity/ab-runs.csv`; the
+console prints median mean tick time, median p95, and new/old cost ratio.
+This is a *ship propulsion-only* CPU measurement. It cannot establish
+whole-game FPS, GPU workload, full-battle CPU, frame time stability,
+or an acceptable user-facing time-dilation policy by itself.
+
+The diagnostic is **not release-blocking**, regardless of speed ratio.
+A production comparison also requires identical seeded 200v200 battles
+and a display-side histogram of 50th/95th/99th-percentile frame times,
+stutter/pose discontinuities, simulation debt, and actual physics ticks
+per real second on target Android and desktop hardware.

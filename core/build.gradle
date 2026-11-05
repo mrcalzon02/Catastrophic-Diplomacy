@@ -1261,3 +1261,15 @@ tasks.register('positionFidelityDiagnostic', JavaExec) {
     mainClass = 'diplomacy.sim.WorldScaleAndPropulsionTest'
     dependsOn tasks.named('testClasses')
 }
+
+ 
+// Diagnostics only; isolates measured 400-ship thrust cost from AI, GPU,
+// collision and GitHub-host variance by comparing both modes in one JVM.
+tasks.register('positionSubstepAB', JavaExec) {
+    group = 'verification'
+    description = 'Same-run 30 vs 60 Hz propulsion CPU A/B with 200v200 fleet, median and p95 tick costs.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PositionSubstepPerformanceDiagnostic'
+    dependsOn tasks.named('testClasses')
+    workingDir = rootProject.projectDir
+}

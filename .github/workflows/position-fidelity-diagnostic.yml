@@ -10,6 +10,7 @@ on:
       - 'core/src/main/java/diplomacy/sim/SublightPropulsion.java'
       - 'core/src/test/java/diplomacy/sim/WorldScaleAndPropulsionTest.java'
       - 'core/build.gradle'
+      - 'core/src/test/java/diplomacy/sim/PositionSubstepPerformanceDiagnostic.java'
       - 'game/src/main/java/diplomacy/client/BattleRenderPoses.java'
       - 'game/src/test/java/diplomacy/client/CombatTimelineDiagnostic.java'
       - '.github/workflows/position-fidelity-diagnostic.yml'
@@ -30,6 +31,9 @@ jobs:
         with: {gradle-version: '8.11.1'}
       - name: Required physical thrust, fuel and motion integrity
         run: gradle --no-daemon :core:worldScaleAndPropulsionSmoke
+      - name: Advisory same-run 200v200 ship-integration cost A/B
+        continue-on-error: true
+        run: gradle --no-daemon :core:positionSubstepAB
       - name: Advisory six-speed 15/30/60 FPS presentation diagnostic
         id: presentation
         continue-on-error: true
@@ -39,7 +43,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cd-position-fidelity-${{ github.run_id }}
-          path: test-output/combat-timeline/
+          path: |
+            test-output/combat-timeline/
+            test-output/position-fidelity/
           if-no-files-found: warn
       - name: Report advisory presentation results
         if: always()
