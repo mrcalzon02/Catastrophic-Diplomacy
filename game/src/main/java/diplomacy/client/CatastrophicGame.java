@@ -2458,7 +2458,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(verifyDemo||Gdx.app==null)return;
         try{
             var preferences=Gdx.app.getPreferences(PERFORMANCE_PREFS);
-            preferences.putFloat("requestedSpeed",CombatPace.clamp(speed));
+            preferences.putFloat("requestedSpeed",CombatPace.clamp(
+                    screensaverMode?previousSpeed:speed));
             preferences.putBoolean("adaptive",paceGovernor.enabled());
             preferences.putBoolean("hud",diagnosticsHud);
             preferences.putBoolean("capture",performanceCaptureEnabled);
@@ -2494,7 +2495,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** Capture persists across battles; a new battle adds a seed-labelled event. */
     private void beginPerformanceCapture(Battle started,String label){
         if(!performanceCaptureEnabled||started==null)return;
-        if(!diagnosticRecorder.recording())
+        if(!diagnosticRecorder.recording()||diagnosticRecorder.framesRecorded()==0)
             diagnosticRecorder.start(started.seed(),started.tick,started.ships().size());
         diagnosticRecorder.event(started.tick,speed,paceGovernor.effective(),
                 label+" seed="+Long.toUnsignedString(started.seed())+
@@ -2514,7 +2515,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         savePerformancePreferences();
     }
-    private void exportDiagnostics(){
+    private void exportDiagnostics(){exportDiagnostics(true);}
+    private void exportDiagnostics(boolean share){
         String path="diagnostics/cd-performance-"+System.currentTimeMillis()+".zip";
         boolean exported=false;
         try{
@@ -2532,7 +2534,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             performanceNotice("EXPORTED "+path);
             Gdx.app.log("CD-PERF-EXPORT",output.file().getAbsolutePath()+
                     " bytes="+output.length());
-            if(diagnosticExportHandler!=null)diagnosticExportHandler.accept(path);
+            if(share&&diagnosticExportHandler!=null)diagnosticExportHandler.accept(path);
         }catch(Exception error){
             performanceNotice("PERFORMANCE EXPORT FAILED: "+error.getMessage());
             Gdx.app.error("CD-PERF-EXPORT","Capture export failed",error);
@@ -2604,7 +2606,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void stopScreensaver(){
         // Retain a real file for the unattended stutter/performance session.
         if(performanceCaptureEnabled&&diagnosticRecorder.framesRecorded()>0)
-            exportDiagnostics();
+            exportDiagnostics(false);
         shipInspector.close();
         screensaverWake.reset();
         screensaverControlsVisible=false;
