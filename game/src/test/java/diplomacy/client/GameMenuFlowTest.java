@@ -112,6 +112,14 @@ public final class GameMenuFlowTest {
         }
         check(GameMenuPanel.devAction(640,340,true)==-1,
                 "Android Dev layout must not accept touches in the column gutter");
+        check(GameMenuPanel.optionsAction(640,266,false,false)==-2,
+                "Desktop unavailable updater must remain disabled");
+        check(GameMenuPanel.optionsAction(640,188,false,false)==5 &&
+                GameMenuPanel.optionsAction(640,110,false,false)==6,
+                "Desktop Dev and Back controls must remain reachable without updates");
+        check(GameMenuPanel.devAction(100,350,false)==-1,
+                "Desktop Dev page must reject off-control clicks");
+
         check(GameMenuPanel.Screen.valueOf("DEV")!=null,
                 "Options must expose an actual Dev submenu");
         check(GameMenuPanel.optionsAction(640,395,true,true)==-1,
