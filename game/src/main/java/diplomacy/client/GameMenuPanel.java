@@ -797,15 +797,15 @@ final class GameMenuPanel {
                     for(int slot=0;slot<MOBILE_HOME_ORDER.length;slot++){
                         int action=MOBILE_HOME_ORDER[slot];
                         String name=action==7?"BATTLE SCREENSAVER":HOME_ACTIONS[action];
-                        label(batch,font,name,mobileColumnX(slot)+32,
-                                mobileHomeY(slot)+60,Color.WHITE);
+                        buttonLabel(batch,font,name,mobileColumnX(slot),
+                                mobileHomeY(slot),MOBILE_COLUMN_WIDTH,96,Color.WHITE);
                     }
                     font.getData().setScale(original);
                 }else{
                 title(batch,font,"CATASTROPHIC DIPLOMACY","TACTICAL FLEET COMMAND");
                 for(int i=0;i<HOME_ACTIONS.length;i++)
-                    label(batch,font,HOME_ACTIONS[i],474,520-i*64,Color.WHITE);
-                label(batch,font,"BATTLE SCREENSAVER",474,68,Color.WHITE);
+                    buttonLabel(batch,font,HOME_ACTIONS[i],438,487-i*64,404,50,Color.WHITE);
+                buttonLabel(batch,font,"BATTLE SCREENSAVER",438,35,404,50,Color.WHITE);
                 label(batch,font,"CAMPAIGN  /  SKIRMISH  /  SHIP ENGINEERING",438,15,MUTED);
 
                 }
@@ -815,18 +815,19 @@ final class GameMenuPanel {
                 Battle.Faction[] factions=Battle.Faction.values();
                 int rows=(factions.length+1)/2;
                 for(int i=0;i<factions.length;i++)
-                    label(batch,font,factions[i].displayName,
-                          101+(i/rows)*570,536-(i%rows)*62,Color.WHITE);
+                    buttonLabel(batch,font,factions[i].displayName,
+                          80+(i/rows)*570,502-(i%rows)*62,520,49,Color.WHITE);
                 if(progress!=null)
                     label(batch,font,"STARTING WILL REPLACE THE EXISTING CAMPAIGN SAVE",325,133,Color.SCARLET);
-                label(batch,font,"CANCEL",132,69,Color.WHITE);
-                label(batch,font,progress==null?"BEGIN CAMPAIGN":"REPLACE AND BEGIN",919,69,Color.WHITE);
+                buttonLabel(batch,font,"CANCEL",80,35,230,54,Color.WHITE);
+                buttonLabel(batch,font,progress==null?"BEGIN CAMPAIGN":"REPLACE AND BEGIN",
+                        892,35,308,54,Color.WHITE);
             }
             case SKIRMISH -> {
                 title(batch,font,"SKIRMISH","CHOOSE A SCENARIO AND DEPLOY A FITTED FLEET");
                 int index=0;
                 for(var choice:ScenarioCatalog.Preset.values())
-                    label(batch,font,choice.title,49,622-(index++)*48,Color.WHITE);
+                    buttonLabel(batch,font,choice.title,30,592-(index++)*48,550,44,Color.WHITE);
                 label(batch,font,"SCENARIO",653,586,Color.CYAN);
                 label(batch,font,preset.title,654,549,Color.WHITE);
                 label(batch,font,preset.description,654,510,MUTED);
@@ -851,10 +852,11 @@ final class GameMenuPanel {
                 label(batch,font,preset==ScenarioCatalog.Preset.CUSTOM?
                         "CUSTOM FLEET SIZE: -  "+fleetCount+"  +":
                         "FLEET SIZE DEFINED BY SCENARIO",677,237,MUTED);
-                label(batch,font,"BACK",70,67,Color.WHITE);
+                buttonLabel(batch,font,"BACK",30,35,160,49,Color.WHITE);
                 if(!preset.demonstration)
-                    label(batch,font,"SHIPYARD",743,67,Color.WHITE);
-                label(batch,font,preset.demonstration?"LAUNCH TEST":"DEPLOY FLEET",998,67,Color.WHITE);
+                    buttonLabel(batch,font,"SHIPYARD",702,35,225,49,Color.WHITE);
+                buttonLabel(batch,font,preset.demonstration?"LAUNCH TEST":"DEPLOY FLEET",
+                        969,35,277,49,Color.WHITE);
             }
             case CAMPAIGN -> drawCampaign(batch,font,progress,page,selectedLevel);
             case RESEARCH -> {
@@ -919,13 +921,12 @@ final class GameMenuPanel {
                         56,183,MUTED);
                 label(batch,font,"MODULE UPGRADES: RESEARCH EACH BRANCH SEPARATELY",
                         56,158,MUTED);
-                label(batch,font,researchReturn==Screen.DOCK?"BACK TO DOCK":"BACK TO CAMPAIGN",
-                        66,68,Color.WHITE);
-                label(batch,font,"TECHNOLOGY LAB",323,67,Color.CYAN);
-                label(batch,font,armedResearch==CampaignProgress.Project.ACCELERATOR?
-                        "CONFIRM LAB SPEND":"AUTHORIZE NEXT LAB",605,67,Color.WHITE);
-                label(batch,font,armedResearch==CampaignProgress.Project.LICENSE?
-                        "CONFIRM LICENSE SPEND":"AUTHORIZE NEXT LICENSE",921,67,Color.WHITE);
+                buttonLabel(batch,font,"BACK",35,35,250,54,Color.WHITE);
+                buttonLabel(batch,font,"TECHNOLOGY LAB",306,35,255,54,Color.CYAN);
+                buttonLabel(batch,font,armedResearch==CampaignProgress.Project.ACCELERATOR?
+                        "CONFIRM LAB SPEND":"AUTHORIZE NEXT LAB",592,35,294,54,Color.WHITE);
+                buttonLabel(batch,font,armedResearch==CampaignProgress.Project.LICENSE?
+                        "CONFIRM LICENSE SPEND":"AUTHORIZE NEXT LICENSE",906,35,330,54,Color.WHITE);
             }
             case TECHNOLOGY -> {
                 title(batch,font,"FACTION TECHNOLOGY LAB",
@@ -935,8 +936,8 @@ final class GameMenuPanel {
                 label(batch,font,"INDUSTRIAL RESEARCH BRANCHES",50,588,Color.CYAN);
                 label(batch,font,"BRANCH / NINE DEVELOPMENT STAGES",366,585,Color.CYAN);
                 for(int branch=0;branch<INDUSTRY_TABS.length;branch++)
-                    label(batch,font,INDUSTRY_TABS[branch],47+(branch%3)*96,
-                            554-(branch/3)*42,
+                    buttonLabel(batch,font,INDUSTRY_TABS[branch],
+                            44+(branch%3)*96,528-(branch/3)*42,90,38,
                             branch==technologyBranch?Color.GOLD:Color.WHITE);
                 for(int row=0;row<INDUSTRY_PAGE_ROWS;row++){
                     int index=technologyPage*INDUSTRY_PAGE_ROWS+row;
@@ -947,8 +948,8 @@ final class GameMenuPanel {
                     label(batch,font,c.subsystem+"  /  "+c.category.toUpperCase(java.util.Locale.ROOT),
                             57,401-row*48,MUTED);
                 }
-                label(batch,font,"PREV",64,174,Color.WHITE);
-                label(batch,font,"NEXT",191,174,Color.WHITE);
+                buttonLabel(batch,font,"PREV",48,144,112,45,Color.WHITE);
+                buttonLabel(batch,font,"NEXT",174,144,125,45,Color.WHITE);
                 label(batch,font,"PAGE "+(technologyPage+1)+" / "+
                         Math.max(1,(components.size()+INDUSTRY_PAGE_ROWS-1)/
                                 INDUSTRY_PAGE_ROWS),55,124,MUTED);
@@ -991,9 +992,9 @@ final class GameMenuPanel {
                         "OUTPUT x%.2f / MASS x%.2f / HEAT x%.2f",
                         upgrade.output,upgrade.mass,upgrade.heat),865,184,Color.CYAN);
                 label(batch,font,shortLabel(technologyNotice,100),352,104,Color.CYAN);
-                label(batch,font,"BACK TO LICENSES",49,68,Color.WHITE);
-                label(batch,font,armedTechnology!=null&&armedTechnology.equals(id)?
-                        "CONFIRM RESEARCH":"AUTHORIZE PROJECT",945,68,Color.WHITE);
+                buttonLabel(batch,font,"BACK",35,35,208,55,Color.WHITE);
+                buttonLabel(batch,font,armedTechnology!=null&&armedTechnology.equals(id)?
+                        "CONFIRM RESEARCH":"AUTHORIZE PROJECT",917,35,317,55,Color.WHITE);
             }
             case DOCK -> {
                 label(batch,font,"FLEET DOCK",37,680,Color.WHITE);
@@ -1083,19 +1084,19 @@ final class GameMenuPanel {
                             688,547,Color.WHITE);
                     label(batch,font,"RADIO VOICE: "+selectedProfile.radio(),
                             688,523,Color.WHITE);
-                    label(batch,font,"ASSIGN SELECTED SHIP TO THIS GROUP",718,477,Color.WHITE);
+                    buttonLabel(batch,font,"ASSIGN SELECTED SHIP",700,446,505,51,Color.WHITE);
                     if(selectedSquadron>0){
-                        label(batch,font,"CHOOSE GROUP NAMING CULTURE",718,399,Color.WHITE);
-                        label(batch,font,"CYCLE GROUP RADIO VOICE",718,321,Color.WHITE);
+                        buttonLabel(batch,font,"GROUP NAME STYLE",700,368,505,51,Color.WHITE);
+                        buttonLabel(batch,font,"GROUP RADIO VOICE",700,290,505,51,Color.WHITE);
                     }else label(batch,font,"Group 0 uses the fleet defaults",718,381,MUTED);
-                    label(batch,font,"GENERATE NAME IN ASSIGNED GROUP",718,243,Color.WHITE);
+                    buttonLabel(batch,font,"GENERATE NAME",700,212,505,51,Color.WHITE);
                     label(batch,font,"Squadron mobilization obeys the mission fleet cap",
                             700,194,MUTED);
-                    label(batch,font,"ACTIVATE GROUP",715,154,Color.WHITE);
-                    label(batch,font,"RESERVE GROUP",978,154,Color.WHITE);
+                    buttonLabel(batch,font,"ACTIVATE GROUP",700,124,243,50,Color.WHITE);
+                    buttonLabel(batch,font,"RESERVE GROUP",962,124,243,50,Color.WHITE);
                     label(batch,font,shortLabel(dockNotice,57),700,103,Color.CYAN);
                 }
-                label(batch,font,"BACK TO DOCK",63,69,Color.WHITE);
+                buttonLabel(batch,font,"BACK",35,35,210,54,Color.WHITE);
             }
             case NAME_THEMES -> {
                 title(batch,font,"SHIP NAMING TRADITIONS",
@@ -1108,8 +1109,8 @@ final class GameMenuPanel {
                     if(style==null)continue;
                     String status=ownedFleet!=null&&style==ownedFleet.style()?"  [ACTIVE]":
                             style==themeCandidate?"  [PREVIEW]":"";
-                    label(batch,font,style.name().replace('_',' ')+status,
-                            73+col*604,544-row*55,
+                    buttonLabel(batch,font,style.name().replace('_',' ')+status,
+                            52+col*604,515-row*55,565,47,
                             style==themeCandidate?Color.GOLD:Color.WHITE);
                 }
                 label(batch,font,"PREVIEW: "+themeCandidate.name().replace('_',' ')+
@@ -1124,10 +1125,10 @@ final class GameMenuPanel {
                             ownedFleet.namingSeed(),ownedFleet.nextSerial()+1),73),
                             66,119,MUTED);
                 }
-                label(batch,font,"CANCEL",73,69,Color.WHITE);
-                if(themePage>0)label(batch,font,"PREVIOUS",270,69,Color.WHITE);
-                if(themePage<nameThemePages()-1)label(batch,font,"NEXT PAGE",456,69,Color.WHITE);
-                label(batch,font,"APPLY THEME",990,69,Color.WHITE);
+                buttonLabel(batch,font,"CANCEL",35,35,196,55,Color.WHITE);
+                if(themePage>0)buttonLabel(batch,font,"PREVIOUS",256,35,163,55,Color.WHITE);
+                if(themePage<nameThemePages()-1)buttonLabel(batch,font,"NEXT PAGE",440,35,163,55,Color.WHITE);
+                buttonLabel(batch,font,"APPLY THEME",945,35,290,55,Color.WHITE);
             }
             case DEPLOYMENT -> {
                 LevelEconomy.Level stage=preparingCampaign?LevelEconomy.level(selectedLevel):null;
@@ -1159,14 +1160,14 @@ final class GameMenuPanel {
                         "MAX VICTORY PAYOUT: "+
                                 LevelEconomy.victoryCredits(stage,deployment.ships(),deployment.ships(),true):
                         "FITTED SHIPS: "+deployment.ships(),843,290,Color.GOLD);
-                label(batch,font,"EDIT FITTED SHIP",896,249,Color.WHITE);
-                label(batch,font,"SHIP ORDERS",945,180,Color.WHITE);
+                buttonLabel(batch,font,"EDIT FITTED SHIP",845,214,352,55,Color.WHITE);
+                buttonLabel(batch,font,"SHIP ORDERS",845,143,352,55,Color.WHITE);
                 label(batch,font,"SELECT AND DRAG A VESSEL TO REPOSITION",61,139,MUTED);
                 label(batch,font,"SELECTED VESSEL #"+(selectedShip+1)+
                         (preparingCampaign?"":" / INDIVIDUAL FITTING"),846,120,Color.GOLD);
                 label(batch,font,editNotice,61,115,MUTED);
-                label(batch,font,preparingCampaign?"BACK TO MAP":"BACK TO SKIRMISH",68,68,Color.WHITE);
-                label(batch,font,"BEGIN MISSION",978,68,Color.WHITE);
+                buttonLabel(batch,font,"BACK",35,35,175,55,Color.WHITE);
+                buttonLabel(batch,font,"BEGIN MISSION",913,35,302,55,Color.WHITE);
             }
             case SHIP_ORDERS -> {
                 title(batch,font,"PER-SHIP STANDING ORDERS",
@@ -1187,12 +1188,12 @@ final class GameMenuPanel {
                     label(batch,font,"< "+ShipStandingOrders.SETTINGS[i],661,y,MUTED);
                     label(batch,font,policy.display(i)+" >",1006,y,Color.WHITE);
                 }
-                label(batch,font,"MARK SHIPS",58,586,Color.WHITE);
-                label(batch,font,"ALL",212,586,Color.WHITE);
-                label(batch,font,"APPLY",326,586,Color.WHITE);
-                label(batch,font,"CLEAR",468,586,Color.WHITE);
+                buttonLabel(batch,font,"MARK SHIPS",52,560,132,40,Color.WHITE);
+                buttonLabel(batch,font,"ALL",192,560,105,40,Color.WHITE);
+                buttonLabel(batch,font,"APPLY",305,560,132,40,Color.WHITE);
+                buttonLabel(batch,font,"CLEAR",445,560,147,40,Color.WHITE);
                 label(batch,font,"GROUP: "+doctrineGroup.size()+" SELECTED"+(selectingGroup?" - TAP SHIPS TO MARK":""),49,620,Color.GREEN);
-                label(batch,font,"BACK TO DEPLOYMENT",927,68,Color.WHITE);
+                buttonLabel(batch,font,"BACK TO DEPLOYMENT",900,32,300,55,Color.WHITE);
                 label(batch,font,"G: MARK   H: ALL   ENTER: APPLY   DEL: CLEAR",48,114,MUTED);
                 label(batch,font,editNotice,48,86,Color.GOLD);
             }
@@ -1213,8 +1214,8 @@ final class GameMenuPanel {
                             updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
                             "DEV", "BACK"};
                     for(int i=0;i<names.length;i++)
-                        label(batch,font,names[i],mobileColumnX(i)+30,mobileOptionY(i)+58,
-                                i==3&&!updaterAvailable?MUTED:Color.WHITE);
+                        buttonLabel(batch,font,names[i],mobileColumnX(i),mobileOptionY(i),
+                                MOBILE_COLUMN_WIDTH,94,i==3&&!updaterAvailable?MUTED:Color.WHITE);
                     font.getData().setScale(original);
                 }else{
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
@@ -1246,13 +1247,13 @@ final class GameMenuPanel {
                     label(batch,font,"PERFORMANCE / DEVELOPMENT CONTROLS",74,614,MUTED);
                     font.getData().setScale(1.65f);
                     for(int i=0;i<actions.length;i++)
-                        label(batch,font,actions[i],mobileColumnX(i)+23,
-                                mobileDevY(i)+68,Color.WHITE);
+                        buttonLabel(batch,font,actions[i],mobileColumnX(i),
+                                mobileDevY(i),MOBILE_COLUMN_WIDTH,112,Color.WHITE);
                     font.getData().setScale(original);
                 }else{
                     title(batch,font,"DEV","PERFORMANCE / DEVELOPMENT CONTROLS");
                     for(int i=0;i<actions.length;i++)
-                        label(batch,font,actions[i],435,522-i*82+42,Color.WHITE);
+                        buttonLabel(batch,font,actions[i],408,522-i*82,464,62,Color.WHITE);
                 }
                 label(batch,font,"RETAINED "+capturedFrames+
                         " FRAMES  |  F2 HUD  F3 RECORD  F4 EXPORT  F5 ADAPTIVE",86,70,MUTED);
@@ -1313,8 +1314,9 @@ final class GameMenuPanel {
                     label(batch,font,"DESTROYED HULLS: "+destroyed,416,348,Color.WHITE);
                     label(batch,font,"CREDITS AWARDED: "+reward,416,312,Color.GOLD);
                 }
-                label(batch,font,"RETRY",423,157,Color.WHITE);
-                label(batch,font,"RETURN TO "+(progress!=null?"CAMPAIGN":"SKIRMISH"),699,157,Color.WHITE);
+                buttonLabel(batch,font,"RETRY",351,122,254,58,Color.WHITE);
+                buttonLabel(batch,font,"RETURN TO "+(progress!=null?"CAMPAIGN":"SKIRMISH"),
+                        673,122,254,58,Color.WHITE);
             }
             default -> {}
         }
