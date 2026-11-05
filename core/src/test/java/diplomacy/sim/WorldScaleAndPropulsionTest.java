@@ -142,6 +142,28 @@ public final class WorldScaleAndPropulsionTest {
                 "Economy posture failed to save actual reaction mass during acceleration");
         System.out.println("PASS bounded impulse, one-tank reserve, paid economy thrust and coast");
     }
+    /** Enter an actual fitted fleet engagement with already established,
+     * physically bounded pre-battle approach momentum. Slow acceleration
+     * alone must not leave a newly deployed screen visually frozen. */
+    private static void visibleDeploymentMovement() throws Exception {
+        Shipyard.Design left=Shipyard.starter(
+                Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        Shipyard.Design right=Shipyard.starter(
+                Battle.Faction.DRAXIAN,Shipyard.Hull.CRUISER);
+        Battle fight=Battle.duel(719912,1,left,right,
+                diplomacy.tech.TechnologyCatalog.loadDefault());
+        Battle.Ship friendly=fight.ships().get(0), hostile=fight.ships().get(1);
+        ok(friendly.vx>0&&hostile.vx<0,
+                "Opposing deployed fleets must retain incoming approach velocities");
+        ok(StrictMath.abs(friendly.vx)<=SublightPropulsion.maximumSpeed(friendly)
+                        &&StrictMath.abs(hostile.vx)<=SublightPropulsion.maximumSpeed(hostile),
+                "Deployment inherited an impossible super-rated ship velocity");
+        double startX=friendly.x;
+        for(int i=0;i<60;i++)fight.step();
+        ok(friendly.x>startX+2,
+                "Fitted ship did not visibly advance after two combat seconds");
+    }
+
     private static void halfGeometry() throws Exception {
         Battle b=new Battle(88611);
         Battle.Ship legacy=b.addShip(0,Battle.Faction.TERRAN,350,300);
@@ -180,6 +202,7 @@ public final class WorldScaleAndPropulsionTest {
         physicalScale();
         installedDrives();
         physicalMovement();
+        visibleDeploymentMovement();
         halfGeometry();
         System.out.println("PASS half-scale ship physical geometry and sublight thrust integration");
     }
