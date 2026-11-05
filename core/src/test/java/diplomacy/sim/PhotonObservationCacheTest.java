@@ -20,12 +20,30 @@ public final class PhotonObservationCacheTest {
         uncached.configurePhotonCacheForDiagnostic(false);
         long cachedNs=0,baselineNs=0;
         for(int i=0;i<steps;i++){
-            long started=System.nanoTime();
-            cached.step();
-            cachedNs+=System.nanoTime()-started;
-            started=System.nanoTime();
-            uncached.step();
-            baselineNs+=System.nanoTime()-started;
+            // Alternate A/B order to remove systematic JIT/CPU-cache bias.
+            // First ten ticks build class profiles; only steady-state timing
+            // contributes to the report. No stopwatch threshold blocks CI.
+            long started;
+            long reuseElapsed,legacyElapsed;
+            if((i&1)==0){
+                started=System.nanoTime();
+                uncached.step();
+                legacyElapsed=System.nanoTime()-started;
+                started=System.nanoTime();
+                cached.step();
+                reuseElapsed=System.nanoTime()-started;
+            }else{
+                started=System.nanoTime();
+                cached.step();
+                reuseElapsed=System.nanoTime()-started;
+                started=System.nanoTime();
+                uncached.step();
+                legacyElapsed=System.nanoTime()-started;
+            }
+            if(i>=10){
+                cachedNs+=reuseElapsed;
+                baselineNs+=legacyElapsed;
+            }
             check(cached.tick==uncached.tick,
                     "Cache changed simulation tick at "+perSide+"v"+perSide);
             check(cached.fingerprint()==uncached.fingerprint(),
@@ -58,13 +76,13 @@ public final class PhotonObservationCacheTest {
                 " ticks="+steps+" fingerprint="+Long.toHexString(cached.fingerprint())+
                 " hits="+cached.photonCacheHits()+
                 " misses="+cached.photonCacheMisses()+
-                " cachedMs="+cachedNs/1_000_000.0+
-                " uncachedMs="+baselineNs/1_000_000.0+
+                " reuseMs="+cachedNs/1_000_000.0+
+                " legacyMs="+baselineNs/1_000_000.0+
                 " (timings diagnostic only)");
     }
     public static void main(String[] args){
         compare(4,45,901L);
         compare(16,35,902L);
-        compare(200,6,903L);
+        compare(200,60,903L);
     }
 }
