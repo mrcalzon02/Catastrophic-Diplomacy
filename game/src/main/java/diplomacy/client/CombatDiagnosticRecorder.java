@@ -22,7 +22,8 @@ final class CombatDiagnosticRecorder {
     private static final int MAX_EVENTS=256;
     private static final String FRAME_HEADER=
             "frame,tick,wall_delta_ms,cpu_frame_ms,simulation_cpu_ms,non_sim_cpu_ms,"+
-            "p95_wall_ms,requested_speed,effective_speed,ships,craft,ordnance,draw_calls,material_binds\n";
+            "p95_wall_ms,requested_speed,effective_speed,ships,craft,ordnance,"+
+            "sim_ticks,simulation_cpu_ms_per_tick,draw_calls,material_binds\n";
     private static final String EVENTS_HEADER=
             "frame,tick,requested_speed,effective_speed,reason\n";
     private final String[] frames=new String[MAX_FRAMES];
@@ -31,6 +32,7 @@ final class CombatDiagnosticRecorder {
     private int peakShips,peakCraft,peakOrdnance;
     private int frameCount,eventCount,framePosition,eventPosition;
     private long totalFrames,droppedFrames,startedMillis;
+    private long totalSimulationTicks,measuredSimulationNs;
     private long battleSeed,firstTick;
     private int startingShips;
     private boolean hasBattleMetadata;
@@ -47,7 +49,7 @@ final class CombatDiagnosticRecorder {
         startingShips=Math.max(0,ships);
         hasBattleMetadata=hasMetadata;
         frameCount=eventCount=framePosition=eventPosition=0;
-        totalFrames=droppedFrames=0;
+        totalFrames=droppedFrames=totalSimulationTicks=measuredSimulationNs=0;
         peakShips=peakCraft=peakOrdnance=0;
         startedMillis=System.currentTimeMillis();
         recording=true;
@@ -55,17 +57,31 @@ final class CombatDiagnosticRecorder {
     void stop(){recording=false;}
     /** Resume after ZIP export failure without discarding the rolling evidence. */
     void resume(){recording=true;}
+    /** Compatibility overload for callers without step-level timing metadata. */
     void frame(long tick,double wallSeconds,long cpuNs,long simNs,
                double p95Ms,float requested,float effective,
                int ships,int craft,int ordnance,int draws,int binds){
+        frame(tick,wallSeconds,cpuNs,simNs,p95Ms,requested,effective,
+                ships,craft,ordnance,draws,binds,-1);
+    }
+    /** Record real physics steps separately from rendered frames. A forced
+     * verification-speed run must never be mistaken for native 1x FPS. */
+    void frame(long tick,double wallSeconds,long cpuNs,long simNs,
+               double p95Ms,float requested,float effective,
+               int ships,int craft,int ordnance,int draws,int binds,int simTicks){
         if(!recording)return;
         if(!Double.isFinite(wallSeconds)||wallSeconds<0||simNs<0||
-                cpuNs<simNs||ships<0||craft<0||ordnance<0)return;
+                cpuNs<simNs||ships<0||craft<0||ordnance<0||simTicks< -1)return;
+        double msPerTick=simTicks>0?simNs/(1_000_000.0*simTicks):0.0;
         String line=String.format(Locale.ROOT,
-                "%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.1f,%.1f,%d,%d,%d,%d,%d\n",
+                "%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f,%.1f,%.1f,%d,%d,%d,%d,%.4f,%d,%d\n",
                 totalFrames,tick,wallSeconds*1000,cpuNs/1e6,simNs/1e6,
                 (cpuNs-simNs)/1e6,p95Ms,requested,effective,
-                ships,craft,ordnance,draws,binds);
+                ships,craft,ordnance,simTicks,msPerTick,draws,binds);
+        if(simTicks>0){
+            totalSimulationTicks+=simTicks;
+            measuredSimulationNs+=simNs;
+        }
         frames[framePosition]=line;
         frameTimes[framePosition]=wallSeconds*1000.0;
         peakShips=Math.max(peakShips,ships);
@@ -152,7 +168,7 @@ final class CombatDiagnosticRecorder {
         String p=platform==null?"unknown":platform.replace("\\","/")
                 .replace("\"","'").replace("\n"," ");
         try(ZipOutputStream zip=new ZipOutputStream(destination,StandardCharsets.UTF_8)){
-            entry(zip,"metadata.json","{\n  \"schema\": 1,\n  \"platform\": \""+
+            entry(zip,"metadata.json","{\n  \"schema\": 2,\n  \"platform\": \""+
                     p+"\",\n  \"startedEpochMillis\": "+startedMillis+
                     ",\n  \"battleSeed\": "+(hasBattleMetadata?Long.toString(battleSeed):"null")+
                     ",\n  \"captureStartTick\": "+(hasBattleMetadata?Long.toString(firstTick):"null")+
@@ -165,6 +181,9 @@ final class CombatDiagnosticRecorder {
             entry(zip,"summary.json","{\n  \"recordedFrames\": "+totalFrames+
                     ",\n  \"retainedFrames\": "+frameCount+
                     ",\n  \"overwrittenFrames\": "+droppedFrames+
+                    ",\n  \"simulationTicksRecorded\": "+totalSimulationTicks+
+                    ",\n  \"meanSimulationCpuMsPerTick\": "+
+                    (totalSimulationTicks>0?measuredSimulationNs/(1_000_000.0*totalSimulationTicks):0.0)+
                     ",\n  \"wallFrameP50Ms\": "+percentile(.50)+
                     ",\n  \"wallFrameP95Ms\": "+percentile(.95)+
                     ",\n  \"wallFrameWorstMs\": "+percentile(1.0)+
