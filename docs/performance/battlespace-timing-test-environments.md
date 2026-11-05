@@ -174,3 +174,17 @@ This reduces repeated cubic calculations and per-pass Pose allocation.
 It is a rendering optimization only: **do not claim an FPS gain until a
 comparable device trace is captured**. The headless smoke suite checks
 same-frame identity, fraction invalidation and real midframe relocation.
+
+## Stage 7 — visual event history lookup cost
+
+At low simulation speeds the GL renderer may draw dozens of frames between
+combat events. The authored weapon-fx renderer previously traversed the
+entire bounded history (up to 8,192 events) on **every** frame, immediately
+discarding all consumed sequence IDs. It now binary-searches the monotonic
+event sequence and processes only events unseen since the previous render.
+This retains all effects from skipped simulation ticks and does not change
+simulation history, projectile counts, or visual event ordering.
+
+The existing headless pose smoke test covers empty history, 8,192 retained
+events, no-new-event frames and trimmed-history offsets. A before/after
+device frame-time comparison is still needed before claiming an FPS gain.

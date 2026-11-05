@@ -143,8 +143,13 @@ final class ModularWeaponFxRenderer implements Disposable {
         shortFlights.beginTick(battle.tick);
         // Visual history is bounded in core. If rendering skips simulation ticks,
         // event sequence IDs still let us consume every retained event exactly once.
-        for(Battle.VisualEvent event:battle.visualEvents()) {
-            if(event.sequence()<=lastSequence)continue;
+        // Histories are ordered by strictly increasing event sequence.
+        // At 0.5x/1x, most graphics frames have NO new events; O(log N)
+        // lookup avoids scanning thousands of already-consumed entries.
+        List<Battle.VisualEvent> history=battle.visualEvents();
+        for(int i=CombatEventCursor.firstUnseen(history,lastSequence);
+                i<history.size();i++){
+            Battle.VisualEvent event=history.get(i);
             lastSequence=event.sequence();
             // Paired FIRE/terminal records allow real within-tick movement
             // to remain observable even if the physical shot is already gone.

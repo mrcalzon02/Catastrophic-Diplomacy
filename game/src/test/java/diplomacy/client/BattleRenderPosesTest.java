@@ -198,6 +198,25 @@ public final class BattleRenderPosesTest {
         shortLife.beginTick(41);
         check(shortLife.flights().isEmpty()&&!shortLife.has(9001,40),
                 "Old tick projectile trail leaked into the next tick");
-        System.out.println("PASS low-speed muzzle, Hermite ships, network 10Hz tween, same-tick real projectile flight and camera easing");
+        // Visual history must not incur O(8192) traversal on every GL frame
+        // when the world is running at only 1.5-3 physics ticks/real second.
+        java.util.List<Battle.VisualEvent> history=new java.util.ArrayList<>();
+        for(int i=0;i<8192;i++)
+            history.add(new Battle.VisualEvent(i+100,9000+i,i,
+                    Battle.VisualPhase.FIRE,"KINETIC",0,1,2,
+                    100,200,150,200));
+        check(CombatEventCursor.firstUnseen(history,99)==0,
+                "First available history entry was skipped");
+        check(CombatEventCursor.firstUnseen(history,101)==2,
+                "Existing history entry was re-consumed");
+        check(CombatEventCursor.firstUnseen(history,4195)==4096,
+                "Event cursor cannot index mid-history");
+        check(CombatEventCursor.firstUnseen(history,8291)==8192,
+                "Repeated display frame re-scanned prior events");
+        check(CombatEventCursor.firstUnseen(history,10)==0,
+                "Pruned old event history must start at retained head");
+        check(CombatEventCursor.firstUnseen(java.util.List.of(),0)==0,
+                "Empty combat event history must be legal");
+        System.out.println("PASS low-speed muzzle, network tween, real projectile replay, event history cursor and camera easing");
     }
 }
