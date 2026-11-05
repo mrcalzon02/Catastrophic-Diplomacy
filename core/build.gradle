@@ -113,6 +113,17 @@ tasks.register('sensorLightTimeSmoke', JavaExec) {
     mainClass = 'diplomacy.sim.SensorLightTimeHistoryTest'
     dependsOn testClasses
 }
+tasks.register('sweptProjectileBroadphaseSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Conservative swept projectile AABB parity against exact collision solver, with JVM timing diagnostics.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.SweptProjectileBroadphaseTest'
+    dependsOn testClasses
+}
+tasks.matching { it.name == 'massMixedOnlySmoke' }.configureEach {
+    dependsOn(tasks.named('sweptProjectileBroadphaseSmoke'))
+}
+
 tasks.register('photonArrivalPruningSmoke', JavaExec) {
     group = 'verification'
     description = 'Exhaustively compare squared-shell pruning with exact photon delay at every time boundary.'

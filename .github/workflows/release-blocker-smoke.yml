@@ -19,6 +19,7 @@ on:
       - core/src/test/java/diplomacy/sim/MassBattleCampaignTest.java
       - core/src/test/java/diplomacy/sim/PhotonObservationCacheTest.java
       - core/src/test/java/diplomacy/sim/BattleStepPhaseObserverTest.java
+      - core/src/test/java/diplomacy/sim/SweptProjectileBroadphaseTest.java
       - core/build.gradle
       - game/src/test/java/diplomacy/client/CombatViewBoundsTest.java
       - game/src/test/java/diplomacy/client/GameWikiTest.java

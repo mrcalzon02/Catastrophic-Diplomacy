@@ -5077,8 +5077,19 @@ public final class Battle {
         }
     }
 
+    /** Cheap conservative broadphase for swept projectiles. Precomputed
+     * endpoints are shared across candidates; only a POSSIBLE collision
+     * reaches the original exact swept-circle/entry-time solver.
+     * Additional margin prevents false negatives at floating boundaries. */
+    static boolean sweptAabbMayHit(double minX,double maxX,double minY,double maxY,
+                                   double cx,double cy,double radius){
+        double extent=radius+1e-6;
+        return !(cx<minX-extent||cx>maxX+extent||
+                 cy<minY-extent||cy>maxY+extent);
+    }
+
     /** Returns the first collision fraction in [0,1], or infinity if missed. */
-    private static double segmentHit(double ax,double ay,double bx,double by,
+    static double segmentHit(double ax,double ay,double bx,double by,
                                      double cx,double cy,double radius) {
         double dx=bx-ax,dy=by-ay;
         double t=(dx*dx+dy*dy)<1e-10?0:
@@ -5134,10 +5145,19 @@ public final class Battle {
             rocket.vx=StrictMath.cos(rocket.heading)*speed;
             rocket.vy=StrictMath.sin(rocket.heading)*speed;
             double nx=rocket.x+rocket.vx*DT,ny=rocket.y+rocket.vy*DT;
+            // Swept AABB is an exclusion-only filter. Hit timing and target
+            // ordering remain determined by the original exact segmentHit.
+            double minX=StrictMath.min(rocket.x,nx);
+            double maxX=StrictMath.max(rocket.x,nx);
+            double minY=StrictMath.min(rocket.y,ny);
+            double maxY=StrictMath.max(rocket.y,ny);
             Ship hit=null;double earliest=Double.POSITIVE_INFINITY;
             for(Ship enemy:ships)if(enemy.team!=rocket.team&&enemy.alive()){
+                double radius=12*enemy.visualScale();
+                if(!sweptAabbMayHit(minX,maxX,minY,maxY,
+                        enemy.x,enemy.y,radius))continue;
                 double contact=segmentHit(rocket.x,rocket.y,nx,ny,
-                        enemy.x,enemy.y,12*enemy.visualScale());
+                        enemy.x,enemy.y,radius);
                 if(contact<earliest){earliest=contact;hit=enemy;}
             }
             if(hit!=null){
@@ -5172,18 +5192,28 @@ public final class Battle {
                 continue;
             }
             double nextX=p.x+p.vx*DT,nextY=p.y+p.vy*DT;
+            double minX=StrictMath.min(p.x,nextX);
+            double maxX=StrictMath.max(p.x,nextX);
+            double minY=StrictMath.min(p.y,nextY);
+            double maxY=StrictMath.max(p.y,nextY);
             Ship closest=null;double earliest=Double.POSITIVE_INFINITY;
             for(Ship candidate:enemyShips(p.team)){
                 if(!candidate.alive())continue;
+                double radius=12*candidate.visualScale();
+                if(!sweptAabbMayHit(minX,maxX,minY,maxY,
+                        candidate.x,candidate.y,radius))continue;
                 double contact=segmentHit(p.x,p.y,nextX,nextY,candidate.x,candidate.y,
-                        12*candidate.visualScale());
+                        radius);
                 if(contact<earliest){earliest=contact;closest=candidate;}
             }
             Craft closestCraft=null;
             if(p.team==0||p.team==1)for(Craft craft:crafts)
                 if(craft.team!=p.team&&craft.integrity>0){
+                    double radius=craft.fighter?5.5:4.2;
+                    if(!sweptAabbMayHit(minX,maxX,minY,maxY,
+                            craft.x,craft.y,radius))continue;
                     double contact=segmentHit(p.x,p.y,nextX,nextY,craft.x,craft.y,
-                            craft.fighter?5.5:4.2);
+                            radius);
                     if(contact<earliest){earliest=contact;closest=null;closestCraft=craft;}
                 }
             if(closestCraft!=null) {
