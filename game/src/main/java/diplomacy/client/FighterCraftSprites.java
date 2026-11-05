@@ -201,6 +201,10 @@ public final class FighterCraftSprites implements Disposable {
             // Finish the GL draw before evicting any material still referenced
             // by pending SpriteBatch vertices.
             surfaces.end(batch);
+            // The hull material shader encodes rotation in SpriteBatch RGB.
+            // That packed value is NOT a tint: never leak it into the next
+            // pass (capital turrets are drawn immediately after fighters).
+            batch.setColor(1f,1f,1f,1f);
             trimAfterFrame(used);
         }
     }
