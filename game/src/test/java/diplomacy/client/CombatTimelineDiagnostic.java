@@ -195,7 +195,7 @@ public final class CombatTimelineDiagnostic {
         }
         diagnoseLargeFrame(frames);
         StringBuilder jitter=new StringBuilder(
-                "speed,ticks,final_ship_x,max_frame_world_step,clipped_wall_ms\\n");
+                "speed,ticks,final_ship_x,max_frame_world_step,clipped_wall_ms\n");
         diagnoseIrregularFrames(jitter);
         Path folder=Path.of("test-output","combat-timeline");
         Files.createDirectories(folder);
