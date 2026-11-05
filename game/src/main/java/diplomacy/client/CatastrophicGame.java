@@ -3477,7 +3477,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 paceGovernor.effective(),battle.alive(0)+battle.alive(1),
                 battle.crafts().size(),
                 battle.missiles().size()+battle.ballistics().size(),
-                frameDrawCalls,frameBinds);
+                frameDrawCalls,frameBinds,diagnosticTicksLastFrame);
         if(renderProfile.ready()){
             var frame=renderProfile.report();
             if((diagnosticsHud||diagnosticRecorder.recording())&&Gdx.app!=null)
@@ -3661,6 +3661,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         verificationReported=true;
         var perf=renderProfile.report();
         String facts=" tick="+battle.tick+" frames="+verifiedFrames+
+            " forcedVerificationSpeed="+speed+"x"+
+            " avgSimulationTicksPerFrame="+(battle.tick/(double)Math.max(1,verifiedFrames))+
+            " avgSimulationCpuMsPerTick="+
+                (perf.meanSimulationMs()*verifiedFrames/Math.max(1.0,battle.tick))+
             " renderCpuAvgMs="+perf.meanCpuMs()+
             " renderCpuWorstMs="+perf.worstCpuMs()+
             " simCpuAvgMs="+perf.meanSimulationMs()+
