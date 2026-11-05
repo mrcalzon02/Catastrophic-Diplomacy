@@ -10,7 +10,7 @@ public final class BattleStepPhaseObserverTest {
     private static void check(boolean condition,String label){
         if(!condition)throw new AssertionError(label);
     }
-    public static void main(String[] args){
+    public static void main(String[] args)throws Exception{
         Battle traced=Battle.duel(7721L,12,
                 Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle control=Battle.duel(7721L,12,
