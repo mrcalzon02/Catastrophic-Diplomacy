@@ -17,8 +17,10 @@ public final class CampaignMap {
     public static List<RouteLink> links(int page){
         if(page<0||page>=PAGE_COUNT)throw new IllegalArgumentException("Unknown map page");
         int base=page*PAGE_SIZE;
-        int[][] pairs={{1,2},{1,5},{1,8},{2,3},{3,4},{3,6},{5,6},
-                {6,7},{6,9},{8,9},{4,10},{7,10},{9,10}};
+        int[][] pairs=page==PAGE_COUNT-1?
+                new int[][]{{1,2},{2,3},{3,4},{4,5},{5,6},{6,7},{7,8},{8,9},{9,10}}:
+                new int[][]{{1,2},{1,5},{1,8},{2,3},{3,4},{3,6},{5,6},
+                        {6,7},{6,9},{8,9},{4,10},{7,10},{9,10}};
         ArrayList<RouteLink> result=new ArrayList<>(pairs.length);
         for(int[] pair:pairs)result.add(new RouteLink(base+pair[0],base+pair[1]));
         return List.copyOf(result);
