@@ -31,7 +31,7 @@ import java.util.List;
 
 /** Lightweight native-font menu views; all hit regions are owned by the client flow. */
 final class GameMenuPanel {
-    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, SQUADRONS, RESEARCH, TECHNOLOGY, DEPLOYMENT, SHIP_ORDERS, OPTIONS, BATTLE, RESULTS }
+    enum Screen { HOME, CAMPAIGN_SETUP, SKIRMISH, CAMPAIGN, DOCK, NAME_THEMES, SQUADRONS, RESEARCH, TECHNOLOGY, DEPLOYMENT, SHIP_ORDERS, OPTIONS, DEV, BATTLE, RESULTS }
     private static final float W=1280,H=720;
     private static final Color PANEL=MilitaryUiTheme.PANEL;
     private static final Color SELECT=MilitaryUiTheme.SELECTION;
@@ -94,6 +94,7 @@ final class GameMenuPanel {
     private static float mobileColumnX(int slot){return 72+(slot%2)*584;}
     private static float mobileHomeY(int slot){return 464-(slot/2)*120;}
     private static float mobileOptionY(int slot){return 350-(slot/2)*115;}
+    private static float mobileDevY(int slot){return 440-(slot/2)*140;}
     private final boolean mobileLayout;
     GameMenuPanel(){this(false);}
     GameMenuPanel(boolean mobileLayout){this.mobileLayout=mobileLayout;}
@@ -114,10 +115,19 @@ final class GameMenuPanel {
     }
     static int optionsAction(float x,float y,boolean updaterAvailable,boolean mobile){
         if(voiceHit(x,y,mobile))return 0;
-        for(int i=0;i<5;i++){
+        for(int i=0;i<6;i++){
             boolean inside=mobile?hit(x,y,mobileColumnX(i),mobileOptionY(i),
                     MOBILE_COLUMN_WIDTH,94):hit(x,y,405,472-i*78,470,59);
             if(inside)return i==3&&!updaterAvailable?-2:i+1;
+        }
+        return -1;
+    }
+    /** Options -> Dev hit contract: 0 FPS, 1 HUD, 2 capture, 3 adaptive, 4 ZIP, 5 back. */
+    static int devAction(float x,float y,boolean mobile){
+        for(int i=0;i<6;i++){
+            boolean inside=mobile?hit(x,y,mobileColumnX(i),mobileDevY(i),
+                    MOBILE_COLUMN_WIDTH,112):hit(x,y,408,522-i*82,464,62);
+            if(inside)return i;
         }
         return -1;
     }
@@ -447,7 +457,9 @@ final class GameMenuPanel {
                int selectedResearchNode,CampaignProgress.Project armedResearch,Screen researchReturn,
                TechnologyCatalog techCatalog,CampaignTechnology.State discoveries,
                int technologyPage,int technologyModule,int technologyTrack,int technologyStage,
-               int technologyBranch,String technologyNotice,String armedTechnology){
+               int technologyBranch,String technologyNotice,String armedTechnology,
+               boolean fpsEnabled,boolean diagnosticsHud,boolean captureEnabled,
+               boolean adaptiveEnabled,long capturedFrames){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -706,14 +718,14 @@ final class GameMenuPanel {
                     rectangle(shapes,MOBILE_VOICE_LEFT+
                             MOBILE_VOICE_WIDTH*VoiceVolumeControl.clamp(voiceVolume)-11,
                             474,22,35,MilitaryUiTheme.AMBER);
-                    for(int i=0;i<5;i++){
+                    for(int i=0;i<6;i++){
                         float x=mobileColumnX(i),y=mobileOptionY(i);
                         if(i==3&&!updaterAvailable)
                             disabledButton(shapes,x,y,MOBILE_COLUMN_WIDTH,94);
                         else button(shapes,x,y,MOBILE_COLUMN_WIDTH,94,false);
                     }
                 }else{
-                for(int i=0;i<5;i++){
+                for(int i=0;i<6;i++){
                     if(i==3&&!updaterAvailable)disabledButton(shapes,405,472-i*78,470,59);
                     else button(shapes,405,472-i*78,470,59,false);
                 }
@@ -727,6 +739,21 @@ final class GameMenuPanel {
                         MilitaryUiTheme.AMBER);
 
                 }
+            }
+            case DEV -> {
+                for(int i=0;i<6;i++){
+                    if(mobileLayout){
+                        float x=mobileColumnX(i),y=mobileDevY(i);
+                        if(i==4)actionButton(shapes,x,y,MOBILE_COLUMN_WIDTH,112,
+                                MilitaryUiTheme.Intent.PRIMARY);
+                        else button(shapes,x,y,MOBILE_COLUMN_WIDTH,112,false);
+                    }else{
+                        if(i==4)actionButton(shapes,408,522-i*82,464,62,
+                                MilitaryUiTheme.Intent.PRIMARY);
+                        else button(shapes,408,522-i*82,464,62,false);
+                    }
+                }
+                rectangle(shapes,70,44,1140,56,PANEL);
             }
             case RESULTS -> {
                 if(report!=null){
@@ -1184,7 +1211,7 @@ final class GameMenuPanel {
                             "SOUND EFFECTS: "+(effects?"ON":"OFF"),
                             "SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),
                             updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
-                            "BACK"};
+                            "DEV", "BACK"};
                     for(int i=0;i<names.length;i++)
                         label(batch,font,names[i],mobileColumnX(i)+30,mobileOptionY(i)+58,
                                 i==3&&!updaterAvailable?MUTED:Color.WHITE);
@@ -1198,9 +1225,37 @@ final class GameMenuPanel {
                 label(batch,font,"SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),445,354,Color.WHITE);
                 label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",445,276,
                         updaterAvailable?Color.WHITE:MUTED);
-                label(batch,font,"BACK",445,198,Color.WHITE);
+                label(batch,font,"DEV",445,198,Color.WHITE);
+                label(batch,font,"BACK",445,120,Color.WHITE);
 
                 }
+            }
+            case DEV -> {
+                String[] actions={
+                        "FPS COUNTER: "+(fpsEnabled?"ON":"OFF"),
+                        "PERFORMANCE HUD: "+(diagnosticsHud?"ON":"OFF"),
+                        "RECORDING: "+(captureEnabled?"ON":"OFF"),
+                        "ADAPTIVE SPEED: "+(adaptiveEnabled?"ON":"OFF"),
+                        "EXPORT PERFORMANCE ZIP",
+                        "BACK TO OPTIONS"};
+                if(mobileLayout){
+                    float original=font.getData().scaleX;
+                    font.getData().setScale(2.05f);
+                    label(batch,font,"DEV",73,665,Color.WHITE);
+                    font.getData().setScale(1.40f);
+                    label(batch,font,"PERFORMANCE / DEVELOPMENT CONTROLS",74,614,MUTED);
+                    font.getData().setScale(1.65f);
+                    for(int i=0;i<actions.length;i++)
+                        label(batch,font,actions[i],mobileColumnX(i)+23,
+                                mobileDevY(i)+68,Color.WHITE);
+                    font.getData().setScale(original);
+                }else{
+                    title(batch,font,"DEV","PERFORMANCE / DEVELOPMENT CONTROLS");
+                    for(int i=0;i<actions.length;i++)
+                        label(batch,font,actions[i],435,522-i*82+42,Color.WHITE);
+                }
+                label(batch,font,"RETAINED "+capturedFrames+
+                        " FRAMES  |  F2 HUD  F3 RECORD  F4 EXPORT  F5 ADAPTIVE",86,70,MUTED);
             }
             case RESULTS -> {
                 title(batch,font,"AFTER-ACTION REPORT","THE ENGAGEMENT HAS ENDED");

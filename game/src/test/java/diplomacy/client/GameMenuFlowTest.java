@@ -54,6 +54,8 @@ public final class GameMenuFlowTest {
         for(int i=0;i<4;i++)
             check(CatastrophicGame.tacticalAction(920,500-60*i)==12+i,
                     "Performance menu mobile touch action "+i);
+        check(CatastrophicGame.tacticalAction(920,260)==16,
+                "Combat tactical menu must open Dev settings without ending the battle");
         // Background selection must not replace simulation-owned battle or map content.
         check("blank_armor_bulkhead".equals(GrittyMenuBackgrounds.nameFor(
                         GameMenuPanel.Screen.HOME)),
@@ -64,6 +66,9 @@ public final class GameMenuFlowTest {
         check("armored_interface".equals(GrittyMenuBackgrounds.nameFor(
                         GameMenuPanel.Screen.CAMPAIGN)),
                 "Campaign map must not use a fake pre-painted star chart");
+        check("blank_armor_bulkhead".equals(GrittyMenuBackgrounds.nameFor(
+                        GameMenuPanel.Screen.DEV)),
+                "Dev settings must use the same native menu background");
         check(GrittyMenuBackgrounds.nameFor(GameMenuPanel.Screen.BATTLE)==null,
                 "Live combat must not be obscured by illustrative art");
         // The exact coordinates that users tap must resolve to the displayed action.
@@ -90,9 +95,25 @@ public final class GameMenuFlowTest {
                 GameMenuPanel.optionsAction(800,395,true,true)==2 &&
                 GameMenuPanel.optionsAction(300,275,true,true)==3 &&
                 GameMenuPanel.optionsAction(800,275,true,true)==4 &&
-                GameMenuPanel.optionsAction(300,160,true,true)==5,
+                GameMenuPanel.optionsAction(300,160,true,true)==5 &&
+                GameMenuPanel.optionsAction(800,160,true,true)==6,
                 "Android options labels and controls have different actions");
         check(GameMenuPanel.optionsAction(800,275,false,true)==-2,
+                "Unavailable updater must be disabled on Android");
+        for(int slot=0;slot<6;slot++){
+            check(GameMenuPanel.optionsAction(640,500-slot*78,true,false)==slot+1,
+                    "Desktop Options control "+slot+" no longer matches displayed label");
+            float x=slot%2==0?350:950;
+            float y=480-(slot/2)*140;
+            check(GameMenuPanel.devAction(x,y,true)==slot,
+                    "Android Dev touch target "+slot+" is not clickable");
+            check(GameMenuPanel.devAction(650,545-slot*82,false)==slot,
+                    "Desktop Dev button "+slot+" is not clickable");
+        }
+        check(GameMenuPanel.devAction(640,340,true)==-1,
+                "Android Dev layout must not accept touches in the column gutter");
+        check(GameMenuPanel.Screen.valueOf("DEV")!=null,
+                "Options must expose an actual Dev submenu");
                 "Unavailable updater must be disabled on Android");
         check(GameMenuPanel.optionsAction(640,395,true,true)==-1,
                 "Android options gutter must not trigger anything");

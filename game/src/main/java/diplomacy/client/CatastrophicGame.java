@@ -81,6 +81,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean diagnosticsHud;
     /** Development capture is ON by default; F3 is the persistent opt-out toggle. */
     private boolean performanceCaptureEnabled=true;
+    private boolean fpsOverlayEnabled=true;
+    /** Return to the paused tactical menu when Dev was opened during combat. */
+    private boolean devReturnToBattle;
     private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
@@ -332,6 +335,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 speed=CombatPace.clamp(preferences.getFloat("requestedSpeed",CombatPace.DEFAULT));
                 diagnosticsHud=preferences.getBoolean("hud",false);
                 performanceCaptureEnabled=preferences.getBoolean("capture",true);
+                fpsOverlayEnabled=preferences.getBoolean("fps",true);
                 paceGovernor.request(speed);
                 paceGovernor.setEnabled(preferences.getBoolean("adaptive",true));
             }catch(RuntimeException failure){
@@ -428,7 +432,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     else if(key==Input.Keys.RIGHT)wiki.pageList(1);
                     return true;
                 }
-                if(!verifyDemo&&screen==GameMenuPanel.Screen.BATTLE){
+                if(!verifyDemo&&(screen==GameMenuPanel.Screen.BATTLE||
+                        screen==GameMenuPanel.Screen.DEV)){
                     if(key==Input.Keys.F2){toggleDiagnosticsHud();return true;}
                     if(key==Input.Keys.F3){toggleDiagnosticsCapture();return true;}
                     if(key==Input.Keys.F4){exportDiagnostics();return true;}
@@ -459,6 +464,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(audio!=null)audio.uiBack();
                         if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
                         else if(screen==GameMenuPanel.Screen.RESEARCH)screen=researchReturn;
+                        else if(screen==GameMenuPanel.Screen.DEV)closeDevOptions();
                         else if(screen==GameMenuPanel.Screen.NAME_THEMES)
                             screen=namingReturn;
                         else if(screen==GameMenuPanel.Screen.SQUADRONS)
@@ -523,6 +529,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             technologyAction(2);
                         return true;
                     }
+                    if(screen==GameMenuPanel.Screen.DEV)return true;
                     if(screen==GameMenuPanel.Screen.OPTIONS){
                         if(key==Input.Keys.U)audio.toggleMusic();
                         if(key==Input.Keys.I)audio.toggleEffects();
@@ -2021,7 +2028,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 2 -> audio.toggleEffects();
                 case 3 -> audio.toggleTrack();
                 case 4 -> {if(updateCheck!=null)updateCheck.run();}
-                case 5 -> {screen=GameMenuPanel.Screen.HOME;audio.uiBack();menuButtonPointer=-1;}
+                case 5 -> {devReturnToBattle=false;screen=GameMenuPanel.Screen.DEV;}
+                case 6 -> {screen=GameMenuPanel.Screen.HOME;audio.uiBack();menuButtonPointer=-1;}
+                default -> {}
+            }
+            return;
+        }
+        if(screen==GameMenuPanel.Screen.DEV){
+            switch(GameMenuPanel.devAction(x,y,menuPanel.mobileLayout())){
+                case 0 -> toggleFpsOverlay();
+                case 1 -> toggleDiagnosticsHud();
+                case 2 -> toggleDiagnosticsCapture();
+                case 3 -> toggleAdaptivePacing();
+                case 4 -> exportDiagnostics();
+                case 5 -> closeDevOptions();
                 default -> {}
             }
             return;
@@ -2176,6 +2196,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
     }
 
+    private void openBattleDevOptions(){
+        devReturnToBattle=true;
+        tacticalMenuOpen=false;
+        running=false;
+        screen=GameMenuPanel.Screen.DEV;
+    }
+    private void closeDevOptions(){
+        if(devReturnToBattle){
+            devReturnToBattle=false;
+            screen=GameMenuPanel.Screen.BATTLE;
+            tacticalMenuOpen=true;
+            running=false;
+        }else screen=GameMenuPanel.Screen.OPTIONS;
+        if(audio!=null)audio.uiBack();
+    }
     private void openTacticalMenu() {
         if (tacticalMenuOpen || shipyard.open()) return;
         resumeAfterMenu = running;
@@ -2211,7 +2246,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** Shared tactical menu hit contract, identical for desktop and touch. */
     static int tacticalAction(float x,float y){
         if(x>=895&&x<=1250){
-            for(int i=0;i<4;i++){
+            for(int i=0;i<5;i++){
                 float low=490-60*i;
                 if(y>=low&&y<low+48)return 12+i;
             }
@@ -2249,6 +2284,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 case 13 -> toggleAdaptivePacing();
                 case 14 -> toggleDiagnosticsCapture();
                 case 15 -> exportDiagnostics();
+                case 16 -> openBattleDevOptions();
         }
     }
     private void drawTacticalMenu() {
@@ -2257,7 +2293,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.setColor(0.008f,0.014f,0.034f,0.97f);
         shapes.rect(408,88,464,559);
         shapes.setColor(0.008f,0.014f,0.034f,0.97f);
-        shapes.rect(880,282,380,281);
+        shapes.rect(880,218,380,345);
         shapes.setColor(0.10f,0.20f,0.32f,1);
         shapes.rect(421,621,438,2);
         shapes.end();
@@ -2292,7 +2328,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "DIAGNOSTICS: "+(diagnosticsHud?"HUD ON":"HUD OFF")+" (F2)",
                 "ADAPTIVE: "+(paceGovernor.enabled()?"ON":"OFF")+" (F5)",
                 diagnosticRecorder.recording()?"STOP CAPTURE (F3)":"START CAPTURE (F3)",
-                "EXPORT ZIP (F4)"};
+                "EXPORT ZIP (F4)",
+                "DEV OPTIONS"};
         font.setColor(Color.CYAN);
         font.draw(batch,"PERFORMANCE",908,549);
         for(int i=0;i<performanceLabels.length;i++){
@@ -2463,6 +2500,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             preferences.putBoolean("adaptive",paceGovernor.enabled());
             preferences.putBoolean("hud",diagnosticsHud);
             preferences.putBoolean("capture",performanceCaptureEnabled);
+            preferences.putBoolean("fps",fpsOverlayEnabled);
             preferences.flush();
         }catch(RuntimeException failure){Gdx.app.error("CD-PERF","Cannot save preferences",failure);}
     }
@@ -2485,6 +2523,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),
                 paceGovernor.enabled()?"AUTO ENABLED":"AUTO DISABLED");
         performanceNotice(paceGovernor.enabled()?"ADAPTIVE ON":"ADAPTIVE OFF");
+        savePerformancePreferences();
+    }
+    private void toggleFpsOverlay(){
+        fpsOverlayEnabled=!fpsOverlayEnabled;
+        performanceNotice(fpsOverlayEnabled?"FPS COUNTER ON":"FPS COUNTER OFF");
         savePerformancePreferences();
     }
     private void toggleDiagnosticsHud(){
@@ -2736,7 +2779,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     afterActionPage,themePage,themeCandidate,
                     selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn,
                     technology,discoveries,technologyPage,technologyModule,technologyTrack,
-                    technologyStage,technologyBranch,technologyNotice,armedTechnology);
+                    technologyStage,technologyBranch,technologyNotice,armedTechnology,
+                    fpsOverlayEnabled,diagnosticsHud,performanceCaptureEnabled,
+                    paceGovernor.enabled(),diagnosticRecorder.framesRecorded());
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
                 // An actual completed framebuffer menu draw, not merely a
                 // click-handler state transition. Android campaign CI requires it.
@@ -3372,6 +3417,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     /** Small always-on overlay, above the playfield and below the battle controls. */
     private void drawFpsOverlay(){
+        if(!fpsOverlayEnabled)return;
         shapes.setProjectionMatrix(camera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         shapes.setColor(0f,0f,0f,.70f);
