@@ -35,8 +35,8 @@ public record ShipStandingOrders(
     };
     private static final BattleOrders.Position[] MOVEMENTS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
-            BattleOrders.Position.HOLD_RANGE,BattleOrders.Position.KEEP_MOVING,
-            BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND
+            BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.CAUTIOUS,
+            BattleOrders.Position.LAST_STAND,BattleOrders.Position.HOLD_RANGE
     };
     public ShipStandingOrders {
         if(tactics==null||aggression<0||aggression>100||caution<0||caution>100||

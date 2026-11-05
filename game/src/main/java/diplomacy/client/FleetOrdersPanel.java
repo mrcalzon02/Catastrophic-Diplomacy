@@ -18,8 +18,8 @@ final class FleetOrdersPanel {
     private static final int ROWS=10;
     private static final BattleOrders.Position[] TEAM_POSITIONS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
-            BattleOrders.Position.HOLD_RANGE,BattleOrders.Position.KEEP_MOVING,
-            BattleOrders.Position.CAUTIOUS,BattleOrders.Position.LAST_STAND
+            BattleOrders.Position.KEEP_MOVING,BattleOrders.Position.CAUTIOUS,
+            BattleOrders.Position.LAST_STAND,BattleOrders.Position.HOLD_RANGE
     };
     private final IntFunction<BattleOrders.Orders> get;
     private final BiConsumer<Integer,BattleOrders.Orders> apply;

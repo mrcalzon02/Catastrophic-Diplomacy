@@ -28,10 +28,10 @@ public final class ShipStandingOrdersTest {
         check(Math.round(retreat.tactics().retreatAtHullFraction()*100)==70
                         &&retreat.shieldWithdrawPercent()==50,
                 "Independent hull and shield retreat minimums not saved");
-        check(retreat.adjust(4,5).tactics().position()==BattleOrders.Position.LAST_STAND,
+        check(retreat.adjust(4,4).tactics().position()==BattleOrders.Position.LAST_STAND,
                 "Last-stand doctrine unavailable");
-        check(policy.adjust(4,2).tactics().position()==BattleOrders.Position.HOLD_RANGE
-                        &&policy.adjust(4,2).display(4).equals("HOLD FIRING RANGE"),
+        check(policy.adjust(4,5).tactics().position()==BattleOrders.Position.HOLD_RANGE
+                        &&policy.adjust(4,5).display(4).equals("HOLD FIRING RANGE"),
                 "Dedicated hold-firing-range standing order unavailable");
         check(policy.adjust(6,1).tactics().pointDefense()!=policy.tactics().pointDefense(),
                 "Point defense doctrine did not change");
