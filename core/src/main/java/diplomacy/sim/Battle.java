@@ -978,63 +978,24 @@ public final class Battle {
     private final Ship[][] expandedSpotters={new Ship[16],new Ship[16]};
     private final double[][] expandedNearest={new double[16],new double[16]};
     /**
-     * The expensive historical photon-arrival search is immutable while the
-     * sensor-history ring is unchanged. An observer/target pair can be queried
-     * multiple times per tick by SHR broadcast, captain acquisition and
-     * subsequent fire-control routing. Cache ONLY the raw causal observation:
-     * every caller still reevaluates present receiver power, hardware, weather,
-     * relay conditions and other authorization. Null observations are cached.
-     *
-     * Flat primitive stamps avoid 400x400 HashMap entries/boxing and are reused
-     * across ticks (about 1.3 MiB at the 400-ship fleet cap).
+     * Reuse only observations already produced by the current operation.
+     * A 400x400 epoch cache was slower in the measured 200v200 A/B and
+     * retained unnecessary observations on 16 MiB Android heaps.
+     * No global scan cache, per-pair allocation, or deferred authorization.
      */
-    private SensorLightTimeHistory.Observation[] photonCache=new SensorLightTimeHistory.Observation[0];
-    private int[] photonCacheStamp=new int[0];
-    private int photonCacheStride,photonCacheEpoch=1;
-    private long photonCacheHits,photonCacheMisses;
-    private boolean photonCacheEnabled=true;
-    private void invalidatePhotonCache(){
-        if(++photonCacheEpoch==0){
-            Arrays.fill(photonCacheStamp,0);
-            photonCacheEpoch=1;
-        }
-    }
-    /** Read-only counters for nonblocking 200v200 performance diagnostics. */
-    public long photonCacheHits(){return photonCacheHits;}
-    public long photonCacheMisses(){return photonCacheMisses;}
-    /** A/B only: compare exact full-battle fingerprints before and after caching. */
+    private boolean reusePhotonObservation=true;
+    private long reusedPhotonObservations,rawPhotonSearches;
+    private final Ship[] relayCandidates=new Ship[32];
+    private final double[] relayCandidateDistances=new double[32];
+    private final SensorLightTimeHistory.Observation[] relayCandidateObservations=
+            new SensorLightTimeHistory.Observation[32];
+    /** Diagnostic A/B counters: avoided repeat searches vs actual searches. */
+    public long photonCacheHits(){return reusedPhotonObservations;}
+    public long photonCacheMisses(){return rawPhotonSearches;}
+    /** Compare direct observation reuse against original redundant searches. */
     public void configurePhotonCacheForDiagnostic(boolean enabled){
-        if(tick!=0)throw new IllegalStateException("Configure photon cache before combat");
-        photonCacheEnabled=enabled;
-        invalidatePhotonCache();
-    }
-    private SensorLightTimeHistory.Observation historicalPhotonObservation(
-            Ship source,Ship target){
-        if(!photonCacheEnabled){
-            photonCacheMisses++;
-            return SensorLightTimeHistory.receive(source,target,tick,
-                    CONTACT_OPTICAL|CONTACT_RADAR|CONTACT_INFRARED|
-                            CONTACT_XRAY|CONTACT_GRAVITIC,0);
-        }
-        if(photonCacheStride!=nextId){
-            int slots=Math.multiplyExact(nextId,nextId);
-            photonCache=new SensorLightTimeHistory.Observation[slots];
-            photonCacheStamp=new int[slots];
-            photonCacheStride=nextId;
-            photonCacheEpoch=1;
-        }
-        int index=source.id*photonCacheStride+target.id;
-        if(photonCacheStamp[index]==photonCacheEpoch){
-            photonCacheHits++;
-            return photonCache[index];
-        }
-        photonCacheMisses++;
-        SensorLightTimeHistory.Observation result=SensorLightTimeHistory.receive(
-                source,target,tick,CONTACT_OPTICAL|CONTACT_RADAR|
-                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0);
-        photonCache[index]=result;
-        photonCacheStamp[index]=photonCacheEpoch;
-        return result;
+        if(tick!=0)throw new IllegalStateException("Configure photon reuse before combat");
+        reusePhotonObservation=enabled;
     }
     /** Configure preordered scan doctrine without changing shipyard save IDs.
      * Later ship-order integration will serialize these policy selections. */
@@ -1772,7 +1733,6 @@ public final class Battle {
     public void step() {
         if(unresolved())return;
         tick++;
-        invalidatePhotonCache();
         // All active vessels enter contact and environmental simulation in
         // the same immutable world, including externally issued coordinates.
         containFleet();
@@ -2526,9 +2486,6 @@ public final class Battle {
     /** One fixed-capacity historical snapshot per ship each simulation tick. */
     private void captureSensorHistory(long observedTick){
         for(Ship ship:ships)ship.sensorHistory.capture(observedTick,ship);
-        // The new sensor snapshot changes which photon fix is eligible when
-        // tactical HUD queries immediately after a completed battle tick.
-        invalidatePhotonCache();
     }
 
     /** Local sensors read only arrived historical light. Remote ships read
@@ -2552,8 +2509,10 @@ public final class Battle {
         // All five historical candidates are evaluated independently against
         // the actual reflected/received profiles after photon delay is solved.
         // Current enemy signature and position are not an eligibility gate.
-        SensorLightTimeHistory.Observation candidate=
-                historicalPhotonObservation(source,target);
+        rawPhotonSearches++;
+        SensorLightTimeHistory.Observation candidate=SensorLightTimeHistory.receive(
+                source,target,tick,CONTACT_OPTICAL|CONTACT_RADAR|
+                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0);
         if(candidate==null)return null;
         int valid=candidate.channels()&historicalSensorChannels(
                 source,target,candidate);
@@ -2665,8 +2624,10 @@ public final class Battle {
         // Preserve the legacy no-weather short-radio behavior, but real
         // equipped datalinks and tracking processors must work in CLEAR space.
         boolean legacyRelay=weather.preset().enabled();
-        Ship[] selected=new Ship[32];
-        double[] distances=new double[32];
+        // Reuse tiny fixed scratch arrays instead of allocating 400x contacts.
+        Ship[] selected=relayCandidates;
+        double[] distances=relayCandidateDistances;
+        SensorLightTimeHistory.Observation[] observations=relayCandidateObservations;
         for(Ship scout:ships){
             if(!scout.alive()||scout.power<=3||scout.crewReadiness()<.05)continue;
             if(!legacyRelay && scout.network.sharingCapacity()<=0
@@ -2682,6 +2643,7 @@ public final class Battle {
             if(broadcastCapacity>0){
                 Arrays.fill(selected,0,broadcastCapacity,null);
                 Arrays.fill(distances,0,broadcastCapacity,Double.POSITIVE_INFINITY);
+                Arrays.fill(observations,0,broadcastCapacity,null);
             }
             for(Ship hostile:ships){
                 if(!hostile.alive()||hostile.team==scout.team)continue;
@@ -2703,8 +2665,10 @@ public final class Battle {
                     for(int n=broadcastCapacity-1;n>k;n--){
                         distances[n]=distances[n-1];
                         selected[n]=selected[n-1];
+                        observations[n]=observations[n-1];
                     }
                     distances[k]=d2;selected[k]=hostile;
+                    observations[k]=sensed;
                     break;
                 }
             }
@@ -2715,9 +2679,12 @@ public final class Battle {
             for(int k=0;k<broadcastCapacity;k++){
                 Ship hostile=selected[k];
                 if(hostile==null)break;
-                SensorLightTimeHistory.Observation received=
-                        receivedContact(scout,hostile,scout);
+                // The exact causal fix was already received during selection.
+                // A/B diagnostics retain the prior duplicate query path.
+                SensorLightTimeHistory.Observation received=reusePhotonObservation
+                        ?observations[k]:receivedContact(scout,hostile,scout);
                 if(received==null)continue;
+                if(reusePhotonObservation)reusedPhotonObservations++;
                 boolean fitted=capacity>0&&fittedRemaining>0;
                 // Legacy short-radio weather reports stay independent and
                 // cannot conjure paid SHR false-contact bandwidth.
@@ -2791,6 +2758,10 @@ public final class Battle {
         // A direct observation can be visible even if the enemy has moved
         // beyond the sensor's present-day reach while its photons are enroute.
         if(receivedContact(actor,hostile,actor)!=null)return actor;
+        return remoteContactSource(actor,hostile);
+    }
+    /** The unchanged remote-authorization path after local photons fail. */
+    private Ship remoteContactSource(Ship actor,Ship hostile){
         if(actor.power<=3||actor.crewReadiness()<.05)return null;
         Ship[] contacts=sharedSpotters[actor.team];
         if(hostile.id>=contacts.length)return null;
@@ -2827,7 +2798,24 @@ public final class Battle {
      * Stored last-known fixes remain navigational and never satisfy this gate. */
     private SensorLightTimeHistory.Observation authorizedContact(
             Ship actor,Ship hostile,double estimatedDistance){
-        Ship source=liveContactSource(actor,hostile,estimatedDistance);
+        if(!reusePhotonObservation){
+            Ship source=liveContactSource(actor,hostile,estimatedDistance);
+            SensorLightTimeHistory.Observation arrived=
+                    receivedContact(actor,hostile,source);
+            if(arrived!=null)rememberTrack(actor,hostile,arrived);
+            return arrived;
+        }
+        // The old path searched the same historical sensor ring twice on
+        // every direct lock: first to select the source, then to retrieve
+        // the very same arrival. Preserve the valid fix, with no new oracle.
+        SensorLightTimeHistory.Observation direct=
+                receivedContact(actor,hostile,actor);
+        if(direct!=null){
+            reusedPhotonObservations++;
+            rememberTrack(actor,hostile,direct);
+            return direct;
+        }
+        Ship source=remoteContactSource(actor,hostile);
         SensorLightTimeHistory.Observation arrived=
                 receivedContact(actor,hostile,source);
         if(arrived!=null)rememberTrack(actor,hostile,arrived);
