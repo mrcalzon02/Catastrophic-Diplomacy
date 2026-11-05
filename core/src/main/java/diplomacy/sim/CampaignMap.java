@@ -35,8 +35,12 @@ public final class CampaignMap {
         for(int index=0;index<PAGE_SIZE;index++){
             int level=page*PAGE_SIZE+index+1;
             LevelEconomy.Level stage=LevelEconomy.level(level);
-            float x=MAP_X[index];
-            float y=MAP_Y[index];
+            // Vary each strategic front without losing readable separation or hit targets.
+            long variation=LevelSky.mix(stage.seed());
+            float x=page==PAGE_COUNT-1?122+index*76:
+                    MAP_X[index]+(((variation>>>10)&31)-15);
+            float y=page==PAGE_COUNT-1?334+(((variation>>>19)&63)-31):
+                    MAP_Y[index]+(((variation>>>18)&31)-15);
             CampaignOpposition.Operation operation=CampaignOpposition.operation(level);
             // Geographic name is authored independently from battle operation.
             // Preserve the operation suffix for readability and existing UI.
