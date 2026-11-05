@@ -29,6 +29,7 @@ final class ModularWeaponFxRenderer implements Disposable {
     private final Map<String,Texture> textures=new HashMap<>();
     private final Set<String> absent=new HashSet<>();
     private final List<OneShot> oneShots=new ArrayList<>();
+    private final ShortProjectileFlight shortFlights=new ShortProjectileFlight();
     private final LaserRun01Fx lasers=new LaserRun01Fx();
     private final OrdnanceLibrarySprites missileLibrary=new OrdnanceLibrarySprites();
     private Battle trackedBattle;
@@ -137,12 +138,17 @@ final class ModularWeaponFxRenderer implements Disposable {
             trackedBattle=battle;
             lastSequence=0;
             oneShots.clear();
+            shortFlights.reset();
         }
+        shortFlights.beginTick(battle.tick);
         // Visual history is bounded in core. If rendering skips simulation ticks,
         // event sequence IDs still let us consume every retained event exactly once.
         for(Battle.VisualEvent event:battle.visualEvents()) {
             if(event.sequence()<=lastSequence)continue;
             lastSequence=event.sequence();
+            // Paired FIRE/terminal records allow real within-tick movement
+            // to remain observable even if the physical shot is already gone.
+            shortFlights.consume(event);
             Profile profile=WeaponFxProfile.forWeapon(event.weapon());
             if(profile==null)continue;
             Clip clip=switch(event.phase()){
@@ -217,6 +223,12 @@ final class ModularWeaponFxRenderer implements Disposable {
         // Local FIRING and terminal IMPACT/INTERCEPT are separate, independent clips.
         for(OneShot shot:oneShots){
             Battle.VisualEvent event=shot.event();
+            // The already-resolved hit is replayed along its real physical
+            // flight first. Do not flash the same-tick impact at the muzzle.
+            if(poses!=null&&shortFlights.has(event.shotId(),event.tick())&&
+                    (event.phase()==Battle.VisualPhase.IMPACT||
+                     event.phase()==Battle.VisualPhase.INTERCEPT)&&
+                    poses.fraction()<.80f)continue;
             if(lasers.handlesFire(event))continue; // Full authored shot replaces old muzzle cutout.
             if(view!=null&&!view.circle(event.x(),event.y(),
                     Math.max(shot.clip().width(),shot.clip().height())*.5f))continue;
@@ -246,6 +258,30 @@ final class ModularWeaponFxRenderer implements Disposable {
                     shot.clip().width()*size,shot.clip().height()*size,angle);
             if(laser!=null)batch.setColor(1,1,1,1);
         }
+        // Physical rounds created and removed during a single tick do not
+        // exist in battle's live projectile list. Reuse only authored
+        // projectile sprites and their REAL FIRE/terminal positions.
+        if(poses!=null&&poses.fraction()<1f)
+            for(ShortProjectileFlight.Path path:shortFlights.flights()){
+                ShortProjectileFlight.Point point=ShortProjectileFlight.at(
+                        path,poses.fraction());
+                if(view!=null&&!view.circle(point.x(),point.y(),8))continue;
+                boolean guided=path.weapon().equals("ROCKET")||
+                        path.weapon().equals("MISSILE")||
+                        path.weapon().equals("TORPEDO")||
+                        path.weapon().equals("DECOY")||
+                        path.weapon().endsWith("_MISSILE");
+                TextureRegion[] atlas=guided?missileBodies():kineticBodies();
+                if(atlas==null)continue;
+                int cell=path.weapon().equals("RAIL_PD")?4:0;
+                if(cell>=atlas.length)continue;
+                float angle=(float)Math.toDegrees(Math.atan2(
+                        path.toY()-path.fromY(),path.toX()-path.fromX()));
+                float width=guided?11f:path.weapon().equals("RAIL_PD")?13f:8f;
+                float height=guided?5f:3f;
+                drawCentered(batch,atlas[cell],point.x(),point.y(),
+                        width,height,angle);
+            }
         // Guided PAYLOAD uses the real physical body's type, fitted payload,
         // warhead, and LIVE motor phase—not one universal missile image.
         for(Battle.Missile missile:battle.missiles()){
@@ -401,7 +437,8 @@ final class ModularWeaponFxRenderer implements Disposable {
     int loadedTextures(){return textures.size();}
     @Override public void dispose(){
         for(Texture value:textures.values())value.dispose();
-        textures.clear();absent.clear();oneShots.clear();trackedBattle=null;lastSequence=0;
+        textures.clear();absent.clear();oneShots.clear();shortFlights.reset();
+        trackedBattle=null;lastSequence=0;
         curatedMissileBodies=null;rejectedMissileAtlas=false;
         lasers.dispose();
         missileLibrary.dispose();

@@ -165,6 +165,31 @@ public final class BattleRenderPosesTest {
                 "SHIP|11|0|TERRAN|7|5|0|100|10|10|10|10"));
         close(remote.pose(11).x(),7,"session restart resets network tracking");
         check(remote.tracked()==1,"old ship tracks leaked across restarted session");
-        System.out.println("PASS low-speed muzzle, Hermite ship continuity, camera easing, network 10Hz tween, pause/resume and catch-up");
+        // A short-lived real rail/kinetic shot can launch and impact inside
+        // one 30Hz step: the live projectile list will never expose it.
+        // Drive the visual path only from authoritative paired event positions.
+        ShortProjectileFlight shortLife=new ShortProjectileFlight();
+        shortLife.beginTick(40);
+        shortLife.consume(new Battle.VisualEvent(1,9001,40,
+                Battle.VisualPhase.FIRE,"RAIL_PD",0,1,2,
+                100,200,250,200));
+        shortLife.consume(new Battle.VisualEvent(2,9001,40,
+                Battle.VisualPhase.IMPACT,"RAIL_PD",0,1,2,
+                140,200,140,200));
+        check(shortLife.flights().size()==1,"Same-tick real flight missing");
+        ShortProjectileFlight.Path segment=shortLife.flights().get(0);
+        close(ShortProjectileFlight.at(segment,0).x(),100,"real muzzle");
+        close(ShortProjectileFlight.at(segment,.5f).x(),120,"real midpoint");
+        close(ShortProjectileFlight.at(segment,1).x(),140,"real impact position");
+        check(shortLife.has(9001,40),"Real terminal event not paired");
+        shortLife.consume(new Battle.VisualEvent(3,9002,40,
+                Battle.VisualPhase.IMPACT,"KINETIC",0,1,2,
+                140,200,140,200));
+        check(shortLife.flights().size()==1,
+                "Orphan impact fabricated a moving projectile");
+        shortLife.beginTick(41);
+        check(shortLife.flights().isEmpty()&&!shortLife.has(9001,40),
+                "Old tick projectile trail leaked into the next tick");
+        System.out.println("PASS low-speed muzzle, Hermite ships, network 10Hz tween, same-tick real projectile flight and camera easing");
     }
 }

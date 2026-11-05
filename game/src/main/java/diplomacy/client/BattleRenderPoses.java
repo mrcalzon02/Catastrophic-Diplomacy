@@ -176,6 +176,8 @@ final class BattleRenderPoses {
         return blend(birth(rails.get(b.visualId),b.spawnTick,
                 b.startX,b.startY,current),current);
     }
+    /** The same fixed-tick fraction used by live hull/ordnance renderers. */
+    float fraction(){return fraction;}
     int trackedShips(){return ships.size();}
     int trackedMissiles(){return missiles.size();}
     int trackedRockets(){return rockets.size();}

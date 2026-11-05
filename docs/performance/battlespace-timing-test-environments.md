@@ -139,3 +139,22 @@ shortest angular arc.
 The existing `:game:renderPosesSmoke` now tests 10 Hz packet arrivals with
 60/30 FPS intermediate frames, reordered IDs, new arrivals, duplicate
 snapshots and session restart.
+
+## Stage 5 — high-speed projectiles that vanish within one tick
+
+A real rail, rotary, flak, kinetic, rocket or guided shot can be launched
+and physically destroyed between successive display frames. Interpolating
+only *live* projectile lists cannot show this flight because the projectile
+no longer exists at render time.
+
+`ShortProjectileFlight` pairs actual **FIRE** and **IMPACT/INTERCEPT/TIMEOUT**
+events with identical shot ID and authoritative tick, reconstructing only
+the recorded start-to-terminal segment for one presentation tick. It uses
+the existing kinetic/guided asset atlas, never creates a physical body,
+changes collision timing, or invents a target. The event-backed draw is
+bounded to 256 transients; more shots drop cosmetic replays only. Terminal
+impact art waits until the final part of that visual interval instead of
+appearing before the visible projectile arrives.
+
+The shared `:game:renderPosesSmoke` covers a real segment's endpoints,
+intermediate position, orphan terminal rejection and tick expiry.
