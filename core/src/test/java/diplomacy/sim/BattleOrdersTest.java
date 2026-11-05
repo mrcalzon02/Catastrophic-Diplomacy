@@ -277,10 +277,26 @@ public final class BattleOrdersTest {
                 "Hold-firing-range policy failed fleet order save roundtrip");
     }
 
+    /** FREE searchers circle a reached rally point while contact is absent. */
+    private static void checkMovingWithoutContact(){
+        Battle b=new Battle(34421);
+        Battle.Ship searcher=b.addShip(0,Battle.Faction.TERRAN,545,445);
+        b.addShip(1,Battle.Faction.DRAXIAN,2000,1200);
+        searcher.sensorRange=0;
+        searcher.infraredRange=searcher.xrayRange=searcher.graviticRange=0;
+        double fuel=searcher.fuel;
+        for(int t=0;t<210;t++)b.step();
+        check(searcher.lastTargetId==0,"Contactless patrol saw a phantom enemy");
+        check(StrictMath.hypot(searcher.x-545,searcher.y-445)>.1,
+                "Default search stopped within rally-point tolerance");
+        check(searcher.fuel<fuel,"Mobile patrol obtained free thrust");
+    }
+
     public static void main(String[] args){
         checkFreeMovement();
         checkMobilePostures();
         checkHoldFiringRange();
+        checkMovingWithoutContact();
         checkResourceOrders();
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,

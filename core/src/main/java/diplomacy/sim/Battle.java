@@ -2136,15 +2136,18 @@ public final class Battle {
         }
         boolean hold=ship.orders.position()==BattleOrders.Position.HOLD
                 ||ship.orders.position()==BattleOrders.Position.HOLD_RANGE;
-        boolean thrust=!hold && ship.fuel>0 && ship.engineCondition>0.01
-                && ship.crewReadiness()>0 &&
-                StrictMath.hypot(rallyX-ship.x,rallyY-ship.y)>45;
-        if(thrust) {
-            steerToward(ship,rallyX,rallyY);
-        } else {
-            // Braking is powered thrust, never free drag in vacuum.
-            // A depleted hull coasts on the last real momentum.
+        if(hold){
+            // Only an explicit standing hold may park a search vessel.
             thrust(ship,0,0);
+        }else if(StrictMath.hypot(rallyX-ship.x,rallyY-ship.y)>45){
+            steerToward(ship,rallyX,rallyY);
+        }else{
+            // Orbit a reached patrol fix instead of braking while the search
+            // timer waits for the next sector: no free acceleration or fuel.
+            double dx=ship.x-rallyX,dy=ship.y-rallyY;
+            double hand=(ship.id&1)==0?1.0:-1.0;
+            steerToward(ship,ship.x-dy*hand+hand*30,
+                    ship.y+dx*hand+30);
         }
     }
 
