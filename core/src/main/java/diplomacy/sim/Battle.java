@@ -3029,8 +3029,9 @@ public final class Battle {
         }
         for(Ship target:ships){
             if(target.team==team||!target.alive())continue;
-            double distance=StrictMath.hypot(viewer.x-target.x,viewer.y-target.y);
-            Ship source=liveContactSource(viewer,target,distance);
+            // No present-position distance can be used for a received
+            // light-time contact; this argument is deliberately ignored.
+            Ship source=liveContactSource(viewer,target,0);
             if(source==null)continue;
             // Source selection already requires genuinely arrived measured
             // sensor channels, not an instant current-position precheck.
@@ -3087,16 +3088,22 @@ public final class Battle {
                 actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
             Ship choice = null;
             double best = Double.POSITIVE_INFINITY;
+            // This observer's fitted tracking precision is fixed during
+            // target selection; do not recompute it for 200 enemy candidates.
+            double uncertaintyDenominator=
+                    1+actor.commanderSkill*.4+tacticalPrecision(actor);
             for (Ship s : ships) if (s.team != actor.team && s.alive()) {
-                double routeDistance=StrictMath.hypot(s.x-actor.x,s.y-actor.y);
+                // The old current-position distance argument was ignored by
+                // liveContactSource. Avoid a costly, omniscient hypot that
+                // cannot authorize a causal contact anyway.
                 SensorLightTimeHistory.Observation contact=
-                        authorizedContact(actor,s,routeDistance);
+                        authorizedContact(actor,s,0);
                 if(contact==null)continue;
                 // Target preference cannot rank by an as-yet unseen trajectory.
                 double distance=StrictMath.hypot(
                         contact.sample().x()-actor.x,contact.sample().y()-actor.y);
                 double estimationError = (random.nextDouble() - 0.5) * 0.52 /
-                        (1+actor.commanderSkill*.4+tacticalPrecision(actor));
+                        uncertaintyDenominator;
                 double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
                 if (assessed < best) { best = assessed; choice = s; }
             }
@@ -3105,6 +3112,8 @@ public final class Battle {
         }
         BattleOrders.Orders orders=actor.orders;
         Ship choice=null;double best=Double.POSITIVE_INFINITY;
+        double uncertaintyDenominator=
+                1+actor.commanderSkill*.4+tacticalPrecision(actor);
         // Gather protected assets once per acting ship, never for each hostile
         // candidate: 200v200 targeting must not grow into a quadratic ally scan.
         java.util.ArrayList<Integer> guardedIds=new java.util.ArrayList<>(5);
@@ -3128,15 +3137,14 @@ public final class Battle {
         for(Ship candidate:ships)if(candidate.team!=actor.team&&candidate.alive()){
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
-            double routeDistance=StrictMath.hypot(
-                    candidate.x-actor.x,candidate.y-actor.y);
+            // liveContactSource ignores the enemy's current position.
             SensorLightTimeHistory.Observation contact=
-                    authorizedContact(actor,candidate,routeDistance);
+                    authorizedContact(actor,candidate,0);
             if(contact==null)continue;
             double distance=StrictMath.hypot(contact.sample().x()-actor.x,
                     contact.sample().y()-actor.y);
             double error=(random.nextDouble()-.5)*.52/
-                    (1+actor.commanderSkill*.4+tacticalPrecision(actor));
+                    uncertaintyDenominator;
             double assessed=distance*(1+error)*100.0/classOrder.priority()
                     +candidate.combatReadiness()*32;
             if(actor.standingOrders!=null &&

@@ -3,6 +3,12 @@ package diplomacy.sim;
 /** Bounded immutable physical target history; no future-time truth in telemetry. */
 public final class SensorLightTimeHistory {
     public static final int CAPACITY=128;
+    // Fixed by the arena dimensions and immutable light propagation speed.
+    // Recomputing the same StrictMath bound for every observer/target pair
+    // caused unnecessary work in 200v200 sensor sweeps.
+    private static final int ONE_WAY_SEARCH_LIMIT=
+            StrictMath.min(CAPACITY-1,
+                    propagationTicks(WorldScale.DIAGONAL_WORLD_UNITS)+2);
     private final Sample[] samples=new Sample[CAPACITY];
     /** Physical/EM sensor signatures and actual installed receiver capabilities
      * at the same tick as each motion sample. Never substituted with current
@@ -90,9 +96,7 @@ public final class SensorLightTimeHistory {
         int active=hardwareChannels&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY);
         Sample passiveFix=null,activeFix=null;
         long activeEmission=-1;
-        int oneWayLimit=StrictMath.min(CAPACITY-1,
-                propagationTicks(WorldScale.DIAGONAL_WORLD_UNITS)+2);
-        for(int age=0;age<=oneWayLimit&&age<=sensorTick;age++){
+        for(int age=0;age<=ONE_WAY_SEARCH_LIMIT&&age<=sensorTick;age++){
             long reflectedTick=sensorTick-age;
             Sample reflected=target.sensorHistory.at(reflectedTick);
             if(reflected==null||!reflected.alive())continue;

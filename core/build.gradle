@@ -431,6 +431,12 @@ tasks.register('massMixedOnlySmoke', JavaExec) {
     args '--mixed-only'
     dependsOn testClasses
 }
+// The focused release-blocker workflow explicitly runs massMixedOnlySmoke.
+// Execute the real cache-on/off fingerprint A/B there, not only in a future
+// full gameFlowSmoke build.
+tasks.named('massMixedOnlySmoke') {
+    dependsOn(tasks.named('photonCacheParitySmoke'))
+}
 tasks.register('battleViewSmoke', JavaExec) {
     group = 'verification'
     description = 'Validate live vessel positions under the HUD in 1v1..200v200 and moving battles.'
