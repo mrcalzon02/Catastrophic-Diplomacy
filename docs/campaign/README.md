@@ -1,6 +1,6 @@
 # The War That Negotiated Itself — campaign production desk
 
-The canonical narrative package for **Catastrophic Diplomacy** is organized here. The underlying battle simulator still operates on 500 sequential missions, fifty ten-system fronts, ten fifty-mission sectors, an eleven-faction opposition roster and Tech 0–IX. New story geography has been surfaced in the real in-game campaign map; voice scripts are **written but unrecorded and not yet wired into playback**.
+The canonical narrative package for **Catastrophic Diplomacy** is organized here. The battle simulator runs 500 persistent missions in fifty ten-system fronts, organized into ten fifty-mission story chapters, with eleven opposing factions and Tech 0–IX. Each front now has three playable routes, with an operation that converges them into the next front. New story geography has been surfaced in the real in-game campaign map; voice scripts are **written but unrecorded and not yet wired into playback**.
 
 ![The ten-region strategic campaign route](GALACTIC_ROUTE.svg)
 
@@ -8,7 +8,7 @@ The canonical narrative package for **Catastrophic Diplomacy** is organized here
 
 1. [STORY_BIBLE.md](STORY_BIBLE.md) — rules of the fictional universe, characters, diplomacy, stakes, 10 arcs, hidden reveal timeline, finale
 2. [GALACTIC_ROUTE.svg](GALACTIC_ROUTE.svg) — large editable strategic schematic of 10 regions and 50 fronts (gold nodes = capital fronts)
-3. [ATLAS_500.json](ATLAS_500.json) — **500 unique named mission sites**, exact sequential links, proposed 250 reversible schematic side-lane connections, strategic coordinates, faction opposition, enemy ceiling, ship cap, waves, proposed fiction objective and chapter clear discovery
+3. [ATLAS_500.json](ATLAS_500.json) — **500 unique named mission sites**, narrative site locations and 250 originally proposed schematic side-lane connections (the executable three-lane unlock graph now lives in Java), strategic coordinates, faction opposition, enemy ceiling, ship cap, waves, proposed fiction objective and chapter clear discovery
 4. [scripts/VOLUME_01_BORDER_SIGNALS.md](scripts/VOLUME_01_BORDER_SIGNALS.md) — recording-ready opening and missions 001–010
 5. [scripts/CHAPTERS_AND_FRONTS.md](scripts/CHAPTERS_AND_FRONTS.md) — recording-ready openings/transitions/conclusions for all 50 fronts
 6. [scripts/VOLUME_10_FINAL_OFFENSIVE.md](scripts/VOLUME_10_FINAL_OFFENSIVE.md) — recording-ready final seven mass battles, epilogue and optional endings
@@ -17,11 +17,13 @@ The canonical narrative package for **Catastrophic Diplomacy** is organized here
 
 ## Domain-map design contracts
 
-The main story route must always proceed **001 → 002 → … → 500** until actual alternate-path unlocking is engineered. Every ten missions form a front; every fifth front culminates in a sector capital. The 250 side-lane segments in the data illustrate plausible local routes but **are not implemented alternate mission unlocks**. Keep the global strategic coordinates separate from the live battlefield's renderer coordinates, and do not assume that listed weather, traffic, sanctuaries or archived evidence are physically instantiated objects.
+**Executable route contract:** Fifty fronts each contain ten selectable missions. Mission 1 of a front is an entry operation; completing it opens three optional lanes (offsets 2, 5, and 8). Two crossing connections allow players to change approaches. The convergence operation (offset 10) requires at least five distinct first-clears in that front and a completed terminal branch mission (offset 4, 7, or 9). Completing it unlocks the next front. Cleared missions remain replayable, uncleared alternatives keep their full first-clear rewards, and the final seven fleet battles (494–500) remain sequential for the scripted finale. Every five fronts are a chapter; each chapter has fifty authored missions. This is gameplay navigation, not a ten-point tutorial railroad.
+
+`CampaignMap.links()` and `CampaignProgress.State.available()` are the executable route authorities. The atlas JSON's older side-lane sketches are **reference geometry only**, not a complete mirror of current unlock rules. Version-5 campaign saves record all 500 individual clear flags, and versions 1–4 are migrated with their previously unlocked linear clears retained. Keep global strategic coordinates distinct from battlefield renderer coordinates, and do not assume listed weather, traffic, sanctuaries or archived evidence are instantiated objects.
 
 The `opponent`, `operation`, `enemy_tier`, `fleet_cap` and `waves` in the JSON are snapshot annotations calculated from the existing campaign rules, not a second runtime authority. Java is the executable authority. Changing the Java campaign formulas without regenerating/reviewing the annotations makes them stale. All proposed fiction objectives must remain visually distinguished from the current **destroy every mandatory hostile wave** victory condition.
 
-`CampaignStoryAtlas.java` is the small native Java lookup used for names, regions and front mandates. `CampaignMap.page` still supplies the familiar ten connected system nodes and faction-dependent enemy fittings. `GameMenuPanel` displays concise region, location and front purpose without changing touch target geometry or campaign unlock behavior.
+`CampaignStoryAtlas.java` is the small native Java lookup used for names, regions and front mandates. `CampaignMap.page` now supplies the three-lane ten-node network per front and faction-dependent enemy fittings. `GameMenuPanel` shows reachable, completed and locked nodes based on real individual clears while preserving the existing touch target geometry.
 
 ## Narrative release and voice policy
 
