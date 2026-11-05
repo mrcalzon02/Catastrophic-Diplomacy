@@ -53,6 +53,8 @@ final class CombatDiagnosticRecorder {
         recording=true;
     }
     void stop(){recording=false;}
+    /** Resume after ZIP export failure without discarding the rolling evidence. */
+    void resume(){recording=true;}
     void frame(long tick,double wallSeconds,long cpuNs,long simNs,
                double p95Ms,float requested,float effective,
                int ships,int craft,int ordnance,int draws,int binds){
