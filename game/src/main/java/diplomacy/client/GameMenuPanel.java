@@ -1219,7 +1219,7 @@ final class GameMenuPanel {
                             1057,532,Color.WHITE);
                     String[] names={"MUSIC: "+(music?"ON":"OFF"),
                             "SOUND EFFECTS: "+(effects?"ON":"OFF"),
-                            "SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),
+                            "SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),
                             updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
                             "DEV", "BACK"};
                     for(int i=0;i<names.length;i++)
@@ -1232,7 +1232,7 @@ final class GameMenuPanel {
                 label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",817,598,Color.WHITE);
                 label(batch,font,"MUSIC: "+(music?"ON":"OFF"),445,510,Color.WHITE);
                 label(batch,font,"SOUND EFFECTS: "+(effects?"ON":"OFF"),445,432,Color.WHITE);
-                label(batch,font,"SOUNDTRACK: "+(trackFinal?"FINAL SURGE":"COLD DRONE"),445,354,Color.WHITE);
+                label(batch,font,"SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),445,354,Color.WHITE);
                 label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",445,276,
                         updaterAvailable?Color.WHITE:MUTED);
                 label(batch,font,"DEV",445,198,Color.WHITE);

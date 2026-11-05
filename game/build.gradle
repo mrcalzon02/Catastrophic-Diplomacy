@@ -30,6 +30,15 @@ tasks.register('spatialAudioSmoke', JavaExec) {
 }
 tasks.named('audioSmoke') { finalizedBy(tasks.named('spatialAudioSmoke')) }
 
+tasks.register('battlePlaylistSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify shuffled complete battle tracks, exhaustion, and no adjacent repeats.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.BattleMusicPlaylistTest'
+}
+tasks.named('audioSmoke') { dependsOn tasks.named('battlePlaylistSmoke') }
+
 tasks.register('menuFlowSmoke', JavaExec) {
     group = 'verification'
     description = 'Verify playable main-menu, skirmish, campaign faction and star-map touch routing.'

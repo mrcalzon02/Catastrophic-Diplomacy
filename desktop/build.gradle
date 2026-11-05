@@ -64,14 +64,16 @@ tasks.named('jar') {
         new java.util.zip.ZipFile(packaged).withCloseable { zip ->
             [
                 'audio/music/cold_unresolved_drone.mp3': 3558384L,
-                'audio/music/final_surge.mp3': 2686806L
+                'audio/music/final_surge.mp3': 2686806L,
+                'audio/music/final_strike.mp3': 4195125L,
+                'audio/music/of_ash.mp3': 4319689L
             ].each { name, expectedBytes ->
                 def entry = zip.getEntry(name)
                 if (entry == null || entry.size != expectedBytes)
                     throw new GradleException('Desktop JAR missing required soundtrack: ' + name)
             }
         }
-        println 'PASS desktop JAR contains both original, source-verified soundtracks'
+        println 'PASS desktop JAR contains four source-verified soundtracks'
     }
 }
 

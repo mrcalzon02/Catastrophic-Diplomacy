@@ -5,7 +5,9 @@ import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
 import diplomacy.sim.Battle;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -29,7 +31,15 @@ public final class CombatAudio implements AutoCloseable {
     private boolean radioFlip;
     private int radioVoiceSourceId;
     private Preferences prefs;
-    private Music battleMusic, ambientMusic, activeMusic;
+    private static final String[] BATTLE_MUSIC_PATHS = {
+        "audio/music/final_surge.mp3",
+        "audio/music/final_strike.mp3",
+        "audio/music/of_ash.mp3"
+    };
+    private final List<Music> battleTracks = new ArrayList<>();
+    private BattleMusicPlaylist battlePlaylist;
+    private Music ambientMusic, activeMusic;
+    private boolean closed;
     private long seenSequence;
     private int seenDestructions;
     private boolean musicOn = true, effectsOn = true, useBattleMusic = true;
@@ -67,8 +77,20 @@ public final class CombatAudio implements AutoCloseable {
         uiHoverSound=loadRadio("ui_hover");uiPressSound=loadRadio("ui_press");
         uiBackSound=loadRadio("ui_back");uiBlockedSound=loadRadio("ui_blocked");
         uiAdjustSound=loadRadio("ui_adjust");
-        ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3");
-        battleMusic = loadMusic("audio/music/final_surge.mp3");
+        ambientMusic = loadMusic("audio/music/cold_unresolved_drone.mp3", true);
+        for (String path : BATTLE_MUSIC_PATHS) {
+            Music track = loadMusic(path, false);
+            if (track != null) {
+                // Android's completion callback need not run on the render thread.
+                track.setOnCompletionListener(finished -> {
+                    if (Gdx.app != null)
+                        Gdx.app.postRunnable(() -> completedBattleTrack(finished));
+                });
+                battleTracks.add(track);
+            }
+        }
+        if (!battleTracks.isEmpty())
+            battlePlaylist = new BattleMusicPlaylist(battleTracks.size());
         switchTrack();
     }
 
@@ -92,12 +114,12 @@ public final class CombatAudio implements AutoCloseable {
             return null;
         }
     }
-    private Music loadMusic(String path) {
+    private Music loadMusic(String path, boolean looping) {
         try {
             if (!Gdx.files.internal(path).exists())
                 throw new IllegalStateException("Missing soundtrack: " + path);
             Music music = Gdx.audio.newMusic(Gdx.files.internal(path));
-            music.setLooping(true);
+            music.setLooping(looping);
             music.setVolume(musicVolume);
             return music;
         } catch (RuntimeException error) {
@@ -106,18 +128,39 @@ public final class CombatAudio implements AutoCloseable {
         }
     }
 
-    private void switchTrack() {
-        Music wanted = useBattleMusic ? battleMusic : ambientMusic;
-        if (wanted == null) wanted = useBattleMusic ? ambientMusic : battleMusic;
+    private Music nextBattleTrack() {
+        return battlePlaylist == null ? null : battleTracks.get(battlePlaylist.nextTrack());
+    }
+
+    private void startMusic(Music wanted) {
         if (activeMusic != wanted && activeMusic != null) activeMusic.stop();
         activeMusic = wanted;
-        if (activeMusic != null) {
-            activeMusic.setVolume(musicVolume);
-            if (musicOn && !suspended && !activeMusic.isPlaying()) {
-                try { activeMusic.play(); }
-                catch (RuntimeException error) { Gdx.app.error("AUDIO", "Music playback failed", error); }
-            }
+        if (wanted == null) return;
+        try {
+            wanted.setVolume(musicVolume);
+            if (musicOn && !suspended && !wanted.isPlaying()) wanted.play();
+        } catch (RuntimeException error) {
+            Gdx.app.error("AUDIO", "Music playback failed", error);
         }
+    }
+
+    private void completedBattleTrack(Music finished) {
+        if (closed || !musicOn || suspended || !useBattleMusic || activeMusic != finished) return;
+        Music next = nextBattleTrack();
+        if (next == finished) finished.stop(); // One surviving decoder: restart from zero.
+        startMusic(next == null ? ambientMusic : next);
+    }
+
+    private void switchTrack() {
+        Music wanted;
+        if (useBattleMusic) {
+            wanted = battleTracks.contains(activeMusic) ? activeMusic : nextBattleTrack();
+            if (wanted == null) wanted = ambientMusic;
+        } else {
+            wanted = ambientMusic != null ? ambientMusic :
+                    (battleTracks.contains(activeMusic) ? activeMusic : nextBattleTrack());
+        }
+        startMusic(wanted);
     }
 
     private void persist() {
@@ -295,6 +338,7 @@ public final class CombatAudio implements AutoCloseable {
     public void resume() { suspended = false; announcer.resume(); hullVoice.resume(); switchTrack(); }
 
     @Override public void close() {
+        closed = true;
         announcer.close();
         hullVoice.close();
         spatial.close();
@@ -308,7 +352,8 @@ public final class CombatAudio implements AutoCloseable {
         if (activeMusic != null) activeMusic.stop();
         for (Sound sound : cues.values()) sound.dispose();
         cues.clear();
-        if (battleMusic != null) battleMusic.dispose();
-        if (ambientMusic != null && ambientMusic != battleMusic) ambientMusic.dispose();
+        for (Music track : battleTracks) track.dispose();
+        battleTracks.clear();
+        if (ambientMusic != null) ambientMusic.dispose();
     }
 }

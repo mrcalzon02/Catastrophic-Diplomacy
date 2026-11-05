@@ -653,6 +653,56 @@ tasks.register('prepareMusicAssets') {
     }
 }
 
+
+/** Reconstruct additional user-sourced battle music from bounded Git transfer parts. */
+def additionalBattleMusic = [
+    [stem: 'final_strike', prefix: 'final-strike', count: 11, bytes: 4195125L,
+     sha256: 'b35c33b3d90631eb65868336908c12ff637c7c18bed0f175bb9c4f3a459d7b8e'],
+    [stem: 'of_ash', prefix: 'of-ash', count: 12, bytes: 4319689L,
+     sha256: 'd55d5009a22e42e56a62a7b0ee123bef43524fa19b9add4cd18de10d8dadf23f']
+]
+tasks.named('prepareMusicAssets') {
+    inputs.files additionalBattleMusic.collectMany { track ->
+        (0..<track.count).collect { i ->
+            file('asset_packs/music/' + track.prefix + '-' +
+                    String.format('%02d', i) + '.bin')
+        }
+    }
+    outputs.files additionalBattleMusic.collect { track ->
+        layout.buildDirectory.file('generated/cd-music/audio/music/' + track.stem + '.mp3')
+    }
+    doLast {
+        additionalBattleMusic.each { track ->
+            def parts = (0..<track.count).collect { i ->
+                file('asset_packs/music/' + track.prefix + '-' +
+                        String.format('%02d', i) + '.bin')
+            }
+            parts.each { part ->
+                if (!part.isFile()) throw new GradleException('Missing battle music part: ' + part)
+            }
+            def output = layout.buildDirectory.file(
+                    'generated/cd-music/audio/music/' + track.stem + '.mp3').get().asFile
+            output.parentFile.mkdirs()
+            output.withOutputStream { target ->
+                parts.each { part ->
+                    part.withInputStream { input -> input.transferTo(target) }
+                }
+            }
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            output.withInputStream { input ->
+                byte[] bytes = new byte[65536]
+                int n
+                while ((n = input.read(bytes)) != -1) digest.update(bytes, 0, n)
+            }
+            if (output.length() != track.bytes ||
+                    digest.digest().encodeHex().toString() != track.sha256) {
+                output.delete()
+                throw new GradleException('Battle music checksum mismatch: ' + track.stem)
+            }
+        }
+    }
+}
+
 /** Fail packaging when combat sound or soundtrack is missing. */
 tasks.register('verifyBattleAudioResources') {
     dependsOn tasks.named('prepareMusicAssets')
@@ -684,7 +734,13 @@ tasks.register('verifyBattleAudioResources') {
         if (sha.digest().encodeHex().toString() !=
                 'fd1c8c713604f9bbe8f93b37e324f0918f2ddd62e1dc3bdbb4bb3543a6217c87')
             throw new GradleException('Battle soundtrack checksum mismatch')
-        println('PASS: 10 combat/UI sound assets and two soundtrack recordings')
+        additionalBattleMusic.each { track ->
+            def generated = layout.buildDirectory.file(
+                    'generated/cd-music/audio/music/' + track.stem + '.mp3').get().asFile
+            if (!generated.isFile() || generated.length() != track.bytes)
+                throw new GradleException('Missing prepared battle soundtrack: ' + track.stem)
+        }
+        println('PASS: 10 combat/UI sound assets and four soundtrack recordings')
     }
 }
 

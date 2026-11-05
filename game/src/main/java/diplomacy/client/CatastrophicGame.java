@@ -2341,7 +2341,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 "RIGHT PD: "+fleetOrders[1].pointDefense().name().replace('_',' '),
                 "MUSIC: "+(audio.musicEnabled()?"ON":"MUTED")+" (U)",
                 "SOUND EFFECTS: "+(audio.effectsEnabled()?"ON":"MUTED")+" (I)",
-                "SOUNDTRACK: "+(audio.battleTrack()?"FINAL SURGE":"COLD DRONE")+" (J)",
+                "SOUNDTRACK: "+(audio.battleTrack()?"BATTLE MIX":"COLD DRONE")+" (J)",
                 "RETURN TO MAIN MENU"};
         // Semantic icons only, sourced from the approved 24-image selection.
         final String[] menuIcons={
