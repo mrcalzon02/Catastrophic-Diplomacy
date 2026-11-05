@@ -12,6 +12,8 @@ on:
       - 'game/src/main/java/diplomacy/client/CombatEventCursor.java'
       - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
       - 'game/src/main/java/diplomacy/client/LaserRun01Fx.java'
+      - 'game/src/main/java/diplomacy/client/VisualAtlasBuckets.java'
+      - 'game/src/test/java/diplomacy/client/LaserRun01FxTest.java'
       - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
       - 'game/src/main/java/diplomacy/client/CombatLightingModel.java'
       - 'game/src/main/java/diplomacy/client/CombatFrameContinuity.java'
@@ -46,7 +48,7 @@ jobs:
         id: fx
         continue-on-error: true
         run: |
-          gradle --no-daemon :game:combatHitFeedbackSmoke :game:lightingSmoke :game:combatPerformanceSmoke
+          gradle --no-daemon :game:combatHitFeedbackSmoke :game:lightingSmoke :game:combatPerformanceSmoke :game:laserFxDiagnostic
       - name: Preserve timing evidence
         if: always()
         uses: actions/upload-artifact@v4
