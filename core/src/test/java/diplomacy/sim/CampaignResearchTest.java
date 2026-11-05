@@ -126,6 +126,45 @@ public final class CampaignResearchTest {
                 "Tech IX campaign research was not persisted");
         reject(()->CampaignProgress.decode(CampaignProgress.encode(first).replace("TERRAN","DRAXIAN")),
                 "Corrupted research save checksum accepted");
-        System.out.println("PASS research: instant zero-floor, paid licenses/labs, four accelerators, quarter replays, v1-v4 saves");
+        // Branching is executable progression, not just lines drawn on the map.
+        var routes=CampaignMap.links(0);
+        check(routes.size()==13&&routes.stream().anyMatch(e->e.from()==1&&e.to()==8),
+                "Campaign atlas has no actual three-path route graph");
+        check(CampaignMap.links(49).size()==9,
+                "Final seven fleet engagements should remain a continuous finale");
+        var branch=CampaignProgress.start(Battle.Faction.TERRAN);
+        check(branch.available(1)&&!branch.available(2)&&!branch.available(5),
+                "An unstarted campaign exposed downstream branches");
+        branch=branch.complete(1,1,1);
+        check(branch.available(2)&&branch.available(5)&&branch.available(8)
+                &&!branch.available(3)&&!branch.available(10),
+                "Entry mission failed to unlock three distinct playable paths");
+        branch=branch.complete(8,1,1);
+        check(branch.available(9)&&branch.available(2)&&!branch.completed(2)
+                &&branch.highestCompleted()==8,
+                "Taking an alternate lane falsely cleared skipped missions");
+        check(CampaignProgress.decode(CampaignProgress.encode(branch)).equals(branch),
+                "Branch-specific clears did not survive a checksum save");
+        // Crossing from the first lane to the center does not require the whole front.
+        branch=branch.complete(2,1,1).complete(3,1,1).complete(4,1,1);
+        check(!branch.available(10),"Convergence finale unlocked without enough sorties");
+        branch=branch.complete(5,1,1);
+        check(branch.available(10),"Convergence finale remained locked after five clears");
+        branch=branch.complete(10,1,1);
+        check(branch.available(11)&&!branch.completed(9),
+                "Completing a front did not open next front or erased optional missions");
+        long full9=LevelEconomy.victoryCredits(LevelEconomy.level(9),1,1,true);
+        var optional=branch.complete(9,1,1);
+        check(optional.credits()-branch.credits()==full9,
+                "Skipped branch incorrectly paid replay credits");
+        check(optional.complete(9,1,1).credits()-optional.credits()==full9/4,
+                "Cleared branch incorrectly paid another first-clear reward");
+        var v4=CampaignProgress.decode(seal("CD-CAMPAIGN-4",
+                "TERRAN\\n6\\n1000\\n5\\n0\\n5\\n0\\nNONE\\n0\\n"));
+        check(v4.completed(1)&&v4.completed(5)&&!v4.completed(6),
+                "Legacy linear save did not migrate to mission-level clears");
+        check(!CampaignProgress.start(Battle.Faction.TERRAN).available(494),
+                "Final-battle corridor became accessible from a new campaign");
+        System.out.println("PASS research/branching: paid progression, three routes, individual first-clears, v1-v5 saves");
     }
 }
