@@ -362,6 +362,10 @@ final class ShipSurfaceLighting implements Disposable {
         if(!started)return;
         batch.end();
         batch.setShader(null);
+        // Lit sprites use packed heading/integrity data in their color
+        // vertices. It is not an ordinary RGB tint and must not escape
+        // into subsequent default-shader sprites (notably fitted turrets).
+        batch.setColor(1f,1f,1f,1f);
         active=null;activeDamage=null;underlayPass=false;started=false;flat=false;
     }
     /** Release an inactive original and its GPU materials after a completed frame. */
