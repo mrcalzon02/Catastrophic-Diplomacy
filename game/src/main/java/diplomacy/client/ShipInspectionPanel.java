@@ -1,5 +1,7 @@
 package diplomacy.client;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -15,7 +17,10 @@ import java.util.Locale;
  * Shared by skirmish, campaign and exhibition battle rendering.
  */
 final class ShipInspectionPanel {
-    static final float X=753f,Y=69f,W=515f,H=540f;
+    static final float X=753f,Y=58f,W=515f,H=551f;
+    static final float WEAPON_FIRST_Y=348f, WEAPON_ROW_STEP=23f;
+    static final float RANGE_BUTTON_X=1101f, RANGE_BUTTON_Y=389f;
+    static final float RANGE_BUTTON_W=158f, RANGE_BUTTON_H=27f;
     private static final int ALL_RANGES=127;
     private static final Battle.DamageType[] GUNS={
             Battle.DamageType.LASER,Battle.DamageType.KINETIC,
@@ -54,13 +59,15 @@ final class ShipInspectionPanel {
     }
     static int action(float x,float y){
         if(!contains(x,y))return -1;
-        if(x>=1210&&y>=565)return 1; // Close (also works at low DPI)
+        if(x>=1210&&y>=565)return 1; // Close
+        if(x>=RANGE_BUTTON_X&&x<=RANGE_BUTTON_X+RANGE_BUTTON_W
+                &&y>=RANGE_BUTTON_Y&&y<=RANGE_BUTTON_Y+RANGE_BUTTON_H)
+            return 2; // Toggle all range overlays
         for(int i=0;i<7;i++){
-            float baseline=375-i*23;
-            if(y>=baseline-15&&y<=baseline+7)return 10+i;
+            float baseline=WEAPON_FIRST_Y-i*WEAPON_ROW_STEP;
+            if(y>=baseline-17&&y<=baseline+7)return 10+i;
         }
-        if(y<104&&x>1090)return 2; // All ranges on/off
-        return 0; // Prevent tap-through into battle/menu HUD.
+        return 0; // Non-interactive inspection pixels must not fire world taps.
     }
     static int mobileAction(float x,float y,int page){
         if(x<615||x>1268||y<60||y>609)return -1;
@@ -194,34 +201,42 @@ final class ShipInspectionPanel {
         if(mobile){drawMobile(battle,shapes,batch,font);return;}
         Battle.Ship s=selected(battle);
         if(s==null)return;
+
+        // ShapeRenderer does not turn on alpha blending itself. Make the
+        // battlespace genuinely visible through this inspection overlay.
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA,GL20.GL_ONE_MINUS_SRC_ALPHA);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(.025f,.045f,.075f,.96f);
+        shapes.setColor(.018f,.028f,.045f,.42f);
         shapes.rect(X,Y,W,H);
-        shapes.setColor(.11f,.23f,.33f,1f);
+        shapes.setColor(.10f,.20f,.27f,.34f);
         shapes.rect(X,Y+H-49,W,49);
-        shapes.setColor(.17f,.26f,.34f,1f);
+        shapes.setColor(.17f,.26f,.34f,.65f);
         shapes.rect(1210,568,49,35);
+
+        // Three slim meters sit BELOW their corresponding text baselines,
+        // instead of running through the text as in the original HUD.
         for(int i=0;i<3;i++){
-            float y=527-i*27;
+            float y=487-i*27;
             bar(shapes,772,y,218,
                     i==0?s.hull:i==1?s.shields:s.armor,
                     i==0?s.maxHull:i==1?s.maxShields:s.maxArmor,
                     i==0?Color.ORANGE:i==1?Color.CYAN:Color.GOLD);
         }
         for(int i=0;i<7;i++){
-            float y=375-i*23;
-            if((i&1)==0){
-                shapes.setColor(.07f,.12f,.18f,.86f);
-                shapes.rect(762,y-16,497,23);
-            }
+            float y=WEAPON_FIRST_Y-i*WEAPON_ROW_STEP;
+            shapes.setColor(.07f,.12f,.18f,(i&1)==0?.41f:.22f);
+            shapes.rect(762,y-17,497,23);
             if(enabled(i)){
-                Color c=COLORS[i];shapes.setColor(c.r,c.g,c.b,.95f);
-                shapes.rect(764,y-13,4,18);
+                Color c=COLORS[i];
+                shapes.setColor(c.r,c.g,c.b,.88f);
+                shapes.rect(764,y-14,4,18);
             }
         }
-        shapes.setColor(.13f,.26f,.33f,.95f);
-        shapes.rect(1101,76,156,30);
+        shapes.setColor(.13f,.26f,.33f,.68f);
+        shapes.rect(RANGE_BUTTON_X,RANGE_BUTTON_Y,RANGE_BUTTON_W,RANGE_BUTTON_H);
         shapes.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
 
         batch.begin();
         font.setColor(Color.WHITE);
@@ -231,33 +246,41 @@ final class ShipInspectionPanel {
                 "  /  #"+s.id+"  /  "+(s.alive()?"ACTIVE":"DESTROYED"),769,564);
         font.setColor(Color.WHITE);
         font.draw(batch,"X",1227,594);
-        font.setColor(Color.CYAN);
-        font.draw(batch,"DEFENSE",772,550);
-        font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch,stat("HULL",s.hull,s.maxHull),773,539);
-        font.draw(batch,stat("SHIELD",s.shields,s.maxShields),773,512);
-        font.draw(batch,stat("ARMOR",s.armor,s.maxArmor),773,485);
-        font.setColor(Color.WHITE);
-        font.draw(batch,stat("POWER",s.power,s.maxPower),1008,544);
-        font.draw(batch,stat("HEAT",s.heat,s.maxHeat),1008,520);
-        font.draw(batch,stat("FUEL",s.fuel,s.maxFuel),1008,496);
-        font.draw(batch,"CREW "+Math.round(s.crewCount)+"/"+s.crewBerths+
-                "  NEED "+s.crewRequired,1008,472);
 
         font.setColor(Color.CYAN);
-        font.draw(batch,"SHIELD FACINGS  F / P / A / S",770,456);
+        font.draw(batch,"DEFENSE / RESOURCES",772,540);
+        font.setColor(Color.WHITE);
+        font.draw(batch,stat("HULL",s.hull,s.maxHull),773,512);
+        font.draw(batch,stat("SHIELD",s.shields,s.maxShields),773,485);
+        font.draw(batch,stat("ARMOR",s.armor,s.maxArmor),773,458);
+        font.draw(batch,stat("POWER",s.power,s.maxPower),1008,512);
+        font.draw(batch,stat("HEAT",s.heat,s.maxHeat),1008,485);
+        font.draw(batch,stat("FUEL",s.fuel,s.maxFuel),1008,458);
+        font.draw(batch,"CREW "+Math.round(s.crewCount)+"/"+s.crewBerths+
+                " NEED "+s.crewRequired,1008,432);
+
+        font.setColor(Color.CYAN);
+        font.draw(batch,"FACINGS  F / P / A / S",773,432);
         font.setColor(Color.LIGHT_GRAY);
         if(s.defense!=null){
             DirectionalDefense.Facing[] f=DirectionalDefense.Facing.values();
             font.draw(batch,percent(s.defense.shields(f[0]),s.defense.maxShields(f[0]))+"%    "+
                     percent(s.defense.shields(f[1]),s.defense.maxShields(f[1]))+"%    "+
                     percent(s.defense.shields(f[2]),s.defense.maxShields(f[2]))+"%    "+
-                    percent(s.defense.shields(f[3]),s.defense.maxShields(f[3]))+"%",775,432);
+                    percent(s.defense.shields(f[3]),s.defense.maxShields(f[3]))+"%",775,405);
         }
+
+        // Column headings and rows use one shared baseline grid; the range
+        // action now belongs next to the weapon section, not in subsystems.
         font.setColor(Color.CYAN);
-        font.draw(batch,"WEAPON / ACTUAL RANGE / RELOAD / AMMO",771,406);
+        font.draw(batch,"WEAPON",773,377);
+        font.draw(batch,"RANGE",907,377);
+        font.draw(batch,"RELOAD",1018,377);
+        font.draw(batch,"AMMO",1105,377);
+        font.draw(batch,"RING",1194,377);
+        font.draw(batch,rangeMask==0?"SHOW RANGES":"HIDE RANGES",1110,408);
         for(int i=0;i<7;i++){
-            int y=375-i*23;
+            float y=WEAPON_FIRST_Y-i*WEAPON_ROW_STEP;
             double reach=range(s,i);
             font.setColor(reach>0?COLORS[i]:Color.GRAY);
             font.draw(batch,LABELS[i],773,y);
@@ -269,30 +292,32 @@ final class ShipInspectionPanel {
             font.setColor(enabled(i)&&reach>0?Color.GREEN:Color.GRAY);
             font.draw(batch,enabled(i)&&reach>0?"RNG":"OFF",1194,y);
         }
+
         font.setColor(Color.CYAN);
-        font.draw(batch,"SUBSYSTEM CONDITION",771,204);
+        font.draw(batch,"SUBSYSTEM CONDITION",773,188);
         font.setColor(Color.LIGHT_GRAY);
-        font.draw(batch,condition("ENGINE",s.engineCondition),773,183);
-        font.draw(batch,condition("WEAPONS",s.weaponsCondition),1010,183);
-        font.draw(batch,condition("REACTOR",s.reactorCondition),773,160);
-        font.draw(batch,condition("SENSORS",s.sensorsCondition),1010,160);
-        font.draw(batch,condition("COOLING",s.coolingCondition),773,137);
-        font.draw(batch,condition("POINT DEF",s.pointDefenseCondition),1010,137);
-        font.draw(batch,condition("COMMAND",s.commandCondition),773,114);
-        font.draw(batch,condition("MAGAZINE",s.magazineCondition),1010,114);
-        font.draw(batch,condition("HANGAR",s.hangarCondition),773,91);
-        font.setColor(Color.CYAN);
-        font.draw(batch,rangeMask==0?"SHOW RANGES":"HIDE RANGES",1110,96);
+        font.draw(batch,condition("ENGINE",s.engineCondition),773,162);
+        font.draw(batch,condition("WEAPONS",s.weaponsCondition),1010,162);
+        font.draw(batch,condition("REACTOR",s.reactorCondition),773,141);
+        font.draw(batch,condition("SENSORS",s.sensorsCondition),1010,141);
+        font.draw(batch,condition("COOLING",s.coolingCondition),773,120);
+        font.draw(batch,condition("POINT DEF",s.pointDefenseCondition),1010,120);
+        font.draw(batch,condition("COMMAND",s.commandCondition),773,99);
+        font.draw(batch,condition("MAGAZINE",s.magazineCondition),1010,99);
+        font.draw(batch,condition("HANGAR",s.hangarCondition),773,78);
+        font.draw(batch,condition("ECM",s.ecmCondition),1010,78);
         batch.end();
     }
     private void drawMobile(Battle battle,ShapeRenderer shapes,
                             SpriteBatch batch,BitmapFont font){
         Battle.Ship s=selected(battle);
         if(s==null)return;
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA,GL20.GL_ONE_MINUS_SRC_ALPHA);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(.025f,.045f,.075f,.975f);
+        shapes.setColor(.018f,.028f,.045f,.43f);
         shapes.rect(615,60,653,549);
-        shapes.setColor(.12f,.23f,.32f,1f);
+        shapes.setColor(.12f,.23f,.32f,.46f);
         shapes.rect(615,557,653,52);
         shapes.setColor(mobilePage==0?Color.CYAN:Color.DARK_GRAY);
         shapes.rect(630,514,298,44);
@@ -307,7 +332,7 @@ final class ShipInspectionPanel {
         }else{
             for(int i=0;i<7;i++){
                 int y=482-i*48;
-                shapes.setColor((i&1)==0?.09f:.065f,.14f,.20f,.95f);
+                shapes.setColor((i&1)==0?.09f:.065f,.14f,.20f,.48f);
                 shapes.rect(633,y-26,626,45);
                 if(enabled(i)){
                     Color c=COLORS[i];
@@ -319,6 +344,7 @@ final class ShipInspectionPanel {
             shapes.rect(1021,64,238,49);
         }
         shapes.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
         float oldX=font.getData().scaleX,oldY=font.getData().scaleY;
         font.getData().setScale(oldX*1.28f,oldY*1.28f);
         try{

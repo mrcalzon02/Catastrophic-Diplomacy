@@ -27,17 +27,24 @@ public final class ShipInspectionPanelTest {
                 "Selected ship starts with weapon ranges available");
         check(ShipInspectionPanel.contains(1000,300)&&!ShipInspectionPanel.contains(200,300),
                 "Large right-hand sheet must capture only its actual bounds");
+        check(ShipInspectionPanel.Y<=78&&ShipInspectionPanel.Y+ShipInspectionPanel.H>=609,
+                "All subsystem baselines and the header must fit inside the desktop sheet");
+        check(ShipInspectionPanel.WEAPON_FIRST_Y-6*ShipInspectionPanel.WEAPON_ROW_STEP>188,
+                "Weapon rows must clear the subsystem heading");
+        check(ShipInspectionPanel.action(1160,402)==2
+                &&ShipInspectionPanel.action(1160,91)==0,
+                "Global ranges action must not overlap subsystem telemetry");
         check(ShipInspectionPanel.action(1240,585)==1,
                 "Close control must be accessible by touch");
-        check(ShipInspectionPanel.action(950,375)==10,
+        check(ShipInspectionPanel.action(950,348)==10,
                 "Laser row must toggle the actual laser range");
-        check(ShipInspectionPanel.action(950,260)==15,
+        check(ShipInspectionPanel.action(950,233)==15,
                 "Torpedo range row must be touch-addressable");
-        check(panel.tap(900,375)&&!panel.enabled(0)&&panel.enabled(4),
+        check(panel.tap(900,348)&&!panel.enabled(0)&&panel.enabled(4),
                 "Tapping a weapon must toggle only its own range");
-        check(panel.tap(1160,91)&&!panel.enabled(4),
+        check(panel.tap(1160,402)&&!panel.enabled(4),
                 "Global toggle hides all weapon overlays");
-        check(panel.tap(1160,91)&&panel.enabled(0)&&panel.enabled(6),
+        check(panel.tap(1160,402)&&panel.enabled(0)&&panel.enabled(6),
                 "Global toggle restores all weapon overlays");
         check(!panel.tap(200,300),"Clicks outside the sheet must reach battlefield");
         check(ShipInspectionPanel.percent(40,80)==50,"Hull percentage uses live value");
@@ -77,6 +84,6 @@ public final class ShipInspectionPanelTest {
                 "Android show/hide ranges control must affect all real range circles");
         check(panel.tap(1235,580)&&panel.selected(b)==null,
                 "Android panel close must be finger-sized and clear selection");
-        System.out.println("PASS ship tap, pan-safe picking, right-side sheet hitboxes, live range/ammo/reload, zoom and overlays");
+        System.out.println("PASS ship tap, translucent inspection layout hitboxes, live range/ammo/reload, zoom and overlays");
     }
 }
