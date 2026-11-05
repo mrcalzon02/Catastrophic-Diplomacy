@@ -977,6 +977,65 @@ public final class Battle {
     /** Separate additional broadcasts, limited by paid transceiver capacity. */
     private final Ship[][] expandedSpotters={new Ship[16],new Ship[16]};
     private final double[][] expandedNearest={new double[16],new double[16]};
+    /**
+     * The expensive historical photon-arrival search is immutable while the
+     * sensor-history ring is unchanged. An observer/target pair can be queried
+     * multiple times per tick by SHR broadcast, captain acquisition and
+     * subsequent fire-control routing. Cache ONLY the raw causal observation:
+     * every caller still reevaluates present receiver power, hardware, weather,
+     * relay conditions and other authorization. Null observations are cached.
+     *
+     * Flat primitive stamps avoid 400x400 HashMap entries/boxing and are reused
+     * across ticks (about 1.3 MiB at the 400-ship fleet cap).
+     */
+    private SensorLightTimeHistory.Observation[] photonCache=new SensorLightTimeHistory.Observation[0];
+    private int[] photonCacheStamp=new int[0];
+    private int photonCacheStride,photonCacheEpoch=1;
+    private long photonCacheHits,photonCacheMisses;
+    private boolean photonCacheEnabled=true;
+    private void invalidatePhotonCache(){
+        if(++photonCacheEpoch==0){
+            Arrays.fill(photonCacheStamp,0);
+            photonCacheEpoch=1;
+        }
+    }
+    /** Read-only counters for nonblocking 200v200 performance diagnostics. */
+    public long photonCacheHits(){return photonCacheHits;}
+    public long photonCacheMisses(){return photonCacheMisses;}
+    /** A/B only: compare exact full-battle fingerprints before and after caching. */
+    public void configurePhotonCacheForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException("Configure photon cache before combat");
+        photonCacheEnabled=enabled;
+        invalidatePhotonCache();
+    }
+    private SensorLightTimeHistory.Observation historicalPhotonObservation(
+            Ship source,Ship target){
+        if(!photonCacheEnabled){
+            photonCacheMisses++;
+            return SensorLightTimeHistory.receive(source,target,tick,
+                    CONTACT_OPTICAL|CONTACT_RADAR|CONTACT_INFRARED|
+                            CONTACT_XRAY|CONTACT_GRAVITIC,0);
+        }
+        if(photonCacheStride!=nextId){
+            int slots=Math.multiplyExact(nextId,nextId);
+            photonCache=new SensorLightTimeHistory.Observation[slots];
+            photonCacheStamp=new int[slots];
+            photonCacheStride=nextId;
+            photonCacheEpoch=1;
+        }
+        int index=source.id*photonCacheStride+target.id;
+        if(photonCacheStamp[index]==photonCacheEpoch){
+            photonCacheHits++;
+            return photonCache[index];
+        }
+        photonCacheMisses++;
+        SensorLightTimeHistory.Observation result=SensorLightTimeHistory.receive(
+                source,target,tick,CONTACT_OPTICAL|CONTACT_RADAR|
+                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0);
+        photonCache[index]=result;
+        photonCacheStamp[index]=photonCacheEpoch;
+        return result;
+    }
     /** Configure preordered scan doctrine without changing shipyard save IDs.
      * Later ship-order integration will serialize these policy selections. */
     public void configureSensorScan(int shipId,SensorActiveScan.Mode mode,int focusTargetId){
@@ -1713,6 +1772,7 @@ public final class Battle {
     public void step() {
         if(unresolved())return;
         tick++;
+        invalidatePhotonCache();
         // All active vessels enter contact and environmental simulation in
         // the same immutable world, including externally issued coordinates.
         containFleet();
@@ -2466,6 +2526,9 @@ public final class Battle {
     /** One fixed-capacity historical snapshot per ship each simulation tick. */
     private void captureSensorHistory(long observedTick){
         for(Ship ship:ships)ship.sensorHistory.capture(observedTick,ship);
+        // The new sensor snapshot changes which photon fix is eligible when
+        // tactical HUD queries immediately after a completed battle tick.
+        invalidatePhotonCache();
     }
 
     /** Local sensors read only arrived historical light. Remote ships read
@@ -2489,9 +2552,8 @@ public final class Battle {
         // All five historical candidates are evaluated independently against
         // the actual reflected/received profiles after photon delay is solved.
         // Current enemy signature and position are not an eligibility gate.
-        SensorLightTimeHistory.Observation candidate=SensorLightTimeHistory.receive(
-                source,target,tick,CONTACT_OPTICAL|CONTACT_RADAR|
-                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0);
+        SensorLightTimeHistory.Observation candidate=
+                historicalPhotonObservation(source,target);
         if(candidate==null)return null;
         int valid=candidate.channels()&historicalSensorChannels(
                 source,target,candidate);
