@@ -9,6 +9,16 @@ on:
       - 'game/src/test/java/diplomacy/client/BattleRenderPosesTest.java'
       - 'game/src/test/java/diplomacy/client/CombatTimelineDiagnostic.java'
       - 'game/build.gradle'
+      - 'game/src/main/java/diplomacy/client/CombatEventCursor.java'
+      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
+      - 'game/src/main/java/diplomacy/client/CombatLightingModel.java'
+      - 'game/src/main/java/diplomacy/client/CombatFrameContinuity.java'
+      - 'game/src/main/java/diplomacy/client/CombatDiagnosticRecorder.java'
+      - 'game/src/main/java/diplomacy/client/RemoteShipInterpolation.java'
+      - 'game/src/main/java/diplomacy/client/RemoteFleetMirrors.java'
+      - 'game/src/test/java/diplomacy/client/CombatPerformanceControlTest.java'
+      - 'game/src/test/java/diplomacy/client/CombatLightingModelTest.java'
+      - 'game/src/test/java/diplomacy/client/CombatHitFeedbackTest.java'
       - '.github/workflows/combat-timeline-diagnostic.yml'
 
 concurrency:
@@ -30,6 +40,11 @@ jobs:
         continue-on-error: true
         run: |
           gradle --no-daemon :game:renderPosesSmoke :game:combatTimelineDiagnostic
+      - name: Visual event cursor, hit feedback and live diagnostics smoke
+        id: fx
+        continue-on-error: true
+        run: |
+          gradle --no-daemon :game:combatHitFeedbackSmoke :game:lightingSmoke :game:combatPerformanceSmoke
       - name: Preserve timing evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -41,7 +56,11 @@ jobs:
         if: always()
         env:
           OUTCOME: ${{ steps.timeline.outcome }}
+          FX_OUTCOME: ${{ steps.fx.outcome }}
         run: |
+          if [ "$FX_OUTCOME" != "success" ]; then
+            echo "::warning::Nonblocking FX/diagnostics regression failed"
+          fi
           if [ "$OUTCOME" != "success" ]; then
             echo "::warning::Battlespace timeline diagnostic failed; inspect its log and evidence"
           else
