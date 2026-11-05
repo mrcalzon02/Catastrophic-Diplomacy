@@ -50,6 +50,8 @@ final class GameWikiCatalog {
     private static final String RESEARCH_COST_LABEL="Research cost ";
     private static final String RESEARCH_COST_SEARCH=
             RESEARCH_COST_LABEL.toLowerCase(Locale.ROOT);
+    // All generated research article search text begins with this ID prefix.
+    private static final String RESEARCH_ID_SEARCH_PREFIX="upgrade.tech-";
     // Every ordinary component has four independently researched branches
     // and nine stages. A 73,260-entry index can be represented by only 2,035
     // canonical base identities without losing lexicographic ordering.
@@ -618,11 +620,13 @@ final class GameWikiCatalog {
                     fixed.add(article);
         if(!selected.equals("ALL")&&!selected.equals("UPGRADES"))return fixed;
 
-        // The same fixed label is emitted into EVERY upgrade Article. A
-        // query contained within it matches all canonical research entries.
-        // Keep ALL-category guide/module results alongside the virtual
-        // upgrades and preserve every ordinary query's full-text fallback.
-        if(RESEARCH_COST_SEARCH.contains(needle))
+        // Every upgrade Article starts with "upgrade.TECH-" and contains
+        // the same research-cost label. Queries contained in either immutable
+        // fragment match all 73,260 IDs; reuse the compact ID index rather
+        // than retaining tens of thousands of duplicate formatted strings.
+        // ALL-category static results are still filtered independently.
+        if(RESEARCH_COST_SEARCH.contains(needle)||
+                RESEARCH_ID_SEARCH_PREFIX.contains(needle))
             return fixed.isEmpty()?upgradeArticles:new IndexedArticles(fixed,upgradeIds);
 
         List<String> matchedIds=new ArrayList<>();

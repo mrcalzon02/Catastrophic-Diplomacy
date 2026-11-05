@@ -147,6 +147,8 @@ public final class GameWikiTest {
         // must remain complete and selectable, not retain 73k duplicate IDs.
         List<GameWikiCatalog.Article> broadTech=catalog.search("UPGRADES","tech");
         check(broadTech.size()==stages,"Broad technology search truncated upgrades");
+        check(broadTech==catalog.search("UPGRADES",""),
+                "Every research ID starts with TECH; broad ID queries must reuse the virtual index");
         for(int index:new int[]{0,stages/2,stages-1}){
             var selected=broadTech.get(index);
             check(selected.searchable.contains("tech")&&
