@@ -2352,10 +2352,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         int active=System.nanoTime()<tacticalPressUntilNs?tacticalPressed:-1;
         if(active>=0||hovered>=0){
             shapes.begin(ShapeRenderer.ShapeType.Filled);
-            for(int i=0;i<12;i++){
+            for(int i=0;i<17;i++){
                 if(i!=hovered&&i!=active)continue;
                 boolean down=i==active;
-                float x=438,y=550-40*i,w=405,h=36,edge=down?4:2;
+                float x=i<12?438:895,y=i<12?550-40*i:490-60*(i-12);
+                float w=i<12?405:355,h=i<12?36:48,edge=down?4:2;
                 shapes.setColor(down?MilitaryUiTheme.AMBER:MilitaryUiTheme.TELEMETRY);
                 shapes.rect(x,y,w,edge);
                 shapes.rect(x,y+h-edge,w,edge);
