@@ -320,17 +320,19 @@ final class ModularWeaponFxRenderer implements Disposable {
         // FIRE-to-IMPACT interpolation or a stationary future explosion.
         // Share the original kinetic atlas; do not allocate new textures.
         for(Battle.FlakRound shot:battle.flakRounds()){
-            if(view!=null&&!view.circle((float)shot.x,(float)shot.y,6))continue;
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)shot.x,(float)shot.y,
+                            (float)StrictMath.atan2(shot.vy,shot.vx)):poses.flak(shot);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),6))continue;
             Texture fallback=shells==null?frame(kinetic.payload(),
                     battle.tick-shot.spawnTick):null;
             if(shells==null&&fallback==null)continue;
-            float angle=(float)StrictMath.toDegrees(
-                    StrictMath.atan2(shot.vy,shot.vx));
+            float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(.90f,.80f,.58f,1f);
             if(shells!=null)
-                drawCentered(batch,shells[0],(float)shot.x,(float)shot.y,
+                drawCentered(batch,shells[0],pose.x(),pose.y(),
                         9,4,angle);
-            else drawCentered(batch,fallback,(float)shot.x,(float)shot.y,
+            else drawCentered(batch,fallback,pose.x(),pose.y(),
                     9,4,angle);
             batch.setColor(1,1,1,1);
         }
@@ -339,34 +341,38 @@ final class ModularWeaponFxRenderer implements Disposable {
         // coordinates using the existing authored kinetic-shell atlas.
         // No fabricated placeholder sprites or per-shot texture allocations.
         for(diplomacy.sim.RotaryPointDefense.Round shot:battle.rotaryRounds()){
-            if(view!=null&&!view.circle((float)shot.x,(float)shot.y,5))continue;
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)shot.x,(float)shot.y,
+                            (float)StrictMath.atan2(shot.vy,shot.vx)):poses.rotary(shot);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),5))continue;
             Texture fallback=shells==null?frame(kinetic.payload(),
                     battle.tick-shot.spawnTick):null;
             if(shells==null&&fallback==null)continue;
-            float angle=(float)StrictMath.toDegrees(
-                    StrictMath.atan2(shot.vy,shot.vx));
+            float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(1f,.84f,.54f,1f);
             if(shells!=null)
-                drawCentered(batch,shells[0],(float)shot.x,(float)shot.y,
+                drawCentered(batch,shells[0],pose.x(),pose.y(),
                         8,3,angle);
-            else drawCentered(batch,fallback,(float)shot.x,(float)shot.y,
+            else drawCentered(batch,fallback,pose.x(),pose.y(),
                     8,3,angle);
             batch.setColor(1,1,1,1);
         }
         // Charged anti-torpedo rail slugs are independent REAL moving solids;
         // the original relativistic/penetrator artwork follows each position.
         for(diplomacy.sim.RailPointDefense.Penetrator shot:battle.railPenetrators()){
-            if(view!=null&&!view.circle((float)shot.x,(float)shot.y,7))continue;
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)shot.x,(float)shot.y,
+                            (float)StrictMath.atan2(shot.vy,shot.vx)):poses.rail(shot);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),7))continue;
             Texture fallback=shells==null?frame(kinetic.payload(),
                     battle.tick-shot.spawnTick):null;
             if(shells==null&&fallback==null)continue;
-            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
-                    shot.vy,shot.vx));
+            float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(.82f,.93f,1f,1f);
             if(shells!=null)
-                drawCentered(batch,shells[4],(float)shot.x,(float)shot.y,
+                drawCentered(batch,shells[4],pose.x(),pose.y(),
                         13,4,angle);
-            else drawCentered(batch,fallback,(float)shot.x,(float)shot.y,
+            else drawCentered(batch,fallback,pose.x(),pose.y(),
                         13,4,angle);
             batch.setColor(1,1,1,1);
         }

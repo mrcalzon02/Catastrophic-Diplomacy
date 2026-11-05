@@ -46,3 +46,13 @@ device benchmark or proof of collision accuracy. They use the production
 
 This workflow is an **informational diagnostic** and is not a new visual,
 balance or frame-rate release gate.
+
+## Stage 1b — point-defense pose coverage
+
+Flak shells, rotary CIWS bullets and rail penetrators now use the shared
+pre-tick pose history and interpolation fraction in their **actual** sprite
+rendering paths. Newly spawned rounds start at physical muzzle coordinates.
+Physics/collision and projectile IDs remain authoritative and unchanged.
+
+Headless tests cover launch presentation. Additional live pixel-motion capture
+at low FPS is still required; the scripted fixture does not certify GPU smoothness.

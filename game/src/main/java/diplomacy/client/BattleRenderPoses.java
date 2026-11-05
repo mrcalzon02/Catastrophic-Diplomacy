@@ -1,6 +1,8 @@
 package diplomacy.client;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleView;
+import diplomacy.sim.RotaryPointDefense;
+import diplomacy.sim.RailPointDefense;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -9,6 +11,7 @@ final class BattleRenderPoses {
     record Pose(float x,float y,float angle){}
     private final Map<Integer,Pose> ships=new HashMap<>(),crafts=new HashMap<>();
     private final Map<Long,Pose> missiles=new HashMap<>(),rockets=new HashMap<>(),shells=new HashMap<>();
+    private final Map<Long,Pose> flak=new HashMap<>(),rotary=new HashMap<>(),rails=new HashMap<>();
     private Battle source;
     private float fraction=1f;
     /** The caller counts real physics steps independently of render frames.
@@ -19,11 +22,11 @@ final class BattleRenderPoses {
     }
     void sync(Battle battle){
         if(source==battle)return;
-        source=battle;ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();
+        source=battle;ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
         fraction=1f;
     }
     void beforeStep(Battle battle){
-        sync(battle);ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();
+        sync(battle);ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
         for(Battle.Ship s:battle.ships())if(s.alive())
             ships.put(s.id,new Pose((float)s.x,(float)s.y,(float)s.facing));
         for(Battle.Craft c:battle.crafts())
@@ -36,12 +39,21 @@ final class BattleRenderPoses {
         for(Battle.Ballistic b:battle.ballistics())
             shells.put(b.visualId,new Pose((float)b.x,(float)b.y,
                     (float)Math.atan2(b.vy,b.vx)));
+        for(Battle.FlakRound b:battle.flakRounds())
+            flak.put(b.shotId,new Pose((float)b.x,(float)b.y,
+                    (float)Math.atan2(b.vy,b.vx)));
+        for(RotaryPointDefense.Round b:battle.rotaryRounds())
+            rotary.put(b.visualId,new Pose((float)b.x,(float)b.y,
+                    (float)Math.atan2(b.vy,b.vx)));
+        for(RailPointDefense.Penetrator b:battle.railPenetrators())
+            rails.put(b.visualId,new Pose((float)b.x,(float)b.y,
+                    (float)Math.atan2(b.vy,b.vx)));
     }
     /** Clear stale pre-tick samples when paused or otherwise frozen.
      * A resumed frame before its next physics tick must never move backwards. */
     void snap(Battle battle){
         sync(battle);
-        ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();
+        ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();flak.clear();rotary.clear();rails.clear();
         fraction=1f;
     }
     void fraction(Battle battle,float value){
@@ -92,6 +104,18 @@ final class BattleRenderPoses {
     }
     Pose shell(Battle.Ballistic b){
         return blend(shells.get(b.visualId),new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx)));
+    }
+    Pose flak(Battle.FlakRound b){
+        return blend(flak.get(b.shotId),new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx)));
+    }
+    Pose rotary(RotaryPointDefense.Round b){
+        return blend(rotary.get(b.visualId),new Pose((float)b.x,(float)b.y,
+                (float)Math.atan2(b.vy,b.vx)));
+    }
+    Pose rail(RailPointDefense.Penetrator b){
+        return blend(rails.get(b.visualId),new Pose((float)b.x,(float)b.y,
                 (float)Math.atan2(b.vy,b.vx)));
     }
     int trackedShips(){return ships.size();}

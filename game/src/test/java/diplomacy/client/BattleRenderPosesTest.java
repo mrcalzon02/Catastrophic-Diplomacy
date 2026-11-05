@@ -68,6 +68,20 @@ public final class BattleRenderPosesTest {
         p.fraction(multi,.5f);
         close(p.ship(moving).x(),100+10*(advanced-1)+5,
                 "Final-step-only interpolation must preserve half-tick movement");
-        System.out.println("PASS pose interpolation, freeze/resume, interpolated camera, catch-up snapshots, heading wrap, spawns and battle reset");
+        // Newly created PD rounds have no prior physics sample: presentation
+        // must begin at their real physical muzzle, with no phantom motion.
+        Battle.FlakRound freshFlak=new Battle.FlakRound(0,moving.id,0,
+                501,0,100,200,150,200,2,3);
+        diplomacy.sim.RotaryPointDefense.Round freshRotary=
+                new diplomacy.sim.RotaryPointDefense.Round(
+                        502,0,moving.id,0,0,100,200,0,3,500);
+        diplomacy.sim.RailPointDefense.Penetrator freshRail=
+                new diplomacy.sim.RailPointDefense.Penetrator(
+                        503,0,0,moving.id,0,100,200,0,500,3,101,3);
+        p.fraction(multi,.5f);
+        close(p.flak(freshFlak).x(),100,"flak muzzle on spawn");
+        close(p.rotary(freshRotary).x(),100,"rotary muzzle on spawn");
+        close(p.rail(freshRail).x(),100,"rail muzzle on spawn");
+        System.out.println("PASS poses, pause/resume, camera, PD munition launches and multi-step interpolation");
     }
 }
