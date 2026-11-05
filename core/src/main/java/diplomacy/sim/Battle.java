@@ -1639,6 +1639,17 @@ public final class Battle {
         }
         return s;
     }
+    /** Fleet ships approach the deployment line already under way. This is
+     * inherited sublight momentum from before combat, not an instantaneous
+     * in-battle acceleration or free fuel impulse. The conservative entry
+     * fraction respects each paid drive's physical speed cap; ordinary
+     * maneuvers, braking and retreat still consume real fuel at rated g. */
+    private static void initializeEntryCruise(Ship ship){
+        double speed=StrictMath.min(6.0,
+                SublightPropulsion.maximumSpeed(ship)*0.18);
+        ship.vx=(ship.team==0?1:-1)*speed;
+        ship.vy=0;
+    }
     public void spawnWing(int team, Shipyard.Design design, TechnologyCatalog catalog,
                           int count, double centerX, double centerY) {
         requireFleetCapacity(team,count);
@@ -1647,8 +1658,9 @@ public final class Battle {
         List<RocketBarrage.Rack> rocketTemplates=Shipyard.rocketRacks(design,catalog);
         for (int i=0;i<count;i++) {
             double[] point = formationPosition(i,count,centerX,centerY,random);
-            addShip(team,design,machinery,doctrine,catalog,
+            Ship deployed=addShip(team,design,machinery,doctrine,catalog,
                     rocketTemplates,point[0],point[1]);
+            initializeEntryCruise(deployed);
         }
         log(design.faction.displayName+" deployed "+count+" fitted "+design.hull+"s");
     }
@@ -1671,8 +1683,9 @@ public final class Battle {
         }
         for(int i=0;i<designs.size();i++){
             double[] point=formationPosition(i,designs.size(),centerX,centerY,random);
-            addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),catalog,
+            Ship deployed=addShip(team,designs.get(i),fittings.get(i),doctrines.get(i),catalog,
                     rocketsByHull.get(i),point[0],point[1]);
+            initializeEntryCruise(deployed);
         }
         log("Team "+team+" deployed "+designs.size()+" individual engineering configurations");
     }
