@@ -136,6 +136,35 @@ public final class BattleRenderPosesTest {
                 "Camera must almost settle at target within a real second");
         close(CombatCameraSmoothing.toward(100,400,0),400,
                 "Manual camera reframe must remain immediate");
-        System.out.println("PASS low-speed muzzle, Hermite ship continuity, camera easing, pause/resume and catch-up");
+        // Host snapshots arrive at ~10Hz, but real render frames arrive
+        // much more often. Presentation must not jump on receipt, reorder
+        // ships by index or change authoritative tick positions.
+        RemoteShipInterpolation remote=new RemoteShipInterpolation();
+        String a0="SHIP|11|0|TERRAN|0|5|3.124139|100|10|10|10|10";
+        String a3="SHIP|11|0|TERRAN|30|5|-3.124139|100|10|10|10|10";
+        remote.observe(0,java.util.List.of(a0));
+        close(remote.pose(11).x(),0,"first remote snapshot snaps");
+        remote.observe(3,java.util.List.of(a3));
+        close(remote.pose(11).x(),0,"new network snapshot must not teleport");
+        remote.advance(.05f);
+        close(remote.pose(11).x(),15,"network midpoint at 10Hz");
+        check(Math.abs(remote.pose(11).facing())>3.12,
+                "Remote heading must use shortest angle through 180 degrees");
+        remote.observe(6,java.util.List.of(
+                "SHIP|22|1|DRAXIAN|400|20|0|100|10|10|10|10",
+                "SHIP|11|0|TERRAN|60|5|0|100|10|10|10|10"));
+        close(remote.pose(11).x(),15,"reordered snapshot continuity");
+        close(remote.pose(22).x(),400,"new ship spawns in correct host location");
+        remote.advance(.05f);
+        close(remote.pose(11).x(),37.5,"remote second midpoint");
+        remote.advance(.05f);
+        close(remote.pose(11).x(),60,"remote endpoint");
+        remote.observe(6,java.util.List.of(a0));
+        close(remote.pose(11).x(),60,"duplicate server tick cannot rewind");
+        remote.observe(2,java.util.List.of(
+                "SHIP|11|0|TERRAN|7|5|0|100|10|10|10|10"));
+        close(remote.pose(11).x(),7,"session restart resets network tracking");
+        check(remote.tracked()==1,"old ship tracks leaked across restarted session");
+        System.out.println("PASS low-speed muzzle, Hermite ship continuity, camera easing, network 10Hz tween, pause/resume and catch-up");
     }
 }

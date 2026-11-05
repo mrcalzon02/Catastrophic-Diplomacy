@@ -121,3 +121,21 @@ same physical interval. The ordinary battle camera uses a frame-rate
 independent smoothing response, including fleet-bounds changes on ship
 deaths. Manual pan/reset is immediate; exhibition mode keeps its existing
 separate cinematic director. The scripted CI verification camera is unchanged.
+
+## Stage 4 — host-snapshot ships do not teleport at 10 Hz
+
+The remote battle view previously copied 10 Hz host snapshots directly into
+the rendered ship coordinates every frame, bypassing all local interpolation.
+`RemoteShipInterpolation` now blends authoritative positions across the
+host's actual tick separation, bounded to 250 ms after network gaps.
+The display freezes at the last known authoritative pose if packets stop;
+it NEVER guesses future movement or authorizes hits, targets, or commands.
+Tracks are indexed by **server ship ID**, not array order, preserving identity
+when the host reorders ships. Newly observed ships snap to their actual
+host-provided origin. Duplicate ticks cannot rewind the presentation; a new
+session with a lower tick clears stale state. Facing interpolates across the
+shortest angular arc.
+
+The existing `:game:renderPosesSmoke` now tests 10 Hz packet arrivals with
+60/30 FPS intermediate frames, reordered IDs, new arrivals, duplicate
+snapshots and session restart.

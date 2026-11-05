@@ -125,6 +125,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int previousLevel,previousFocusedId;
     private MultiplayerPanel multiplayer;
     private Battle remotePresentation;
+    private final RemoteShipInterpolation remoteShipInterpolation=new RemoteShipInterpolation();
     private GameMenuPanel menuPanel;
     private GameWikiPanel wiki;
     private boolean wikiVisible,wikiRestoreRunning;
@@ -3861,31 +3862,58 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.end();
     }
 
-    /** Presentation mirror only: no local step(), commands, campaign settlement or second rules engine. */
+    /** A host-authoritative mirror: only positions are interpolated locally.
+     * No multiplayer damage, targeting, survival or fleet orders are inferred. */
     private void drawRemoteBattle(diplomacy.net.BattleConnection.Snapshot snapshot){
-        java.util.List<String> rows=snapshot.entities().stream().filter(s->s.startsWith("SHIP|")).collect(java.util.stream.Collectors.toList());
+        java.util.List<String> rows=snapshot.entities().stream()
+                .filter(s->s.startsWith("SHIP|"))
+                .collect(java.util.stream.Collectors.toList());
+        remoteShipInterpolation.observe(snapshot.tick(),rows);
+        remoteShipInterpolation.advance(Math.min(.08f,Gdx.graphics.getDeltaTime()));
         if(remotePresentation==null||remotePresentation.ships().size()!=rows.size()){
             remotePresentation=new Battle(0);
-            for(String row:rows){String[] p=row.split("\\|");remotePresentation.addShip(Integer.parseInt(p[2]),Battle.Faction.valueOf(p[3]),0,0);}
+            for(String row:rows){
+                String[] p=row.split("[|]");
+                remotePresentation.addShip(Integer.parseInt(p[2]),
+                        Battle.Faction.valueOf(p[3]),0,0);
+            }
         }
         for(int i=0;i<rows.size();i++){
-            String[] p=rows.get(i).split("\\|");Battle.Ship s=remotePresentation.ships().get(i);
-            s.x=Double.parseDouble(p[4]);s.y=Double.parseDouble(p[5]);s.facing=Double.parseDouble(p[6]);s.hull=Double.parseDouble(p[7]);s.shields=Double.parseDouble(p[8]);s.armor=Double.parseDouble(p[9]);s.power=Double.parseDouble(p[10]);s.fuel=Double.parseDouble(p[11]);
-            s.hullClass=diplomacy.shipyard.Shipyard.Hull.CORVETTE;
+            String[] p=rows.get(i).split("[|]");
+            Battle.Ship ship=remotePresentation.ships().get(i);
+            RemoteShipInterpolation.Pose view=remoteShipInterpolation.pose(
+                    Integer.parseInt(p[1]));
+            if(view==null)throw new IllegalStateException("Missing remote ship interpolation");
+            ship.x=view.x();ship.y=view.y();ship.facing=view.facing();
+            ship.hull=Double.parseDouble(p[7]);
+            ship.shields=Double.parseDouble(p[8]);
+            ship.armor=Double.parseDouble(p[9]);
+            ship.power=Double.parseDouble(p[10]);
+            ship.fuel=Double.parseDouble(p[11]);
+            ship.hullClass=diplomacy.shipyard.Shipyard.Hull.CORVETTE;
         }
         remotePresentation.tick=snapshot.tick();
-        Gdx.gl.glClearColor(.015f,.025f,.055f,1);Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);viewport.apply();battleCamera.update();
-        // Reuse existing hull geometry and approved sprite renderer for the authoritative poses.
-        Battle solo=battle;try{
+        Gdx.gl.glClearColor(.015f,.025f,.055f,1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
+        viewport.apply();battleCamera.update();
+        // Share hull geometry and rendering with local gameplay. Remote
+        // state is already presentation-smoothed before entering renderers.
+        Battle solo=battle;
+        try{
             battle=remotePresentation;
-            // Snapshot presentations are complete authoritative frames; never
-            // borrow previous local simulation poses with recycled vessel IDs.
             renderPoses.sync(remotePresentation);
             drawShipsFallback();
         }finally{battle=solo;}
-        batch.setProjectionMatrix(battleCamera.combined);if(terranSprites!=null&&terranSprites.loaded()>0)terranSprites.render(remotePresentation,batch);
-        batch.setProjectionMatrix(battleCamera.combined);if(craftSprites!=null)craftSprites.render(remotePresentation,batch);
-        batch.setProjectionMatrix(camera.combined);batch.begin();font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+" / TAB: CONNECTION AND FLEET ORDERS",24,696);batch.end();
+        batch.setProjectionMatrix(battleCamera.combined);
+        if(terranSprites!=null&&terranSprites.loaded()>0)
+            terranSprites.render(remotePresentation,batch);
+        batch.setProjectionMatrix(battleCamera.combined);
+        if(craftSprites!=null)craftSprites.render(remotePresentation,batch);
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+
+                " / TAB: CONNECTION AND FLEET ORDERS",24,696);
+        batch.end();
     }
     @Override public void resize(int width, int height) { viewport.update(width, height, true); }
     @Override public void pause() {
