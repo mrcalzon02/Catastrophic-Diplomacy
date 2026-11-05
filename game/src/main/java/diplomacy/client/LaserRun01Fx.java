@@ -31,6 +31,8 @@ final class LaserRun01Fx implements Disposable {
     private static final int MAX_SHOTS=384;
     private record Shot(Battle.VisualEvent event,int atlas) { }
     private final List<Shot> shots=new ArrayList<>();
+    private final VisualAtlasBuckets<Shot> groupedShots=new VisualAtlasBuckets<>(IDS.length);
+    private boolean groupsDirty=true;
     private final Map<Integer,Texture> textures=new HashMap<>();
     private final Map<Integer,TextureRegion[]> regions=new HashMap<>();
     private final boolean[] checked=new boolean[IDS.length],exists=new boolean[IDS.length];
@@ -80,6 +82,7 @@ final class LaserRun01Fx implements Disposable {
             tracked=battle;
             lastSequence=0;
             shots.clear();
+            groupsDirty=true;
             processedTick=Long.MIN_VALUE;
         }
         List<Battle.VisualEvent> history=battle.visualEvents();
@@ -94,15 +97,22 @@ final class LaserRun01Fx implements Disposable {
             LaserFamilies.Type family=LaserFamilies.fromWeapon(event.weapon());
             if(family==null)continue;
             int selected=effectIndex(family,event.shotId());
-            if(frameAt(selected,battle.tick-event.tick())>=0&&available(selected))
+            if(frameAt(selected,battle.tick-event.tick())>=0&&available(selected)){
                 shots.add(new Shot(event,selected));
+                groupsDirty=true;
+            }
         }
         for(Iterator<Shot> it=shots.iterator();it.hasNext();){
             Shot shot=it.next();
-            if(frameAt(shot.atlas(),battle.tick-shot.event().tick())<0)it.remove();
+            if(frameAt(shot.atlas(),battle.tick-shot.event().tick())<0){
+                it.remove();
+                groupsDirty=true;
+            }
         }
-        if(shots.size()>MAX_SHOTS)
+        if(shots.size()>MAX_SHOTS){
             shots.subList(0,shots.size()-MAX_SHOTS).clear();
+            groupsDirty=true;
+        }
     }
     private TextureRegion[] load(int atlas){
         TextureRegion[] cached=regions.get(atlas);
@@ -131,16 +141,18 @@ final class LaserRun01Fx implements Disposable {
     /** Caller owns SpriteBatch.begin/end; artwork is anchored at the true muzzle. */
     void draw(SpriteBatch batch,Battle battle,CombatViewBounds view){
         if(shots.isEmpty())return;
+        if(groupsDirty){
+            groupedShots.rebuild(shots,Shot::atlas);
+            groupsDirty=false;
+        }
         batch.setColor(1,1,1,1);
-        // Group by atlas to limit texture binds during large fleet battles.
+        // Draw each grouped shot once per frame, retaining atlas painter order.
         for(int index=0;index<IDS.length;index++){
-            boolean active=false;
-            for(Shot shot:shots)if(shot.atlas()==index){active=true;break;}
-            if(!active)continue;
+            List<Shot> group=groupedShots.atlas(index);
+            if(group.isEmpty())continue;
             TextureRegion[] frames=load(index);
             if(frames==null)continue;
-            for(Shot shot:shots){
-                if(shot.atlas()!=index)continue;
+            for(Shot shot:group){
                 Battle.VisualEvent event=shot.event();
                 int frame=frameAt(index,battle.tick-event.tick());
                 if(frame<0)continue;
@@ -166,8 +178,9 @@ final class LaserRun01Fx implements Disposable {
     @Override public void dispose(){
         for(Texture value:textures.values())value.dispose();
         textures.clear();regions.clear();shots.clear();
+        groupedShots.clear();groupsDirty=true;
         java.util.Arrays.fill(checked,false);
         java.util.Arrays.fill(exists,false);
-        tracked=null;lastSequence=0;
+        tracked=null;lastSequence=0;processedTick=Long.MIN_VALUE;
     }
 }
