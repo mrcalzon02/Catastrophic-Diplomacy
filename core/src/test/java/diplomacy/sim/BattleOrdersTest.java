@@ -192,7 +192,41 @@ public final class BattleOrdersTest {
         check(attacker.kineticAmmo>=1,
                 "Live salvo fire pierced the captain's protected final round");
     }
+    /** A FREE captain must maneuver within gun range; only HOLD may park. */
+    private static void checkFreeMovement(){
+        Battle battle=new Battle(20261105L);
+        Battle.Ship captain=battle.addShip(0,Battle.Faction.TERRAN,390,330);
+        Battle.Ship opponent=battle.addShip(1,Battle.Faction.DRAXIAN,560,330);
+        battle.setShipStandingOrders(captain.id,ShipStandingOrders.DEFAULT);
+        battle.setShipCommandQueue(opponent.id,
+                java.util.List.of(ShipCommandQueue.Command.hold(1000)));
+        // Preserve the contact, not a random patrol waypoint, for this test.
+        captain.laserDamage=captain.kineticDamage=captain.plasmaDamage=0;
+        captain.particleDamage=captain.missileDamage=captain.torpedoDamage=0;
+        opponent.laserDamage=opponent.kineticDamage=opponent.plasmaDamage=0;
+        opponent.particleDamage=opponent.missileDamage=opponent.torpedoDamage=0;
+        for(int t=0;t<250&&captain.lastTargetId!=opponent.id;t++)
+            battle.step();
+        check(captain.lastTargetId==opponent.id,
+                "Free-navigation fixture never acquired the nearby opponent");
+        // Eliminate approach momentum so the old brake-to-zero bug cannot
+        // masquerade as tactical movement in the engagement band.
+        captain.vx=0;captain.vy=0;
+        double x=captain.x,y=captain.y,fuel=captain.fuel;
+        for(int t=0;t<120;t++)battle.step();
+        check(StrictMath.hypot(captain.x-x,captain.y-y)>.1,
+                "FREE doctrine parked a ship inside its engagement range");
+        check(captain.fuel<fuel,"FREE maneuver did not spend physical fuel");
+        battle.setShipStandingOrders(captain.id,new ShipStandingOrders(
+                BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD),50,50,0));
+        captain.vx=0;captain.vy=0;
+        x=captain.x;y=captain.y;
+        for(int t=0;t<45;t++)battle.step();
+        check(StrictMath.hypot(captain.x-x,captain.y-y)<1e-6,
+                "Explicit HOLD doctrine moved the ship");
+    }
     public static void main(String[] args){
+        checkFreeMovement();
         checkResourceOrders();
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,

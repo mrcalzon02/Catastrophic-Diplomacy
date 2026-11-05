@@ -3349,7 +3349,16 @@ public final class Battle {
         double distance=StrictMath.hypot(target.x-ship.x,target.y-ship.y);
         if(orders.position()!=BattleOrders.Position.KEEP_MOVING
                 &&distance>=preferredRange*0.5&&distance<=preferredRange){
-            thrust(ship,0,0);
+            if(orders.position()==BattleOrders.Position.FREE){
+                // FREE is an active combat maneuver, not a disguised HOLD.
+                // Fly a tangential course inside the engagement band rather
+                // than braking every autonomous captain at weapon range.
+                // This uses the same physical thrust/fuel accounting as
+                // approach, retreat and queued orders.
+                double dx=target.x-ship.x,dy=target.y-ship.y;
+                double direction=ship.team==0?1:-1;
+                steerToward(ship,ship.x-direction*dy,ship.y+direction*dx);
+            }else thrust(ship,0,0);
             return;
         }
         if(distance<preferredRange*0.5){
