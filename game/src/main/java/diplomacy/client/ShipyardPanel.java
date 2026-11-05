@@ -74,6 +74,7 @@ final class ShipyardPanel {
     private Shipyard.Design draft;
     private int team, selectedSlot, scroll, modulePage;
     private boolean unlockedOnly;
+    private String candidateId;
     private boolean stripHullArmed;
     private String notice="Select a hardpoint, choose machinery, then APPLY to deploy.";
     private boolean open;
@@ -162,7 +163,7 @@ final class ShipyardPanel {
     boolean open() { return open; }
     void show() {
         open=true;usage=Usage.WORKSHOP;playerOnly=false;
-        draft=active[team];selectedSlot=0;scroll=0;modulePage=0;unlockedOnly=true;artPreview=true;technologyView=false;guidedView=false;perRackView=false;
+        draft=active[team];selectedSlot=0;scroll=0;modulePage=0;candidateId=null;unlockedOnly=true;artPreview=true;technologyView=false;guidedView=false;perRackView=false;
         purchaseArmedDesign=null;refitShipId=0;
         notice="DESIGN SANDBOX: configure fitted modules; campaign technology is researched separately.";
     }
@@ -193,9 +194,9 @@ final class ShipyardPanel {
     void dispose(){close();backgrounds.dispose();}
     void sync(int side,Shipyard.Design design) {
         active[side]=design;
-        if(side==team){draft=design;selectedSlot=0;scroll=0;modulePage=0;}
+        if(side==team){draft=design;selectedSlot=0;scroll=0;modulePage=0;candidateId=null;}
     }
-    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;modulePage=0;artPreview=true;technologyView=false;guidedView=false;}
+    private void side(int side){team=side;draft=active[side];selectedSlot=0;scroll=0;modulePage=0;candidateId=null;artPreview=true;technologyView=false;guidedView=false;}
     private void hull(int step){
         Shipyard.Hull[] options=Shipyard.Hull.shipyardOrder();
         int current=0;
@@ -210,7 +211,7 @@ final class ShipyardPanel {
         }
         if(next==null){notice="No hull licensed at Tech "+campaignRank;return;}
         draft=Shipyard.starter(draft.faction,next);
-        selectedSlot=0;scroll=0;modulePage=0;artPreview=true;
+        selectedSlot=0;scroll=0;modulePage=0;candidateId=null;artPreview=true;
         var line=ShipLineages.of(next);
         notice="SIZE "+line.generation()+"/10 | TECH "+HullProgression.requiredTier(next)+
                 " | "+line.role().description;
@@ -224,7 +225,7 @@ final class ShipyardPanel {
             if((usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)&&
                     !HullProgression.available(next,campaignRank))continue;
             draft=Shipyard.starter(draft.faction,next);
-            selectedSlot=0;scroll=0;modulePage=0;artPreview=true;
+            selectedSlot=0;scroll=0;modulePage=0;candidateId=null;artPreview=true;
             notice="SIZE "+target+"/10 | BASE TECH "+HullProgression.requiredTier(next)+
                     " | choose chassis with hull arrows";
             return;
@@ -234,7 +235,7 @@ final class ShipyardPanel {
         Battle.Faction[] options=Battle.Faction.values();
         Battle.Faction next=options[Math.floorMod(draft.faction.ordinal()+step,options.length)];
         draft=Shipyard.starter(next,draft.hull);
-        selectedSlot=0;scroll=0;modulePage=0;artPreview=true;
+        selectedSlot=0;scroll=0;modulePage=0;candidateId=null;artPreview=true;
         notice="New "+next.displayName+" "+draft.hull+" frame; stock equipment installed";
     }
     private String legacyFileName(){return "shipyard/"+team+"-"+draft.faction.name().toLowerCase(Locale.ROOT)+".ship";}
@@ -261,7 +262,7 @@ final class ShipyardPanel {
             if(usage==Usage.CAMPAIGN||usage==Usage.CAMPAIGN_REFIT)
                 CampaignShipyardRules.requireAllowed(loaded,campaignWallet.get(),
                         campaignDiscoveries.get(),catalog);
-            draft=loaded;selectedSlot=0;scroll=0;modulePage=0;artPreview=true;notice="Loaded "+file.path()+"; APPLY to deploy";
+            draft=loaded;selectedSlot=0;scroll=0;modulePage=0;candidateId=null;artPreview=true;notice="Loaded "+file.path()+"; APPLY to deploy";
         }catch(RuntimeException error){notice="Load refused: "+error.getMessage();}
     }
     private void cycleFighter(){
@@ -589,7 +590,7 @@ final class ShipyardPanel {
         else if(dy!=0){
             int pages=Math.max(1,(displayedModuleChoices().size()+MODULE_OPTIONS_PER_PAGE-1)
                     /MODULE_OPTIONS_PER_PAGE);
-            modulePage=Math.floorMod(modulePage+(dy>0?1:-1),pages);
+            modulePage=Math.floorMod(modulePage+(dy>0?1:-1),pages);candidateId=null;
         }
         return true;
     }
@@ -605,7 +606,7 @@ final class ShipyardPanel {
             else {
                 int pages=Math.max(1,(displayedModuleChoices().size()+MODULE_OPTIONS_PER_PAGE-1)
                         /MODULE_OPTIONS_PER_PAGE);
-                modulePage=Math.floorMod(modulePage+(rows>0?1:-1),pages);
+                modulePage=Math.floorMod(modulePage+(rows>0?1:-1),pages);candidateId=null;
             }
         }
         return true;
@@ -767,6 +768,7 @@ final class ShipyardPanel {
     boolean prefersHullArt(){return artPreview;}
     int selectedHardpoint(){return selectedSlot;}
     Shipyard.Design draftDesign(){return draft;}
+    String previewedModuleId(){return candidateId;}
     private float hardpointX(Shipyard.Slot slot) {
         return showingHullArt()?fleetArt.previewMountX(draft.faction,draft.hull,
                 slot.index(),MAP_CX,PREVIEW_WIDTH,PREVIEW_HEIGHT):
@@ -803,19 +805,30 @@ final class ShipyardPanel {
         for(Component part:all)if(moduleUnlocked(part))unlocked.add(part);
         return unlocked;
     }
-    private void installChoice(Component part){
+    private void previewChoice(Component part){
+        candidateId=part.id;
+        notice=moduleUnlocked(part)?"PREVIEW: "+part.name+" - tap FIT SELECTED to install":
+                "LOCKED: "+part.name+" needs higher technology";
+    }
+    private void fitCandidate(){
+        if(candidateId==null){notice="Select a module to preview before fitting";return;}
+        Component part=catalog.base(candidateId);
+        if(part==null||!Shipyard.choices(catalog,draft.faction,draft.hull,selectedSlot)
+                .stream().anyMatch(c->c.id.equals(part.id))){
+            candidateId=null;notice="This module does not fit the selected mount";return;
+        }
         if(!moduleUnlocked(part)){
             notice="LOCKED: "+part.name+" needs higher technology";return;
         }
         try{
             draft=draft.install(selectedSlot,part.id);
+            candidateId=null;purchaseArmedDesign=null;
             notice="FITTED: "+part.name+" on mount "+(selectedSlot+1);
-            purchaseArmedDesign=null;
         }catch(IllegalArgumentException blocked){notice=blocked.getMessage();}
     }
     private void select(int index) {
         stripHullArmed=false;
-        if(selectedSlot!=index)modulePage=0;
+        if(selectedSlot!=index){modulePage=0;candidateId=null;}
         selectedSlot=index;
         if(index<scroll)scroll=index;
         if(index>=scroll+SLOT_ROWS)scroll=index-SLOT_ROWS+1;
@@ -880,7 +893,7 @@ final class ShipyardPanel {
                 notice="CONFIRM EMPTY HULL: tap STRIP HULL again";
             }else{
                 draft=Shipyard.bareHull(draft.faction,draft.hull);
-                stripHullArmed=false;modulePage=0;selectedSlot=0;scroll=0;
+                stripHullArmed=false;modulePage=0;selectedSlot=0;scroll=0;candidateId=null;
                 purchaseArmedDesign=null;cachedQuote=null;
                 notice="EMPTY HULL: baseline systems remain operational";
             }
@@ -895,7 +908,7 @@ final class ShipyardPanel {
         }
         if(x>=30&&x<=317){
             if(y>=532&&y<=559){
-                unlockedOnly=x>=171;modulePage=0;
+                unlockedOnly=x>=171;modulePage=0;candidateId=null;
                 notice=unlockedOnly?"Only researched / unlocked module alternatives":
                         "All compatible modules (locked alternatives are disabled)";
                 return true;
@@ -905,18 +918,20 @@ final class ShipyardPanel {
                 List<Component> options=displayedModuleChoices();
                 int i=modulePage*MODULE_OPTIONS_PER_PAGE+row;
                 if(row>=0&&row<MODULE_OPTIONS_PER_PAGE&&i<options.size())
-                    installChoice(options.get(i));
+                    previewChoice(options.get(i));
                 return true;
             }
-            if(y>=213&&y<=262){
-                try{draft=draft.install(selectedSlot,null);notice="Mount cleared";purchaseArmedDesign=null;}
-                catch(IllegalArgumentException blocked){notice=blocked.getMessage();}
-                return true;
-            }
+            if(y>=213&&y<=262){fitCandidate();return true;}
             if(y>=157&&y<=209){
                 int pages=Math.max(1,(displayedModuleChoices().size()+MODULE_OPTIONS_PER_PAGE-1)
                         /MODULE_OPTIONS_PER_PAGE);
-                modulePage=Math.floorMod(modulePage+(x<171?-1:1),pages);
+                if(x<125)modulePage=Math.floorMod(modulePage-1,pages);
+                else if(x<219)modulePage=Math.floorMod(modulePage+1,pages);
+                else{
+                    try{draft=draft.install(selectedSlot,null);notice="Mount cleared";purchaseArmedDesign=null;}
+                    catch(IllegalArgumentException blocked){notice=blocked.getMessage();}
+                }
+                candidateId=null;
                 return true;
             }
         }
@@ -1332,6 +1347,7 @@ final class ShipyardPanel {
             if(i>=moduleChoices.size())break;
             Component part=moduleChoices.get(i);
             rectangle(shapes,30,522-(n+1)*42,287,40,
+                    part.id.equals(candidateId)?new Color(0.06f,0.23f,0.30f,1):
                     installed!=null&&installed.component.equals(part.id)?
                     new Color(0.18f,0.22f,0.14f,1):
                     new Color(0.07f,0.11f,0.16f,1));
@@ -1341,8 +1357,9 @@ final class ShipyardPanel {
         rectangle(shapes,173,531,144,29,unlockedOnly?
                 new Color(0.12f,0.25f,0.32f,1):new Color(0.08f,0.12f,0.17f,1));
         rectangle(shapes,30,214,287,48,new Color(0.18f,0.10f,0.10f,1));
-        rectangle(shapes,30,158,140,50,new Color(0.08f,0.14f,0.20f,1));
-        rectangle(shapes,173,158,144,50,new Color(0.08f,0.14f,0.20f,1));
+        rectangle(shapes,30,158,93,50,new Color(0.08f,0.14f,0.20f,1));
+        rectangle(shapes,126,158,91,50,new Color(0.08f,0.14f,0.20f,1));
+        rectangle(shapes,220,158,97,50,new Color(0.18f,0.10f,0.10f,1));
         rectangle(shapes,30,93,287,50,stripHullArmed?
                 new Color(0.30f,0.10f,0.10f,1):new Color(0.12f,0.09f,0.10f,1));
         shapes.end();
@@ -1453,18 +1470,20 @@ final class ShipyardPanel {
             if(i>=moduleChoices.size())break;
             Component part=moduleChoices.get(i);
             font.setColor(!moduleUnlocked(part)?Color.GRAY:
+                    part.id.equals(candidateId)?Color.CYAN:
                     installed!=null&&installed.component.equals(part.id)?Color.GOLD:Color.WHITE);
             font.draw(batch,shortText(part.name,26),39,508-n*42);
-            font.draw(batch,moduleUnlocked(part)?"FIT":"LOCK",277,491-n*42);
+            font.draw(batch,moduleUnlocked(part)?"VIEW":"LOCK",275,491-n*42);
         }
         if(moduleChoices.isEmpty()){
             font.setColor(Color.GRAY);
             font.draw(batch,"NO UNLOCKED ALTERNATIVES",40,486);
         }
         font.setColor(Color.WHITE);
-        font.draw(batch,"CLEAR MOUNT",95,244);
-        font.draw(batch,"< PREV",63,188);
-        font.draw(batch,"NEXT >",204,188);
+        font.draw(batch,candidateId==null?"SELECT MODULE":"FIT SELECTED",95,244);
+        font.draw(batch,"< PREV",46,188);
+        font.draw(batch,"NEXT >",137,188);
+        font.draw(batch,"CLEAR",237,188);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"PAGE "+(modulePage+1)+"/"+modulePages,113,149);
         font.setColor(stripHullArmed?Color.SCARLET:Color.LIGHT_GRAY);
@@ -1577,25 +1596,29 @@ final class ShipyardPanel {
                     hardpointX(selected)+12,hardpointY(selected)+5);
         }
         Component fitted=installed==null?null:catalog.base(installed.component);
-        font.setColor(Color.CYAN);
-        font.draw(batch,"SELECTED MODULE",813,559);
-        font.setColor(Color.WHITE);
-        font.draw(batch,shortText(fitted==null?"EMPTY MOUNT":fitted.name,36),813,532);
+        Component inspected=candidateId==null?fitted:catalog.base(candidateId);
+        font.setColor(Color.LIGHT_GRAY);
+        font.draw(batch,"FITTED: "+shortText(fitted==null?"EMPTY MOUNT":fitted.name,34),813,559);
+        font.setColor(candidateId==null?Color.WHITE:Color.CYAN);
+        font.draw(batch,(candidateId==null?"DETAILS: ":"PREVIEW: ")+
+                shortText(inspected==null?"SELECT FROM LEFT PALETTE":inspected.name,28),813,532);
         font.setColor(Color.LIGHT_GRAY);
         font.draw(batch,"MOUNT "+selected.mount()+"  SOCKET "+(selectedSlot+1),813,504);
-        if(fitted!=null){
+        if(inspected!=null){
+            font.setColor(moduleUnlocked(inspected)?Color.WHITE:Color.SCARLET);
             font.draw(batch,String.format(Locale.ROOT,"MASS %.1f t  POWER %.1f MW",
-                    fitted.mass,fitted.power),813,478);
+                    inspected.mass,inspected.power),813,478);
             font.draw(batch,String.format(Locale.ROOT,"HEAT %.1f MW  INTEGRITY %.1f",
-                    fitted.heat,fitted.integrity),813,453);
+                    inspected.heat,inspected.integrity),813,453);
             font.draw(batch,String.format(Locale.ROOT,"EFFECT x%.2f  COST %d",
-                    fitted.effect,fitted.industryCost),813,428);
+                    inspected.effect,inspected.industryCost),813,428);
         }
         font.setColor(Color.CYAN);
-        font.draw(batch,"TAP SHIP MOUNT; FIT FROM LEFT PALETTE",813,399);
+        font.draw(batch,candidateId==null?"SELECT MOUNT > PREVIEW MODULE":
+                "CANDIDATE ONLY - TAP FIT SELECTED",813,399);
         Shipyard.Track activeResearch=installed==null?null:installed.branch();
         font.setColor(Color.WHITE);
-        font.draw(batch,"MODULE SPECIALIZATION - "+selected.mount()+" #"+(selectedSlot+1),813,372);
+        font.draw(batch,"FITTED MODULE SPECIALIZATION - "+selected.mount()+" #"+(selectedSlot+1),813,372);
         for(int n=0;n<Shipyard.Track.values().length;n++){
             Shipyard.Track track=Shipyard.Track.values()[n];
             int level=installed==null?0:installed.stage(track);
