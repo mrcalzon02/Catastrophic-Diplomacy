@@ -24,7 +24,8 @@ public final class BattleRenderPosesTest {
         Battle second=new Battle(7L);
         Battle.Ship recycled=second.addShip(0,Battle.Faction.TERRAN,-100,55);
         p.fraction(second,.2f);close(p.ship(recycled).x(),-100,"battle switch clears old ids");
-        check(p.trackedShips()==0,"old state cleared");
+        check(p.trackedShips()==0&&p.trackedRockets()==0,
+                "old simulation poses must not leak to a new battle");
         p.beforeStep(second);recycled.x=-80;p.fraction(second,.5f);
         close(p.ship(recycled).x(),-90,"new battle interpolates");
         System.out.println("PASS render-only interpolation, heading wrap, spawns, warps, battle reset");

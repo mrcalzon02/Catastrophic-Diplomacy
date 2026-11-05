@@ -79,6 +79,8 @@ final class GuidedPayloadVisual {
                 phase==OrdnancePropulsion.Phase.COAST){
             r*=.82f;g*=.82f;b*=.82f;
         }
-        return new Appearance(CURATED,36f*size,28f*size,r,g,b,a,cell,fallback);
+        // Render the real missile body at one-quarter of the old giant art
+        // footprint. Hitboxes, physical size, guidance and thrust are untouched.
+        return new Appearance(CURATED,9f*size,7f*size,r,g,b,a,cell,fallback);
     }
 }

@@ -27,7 +27,8 @@ final class RocketPayloadVisual {
             case SIEGE -> 1.35f;
         };
         float tint=rocket.burning()?1f:.75f;
-        return new Appearance(cell,36f*scale,25f*scale,
+        // Unguided rockets use the same compact projectile-art world scale.
+        return new Appearance(cell,9f*scale,6.25f*scale,
                 tint,tint*.92f,tint*.80f);
     }
 }

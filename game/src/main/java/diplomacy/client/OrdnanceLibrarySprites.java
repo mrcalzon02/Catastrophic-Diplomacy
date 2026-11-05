@@ -129,13 +129,14 @@ final class OrdnanceLibrarySprites implements Disposable {
             int frame=(int)Math.floorMod((tick-missile.spawnTick)/2,FRAMES);
             TextureRegion plume=plumeRegions[index*FRAMES+frame];
             float phaseScale=switch(missile.thrustPhase){
-                case BOOST -> 1.45f;
-                case TERMINAL -> 1.85f;
-                case CRUISE -> 1.0f;
+                case BOOST -> 1.10f;
+                case TERMINAL -> 1.25f;
+                case CRUISE -> .90f;
                 default -> 0f;
             };
-            float plumeWidth=width*1.75f*phaseScale;
-            float plumeHeight=height*1.35f;
+            // No ship-sized exhaust halos at cinematic tracking zoom.
+            float plumeWidth=width*1.25f*phaseScale;
+            float plumeHeight=height*.90f;
             double rad=pose.angle();
             float x=pose.x()-(float)StrictMath.cos(rad)*(width*.5f+plumeWidth*.12f);
             float y=pose.y()-(float)StrictMath.sin(rad)*(width*.5f+plumeWidth*.12f);

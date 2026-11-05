@@ -38,6 +38,10 @@ public final class GuidedPayloadVisualTest {
                 &&heavy.width()>standard.width()
                 &&torpedo.width()>standard.width(),
                 "Micro, standard and heavy ordnance must have genuinely different footprints");
+        check(CombatEffectScale.of(standard.width())<=3.1f &&
+                CombatEffectScale.of(heavy.width())<5f &&
+                CombatEffectScale.of(torpedo.width())<5f,
+                "Guided projectile body art must stay far below an escort hull footprint");
         check(decoy.alpha()<standard.alpha()&&decoy.width()!=standard.width(),
                 "Decoy must not be visually identical to a live guided warhead");
         var emp=look(false,OrdnanceDoctrine.Payload.STANDARD,
