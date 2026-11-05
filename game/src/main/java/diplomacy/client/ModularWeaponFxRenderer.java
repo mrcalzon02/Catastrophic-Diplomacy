@@ -274,18 +274,21 @@ final class ModularWeaponFxRenderer implements Disposable {
         TextureRegion[] rocketAtlas=missileBodies();
         for(Battle.Rocket rocket:battle.rockets()){
             RocketPayloadVisual.Appearance style=RocketPayloadVisual.forRocket(rocket);
-            if(view!=null&&!view.circle((float)rocket.x,(float)rocket.y,
+            BattleRenderPoses.Pose pose=poses==null?
+                    new BattleRenderPoses.Pose((float)rocket.x,(float)rocket.y,
+                            (float)rocket.heading):poses.rocket(rocket);
+            if(view!=null&&!view.circle(pose.x(),pose.y(),
                     CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f))
                 continue;
             Texture fallback=rocketAtlas==null?texture(GuidedPayloadVisual.GUIDED):null;
             if(rocketAtlas==null&&fallback==null)continue;
-            float heading=(float)StrictMath.toDegrees(rocket.heading);
+            float heading=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(style.red(),style.green(),style.blue(),1f);
             if(rocketAtlas!=null)
                 drawCentered(batch,rocketAtlas[style.cell()],
-                        (float)rocket.x,(float)rocket.y,
+                        pose.x(),pose.y(),
                         style.width(),style.height(),heading);
-            else drawCentered(batch,fallback,(float)rocket.x,(float)rocket.y,
+            else drawCentered(batch,fallback,pose.x(),pose.y(),
                     style.width(),style.height(),heading);
             batch.setColor(1,1,1,1);
         }

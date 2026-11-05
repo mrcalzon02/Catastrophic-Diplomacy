@@ -7,16 +7,16 @@ import java.util.Map;
 final class BattleRenderPoses {
     record Pose(float x,float y,float angle){}
     private final Map<Integer,Pose> ships=new HashMap<>(),crafts=new HashMap<>();
-    private final Map<Long,Pose> missiles=new HashMap<>(),shells=new HashMap<>();
+    private final Map<Long,Pose> missiles=new HashMap<>(),rockets=new HashMap<>(),shells=new HashMap<>();
     private Battle source;
     private float fraction=1f;
     void sync(Battle battle){
         if(source==battle)return;
-        source=battle;ships.clear();crafts.clear();missiles.clear();shells.clear();
+        source=battle;ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();
         fraction=1f;
     }
     void beforeStep(Battle battle){
-        sync(battle);ships.clear();crafts.clear();missiles.clear();shells.clear();
+        sync(battle);ships.clear();crafts.clear();missiles.clear();rockets.clear();shells.clear();
         for(Battle.Ship s:battle.ships())if(s.alive())
             ships.put(s.id,new Pose((float)s.x,(float)s.y,(float)s.facing));
         for(Battle.Craft c:battle.crafts())
@@ -24,6 +24,8 @@ final class BattleRenderPoses {
         for(Battle.Missile m:battle.missiles())
             missiles.put(m.visualId,new Pose((float)m.x,(float)m.y,
                     (float)Math.atan2(m.vy,m.vx)));
+        for(Battle.Rocket r:battle.rockets())
+            rockets.put(r.visualId,new Pose((float)r.x,(float)r.y,(float)r.heading));
         for(Battle.Ballistic b:battle.ballistics())
             shells.put(b.visualId,new Pose((float)b.x,(float)b.y,
                     (float)Math.atan2(b.vy,b.vx)));
@@ -51,10 +53,15 @@ final class BattleRenderPoses {
         return blend(missiles.get(m.visualId),new Pose((float)m.x,(float)m.y,
                 (float)Math.atan2(m.vy,m.vx)));
     }
+    Pose rocket(Battle.Rocket r){
+        return blend(rockets.get(r.visualId),
+                new Pose((float)r.x,(float)r.y,(float)r.heading));
+    }
     Pose shell(Battle.Ballistic b){
         return blend(shells.get(b.visualId),new Pose((float)b.x,(float)b.y,
                 (float)Math.atan2(b.vy,b.vx)));
     }
     int trackedShips(){return ships.size();}
     int trackedMissiles(){return missiles.size();}
+    int trackedRockets(){return rockets.size();}
 }

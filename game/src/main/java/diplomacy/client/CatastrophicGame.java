@@ -2997,9 +2997,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // Only when approved rocket body art is genuinely unavailable:
         // use bounded live projectile dots, never fabricate ship sprites.
         if(!texturedRockets)for(Battle.Rocket rocket:battle.rockets()){
-            if(!view.circle((float)rocket.x,(float)rocket.y,4))continue;
+            BattleRenderPoses.Pose pose=renderPoses.rocket(rocket);
+            if(!view.circle(pose.x(),pose.y(),4))continue;
             shapes.setColor(rocket.burning()?Color.ORANGE:Color.GOLD);
-            shapes.circle((float)rocket.x,(float)rocket.y,
+            shapes.circle(pose.x(),pose.y(),
                     CombatEffectScale.of(rocket.size==diplomacy.sim.RocketBarrage.Size.SIEGE?
                             3.6f:2f),7);
         }
