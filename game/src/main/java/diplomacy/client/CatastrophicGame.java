@@ -79,6 +79,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private final AdaptiveCombatPace paceGovernor=new AdaptiveCombatPace();
     private final CombatDiagnosticRecorder diagnosticRecorder=new CombatDiagnosticRecorder();
     private boolean diagnosticsHud;
+    /** Development capture is ON by default; F3 is the persistent opt-out toggle. */
+    private boolean performanceCaptureEnabled=true;
     private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
@@ -329,6 +331,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 var preferences=Gdx.app.getPreferences(PERFORMANCE_PREFS);
                 speed=CombatPace.clamp(preferences.getFloat("requestedSpeed",CombatPace.DEFAULT));
                 diagnosticsHud=preferences.getBoolean("hud",false);
+                performanceCaptureEnabled=preferences.getBoolean("capture",true);
                 paceGovernor.request(speed);
                 paceGovernor.setEnabled(preferences.getBoolean("adaptive",true));
             }catch(RuntimeException failure){
@@ -2458,6 +2461,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             preferences.putFloat("requestedSpeed",CombatPace.clamp(speed));
             preferences.putBoolean("adaptive",paceGovernor.enabled());
             preferences.putBoolean("hud",diagnosticsHud);
+            preferences.putBoolean("capture",performanceCaptureEnabled);
             preferences.flush();
         }catch(RuntimeException failure){Gdx.app.error("CD-PERF","Cannot save preferences",failure);}
     }
@@ -2487,20 +2491,32 @@ public final class CatastrophicGame extends ApplicationAdapter {
         performanceNotice(diagnosticsHud?"PERFORMANCE HUD ON":"PERFORMANCE HUD OFF");
         savePerformancePreferences();
     }
+    /** Capture persists across battles; a new battle adds a seed-labelled event. */
+    private void beginPerformanceCapture(Battle started,String label){
+        if(!performanceCaptureEnabled||started==null)return;
+        if(!diagnosticRecorder.recording())
+            diagnosticRecorder.start(started.seed(),started.tick,started.ships().size());
+        diagnosticRecorder.event(started.tick,speed,paceGovernor.effective(),
+                label+" seed="+Long.toUnsignedString(started.seed())+
+                " ships="+started.ships().size());
+    }
     private void toggleDiagnosticsCapture(){
-        if(diagnosticRecorder.recording()){
+        performanceCaptureEnabled=!performanceCaptureEnabled;
+        if(!performanceCaptureEnabled){
             diagnosticRecorder.stop();
-            performanceNotice("CAPTURE STOPPED - EXPORT TO SAVE");
+            performanceNotice("DEV PERFORMANCE RECORDING OFF (F3)");
         }else{
-            if(battle!=null)
-                diagnosticRecorder.start(battle.seed(),battle.tick,battle.ships().size());
+            if(battle!=null)diagnosticRecorder.start(battle.seed(),battle.tick,battle.ships().size());
             else diagnosticRecorder.start();
-            diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),"CAPTURE START");
-            performanceNotice("PERFORMANCE CAPTURE RECORDING");
+            diagnosticRecorder.event(battle==null?0:battle.tick,speed,
+                    paceGovernor.effective(),"DEV RECORDING ENABLED");
+            performanceNotice("DEV PERFORMANCE RECORDING ON (F3)");
         }
+        savePerformancePreferences();
     }
     private void exportDiagnostics(){
         String path="diagnostics/cd-performance-"+System.currentTimeMillis()+".zip";
+        boolean exported=false;
         try{
             boolean android=Gdx.app.getType()==com.badlogic.gdx.Application.ApplicationType.Android;
             var output=android?Gdx.files.local(path):
@@ -2512,6 +2528,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             // Verify from the actual platform filesystem before telling the
             // player an artifact exists or invoking Android's share chooser.
             CombatDiagnosticRecorder.verifyArchive(output.read());
+            exported=true;
             performanceNotice("EXPORTED "+path);
             Gdx.app.log("CD-PERF-EXPORT",output.file().getAbsolutePath()+
                     " bytes="+output.length());
@@ -2519,6 +2536,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }catch(Exception error){
             performanceNotice("PERFORMANCE EXPORT FAILED: "+error.getMessage());
             Gdx.app.error("CD-PERF-EXPORT","Capture export failed",error);
+        }finally{
+            // ZIP export stops the recorder internally. A developer capture
+            // must immediately resume; failed exports preserve the old samples.
+            if(performanceCaptureEnabled){
+                if(exported){
+                    if(battle!=null)diagnosticRecorder.start(battle.seed(),battle.tick,
+                            battle.ships().size());
+                    else diagnosticRecorder.start();
+                }else diagnosticRecorder.resume();
+                diagnosticRecorder.event(battle==null?0:battle.tick,speed,
+                        paceGovernor.effective(),exported?
+                        "CONTINUE AFTER VERIFIED EXPORT":"CONTINUE AFTER FAILED EXPORT");
+            }
         }
     }
     private void tapScreensaverControl(float x){
@@ -2564,6 +2594,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         screensaverResultPause=0;
         accumulator=0;running=true;
         if(audio!=null)audio.resetForBattle();
+        beginPerformanceCapture(battle,"SCREENSAVER ROUND");
         Gdx.app.log("CD-SCREENSAVER","ROUND seed="+screensaverRound.seed()
                 +" sides="+screensaverRound.left()+"("+screensaverRound.leftFleet().size()
                 +",T"+screensaverRound.leftTier()+") / "+screensaverRound.right()
@@ -2571,6 +2602,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 +") backdrop="+battlefieldLevel);
     }
     private void stopScreensaver(){
+        // Retain a real file for the unattended stutter/performance session.
+        if(performanceCaptureEnabled&&diagnosticRecorder.framesRecorded()>0)
+            exportDiagnostics();
         shipInspector.close();
         screensaverWake.reset();
         screensaverControlsVisible=false;
@@ -2629,6 +2663,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         accumulator = 0;
         if (audio != null) audio.resetForBattle();
         running = true;
+        beginPerformanceCapture(battle,"BATTLE START");
         if(verifyDemo){
             verifiedSequence=0;verifiedFrames=verifiedShots=verifiedImpacts=peakAnimations=peakCraft=peakOrdnance=peakSpriteShips=0;
             verificationReported=false;verifiedTypes.clear();verifiedShotIds.clear();
@@ -3130,6 +3165,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 batch.setProjectionMatrix(camera.combined);
                 shipInspector.draw(battle,shapes,batch,font);
             }
+            drawFpsOverlay();
+            sampleCombatPerformanceFrame(renderStartNs,simulationEndNs,
+                    lightingOverlayNs,drawCallsBefore);
             return;
         }
         // HUD is screen-anchored; do not draw fixed bars in the moving battle camera.
@@ -3312,6 +3350,41 @@ public final class CatastrophicGame extends ApplicationAdapter {
             shipInspector.draw(battle,shapes,batch,font);
         }
         if (tacticalMenuOpen) drawTacticalMenu();
+        drawFpsOverlay();
+        sampleCombatPerformanceFrame(renderStartNs,simulationEndNs,
+                lightingOverlayNs,drawCallsBefore);
+        if(playedCampaign&&screen==GameMenuPanel.Screen.BATTLE&&battle!=null&&
+                battle.tick>=15){
+            // Emit only AFTER the actual gameplay framebuffer is drawn.
+            long bucket=battle.tick/60;
+            if(lastCampaignFrameBucket!=bucket){
+                lastCampaignFrameBucket=bucket;
+                Gdx.app.log("CD-CAMPAIGN-RUNTIME","BATTLE_FRAME mission="+activeMission+
+                        " tick="+battle.tick+" alive="+battle.alive(0)+"/"+
+                        battle.alive(1)+" ships="+battle.ships().size());
+            }
+        }
+        if(verifyDemo)verifyRenderedDemoFrame();
+        captureArmorFramebuffer();
+    }
+
+    /** Small always-on overlay, above the playfield and below the battle controls. */
+    private void drawFpsOverlay(){
+        shapes.setProjectionMatrix(camera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        shapes.setColor(0f,0f,0f,.70f);
+        shapes.rect(W-112,H-140,104,29);
+        shapes.end();
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        font.setColor(Color.WHITE);
+        font.draw(batch,"FPS "+Gdx.graphics.getFramesPerSecond(),W-101,H-116);
+        batch.end();
+    }
+
+    /** One perf sampler for both campaign/skirmish AND the Battlespace screensaver. */
+    private void sampleCombatPerformanceFrame(long renderStartNs,long simulationEndNs,
+                                              long lightingOverlayNs,int drawCallsBefore){
         long cpuFrameNs=System.nanoTime()-renderStartNs;
         long simulationNs=simulationEndNs-renderStartNs;
         int frameDrawCalls=Math.max(0,batch.totalRenderCalls-drawCallsBefore);
@@ -3352,21 +3425,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     " fps="+Gdx.graphics.getFramesPerSecond());
             renderProfile.reset();
         }
-        if(playedCampaign&&screen==GameMenuPanel.Screen.BATTLE&&battle!=null&&
-                battle.tick>=15){
-            // Emit only AFTER the actual gameplay framebuffer is drawn.
-            // A bare CAMPAIGN_BATTLE transition no longer suffices for CI.
-            long bucket=battle.tick/60;
-            if(lastCampaignFrameBucket!=bucket){
-                lastCampaignFrameBucket=bucket;
-                Gdx.app.log("CD-CAMPAIGN-RUNTIME","BATTLE_FRAME mission="+activeMission+
-                        " tick="+battle.tick+" alive="+battle.alive(0)+"/"+
-                        battle.alive(1)+" ships="+battle.ships().size());
-            }
-        }
-        if(verifyDemo)verifyRenderedDemoFrame();
-        captureArmorFramebuffer();
     }
+
 
     /** Setup a new self-contained seeded firing lane or explicit artificial stress. */
     private void selectArmorCapture(int index){
