@@ -33,6 +33,26 @@ public final class CapitalTurretSpritesTest {
                 *3f-6.4f)<.0001f,"Mounted turret diameter must be 1/3 former size");
         check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.TORPEDO,1f)
                 *3f-6.4f*1.14f)<.0001f,"Torpedo fittings retain relative sizing");
+        // Visual-only scaling: preserve all primary turrets, halve each PD family.
+        float oldBase=6.4f/3f;
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.POINT_DEFENSE,1f)
+                -oldBase*.75f*.5f)<.0001f,"Standard PD must be half its old size");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.FLAK,1f)
+                -oldBase*.5f)<.0001f,"Flak is also point defense and must shrink");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.ROTARY_CIWS,1f)
+                -oldBase*.82f*.5f)<.0001f,"Rotary CIWS must be half its old size");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.RAIL_PD,1f)
+                -oldBase*1.02f*.5f)<.0001f,"Rail PD must be half its old size");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.PARTICLE_PD,1f)
+                -oldBase*.85f*.5f)<.0001f,"Particle PD must be half its old size");
+        check(Math.abs(CapitalTurretSprites.diameter(WeaponMuzzles.Family.POINT_DEFENSE,2f)
+                -oldBase*.75f)<.0001f,"PD reduction must scale with parent hull");
+        for(WeaponMuzzles.Family primary:new WeaponMuzzles.Family[]{
+                WeaponMuzzles.Family.KINETIC,WeaponMuzzles.Family.LASER,
+                WeaponMuzzles.Family.PLASMA,WeaponMuzzles.Family.PARTICLE,
+                WeaponMuzzles.Family.MISSILE,WeaponMuzzles.Family.ROCKET})
+            check(Math.abs(CapitalTurretSprites.diameter(primary,1f)-oldBase)<.0001f,
+                    "Primary weapons must retain their original size: "+primary);
         check(CapitalTurretSprites.tile(WeaponMuzzles.Family.PLASMA,1)==4,
                 "Plasma modules must show plasma cannon artwork");
         check(CapitalTurretSprites.tile(WeaponMuzzles.Family.POINT_DEFENSE,2)==6,

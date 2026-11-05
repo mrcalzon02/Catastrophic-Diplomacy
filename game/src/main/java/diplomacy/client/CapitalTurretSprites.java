@@ -72,6 +72,7 @@ public final class CapitalTurretSprites implements AutoCloseable {
     }
 
     /** Divide the previous mounted-art footprint by THREE in each dimension.
+     * Point-defense fittings render at another 50% of their former size.
      * Weapons and damage values stay untouched; sockets remain the pivot. */
     static float diameter(WeaponMuzzles.Family family,float shipScale){
         if(family==null||!Float.isFinite(shipScale)||shipScale<=0)
@@ -82,6 +83,12 @@ public final class CapitalTurretSprites implements AutoCloseable {
         if(family==WeaponMuzzles.Family.PARTICLE_PD)value*=.85f;
         if(family==WeaponMuzzles.Family.RAIL_PD)value*=1.02f;
         if(family==WeaponMuzzles.Family.TORPEDO)value*=1.14f;
+        // Half-size every point-defense turret without changing heavy weapons.
+        if(family==WeaponMuzzles.Family.POINT_DEFENSE
+                ||family==WeaponMuzzles.Family.FLAK
+                ||family==WeaponMuzzles.Family.ROTARY_CIWS
+                ||family==WeaponMuzzles.Family.RAIL_PD
+                ||family==WeaponMuzzles.Family.PARTICLE_PD)value*=.5f;
         return value;
     }
 
