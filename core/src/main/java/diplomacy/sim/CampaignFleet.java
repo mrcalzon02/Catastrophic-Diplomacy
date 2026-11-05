@@ -447,6 +447,11 @@ public final class CampaignFleet {
                         }else if(craft.repair)repairs++;
                         else drones++;
                     }
+                    // Recovered aircraft awaiting paid ammunition service are
+                    // physically in the carrier's hangar, not in battle.crafts().
+                    // Preserve the airframes in campaign inventory without
+                    // counting their already-returned pilots twice.
+                    fighters+=s.dockedFighters.size();
                     // Only craft that actually survive in the battle can be
                     // recovered, and never more than this vessel launched.
                     Stores supplies=Stores.capture(s).recover(
