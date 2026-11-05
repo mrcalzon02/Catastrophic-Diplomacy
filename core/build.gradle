@@ -92,6 +92,20 @@ tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
     dependsOn(tasks.named('battleArenaSmoke'))
 }
 
+// Parity is an objective functional gate, not a stopwatch threshold.
+// Exercise the exact same seeded battles with the historical photon cache
+// enabled and disabled; include full 200v200 deterministic state readback.
+tasks.register('photonCacheParitySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Compare cached and uncached 4v4, 16v16 and 200v200 causal light-time battle fingerprints.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.PhotonObservationCacheTest'
+    dependsOn testClasses
+}
+tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('photonCacheParitySmoke'))
+}
+
 tasks.register('sensorLightTimeSmoke', JavaExec) {
     group = 'verification'
     description = 'Causal light-time sensor history, active echo and bounded relay fixtures.'
