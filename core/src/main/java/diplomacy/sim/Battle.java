@@ -4784,10 +4784,20 @@ public final class Battle {
         double ty=intercept!=null?intercept.y:
                 shared!=null?shared.y():target.y;
         double distance=StrictMath.hypot(tx-craft.x,ty-craft.y);
-        // Standoff craft do not fly through targets at their maximum thrust.
+        // Standoff weapons are not permission to park on a carrier deck.
+        // Bombers can already be inside torpedo range when launched; they
+        // still need to clear the parent hull before taking a firing station.
+        // This is a real flight displacement, not a rendered offset.
         double desired=profile.range()*0.68;
-        if(distance>desired && distance>1){
-            double movement=Math.min(distance-desired,profile.speed()*DT);
+        Ship flightDeck=findShip(craft.sourceId);
+        double fromDeck=flightDeck==null?Double.POSITIVE_INFINITY:
+                StrictMath.hypot(craft.x-flightDeck.x,craft.y-flightDeck.y);
+        double deckClearance=StrictMath.max(36,
+                StrictMath.min(64,profile.range()*0.18));
+        if(distance>1&&(distance>desired||fromDeck<deckClearance)){
+            double needed=distance>desired?distance-desired:deckClearance-fromDeck;
+            double movement=StrictMath.min(distance,
+                    StrictMath.min(needed,profile.speed()*DT));
             craft.x+=(tx-craft.x)/distance*movement;
             craft.y+=(ty-craft.y)/distance*movement;
         }

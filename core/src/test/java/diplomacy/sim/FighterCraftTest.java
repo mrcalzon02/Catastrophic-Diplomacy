@@ -407,9 +407,32 @@ public final class FighterCraftTest {
                 "No-magazine carrier must store aircraft rather than mint full missiles");
     }
 
+    /** Long-range bombers must physically depart the flight deck even when
+     * their target is already within the fitted torpedo firing envelope. */
+    private static void clearFlightDeck(TechnologyCatalog tech){
+        Battle battle=scenario(tech,FighterModel.Hull.TORPEDO_BOMBER,20261106L);
+        Battle.Ship parent=battle.ships().get(0);
+        awaitPhysicalSorties(battle,parent,1);
+        Battle.Craft launched=null;
+        for(Battle.Craft craft:battle.crafts())
+            if(craft.fighter&&craft.sourceId==parent.id){launched=craft;break;}
+        check(launched!=null,"Launch-clearance fixture has no live bomber");
+        check(StrictMath.hypot(battle.ships().get(1).x-parent.x,
+                battle.ships().get(1).y-parent.y)
+                <launched.profile.range()*0.68,
+                "Flight-deck test must begin inside the bomber's standoff band");
+        int launchedId=launched.id;
+        for(int t=0;t<25;t++)battle.step();
+        check(battle.crafts().stream().anyMatch(c->c.id==launchedId),
+                "Launch-clearance bomber disappeared before flying clear");
+        check(StrictMath.hypot(launched.x-parent.x,launched.y-parent.y)>36,
+                "Torpedo bomber remains stacked on its carrier after launch");
+    }
+
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         sensorAndArmor();
+        clearFlightDeck(tech);
         flightWingManifest(tech);
         CampaignFlightWingCodecTest.run(tech);
         saves(tech);
