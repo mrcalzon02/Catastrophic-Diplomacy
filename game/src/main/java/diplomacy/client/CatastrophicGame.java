@@ -1176,7 +1176,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     }
     private void showCampaign(){
         if(campaign==null){openCampaignSetup();return;}
-        selectedMission=campaign.unlocked();
+        selectedMission=campaign.recommendedMission();
         campaignPage=CampaignMap.pageOf(selectedMission);
         screen=GameMenuPanel.Screen.CAMPAIGN;
     }
