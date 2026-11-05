@@ -2668,6 +2668,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shipInspector.close();
         screensaverRound=ScreensaverBattle.create(screensaverRandom.nextLong(),technology);
         battle=screensaverRound.battle();
+        battle.initializeBattleApproach();
         // Each battle is a new shot sequence. Never follow stale/dead previous-round IDs.
         screensaverCamera.reset(battle,screensaverRound.seed());
         battlefieldLevel=screensaverRound.environmentLevel();
@@ -2739,6 +2740,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 ship.squadronRadio=campaignFleet.radioFor(owned.id());
             }
         }
+        // Only explicitly launched live engagements inherit their approach
+        // momentum; deterministic headless simulation fixtures stay at rest.
+        if(!verifyDemo)battle.initializeBattleApproach();
         if (weatherEnabled || playedCampaign) battle.configureWeather(environment.weather());
         // Only explicit 200v200 verifier installs a timing callback. Regular
         // campaign, skirmish, screensaver and network battles never do.
