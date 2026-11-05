@@ -9,12 +9,19 @@ import java.util.zip.CRC32;
  * work. No wall-clock timers, free research or failed-mission work credit.
  */
 public final class CampaignProgress {
-    private static final String MAGIC="CD-CAMPAIGN-4";
-    private static final String PREVIOUS="CD-CAMPAIGN-3";
+    private static final String MAGIC="CD-CAMPAIGN-5";
+    private static final String PREVIOUS="CD-CAMPAIGN-4";
+    private static final String V3="CD-CAMPAIGN-3";
     private static final String V2="CD-CAMPAIGN-2";
     private static final String V1="CD-CAMPAIGN-1";
     private static final int[] ACCELERATOR_WORK={0,2,3,4,5};
     private CampaignProgress() { }
+    /** Fixed 500-bit clear mask. Historical linear saves migrate with all prior missions cleared. */
+    private static String clearedThrough(int high){
+        StringBuilder bits=new StringBuilder(LevelEconomy.LEVEL_COUNT);
+        for(int i=1;i<=LevelEconomy.LEVEL_COUNT;i++)bits.append(i<=high?'1':'0');
+        return bits.toString();
+    }
     private static int requiredMissions(Project kind,int rank,int speed){
         int base=switch(kind){
             case NONE -> 0;
@@ -40,7 +47,14 @@ public final class CampaignProgress {
     public enum Project { NONE, LICENSE, ACCELERATOR }
     public record State(Battle.Faction faction,int unlocked,long credits,int victories,
                         int researchRank,int highestCompleted,int speedUpgrades,
-                        Project activeProject,int projectProgress) {
+                        Project activeProject,int projectProgress,String clears) {
+        /** Preserve historical State construction used by tests and save migration. */
+        public State(Battle.Faction faction,int unlocked,long credits,int victories,
+                     int researchRank,int highestCompleted,int speedUpgrades,
+                     Project activeProject,int projectProgress){
+            this(faction,unlocked,credits,victories,researchRank,highestCompleted,
+                    speedUpgrades,activeProject,projectProgress,clearedThrough(highestCompleted));
+        }
         public State(Battle.Faction faction,int unlocked,long credits,int victories){
             this(faction,unlocked,credits,victories,0);
         }
@@ -53,25 +67,67 @@ public final class CampaignProgress {
                     ||credits<0||victories<0||researchRank<0||researchRank>9
                     ||highestCompleted<0||highestCompleted>LevelEconomy.LEVEL_COUNT
                     ||unlocked!=Math.min(LevelEconomy.LEVEL_COUNT,highestCompleted+1)
-                    ||speedUpgrades<0||speedUpgrades>4||activeProject==null||projectProgress<0)
+                    ||speedUpgrades<0||speedUpgrades>4||activeProject==null||projectProgress<0
+                    ||clears==null||clears.length()!=LevelEconomy.LEVEL_COUNT)
                 throw new IllegalArgumentException("Invalid campaign progression");
+            for(int i=0;i<clears.length();i++)
+                if(clears.charAt(i)!='0'&&clears.charAt(i)!='1')
+                    throw new IllegalArgumentException("Invalid campaign clear mask");
+            if(highestCompleted>0&&clears.charAt(highestCompleted-1)!='1')
+                throw new IllegalArgumentException("Campaign frontier not cleared");
             int maxWork=requiredMissions(activeProject,researchRank,speedUpgrades);
             if((activeProject==Project.NONE&&projectProgress!=0)
                     ||(activeProject!=Project.NONE&&
                     (maxWork==0||projectProgress>=maxWork)))
                 throw new IllegalArgumentException("Invalid unfinished research project");
         }
-        public boolean available(int level){return level>=1&&level<=unlocked;}
+        /** A front opens after the preceding front's final mission. Within it,
+         * players can pursue three real paths, including two cross-lane links. */
+        public boolean available(int level){
+            if(level<1||level>LevelEconomy.LEVEL_COUNT)return false;
+            if(completed(level))return true; // Replays remain available.
+            // The seven final fleet battles are intentionally one escalating finale.
+            if(level>=494)return completed(level-1);
+            int start=((level-1)/CampaignMap.PAGE_SIZE)*CampaignMap.PAGE_SIZE+1;
+            if(level==start)return level==1||completed(start-1);
+            if(!completed(start))return false;
+            int offset=level-start;
+            return switch(offset){
+                case 1,4,7 -> true; // Three branches out of the entry mission.
+                case 2 -> completed(start+1);
+                case 3 -> completed(start+2);
+                case 5 -> completed(start+4)||completed(start+2);
+                case 6 -> completed(start+5);
+                case 8 -> completed(start+7)||completed(start+5);
+                case 9 -> { // A convergence operation, not nine arbitrary linear steps.
+                    int clearCount=0;
+                    for(int i=start;i<start+9;i++)if(completed(i))clearCount++;
+                    yield clearCount>=5&&(completed(start+3)
+                            ||completed(start+6)||completed(start+8));
+                }
+                default -> false;
+            };
+        }
         public boolean completed(int level){
-            return level>=1&&level<=highestCompleted;
+            return level>=1&&level<=LevelEconomy.LEVEL_COUNT&&clears.charAt(level-1)=='1';
         }
         public boolean completedMission(int level){return completed(level);}
         public boolean isReplay(int level){return completed(level);}
+        /** Prefer the current playable front, not a locked numeric successor. */
+        public int recommendedMission(){
+            int start=Math.min(LevelEconomy.LEVEL_COUNT,
+                    ((Math.min(LevelEconomy.LEVEL_COUNT,highestCompleted+1)-1)/10)*10+1);
+            for(int i=start;i<=Math.min(LevelEconomy.LEVEL_COUNT,start+9);i++)
+                if(available(i)&&!completed(i))return i;
+            for(int i=1;i<=LevelEconomy.LEVEL_COUNT;i++)
+                if(available(i)&&!completed(i))return i;
+            return LevelEconomy.LEVEL_COUNT;
+        }
         public State spend(long cost){
             if(cost<0||cost>credits)
                 throw new IllegalArgumentException("Insufficient campaign credits");
             return new State(faction,unlocked,credits-cost,victories,researchRank,
-                    highestCompleted,speedUpgrades,activeProject,projectProgress);
+                    highestCompleted,speedUpgrades,activeProject,projectProgress,clears);
         }
         /** Award salvage only when combat verified a beacon-bearing wreck and
          * victorious recovery; preserves the existing durable ledger format. */
@@ -80,7 +136,7 @@ public final class CampaignProgress {
             if(recoveredCredits==0)return this;
             return new State(faction,unlocked,Math.addExact(credits,recoveredCredits),
                     victories,researchRank,highestCompleted,speedUpgrades,
-                    activeProject,projectProgress);
+                    activeProject,projectProgress,clears);
         }
         public long nextResearchCost(){
             return researchRank==9?0:LevelEconomy.draftResearchCost(researchRank+1);
@@ -160,7 +216,7 @@ public final class CampaignProgress {
                     needed==0&&desired==Project.LICENSE?researchRank+1:researchRank,
                     highestCompleted,
                     needed==0&&desired==Project.ACCELERATOR?speedUpgrades+1:speedUpgrades,
-                    needed==0?Project.NONE:desired,0);
+                    needed==0?Project.NONE:desired,0,clears);
         }
         /** Historical entrypoint now starts paid work instead of granting a rank. */
         public State purchaseNextResearch(){return beginResearch(Project.LICENSE);}
@@ -186,7 +242,8 @@ public final class CampaignProgress {
             }
             return new State(faction,Math.min(LevelEconomy.LEVEL_COUNT,nextHigh+1),
                     Math.addExact(credits,reward),Math.addExact(victories,1),
-                    nextLicense,nextHigh,nextSpeed,nextProject,nextProgress);
+                    nextLicense,nextHigh,nextSpeed,nextProject,nextProgress,
+                    clears.substring(0,level-1)+'1'+clears.substring(level));
         }
     }
     public static State start(Battle.Faction faction){return new State(faction,1,0,0);}
@@ -195,7 +252,8 @@ public final class CampaignProgress {
         String body=MAGIC+"\n"+state.faction().name()+"\n"+state.unlocked()+"\n"+
                 state.credits()+"\n"+state.victories()+"\n"+state.researchRank()+"\n"+
                 state.highestCompleted()+"\n"+state.speedUpgrades()+"\n"+
-                state.activeProject().name()+"\n"+state.projectProgress()+"\n";
+                state.activeProject().name()+"\n"+state.projectProgress()+"\n"+
+                state.clears()+"\n";
         CRC32 checksum=new CRC32();checksum.update(body.getBytes(StandardCharsets.UTF_8));
         return body+Long.toHexString(checksum.getValue())+"\n";
     }
@@ -205,9 +263,10 @@ public final class CampaignProgress {
         String[] rows=save.split("\n",-1);
         boolean v1=rows.length==7&&V1.equals(rows[0]);
         boolean v2=rows.length==8&&V2.equals(rows[0]);
-        boolean v3=rows.length==12&&PREVIOUS.equals(rows[0]);
-        boolean v4=rows.length==12&&MAGIC.equals(rows[0]);
-        if(!(v1||v2||v3||v4)||!rows[rows.length-1].isEmpty())
+        boolean v3=rows.length==12&&V3.equals(rows[0]);
+        boolean v4=rows.length==12&&PREVIOUS.equals(rows[0]);
+        boolean v5=rows.length==13&&MAGIC.equals(rows[0]);
+        if(!(v1||v2||v3||v4||v5)||!rows[rows.length-1].isEmpty())
             throw new IllegalArgumentException("Unsupported campaign save");
         int checksumLine=rows.length-2;
         StringBuilder body=new StringBuilder();
@@ -217,8 +276,12 @@ public final class CampaignProgress {
             throw new IllegalArgumentException("Campaign checksum mismatch");
         try {
             int reached=Integer.parseInt(rows[2]);
-            int high=(v3||v4)?Integer.parseInt(rows[6]):Math.max(0,reached-1);
+            int high=(v3||v4||v5)?Integer.parseInt(rows[6]):Math.max(0,reached-1);
             int licensed=v1?0:Integer.parseInt(rows[5]);
+            if(v5)return new State(Battle.Faction.valueOf(rows[1]),reached,
+                    Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,high,
+                    Integer.parseInt(rows[7]),Project.valueOf(rows[8]),
+                    Integer.parseInt(rows[9]),rows[10]);
             if(v4)return restored(Battle.Faction.valueOf(rows[1]),reached,
                     Long.parseLong(rows[3]),Integer.parseInt(rows[4]),licensed,high,
                     Integer.parseInt(rows[7]),Project.valueOf(rows[8]),
