@@ -53,6 +53,15 @@ These are semantic anchors, not instructions to saturate every control with colo
 - Alarm/warning surfaces must show concrete causes, e.g. `AMMUNITION LOW`, `CREW UNDERSTRENGTH`, `FUEL REQUIRED`; casualties are not jokes.
 - Tooltips, key bindings and touch hit regions must match what they do. Decorative mock-up controls must never appear as active buttons.
 
+## Information density and button-label containment (2026-11-04)
+
+- **One screen title, one level of context.** Never repeat “campaign”, “fleet dock”, or other known parent navigation state in nested panels and subtitles. Inside a screen, display newly actionable information about the selected object or mission instead.
+- **No decorative duplicate lists.** The shipyard visual hull and its selected sockets are authoritative; use adjacent space for a module palette, filters, and selected-module specifications rather than repeating the same installed modules in a second list.
+- **Honest campaign geography.** The 500 missions are 10 distinct 50-mission chapters, each comprising five fronts. Draw executable branching routes and differentiate available, completed, and locked nodes. A schematic-only side lane must not masquerade as a playable mission choice.
+- **Button text is subordinate to the button.** Center labels on both axes within the visible art and clickable rectangle, leave inset border padding, and truncate overlong text before it crosses a border. Prefer concise action names plus nearby selected-object detail; never draw font glyphs outside the button to satisfy a long caption.
+- **Mobile is not simply smaller desktop.** Use independently designed large touch targets and legible text for Android and Fire OS. The input hitbox must match the painted control and its caption.
+- Verify button geometry on actual 1280×720 desktop and a landscape Android viewport. Visual readability tests produce screenshots for review but remain nonblocking diagnostics; objective broken or inert controls are functional failures.
+
 ## Required views and modules
 
 Design all of these using a common component kit: main menu and campaign setup; campaign starmap; active/reserve fleet dock and vessel service; squadron profiles and assignments; naming traditions and radio voice; pre-battle placement and per-ship doctrine; shipyard fitting and equipment; research tree; fleet orders; in-battle HUD and tactical overlays; after-action casualty and supply reports; settings/audio; native desktop executable/application icon.
