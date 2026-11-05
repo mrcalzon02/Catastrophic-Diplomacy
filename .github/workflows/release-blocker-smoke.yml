@@ -21,6 +21,9 @@ on:
       - game/src/test/java/diplomacy/client/CombatViewBoundsTest.java
       - game/src/test/java/diplomacy/client/GameWikiTest.java
       - game/src/test/java/diplomacy/client/GameMenuFlowTest.java
+      # Fitting/clearing a module is functional gameplay, not a visual gate.
+      - game/src/main/java/diplomacy/client/ShipyardPanel.java
+      - game/src/test/java/diplomacy/client/GuidedShipyardPanelTest.java
       - game/src/main/java/diplomacy/client/CombatPace.java
       - game/src/main/java/diplomacy/client/AdaptiveCombatPace.java
       - game/src/main/java/diplomacy/client/CombatDiagnosticRecorder.java
