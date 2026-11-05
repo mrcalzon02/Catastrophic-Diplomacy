@@ -34,6 +34,7 @@ final class ModularWeaponFxRenderer implements Disposable {
     private final OrdnanceLibrarySprites missileLibrary=new OrdnanceLibrarySprites();
     private Battle trackedBattle;
     private long lastSequence;
+    private long processedTick=Long.MIN_VALUE;
     private static final int ACTIVE_LIMIT=4096;
     private TextureRegion[] curatedMissileBodies;
     private boolean rejectedMissileAtlas;
@@ -134,19 +135,25 @@ final class ModularWeaponFxRenderer implements Disposable {
     }
 
     private void sync(Battle battle) {
-        if(trackedBattle!=battle) {
+        if(trackedBattle!=battle||battle.tick<processedTick) {
             trackedBattle=battle;
             lastSequence=0;
+            processedTick=Long.MIN_VALUE;
             oneShots.clear();
             shortFlights.reset();
         }
+        // A 0.5x battle can render 20+ identical frames before its next
+        // authoritative step. Do not rescan or age unchanged FX on each.
+        List<Battle.VisualEvent> history=battle.visualEvents();
+        if(!CombatEventCursor.needsRefresh(processedTick,lastSequence,
+                battle.tick,history))return;
+        processedTick=battle.tick;
         shortFlights.beginTick(battle.tick);
         // Visual history is bounded in core. If rendering skips simulation ticks,
         // event sequence IDs still let us consume every retained event exactly once.
         // Histories are ordered by strictly increasing event sequence.
         // At 0.5x/1x, most graphics frames have NO new events; O(log N)
         // lookup avoids scanning thousands of already-consumed entries.
-        List<Battle.VisualEvent> history=battle.visualEvents();
         for(int i=CombatEventCursor.firstUnseen(history,lastSequence);
                 i<history.size();i++){
             Battle.VisualEvent event=history.get(i);
@@ -443,7 +450,7 @@ final class ModularWeaponFxRenderer implements Disposable {
     @Override public void dispose(){
         for(Texture value:textures.values())value.dispose();
         textures.clear();absent.clear();oneShots.clear();shortFlights.reset();
-        trackedBattle=null;lastSequence=0;
+        trackedBattle=null;lastSequence=0;processedTick=Long.MIN_VALUE;
         curatedMissileBodies=null;rejectedMissileAtlas=false;
         lasers.dispose();
         missileLibrary.dispose();

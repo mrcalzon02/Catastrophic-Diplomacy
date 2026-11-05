@@ -10,6 +10,8 @@ on:
       - 'game/src/test/java/diplomacy/client/CombatTimelineDiagnostic.java'
       - 'game/build.gradle'
       - 'game/src/main/java/diplomacy/client/CombatEventCursor.java'
+      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
+      - 'game/src/main/java/diplomacy/client/LaserRun01Fx.java'
       - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
       - 'game/src/main/java/diplomacy/client/CombatLightingModel.java'
       - 'game/src/main/java/diplomacy/client/CombatFrameContinuity.java'

@@ -244,6 +244,22 @@ public final class BattleRenderPosesTest {
                 "Pruned old event history must start at retained head");
         check(CombatEventCursor.firstUnseen(java.util.List.of(),0)==0,
                 "Empty combat event history must be legal");
+        // One tick at 0.5x can span ~40 rendered frames at 60 FPS.
+        // Active authored clips must be checked once, not once per frame;
+        // a same-tick event arriving after a prior render still gets seen.
+        check(CombatEventCursor.needsRefresh(Long.MIN_VALUE,8291,20,history),
+                "Fresh VFX renderer must process the first tick");
+        for(int frame=0;frame<40;frame++)
+            check(!CombatEventCursor.needsRefresh(20,8291,20,history),
+                    "Unchanged render frame redundantly refreshed effects");
+        check(CombatEventCursor.needsRefresh(20,8291,21,history),
+                "New physics tick must advance animation expiry");
+        java.util.List<Battle.VisualEvent> late=new java.util.ArrayList<>(history);
+        late.add(new Battle.VisualEvent(8292,20000,20,Battle.VisualPhase.FIRE,
+                "KINETIC",0,1,2,200,300,240,300));
+        check(CombatEventCursor.needsRefresh(20,8291,20,late) &&
+                CombatEventCursor.firstUnseen(late,8291)==8192,
+                "Late event in the same simulation tick was skipped");
         System.out.println("PASS low-speed muzzle, network tween, real projectile replay, event history cursor and camera easing");
     }
 }

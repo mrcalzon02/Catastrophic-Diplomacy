@@ -36,6 +36,7 @@ final class LaserRun01Fx implements Disposable {
     private final boolean[] checked=new boolean[IDS.length],exists=new boolean[IDS.length];
     private Battle tracked;
     private long lastSequence;
+    private long processedTick=Long.MIN_VALUE;
 
     /** Two deliberately distinct Library animations per modeled laser family. */
     static int effectIndex(LaserFamilies.Type family,long shotId){
@@ -75,9 +76,19 @@ final class LaserRun01Fx implements Disposable {
         return family!=null&&available(effectIndex(family,event.shotId()));
     }
     void sync(Battle battle){
-        if(tracked!=battle){tracked=battle;lastSequence=0;shots.clear();}
-        for(Battle.VisualEvent event:battle.visualEvents()){
-            if(event.sequence()<=lastSequence)continue;
+        if(tracked!=battle||battle.tick<processedTick){
+            tracked=battle;
+            lastSequence=0;
+            shots.clear();
+            processedTick=Long.MIN_VALUE;
+        }
+        List<Battle.VisualEvent> history=battle.visualEvents();
+        if(!CombatEventCursor.needsRefresh(processedTick,lastSequence,
+                battle.tick,history))return;
+        processedTick=battle.tick;
+        for(int i=CombatEventCursor.firstUnseen(history,lastSequence);
+                i<history.size();i++){
+            Battle.VisualEvent event=history.get(i);
             lastSequence=event.sequence();
             if(event.phase()!=Battle.VisualPhase.FIRE)continue;
             LaserFamilies.Type family=LaserFamilies.fromWeapon(event.weapon());

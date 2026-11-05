@@ -240,3 +240,17 @@ scratch maps and reuses the old backing table. The existing
 `:game:lightingSmoke` verifies ignition, phase changes, lingering smoke,
 battle resets and bounded effects. This reduces allocation and potential
 GC pauses without changing projectile physics or observed smoke positions.
+
+## Stage 12 — skip redundant effect aging on repeated render frames
+
+The modular weapon-FX and the authored laser-FX renderers now advance their
+active event/clip sets only when the authoritative simulation tick changes
+or an additional event arrives within the current tick. They previously
+walked up to 4,096 modular one-shots and 384 authored laser shots on every
+graphics frame, even though a 0.5x battle can render dozens of frames with
+the same integer tick. Existing artwork still renders on every GL frame;
+only redundant event ingestion/expiration work is skipped. Sequences,
+pause, battle reset, and tick rewinds retain their correctness. The
+deterministic tests cover unchanged 40-frame windows, the next tick, and
+same-tick late events. This is an allocation/CPU improvement, not a
+guaranteed FPS change.

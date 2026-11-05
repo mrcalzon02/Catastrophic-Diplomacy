@@ -12,6 +12,18 @@ import java.util.List;
 final class CombatEventCursor {
     private CombatEventCursor(){}
 
+    /** A presentation frame with no new tick or event cannot advance the
+     * clip age or active one-shot collection. Constant-time detection saves
+     * active-list traversal on all those otherwise identical frames. */
+    static boolean needsRefresh(long renderedTick,long lastSeen,
+                                long authoritativeTick,
+                                List<Battle.VisualEvent> history){
+        if(history==null)throw new IllegalArgumentException("Event history required");
+        if(renderedTick!=authoritativeTick)return true;
+        return !history.isEmpty()&&
+                history.get(history.size()-1).sequence()>lastSeen;
+    }
+
     /** Index of the earliest event with sequence strictly above lastSeen.
      * Handles empty lists and a ring trimmed from its beginning. */
     static int firstUnseen(List<Battle.VisualEvent> history,long lastSeen){
