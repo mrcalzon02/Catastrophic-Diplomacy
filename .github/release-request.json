@@ -2,6 +2,6 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-04",
-  "revision": 13,
-  "note": "User requests public signed APK and Windows MSI/Linux release now. Trigger a fresh full three-platform release from current main (instead of older 685 commit blocked by GitHub Workflows permission on tag/release creation). Preserve all 15 functional gates: Android 14 runtime, 11 Android 10 campaign shards, signed APK signer continuity and upgrade, Windows installed MSI launch, Linux launch. No reduced tests, no overwrite/retag, no new credential. Publish only after all packages are verified and read back."
+  "revision": 14,
+  "note": "User explicitly authorizes a new public signed Android APK, Windows MSI and Linux ZIP after repairing omitted desktop ambient soundtrack, adding packaged-JAR verification, signed Android Options > Dev screenshot/toggle acceptance, and tick-normalized 200v200 performance telemetry. Run all existing objective functional gates (including Android runtime and campaign shards, exact signer continuity, MSI install/launch/uninstall, Linux executable, archive checksums and readback); keep cosmetic/performance targets diagnostic and disclose measurements. Publish this exact source only on success, never overwrite/retag or invent credentials."
 }
