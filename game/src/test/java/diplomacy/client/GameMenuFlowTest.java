@@ -465,6 +465,19 @@ public final class GameMenuFlowTest {
             for(var node:CampaignMap.page(page))
                 check(GameMenuPanel.mapHit(node.x(),node.y(),page)==node.level(),
                         "Map selection did not return the displayed mission: "+node.level());
+        // Visual link geometry must correspond to real reachable branches.
+        check(CampaignMap.PAGE_COUNT==50 && CampaignMap.page(0).size()==10,
+                "500 missions must be divided into fifty navigable fronts");
+        check(CampaignMap.links(0).size()==13,
+                "Ordinary campaign fronts lack three genuine interconnected routes");
+        var captain=CampaignProgress.start(Battle.Faction.TERRAN);
+        check(captain.available(1)&&!captain.available(8),
+                "Locked map lanes were exposed before the opening sortie");
+        captain=captain.complete(1,1,1);
+        check(captain.available(2)&&captain.available(5)&&captain.available(8),
+                "Completing a front entry did not unlock all three route choices");
+        check(!captain.completed(2)&&!captain.available(10),
+                "Campaign map conflated route visibility with completed missions");
         check(GameMenuPanel.afterActionAction(860,274)==-1,
                 "Previous report page has no touch action");
         check(GameMenuPanel.afterActionAction(1060,274)==1,
