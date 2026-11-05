@@ -1,7 +1,8 @@
 {
   "action": "verified-three-platform-release",
   "requested_by": "user",
-  "request_date": "2026-11-04",
-  "revision": 17,
-  "note": "User requested battlespace smoothing/optimization followed by verified three-platform release. Include reusable single-pass faction/hull instance bucketing preserving render order, sprites and exact Battle simulation, and native Windows startup-failure diagnosis for prior 0xC0000005 MSI launch failure. Require full tested Linux native launch, real Windows MSI install/launch/uninstall (do not bypass a crash), signed Android APK with retained signer and real upgrade, API34 200v200 graphics/combat, and all eleven API29 campaign save/resume shards. Performance/FPS visual targets are nonblocking diagnostics; publish only if all objective jobs and three public assets readback succeed. Use a new prerelease tag; no retagging or made-up credentials."
+  "request_date": "2026-11-05",
+  "revision": 18,
+  "source_base_commit": "96a10720f41fbfa2d6578c3ae26b494be2b2664a",
+  "note": "User explicitly requested push update and finish. Build and publish the current main Catastrophic Diplomacy smoothing/performance revisions: ship and projectile birth-tick interpolation; short-projectile replay; camera and 10Hz multiplayer snapshot smoothing; surviving remote hull identity; FX event cursors, per-frame render caching, laser atlas bucketing; live continuity and uneven-frame diagnostic tests. Use existing installed Android signing credentials with retained signer, real Android emulator/menu/campaign/updater tests; functional 200v200 gameplay, required LAN/PvP and updater; native Linux ZIP launch; native Windows MSI install/launch/uninstall. Honor release-blocker policy: only actual build/launch and required multiplayer/updater failures block, not visual/FX/balance/performance diagnostics. Publish new prerelease (do not retag) only after jobs are successful and all three assets plus checksums independently read back. No placeholder artifacts, no skipped functional gates."
 }
