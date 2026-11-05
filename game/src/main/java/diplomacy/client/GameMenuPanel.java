@@ -424,7 +424,7 @@ final class GameMenuPanel {
         float fit=Math.min(1f,room/Math.max(1f,buttonTextLayout.width));
         fit=Math.max(.86f,fit);
         font.getData().setScale(sx*fit,sy*fit);
-        buttonTextLayout.setText(font,text,color,room,Align.center,false,"...");
+        buttonTextLayout.setText(font,text,0,text.length(),color,room,Align.center,false,"...");
         font.setColor(color);
         font.draw(batch,buttonTextLayout,x+12f,y+(height+buttonTextLayout.height)*.5f);
         font.getData().setScale(sx,sy);
@@ -432,7 +432,7 @@ final class GameMenuPanel {
     /** Truncates data-panel text to its panel, without inventing a button. */
     private void fittedLabel(SpriteBatch batch,BitmapFont font,String text,
                              float x,float y,float width,Color color){
-        buttonTextLayout.setText(font,text,color,Math.max(1,width),Align.left,false,"...");
+        buttonTextLayout.setText(font,text,0,text.length(),color,Math.max(1,width),Align.left,false,"...");
         font.setColor(color);font.draw(batch,buttonTextLayout,x,y);
     }
     private static void title(SpriteBatch batch,BitmapFont font,String text,String subtitle){
