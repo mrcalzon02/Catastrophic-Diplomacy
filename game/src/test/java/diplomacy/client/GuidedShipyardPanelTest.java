@@ -79,9 +79,20 @@ public final class GuidedShipyardPanelTest {
         check(editor.tap(562f+chosen.x()*2.65f,343f+chosen.y()*2.65f)
                 &&editor.selectedHardpoint()==chosen.index(),
                 "Hardpoints must remain selectable in the schematic fallback");
-        editor.tap(43,560-4*26-8);
-        check(editor.selectedHardpoint()==4,
-                "Shipyard list rows and touch hitboxes must agree after heading spacing fix");
+        var alternatives=Shipyard.choices(catalog,stock.faction,stock.hull,chosen.index());
+        check(!alternatives.isEmpty(),"Selected mount must offer compatible alternative modules");
+        editor.tap(43,502); // First visible module in the new left-hand fitting palette
+        check(editor.selectedHardpoint()==chosen.index(),
+                "Choosing a module must not silently switch the selected hull mount");
+        check(editor.draftDesign().at(chosen.index())!=null&&
+                alternatives.get(0).id.equals(editor.draftDesign().at(chosen.index()).component),
+                "Palette tap must fit its compatible component to the selected hull mount");
+        editor.tap(75,246);
+        check(editor.draftDesign().at(chosen.index())==null,
+                "Clear mount must remove only the selected socket fitting");
+        editor.tap(43,502);
+        check(editor.draftDesign().at(chosen.index())!=null,
+                "Palette must restore a cleared module without switching sockets");
         editor.tap(715,597);
         check(!editor.prefersHullArt(),"Schematic toggle must remain available");
         editor.close();
