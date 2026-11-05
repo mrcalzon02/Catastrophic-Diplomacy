@@ -139,6 +139,16 @@ tasks.register('renderPosesSmoke', JavaExec) {
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('renderPosesSmoke') }
 
+// The real release path must prove per-frame fallback hull batching retains
+// exact faction/class order, original ship order and sprite exclusions.
+tasks.register('instancedBucketsSmoke', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.ShipInstanceBucketsTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('instancedBucketsSmoke') }
+
 tasks.register('combatVisibilitySmoke', JavaExec) {
     group = 'verification'
     description = 'Check safe viewport culling, beam edge cases and zoomed-in battle geometry.'

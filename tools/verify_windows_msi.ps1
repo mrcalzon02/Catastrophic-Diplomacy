@@ -70,7 +70,28 @@ try {
   try {
     Start-Sleep -Seconds 12
     $game.Refresh()
-    if ($game.HasExited) { throw "Installed Windows game exited during startup (code $($game.ExitCode))" }
+    if ($game.HasExited) {
+      # A Windows runner's native 0xC0000005 is a real launch failure. Surface
+      # the Java fatal-error file / Application event instead of retrying blindly
+      # or treating a successful MSI install as a successful game launch.
+      Write-Host "FAIL: installed Windows game exited during startup (code $($game.ExitCode))"
+      foreach ($folder in @($env:RUNNER_TEMP, $launcher.DirectoryName)) {
+        Get-ChildItem -LiteralPath $folder -Filter 'hs_err_pid*.log' -File -ErrorAction SilentlyContinue |
+          ForEach-Object {
+            Write-Host "Java native crash report: $($_.FullName)"
+            Get-Content -LiteralPath $_.FullName -TotalCount 80 -ErrorAction SilentlyContinue
+          }
+      }
+      try {
+        Get-WinEvent -FilterHashtable @{ LogName='Application'; StartTime=(Get-Date).AddMinutes(-5) } -MaxEvents 60 -ErrorAction Stop |
+          Where-Object { $_.Message -match 'CatastrophicDiplomacy|java[.]dll|glfw|OpenGL' } |
+          Select-Object -First 5 TimeCreated, ProviderName, Id, Message |
+          Format-List | Out-String | Write-Host
+      } catch {
+        Write-Host "Windows native event diagnostic unavailable: $($_.Exception.Message)"
+      }
+      throw "Installed Windows game exited during startup (code $($game.ExitCode))"
+    }
     Write-Host 'PASS: installed Windows game stayed running'
   } finally {
     $game.Refresh()

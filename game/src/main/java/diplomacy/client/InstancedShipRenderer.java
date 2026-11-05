@@ -16,6 +16,8 @@ public final class InstancedShipRenderer implements AutoCloseable {
             new Mesh[Battle.Faction.values().length][Shipyard.Hull.values().length];
     private final ShaderProgram shader;
     private final float[] positions=new float[4096*4];
+    // Reused per-frame buckets preserve faction/hull draw order and ship insertion order.
+    private final ShipInstanceBuckets buckets=new ShipInstanceBuckets();
     public int drawCalls,instances;
 
     public InstancedShipRenderer() {
@@ -73,14 +75,13 @@ public final class InstancedShipRenderer implements AutoCloseable {
                        BattleRenderPoses poses) {
         drawCalls=0;instances=0;
         CombatViewBounds view=CombatViewBounds.from(camera);
+        buckets.collect(battle,hasArt);
         shader.bind();
         shader.setUniformMatrix("u_proj",camera.combined);
         for(Battle.Faction faction:Battle.Faction.values())
             for(Shipyard.Hull hull:Shipyard.Hull.values()) {
                 int n=0;
-                for(Battle.Ship ship:battle.ships()) {
-                    Shipyard.Hull type=ship.hullClass==null?Shipyard.Hull.CORVETTE:ship.hullClass;
-                    if(!ship.alive()||ship.faction!=faction||type!=hull||hasArt.test(ship))continue;
+                for(Battle.Ship ship:buckets.group(faction,hull)) {
                     if(n>=4096)throw new IllegalStateException("Hull instance batch exceeded 4096");
                     BattleRenderPoses.Pose pose=poses==null?
                             new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
