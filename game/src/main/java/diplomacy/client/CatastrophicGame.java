@@ -1940,6 +1940,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(GameMenuPanel.hit(x,y,964,35,278,50)){openDock();return;}
             if(GameMenuPanel.hit(x,y,525,35,200,50)){openResearch();return;}
             if(GameMenuPanel.hit(x,y,741,35,190,50)){openCampaignShipyard();return;}
+            int selectedFront=GameMenuPanel.campaignFrontTabHit(x,y,campaignPage);
+            if(selectedFront>=0){
+                campaignPage=selectedFront;
+                selectedMission=campaignPage*CampaignMap.PAGE_SIZE+1;
+                return;
+            }
             int mission=GameMenuPanel.mapHit(x,y,campaignPage);
             if(mission>=1)selectedMission=mission;
             return;
