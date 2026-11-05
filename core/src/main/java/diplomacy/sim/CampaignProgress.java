@@ -89,7 +89,21 @@ public final class CampaignProgress {
             // The seven final fleet battles are intentionally one escalating finale.
             if(level>=494)return completed(level-1);
             int start=((level-1)/CampaignMap.PAGE_SIZE)*CampaignMap.PAGE_SIZE+1;
-            if(level==start)return level==1||completed(start-1);
+            if(level==start){
+                // Each 50-mission chapter contains five selectable fronts.
+                // After the chapter opening, the middle three can be pursued in
+                // any order. The capital front requires three prior front wins.
+                int chapterStart=((level-1)/50)*50+1;
+                if(start==chapterStart)
+                    return chapterStart==1||completed(chapterStart-1);
+                if(!completed(chapterStart))return false;
+                int front=(start-chapterStart)/10;
+                if(front<4)return true;
+                int victories=0;
+                for(int i=0;i<4;i++)
+                    if(completed(chapterStart+i*10+9))victories++;
+                return victories>=3;
+            }
             if(!completed(start))return false;
             int offset=level-start;
             return switch(offset){
