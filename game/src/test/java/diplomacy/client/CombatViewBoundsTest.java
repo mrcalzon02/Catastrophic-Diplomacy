@@ -16,6 +16,20 @@ public final class CombatViewBoundsTest {
         ok(close.ship(p,1),"wide hull near edge retained");
         ok(!close.ship(new BattleRenderPoses.Pose(2000,20,0),1),
                 "far-off fleet eliminated");
+        // Early fighter-art check must err on the side of rendering:
+        // a near-edge craft is retained before its PNG dimensions are known,
+        // while a distant craft can skip all GPU texture acquisition.
+        var nearCraft=new BattleRenderPoses.Pose(229,10,0);
+        var distantCraft=new BattleRenderPoses.Pose(230.1f,10,0);
+        ok(FighterCraftSprites.potentiallyVisible(close,nearCraft,2f),
+                "Conservative preload margin must include near-edge fighters");
+        ok(!FighterCraftSprites.potentiallyVisible(close,distantCraft,2f),
+                "Offscreen fighters should skip texture acquisition");
+        ok(FighterCraftSprites.potentiallyVisible(null,distantCraft,2f),
+                "Unbounded editor view must never cull fighter art");
+        ok(FighterCraftSprites.potentiallyVisible(close,
+                new BattleRenderPoses.Pose(280,10,0),20f),
+                "Larger craft must receive a size-scaled preload margin");
         ok(!close.circle(Double.NaN,0,10),"invalid coordinates rejected");
         ok(!close.segment(0,0,Double.POSITIVE_INFINITY,0,1),
                 "invalid beam rejected");
