@@ -3059,15 +3059,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (instanced == null) drawShipsFallback(view);
         else {
             try {
+                // hasSprite() may acquire a GPU texture: never query it for
+                // an offscreen ship just to build the fallback instance list.
                 instanced.render(battle,battleCamera,
                         ship -> !hullOpticallyVisible(ship) ||
-                                (terranSprites!=null && terranSprites.hasSprite(ship)),
+                                (terranSprites!=null &&
+                                view.ship(renderPoses.ship(ship),ship.visualScale()) &&
+                                terranSprites.hasSprite(ship)),
                         renderPoses);
                 int expected=0;
                 for(Battle.Ship ship:battle.ships())
                     if(ship.alive() && hullOpticallyVisible(ship)
-                            && (terranSprites==null || !terranSprites.hasSprite(ship))
-                            && view.ship(renderPoses.ship(ship),ship.visualScale()))expected++;
+                            && view.ship(renderPoses.ship(ship),ship.visualScale())
+                            && (terranSprites==null || !terranSprites.hasSprite(ship)))
+                        expected++;
                 if(instanced.instances!=expected)
                     throw new IllegalStateException("GPU instance count disagrees with non-sprite ships");
             }
@@ -3860,11 +3865,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private void drawShipsFallback(CombatViewBounds view,boolean unrestricted) {
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for (Battle.Ship s : battle.ships()) if (s.alive()
-                && (unrestricted||hullOpticallyVisible(s))
-                && (terranSprites==null||!terranSprites.hasSprite(s))) {
-            shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
+                && (unrestricted||hullOpticallyVisible(s))) {
             BattleRenderPoses.Pose pose=renderPoses.ship(s);
             if(view!=null&&!view.ship(pose,s.visualScale()))continue;
+            if(terranSprites!=null&&terranSprites.hasSprite(s))continue;
+            shapes.setColor(s.faction.r, s.faction.g, s.faction.b, 1);
             float x=pose.x(),y=pose.y();
             float scale=(float)s.visualScale();
             // Keep Stage 2's distinct faction/class art in the GL2 fallback path.
