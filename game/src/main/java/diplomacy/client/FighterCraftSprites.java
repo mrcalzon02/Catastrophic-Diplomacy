@@ -33,7 +33,11 @@ public final class FighterCraftSprites implements Disposable {
     private final Map<String,Texture> originals=new LinkedHashMap<>(32,.75f,true);
     private final Set<String> missingPaths=new HashSet<>();
     private final Map<Integer,Battle.Ship> vesselById=new HashMap<>();
+    // Reuse per-frame membership instead of allocating a new HashSet at every draw.
+    private final Set<String> usedThisFrame=new HashSet<>();
+    private int offscreenCraftRejectedLastFrame;
     private final ShipSurfaceLighting surfaces=new ShipSurfaceLighting();
+    public int offscreenCraftRejectedLastFrame(){return offscreenCraftRejectedLastFrame;}
     public int litCraftMaterials(){return surfaces.materialCount();}
     public int materialTextureBindings(){return surfaces.textureBindings();}
 
@@ -116,6 +120,17 @@ public final class FighterCraftSprites implements Disposable {
         // Shader only. Sprite and material textures are loaded when actual
         // fighters appear, not for all civilizations on every main-menu boot.
     }
+    /**
+     * Reject distant craft before loading any GL source art or material.
+     * 80 world units is deliberately far larger than the tiny fighter footprint;
+     * the existing exact texture-aspect test still decides final visibility.
+     * This protects extreme silhouette ratios and camera-edge rotations.
+     */
+    static boolean potentiallyVisible(CombatViewBounds view,
+                                      BattleRenderPoses.Pose position,float height){
+        return view==null||view.circle(position.x(),position.y(),
+                Math.max(80.0,height*8.0));
+    }
     private Texture art(String path){
         Texture existing=originals.get(path);
         if(existing!=null)return existing;
@@ -173,9 +188,10 @@ public final class FighterCraftSprites implements Disposable {
     public void render(Battle battle,SpriteBatch batch,BattleRenderPoses poses,
                        CombatViewBounds view) {
         vesselById.clear();
+        usedThisFrame.clear();
+        offscreenCraftRejectedLastFrame=0;
         for(Battle.Ship ship:battle.ships())vesselById.put(ship.id,ship);
         if(battle.crafts().isEmpty())return;
-        Set<String> used=new HashSet<>();
         surfaces.begin(batch,battle,view);
         try{
         batch.setColor(1,1,1,1);
@@ -183,24 +199,28 @@ public final class FighterCraftSprites implements Disposable {
             Battle.Ship source=vesselById.get(craft.sourceId);
             if(source==null)
                 throw new IllegalStateException("Autonomous craft has no parent faction: "+craft.sourceId);
+            BattleRenderPoses.Pose position=poses==null?
+                    new BattleRenderPoses.Pose((float)craft.x,(float)craft.y,0):poses.craft(craft);
+            float height=craft.fighter?fighterHeight(craft.profile.hull()):droneHeight();
+            if(!potentiallyVisible(view,position,height)){
+                offscreenCraftRejectedLastFrame++;
+                continue;
+            }
             String artRole=role(craft,source);
             String path=spritePath(source.faction,artRole);
             Texture picture=art(path);
             if(picture==null)continue;
-            used.add(path);
-            float height=craft.fighter?fighterHeight(craft.profile.hull()):droneHeight();
+            usedThisFrame.add(path);
             float width=height*picture.getWidth()/(float)picture.getHeight();
+            if(view!=null&&!view.circle(position.x(),position.y(),
+                    Math.max(width,height)*.72))continue;
             Battle.Ship target=vesselById.get(craft.targetId);
-            BattleRenderPoses.Pose position=poses==null?
-                    new BattleRenderPoses.Pose((float)craft.x,(float)craft.y,0):poses.craft(craft);
             BattleRenderPoses.Pose aim=target==null?null:poses==null?
                     new BattleRenderPoses.Pose((float)target.x,(float)target.y,(float)target.facing):
                     poses.ship(target);
             double bearing=aim!=null?
                     StrictMath.atan2(aim.y()-position.y(),aim.x()-position.x()):source.facing;
             float rotation=(float)StrictMath.toDegrees(bearing)-90f;
-            if(view!=null&&!view.circle(position.x(),position.y(),
-                    Math.max(width,height)*.72))continue;
             surfaces.bind(batch,picture);
             surfaces.color(batch,rotation);
             batch.draw(picture,position.x()-width/2,position.y()-height/2,
@@ -215,7 +235,7 @@ public final class FighterCraftSprites implements Disposable {
             // That packed value is NOT a tint: never leak it into the next
             // pass (capital turrets are drawn immediately after fighters).
             batch.setColor(1f,1f,1f,1f);
-            trimAfterFrame(used);
+            trimAfterFrame(usedThisFrame);
         }
     }
     @Override public void dispose(){
