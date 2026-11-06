@@ -912,13 +912,19 @@ public final class TerranPlaceholderSprites implements Disposable {
         // Upload damage masks outside the SpriteBatch; only changed quantized
         // armor cells rebuild. One damaged ship draws two hull quads, not 256.
         retainedDamageIds.clear();
-        for(Battle.Ship ship:battle.ships())if(hasSprite(ship)){
+        for(Battle.Ship ship:battle.ships()){
+            if(!ship.alive())continue;
             boolean damaged=breached(ship);
+            // Preserve cached damage for offscreen ships; only GPU preparation
+            // is skipped. A later camera pan must reveal the same wounds.
             if(damaged)retainedDamageIds.add(ship.id);
+            if(!hullVisible.test(ship))continue;
             BattleRenderPoses.Pose position=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
             if(view!=null&&!view.ship(position,ship.visualScale()))continue;
+            // hasSprite() can upload source art, so it must run AFTER culling.
+            if(!hasSprite(ship))continue;
             Texture tex=texture(ship);
             if(!ShipSurfaceLighting.flatAt(view))
                 surfaces.prepare(tex,originals.get(tex));
@@ -938,11 +944,12 @@ public final class TerranPlaceholderSprites implements Disposable {
         // forensic inspection. Production five-argument rendering is unchanged.
         surfaces.begin(batch,forensicSurface?null:battle,view);
         for(Battle.Ship ship:battle.ships()) {
-            if(!hasSprite(ship)||!hullVisible.test(ship))continue;
+            if(!ship.alive()||!hullVisible.test(ship))continue;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
+            if(!hasSprite(ship))continue;
             Texture tex=texture(ship);
             if(tex==null)continue;
             float height=(float)(34*ship.visualScale());
@@ -994,7 +1001,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         batch.begin();
         if(shieldInk!=null)shieldInk.configure(false,battle.tick);
         for(Battle.Ship ship:battle.ships()){
-            if(!hasSprite(ship)||!hullVisible.test(ship)||ship.shields<=0)continue;
+            if(!ship.alive()||!hullVisible.test(ship)||ship.shields<=0)continue;
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
@@ -1002,6 +1009,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             float height=(float)(34*ship.visualScale());
             if(!ShieldSurfaceModel.drawable(height,view==null?1280: view.right-view.left))
                 continue;
+            if(!hasSprite(ship))continue;
             Texture tex=texture(ship);
             if(tex==null)continue;
             float width=height*tex.getWidth()/(float)tex.getHeight();
@@ -1012,8 +1020,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         // copy of the original art rather than a fabricated solid ring.
         if(shieldFx!=null && shieldShell!=null)
             for(ShieldFxTimeline.Effect fx:shieldFx.events()){
-                if(fx.kind!=ShieldFxTimeline.Kind.COLLAPSE||!hasSprite(fx.ship)
-                        ||!hullVisible.test(fx.ship)
+                if(fx.kind!=ShieldFxTimeline.Kind.COLLAPSE||fx.ship==null
+                        ||!fx.ship.alive()||!hullVisible.test(fx.ship)
                         ||fx.ship.defense.shields(fx.facing)>.015)continue;
                 BattleRenderPoses.Pose pose=poses==null
                         ?new BattleRenderPoses.Pose((float)fx.ship.x,(float)fx.ship.y,(float)fx.ship.facing)
@@ -1022,6 +1030,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float height=(float)(34*fx.ship.visualScale());
                 if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
                     continue;
+                if(!hasSprite(fx.ship))continue;
                 Texture tex=texture(fx.ship);
                 if(tex==null)continue;
                 float width=height*tex.getWidth()/(float)tex.getHeight();
@@ -1041,7 +1050,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             batch.begin();
             if(shieldInk!=null)shieldInk.configure(true,battle.tick);
             for(Battle.Ship ship:battle.ships()){
-                if(!hasSprite(ship)||!hullVisible.test(ship)||ship.shields<=0)continue;
+                if(!ship.alive()||!hullVisible.test(ship)||ship.shields<=0)continue;
                 BattleRenderPoses.Pose pose=poses==null
                         ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
                         :poses.ship(ship);
@@ -1049,6 +1058,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float height=(float)(34*ship.visualScale());
                 if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
                     continue;
+                if(!hasSprite(ship))continue;
                 Texture tex=texture(ship);
                 if(tex==null)continue;
                 float width=height*tex.getWidth()/(float)tex.getHeight();
