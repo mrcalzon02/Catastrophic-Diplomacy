@@ -939,14 +939,14 @@ public final class TerranPlaceholderSprites implements Disposable {
         surfaces.begin(batch,forensicSurface?null:battle,view);
         for(Battle.Ship ship:battle.ships()) {
             if(!hasSprite(ship)||!hullVisible.test(ship))continue;
-            Texture tex=texture(ship);
-            if(tex==null)continue;
-            float height=(float)(34*ship.visualScale());
-            float width=height*tex.getWidth()/(float)tex.getHeight();
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
+            Texture tex=texture(ship);
+            if(tex==null)continue;
+            float height=(float)(34*ship.visualScale());
+            float width=height*tex.getWidth()/(float)tex.getHeight();
             float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
             surfaces.bind(batch,tex);
             surfaces.color(batch,rotation,(float)Math.max(0,
@@ -995,15 +995,16 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(shieldInk!=null)shieldInk.configure(false,battle.tick);
         for(Battle.Ship ship:battle.ships()){
             if(!hasSprite(ship)||!hullVisible.test(ship)||ship.shields<=0)continue;
-            Texture tex=texture(ship);
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing):
                     poses.ship(ship);
             if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
             float height=(float)(34*ship.visualScale());
-            float width=height*tex.getWidth()/(float)tex.getHeight();
             if(!ShieldSurfaceModel.drawable(height,view==null?1280: view.right-view.left))
                 continue;
+            Texture tex=texture(ship);
+            if(tex==null)continue;
+            float width=height*tex.getWidth()/(float)tex.getHeight();
             drawShield(batch,ship,tex,pose,width,height,
                     (float)(StrictMath.toDegrees(pose.angle())-90),battle.tick,shieldFx);
         }
@@ -1045,10 +1046,11 @@ public final class TerranPlaceholderSprites implements Disposable {
                         ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
                         :poses.ship(ship);
                 if(view!=null&&!view.ship(pose,ship.visualScale()))continue;
-                Texture tex=texture(ship);
                 float height=(float)(34*ship.visualScale());
                 if(!ShieldSurfaceModel.drawable(height,view==null?1280:view.right-view.left))
                     continue;
+                Texture tex=texture(ship);
+                if(tex==null)continue;
                 float width=height*tex.getWidth()/(float)tex.getHeight();
                 Texture[] sectors=shieldSections.get(tex);
                 if(sectors==null)continue;
@@ -1130,18 +1132,24 @@ public final class TerranPlaceholderSprites implements Disposable {
             if(!hullVisible.test(ship))continue;
             int contacts=DeceptionProjection.falseContacts(ship);
             if(contacts==0)continue;
-            Texture original=texture(ship);
-            if(original==null)continue;
             BattleRenderPoses.Pose actual=poses==null
                     ?new BattleRenderPoses.Pose((float)ship.x,(float)ship.y,(float)ship.facing)
                     :poses.ship(ship);
             float height=(float)(34*ship.visualScale());
-            float width=height*original.getWidth()/(float)original.getHeight();
+            Texture original=null;
+            float width=0;
             for(int contact=0;contact<contacts;contact++){
                 float x=actual.x()+(float)(DeceptionProjection.ghostX(ship,contact,battle.tick)-ship.x);
                 float y=actual.y()+(float)(DeceptionProjection.ghostY(ship,contact,battle.tick)-ship.y);
                 BattleRenderPoses.Pose phantom=new BattleRenderPoses.Pose(x,y,actual.angle());
                 if(view!=null&&!view.ship(phantom,ship.visualScale()))continue;
+                // Offscreen decoys do not need a GPU image. But a decoy can be
+                // onscreen while its real parent ship is outside camera bounds.
+                if(original==null){
+                    original=texture(ship);
+                    if(original==null)break;
+                    width=height*original.getWidth()/(float)original.getHeight();
+                }
                 if(!drawing){batch.setShader(null);batch.begin();drawing=true;}
                 batch.setColor(.31f,.78f,1f,.21f);
                 drawWhole(batch,original,phantom,width*.96f,height*.96f,
