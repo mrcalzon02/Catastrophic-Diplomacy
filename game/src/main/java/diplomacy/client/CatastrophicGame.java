@@ -3562,6 +3562,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     " maxDraws="+frame.maximumDrawCalls()+
                     " avgMaterialBinds="+frame.meanMaterialBinds()+
                     " maxMaterialBinds="+frame.maximumMaterialBinds()+
+                    " residentShipTextures="+(terranSprites==null?0:
+                            terranSprites.residentOriginalTextures())+
+                    " residentCraftTextures="+(craftSprites==null?0:craftSprites.loaded())+
+                    " offscreenCraftArtSkipsLastFrame="+(craftSprites==null?0:
+                            craftSprites.offscreenCraftRejectedLastFrame())+
                     " fps="+Gdx.graphics.getFramesPerSecond());
             renderProfile.reset();
         }
