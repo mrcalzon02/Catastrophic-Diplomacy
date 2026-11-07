@@ -159,15 +159,15 @@ final class GameWikiPanel {
         batch.begin();
         font.getData().setScale(mobile?1.62f:1.48f);
         label(batch,font,"FIELD ENCYCLOPEDIA",38,688,Color.WHITE);
-        label(batch,font,"CLOSE",1110,681,Color.WHITE);
+        UiText.button(batch,font,"CLOSE",1090,647,160,55,Color.WHITE);
         font.getData().setScale(scale);
         label(batch,font,query.isEmpty()?"SEARCH - TAP OR TYPE TO FILTER":query,47,632,
                 query.isEmpty()?MUTED:Color.WHITE);
-        label(batch,font,"CLEAR",1110,631,Color.WHITE);
+        UiText.button(batch,font,"CLEAR",1080,604,165,42,Color.WHITE);
         font.getData().setScale(mobile?1.27f:1.04f);
         for(int i=0;i<GameWikiCatalog.CATEGORIES.length;i++)
-            label(batch,font,GameWikiCatalog.CATEGORIES[i],
-                    46+(i%6)*204,580-(i/6)*43,
+            UiText.button(batch,font,GameWikiCatalog.CATEGORIES[i],
+                    35+(i%6)*204,555-(i/6)*43,198,38,
                     i==category?Color.BLACK:Color.WHITE);
         font.getData().setScale(scale);
         for(int row=0;row<ROWS;row++){
@@ -199,10 +199,10 @@ final class GameWikiPanel {
             }
         }
         font.getData().setScale(mobile?1.25f:1.14f);
-        label(batch,font,"LIST PREV",44,67,Color.WHITE);
-        label(batch,font,"LIST NEXT",244,67,Color.WHITE);
-        label(batch,font,"READ UP",466,67,Color.WHITE);
-        label(batch,font,"READ DOWN",1074,67,Color.WHITE);
+        UiText.button(batch,font,"LIST PREV",35,32,175,57,Color.WHITE);
+        UiText.button(batch,font,"LIST NEXT",235,32,175,57,Color.WHITE);
+        UiText.button(batch,font,"READ UP",455,32,175,57,Color.WHITE);
+        UiText.button(batch,font,"READ DOWN",1065,32,175,57,Color.WHITE);
         label(batch,font,"PAGE "+(listPage+1)+"/"+Math.max(1,(hits.size()+ROWS-1)/ROWS),
                 684,66,ACCENT);
         font.setColor(Color.WHITE);

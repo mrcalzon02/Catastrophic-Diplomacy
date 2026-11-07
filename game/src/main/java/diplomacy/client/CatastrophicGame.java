@@ -104,7 +104,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private String diagnosticNotice="";
     private long diagnosticNoticeUntilNs;
     private static final String PERFORMANCE_PREFS="catastrophic-diplomacy-performance";
-    private int voiceSliderPointer=-1, menuButtonPointer=-1;
+    private int menuButtonPointer=-1;
     private int tacticalHovered=-1, tacticalPressed=-1;
     private long tacticalPressUntilNs;
     private final com.badlogic.gdx.math.Vector2 tacticalPointer=new com.badlogic.gdx.math.Vector2();
@@ -273,7 +273,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         battleCamera.setToOrtho(false,W,H);
         viewport = new FitViewport(W, H, camera);
         viewport.update(Gdx.graphics.getWidth(), Gdx.graphics.getHeight(), true);
-        shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = new BitmapFont();
+        shapes = new ShapeRenderer(); batch = new SpriteBatch(); font = UiText.font();
         shipInspector.setMobile(Gdx.app.getType()==
                 com.badlogic.gdx.Application.ApplicationType.Android);
         audio = new CombatAudio();
@@ -752,13 +752,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         world.y>125 && world.y<610 &&
                         battleTouch.start(pointer,world.x,world.y))return true;
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
-                    if(screen==GameMenuPanel.Screen.OPTIONS&&
-                            GameMenuPanel.voiceHit(world.x,world.y,menuPanel.mobileLayout())){
-                        voiceSliderPointer=pointer;
-                        audio.setVoiceVolume(GameMenuPanel.voiceAt(world.x,menuPanel.mobileLayout()),false);
-                        audio.uiAdjust();
-                        return true;
-                    }
                     int control=menuPanel.controlAt(world.x,world.y);
                     if(control==-2){audio.uiBlocked();return true;}
                     if(control>=0){
@@ -869,14 +862,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return true;
                 }
                 com.badlogic.gdx.math.Vector2 world=viewport.unproject(new com.badlogic.gdx.math.Vector2(x,y));
-                if(pointer==voiceSliderPointer){
-                    float next=GameMenuPanel.voiceAt(world.x,menuPanel.mobileLayout());
-                    if(Math.abs(next-audio.voiceVolume())>.004f){
-                        audio.setVoiceVolume(next,false);
-                        audio.uiAdjust();
-                    }
-                    return true;
-                }
                 if(battleTouch.owns(pointer)){
                     BattleTouchNavigation.Motion m=battleTouch.move(pointer,world.x,world.y);
                     if(m.changed()){
@@ -934,11 +919,6 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(audio!=null)audio.ui();
                         Gdx.app.log("CD-SCREENSAVER","CONTROLS "+(screensaverControlsVisible?"WAKE":"HIDE"));
                     }
-                    return true;
-                }
-                if(pointer==voiceSliderPointer){
-                    voiceSliderPointer=-1;
-                    audio.saveVoiceVolume();
                     return true;
                 }
                 if(pointer==menuButtonPointer){
@@ -2054,7 +2034,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
             switch(GameMenuPanel.optionsAction(x,y,updateCheck!=null,menuPanel.mobileLayout())){
-                case 0 -> audio.setVoiceVolume(GameMenuPanel.voiceAt(x,menuPanel.mobileLayout()),true);
+                case 7 -> {audio.stepVoiceVolume(-1);Gdx.app.log("CD-OPTIONS","VOICE "+Math.round(audio.voiceVolume()*100)+"%");}
+                case 8 -> {audio.stepVoiceVolume(1);Gdx.app.log("CD-OPTIONS","VOICE "+Math.round(audio.voiceVolume()*100)+"%");}
                 case 1 -> audio.toggleMusic();
                 case 2 -> audio.toggleEffects();
                 case 3 -> audio.toggleTrack();

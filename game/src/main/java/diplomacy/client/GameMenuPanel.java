@@ -90,7 +90,6 @@ final class GameMenuPanel {
     /** Android landscape command tiles, independent of the desktop mouse layout. */
     private static final int[] MOBILE_HOME_ORDER={0,1,2,3,4,6,7,5};
     private static final float MOBILE_COLUMN_WIDTH=552f;
-    private static final float MOBILE_VOICE_LEFT=225f,MOBILE_VOICE_WIDTH=832f;
     private static float mobileColumnX(int slot){return 72+(slot%2)*584;}
     private static float mobileHomeY(int slot){return 464-(slot/2)*120;}
     private static float mobileOptionY(int slot){return 350-(slot/2)*115;}
@@ -99,12 +98,13 @@ final class GameMenuPanel {
     GameMenuPanel(){this(false);}
     GameMenuPanel(boolean mobileLayout){this.mobileLayout=mobileLayout;}
     boolean mobileLayout(){return mobileLayout;}
-    static boolean voiceHit(float x,float y,boolean mobile){
-        return mobile?hit(x,y,120,462,1040,108):VoiceVolumeControl.hit(x,y);
-    }
-    static float voiceAt(float x,boolean mobile){
-        return mobile?VoiceVolumeControl.clamp((x-MOBILE_VOICE_LEFT)/MOBILE_VOICE_WIDTH):
-                VoiceVolumeControl.valueAt(x);
+    /** Same painted buttons and hit bounds on mouse and touch layouts. */
+    static int voiceDirection(float x,float y,boolean mobile){
+        float left=mobile?120:405, right=mobile?1000:755;
+        float bottom=mobile?462:544, width=mobile?160:120, height=mobile?108:72;
+        if(hit(x,y,left,bottom,width,height))return -1;
+        if(hit(x,y,right,bottom,width,height))return 1;
+        return 0;
     }
     static boolean hit(float x,float y,float bx,float by,float w,float h){
         return x>=bx&&x<=bx+w&&y>=by&&y<=by+h;
@@ -114,7 +114,8 @@ final class GameMenuPanel {
         return optionsAction(x,y,updaterAvailable,false);
     }
     static int optionsAction(float x,float y,boolean updaterAvailable,boolean mobile){
-        if(voiceHit(x,y,mobile))return 0;
+        int direction=voiceDirection(x,y,mobile);
+        if(direction!=0)return direction<0?7:8;
         for(int i=0;i<6;i++){
             boolean inside=mobile?hit(x,y,mobileColumnX(i),mobileOptionY(i),
                     MOBILE_COLUMN_WIDTH,94):hit(x,y,405,472-i*78,470,59);
@@ -425,16 +426,7 @@ final class GameMenuPanel {
      * painting beyond a button or making touch labels microscopic. */
     private void buttonLabel(SpriteBatch batch,BitmapFont font,String text,
                              float x,float y,float width,float height,Color color){
-        float sx=font.getData().scaleX,sy=font.getData().scaleY;
-        buttonTextLayout.setText(font,text);
-        float room=Math.max(1f,width-24f);
-        float fit=Math.min(1f,room/Math.max(1f,buttonTextLayout.width));
-        fit=Math.max(.86f,fit);
-        font.getData().setScale(sx*fit,sy*fit);
-        buttonTextLayout.setText(font,text,0,text.length(),color,room,Align.center,false,"...");
-        font.setColor(color);
-        font.draw(batch,buttonTextLayout,x+12f,y+(height+buttonTextLayout.height)*.5f);
-        font.getData().setScale(sx,sy);
+        UiText.button(batch,font,text,x,y,width,height,color);
     }
     /** Truncates data-panel text to its panel, without inventing a button. */
     private void fittedLabel(SpriteBatch batch,BitmapFont font,String text,
@@ -717,36 +709,16 @@ final class GameMenuPanel {
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
-                if(mobileLayout){
-                    rectangle(shapes,120,462,1040,108,PANEL);
-                    rectangle(shapes,MOBILE_VOICE_LEFT,485,MOBILE_VOICE_WIDTH,13,
-                            MilitaryUiTheme.FRAME);
-                    rectangle(shapes,MOBILE_VOICE_LEFT,485,
-                            MOBILE_VOICE_WIDTH*VoiceVolumeControl.clamp(voiceVolume),13,
-                            MilitaryUiTheme.TELEMETRY);
-                    rectangle(shapes,MOBILE_VOICE_LEFT+
-                            MOBILE_VOICE_WIDTH*VoiceVolumeControl.clamp(voiceVolume)-11,
-                            474,22,35,MilitaryUiTheme.AMBER);
-                    for(int i=0;i<6;i++){
-                        float x=mobileColumnX(i),y=mobileOptionY(i);
-                        if(i==3&&!updaterAvailable)
-                            disabledButton(shapes,x,y,MOBILE_COLUMN_WIDTH,94);
-                        else button(shapes,x,y,MOBILE_COLUMN_WIDTH,94,false);
-                    }
-                }else{
+                float vx=mobileLayout?120:405, vy=mobileLayout?462:544;
+                float vw=mobileLayout?160:120, vh=mobileLayout?108:72;
+                button(shapes,vx,vy,vw,vh,false);
+                button(shapes,mobileLayout?1000:755,vy,vw,vh,false);
                 for(int i=0;i<6;i++){
-                    if(i==3&&!updaterAvailable)disabledButton(shapes,405,472-i*78,470,59);
-                    else button(shapes,405,472-i*78,470,59,false);
-                }
-                rectangle(shapes,405,544,470,72,MilitaryUiTheme.PANEL);
-                rectangle(shapes,VoiceVolumeControl.LEFT,560,VoiceVolumeControl.WIDTH,7,
-                        MilitaryUiTheme.FRAME);
-                rectangle(shapes,VoiceVolumeControl.LEFT,560,
-                        VoiceVolumeControl.WIDTH*VoiceVolumeControl.clamp(voiceVolume),7,
-                        MilitaryUiTheme.TELEMETRY);
-                rectangle(shapes,VoiceVolumeControl.thumbX(voiceVolume)-7,552,14,24,
-                        MilitaryUiTheme.AMBER);
-
+                    float x=mobileLayout?mobileColumnX(i):405;
+                    float y=mobileLayout?mobileOptionY(i):472-i*78;
+                    float w=mobileLayout?MOBILE_COLUMN_WIDTH:470,h=mobileLayout?94:59;
+                    if(i==3&&!updaterAvailable)disabledButton(shapes,x,y,w,h);
+                    else button(shapes,x,y,w,h,false);
                 }
             }
             case DEV -> {
@@ -855,8 +827,8 @@ final class GameMenuPanel {
                             "FITTINGS: MIXED MODULE AND FACTION LAYOUTS":
                             "LOADOUTS: FIXED VERIFICATION FIXTURE",677,298,MUTED);
                 }else{
-                    label(batch,font,"LEFT FACTION: "+left.displayName+"  >",677,359,Color.WHITE);
-                    label(batch,font,"RIGHT FACTION: "+right.displayName+"  >",677,298,Color.WHITE);
+                    buttonLabel(batch,font,"LEFT FACTION: "+left.displayName+"  >",661,332,545,42,Color.WHITE);
+                    buttonLabel(batch,font,"RIGHT FACTION: "+right.displayName+"  >",661,271,545,42,Color.WHITE);
                 }
                 label(batch,font,preset==ScenarioCatalog.Preset.CUSTOM?
                         "CUSTOM FLEET SIZE: -  "+fleetCount+"  +":
@@ -1214,9 +1186,10 @@ final class GameMenuPanel {
                     font.getData().setScale(1.52f);
                     label(batch,font,"AUDIO AND APPLICATION",74,613,MUTED);
                     font.getData().setScale(1.85f);
-                    label(batch,font,"VOICE VOLUME",153,532,Color.WHITE);
-                    label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
-                            1057,532,Color.WHITE);
+                    buttonLabel(batch,font,"<",120,462,160,108,Color.WHITE);
+                    buttonLabel(batch,font,">",1000,462,160,108,Color.WHITE);
+                    buttonLabel(batch,font,"VOICE  "+Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
+                            290,462,700,108,Color.WHITE);
                     String[] names={"MUSIC: "+(music?"ON":"OFF"),
                             "SOUND EFFECTS: "+(effects?"ON":"OFF"),
                             "SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),
@@ -1228,15 +1201,16 @@ final class GameMenuPanel {
                     font.getData().setScale(original);
                 }else{
                 title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
-                label(batch,font,"VOICE VOLUME",427,598,Color.WHITE);
-                label(batch,font,Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",817,598,Color.WHITE);
-                label(batch,font,"MUSIC: "+(music?"ON":"OFF"),445,510,Color.WHITE);
-                label(batch,font,"SOUND EFFECTS: "+(effects?"ON":"OFF"),445,432,Color.WHITE);
-                label(batch,font,"SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),445,354,Color.WHITE);
-                label(batch,font,updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",445,276,
-                        updaterAvailable?Color.WHITE:MUTED);
-                label(batch,font,"DEV",445,198,Color.WHITE);
-                label(batch,font,"BACK",445,120,Color.WHITE);
+                buttonLabel(batch,font,"<",405,544,120,72,Color.WHITE);
+                buttonLabel(batch,font,">",755,544,120,72,Color.WHITE);
+                buttonLabel(batch,font,"VOICE  "+Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
+                        525,544,230,72,Color.WHITE);
+                String[] names={"MUSIC: "+(music?"ON":"OFF"),
+                        "SOUND EFFECTS: "+(effects?"ON":"OFF"),
+                        "SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),
+                        updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE","DEV","BACK"};
+                for(int i=0;i<names.length;i++)buttonLabel(batch,font,names[i],405,472-i*78,
+                        470,59,i==3&&!updaterAvailable?MUTED:Color.WHITE);
 
                 }
             }

@@ -1,30 +1,6 @@
 name: Battlespace timeline diagnostic
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'game/src/main/java/diplomacy/client/BattleRenderPoses.java'
-      - 'game/src/main/java/diplomacy/client/CatastrophicGame.java'
-      - 'game/src/test/java/diplomacy/client/BattleRenderPosesTest.java'
-      - 'game/src/test/java/diplomacy/client/CombatTimelineDiagnostic.java'
-      - 'game/build.gradle'
-      - 'game/src/main/java/diplomacy/client/CombatEventCursor.java'
-      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
-      - 'game/src/main/java/diplomacy/client/LaserRun01Fx.java'
-      - 'game/src/main/java/diplomacy/client/VisualAtlasBuckets.java'
-      - 'game/src/test/java/diplomacy/client/LaserRun01FxTest.java'
-      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
-      - 'game/src/main/java/diplomacy/client/CombatLightingModel.java'
-      - 'game/src/main/java/diplomacy/client/CombatFrameContinuity.java'
-      - 'game/src/main/java/diplomacy/client/CombatDiagnosticRecorder.java'
-      - 'game/src/main/java/diplomacy/client/RemoteShipInterpolation.java'
-      - 'game/src/main/java/diplomacy/client/RemoteFleetMirrors.java'
-      - 'game/src/test/java/diplomacy/client/CombatPerformanceControlTest.java'
-      - 'game/src/test/java/diplomacy/client/CombatLightingModelTest.java'
-      - 'game/src/test/java/diplomacy/client/CombatHitFeedbackTest.java'
-      - '.github/workflows/combat-timeline-diagnostic.yml'
-
 concurrency:
   group: cd-timeline-diag-${{ github.ref }}
   cancel-in-progress: true

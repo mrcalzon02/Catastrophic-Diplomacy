@@ -2,19 +2,6 @@
 name: Optional technology and wiki memory diagnostics
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/technology-efficiency-diagnostics.yml
-      - core/src/main/java/diplomacy/tech/TechnologyCatalog.java
-      - core/src/test/java/diplomacy/sim/TechnologyCatalogTest.java
-      - core/src/test/java/diplomacy/sim/TechnologyMemoryProfile.java
-      - game/src/main/java/diplomacy/client/GameWikiCatalog.java
-      - game/src/main/java/diplomacy/client/GameWikiPanel.java
-      - game/src/test/java/diplomacy/client/WikiMemoryProfile.java
-      - game/src/test/java/diplomacy/client/WikiArbitrarySearchProfile.java
-      - game/build.gradle
-
 permissions:
   contents: read
 

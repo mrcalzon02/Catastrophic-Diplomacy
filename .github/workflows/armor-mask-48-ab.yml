@@ -1,10 +1,5 @@
 name: Optional native 96px armor-mask authoring and inspection
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'tools/generate_damage_masks_96.py'
-      - '.github/workflows/armor-mask-48-ab.yml'
   workflow_dispatch:
 
 # Artwork generation is independent of release and never gates packages.

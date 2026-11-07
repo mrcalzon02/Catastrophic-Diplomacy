@@ -1,22 +1,5 @@
 name: Physical particle point-defense validation
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/sim/ParticlePointDefense.java'
-      - 'core/src/main/java/diplomacy/sim/Battle.java'
-      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
-      - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
-      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
-      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
-      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
-      - 'core/src/test/java/diplomacy/sim/ParticlePointDefenseDiagnostic.java'
-      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
-      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
-      - 'game/src/main/java/diplomacy/client/WeaponBeamSprites.java'
-      - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
-      - 'core/build.gradle'
-      - '.github/workflows/particle-pd-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read

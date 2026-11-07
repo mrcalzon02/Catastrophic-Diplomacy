@@ -1,8 +1,8 @@
 {
   "action": "verified-three-platform-release",
   "requested_by": "user",
-  "request_date": "2026-11-05",
-  "revision": 18,
-  "source_base_commit": "96a10720f41fbfa2d6578c3ae26b494be2b2664a",
-  "note": "User explicitly requested push update and finish. Build and publish the current main Catastrophic Diplomacy smoothing/performance revisions: ship and projectile birth-tick interpolation; short-projectile replay; camera and 10Hz multiplayer snapshot smoothing; surviving remote hull identity; FX event cursors, per-frame render caching, laser atlas bucketing; live continuity and uneven-frame diagnostic tests. Use existing installed Android signing credentials with retained signer, real Android emulator/menu/campaign/updater tests; functional 200v200 gameplay, required LAN/PvP and updater; native Linux ZIP launch; native Windows MSI install/launch/uninstall. Honor release-blocker policy: only actual build/launch and required multiplayer/updater failures block, not visual/FX/balance/performance diagnostics. Publish new prerelease (do not retag) only after jobs are successful and all three assets plus checksums independently read back. No placeholder artifacts, no skipped functional gates."
+  "request_date": "2026-11-06",
+  "revision": 19,
+  "source_base_commit": "2250916dab76d6988afa6f59c8ecc5064e23cbe0",
+  "note": "User requested current-project UI/operational audit, unified volume buttons and centered labels, open-source readable font, responsive update checks with actual downloads, reduced automatic diagnostic Actions, and published APK. Build current main with existing retained signing credentials, real Android menu/volume/updater/upgrade/campaign checks, required functional multiplayer tests, and Windows/Linux packages. Include bounded draft-publication retries after previous HTTP 500. Publish a new prerelease without retagging, and verify public assets."
 }

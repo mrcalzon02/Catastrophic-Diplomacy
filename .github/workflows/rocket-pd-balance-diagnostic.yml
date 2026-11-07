@@ -1,25 +1,5 @@
 name: Optional point-defense threat balance diagnostics
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/sim/RocketBarrage.java'
-      - 'core/src/main/java/diplomacy/sim/Battle.java'
-      - 'core/src/main/java/diplomacy/sim/ProjectileModel.java'
-      - 'core/src/main/java/diplomacy/sim/WeaponBehaviorTable.java'
-      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
-      - 'core/src/test/java/diplomacy/sim/RocketPdBalanceDiagnostic.java'
-      - 'core/src/test/java/diplomacy/sim/PointDefenseThreatMatrixDiagnostic.java'
-      - 'core/src/test/java/diplomacy/sim/PointDefenseLoadDiagnostic.java'
-      - 'core/src/main/java/diplomacy/sim/OrdnanceDoctrine.java'
-      - 'core/src/main/java/diplomacy/sim/AmmunitionTable.java'
-      - 'core/src/test/java/diplomacy/sim/AmmunitionTableTest.java'
-      - 'core/src/test/java/diplomacy/sim/OrdnanceDoctrineTest.java'
-      - 'core/src/main/java/diplomacy/sim/OrdnanceSubmunitions.java'
-      - 'core/src/main/java/diplomacy/sim/FighterModel.java'
-      - 'core/src/main/java/diplomacy/sim/RocketPdSaturation.java'
-      - 'core/build.gradle'
-      - '.github/workflows/rocket-pd-balance-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read

@@ -39,6 +39,8 @@ jobs:
         with: {python-version: '3.12'}
       - name: Install deterministic icon exporter
         run: python -m pip install Pillow==11.3.0
+      - name: Verify publication retry behavior
+        run: python3 -m unittest discover -s tools -p test_publish_release_with_retry.py
       - name: Validate gameplay, 200v200, LAN/PvP, updater and installed Linux application
         run: |
           gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke \
@@ -365,6 +367,7 @@ jobs:
       GH_TOKEN: ${{ secrets.CD_RELEASE_TOKEN || github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: {name: 'cd-linux-${{ github.run_id }}', path: dist}
       - uses: actions/download-artifact@v4
@@ -441,7 +444,7 @@ jobs:
             echo "BLOCKED: release source history diverged during upload; draft retained ($relation)"
             exit 1
           fi
-          gh release edit "$CD_RELEASE_TAG" -R "$GH_REPO" --draft=false
+          python3 "$GITHUB_WORKSPACE/tools/publish_release_with_retry.py" "$CD_RELEASE_TAG" "$GH_REPO"
           # Read back the published release and require exactly this source's
           # public three-platform package set. A successful upload command
           # alone is not an independently verified publication.

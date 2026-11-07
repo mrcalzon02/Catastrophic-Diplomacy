@@ -24,6 +24,8 @@ final class DesktopReleaseUpdater {
     private static final String API="https://api.github.com/repos/"+UpdatePolicy.REPOSITORY+"/releases";
     private static final int MAX_PAGES=20, PAGE_SIZE=100, MAX_JSON=2*1024*1024;
     private final AtomicBoolean busy=new AtomicBoolean();
+    private javax.swing.JDialog progress;
+    private javax.swing.JLabel progressText;
     private final String ownTag;
     private final String assetName;
 
@@ -34,26 +36,50 @@ final class DesktopReleaseUpdater {
 
     void checkForUpdates() { checkForUpdates(true); }
     void checkForUpdates(boolean manual) {
-        if(!busy.compareAndSet(false,true))return;
+        if(!busy.compareAndSet(false,true)){
+            if(manual)message("Update in progress","An update check or download is already running.");
+            return;
+        }
+        if(manual)status("Checking published releases, including prereleases…");
         Thread thread=new Thread(()->{
             try{
                 Release latest=lookup();
                 if(latest==null){
+                    endStatus();
                     if(manual)message("No new release for this platform",
                             "You already have the newest published "+(assetName.endsWith(".msi")?"Windows":"Linux")+
                             " package on "+UpdatePolicy.REPOSITORY+".\nStable AND prereleases were checked.");
                     return;
                 }
-                confirmAndDownload(latest);
+                if(manual)download(latest);
+                else System.out.println("CD desktop updater: available "+latest.tag);
             }catch(Exception failure){
+                endStatus();
                 if(manual)message("GitHub update check failed",
                         failure.getMessage()==null?"Could not check GitHub releases.":failure.getMessage());
                 else System.err.println("CD desktop updater: "+failure.getMessage());
-            }finally{busy.set(false);}
+            }finally{busy.set(false);endStatus();}
         },"CD-Desktop-Updater");
         thread.setDaemon(true);
         thread.start();
     }
+
+    private void status(String text){
+        SwingUtilities.invokeLater(()->{
+            if(progress==null){
+                progress=new javax.swing.JDialog((java.awt.Frame)null,"Catastrophic Diplomacy — Update",false);
+                progressText=new javax.swing.JLabel();
+                progressText.setBorder(javax.swing.BorderFactory.createEmptyBorder(20,24,20,24));
+                progress.add(progressText);
+                progress.setDefaultCloseOperation(javax.swing.WindowConstants.HIDE_ON_CLOSE);
+            }
+            progressText.setText(text);
+            progress.pack();progress.setLocationRelativeTo(null);progress.setVisible(true);
+        });
+    }
+    private void endStatus(){SwingUtilities.invokeLater(()->{
+        if(progress!=null){progress.dispose();progress=null;progressText=null;}
+    });}
 
     private Release lookup() throws Exception {
         if(ownTag==null||ownTag.isBlank())
@@ -100,18 +126,8 @@ final class DesktopReleaseUpdater {
         return best;
     }
 
-    private void confirmAndDownload(Release release)throws Exception{
-        final boolean[] accepted={false};
-        SwingUtilities.invokeAndWait(()->{
-            int choice=JOptionPane.showConfirmDialog(null,
-                    "New Catastrophic Diplomacy release: "+release.tag+
-                    "\nPackage: "+assetName+
-                    "\nSize: "+(release.bytes/1048576)+" MiB"+
-                    "\nPublished on GitHub (prereleases included).\n\nDownload this update?",
-                    "Catastrophic Diplomacy — GitHub update",JOptionPane.YES_NO_OPTION);
-            accepted[0]=choice==JOptionPane.YES_OPTION;
-        });
-        if(!accepted[0])return;
+    private void download(Release release)throws Exception{
+        status("Downloading "+release.tag+"…");
         Path directory=Path.of(System.getProperty("user.home"),"Downloads","Catastrophic-Diplomacy");
         Files.createDirectories(directory);
         // Always use a unique release-specific destination; never overwrite a previous installer.
@@ -121,6 +137,7 @@ final class DesktopReleaseUpdater {
         try{
             HttpURLConnection conn=connect(release.url);
             long received=0;
+            int lastPercent=-1;
             MessageDigest digest=MessageDigest.getInstance("SHA-256");
             try(InputStream in=conn.getInputStream();OutputStream out=Files.newOutputStream(part)){
                 byte[] block=new byte[65536];int n;
@@ -129,6 +146,8 @@ final class DesktopReleaseUpdater {
                     if(received>release.bytes||received>DesktopUpdatePolicy.MAX_DOWNLOAD_BYTES)
                         throw new IllegalStateException("Download exceeded published asset size");
                     digest.update(block,0,n);out.write(block,0,n);
+                    int percent=(int)(received*100/release.bytes);
+                    if(percent!=lastPercent){lastPercent=percent;status("Downloading "+release.tag+": "+percent+"%");}
                 }
             }finally{conn.disconnect();}
             if(received!=release.bytes)throw new IllegalStateException("Downloaded file size mismatch");
@@ -143,6 +162,7 @@ final class DesktopReleaseUpdater {
                 }
             }
             Files.move(part,target,StandardCopyOption.REPLACE_EXISTING);
+            endStatus();
         }finally{Files.deleteIfExists(part);}
         SwingUtilities.invokeAndWait(()->{
             try{

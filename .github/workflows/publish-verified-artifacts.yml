@@ -26,6 +26,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       CD_SOURCE_RUN: ${{ inputs.source_run_id }}
     steps:
+      - uses: actions/checkout@v4
       - name: Require release authorization and independently audit original functional jobs
         env:
           CD_RELEASE_TOKEN: ${{ secrets.CD_RELEASE_TOKEN }}
@@ -150,7 +151,7 @@ jobs:
             echo "BLOCKED: source diverged during upload; draft retained ($relation)"
             exit 1
           fi
-          gh release edit "$CD_RELEASE_TAG" -R "$GH_REPO" --draft=false
+          python3 "$GITHUB_WORKSPACE/tools/publish_release_with_retry.py" "$CD_RELEASE_TAG" "$GH_REPO"
           gh release view "$CD_RELEASE_TAG" -R "$GH_REPO" \
             --json tagName,targetCommitish,isDraft,isPrerelease,assets \
             | jq -e --arg tag "$CD_RELEASE_TAG" --arg sha "$CD_SOURCE_SHA" '

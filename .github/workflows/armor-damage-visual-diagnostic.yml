@@ -1,41 +1,5 @@
 name: Optional original-ship armor damage visual diagnostic
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'game/src/main/java/diplomacy/client/ShipArmorStamps.java'
-      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageVisual.java'
-      - 'game/src/main/java/diplomacy/client/ShipDamageScorch.java'
-      - 'game/src/main/java/diplomacy/client/ShipImpactProfiles.java'
-      - 'assets/damage_masks/*.png'
-      - 'assets/damage_masks/hires96/*.png'
-      - 'tools/audit_damage_mask_assets.py'
-      - 'tools/audit_damage_masks_96_materials.py'
-      - 'game/src/main/java/diplomacy/client/CombatHitFeedback.java'
-      - 'game/src/main/java/diplomacy/client/CombatHitRenderer.java'
-      - 'game/src/main/java/diplomacy/client/CombatLightingRenderer.java'
-      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
-      - 'game/src/main/java/diplomacy/client/ShipDamageImageMasks.java'
-      - 'game/src/test/java/diplomacy/client/CombatHitFeedbackTest.java'
-      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageCaptureTest.java'
-      - 'game/src/main/java/diplomacy/client/ShipDamageVariants.java'
-      - 'game/src/main/java/diplomacy/client/ShipSurfaceLighting.java'
-      - 'game/src/main/java/diplomacy/client/ShipLightProbes.java'
-      - 'game/src/main/java/diplomacy/client/TerranPlaceholderSprites.java'
-      - 'game/src/main/java/diplomacy/client/ShipSurfaceSampleGrid.java'
-      - 'game/src/main/java/diplomacy/client/ShipDamageMaskRegion.java'
-      - 'game/src/main/java/diplomacy/client/ShipArmorStampAnchors.java'
-      - 'game/src/test/java/diplomacy/client/ShipDamageMaskRegionTest.java'
-      - 'core/src/test/java/diplomacy/sim/ArmorBreachTelemetry.java'
-      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageVisualTest.java'
-      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageFixture.java'
-      - 'game/src/main/java/diplomacy/client/ShipSurfaceDamageCapture.java'
-      - 'game/src/test/java/diplomacy/client/ShipSurfaceDamageCaptureTest.java'
-      - 'tools/armor_visual_gallery.py'
-      - 'docs/ARMOR_DAMAGE_STAMPS.md'
-      - 'game/src/main/java/diplomacy/client/CatastrophicGame.java'
-      - 'desktop/src/main/java/diplomacy/desktop/DesktopLauncher.java'
-      - '.github/workflows/armor-damage-visual-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read

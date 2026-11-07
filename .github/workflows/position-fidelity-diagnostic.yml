@@ -4,17 +4,6 @@
 name: Doubled position fidelity checks
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/sim/SublightPropulsion.java'
-      - 'core/src/test/java/diplomacy/sim/WorldScaleAndPropulsionTest.java'
-      - 'core/build.gradle'
-      - 'core/src/test/java/diplomacy/sim/PositionSubstepPerformanceDiagnostic.java'
-      - 'game/src/main/java/diplomacy/client/BattleRenderPoses.java'
-      - 'game/src/test/java/diplomacy/client/CombatTimelineDiagnostic.java'
-      - '.github/workflows/position-fidelity-diagnostic.yml'
-
 concurrency:
   group: cd-position-fidelity-${{ github.ref }}
   cancel-in-progress: true

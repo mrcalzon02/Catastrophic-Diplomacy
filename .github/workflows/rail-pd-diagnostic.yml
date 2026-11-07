@@ -1,24 +1,5 @@
 name: Physical charged rail point-defense validation
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/sim/RailPointDefense.java'
-      - 'core/src/main/java/diplomacy/sim/Battle.java'
-      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
-      - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
-      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
-      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
-      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
-      - 'core/src/test/java/diplomacy/sim/RailPointDefenseDiagnostic.java'
-      - 'core/src/test/java/diplomacy/sim/PointDefenseFleetScaleDiagnostic.java'
-      - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
-      - 'core/src/test/java/diplomacy/sim/BattleTerminationTest.java'
-      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
-      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
-      - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
-      - 'core/build.gradle'
-      - '.github/workflows/rail-pd-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read

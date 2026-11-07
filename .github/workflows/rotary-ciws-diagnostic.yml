@@ -1,39 +1,5 @@
 name: Focused physical rotary CIWS validation
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'core/src/main/java/diplomacy/sim/RotaryPointDefense.java'
-      - 'core/src/main/java/diplomacy/sim/Battle.java'
-      - 'core/src/test/java/diplomacy/sim/SensorTacticalPictureTest.java'
-      - 'game/src/main/java/diplomacy/client/SensorContactOverlay.java'
-      - 'core/src/main/java/diplomacy/sim/BattleArena.java'
-      - 'core/src/main/java/diplomacy/sim/BattleTermination.java'
-      - 'core/src/main/java/diplomacy/sim/CampaignEncounter.java'
-      - 'server/src/main/java/diplomacy/server/BattleServer.java'
-      - 'server/src/test/java/diplomacy/server/BattleTerminalProtocolTest.java'
-      - 'server/build.gradle'
-      - 'core/src/main/java/diplomacy/net/BattleConnection.java'
-      - 'game/src/main/java/diplomacy/client/MultiplayerPanel.java'
-      - 'core/src/test/java/diplomacy/sim/BattleTerminationTest.java'
-      - 'core/src/test/java/diplomacy/sim/BattleArenaLimitsTest.java'
-      - 'core/src/main/java/diplomacy/sim/WeaponMuzzles.java'
-      - 'core/src/main/java/diplomacy/shipyard/HullLayouts.java'
-      - 'core/src/main/java/diplomacy/shipyard/ApprovedHardpointResource.java'
-      - 'core/src/test/java/diplomacy/sim/ApprovedHardpointsTest.java'
-      - 'core/src/test/java/diplomacy/sim/HullLayoutsTest.java'
-      - 'tools/ApprovedHardpointBake.java'
-      - 'build.gradle'
-      - 'core/src/main/java/diplomacy/sim/ShipDamageTargeting.java'
-      - 'core/src/main/java/diplomacy/tech/TechnologyCatalog.java'
-      - 'core/src/main/java/diplomacy/shipyard/Shipyard.java'
-      - 'core/src/main/java/diplomacy/shipyard/ModuleBranchEffects.java'
-      - 'core/src/test/java/diplomacy/sim/RotaryCiwsDiagnostic.java'
-      - 'game/src/main/java/diplomacy/client/ModularWeaponFxRenderer.java'
-      - 'game/src/main/java/diplomacy/client/CapitalTurretSprites.java'
-      - 'core/src/main/java/diplomacy/fx/WeaponFxProfile.java'
-      - 'core/build.gradle'
-      - '.github/workflows/rotary-ciws-diagnostic.yml'
   workflow_dispatch:
 permissions:
   contents: read

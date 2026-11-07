@@ -1,6 +1,7 @@
 package diplomacy.android;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -58,14 +59,30 @@ final class SideloadUpdater {
     });
     private final AtomicBoolean busy = new AtomicBoolean();
     private volatile boolean closed;
-    private File pendingApk;
+    private volatile boolean manualRequested;
+    private volatile File pendingApk;
+    private ProgressDialog progress;
 
     SideloadUpdater(Activity activity) { this.activity = activity; }
 
     void checkForUpdates() { checkForUpdates(true); }
     /** At startup, check quietly if offline; manual checks always provide feedback. */
     void checkForUpdates(boolean manual) {
-        if (closed || !busy.compareAndSet(false, true)) return;
+        if (closed) return;
+        if (manual && pendingApk != null && pendingApk.isFile()) {
+            activity.runOnUiThread(() -> openInstaller(pendingApk));
+            return;
+        }
+        if (!busy.compareAndSet(false, true)) {
+            if (manual) {
+                manualRequested=true;
+                activity.runOnUiThread(() -> {
+                    if(progress==null)beginProgress("Update in progress", "Waiting for the current check or download…", false);
+                });
+            }
+            return;
+        }
+        manualRequested=manual;
         activity.runOnUiThread(() -> {
             String managedStore=managedStore();
             if (managedStore != null) {
@@ -92,7 +109,7 @@ final class SideloadUpdater {
                 }
                 return;
             }
-            if (manual) Toast.makeText(activity, "Checking all published GitHub releases…", Toast.LENGTH_SHORT).show();
+            if (manual) beginProgress("Checking for updates", "Checking published releases, including prereleases…", false);
             io.execute(() -> findUpdate(manual));
         });
     }
@@ -224,6 +241,10 @@ final class SideloadUpdater {
                         android.util.Log.w("CD-Updater", "Release manifest unavailable or inconsistent", badManifest);
                     }
                 }
+                // Older releases may lack a manifest. An exact installed release
+                // tag is still sufficient to avoid downloading the same build.
+                if(candidate.versionCode()<0 && tag.equals("cd-v"+installed.versionName))
+                    alreadyCurrent=true;
                 selected = new Release(candidate, apkUrl, newest.prerelease());
             }
 
@@ -231,28 +252,32 @@ final class SideloadUpdater {
             boolean current = alreadyCurrent;
             int skipped = rejected;
             activity.runOnUiThread(() -> {
+                busy.set(false);
+                endProgress();
                 if (closed || activity.isFinishing()) return;
                 if (latest == null) {
-                    if (manual) dialog("No Android releases",
+                    if (manual || manualRequested) dialog("No Android releases",
                             "No downloadable APK exists in the published GitHub releases." +
                             (skipped > 0 ? " Rejected malformed assets: " + skipped : ""), null);
                     return;
                 }
                 if (current) {
-                    if (manual) dialog("Already up to date",
+                    if (manual || manualRequested) dialog("Already up to date",
                             "Installed: " + installed.versionName + " (build " + installedCode +
                             "). Latest published: " + latest.candidate().tag() + ".", null);
                     return;
                 }
                 // A background check never steals focus from the game.
-                if (manual) showAvailableUpdate(latest, installed.versionName, installedCode);
+                if (manual || manualRequested) downloadUpdate(latest);
                 else android.util.Log.i("CD-Updater", "Newest published APK: " + latest.candidate().tag());
             });
         } catch (Exception failure) {
-            if (manual) dialog("Update check failed", safeError(failure), null);
-            else android.util.Log.w("CD-Updater", "Automatic release check unavailable", failure);
-        } finally {
             busy.set(false);
+            if (manual || manualRequested) activity.runOnUiThread(() -> {
+                endProgress();
+                dialog("Update check failed", safeError(failure), null);
+            });
+            else android.util.Log.w("CD-Updater", "Automatic release check unavailable", failure);
         }
     }
 
@@ -291,7 +316,7 @@ final class SideloadUpdater {
 
     private void downloadUpdate(Release release) {
         if (closed || !busy.compareAndSet(false, true)) return;
-        show("Downloading verified update…");
+        beginProgress("Downloading update", release.candidate.tag(), true);
         io.execute(() -> {
             File part = null;
             try {
@@ -303,6 +328,7 @@ final class SideloadUpdater {
                 Files.deleteIfExists(target.toPath());
                 MessageDigest sha = MessageDigest.getInstance("SHA-256");
                 long read = 0;
+                int lastPercent = -1;
                 HttpURLConnection conn = connect(release.apkUrl);
                 try (InputStream input = new BufferedInputStream(conn.getInputStream());
                      FileOutputStream output = new FileOutputStream(part)) {
@@ -315,6 +341,11 @@ final class SideloadUpdater {
                             throw new IOException("APK exceeded verified size");
                         sha.update(buffer, 0, length);
                         output.write(buffer, 0, length);
+                        int percent=(int)(read*100/release.candidate.bytes());
+                        if(percent!=lastPercent){
+                            lastPercent=percent;
+                            activity.runOnUiThread(() -> {if(progress!=null)progress.setProgress(percent);});
+                        }
                     }
                     output.getFD().sync();
                 } finally { conn.disconnect(); }
@@ -326,15 +357,15 @@ final class SideloadUpdater {
                 if (!part.renameTo(target)) throw new IOException("Unable to stage verified APK");
                 pendingApk = target;
                 activity.runOnUiThread(() -> {
-                    if (!closed && !activity.isFinishing())
-                        new AlertDialog.Builder(activity).setTitle("Update verified")
-                                .setMessage("This APK has passed byte-length, package ID, newer Android versionCode and signing-certificate checks. Any supplied SHA256 was also verified. Open Android's system installer?")
-                                .setNegativeButton("Later", null)
-                                .setPositiveButton("Install", (d, w) -> openInstaller(target)).show();
+                    endProgress();
+                    if (!closed && !activity.isFinishing()) openInstaller(target);
                 });
             } catch (Exception failure) {
                 if (part != null) part.delete();
-                dialog("Update download rejected", safeError(failure), null);
+                activity.runOnUiThread(() -> {
+                    endProgress();
+                    dialog("Update download rejected", safeError(failure), null);
+                });
             } finally { busy.set(false); }
         });
     }
@@ -545,6 +576,23 @@ final class SideloadUpdater {
         if (!closed && !activity.isFinishing()) new AlertDialog.Builder(activity).setTitle(title)
                 .setMessage(message).setPositiveButton("OK", (d, w) -> { if (after != null) after.run(); }).show();
     }); }
-    void close() { closed = true; io.shutdownNow(); }
+    private void beginProgress(String title,String message,boolean download) {
+        // Called on Android's UI thread, never the render or network worker.
+        endProgress();
+        if(closed || activity.isFinishing())return;
+        progress=new ProgressDialog(activity);
+        progress.setTitle(title);
+        progress.setMessage(message);
+        progress.setProgressStyle(download?ProgressDialog.STYLE_HORIZONTAL:ProgressDialog.STYLE_SPINNER);
+        progress.setIndeterminate(!download);
+        progress.setMax(100);
+        progress.setCancelable(false);
+        progress.setButton(AlertDialog.BUTTON_NEGATIVE,"Hide",(dialog,which)->progress=null);
+        progress.show();
+    }
+    private void endProgress() {
+        if(progress!=null){progress.dismiss();progress=null;}
+    }
+    void close() { closed = true; io.shutdownNow(); activity.runOnUiThread(this::endProgress); }
     private record Release(UpdatePolicy.Candidate candidate, String apkUrl, boolean prerelease) { }
 }

@@ -99,7 +99,17 @@ adb logcat -d -v time > "$report/dev-options-logcat.txt"
 grep -q 'CD-DEV.*OPTIONS OPEN' "$report/dev-options-logcat.txt" || {
   echo "FAIL: signed APK did not open Options" >&2; exit 1;
 }
-touch_ui options 350 165
+# Exercise the real volume buttons and preserve readable Options evidence.
+touch_ui options 200 510
+sleep 1
+capture options-voice-decreased
+touch_ui options-voice-decreased 1080 510
+sleep 1
+capture options-voice-restored
+adb logcat -d -v time > "$report/voice-options-logcat.txt"
+grep -q 'CD-OPTIONS.*VOICE 95%' "$report/voice-options-logcat.txt"
+grep -q 'CD-OPTIONS.*VOICE 100%' "$report/voice-options-logcat.txt"
+touch_ui options-voice-restored 350 165
 sleep 1
 capture dev-menu-default
 adb logcat -d -v time > "$report/dev-menu-logcat.txt"

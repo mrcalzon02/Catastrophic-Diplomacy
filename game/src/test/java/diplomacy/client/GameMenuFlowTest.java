@@ -89,8 +89,9 @@ public final class GameMenuFlowTest {
                 "Android must not retain an invisible desktop screensaver hitbox");
         check(GameMenuPanel.homeHit(600,510,false)==0,
                 "Desktop campaign hitbox changed");
-        check(GameMenuPanel.optionsAction(640,510,true,true)==0,
-                "Android voice slider must be tappable");
+        check(GameMenuPanel.optionsAction(200,510,true,true)==7 &&
+                GameMenuPanel.optionsAction(1080,510,true,true)==8,
+                "Android voice buttons must be tappable");
         check(GameMenuPanel.optionsAction(300,395,true,true)==1 &&
                 GameMenuPanel.optionsAction(800,395,true,true)==2 &&
                 GameMenuPanel.optionsAction(300,275,true,true)==3 &&
@@ -124,12 +125,10 @@ public final class GameMenuFlowTest {
                 "Options must expose an actual Dev submenu");
         check(GameMenuPanel.optionsAction(640,395,true,true)==-1,
                 "Android options gutter must not trigger anything");
-        check(GameMenuPanel.voiceHit(640,500,true) &&
-                !GameMenuPanel.voiceHit(640,500,false),
-                "Android voice panel must have distinct touch bounds");
-        check(GameMenuPanel.voiceAt(225,true)==0f &&
-                GameMenuPanel.voiceAt(1057,true)==1f,
-                "Android voice slider endpoints fail");
+        check(GameMenuPanel.voiceDirection(200,500,true)==-1 &&
+                GameMenuPanel.voiceDirection(1080,500,true)==1 &&
+                GameMenuPanel.voiceDirection(640,500,true)==0,
+                "Voice readout and gutters must not change volume");
         check(GameMenuPanel.Screen.valueOf("CAMPAIGN_SETUP")!=null,
                 "New-campaign confirmation view is missing");
         ScenarioCatalog.Preset[] presets=ScenarioCatalog.Preset.values();

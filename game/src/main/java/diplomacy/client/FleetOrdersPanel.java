@@ -134,11 +134,10 @@ final class FleetOrdersPanel {
         batch.begin();
         if(uiIcons != null){
             uiIcons.drawButton(batch,"secondary",1116,629,150,55);
-            uiIcons.draw(batch,"close",1128,643,24);
         }
         font.setColor(Color.WHITE);
         font.draw(batch,"FLEET TACTICAL ORDERS",39,687);
-        font.draw(batch,"CLOSE / BACK",1159,665);
+        UiText.button(batch,font,"CLOSE",1116,629,150,55,Color.WHITE);
         for(int side=0;side<2;side++){
             float x=side==0?39:657;
             font.setColor(side==0?Color.CYAN:Color.CORAL);
