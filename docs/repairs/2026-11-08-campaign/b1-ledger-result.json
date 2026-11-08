@@ -1,0 +1,8 @@
+{
+  "compile_exit": 0,
+  "test_exit": 0,
+  "elapsed_seconds": 2.2136424189993704,
+  "scope": "CampaignLedgerTest; isolated Java17 compilation of two owned files",
+  "source_baseline": "f887d8ba93459cabadcfe33a35e24fbd8669c75c",
+  "android_api_scan": "PASS"
+}

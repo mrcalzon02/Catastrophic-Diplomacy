@@ -1,0 +1,14 @@
+GL_PROOF version=4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 renderer=llvmpipe (LLVM 19.1.7, 256 bits)
+[CD-GAME-FLOW] MAIN_MENU
+[CAMPAIGN] Battle settlement remains pending: RETRYABLE_FAILURE / Campaign remains unchanged. Restore storage access/free space and retry the same transaction. /workspace/scratch/2c6cab9e5294/audit-work/repair-visual/runtime-1560x720-nm6gvmre/campaign/authoritative-ledger-v1.dat.tmp (Is a directory)
+[CD-GAME-FLOW] AFTER_ACTION
+STATE pending: generation=1 reportRows=4 credits=10000 notice=OUTCOME PENDING. Storage could not save the campaign. Check free space and access. Retry Save; keep this app open.
+CAPTURED settlement-pending 1560x720 actual game framebuffer
+[CD-GAME-FLOW] MISSION_LEDGER_COMMITTED mission=31 replay=false credits=42405 recoveredScrap=0 owned=3
+STATE saved: generation=2 credits=52405 owned=3 notice=OUTCOME SAVED. Fleet, credits and research are up to date.
+CAPTURED settlement-retry-saved 1560x720 actual game framebuffer
+[CAMPAIGN] Authoritative recovery unavailable: INVALID
+[CD-GAME-FLOW] CAMPAIGN_FACTION_SETUP
+STATE reset-confirmation: armed=true filesPreserved=true notice=Damaged saves will be archived before a fresh campaign starts. Press ARCHIVE & BEGIN to confirm; CANCEL preserves the current files.
+CAPTURED corrupt-save-confirmation 1560x720 actual game framebuffer
+PASS actual recovery framebuffer sequence 1560x720: pending -> retry saved -> corrupted-save confirmation -> cancel

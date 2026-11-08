@@ -1,6 +1,6 @@
 # GitHub Actions — current workflow ownership
 
-Reconciled on **8 November 2026** against production source `0159042e47a9271e5e3b077756f5c4d57763a688`. This documentation update changes no workflow, trigger, job or release request. See the [full audit](PROJECT_AUDIT_2026-11-08.md) and [development repair plan](DEVELOPMENT_REPAIR_PLAN.md).
+Updated on **8 November 2026** for repair source `4d5ed0028ae2d8b34dcff315924b597cc6708cd5`. The existing smoke workflow now covers runtime/build inputs across all five modules, compiles desktop and Android, and exercises campaign recovery, updates and networking in the same single job. See the [full audit](PROJECT_AUDIT_2026-11-08.md) and [development repair plan](DEVELOPMENT_REPAIR_PLAN.md).
 
 ## Actual activation
 
@@ -39,13 +39,13 @@ Names above omit the common `.yml` suffix. These jobs remain available; routine 
 
 ## Audit findings requiring follow-up
 
-- **F18: coverage holes.** The one smoke path filter misses server/network/hbnet, Android/desktop and much campaign/persistence source. Expand relevant coverage within the existing job.
-- **F19: transitive convention checks.** Mandatory Gradle tasks still pull some source-spelling or visual convention assertions. Preserve actual runtime/resource safety tests while making artistic/implementation-convention checks advisory.
+- **F18: repaired and verified.** Runtime/build paths in core/game/server/desktop/Android, required assets and relevant tools now reach the same job. Documentation remains quiet. The exact-source run below passed Android and desktop compilation plus the functional checks.
+- **F19: shader-source portion repaired.** `shipSurfaceSmoke` is advisory; exact shader-token checks moved there from the required light-behavior test. Behavioral lighting, alpha and other resource/runtime checks remain required. Broader audio/presentation convention classification remains open.
 - **F24: recovery mismatch.** Main release permits `workflow_dispatch`, but recovery currently requires the source event to be `push`. Align supported entrypoints without weakening source/artifact/job verification.
 
-These are planned repairs, not changes performed by this audit. The full register and acceptance criteria are in the development plan.
+The full remaining register and acceptance criteria are in the development plan. [Repair smoke run 42509215714](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/42509215714) passed its one job at source `4d5ed0028ae2d8b34dcff315924b597cc6708cd5`: 137 named Smoke tasks, 167 actionable tasks, including Android and desktop compilation. [Repair receipts](repairs/2026-11-08-campaign/README.md).
 
-## Source-matched release evidence
+## Historical source-matched release evidence
 
 [Release `cd-v0.1.5-dev.693`](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/tag/cd-v0.1.5-dev.693) targets the audited source and includes Android APK, Windows MSI, Linux ZIP, full checksums, package identity, release manifest and signing evidence.
 

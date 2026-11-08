@@ -1,0 +1,14 @@
+{
+  "tasks": [
+    ":core:campaignLedgerSmoke",
+    ":core:campaignAfterActionSmoke",
+    ":core:campaignTechnologySmoke",
+    ":core:gameFlowSmoke",
+    ":game:campaignRecoverySmoke",
+    ":game:menuFlowSmoke",
+    ":desktop:compileJava"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 83.088,
+  "log": "/workspace/scratch/2c6cab9e5294/audit-work/logs/repair-functional.log"
+}

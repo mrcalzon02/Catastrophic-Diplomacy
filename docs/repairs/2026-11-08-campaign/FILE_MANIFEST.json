@@ -1,0 +1,247 @@
+{
+  "implementation_commit": "4d5ed0028ae2d8b34dcff315924b597cc6708cd5",
+  "hosted_run": 42509215714,
+  "scope": "Current repair code, documentation and retained evidence. Manifest excludes itself. Historical audit manifest remains pinned to its original checkpoint.",
+  "files": [
+    {
+      "path": ".github/workflows/release-blocker-smoke.yml",
+      "bytes": 2930,
+      "sha256": "088dba3c33f4ab8ff0754714ef4b2791a60c408b181cbb7ea26f061b2a29dc33",
+      "git_blob_sha1": "b6ba804127e700488560318f2a36b24cbcb1e41e"
+    },
+    {
+      "path": "README.md",
+      "bytes": 21603,
+      "sha256": "2864499d4863daf95176f4b1dd463e403cf519744e01e490a23c8d608527dcfd",
+      "git_blob_sha1": "baf6b8423ea06e217d2c35324c6b6ce9da9893ab"
+    },
+    {
+      "path": "core/src/main/java/diplomacy/sim/CampaignLedger.java",
+      "bytes": 25617,
+      "sha256": "2a0dc2c7bbc645bd15ab5baffd3396f1cce2782c4ef3e7a9de07d09d7a250204",
+      "git_blob_sha1": "766293cc6d79f057b5a7159d2fd26c9587c2d872"
+    },
+    {
+      "path": "core/src/test/java/diplomacy/sim/CampaignLedgerTest.java",
+      "bytes": 22881,
+      "sha256": "a20bfec6c0c79629859ae9c44f2b1111982c17a9d96f3e65ff34c39f6b8af9a2",
+      "git_blob_sha1": "ac596560dec6c4e330e61a988a56554a373376f9"
+    },
+    {
+      "path": "docs/CAMPAIGN_FLEET_CONTINUITY.md",
+      "bytes": 7352,
+      "sha256": "27d3ba5def93428057bcec375bac2f429027af487b8a228a0d9a810cb2ef9349",
+      "git_blob_sha1": "72cdebb290d255516b335bd1ec290df8af5174e7"
+    },
+    {
+      "path": "docs/CI_WORKFLOWS.md",
+      "bytes": 5850,
+      "sha256": "427dfed325025f894bceace5ef171aaf71479a0c3c36dc2fe0d911dbc0c7c2e9",
+      "git_blob_sha1": "d595aa77da5aac268805ba40133b77e843e10115"
+    },
+    {
+      "path": "docs/DEVELOPMENT_REPAIR_PLAN.md",
+      "bytes": 25832,
+      "sha256": "3349bd49c0116f5ee97729d9635a3e189819c4e1fbfa4fdcf1ac1f91f7e77ee6",
+      "git_blob_sha1": "ab8baedc6d55b7e5a02343eb9820ef39238eb8c8"
+    },
+    {
+      "path": "docs/LEVEL_SYSTEM_I.md",
+      "bytes": 6592,
+      "sha256": "4f4ce0c52c5eba1f675d9ed1b13c243dc2bd3cdcee6f275c0193b15f4ae03ca2",
+      "git_blob_sha1": "77f604ebdf582e808ee2e57d02df6cf93561460a"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/CHECKPOINTS.md",
+      "bytes": 5364,
+      "sha256": "38586d877846cbc1705bee1350c7f70d003a38ac2e20864810c1be6a41dac68f",
+      "git_blob_sha1": "1421d8ad2ed865b9194cb94dfc948e9fc92915b6"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/README.md",
+      "bytes": 9548,
+      "sha256": "44331dd66c2006a6bd82177aa5d6bcba7e785bd7f90a3f08c0936ebaee44606b",
+      "git_blob_sha1": "6f4d450c1948c9482e47f28cb7be4884c0e879da"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/b0-validation.json",
+      "bytes": 407,
+      "sha256": "146994ce3cfa5a352d740b41ff74f0bd43d83d918bb92ea40b0612b507f2a658",
+      "git_blob_sha1": "002f2953b5b502aeb064fd54a53312b50c7d7e80"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/b1-ledger-result.json",
+      "bytes": 258,
+      "sha256": "a2b63639c1d6cd15943e6f4a4895fe2fd81f60a39cffcafe95deff9d2c1bdda5",
+      "git_blob_sha1": "99627114bf757d5cafa0f6212afbf9c2cb05c199"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/b1-ledger-test.log",
+      "bytes": 190,
+      "sha256": "2027eb8b4f3353af756af31a40b0b7fb91828bec0b232bf2cd20163f986f5f27",
+      "git_blob_sha1": "10fba7bdff9900c5e9070e8c32826cbdec88856c"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/ci-result.json",
+      "bytes": 8580,
+      "sha256": "cf7256b04347b4ee0daac2ec541952ef5ba0a00610ecca6925145e84e722f0ac",
+      "git_blob_sha1": "68d6aebfa338c2222e192bd0044013469ff4922f"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/hosted-functional-excerpt.log",
+      "bytes": 39498,
+      "sha256": "d6fcf1ff03f6301e2e1b860a2e4585b8da38b1fe629cb3e345a598071200f6f2",
+      "git_blob_sha1": "1247af2990614bdbdae65ccf47f3ce28c47adff1"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/production-readback.json",
+      "bytes": 3046,
+      "sha256": "8db749f4605f5933708499c468077b20cd389b08f292e40f46fae6f1dcdc354b",
+      "git_blob_sha1": "7fb6f2bee0ffe093cea6fe6a619447e168baea59"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/repair-final-result.json",
+      "bytes": 274,
+      "sha256": "95b8c5598ea1ee4e3cbac2cffc5467865bef3dca87dbca5c64c26f15d70fd785",
+      "git_blob_sha1": "86bdb08a14e08574235d19a2530cdb337d751a9c"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/repair-final.log",
+      "bytes": 2304,
+      "sha256": "304489eab085cef4beac2dd9b4fa02ca78a207a657c1c4585c8a167da0772b6f",
+      "git_blob_sha1": "334fdb1842bfc36d53a09779eaebc6c215938877"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/repair-functional-result.json",
+      "bytes": 374,
+      "sha256": "b73694448eafee02d6497df471a6b2fb357dae87e0fc839192b396d07d51e14a",
+      "git_blob_sha1": "8d378d0747107b876f9dc4471a98558b0ce2e731"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/repair-functional.log",
+      "bytes": 19494,
+      "sha256": "6422b103f78db0cf79bed82108ee3d1b734d4998ef0fdf8981cc4de747022e4b",
+      "git_blob_sha1": "a5bfc51e6ddd41e30d5ee31db93217aed69b760a"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/README.md",
+      "bytes": 4541,
+      "sha256": "96c9d608ab3a1fcd4444bb34b790687b6ed4ffd55e819e3384cfd82c8c64f154",
+      "git_blob_sha1": "99d96fc40b8228ff8d179180949be7464a3bffa0"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/RecoveryVisualCapture.java",
+      "bytes": 11096,
+      "sha256": "fee5618edb459add2431d2350918f18679baee5e935c2e1ddf3d4a55fbedbde3",
+      "git_blob_sha1": "b85d6629cfc9ef667549c1d5a819d1059dafd84c"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/SHA256SUMS.txt",
+      "bytes": 1131,
+      "sha256": "8a87c3783a4a773a97b05e6680b22e3d7167abb1f7c67c0acdd75456055324fc",
+      "git_blob_sha1": "535a053a098691249b9f59258de4a12e3ba77175"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/capture-1280x720.log",
+      "bytes": 1448,
+      "sha256": "be7731f366984f0daa8fad1009f7b72a105c8629ff89950c1ef92ad813ed01ff",
+      "git_blob_sha1": "9942c504083484a8eb2a9edb4773ebe7643d3c2e"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/capture-1560x720.log",
+      "bytes": 1448,
+      "sha256": "cbf7b0a93d0772d73af0ddbe068f65e473fba5b5ad22ab5ddfdcdfab50d4b411",
+      "git_blob_sha1": "6ee61db06a0a815083532c403507396730b762a4"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/capture-manifest.json",
+      "bytes": 3280,
+      "sha256": "91e9224200ed4fea0fd766cc1e8fc33f03eea888b6b37eb8f6db2688f320be3c",
+      "git_blob_sha1": "591adcb98de9b534319144f9afd6c91ddcf3c9be"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/corrupt-save-confirmation-1280x720.png",
+      "bytes": 947367,
+      "sha256": "602b50f8fd83b4484c187a13325502b6acce91887386ccd9a5f8012ff9f3b484",
+      "git_blob_sha1": "71a57918c90cb9c26bddb9fa12a3bbab7998145c"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/corrupt-save-confirmation-1560x720.png",
+      "bytes": 962609,
+      "sha256": "be9e1221c817195818fa4594bae1ad8aba8496e4ab27949636bda608185bffe3",
+      "git_blob_sha1": "745e02111a2348cfc7316a20d4020a8faa597cbf"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/run_capture.py",
+      "bytes": 5879,
+      "sha256": "8dd0dc046c32e7f905a3a46803fba67d0be30da9e9879c0d3d69b26e7939b613",
+      "git_blob_sha1": "3942b3ebafb7a33f8d09f36e351e7cee3418b5ac"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/settlement-pending-1280x720.png",
+      "bytes": 776412,
+      "sha256": "e76b22b7dafe0230f9d10df9ff36dd97d0980080697d825caa173fa8e6a0209f",
+      "git_blob_sha1": "a9f487ec3f97f1697dd19aad717160659c7c61d6"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/settlement-pending-1560x720.png",
+      "bytes": 788106,
+      "sha256": "72d518feee5d9725cf16a967d160564eb827fd4d24aa03c2119b3976cfd15269",
+      "git_blob_sha1": "c3c61fac0ea7611b60b5fdd9a66a373f99102760"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/settlement-retry-saved-1280x720.png",
+      "bytes": 765519,
+      "sha256": "ee7830b048caefa9f59da8b81398bf6a86715bf2e8737b1289595e5efe2cf3ac",
+      "git_blob_sha1": "5e0dc862bbbfdb91e7f8ab9e5f88352a0ae60abd"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/settlement-retry-saved-1560x720.png",
+      "bytes": 778623,
+      "sha256": "7b035898e542e92ade647b76592afbbb8ae82ad16b1673ece69afecef94049d4",
+      "git_blob_sha1": "367a1da8fff80ee92a795a67b21d92f66b5c0696"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/visual/visual-review.json",
+      "bytes": 1671,
+      "sha256": "005c878e00927a315521b3231525393050256a89f4e8a2914dfa59e3be298bea",
+      "git_blob_sha1": "b9abdfd90bacd16b7048cebfb3b3e4bae83c3a05"
+    },
+    {
+      "path": "game/build.gradle",
+      "bytes": 20164,
+      "sha256": "e7118a4b4369ea90f790905ce6fe836ee682049a386027466a47175310a28c0e",
+      "git_blob_sha1": "fd6b37cb7742acfcf27388280c7abcac9d374b7f"
+    },
+    {
+      "path": "game/src/main/java/diplomacy/client/CatastrophicGame.java",
+      "bytes": 226185,
+      "sha256": "f23a7410f838bf920f6507fc656d4a379bcc517273c960e6fe18a86b1e6eae76",
+      "git_blob_sha1": "c8fb975e892255ee013a2cb5d1a20aaffd1238ce"
+    },
+    {
+      "path": "game/src/main/java/diplomacy/client/GameMenuPanel.java",
+      "bytes": 80788,
+      "sha256": "ce79cd523169642c2ff4eba760e3c0b7f37c4dd1bbaa6e9947a5c8812977e014",
+      "git_blob_sha1": "561d584220bff98aae93e8fa84dc71331c8a5f40"
+    },
+    {
+      "path": "game/src/test/java/diplomacy/client/CampaignRecoveryFlowTest.java",
+      "bytes": 37941,
+      "sha256": "0b903bca41724328738f04250d832d2aea2eb3d0abbe92f4304bee7cc4b5ae7a",
+      "git_blob_sha1": "c93110592bd7b1ad50cef37a57f2299e3d2db018"
+    },
+    {
+      "path": "game/src/test/java/diplomacy/client/ShipLightProbesTest.java",
+      "bytes": 3582,
+      "sha256": "d8377943e055e9950a3281f6c17f5a1c44f7f51ebf76d670cd8eea6001494640",
+      "git_blob_sha1": "a6dda49800c1cd0ef8f8a1c1f29b776bc5a45f44"
+    },
+    {
+      "path": "game/src/test/java/diplomacy/client/ShipSurfaceShaderTest.java",
+      "bytes": 2185,
+      "sha256": "c82ca35a8c36edebbe16b9636a1fea04f6e0511efada365d6de90c1b88add1af",
+      "git_blob_sha1": "652120455089aa94dceca4dfa00826894899acb8"
+    }
+  ]
+}

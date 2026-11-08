@@ -1,0 +1,11 @@
+{
+  "tasks": [
+    ":core:campaignLedgerSmoke",
+    ":game:campaignRecoverySmoke",
+    ":game:shipLightProbesSmoke",
+    ":desktop:compileJava"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 11.987,
+  "log": "/workspace/scratch/2c6cab9e5294/audit-work/logs/repair-final.log"
+}

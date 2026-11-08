@@ -1,0 +1,84 @@
+{
+  "commit": "4d5ed0028ae2d8b34dcff315924b597cc6708cd5",
+  "files": [
+    {
+      "path": ".github/workflows/release-blocker-smoke.yml",
+      "bytes": 2930,
+      "chars": 2930,
+      "sha256": "088dba3c33f4ab8ff0754714ef4b2791a60c408b181cbb7ea26f061b2a29dc33",
+      "blob": "b6ba804127e700488560318f2a36b24cbcb1e41e"
+    },
+    {
+      "path": "core/src/main/java/diplomacy/sim/CampaignLedger.java",
+      "bytes": 25617,
+      "chars": 25617,
+      "sha256": "2a0dc2c7bbc645bd15ab5baffd3396f1cce2782c4ef3e7a9de07d09d7a250204",
+      "blob": "766293cc6d79f057b5a7159d2fd26c9587c2d872"
+    },
+    {
+      "path": "core/src/test/java/diplomacy/sim/CampaignLedgerTest.java",
+      "bytes": 22881,
+      "chars": 22881,
+      "sha256": "a20bfec6c0c79629859ae9c44f2b1111982c17a9d96f3e65ff34c39f6b8af9a2",
+      "blob": "ac596560dec6c4e330e61a988a56554a373376f9"
+    },
+    {
+      "path": "docs/DEVELOPMENT_REPAIR_PLAN.md",
+      "bytes": 25588,
+      "chars": 25496,
+      "sha256": "1382e58f48153e9261de3c5cfedc0b1cef59366c5dba86fc12878d77f10b77ee",
+      "blob": "773b3567b84730208ce8fb2d7f8aae4b4078f674"
+    },
+    {
+      "path": "game/build.gradle",
+      "bytes": 20164,
+      "chars": 20164,
+      "sha256": "e7118a4b4369ea90f790905ce6fe836ee682049a386027466a47175310a28c0e",
+      "blob": "fd6b37cb7742acfcf27388280c7abcac9d374b7f"
+    },
+    {
+      "path": "game/src/main/java/diplomacy/client/CatastrophicGame.java",
+      "bytes": 226185,
+      "chars": 226183,
+      "sha256": "f23a7410f838bf920f6507fc656d4a379bcc517273c960e6fe18a86b1e6eae76",
+      "blob": "c8fb975e892255ee013a2cb5d1a20aaffd1238ce"
+    },
+    {
+      "path": "game/src/main/java/diplomacy/client/GameMenuPanel.java",
+      "bytes": 80788,
+      "chars": 80788,
+      "sha256": "ce79cd523169642c2ff4eba760e3c0b7f37c4dd1bbaa6e9947a5c8812977e014",
+      "blob": "561d584220bff98aae93e8fa84dc71331c8a5f40"
+    },
+    {
+      "path": "game/src/test/java/diplomacy/client/ShipLightProbesTest.java",
+      "bytes": 3582,
+      "chars": 3582,
+      "sha256": "d8377943e055e9950a3281f6c17f5a1c44f7f51ebf76d670cd8eea6001494640",
+      "blob": "a6dda49800c1cd0ef8f8a1c1f29b776bc5a45f44"
+    },
+    {
+      "path": "game/src/test/java/diplomacy/client/ShipSurfaceShaderTest.java",
+      "bytes": 2185,
+      "chars": 2185,
+      "sha256": "c82ca35a8c36edebbe16b9636a1fea04f6e0511efada365d6de90c1b88add1af",
+      "blob": "652120455089aa94dceca4dfa00826894899acb8"
+    },
+    {
+      "path": "docs/repairs/2026-11-08-campaign/CHECKPOINTS.md",
+      "bytes": 3759,
+      "chars": 3751,
+      "sha256": "5370392388ac75604900930f076cd93a8afae557f113088735c3e99da505bd29",
+      "blob": "3a7a23e030ef45fefeac16bef7c328807c650c9d"
+    },
+    {
+      "path": "game/src/test/java/diplomacy/client/CampaignRecoveryFlowTest.java",
+      "bytes": 37941,
+      "chars": 37935,
+      "sha256": "0b903bca41724328738f04250d832d2aea2eb3d0abbe92f4304bee7cc4b5ae7a",
+      "blob": "c93110592bd7b1ad50cef37a57f2299e3d2db018"
+    }
+  ],
+  "remote_contents_equal": true,
+  "worktree": "clean"
+}

@@ -1,0 +1,42 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :core:compileJava UP-TO-DATE
+> Task :prepareLegacyFactionArt UP-TO-DATE
+> Task :prepareStage1Art UP-TO-DATE
+> Task :bakeApprovedHardpoints UP-TO-DATE
+> Task :core:processResources UP-TO-DATE
+> Task :core:classes UP-TO-DATE
+> Task :core:compileTestJava UP-TO-DATE
+> Task :core:processTestResources NO-SOURCE
+> Task :core:testClasses UP-TO-DATE
+
+> Task :core:campaignLedgerSmoke
+PASS atomic campaign ledger: strict compatibility, exactly-once retry, lost acknowledgement, readback recovery, verified corrupt-save archive and inaccessible-storage protection (64 checks)
+
+> Task :core:jar UP-TO-DATE
+> Task :game:compileJava
+> Task :game:processResources NO-SOURCE
+> Task :game:classes
+> Task :game:compileTestJava
+> Task :game:processTestResources NO-SOURCE
+> Task :game:testClasses
+
+> Task :game:campaignRecoverySmoke
+PASS campaign recovery: pending Results, blocked exits, frozen retry, exact-once stores/losses/research and reopen
+PASS campaign recovery: already-written proposal reconciles without another reward/generation
+PASS campaign Results: pointer/keyboard preparation and exits, defeat and withdrawn reserves
+PASS campaign recovery: explicit corrupt-save archive/reset, faction change and cancelled consent
+PASS campaign recovery: a valid backup still restores automatically without reset
+PASS campaign creation: Cancel/faction changes reconcile lost acknowledgements and retain unverified intent
+PASS campaign branch context: mission 31 permits five owned ships in dock and squadrons, rejects six
+PASS campaign research: Tech VII–IX card/quote parity, cancellation, paid confirmation and repeat-click protection
+PASS campaign map: Enter/pointer deployment parity and locked-mission rejection
+PASS campaign recovery flow: actual controllers and durable local transactions; no graphics/device claim
+
+> Task :game:shipLightProbesSmoke
+PASS: bounded local lights, distance LOD, alpha-safe scorch
+
+> Task :desktop:compileJava UP-TO-DATE
+
+BUILD SUCCESSFUL in 11s
+13 actionable tasks: 5 executed, 8 up-to-date

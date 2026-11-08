@@ -1,0 +1,65 @@
+{
+  "started_utc": "2026-11-08T18:16:39.902340+00:00",
+  "game_type": "Desktop LWJGL3; software OpenGL in TCP Xvfb",
+  "fixture": "Four actual commissioned vessels, controlled finished battle, real temporary save write fault",
+  "source_head": "f887d8ba93459cabadcfe33a35e24fbd8669c75c",
+  "android_device_claim": false,
+  "mock_panels": false,
+  "sources": {
+    "game/src/main/java/diplomacy/client/CatastrophicGame.java": "f23a7410f838bf920f6507fc656d4a379bcc517273c960e6fe18a86b1e6eae76",
+    "game/src/main/java/diplomacy/client/GameMenuPanel.java": "ce79cd523169642c2ff4eba760e3c0b7f37c4dd1bbaa6e9947a5c8812977e014",
+    "core/src/main/java/diplomacy/sim/CampaignLedger.java": "2a0dc2c7bbc645bd15ab5baffd3396f1cce2782c4ef3e7a9de07d09d7a250204"
+  },
+  "classes": {
+    "game/build/classes/java/main/diplomacy/client/CatastrophicGame.class": "8a2f061bf7c8534af91de20aa39e6e9606a0b6c6a7eeb66ce66a1748e4dd7bde",
+    "game/build/classes/java/main/diplomacy/client/GameMenuPanel.class": "6f3899f94951b9b75272ed6a395904113002e352538c122748b4c190dd489681",
+    "core/build/classes/java/main/diplomacy/sim/CampaignLedger.class": "b3203053f89e6ffeb57f4446b3c10bf8903c91b69b1addf64d4c5465a7412419"
+  },
+  "runs": [
+    {
+      "size": "1280x720",
+      "game_exit": 0,
+      "runtime": "/workspace/scratch/2c6cab9e5294/audit-work/repair-visual/runtime-1280x720-vwqr4ooq",
+      "log": "/workspace/scratch/2c6cab9e5294/audit-work/repair-visual/capture-1280x720.log",
+      "screenshots": {
+        "settlement-pending-1280x720.png": {
+          "sha256": "e76b22b7dafe0230f9d10df9ff36dd97d0980080697d825caa173fa8e6a0209f",
+          "bytes": 776412
+        },
+        "settlement-retry-saved-1280x720.png": {
+          "sha256": "ee7830b048caefa9f59da8b81398bf6a86715bf2e8737b1289595e5efe2cf3ac",
+          "bytes": 765519
+        },
+        "corrupt-save-confirmation-1280x720.png": {
+          "sha256": "602b50f8fd83b4484c187a13325502b6acce91887386ccd9a5f8012ff9f3b484",
+          "bytes": 947367
+        }
+      }
+    },
+    {
+      "size": "1560x720",
+      "game_exit": 0,
+      "runtime": "/workspace/scratch/2c6cab9e5294/audit-work/repair-visual/runtime-1560x720-nm6gvmre",
+      "log": "/workspace/scratch/2c6cab9e5294/audit-work/repair-visual/capture-1560x720.log",
+      "screenshots": {
+        "settlement-pending-1560x720.png": {
+          "sha256": "72d518feee5d9725cf16a967d160564eb827fd4d24aa03c2119b3976cfd15269",
+          "bytes": 788106
+        },
+        "settlement-retry-saved-1560x720.png": {
+          "sha256": "7b035898e542e92ade647b76592afbbb8ae82ad16b1673ece69afecef94049d4",
+          "bytes": 778623
+        },
+        "corrupt-save-confirmation-1560x720.png": {
+          "sha256": "be9e1221c817195818fa4594bae1ad8aba8496e4ab27949636bda608185bffe3",
+          "bytes": 962609
+        }
+      }
+    }
+  ],
+  "harness_sha256": "fee5618edb459add2431d2350918f18679baee5e935c2e1ddf3d4a55fbedbde3",
+  "harness_compile_exit": 0,
+  "finished_utc": "2026-11-08T18:16:45.996802+00:00",
+  "verified_implementation_commit": "4d5ed0028ae2d8b34dcff315924b597cc6708cd5",
+  "provenance_note": "Capture checkout HEAD was the audit checkpoint; the captured working-tree source hashes exactly match the subsequently published and read-back implementation commit above."
+}

@@ -6,6 +6,8 @@
 
 The dated audit reconciles current implementation, fresh Java 17 tests, source-matched release evidence, reproduced player-flow defects and remaining device acceptance. Use that status and the repair plan when selecting the next development task.
 
+**First repair batch delivered:** [campaign recovery and controller repairs](docs/repairs/2026-11-08-campaign/README.md). Pending settlements now retry safely; corrupt saves have explicit archive/reset; Results and map controls, branch caps, late research cards and report spacing are repaired. The source checkpoint passed the single hosted job, including Android compilation, and has actual desktop screenshots. The next functional batch is B3 combat chronology/withdrawal fixes.
+
 ### Gritty military UI — first production asset intake
 
 The native menu now renders eight textless, nine-patch gritty button skins, drawn underneath live labels. The complete 182 edge-filtered source candidates and nine background panels are stored in checksummed `asset_packs/gritty-ui/` archives, **not** injected into the runtime indiscriminately. The source sprites remain subject to visual approval; only the eight hand-selected controls are currently live. See [UI design authority](docs/AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) and `assets/ui/gritty/README.md`. Windows/Linux and Android/Fire OS use the same shared game resources. The Gradle `verifyGrittyUiAssets` task prevents altered images or lost source archives from shipping.

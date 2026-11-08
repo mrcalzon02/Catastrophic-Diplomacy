@@ -1,0 +1,413 @@
+# Exact-source hosted verification excerpt
+# Source: https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/42509215714/job/128818404158
+# Production commit: 4d5ed0028ae2d8b34dcff315924b597cc6708cd5
+
+2026-11-08T18:17:29.5457487Z PASS runtime sources avoid Android-incompatible Stream.toList, java.util.HexFormat and BigInteger.longValueExact, InputStream.readAllBytes/readNBytes
+2026-11-08T18:17:48.7781449Z > Task :core:compileJava
+2026-11-08T18:17:51.6798086Z > Task :game:compileJava
+2026-11-08T18:17:52.9754393Z > Task :desktop:compileJava
+2026-11-08T18:17:52.9771470Z > Task :game:processResources NO-SOURCE
+2026-11-08T18:17:52.9772312Z > Task :game:classes
+2026-11-08T18:17:53.1755172Z > Task :game:jar
+2026-11-08T18:17:56.2759259Z > Task :prepareLegacyFactionArt
+2026-11-08T18:17:56.2780082Z PASS: 50 original Drive-sourced legacy faction hulls generated for both release platforms.
+2026-11-08T18:17:56.4790643Z > Task :prepareStage1Art
+2026-11-08T18:17:56.4810850Z PASS: 10 Terran hull sprites + 35 beam frames restored from original Git archive.
+2026-11-08T18:18:00.2756897Z > Task :bakeApprovedHardpoints
+2026-11-08T18:18:00.2758424Z PASS approved-source hardpoints: 506 faction/variant combinations, 110 authenticated source PNGs, 9515 physical socket anchors
+2026-11-08T18:18:00.2773389Z > Task :core:processResources
+2026-11-08T18:18:00.2774137Z > Task :core:classes
+2026-11-08T18:18:00.4768214Z > Task :core:jar
+2026-11-08T18:18:00.4800639Z > Task :android:preBuild UP-TO-DATE
+2026-11-08T18:18:00.4802377Z > Task :android:preDebugBuild UP-TO-DATE
+2026-11-08T18:18:00.5751084Z > Task :android:javaPreCompileDebug
+2026-11-08T18:18:03.6770449Z > Task :android:checkDebugAarMetadata
+2026-11-08T18:18:05.8754575Z > Task :android:generateAppIcons
+2026-11-08T18:18:05.8755912Z PASS original-art icon on all three platforms; SHA-256 01b61b0a957dcfa34373520aaa7bac1c9b1bb91ef7ff0de748ff4f813028f3c0
+2026-11-08T18:18:05.8757244Z > Task :android:generateDebugResValues
+2026-11-08T18:18:05.9755015Z > Task :android:mapDebugSourceSetPaths
+2026-11-08T18:18:05.9761122Z > Task :android:generateDebugResources
+2026-11-08T18:18:06.3766472Z > Task :android:packageDebugResources
+2026-11-08T18:18:06.6750758Z > Task :android:mergeDebugResources
+2026-11-08T18:18:07.4771253Z > Task :android:createDebugCompatibleScreenManifests
+2026-11-08T18:18:07.4772146Z > Task :android:extractDeepLinksDebug
+2026-11-08T18:18:07.5783149Z > Task :android:parseDebugLocalResources
+2026-11-08T18:18:07.6801792Z > Task :android:processDebugMainManifest
+2026-11-08T18:18:07.9751516Z > Task :android:processDebugManifest
+2026-11-08T18:18:09.9783089Z > Task :core:compileTestJava
+2026-11-08T18:18:09.9850068Z > Task :core:processTestResources NO-SOURCE
+2026-11-08T18:18:09.9850981Z > Task :core:testClasses
+2026-11-08T18:18:11.1783518Z > Task :core:ammunitionResearchSmoke
+2026-11-08T18:18:11.1811099Z PASS research-locked ammo: 11 races, 3 launcher types, 4 exclusive trees x 6 ranks, per-bank intersection, live ballistic rounds and frozen salvo warheads
+2026-11-08T18:18:12.2754356Z > Task :core:ammunitionSelectionSmoke
+2026-11-08T18:18:12.2755470Z PASS CD-SHIP-1/2/3 compatibility, player ammo fitting, 11 race save parity, anti-downgrade lockouts and live EMP launches
+2026-11-08T18:18:12.5753284Z > Task :core:ammunitionTypesSmoke
+2026-11-08T18:18:12.5754594Z PASS 5 ballistic ammunition and 6 missile payloads: physical rounds, AP penetration, explosions, EMP, shield attack and replay
+2026-11-08T18:18:13.8750774Z > Task :core:battleTerminationSmoke
+2026-11-08T18:18:13.8751775Z PASS real disarmed 1v1 stalemate at tick 3600
+2026-11-08T18:18:13.8752543Z PASS campaign unresolved draw, unchanged wave and actual-win distinction
+2026-11-08T18:18:13.8753588Z PASS deterministic finite battle end policy, damage grace, delayed threats and survivor accounting
+2026-11-08T18:18:15.3753856Z > Task :core:worldScaleAndPropulsionSmoke
+2026-11-08T18:18:15.3754722Z PASS fixed one-light-minute diagonal and 60:1 compressed clock
+2026-11-08T18:18:15.3755545Z PASS bare, one-ENG, two-ENG and upgraded-drive tiers
+2026-11-08T18:18:15.3756373Z PASS bounded impulse, one-tank reserve, paid economy thrust and coast
+2026-11-08T18:18:15.3761827Z PASS 60 Hz ship-position substeps; 30Hz error 0.012565518, 60Hz error 0.006080089, fuel parity
+2026-11-08T18:18:15.3771454Z PASS 50%-size fitted hull, physical kinetic radius and source-art muzzle
+2026-11-08T18:18:15.3772453Z PASS half-scale ship physical geometry and sublight thrust integration
+2026-11-08T18:18:15.5755580Z > Task :core:battleArenaSmoke
+2026-11-08T18:18:15.5756675Z PASS fixed arena, 200v200, ship bounds, six projectile types and timeouts
+2026-11-08T18:18:16.8752743Z > Task :core:campaignLaunchRuntimeSmoke
+2026-11-08T18:18:16.8753896Z PASS campaign start/save/restore + mission 1/2 live 30-tick combat for 11 factions, 22 missions
+2026-11-08T18:18:18.8760847Z > Task :core:crewAccommodationSmoke
+2026-11-08T18:18:18.8762920Z PASS crew habitat: 506 staffed faction/chassis combinations, intrinsic hull berths and life support, optional upgrades, no unmanned gunfire and version-1 migration
+2026-11-08T18:18:27.0754781Z > Task :core:demoWeaponSmoke
+2026-11-08T18:18:27.0756051Z PASS demo 200v200: six weapon families fired, impacts=6621 hits=3780 craft=326 ordnance=247 fingerprint=8ccb3dfec5fb4f19
+2026-11-08T18:18:33.1750408Z PASS demo 200v200: six weapon families fired, impacts=6621 hits=3780 craft=326 ordnance=247 fingerprint=8ccb3dfec5fb4f19
+2026-11-08T18:18:34.7754123Z > Task :core:hullCoverageSmoke
+2026-11-08T18:18:34.7755266Z PASS hull coverage: 11 x 1v1, 11v11 mixed, 194 physical module anchors, 22 varied layouts, shields-first and deterministic fleet replay
+2026-11-08T18:18:36.4751672Z > Task :core:hullFoundationSmoke
+2026-11-08T18:18:36.4753469Z PASS physical hull baseline: 506 chassis/faction combinations, 11 native module rosters, 73260 tech upgrades, unarmed fits, symmetric combat
+2026-11-08T18:18:36.5751334Z > Task :core:hullVoiceSmoke
+2026-11-08T18:18:36.5752059Z PASS: 598 hull/event checks, 11 voice themes, deterministic choices
+2026-11-08T18:18:37.5752591Z > Task :core:moduleVersionsSmoke
+2026-11-08T18:18:37.5753783Z PASS 40700 module manufacturing versions, exclusive six-rank research retention, fitted sidegrades and CD-SHIP-1/2 compatibility
+2026-11-08T18:18:37.8750168Z > Task :core:ordnanceDoctrineSmoke
+2026-11-08T18:18:37.8751514Z PASS 14 physical missile/torpedo schematics, finite reload and ammo, decoys, cold ignition, PD and replay
+2026-11-08T18:18:37.8753028Z > Task :core:ordnancePropulsionSmoke
+2026-11-08T18:18:37.8754278Z PASS inertial coasting, cold ejection, finite acceleration, dynamic PD signatures, physical terminal sprint and motor phases
+2026-11-08T18:18:37.9762360Z > Task :android:processDebugManifestForPackage
+2026-11-08T18:18:38.1751788Z > Task :core:ordnanceConfigurationSmoke
+2026-11-08T18:18:38.1753143Z PASS independent salvo/propulsion/seeker configuration, real offset guidance, cold launch, ammo, snapshot and deterministic replay
+2026-11-08T18:18:39.2761162Z > Task :core:ordnanceBlueprintSmoke
+2026-11-08T18:18:39.2764373Z PASS versioned launcher blueprint, 9-tier research, old designs, editing invariants, real battle spawn, missile flight and authorization
+2026-11-08T18:18:40.3750486Z > Task :core:ordnanceRacksSmoke
+2026-11-08T18:18:40.3751978Z PASS CD-SHIP-5 separate socket research, magazines, reloading, real muzzles, physical missiles, payloads, tamper rejection and replay
+2026-11-08T18:18:40.5754752Z > Task :core:ordnanceSeekerSmoke
+2026-11-08T18:18:40.5755543Z PASS seeded seeker ECM loss/reacquisition, cold-coast PD counterplay and replay
+2026-11-08T18:18:40.8753218Z > Task :core:ordnanceSubmunitionsSmoke
+2026-11-08T18:18:40.8781738Z PASS live cluster carrier and cascade swarm: PD, ammo, damage, art-independent split and replay
+2026-11-08T18:18:42.8753018Z > Task :core:photonCacheParitySmoke
+2026-11-08T18:18:42.8754624Z PASS cache parity 4v4 ticks=45 fingerprint=a88a76d5b43e9710 hits=1152 misses=2104 reuseMs=19.179363 legacyMs=19.795097 (timings diagnostic only)
+2026-11-08T18:18:42.8756941Z PASS cache parity 16v16 ticks=35 fingerprint=e1563d66a6e3ee34 hits=13312 misses=19900 reuseMs=31.91809 legacyMs=26.559593 (timings diagnostic only)
+2026-11-08T18:18:44.2750857Z PASS cache parity 200v200 ticks=60 fingerprint=9ce4b4f4b8f4b9e5 hits=3979223 misses=4794459 reuseMs=977.150614 legacyMs=1427.568526 (timings diagnostic only)
+2026-11-08T18:18:45.5751495Z > Task :core:rocketBarrageSmoke
+2026-11-08T18:18:45.5753212Z PASS four native rocket sizes, 4/8/16 cheap physical volleys, two fixed-bearing motor envelopes, long reloads, PD, dodge, hit and replay
+2026-11-08T18:18:45.7754782Z > Task :core:beamPhotonFlightSmoke
+2026-11-08T18:18:45.7755945Z PASS delayed laser photons, real hull impact, physical dodge
+2026-11-08T18:18:45.7757057Z PASS delayed photon replay and pending pulse fingerprint
+2026-11-08T18:18:45.9752933Z > Task :core:beamRaySmoke
+2026-11-08T18:18:45.9754142Z PASS physical beam grazing, bounded reach, occlusion and imperfect-aim hit/miss
+2026-11-08T18:18:45.9755449Z PASS live LASER physical beam fire/impact parity; 6 rays, 6 hull intersections
+2026-11-08T18:18:45.9756704Z PASS live PLASMA physical beam fire/impact parity; 4 rays, 4 hull intersections
+2026-11-08T18:18:45.9763315Z PASS live PARTICLE physical beam fire/impact parity; 3 rays, 3 hull intersections
+2026-11-08T18:18:47.1752430Z > Task :core:fighterCountermeasureSmoke
+2026-11-08T18:18:47.1753352Z PASS independent real flak and rotary CHAFF diversions, flare spectra, finite ammo/cooldowns
+2026-11-08T18:18:47.1754133Z PASS seeded independently replayed fighter/chaff/flak combat
+2026-11-08T18:18:48.2750770Z > Task :core:fighterEscapePodSmoke
+2026-11-08T18:18:48.2751871Z PASS physical drift, exact pickup range, enemy isolation, crew capacity and capsule expiry
+2026-11-08T18:18:48.2752986Z PASS real launched pilot debit, intact fighter retrieval and idempotent campaign roster
+2026-11-08T18:18:48.2754015Z PASS real ejection capsule, finite friendly pickup, after-action crew settlement
+2026-11-08T18:18:48.2754957Z PASS distant ejection remains adrift and cannot mint campaign personnel
+2026-11-08T18:18:49.5750640Z > Task :core:fighterInfraredSeekerSmoke
+2026-11-08T18:18:49.5751967Z PASS actual fitted fighter interceptors, passive photon tracks, finite flare competition
+2026-11-08T18:18:49.5756418Z PASS deterministic live infrared fighter missiles and flares
+2026-11-08T18:18:50.6752692Z > Task :core:fighterOpticalSeekerSmoke
+2026-11-08T18:18:50.6754165Z PASS independent optical range/cone, real photon age, glare alignment and band isolation
+2026-11-08T18:18:50.6755711Z PASS optical nebula path attenuation, solar burst edges, spectral isolation, photon causality
+2026-11-08T18:18:50.6757215Z PASS exclusive researched FTR optical selection and finite optical measurement
+2026-11-08T18:18:50.6758526Z PASS real equipped optical interceptors, delayed photons, IR/radar isolation and replay
+2026-11-08T18:18:50.6760162Z PASS real fitted optical wing in seeded nebula weather
+2026-11-08T18:18:51.9752076Z > Task :core:fighterRadarSeekerSmoke
+2026-11-08T18:18:51.9753378Z PASS causal active radar transmission/return, geometry, chaff vs flare bands
+2026-11-08T18:18:51.9754745Z PASS finite IR/radar seeker error, spectral resolution, signal, delay and replay
+2026-11-08T18:18:51.9755912Z PASS fitted radar fighter missiles, chaff, IR isolation, replay
+2026-11-08T18:18:53.0750643Z > Task :core:fighterSeekerBlueprintSmoke
+2026-11-08T18:18:53.0751181Z PASS CD-SHIP-7, FTR licences, legacy defaults, mutation and fleet export
+2026-11-08T18:18:53.0751784Z PASS persisted FTR doctrine, real distinct missile heads, delayed photons and replay
+2026-11-08T18:18:54.0750231Z > Task :core:fighterSurvivabilitySmoke
+2026-11-08T18:18:54.0751280Z PASS all six fighter hulls, paid rank progression and bounded independent pilot ejection probabilities
+2026-11-08T18:18:54.0752347Z PASS actual single shield then single armor cell, hit cooldown, finite recharge and stock fallback
+2026-11-08T18:18:54.0753108Z PASS real fatal-hit ejection across three seats, exact-once survivor bookkeeping and deterministic replay
+2026-11-08T18:18:54.0754151Z PASS fitted FTR rank 9 inherited by physically constructed fighter
+2026-11-08T18:18:54.9757809Z > Task :core:fighterWingLinkSmoke
+2026-11-08T18:18:54.9758919Z PASS 60-unit direct radio, one-tick delay, no team leaks or multi-hop
+2026-11-08T18:18:54.9760340Z PASS real close-formation fighter scout contact, no remote weapon lock and replay
+2026-11-08T18:18:55.1780494Z > Task :core:guidedSalvoCausalitySmoke
+2026-11-08T18:18:55.1797208Z PASS sixteen guided rounds preserve original received fix after evasive target maneuver
+2026-11-08T18:18:55.3750651Z > Task :core:guidedTrajectoryPredictionSmoke
+2026-11-08T18:18:55.3751967Z PASS finite trajectory path, ETA, determinism and read-only projectile state
+2026-11-08T18:18:55.3753331Z PASS thrust/coast/cold launch, last-fix deception and lock loss
+2026-11-08T18:18:55.3754573Z PASS guided prediction never queries current hostile truth
+2026-11-08T18:18:55.4760534Z > Task :core:ordnanceSeekerPhotonSmoke
+2026-11-08T18:18:55.4761356Z PASS seeker optical light-cone delay, historical movement and delayed ECM
+2026-11-08T18:18:55.4762228Z PASS historical hologram emission, movement and power-loss delay
+2026-11-08T18:18:55.4763108Z PASS finite moving receiver light-front intersection, prior passage and replay
+2026-11-08T18:18:55.4764138Z PASS bounded finite seeker noise, paid quality, photon-delayed ECM and deterministic replay
+2026-11-08T18:18:55.4765122Z PASS deterministic seeker observations without current-target oracle
+2026-11-08T18:18:55.5776212Z > Task :core:rocketTrajectorySmoke
+2026-11-08T18:18:55.5777622Z PASS 16 thrust/research cases share actual rocket velocity and finite lifetime
+2026-11-08T18:18:55.5778651Z PASS causal motor lead pips, reachability, accuracy and researched thrust
+2026-11-08T18:18:55.6750576Z > Task :core:sensorActiveScanSmoke
+2026-11-08T18:18:55.6751507Z PASS powered passive, wide radar, focus radar, X-ray probe, pulse clock and no-free-hardware modes
+2026-11-08T18:18:55.8760733Z > Task :core:sensorCausalAcquisitionSmoke
+2026-11-08T18:18:55.8761874Z PASS STANDARD radar obeys physical roundtrip, powered hardware and no-free-TRK
+2026-11-08T18:18:55.8763314Z PASS radar power-on cannot fabricate historical outbound photons
+2026-11-08T18:18:55.8764397Z PASS non-powered passive optics cannot outrun light
+2026-11-08T18:18:55.8765489Z PASS causal STANDARD acquisition and passive optical contact
+2026-11-08T18:18:56.7752757Z > Task :core:sensorComputeBudgetSmoke
+2026-11-08T18:18:56.7753651Z PASS finite per-tick work, replay, contention, replenishment and power loss
+2026-11-08T18:18:56.7754719Z PASS RES/TRK/ACU compute throughput, CAP-only parallel slots and nonlinear age/range load
+2026-11-08T18:18:56.7755957Z PASS historical ghost hypotheses spend finite processing and shutdown refunds only after light delay
+2026-11-08T18:18:56.7757147Z PASS finite paid FCM work, two-way signal delay, allied competition, power loss and replay
+2026-11-08T18:18:57.9750397Z > Task :core:sensorFalseContactRelaySmoke
+2026-11-08T18:18:57.9751302Z PASS bounded false-hypothesis packets, delayed shutoff and radio replay
+2026-11-08T18:18:57.9752296Z PASS real SHR false reports, causal blackout and non-locking phantoms
+2026-11-08T18:18:57.9762613Z PASS false-contact deterministic battle replay
+2026-11-08T18:18:58.1750285Z > Task :core:sensorHistoricalSignaturesSmoke
+2026-11-08T18:18:58.1751405Z PASS fire-control lock penalty retains historical emitter timing
+2026-11-08T18:18:58.1752380Z PASS delayed RCS/range uses real reflected profile, not current hull truth
+2026-11-08T18:18:58.1760620Z PASS optical cloak timing retains older light without future truth
+2026-11-08T18:18:58.1761462Z PASS active sensor fitting cannot create past radar illumination
+2026-11-08T18:18:58.1762261Z PASS temporal RCS, optical cloak, movement and sender hardware profiles
+2026-11-08T18:18:58.2750512Z > Task :core:sensorLeadProjectionSmoke
+2026-11-08T18:18:58.2751509Z PASS velocity lead pips, age/compute uncertainty, physical trajectory and firing-solution parity
+2026-11-08T18:18:58.2752285Z > Task :core:sensorRelayBufferSmoke
+2026-11-08T18:18:58.2752775Z PASS bounded actual scout transmissions, in-flight history and one-way receiver delay
+2026-11-08T18:18:58.3750787Z > Task :core:sensorLightTimeSmoke
+2026-11-08T18:18:58.3751974Z PASS passive and active photon light time, bounded history, relay latency
+2026-11-08T18:18:59.3751561Z > Task :core:sensorTacticalPictureSmoke
+2026-11-08T18:18:59.3752335Z PASS SHR relay provenance and loss-of-power cutover
+2026-11-08T18:18:59.3753180Z PASS no retroactive scout acquisition; only genuinely sent delayed packets
+2026-11-08T18:18:59.3754223Z PASS TRK/LNK stale coordinates, expiry topology and no-lock guarantee
+2026-11-08T18:18:59.3755055Z PASS remotely observed optical return stays marked relayed
+2026-11-08T18:18:59.3755862Z PASS default fitted command-anchor selection and power fallback
+2026-11-08T18:18:59.3756564Z PASS bounded read-only real fleet sensor picture
+2026-11-08T18:18:59.4762378Z > Task :core:sensorTargetingSolutionSmoke
+2026-11-08T18:18:59.4763527Z PASS bounded deterministic aim, measured velocity lead and finite compute benefit
+2026-11-08T18:18:59.4764943Z PASS imperfect aim can intersect real 12-unit hulls; hits=133 misses=27 nonzero-error-hits=133
+2026-11-08T18:18:59.4765811Z PASS physically meaningful historical sensor targeting estimation
+2026-11-08T18:18:59.5751662Z > Task :core:sensorTrackRelayBufferSmoke
+2026-11-08T18:18:59.5752572Z PASS finite actual LNK transmissions, order, replay and photon arrival
+2026-11-08T18:19:00.4752280Z > Task :core:sensorNetworkSmoke
+2026-11-08T18:19:00.4753259Z PASS six fleet sensor-network modules, 24 variants, research, amplification, finite relay, command fusion, track memory and CAP
+2026-11-08T18:19:01.5750809Z > Task :core:sensingModulesSmoke
+2026-11-08T18:19:01.5780572Z PASS sensing module fittings, research, persistence and detection
+2026-11-08T18:19:02.7750564Z > Task :core:survivalModulesSmoke
+2026-11-08T18:19:02.7751747Z PASS twelve survival roots and 48 physical variants including unsafe engineering
+2026-11-08T18:19:02.8752504Z > Task :core:weaponBehaviorSmoke
+2026-11-08T18:19:02.8753766Z PASS authoritative weapon behavior: 6 ship guns, 3 delivery modes, 4 PD toggles, 66 fighter loadouts, ammo/power/heat/range/reload/accuracy and live FIRE events
+2026-11-08T18:19:04.2755184Z > Task :core:gameFlowSmoke
+2026-11-08T18:19:04.2756616Z PASS game flow: real skirmishes, sequential campaign waves, map, saves and rewards
+2026-11-08T18:19:17.2760586Z > Task :core:screensaverSmoke
+2026-11-08T18:19:17.2763214Z PASS screensaver seeded fitted battles, distinct replayable captain orders and safe escorts
+2026-11-08T18:19:20.2768798Z > Task :core:technologySmoke
+2026-11-08T18:19:20.2770389Z PASS technology catalog | components=2035 upgrades=73260 verified branches=44
+2026-11-08T18:19:22.2750281Z > Task :core:shipyardSmoke
+2026-11-08T18:19:22.2751498Z PASS shipyard | 506 faction/hull starters + invalid fitting + upgrades + blueprint round-trip + deterministic battles
+2026-11-08T18:19:22.9750541Z > Task :core:approvedHardpointsSmoke
+2026-11-08T18:19:22.9751945Z PASS approved hardpoints: 506 graphics/headless-identical hulls, 9515 original socket anchors, fingerprint 3060a0147a828cf5
+2026-11-08T18:19:24.5757889Z > Task :core:hullLayoutsSmoke
+2026-11-08T18:19:24.5759898Z PASS hull layouts: 506 valid faction/class fittings, stable sockets, selected touch centres and live muzzle bindings; advisory close original-art pairs=1643
+2026-11-08T18:19:25.7756029Z > Task :core:shipLineagesSmoke
+2026-11-08T18:19:25.7756994Z PASS 506 faction/chassis prototypes in 10 alternating fleet-size generations
+2026-11-08T18:19:26.5753252Z > Task :core:campaignBlueprintSmoke
+2026-11-08T18:19:26.5754539Z PASS persistent campaign purchase blueprint: checksum, sub-chassis, faction, milestone, restart and corruption
+2026-11-08T18:19:26.6752081Z > Task :core:campaignResearchSmoke
+2026-11-08T18:19:26.6753331Z PASS research/branching: paid progression, three routes, individual first-clears, v1-v5 saves
+2026-11-08T18:19:26.7760456Z > Task :core:researchVictoryFloorSmoke
+2026-11-08T18:19:26.7761464Z PASS 10 instant and 20 mission-timed technology combinations, plus 4 paid laboratory projects
+2026-11-08T18:19:27.8761086Z > Task :core:campaignTechnologySmoke
+2026-11-08T18:19:27.8762192Z PASS campaign technology: faction ownership, prerequisites, debit, victories, authorization, atomic ledger
+2026-11-08T18:19:28.8751360Z > Task :core:shipTechnologyFitSmoke
+2026-11-08T18:19:28.8752655Z PASS independent ship technology snapshots, per-socket/parallel/matching/doctrine unlock enforcement
+2026-11-08T18:19:29.8750547Z > Task :core:skirmishTechSmoke
+2026-11-08T18:19:29.8751518Z PASS skirmish challenge: independent caps, hulls, branch/ID bans, fitting and portable exchange
+2026-11-08T18:19:30.9750816Z > Task :core:mixedTierFleetSmoke
+2026-11-08T18:19:30.9751722Z PASS mixed-tier fleets: inclusive challenge rank, individual designs, battle, portable export
+2026-11-08T18:19:33.0749818Z > Task :core:campaignOppositionSmoke
+2026-11-08T18:19:33.0750774Z PASS campaign opposition: 500 map systems, 0..IX physical tech, mixed faction fleets, seeded replay and active battle reinforcements
+2026-11-08T18:19:34.4751272Z > Task :core:campaignDeploymentSmoke
+2026-11-08T18:19:34.4752313Z PASS campaign deployment: 4 stages, all formations, real coordinates, fleet caps, reward balance
+2026-11-08T18:19:35.5761402Z > Task :core:shipPlacementOrdersSmoke
+2026-11-08T18:19:35.5762418Z PASS placement and individual orders: full 200-ship zones, collision rejection, 250 commands, independent queues and live ordered navigation
+2026-11-08T18:19:36.6810754Z > Task :core:shipStandingOrdersSmoke
+2026-11-08T18:19:36.6824763Z PASS individual standing orders: 23 simultaneous doctrines, 200 saved hull policies, withdrawal behavior, real combat and wave retention
+2026-11-08T18:19:37.6766605Z > Task :core:shipTacticalDirectivesSmoke
+2026-11-08T18:19:37.6767563Z PASS rich tactical directives: slot binding, relation guards, fighter, PD and speed controls
+2026-11-08T18:19:38.8750511Z > Task :core:fleetDoctrineGroupSmoke
+2026-11-08T18:19:38.8751673Z PASS group standing orders: 200 hulls, independent targets, deployment, save, live battle
+2026-11-08T18:19:40.1751001Z > Task :core:battleRetreatSmoke
+2026-11-08T18:19:40.1752493Z PASS withdrawal: physical left/right exits, hull/shield latch, last stand, waypoint precedence, wave resolution and credit exclusion
+2026-11-08T18:19:41.4766494Z > Task :core:campaignFleetSmoke
+2026-11-08T18:19:41.4781202Z PASS persistent campaign fleet: active/reserve, safe retreat, destroyed replacement, paid hull/crew/fuel/ammo/Service All, multiple name cultures and manual names, fighter/capital chatter
+2026-11-08T18:19:42.5750125Z > Task :core:squadronOperationsSmoke
+2026-11-08T18:19:42.5752288Z PASS commissioned squadrons: 8 persistent groups, mixed styles/voices, actual battle subtitle overrides, unique ID ownership, v4 checksum, paid service, reserve, casualties and 16-digit name independence
+2026-11-08T18:19:43.8753910Z > Task :core:fleetNameRangeSmoke
+2026-11-08T18:19:43.8755123Z PASS cultural ship naming: 38 themes, 22800 distinct commissioned roster names, rerolls, lengths, identity separation and deterministic replay
+2026-11-08T18:19:44.9754064Z > Task :core:campaignAfterActionSmoke
+2026-11-08T18:19:44.9755359Z PASS named after-action ledger: casualty ships, returned hulls, stores, 13-ship pagination
+2026-11-08T18:19:46.0751501Z > Task :core:vesselIdentifiersSmoke
+2026-11-08T18:19:46.0752952Z PASS 500 missions x 200 ships x 5 campaign namespaces = 500000 permanent unique 16-digit IDs, independent names and battle slots
+2026-11-08T18:19:47.8761195Z > Task :core:campaignLedgerSmoke
+2026-11-08T18:19:47.8763060Z PASS atomic campaign ledger: strict compatibility, exactly-once retry, lost acknowledgement, readback recovery, verified corrupt-save archive and inaccessible-storage protection (64 checks)
+2026-11-08T18:19:48.8751072Z > Task :core:platformSmoke
+2026-11-08T18:19:48.8751922Z PASS shared platform persistence: checksum, fittings, touch gesture/pointer safety
+2026-11-08T18:19:50.1751087Z > Task :core:combatMachinerySmoke
+2026-11-08T18:19:50.1752435Z PASS combat machinery: fighters, defense drones, magazines, ECM, four distinct weapon branches and deterministic replay
+2026-11-08T18:19:53.6754605Z > Task :core:fleetScaleSmoke
+2026-11-08T18:19:53.6755593Z PASS 200-ship headless scale | 2 x 300 ticks | combined-ms=2340.4 | fingerprint=20b522088f1cc110
+2026-11-08T18:19:53.7757281Z > Task :core:directionalDefenseSmoke
+2026-11-08T18:19:53.7759124Z PASS directional shield/armor/structure: 4 facings, tiles, typed damage and determinism
+2026-11-08T18:19:53.9764096Z > Task :core:shipSurfaceDamageSmoke
+2026-11-08T18:19:53.9765483Z PASS surface damage: shield first, localized abrasion, staged penetration, bypass, overhaul, save/replay
+2026-11-08T18:19:54.0760863Z > Task :core:levelEconomySmoke
+2026-11-08T18:19:54.0761983Z PASS 500 level definitions and exact survivor/underdog credit economics
+2026-11-08T18:19:54.1750491Z > Task :core:skySmoke
+2026-11-08T18:19:54.1751236Z PASS 500 reproducible and distinct sky recipes, sector palettes and limits
+2026-11-08T18:19:54.2750391Z > Task :core:spaceWeatherSmoke
+2026-11-08T18:19:54.2751328Z PASS 500 weather presets, seeded hazards, asteroid hits/misses and radiation effects
+2026-11-08T18:19:54.3758415Z > Task :core:updaterPolicySmoke
+2026-11-08T18:19:54.3759858Z PASS stable + prerelease + nightly + same-name incremented versionCode; manifest optional
+2026-11-08T18:19:54.4751578Z > Task :core:desktopUpdaterPolicySmoke
+2026-11-08T18:19:54.4752790Z PASS: desktop prerelease updater detects newest published GitHub release; Windows MSI and Linux ZIP
+2026-11-08T18:19:54.6751101Z > Task :server:compileJava
+2026-11-08T18:19:54.6751928Z > Task :server:processResources NO-SOURCE
+2026-11-08T18:19:54.6780190Z > Task :server:classes
+2026-11-08T18:19:54.7753305Z > Task :server:compileTestJava
+2026-11-08T18:19:54.7770317Z > Task :server:processTestResources NO-SOURCE
+2026-11-08T18:19:54.7815269Z > Task :server:testClasses
+2026-11-08T18:19:56.7749583Z > Task :server:terminalProtocolSmoke
+2026-11-08T18:19:56.7750586Z PASS LAN terminal STALEMATE first player and late spectator, tick 4
+2026-11-08T18:19:56.7751362Z PASS LAN terminal TIME_LIMIT first player and late spectator, tick 3
+2026-11-08T18:19:56.8771530Z PASS LAN terminal LEFT_VICTORY first player and late spectator, tick 3
+2026-11-08T18:19:57.1750119Z PASS LAN terminal NO_FIELD_CONTROL first player and late spectator, tick 3
+2026-11-08T18:20:00.2750858Z > Task :server:networkSmoke
+2026-11-08T18:20:00.2751677Z PASS BattleServerTest ships=2 tick=44 max_tick_us=9292 queued_bytes=5677
+2026-11-08T18:20:01.9750127Z PASS BattleServerTest ships=32 tick=40 max_tick_us=4452 queued_bytes=79900
+2026-11-08T18:20:03.6750769Z PASS BattleServerTest ships=400 tick=45 max_tick_us=50594 queued_bytes=1216477
+2026-11-08T18:20:05.8750175Z > Task :server:pvpFleetSmoke
+2026-11-08T18:20:05.8751744Z PASS PVP two-client host-published Tech III/VI rules, mixed fleets, Tier IV rejection and real TCP snapshots
+2026-11-08T18:20:09.9749785Z > Task :server:fleetLobbySmoke
+2026-11-08T18:20:09.9755575Z PASS two-client fleet lobby Tech3/6, mixed tiers, bad/oversize/spoof rejection and real battle snapshots
+2026-11-08T18:20:10.1751160Z > Task :server:test
+2026-11-08T18:20:10.1752115Z > Task :server:check
+2026-11-08T18:20:10.6771061Z > Task :game:compileTestJava
+2026-11-08T18:20:10.6800310Z > Task :game:processTestResources NO-SOURCE
+2026-11-08T18:20:10.6801337Z > Task :game:testClasses
+2026-11-08T18:20:12.6760783Z > Task :game:campaignRecoverySmoke
+2026-11-08T18:20:12.6791053Z PASS campaign recovery: pending Results, blocked exits, frozen retry, exact-once stores/losses/research and reopen
+2026-11-08T18:20:12.6820743Z PASS campaign recovery: already-written proposal reconciles without another reward/generation
+2026-11-08T18:20:12.6830894Z PASS campaign Results: pointer/keyboard preparation and exits, defeat and withdrawn reserves
+2026-11-08T18:20:12.6834661Z PASS campaign recovery: explicit corrupt-save archive/reset, faction change and cancelled consent
+2026-11-08T18:20:12.6836185Z PASS campaign recovery: a valid backup still restores automatically without reset
+2026-11-08T18:20:12.6838023Z PASS campaign creation: Cancel/faction changes reconcile lost acknowledgements and retain unverified intent
+2026-11-08T18:20:12.7751908Z PASS campaign branch context: mission 31 permits five owned ships in dock and squadrons, rejects six
+2026-11-08T18:20:12.8757713Z PASS campaign research: Tech VII–IX card/quote parity, cancellation, paid confirmation and repeat-click protection
+2026-11-08T18:20:12.8759735Z PASS campaign map: Enter/pointer deployment parity and locked-mission rejection
+2026-11-08T18:20:12.8761412Z PASS campaign recovery flow: actual controllers and durable local transactions; no graphics/device claim
+2026-11-08T18:20:13.2786158Z > Task :core:laserFamiliesSmoke
+2026-11-08T18:20:13.2804667Z PASS five installed laser patterns, physical beams, real damage events, costs, and muzzles
+2026-11-08T18:20:14.6750672Z > Task :core:armorEngineeringSmoke
+2026-11-08T18:20:14.6751699Z PASS armor engineering 55 native fitted families, 4 branches x 9 ranks, physical shield/armor/structure
+2026-11-08T18:20:16.1761443Z > Task :core:fighterCraftSmoke
+2026-11-08T18:20:16.1762720Z PASS campaign flight wing codec: legacy stock, organic/FTR mixed bays, save/reload, refit guard, ownership and checksum
+2026-11-08T18:20:16.1764002Z PASS fighter type INTERCEPTOR -> CANNON
+2026-11-08T18:20:16.1779709Z PASS fighter type ASSAULT_GUNSHIP -> CANNON
+2026-11-08T18:20:16.1780620Z PASS fighter type LASER_FIGHTER -> LASER
+2026-11-08T18:20:16.1781672Z PASS fighter type PARTICLE_FIGHTER -> PARTICLE
+2026-11-08T18:20:16.1782314Z PASS fighter type MISSILE_FIGHTER -> MISSILE
+2026-11-08T18:20:16.1782772Z PASS fighter type TORPEDO_BOMBER -> TORPEDO
+2026-11-08T18:20:16.1783350Z PASS six armed fighter loadouts, air-to-air targeting, PD signatures, ammo, saves and replay
+2026-11-08T18:20:16.5750659Z > Task :core:battleWeatherSmoke
+2026-11-08T18:20:16.5751773Z PASS environmental targeting, battle damage, thermal effects and replay
+2026-11-08T18:20:16.7750888Z > Task :core:levelEnvironmentSmoke
+2026-11-08T18:20:16.7765981Z PASS all 500 level backgrounds linked to weather simulation
+2026-11-08T18:20:16.9760883Z > Task :core:weaponFxSmoke
+2026-11-08T18:20:16.9761529Z PASS modular VFX: per-shot origins, three separate clips, deterministic impacts and real moving ordnance
+2026-11-08T18:20:17.3777695Z > Task :core:battleOrdersSmoke
+2026-11-08T18:20:17.3778858Z PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay
+2026-11-08T18:20:18.5760840Z > Task :core:projectileModuleSmoke
+2026-11-08T18:20:18.5762282Z PASS projectile modules: fitted speed/health/RCS/signature, sensor range, tracking, launch properties and replay
+2026-11-08T18:20:19.5750289Z > Task :core:weaponMuzzleSmoke
+2026-11-08T18:20:19.5751586Z PASS: installed module family mapping, deterministic slots, beam/fire-origin parity and live fitted rounds
+2026-11-08T18:20:20.4763782Z > Task :core:moduleResearchSmoke
+2026-11-08T18:20:20.4765441Z PASS per-module exclusive research: 4 branches x 6 stages, independent sockets, switch lock, reset, physics, cumulative costs and legacy safety
+2026-11-08T18:20:21.4759124Z > Task :core:supportSystemsSmoke
+2026-11-08T18:20:21.4760718Z PASS six-rank module doctrine + self repair + allied repair beams + shield transfers + finite service drones
+2026-11-08T18:20:22.6753780Z > Task :core:fleetLogisticsSmoke
+2026-11-08T18:20:22.6755373Z PASS four-channel logistics: purpose-fitted remote range/cost, independent limited drone magazines, gentle spherical auras and no free SHD relay
+2026-11-08T18:20:22.8751647Z > Task :game:combatVisibilitySmoke
+2026-11-08T18:20:22.8753437Z PASS combat view bounds: edge-safe hulls, long beams, zoom and pan
+2026-11-08T18:20:24.8750808Z > Task :core:battlePhaseObserverSmoke
+2026-11-08T18:20:24.8752045Z PASS diagnostic-only ordered combat phases and 40-tick deterministic parity
+2026-11-08T18:20:26.0753522Z PASS diagnostic 200v200 phased combat PREPARATIONMsPerTick=0.03810067142857143 SENSOR_NETWORKMsPerTick=0.08964608571428571 CAPTAINSMsPerTick=15.4651453 SUPPORTMsPerTick=0.09248311428571429 PROJECTILESMsPerTick=2.181977842857143 CRAFT_AND_CLEANUPMsPerTick=0.7713389428571429 ticks=90 fingerprint=946639bebf6b681a (JVM timing diagnostic only)
+2026-11-08T18:20:31.2757479Z > Task :core:opponentIndexParitySmoke
+2026-11-08T18:20:31.2758881Z PASS opponent-index 200v200 parity ticks=90 fingerprint=946639bebf6b681a indexedMs=1208.873778 fullFleetScanMs=1213.574917 (same-run JVM timing diagnostic only)
+2026-11-08T18:20:31.5750432Z > Task :core:photonArrivalPruningSmoke
+2026-11-08T18:20:31.5752145Z PASS photon shell exact oracle checks=104204 arrivals=9924 optimizedMs=4.056996 exactMs=9.572303 (JVM timings diagnostic, not a release gate)
+2026-11-08T18:20:32.0766495Z > Task :core:sweptProjectileBroadphaseSmoke
+2026-11-08T18:20:32.0769168Z PASS swept projectile broadphase parity cases=150080 nearPathCases=37500 hits=228 narrowOnlyMs=17.570699 broadphaseMs=9.052614 (timings diagnostic only)
+2026-11-08T18:20:40.4830574Z > Task :core:massMixedOnlySmoke
+2026-11-08T18:20:40.4833239Z PASS 200v200 combined arms: ticks=480 hits=3797 destroyed=104 peak-missiles=410 peak-craft=274 fighter-types=[INTERCEPTOR, ASSAULT_GUNSHIP, LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER] fighter-payloads=719/74/199/112/72 visible-beam-types=[LASER, PLASMA, PARTICLE] tracked-kinetics=true fingerprint=9192d36f3d2785df
+2026-11-08T18:20:46.4752198Z PASS 200v200 combined arms: ticks=480 hits=3797 destroyed=104 peak-missiles=410 peak-craft=274 fighter-types=[INTERCEPTOR, ASSAULT_GUNSHIP, LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER] fighter-payloads=719/74/199/112/72 visible-beam-types=[LASER, PLASMA, PARTICLE] tracked-kinetics=true fingerprint=9192d36f3d2785df
+2026-11-08T18:20:46.4756090Z PASS focused real 200v200 all-weapon mixed replay
+2026-11-08T18:20:47.0749786Z > Task :core:hardpointsLowHeapSmoke
+2026-11-08T18:20:47.0750965Z PASS approved hardpoints: 506 graphics/headless-identical hulls, 9515 original socket anchors, fingerprint 3060a0147a828cf5
+2026-11-08T18:20:52.1749951Z > Task :game:wikiSmoke
+2026-11-08T18:20:57.7749121Z PASS game wiki: 75476 articles including 46 physical hulls, 2035 actual modules, 73260 real research upgrades, searchable Android/desktop navigation
+2026-11-08T18:20:57.9752233Z > Task :game:battlePlaylistSmoke
+2026-11-08T18:20:57.9753088Z PASS battle playlist shuffle-bag, exhaustion, and boundary repeat checks
+2026-11-08T18:20:57.9754133Z > Task :game:audioSmoke
+2026-11-08T18:20:57.9754469Z PASS shared-platform audio cue classification
+2026-11-08T18:20:58.1749405Z > Task :game:spatialAudioSmoke
+2026-11-08T18:20:58.1750852Z PASS spatial zoom culling, stereo, fleet audio and 9 synthesized WAV types
+2026-11-08T18:20:58.1752139Z > Task :game:announcerSmoke
+2026-11-08T18:20:58.1752723Z PASS: 30 unique ordered announcer voice cue paths
+2026-11-08T18:20:58.3749993Z > Task :game:combatAftermathSmoke
+2026-11-08T18:20:58.3750779Z PASS final hull aftermath, pause fidelity and round reset
+2026-11-08T18:20:58.5750720Z > Task :game:combatHitFeedbackSmoke
+2026-11-08T18:20:58.5751588Z PASS shield/armor/hull hit layers, location, no phantom hits, 400-ship cap
+2026-11-08T18:20:59.1750657Z > Task :game:combatPerformanceSmoke
+2026-11-08T18:20:59.1751487Z PASS discrete combat speeds, adaptive governor and ZIP telemetry readback
+2026-11-08T18:20:59.3753025Z > Task :game:combatShipStatusSmoke
+2026-11-08T18:20:59.3753994Z PASS selected-hull stats, live deception and engineering status
+2026-11-08T18:20:59.3759315Z > Task :game:radioVoiceProximitySmoke
+2026-11-08T18:20:59.3760606Z PASS: ship radio camera-proximity fades in/out smoothly
+2026-11-08T18:20:59.4767600Z > Task :game:fighterVoiceSmoke
+2026-11-08T18:20:59.4768588Z PASS: 260 unique original recorded cues across 10 fixed hull voices
+2026-11-08T18:21:00.5762134Z > Task :game:guidedShipyardSmoke
+2026-11-08T18:21:00.5763455Z PASS UI fighter seeker selection and saved design
+2026-11-08T18:21:00.5765077Z PASS touch-sized guided shipyard tabs, selection arrows, researched skip, salvo/motor/seeker/warhead edits, saved blueprint and compatibility
+2026-11-08T18:21:00.6751361Z > Task :game:instancedBucketsSmoke
+2026-11-08T18:21:00.6752304Z PASS single-pass hull grouping, exact order, sprite exclusion, and reset
+2026-11-08T18:21:00.8787822Z > Task :game:combatPropulsionFxSmoke
+2026-11-08T18:21:00.8790097Z PASS cold-launch, coasting gaps, terminal restart and bounded FX timelines
+2026-11-08T18:21:01.1751685Z > Task :game:lightingSmoke
+2026-11-08T18:21:01.1753086Z PASS combat lighting: event correlation, missile smoke, expiration, pause and budgets
+2026-11-08T18:21:01.1754390Z > Task :game:renderPerformanceSmoke
+2026-11-08T18:21:01.1755528Z PASS: full frame vs simulation/lighting split, per-frame batching, binds and reset
+2026-11-08T18:21:01.2750613Z > Task :game:renderPosesSmoke
+2026-11-08T18:21:01.2751600Z PASS low-speed muzzle, network tween, real projectile replay, event history cursor and camera easing
+2026-11-08T18:21:01.4783303Z > Task :game:rocketHudSmoke
+2026-11-08T18:21:01.4810632Z PASS real rocket HUD 46px touch buttons, 4/8/16 selection, two motors, mounted sockets and friendly-only control
+2026-11-08T18:21:02.4750813Z > Task :game:screensaverCameraSmoke
+2026-11-08T18:21:02.4751732Z PASS: multi-faction autonomous tracking, smooth shots and death retargeting
+2026-11-08T18:21:02.5754721Z > Task :game:screensaverWakeSmoke
+2026-11-08T18:21:02.5755238Z PASS: double tap wake; single tap, drag, pinch, hold and distance safety
+2026-11-08T18:21:02.7750432Z > Task :game:shipDeathSmoke
+2026-11-08T18:21:02.7751483Z PASS: unique, seeded, closed fracture wedges, 400-loss cap, no physics mutation
+2026-11-08T18:21:02.9800357Z > Task :game:shipInspectionSmoke
+2026-11-08T18:21:02.9830558Z PASS ship tap, translucent inspection layout hitboxes, live range/ammo/reload, zoom and overlays
+2026-11-08T18:21:03.0754285Z > Task :game:shipLightProbesSmoke
+2026-11-08T18:21:03.0755047Z PASS: bounded local lights, distance LOD, alpha-safe scorch
+2026-11-08T18:21:03.0755841Z > Task :game:voiceMenuSmoke
+2026-11-08T18:21:03.0756358Z PASS voice step buttons and UI tones
+2026-11-08T18:21:04.7751181Z > Task :game:menuFlowSmoke
+2026-11-08T18:21:04.7752305Z PASS functional menu hit regions: six home actions, 11 skirmishes, 11 factions, 500 map nodes
+2026-11-08T18:21:05.7749985Z > Task :android:processDebugResources
+2026-11-08T18:21:09.2795493Z > Task :android:compileDebugJavaWithJavac
+2026-11-08T18:21:11.2733623Z BUILD SUCCESSFUL in 3m 41s
+2026-11-08T18:21:11.2734072Z 167 actionable tasks: 167 executed
+2026-11-08T18:21:18.0361816Z > Task :noop UP-TO-DATE
+2026-11-08T18:21:18.0363645Z BUILD SUCCESSFUL in 4s
+

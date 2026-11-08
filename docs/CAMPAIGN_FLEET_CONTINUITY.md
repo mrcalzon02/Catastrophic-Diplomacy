@@ -2,7 +2,7 @@
 
 ## Current status override — 8 November 2026
 
-The [project audit](PROJECT_AUDIT_2026-11-08.md) and [repair plan](DEVELOPMENT_REPAIR_PLAN.md) supersede the historical remaining-work list below. The combined atomic progress/fleet/technology ledger, named after-action report, and advisory service warnings are implemented. Current source-matched hosted release jobs pass. Remaining priorities are failed-settlement recovery, explicit damaged-save recovery, actual Results actions, branching mission context, late-license card consistency and rendered report readability. Physical-device and real saved-state upgrade acceptance are still separate evidence requirements.
+The [project audit](PROJECT_AUDIT_2026-11-08.md) and [repair plan](DEVELOPMENT_REPAIR_PLAN.md) supersede the historical remaining-work list below. The combined atomic progress/fleet/technology ledger, named after-action report, and advisory service warnings are implemented. Current source-matched hosted release jobs pass. The [first repair batch](repairs/2026-11-08-campaign/README.md) now implements failed-settlement recovery, explicit damaged-save recovery, actual Results actions, branching mission context, late-license card consistency and report spacing, with targeted tests, desktop screenshots and a passing exact-source hosted job. Physical-device and real saved-state upgrade acceptance are still separate evidence requirements.
 
 Earlier observations and design receipts below are retained as history; do not use their obsolete “not yet implemented” claims as the present backlog.
 

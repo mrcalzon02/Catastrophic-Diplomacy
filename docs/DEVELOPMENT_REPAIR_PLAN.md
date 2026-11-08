@@ -1,6 +1,6 @@
 # Catastrophic Diplomacy — Development Repair Plan
 
-**Prepared:** 8 November 2026. **Audited game code:** `0159042e47a9271e5e3b077756f5c4d57763a688`. **Evidence checkpoint:** `26f852a005750e0fd06588f4b93a7ea157f22a13`. **Status:** first implementation batch is underway; B0 coverage and B1/B2 campaign repairs are recorded in the [repair checkpoints](repairs/2026-11-08-campaign/CHECKPOINTS.md). The original audit remains a historical baseline.
+**Prepared:** 8 November 2026. **Audited game code:** `0159042e47a9271e5e3b077756f5c4d57763a688`. **Evidence checkpoint:** `26f852a005750e0fd06588f4b93a7ea157f22a13`. **Status:** first source repair batch delivered at `4d5ed0028ae2d8b34dcff315924b597cc6708cd5`; [implementation and evidence](repairs/2026-11-08-campaign/README.md). F01–F05 and F20 have core/controller and desktop evidence; F18 passed the single exact-source hosted job including Android compilation. F19 shader conventions are separated, with broader classification still open. Physical-device acceptance remains distinct. The original audit is a historical baseline.
 
 ## 1. Starting position and operating rules
 

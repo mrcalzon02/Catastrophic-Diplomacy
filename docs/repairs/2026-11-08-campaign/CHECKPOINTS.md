@@ -25,3 +25,12 @@
 - Historical defect-asserting audit probes remain unchanged. New positive controller/ledger tests verify repaired behavior.
 
 Next: publish/read back the production checkpoint; preserve final screenshots, reproducible capture harness and logs; verify the one hosted job; update current repair status.
+
+## CP2 — source published, real rendering and hosted verification
+
+- Published implementation checkpoint `4d5ed0028ae2d8b34dcff315924b597cc6708cd5` as a fast-forward on main. All eleven changed files were fetched and compared byte for byte; the local checkout matched the remote tree.
+- Final focused run passed on the committed source: 64 ledger checks, controller recovery/creation/map/Results cases, functional light behavior and desktop compilation. Final command/output: `repair-final-result.json` and `repair-final.log`.
+- Six final real framebuffer captures passed, with four report rows and clear save/confirmation controls at 1280×720 and 1560×720. Source/class hashes and raw PNG digests are retained. A failed initial layout was corrected and recaptured before acceptance.
+- Exact-source hosted run `42509215714`, job `128818404158`, completed SUCCESS. One job executed 137 named Smoke tasks / 167 actionable Gradle tasks, including Android debug Java compilation, desktop compilation, campaign recovery, updater policies and real server fixtures.
+- F01–F05 and F20 are implemented with the documented core/controller/desktop evidence; F18 is verified by the hosted job. F19's shader-source portion is complete, while broader convention classification remains open. Physical Android/Fire/Windows/Linux user walkthroughs, in-app archive export and forced-process pending recovery remain separate scope.
+- This final evidence/documentation checkpoint adds no production change or release request. Next functional work is B3: causal steering, withdrawal PPD and command-sharing chronology.

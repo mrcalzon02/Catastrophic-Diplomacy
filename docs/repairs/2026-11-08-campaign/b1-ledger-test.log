@@ -1,0 +1,1 @@
+PASS atomic campaign ledger: strict compatibility, exactly-once retry, lost acknowledgement, readback recovery, verified corrupt-save archive and inaccessible-storage protection (64 checks)

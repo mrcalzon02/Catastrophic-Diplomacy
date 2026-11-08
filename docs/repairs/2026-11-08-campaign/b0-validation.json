@@ -1,0 +1,9 @@
+{
+  "dry_run_exit": 0,
+  "task_count": 162,
+  "campaign_recovery_in_aggregate": true,
+  "shader_source_conventions_removed_from_aggregate": true,
+  "other_renderer_audio_resources_present": true,
+  "android_compile_locally_unverified": "No Android SDK in this container; workflow provisions SDK36/build-tools35 before compile",
+  "log": "/workspace/scratch/2c6cab9e5294/audit-work/logs/b0-task-graph.log"
+}

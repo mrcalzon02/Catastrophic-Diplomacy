@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "final_frozen_source_hashes_verified": {
+    "game/src/main/java/diplomacy/client/CatastrophicGame.java": "f23a7410f838bf920f6507fc656d4a379bcc517273c960e6fe18a86b1e6eae76",
+    "core/src/main/java/diplomacy/sim/CampaignLedger.java": "2a0dc2c7bbc645bd15ab5baffd3396f1cce2782c4ef3e7a9de07d09d7a250204"
+  },
+  "capture_count": 6,
+  "viewports": [
+    "1280x720",
+    "1560x720"
+  ],
+  "backend": "Actual desktop LWJGL3, OpenGL 4.5 Core Profile Mesa llvmpipe",
+  "visual_inspection": "All six final PNGs are byte-identical to the corresponding visually inspected corrected pass. Four populated report rows, vessel IDs/stores, pending/saved notices and controls remain readable without the previous overlap.",
+  "pending_flow": "Real temporary-file write fault retained generation 1 and prior wallet 10000; credits awarded stayed 0. Pending notice is short, actionable and separated from the buttons.",
+  "retry_flow": "Actual registered R keyboard action committed generation 2; wallet became 52405, credits awarded 42405, and three owned survivors remained from the four-vessel report.",
+  "reset_flow": "Actual restore/setup and Enter action showed explicit Archive & Begin confirmation while preserving both corrupt authorities. Actual Escape returned HOME without replacement.",
+  "limits": "Controlled finished-battle fixture, actual production controller and renderer, no mock panels. Wider viewport is phone-aspect desktop rendering, not Android or physical-device proof. Audio disabled.",
+  "first_pass_issue": "Iteration 01 exposed an overlong raw filesystem error overlapping Retry Save; corrected and recaptured before this final pass."
+}
