@@ -47,6 +47,15 @@ tasks.register('menuFlowSmoke', JavaExec) {
     mainClass = 'diplomacy.client.GameMenuFlowTest'
 }
 
+tasks.register('campaignRecoverySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify campaign recovery state, explicit replacement and safe return-to-menu behavior.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.CampaignRecoveryFlowTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('campaignRecoverySmoke') }
+
 // Isolated behavioral UI verification: do not drag the unrelated audio,
 // shaders or optional art diagnostics into the fuel-order integration gate.
 tasks.register('fuelOrdersTouchSmoke', JavaExec) {
@@ -221,12 +230,14 @@ tasks.named('menuFlowSmoke') { dependsOn tasks.named('combatHitFeedbackSmoke') }
 
 tasks.register('shipSurfaceSmoke', JavaExec) {
     group = 'verification'
-    description = 'Headless proof of real normal, emissive, alpha and rotation shader contracts.'
+    description = 'Advisory material-path, exact shader-source and visual LOD conventions.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'diplomacy.client.ShipSurfaceShaderTest'
 }
-tasks.named('menuFlowSmoke') { dependsOn tasks.named('shipSurfaceSmoke') }
+// This test matches literal GLSL source and visual conventions, not actual GL
+// compilation. Keep it directly runnable without gating functional aggregates.
+// Java/resource compilation and the other renderer/audio behavior checks remain.
 
 tasks.register('shipLightProbesSmoke', JavaExec) {
     group = 'verification'

@@ -18,6 +18,12 @@ public final class ShipSurfaceShaderTest {
                 throw new AssertionError("Missing real surface shader input: "+token);
         if(ShipSurfaceLighting.FRAGMENT.contains("gl_FragColor=vec4(1.0"))
             throw new AssertionError("Flat placeholder shader");
+        // Source-spelling conventions are advisory, separate from functional light tests.
+        for(String token:new String[]{"varying vec2 v_world;","uniform vec4 u_light0;",
+                "uniform vec4 u_light1;","uniform float u_detail;",
+                "localLight(u_light0","localLight(u_light1","if(u_detail<0.01)"})
+            if(!ShipSurfaceLighting.FRAGMENT.contains(token))
+                throw new AssertionError("Local normal-light shader missing "+token);
         CombatViewBounds far=new CombatViewBounds(0,0,4100,800);
         CombatViewBounds close=new CombatViewBounds(0,0,900,700);
         if(!ShipSurfaceLighting.flatAt(far)||ShipSurfaceLighting.flatAt(close))

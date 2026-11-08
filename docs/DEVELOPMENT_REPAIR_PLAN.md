@@ -1,6 +1,6 @@
 # Catastrophic Diplomacy — Development Repair Plan
 
-**Prepared:** 8 November 2026. **Audited game code:** `0159042e47a9271e5e3b077756f5c4d57763a688`. **Evidence checkpoint:** `26f852a005750e0fd06588f4b93a7ea157f22a13`. **Status:** planned work; no production repairs have been implemented by this audit.
+**Prepared:** 8 November 2026. **Audited game code:** `0159042e47a9271e5e3b077756f5c4d57763a688`. **Evidence checkpoint:** `26f852a005750e0fd06588f4b93a7ea157f22a13`. **Status:** first implementation batch is underway; B0 coverage and B1/B2 campaign repairs are recorded in the [repair checkpoints](repairs/2026-11-08-campaign/CHECKPOINTS.md). The original audit remains a historical baseline.
 
 ## 1. Starting position and operating rules
 
@@ -14,7 +14,7 @@ Repair priority is not a new release gate. Build, launch/run and required multip
 
 ## 2. Dependency and responsibility map
 
-Batch numbers identify work packages, not a requirement to serialize independent work. Complete B0 first. Campaign recovery precedes campaign retry changes. Network decoding/session identity precedes expanded presentation and lobby lifecycle. Combat repairs, wiki repair and updater acceptance can proceed independently once evidence discipline is established. Coordinate edits touching `Battle` or `CatastrophicGame` through one integrator per file.
+Batch numbers identify work packages, not a requirement to serialize independent work. Establish B0 runtime coverage before integrating the functional repairs; remaining advisory-classification cleanup can continue alongside them. Campaign recovery precedes campaign retry changes. Network decoding/session identity precedes expanded presentation and lobby lifecycle. Combat repairs, wiki repair and updater acceptance can proceed independently once evidence discipline is established. Coordinate edits touching `Battle` or `CatastrophicGame` through one integrator per file.
 
 | Batch | Findings / responsibility | Prerequisite | Concrete completion evidence |
 |---|---|---|---|

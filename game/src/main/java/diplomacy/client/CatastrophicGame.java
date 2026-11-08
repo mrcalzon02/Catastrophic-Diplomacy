@@ -161,6 +161,16 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private static final String ROSTER_FILE="campaign/fleet-roster-v1.dat";
     private static final String LEDGER_FILE="campaign/authoritative-ledger-v1.dat";
     private long ledgerGeneration;
+    private String setupNotice="";
+    private boolean campaignResetArmed;
+    private PendingCampaignCreation pendingCampaignCreation;
+    /** Canonical bytes freeze mutable blueprint aliases until the outcome is acknowledged. */
+    private record PendingCampaignCreation(String before,String proposed,boolean replaceInvalid){}
+    private record PendingCampaignSettlement(String before,String proposed,long reward,
+                                             String completionNotice,boolean replay,long salvage){}
+    private PendingCampaignSettlement pendingSettlement;
+    private boolean settlementPending,engagementFinished;
+    private String settlementNotice="";
     /** Once an authoritative wallet+fleet save exists, never reimport
      * independently saved legacy files or issue replacement starter ships. */
     private boolean ledgerAuthorityPresent;
@@ -397,7 +407,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shipyard.setIcons(uiIcons);
         shipyard.setSkirmishRules(()->skirmishRules,rules->{
             skirmishRules=rules;
-            skirmishNotice="CHALLENGE TECH "+rules.maxStage()+"/6, HULL GEN "+rules.maxHullGeneration()+"/10";
+            skirmishNotice="CHALLENGE TECH "+rules.maxStage()+"/9, HULL GEN "+rules.maxHullGeneration()+"/10";
         });
         shipyard.setCampaignDiscovery(()->discoveries);
         shipyard.setCampaignPurchasing(()->campaign,design->{
@@ -482,9 +492,10 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return true;
                 }
                 if(!verifyDemo&&screen!=GameMenuPanel.Screen.BATTLE&&!shipyard.open()){
+                    if(screen==GameMenuPanel.Screen.RESULTS){resultsKey(key);return true;}
                     if(key==Input.Keys.ESCAPE||key==Input.Keys.BACK){
                         if(audio!=null)audio.uiBack();
-                        if(screen==GameMenuPanel.Screen.RESULTS)leaveResults();
+                        if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP)cancelCampaignSetup();
                         else if(screen==GameMenuPanel.Screen.RESEARCH)screen=researchReturn;
                         else if(screen==GameMenuPanel.Screen.DEV)closeDevOptions();
                         else if(screen==GameMenuPanel.Screen.NAME_THEMES)
@@ -561,22 +572,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         if(key==Input.Keys.K&&updateCheck!=null)updateCheck.run();
                         return true;
                     }
-                    if(screen==GameMenuPanel.Screen.RESULTS){
-                        if(key==Input.Keys.LEFT)afterActionPage=Math.max(0,afterActionPage-1);
-                        else if(key==Input.Keys.RIGHT&&campaignAfterAction!=null)
-                            afterActionPage=Math.min(campaignAfterAction.pages(5)-1,afterActionPage+1);
-                        if(key==Input.Keys.R){
-                            if(playedCampaign)openDock();else launchSkirmish();
-                        }else if(key==Input.Keys.ENTER)leaveResults();
-                        return true;
-                    }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
                         if(key==Input.Keys.ENTER){newCampaign();return true;}
                         if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT||
                                 key==Input.Keys.UP||key==Input.Keys.DOWN){
                             Battle.Faction[] choices=Battle.Faction.values();
                             int delta=(key==Input.Keys.RIGHT||key==Input.Keys.DOWN)?1:-1;
-                            pendingFaction=choices[Math.floorMod(pendingFaction.ordinal()+delta,choices.length)];
+                            selectCampaignFaction(choices[Math.floorMod(pendingFaction.ordinal()+delta,choices.length)]);
                         }
                         return true;
                     }
@@ -644,13 +646,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN){
-                        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
-                            selectedMission=Math.max(1,Math.min(LevelEconomy.LEVEL_COUNT,
-                                    selectedMission+(key==Input.Keys.LEFT?-1:1)));
-                            campaignPage=CampaignMap.pageOf(selectedMission);
-                        }
-                        if(key==Input.Keys.ENTER)launchCampaignMission();
-                        return true;
+                        campaignMapKey(key);return true;
                     }
                     return true;
                 }
@@ -1147,6 +1143,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         }
         playedCampaign=false;
+        engagementFinished=false;settlementPending=false;pendingSettlement=null;settlementNotice="";
         battlefieldLevel=scenario.environmentLevel;
         screen=GameMenuPanel.Screen.BATTLE;
         deployedAtLaunch=preparedSkirmish?deployment.ships():
@@ -1165,21 +1162,103 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
     }
     private void openCampaignSetup(){
+        if(campaignSettlementPending()){screen=GameMenuPanel.Screen.RESULTS;return;}
+        if(!reconcileCampaignCreationForExit()){screen=GameMenuPanel.Screen.CAMPAIGN_SETUP;return;}
         pendingFaction=campaign==null?left:campaign.faction();
+        campaignResetArmed=false;pendingCampaignCreation=null;
+        var inspection=CampaignLedger.inspect(campaignLedgerPath(),technology);
+        setupNotice=switch(inspection.status()){
+            case INVALID -> "Saved campaign is damaged. BEGIN reviews recovery; existing files are preserved.";
+            case UNAVAILABLE -> "Campaign storage is unavailable. Restore storage access before starting a campaign.";
+            default -> campaign==null?"":"Starting replaces the existing campaign. Credits and ships reset.";
+        };
         screen=GameMenuPanel.Screen.CAMPAIGN_SETUP;
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_FACTION_SETUP");
     }
+    /** Cancellation cannot roll back an already-written campaign replacement.
+     * Reconcile its acknowledgement before exposing a stale live wallet/fleet. */
+    private boolean reconcileCampaignCreationForExit(){
+        if(pendingCampaignCreation==null)return true;
+        var inspection=CampaignLedger.inspect(campaignLedgerPath(),technology);
+        if(inspection.status()==CampaignLedger.AuthorityStatus.VALID){
+            adoptCampaignSnapshot(inspection.authority());
+            pendingCampaignCreation=null;
+            Gdx.app.log("CAMPAIGN","Reconciled campaign creation before leaving setup");
+            return true;
+        }
+        boolean unchangedInvalid=inspection.status()==CampaignLedger.AuthorityStatus.INVALID&&
+                pendingCampaignCreation.replaceInvalid();
+        boolean unchangedMissing=inspection.status()==CampaignLedger.AuthorityStatus.MISSING&&
+                pendingCampaignCreation.before()==null&&!pendingCampaignCreation.replaceInvalid();
+        if(unchangedInvalid||unchangedMissing){pendingCampaignCreation=null;return true;}
+        setupNotice="Campaign save status is unavailable. Keep this app open and retry before changing campaign setup.";
+        return false;
+    }
+    private void cancelCampaignSetup(){
+        if(!reconcileCampaignCreationForExit())return;
+        campaignResetArmed=false;pendingCampaignCreation=null;
+        screen=GameMenuPanel.Screen.HOME;
+    }
+    private void selectCampaignFaction(Battle.Faction faction){
+        if(faction==pendingFaction||!reconcileCampaignCreationForExit())return;
+        pendingFaction=faction;campaignResetArmed=false;pendingCampaignCreation=null;
+        setupNotice="Faction changed. BEGIN reviews the selected campaign before recovery.";
+    }
     private void newCampaign(){
-        CampaignProgress.State proposed=CampaignProgress.start(pendingFaction);
-        // A new campaign receives its own name seed; existing campaigns keep
-        // their original seed in the atomic roster save.
-        long namingSeed=java.util.concurrent.ThreadLocalRandom.current().nextLong();
-        CampaignFleet.Roster vessels=CampaignFleet.startSolo(pendingFaction,
-                Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology,namingSeed);
-        if(!commitCampaign(proposed,vessels,new CampaignTechnology.State(pendingFaction)))return;
+        if(campaignSettlementPending()){
+            screen=GameMenuPanel.Screen.RESULTS;
+            settlementNotice="Outcome not saved. Retry Save before starting another campaign. Keep this app open.";
+            return;
+        }
+        var inspection=CampaignLedger.inspect(campaignLedgerPath(),technology);
+        if(pendingCampaignCreation==null){
+            if(inspection.status()==CampaignLedger.AuthorityStatus.UNAVAILABLE){
+                campaignResetArmed=false;setupNotice="Campaign storage is unavailable. Restore storage access and try again.";
+                Gdx.app.error("CAMPAIGN",inspection.message());return;
+            }
+            boolean replaceInvalid=inspection.status()==CampaignLedger.AuthorityStatus.INVALID;
+            if(replaceInvalid&&!campaignResetArmed){
+                campaignResetArmed=true;
+                setupNotice="Damaged saves will be archived before a fresh campaign starts. Press ARCHIVE & BEGIN to confirm; CANCEL preserves the current files.";
+                return;
+            }
+            if(!replaceInvalid&&campaignResetArmed){
+                campaignResetArmed=false;
+                setupNotice="Save recovery state changed. Review the campaign and press BEGIN again.";
+                if(inspection.authority()!=null)adoptCampaignSnapshot(inspection.authority());
+                return;
+            }
+            CampaignLedger.Snapshot before=inspection.authority();
+            CampaignProgress.State proposed=CampaignProgress.start(pendingFaction);
+            long namingSeed=java.util.concurrent.ThreadLocalRandom.current().nextLong();
+            CampaignFleet.Roster vessels=CampaignFleet.startSolo(pendingFaction,
+                    Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE),technology,namingSeed);
+            var next=new CampaignLedger.Snapshot(before==null?1:Math.addExact(before.generation(),1),
+                    proposed,vessels,new CampaignTechnology.State(pendingFaction));
+            pendingCampaignCreation=new PendingCampaignCreation(before==null?null:CampaignLedger.encode(before),
+                    CampaignLedger.encode(next),replaceInvalid);
+        }
+        PendingCampaignCreation pending=pendingCampaignCreation;
+        var before=pending.before()==null?null:CampaignLedger.decode(pending.before(),technology);
+        var proposed=CampaignLedger.decode(pending.proposed(),technology);
+        CampaignLedger.CommitResult result;
+        java.nio.file.Path archive=null;
+        if(pending.replaceInvalid()&&inspection.status()==CampaignLedger.AuthorityStatus.INVALID){
+            var replacement=CampaignLedger.archiveAndReplaceInvalid(campaignLedgerPath(),proposed,technology);
+            result=replacement.commit();archive=replacement.archive();
+        }else result=CampaignLedger.commitRecoverably(campaignLedgerPath(),before,proposed,technology);
+        if(!result.committed()){
+            setupNotice=campaignSaveMessage(result)+" Campaign was not opened.";
+            Gdx.app.error("CAMPAIGN",result.message());
+            return;
+        }
+        adoptCampaignSnapshot(proposed);
+        campaignResetArmed=false;pendingCampaignCreation=null;
+        pendingSettlement=null;settlementPending=false;engagementFinished=false;settlementNotice="";
         campaignDesign=Shipyard.starter(pendingFaction,Shipyard.Hull.CORVETTE);
         saveCampaignBlueprint(campaignDesign);
-        campaignPage=0;selectedMission=1;lastCampaignDrawn="";
+        if(archive!=null)dockNotice="Damaged saves preserved in "+archive.getFileName()+". New campaign ready.";
+        setupNotice="";campaignPage=0;selectedMission=1;lastCampaignDrawn="";
         screen=GameMenuPanel.Screen.CAMPAIGN;
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_MAP 1");
     }
@@ -1329,7 +1408,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(campaign==null)return;
         var quote=CampaignBudgetQuotes.research(campaign,project);
         selectedResearchNode=project==CampaignProgress.Project.LICENSE?
-                Math.min(5,campaign.researchRank()):
+                Math.min(8,campaign.researchRank()):
                 100+Math.min(3,campaign.speedUpgrades());
         if(!quote.allowed()){
             armedResearch=CampaignProgress.Project.NONE;
@@ -1371,7 +1450,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }catch(IllegalArgumentException denied){researchNotice=denied.getMessage();}
     }
     private void openDock(){
+        if(campaignSettlementPending()){screen=GameMenuPanel.Screen.RESULTS;return;}
         if(campaign==null)return;
+        selectedMission=selectedPlayableMission();
         dockSelected=campaignFleet==null?0:Math.max(0,
                 Math.min(dockSelected,campaignFleet.ships().size()-1));
         dockPage=dockSelected/9;
@@ -1456,7 +1537,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         try{
             long id=dockShipId();
             boolean active=!campaignFleet.get(id).deployed();
-            int mission=selectedMission<=campaign.unlocked()?selectedMission:campaign.unlocked();
+            int mission=selectedPlayableMission();
             if(!commitCampaign(campaign,campaignFleet.setActive(id,active,
                     LevelEconomy.level(mission).maximumFleet())))return;
             dockNotice="Ship #"+id+(active?" moved to ACTIVE deployment.":" moved to AVAILABLE reserve.");
@@ -1526,7 +1607,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 }
                 case 5,6 -> {
                     boolean activate=action==5;
-                    int mission=selectedMission<=campaign.unlocked()?selectedMission:campaign.unlocked();
+                    int mission=selectedPlayableMission();
                     int cap=LevelEconomy.level(mission).maximumFleet();
                     var updated=campaignFleet.setSquadronActive(selectedSquadron,activate,cap);
                     if(!commitCampaign(campaign,updated))return;
@@ -1615,6 +1696,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 costs[n++]=campaignFleet.cost(id,service,technology);
         }
         return costs;
+    }
+    private void campaignMapKey(int key){
+        if(screen!=GameMenuPanel.Screen.CAMPAIGN)return;
+        if(key==Input.Keys.LEFT||key==Input.Keys.RIGHT){
+            selectedMission=Math.max(1,Math.min(LevelEconomy.LEVEL_COUNT,
+                    selectedMission+(key==Input.Keys.LEFT?-1:1)));
+            campaignPage=CampaignMap.pageOf(selectedMission);
+        }
+        if(key==Input.Keys.ENTER)openDeployment();
+    }
+    private int selectedPlayableMission(){
+        if(campaign==null)throw new IllegalStateException("No campaign mission context");
+        return campaign.available(selectedMission)?selectedMission:campaign.recommendedMission();
     }
     private void openDeployment(){
         if(campaign==null||!campaign.available(selectedMission))return;
@@ -1794,6 +1888,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 right,technology).get(0);
         shipyard.sync(0,leftDesign);shipyard.sync(1,rightDesign);
         campaignAfterAction=null;afterActionPage=0;
+        engagementFinished=false;settlementPending=false;pendingSettlement=null;settlementNotice="";
         deployedAtLaunch=deployment.ships();
         campaignSortie.clear();
         for(var vessel:campaignFleet.active())campaignSortie.add(vessel.id());
@@ -1805,6 +1900,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         Gdx.app.log("CD-GAME-FLOW","CAMPAIGN_BATTLE "+activeMission+" "+deployment.ships()+" "+deployment.formation());
     }
     private void finishEngagement(){
+        if(engagementFinished)return;
+        engagementFinished=true;running=false;
         lastWon=!battle.unresolved()&&battle.engaged(0)>0&&battle.alive(1)==0;
         if(audio!=null)audio.announcePriority(lastWon?AnnouncerAudio.Cue.VICTORY:AnnouncerAudio.Cue.MISSION_FAILED);
         survivorsAtEnd=battle.engaged(0);
@@ -1812,56 +1909,95 @@ public final class CatastrophicGame extends ApplicationAdapter {
         escapedAtEnd=battle.escaped(0);
         destroyedAtEnd=battle.destroyed(0);
         lastReward=0;
-        if(playedCampaign&&campaignFleet!=null&&campaign!=null){
-            try{
-                // The battle ends once. Its returned vessels, costs, mission
-                // rewards and research tick are one durable ledger generation.
-                campaignAfterAction=CampaignAfterAction.capture(campaignFleet,campaignSortie,battle);
-                afterActionPage=0;
-                CampaignFleet.Roster returned=campaignFleet.afterBattle(battle,campaignSortie);
-                CampaignProgress.State before=campaign;
-                long recoveredScrap=lastWon?battle.recoverySalvageCredits(0):0;
-                CampaignProgress.State next=lastWon?
-                        before.complete(activeMission,deployedAtLaunch,survivorsAtEnd)
-                                .awardAfterActionSalvage(recoveredScrap):before;
-                CampaignTechnology.State beforeTechnology=discoveries;
-                CampaignTechnology.State nextTechnology=lastWon?
-                        beforeTechnology.victory():beforeTechnology;
-                boolean replay=before.isReplay(activeMission);
-                if(commitCampaign(next,returned,nextTechnology)){
-                    lastReward=next.credits()-before.credits();
-                    if(lastWon&&nextTechnology.unlocked().size()>beforeTechnology.unlocked().size())
-                        dockNotice="TECHNOLOGY DISCOVERED: "+beforeTechnology.activeId();
-                    else if(lastWon&&next.researchRank()>before.researchRank())
-                        dockNotice="RESEARCH COMPLETE: technology license rank "+
-                                next.researchRank()+" acquired.";
-                    else if(lastWon&&next.speedUpgrades()>before.speedUpgrades())
-                        dockNotice="LAB UPGRADE COMPLETE: research time reduced, minimum zero.";
-                    else if(lastWon&&before.activeProject()!=CampaignProgress.Project.NONE)
-                        dockNotice="Research progress "+next.projectProgress()+
-                                "/"+next.currentProjectMissions()+" mission ticks.";
-                    Gdx.app.log("CD-GAME-FLOW","MISSION_LEDGER_COMMITTED mission="+
-                            activeMission+" replay="+replay+" credits="+lastReward+
-                            " recoveredScrap="+recoveredScrap+
-                            " owned="+returned.ships().size());
-                }else{
-                    lastReward=0; // An unsaved victory is not a credited victory.
-                    Gdx.app.error("CAMPAIGN","Battle ended; combined fleet/reward ledger not committed");
-                }
-            }catch(RuntimeException failed){
+        settlementPending=playedCampaign;
+        if(settlementPending)retryCampaignSettlement();
+        screen=GameMenuPanel.Screen.RESULTS;
+        Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
+    }
+    private void prepareCampaignSettlement(){
+        if(pendingSettlement!=null)return;
+        campaignAfterAction=CampaignAfterAction.capture(campaignFleet,campaignSortie,battle);
+        afterActionPage=0;
+        CampaignFleet.Roster returned=campaignFleet.afterBattle(battle,campaignSortie);
+        CampaignProgress.State before=campaign;
+        long recoveredScrap=lastWon?battle.recoverySalvageCredits(0):0;
+        CampaignProgress.State next=lastWon?
+                before.complete(activeMission,deployedAtLaunch,survivorsAtEnd)
+                        .awardAfterActionSalvage(recoveredScrap):before;
+        CampaignTechnology.State beforeTechnology=discoveries;
+        CampaignTechnology.State nextTechnology=lastWon?beforeTechnology.victory():beforeTechnology;
+        String notice="Fleet, credits and research are up to date.";
+        if(lastWon&&nextTechnology.unlocked().size()>beforeTechnology.unlocked().size())
+            notice="TECHNOLOGY DISCOVERED: "+beforeTechnology.activeId();
+        else if(lastWon&&next.researchRank()>before.researchRank())
+            notice="RESEARCH COMPLETE: technology license rank "+next.researchRank()+" acquired.";
+        else if(lastWon&&next.speedUpgrades()>before.speedUpgrades())
+            notice="LAB UPGRADE COMPLETE: license/lab work reduced, minimum zero.";
+        else if(lastWon&&before.activeProject()!=CampaignProgress.Project.NONE)
+            notice="Research progress "+next.projectProgress()+"/"+next.currentProjectMissions()+" mission ticks.";
+        var previous=currentCampaignSnapshot();
+        var proposed=new CampaignLedger.Snapshot(Math.addExact(ledgerGeneration,1),next,returned,nextTechnology);
+        pendingSettlement=new PendingCampaignSettlement(previous==null?null:CampaignLedger.encode(previous),
+                CampaignLedger.encode(proposed),next.credits()-before.credits(),notice,
+                before.isReplay(activeMission),recoveredScrap);
+    }
+    private void retryCampaignSettlement(){
+        if(!campaignSettlementPending())return;
+        try{
+            prepareCampaignSettlement();
+            PendingCampaignSettlement pending=pendingSettlement;
+            var before=pending.before()==null?null:CampaignLedger.decode(pending.before(),technology);
+            var proposed=CampaignLedger.decode(pending.proposed(),technology);
+            var result=CampaignLedger.commitRecoverably(campaignLedgerPath(),before,proposed,technology);
+            if(result.committed()){
+                adoptCampaignSnapshot(proposed);
+                lastReward=pending.reward();dockNotice=pending.completionNotice();
+                settlementNotice="OUTCOME SAVED. "+pending.completionNotice();
+                settlementPending=false;pendingSettlement=null;
+                Gdx.app.log("CD-GAME-FLOW","MISSION_LEDGER_COMMITTED mission="+activeMission+
+                        " replay="+pending.replay()+" credits="+lastReward+
+                        " recoveredScrap="+pending.salvage()+" owned="+campaignFleet.ships().size());
+            }else{
                 lastReward=0;
-                dockNotice="Campaign recovery failed; no rewards or ship losses were committed.";
-                Gdx.app.error("CAMPAIGN","Unable to commit battle settlement",failed);
+                settlementNotice="OUTCOME PENDING. "+campaignSaveMessage(result)+" Retry Save; keep this app open.";
+                Gdx.app.error("CAMPAIGN","Battle settlement remains pending: "+result.status()+" / "+result.message());
             }
+        }catch(RuntimeException failed){
+            lastReward=0;
+            settlementNotice="OUTCOME NOT SAVED. Recovery could not finish. Retry Save; keep this app open.";
+            Gdx.app.error("CAMPAIGN","Unable to prepare or commit battle settlement",failed);
         }
-        running=false;screen=GameMenuPanel.Screen.RESULTS;Gdx.app.log("CD-GAME-FLOW","AFTER_ACTION");
+    }
+    private boolean campaignSettlementPending(){return playedCampaign&&settlementPending;}
+    private String resultsNotice(){return playedCampaign?settlementNotice:"";}
+    private String resultsPrimaryLabel(){
+        return GameMenuPanel.resultsPrimaryLabel(playedCampaign,campaignSettlementPending());
+    }
+    private void resultsPrimaryAction(){
+        if(screen!=GameMenuPanel.Screen.RESULTS)return;
+        if(campaignSettlementPending()){retryCampaignSettlement();return;}
+        if(playedCampaign){
+            selectedMission=campaign.available(activeMission)?activeMission:campaign.recommendedMission();
+            openDeployment();
+        }else launchSkirmish();
+    }
+    private void resultsKey(int key){
+        if(screen!=GameMenuPanel.Screen.RESULTS)return;
+        if(key==Input.Keys.LEFT)afterActionPage=Math.max(0,afterActionPage-1);
+        else if(key==Input.Keys.RIGHT&&campaignAfterAction!=null)
+            afterActionPage=Math.min(campaignAfterAction.pages(GameMenuPanel.AFTER_ACTION_PAGE_SIZE)-1,afterActionPage+1);
+        else if(key==Input.Keys.R||(key==Input.Keys.ENTER&&campaignSettlementPending()))resultsPrimaryAction();
+        else if(key==Input.Keys.ENTER||key==Input.Keys.ESCAPE||key==Input.Keys.BACK)leaveResults();
     }
     private void leaveResults(){
+        if(campaignSettlementPending()){
+            settlementNotice="OUTCOME NOT SAVED. Retry Save before returning to the dock. Keep this app open.";
+            return;
+        }
         if(playedCampaign){
             campaignPage=CampaignMap.pageOf(selectedMission);
             openDock();
-        }
-        else screen=GameMenuPanel.Screen.SKIRMISH;
+        }else screen=GameMenuPanel.Screen.SKIRMISH;
     }
     private void openWiki(){
         if(verifyDemo||screensaverMode||multiplayer!=null||wikiVisible)return;
@@ -1906,13 +2042,13 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
             if(GameMenuPanel.hit(x,y,80,35,230,54)){
-                screen=GameMenuPanel.Screen.HOME;return;
+                cancelCampaignSetup();return;
             }
             if(GameMenuPanel.hit(x,y,892,35,308,54)){
                 newCampaign();return;
             }
             Battle.Faction selected=GameMenuPanel.factionHit(x,y);
-            if(selected!=null)pendingFaction=selected;
+            if(selected!=null)selectCampaignFaction(selected);
             return;
         }
         if(screen==GameMenuPanel.Screen.SKIRMISH){
@@ -2065,12 +2201,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if(screen==GameMenuPanel.Screen.RESULTS){
             int direction=GameMenuPanel.afterActionAction(x,y);
             if(campaignAfterAction!=null&&direction!=0){
-                afterActionPage=Math.max(0,Math.min(campaignAfterAction.pages(5)-1,
+                afterActionPage=Math.max(0,Math.min(campaignAfterAction.pages(GameMenuPanel.AFTER_ACTION_PAGE_SIZE)-1,
                         afterActionPage+direction));
                 return;
             }
             if(GameMenuPanel.hit(x,y,351,122,254,58)){
-                if(playedCampaign)launchCampaignMission();else launchSkirmish();
+                resultsPrimaryAction();
             }else if(GameMenuPanel.hit(x,y,673,122,254,58))leaveResults();
         }
     }
@@ -2128,23 +2264,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** Both records are restored from a single validated authority.
      * Only when NO ledger has ever been written can old split saves be imported. */
     private void restoreCampaign(){
-        java.nio.file.Path file=Gdx.files.local(LEDGER_FILE).file().toPath();
-        ledgerAuthorityPresent=java.nio.file.Files.exists(file)||
-                java.nio.file.Files.exists(file.resolveSibling(file.getFileName()+".bak"));
+        var inspection=CampaignLedger.inspect(campaignLedgerPath(),technology);
+        ledgerAuthorityPresent=inspection.status()!=CampaignLedger.AuthorityStatus.MISSING;
         if(ledgerAuthorityPresent){
-            try{
-                var stored=CampaignLedger.load(file,technology).orElseThrow();
-                campaign=stored.progress();campaignFleet=stored.fleet();
-                discoveries=stored.technology();
-                ledgerGeneration=stored.generation();
+            if(inspection.status()==CampaignLedger.AuthorityStatus.VALID){
+                adoptCampaignSnapshot(inspection.authority());
                 Gdx.app.log("CAMPAIGN","Loaded atomic campaign generation "+ledgerGeneration);
-            }catch(RuntimeException invalid){
-                campaign=null;campaignFleet=null;discoveries=null;
-                dockNotice="Campaign ledger and backup invalid. No free ships or credits issued.";
-                Gdx.app.error("CAMPAIGN","Authoritative recovery failed",invalid);
+            }else{
+                campaign=null;campaignFleet=null;discoveries=null;ledgerGeneration=0;
+                dockNotice=inspection.message();setupNotice=dockNotice;
+                Gdx.app.error("CAMPAIGN","Authoritative recovery unavailable: "+inspection.status());
             }
             return;
         }
+        ledgerGeneration=0;
         for(FileHandle f:new FileHandle[]{Gdx.files.local(CAMPAIGN_FILE),
                 Gdx.files.local(CAMPAIGN_FILE+".bak")}){
             if(!f.exists())continue;
@@ -2186,8 +2319,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // retained for manual recovery, but are never used after this succeeds.
         commitCampaign(campaign,legacy);
     }
-    /** No live wallet/fleet mutation until the complete next snapshot has
-     * atomically reached local storage and readback verified it. */
+    private static String campaignSaveMessage(CampaignLedger.CommitResult result){
+        if(result.message().contains("Atomic campaign save is unsupported"))
+            return "This storage does not support safe campaign saves.";
+        return switch(result.status()){
+            case RETRYABLE_FAILURE -> "Storage could not save the campaign. Check free space and access.";
+            case STORAGE_UNAVAILABLE -> "Campaign storage is unavailable. Restore access before retrying.";
+            case OUTCOME_UNKNOWN -> "Save could not be confirmed. Retry checks the stored outcome first.";
+            case CONFLICT -> "The saved campaign changed. This pending transaction was not applied.";
+            case INVALID_AUTHORITY -> "The saved campaign cannot be validated. Current files are preserved.";
+            default -> "Campaign transaction saved and verified.";
+        };
+    }
+    private java.nio.file.Path campaignLedgerPath(){
+        return Gdx.files.local(LEDGER_FILE).file().toPath();
+    }
+    private CampaignLedger.Snapshot currentCampaignSnapshot(){
+        return ledgerGeneration>0?new CampaignLedger.Snapshot(ledgerGeneration,campaign,campaignFleet,discoveries):null;
+    }
+    private void adoptCampaignSnapshot(CampaignLedger.Snapshot saved){
+        campaign=saved.progress();campaignFleet=saved.fleet();discoveries=saved.technology();
+        ledgerGeneration=saved.generation();ledgerAuthorityPresent=true;
+    }
+    /** Confirm a complete authoritative generation before mutating the live campaign. */
     private boolean commitCampaign(CampaignProgress.State nextProgress,
                                    CampaignFleet.Roster nextFleet){
         return commitCampaign(nextProgress,nextFleet,discoveries);
@@ -2196,20 +2350,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
                                    CampaignFleet.Roster nextFleet,
                                    CampaignTechnology.State nextTechnology){
         if(nextProgress==null||nextFleet==null||nextTechnology==null)return false;
-        try{
-            var pending=new CampaignLedger.Snapshot(
-                    Math.addExact(ledgerGeneration,1),nextProgress,nextFleet,nextTechnology);
-            CampaignLedger.commit(Gdx.files.local(LEDGER_FILE).file().toPath(),
-                    pending,technology);
-            campaign=nextProgress;campaignFleet=nextFleet;discoveries=nextTechnology;
-            ledgerGeneration=pending.generation();
-            ledgerAuthorityPresent=true;
-            return true;
-        }catch(java.io.IOException|RuntimeException failed){
-            dockNotice="CAMPAIGN SAVE FAILED: credits and fleet unchanged; free space and retry.";
-            Gdx.app.error("CAMPAIGN","Failed atomic campaign transaction",failed);
-            return false;
+        if(campaignSettlementPending()){
+            dockNotice="Save the pending battle outcome before changing campaign resources.";return false;
         }
+        try{
+            var proposed=new CampaignLedger.Snapshot(Math.addExact(ledgerGeneration,1),
+                    nextProgress,nextFleet,nextTechnology);
+            var result=CampaignLedger.commitRecoverably(campaignLedgerPath(),currentCampaignSnapshot(),proposed,technology);
+            if(result.committed()){adoptCampaignSnapshot(proposed);return true;}
+            dockNotice="CAMPAIGN SAVE: "+campaignSaveMessage(result);
+            if(screen==GameMenuPanel.Screen.RESEARCH)researchNotice=dockNotice;
+            if(screen==GameMenuPanel.Screen.TECHNOLOGY)technologyNotice=dockNotice;
+            Gdx.app.error("CAMPAIGN","Campaign transaction not acknowledged: "+result.status()+" / "+result.message());
+        }catch(RuntimeException failed){
+            dockNotice="CAMPAIGN SAVE FAILED: operation was not acknowledged; restore storage and retry.";
+            if(screen==GameMenuPanel.Screen.RESEARCH)researchNotice=dockNotice;
+            if(screen==GameMenuPanel.Screen.TECHNOLOGY)technologyNotice=dockNotice;
+            Gdx.app.error("CAMPAIGN","Failed atomic campaign transaction",failed);
+        }
+        return false;
     }
 
     private void openBattleDevOptions(){
@@ -2805,6 +2964,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             CampaignFleet.purchaseCost(campaignDesign==null?leftDesign:campaignDesign,
                                     technology):0L,
                     screen==GameMenuPanel.Screen.RESEARCH?researchNotice:
+                            screen==GameMenuPanel.Screen.CAMPAIGN_SETUP?setupNotice:
+                            screen==GameMenuPanel.Screen.RESULTS?resultsNotice():
                             screen==GameMenuPanel.Screen.SKIRMISH?skirmishNotice:dockNotice,
                     audio.musicEnabled(),audio.effectsEnabled(),audio.battleTrack(),updateCheck!=null,
                     audio.voiceVolume(),lastWon,
@@ -2812,7 +2973,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             battle.terminationReason(),lastReward,
                     survivorsAtEnd,deployedAtLaunch,escapedAtEnd,destroyedAtEnd,withdrawingAtEnd,
                     screen==GameMenuPanel.Screen.RESULTS&&playedCampaign?campaignAfterAction:null,
-                    afterActionPage,themePage,themeCandidate,
+                    afterActionPage,campaignSettlementPending(),campaignResetArmed,themePage,themeCandidate,
                     selectedSquadron,namingReturn,selectedResearchNode,armedResearch,researchReturn,
                     technology,discoveries,technologyPage,technologyModule,technologyTrack,
                     technologyStage,technologyBranch,technologyNotice,armedTechnology,

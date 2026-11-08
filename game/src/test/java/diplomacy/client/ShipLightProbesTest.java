@@ -65,11 +65,6 @@ public final class ShipLightProbesTest {
             throw new AssertionError("Scorch failed original alpha/color contract");
         if(ShipDamageScorch.darken(0,.8f,.1f)!=0)
             throw new AssertionError("Transparent source pixel became visible");
-        for(String token:new String[]{"varying vec2 v_world;","uniform vec4 u_light0;",
-                "uniform vec4 u_light1;","uniform float u_detail;",
-                "localLight(u_light0","localLight(u_light1","if(u_detail<0.01)"})
-            if(!ShipSurfaceLighting.FRAGMENT.contains(token))
-                throw new AssertionError("Local normal-light shader missing "+token);
-        System.out.println("PASS: bounded local lights, distance LOD, alpha-safe scorch and shader");
+        System.out.println("PASS: bounded local lights, distance LOD, alpha-safe scorch");
     }
 }

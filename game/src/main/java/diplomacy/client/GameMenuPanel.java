@@ -438,6 +438,10 @@ final class GameMenuPanel {
         label(batch,font,text,37,680,Color.WHITE);
         label(batch,font,subtitle,38,650,MUTED);
     }
+    static final int AFTER_ACTION_PAGE_SIZE=4;
+    static String resultsPrimaryLabel(boolean campaign,boolean pending){
+        return pending?"RETRY SAVE":campaign?"PREPARE SORTIE":"RETRY";
+    }
     void draw(Screen screen,ShapeRenderer shapes,SpriteBatch batch,BitmapFont font,
               ScenarioCatalog.Preset preset,Battle.Faction left,Battle.Faction right,Battle.Faction selectedFaction,
               int fleetCount,CampaignProgress.State progress,int page,int selectedLevel,
@@ -451,6 +455,7 @@ final class GameMenuPanel {
               boolean won,diplomacy.sim.BattleTermination.Reason termination,long reward,
               int surviving,int deployed,int escaped,int destroyed,
               int withdrawing,CampaignAfterAction.Report report,int reportPage,
+              boolean settlementPending,boolean campaignResetArmed,
                int themePage,FleetNames.Style themeCandidate,
                int selectedSquadron,Screen namingReturn,
                int selectedResearchNode,CampaignProgress.Project armedResearch,Screen researchReturn,
@@ -499,7 +504,8 @@ final class GameMenuPanel {
                     button(shapes,80+(i/rows)*570,502-(i%rows)*62,520,49,
                             factions[i]==selectedFaction);
                 button(shapes,80,35,230,54,false);
-                actionButton(shapes,892,35,308,54,MilitaryUiTheme.Intent.PRIMARY);
+                actionButton(shapes,892,35,308,54,campaignResetArmed?
+                        MilitaryUiTheme.Intent.CONFIRM:MilitaryUiTheme.Intent.PRIMARY);
             }
             case SKIRMISH -> {
                 rectangle(shapes,610,113,638,524,PANEL);
@@ -798,10 +804,14 @@ final class GameMenuPanel {
                 for(int i=0;i<factions.length;i++)
                     buttonLabel(batch,font,factions[i].displayName,
                           80+(i/rows)*570,502-(i%rows)*62,520,49,Color.WHITE);
-                if(progress!=null)
+                if(dockNotice!=null&&!dockNotice.isBlank()){
+                    font.setColor(campaignResetArmed?Color.GOLD:Color.SCARLET);
+                    font.draw(batch,dockNotice,80,155,1120,com.badlogic.gdx.utils.Align.left,true);
+                }else if(progress!=null)
                     label(batch,font,"STARTING WILL REPLACE THE EXISTING CAMPAIGN SAVE",325,133,Color.SCARLET);
                 buttonLabel(batch,font,"CANCEL",80,35,230,54,Color.WHITE);
-                buttonLabel(batch,font,progress==null?"BEGIN CAMPAIGN":"REPLACE AND BEGIN",
+                buttonLabel(batch,font,campaignResetArmed?"ARCHIVE & BEGIN":
+                        progress==null?"BEGIN CAMPAIGN":"REPLACE AND BEGIN",
                         892,35,308,54,Color.WHITE);
             }
             case SKIRMISH -> {
@@ -1261,22 +1271,22 @@ final class GameMenuPanel {
                     label(batch,font,"DESTROYED: "+
                             report.count(CampaignAfterAction.Outcome.DESTROYED),56,387,Color.SCARLET);
                     label(batch,font,"CREDITS AWARDED: "+reward,56,344,Color.GOLD);
-                    int pages=report.pages(5);
+                    int pages=report.pages(AFTER_ACTION_PAGE_SIZE);
                     int safe=Math.max(0,Math.min(pages-1,reportPage));
                     label(batch,font,"COMMISSIONED SHIPS  PAGE "+(safe+1)+"/"+pages,
                             510,579,Color.WHITE);
                     int row=0;
-                    for(var ship:report.page(safe,5)){
-                        int y=542-row*48;
+                    for(var ship:report.page(safe,AFTER_ACTION_PAGE_SIZE)){
+                        int y=542-row*64;
                         label(batch,font,shortLabel(ship.name(),23)+
                                 " ["+ship.hull().name().replace('_',' ')+"] "+ship.outcome(),
                                 510,y,ship.outcome()==CampaignAfterAction.Outcome.DESTROYED?
                                         Color.SCARLET:Color.WHITE);
-                        label(batch,font,"ID "+ship.id(),510,y-17,MUTED);
+                        label(batch,font,"ID "+ship.id(),510,y-20,MUTED);
                         label(batch,font,"HULL "+ship.hullPercent()+"% | CREW LOST "+ship.crewLost()+
                                 " | AMMO K/M/T "+ship.kineticSpent()+"/"+
                                 ship.missileSpent()+"/"+ship.torpedoSpent()+
-                                " | FUEL "+ship.fuelSpent(),510,y-20,MUTED);
+                                " | FUEL "+ship.fuelSpent(),510,y-40,MUTED);
                         row++;
                     }
                     label(batch,font,"< PREVIOUS",843,284,Color.WHITE);
@@ -1297,9 +1307,15 @@ final class GameMenuPanel {
                     label(batch,font,"DESTROYED HULLS: "+destroyed,416,348,Color.WHITE);
                     label(batch,font,"CREDITS AWARDED: "+reward,416,312,Color.GOLD);
                 }
-                buttonLabel(batch,font,"RETRY",351,122,254,58,Color.WHITE);
-                buttonLabel(batch,font,"RETURN TO "+(progress!=null?"CAMPAIGN":"SKIRMISH"),
-                        673,122,254,58,Color.WHITE);
+                if(dockNotice!=null&&!dockNotice.isBlank()){
+                    font.setColor(settlementPending?Color.GOLD:Color.CYAN);
+                    font.draw(batch,dockNotice,56,226,1165,com.badlogic.gdx.utils.Align.left,true);
+                }
+                buttonLabel(batch,font,resultsPrimaryLabel(progress!=null,settlementPending),
+                        351,122,254,58,Color.WHITE);
+                buttonLabel(batch,font,settlementPending?"SAVE BEFORE RETURN":
+                        "RETURN TO "+(progress!=null?"DOCK":"SKIRMISH"),
+                        673,122,254,58,settlementPending?MUTED:Color.WHITE);
             }
             default -> {}
         }
