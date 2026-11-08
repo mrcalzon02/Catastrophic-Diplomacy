@@ -1,0 +1,10 @@
+.............PASS: public release read back after publication
+Publication not confirmed (edit status 1); retrying boundedly.
+Publication not confirmed (edit status 1); retrying boundedly.
+Publication not confirmed (edit status 1); retrying boundedly.
+Publication not confirmed (edit status 1); retrying boundedly.
+.........
+----------------------------------------------------------------------
+Ran 22 tests in 0.028s
+
+OK

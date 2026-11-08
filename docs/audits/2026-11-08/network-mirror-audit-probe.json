@@ -1,0 +1,7 @@
+{
+  "compile_exit": 0,
+  "compile_stderr": "",
+  "run_exit": 0,
+  "stdout": "SAME_TICK_NEW_CONNECTION: x=5.0 team=0 (new connection fixture x=999 team=1 discarded)\nLATER_TICK_NEW_CONNECTION: initial_x=5.0 (new connection fixture x=999 blends from previous server)\nMIRROR_DEFAULT: hullClass=CORVETTE missiles=0 ballistics=0 crafts=0\nMALFORMED_SNAPSHOT: accepted_by_connection=true throws_in_render_parser=true\nUNVALIDATED_STATE: accepted_team=9 accepted_hull=NaN\n",
+  "stderr": ""
+}

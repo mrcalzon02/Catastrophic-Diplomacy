@@ -1,0 +1,8 @@
+NAV tick=13 sameDelayedFix=true fixA=(600.000,100.000,t9) fixB=(600.000,100.000,t9) enemyTruthA=(600.000,100.000) enemyTruthB=(600.000,250.000)
+NAV observer velocity A=(0.000802876,-0.000321150) B=(0.000829312,-0.000244926) delta=0.000080678 headings=(-0.380506377,-0.287173044)
+CONFIRMED navigation reacted to changed present truth while the measured enemy fix stayed identical
+PPD withdrawing=false realIncomingLaunches=5 paidBeamTicks=70 alive=true escaped=false
+PPD withdrawing=true realIncomingLaunches=5 paidBeamTicks=0 alive=true escaped=false
+FCM tick=600 donor=1 assignedDonor=1 capacity=0.600000 separation=80.117194 localAllocations=19 localExhausted=19 sharedAllocations=0 sharedExhausted=0
+CONFIRMED noncolocated FCM donor is never debited despite assigned ally with real exhausted firing compute
+CONFIRMED withdrawing PPD suppresses all beam ticks despite an otherwise armed, powered, targetable defensive fixture

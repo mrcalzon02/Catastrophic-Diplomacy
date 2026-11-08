@@ -1,0 +1,20 @@
+[
+  {
+    "check": "WikiMemoryProfile-16m",
+    "exit_code": 0,
+    "elapsed_seconds": 1.476,
+    "output": "[0.001s][warning][perf,memops] Cannot use file /tmp/hsperfdata_agent/6 because it is locked by another process (errno = 11)\nWIKI_PROFILE maxHeapBytes=16777216 retainedBytes=14548720 indexedBytes=14913304 catalogLoadMillis=892.548854 wikiIndexMillis=425.132172 broadSearchMillis=0.015433 selectedMillis=44.057607 articleCount=75476 matchingIds=73260\n"
+  },
+  {
+    "check": "WikiArbitrarySearchProfile-16m",
+    "exit_code": 1,
+    "elapsed_seconds": 3.746,
+    "output": "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space\n\tat java.base/jdk.internal.misc.Unsafe.allocateUninitializedArray(Unsafe.java:1375)\n\tat java.base/java.lang.StringConcatHelper.newArray(StringConcatHelper.java:497)\n\tat java.base/java.lang.StringConcatHelper.simpleConcat(StringConcatHelper.java:421)\n\tat java.base/java.lang.invoke.DirectMethodHandle$Holder.invokeStatic(DirectMethodHandle$Holder)\n\tat java.base/java.lang.invoke.LambdaForm$MH/0x00007f19f8005c00.invoke(LambdaForm$MH)\n\tat java.base/java.lang.invoke.Invokers$Holder.linkToTargetMethod(Invokers$Holder)\n\tat diplomacy.tech.TechnologyCatalog.get(TechnologyCatalog.java:297)\n\tat diplomacy.client.GameWikiCatalog.search(GameWikiCatalog.java:639)\n\tat diplomacy.client.WikiArbitrarySearchProfile.main(WikiArbitrarySearchProfile.java:27)\n"
+  },
+  {
+    "check": "WikiArbitrarySearchProfile-32m",
+    "exit_code": 0,
+    "elapsed_seconds": 2.988,
+    "output": "WIKI_QUERY_PROFILE query=plasma matches=2376 millis=666.566706 baselineBytes=14805096 resultHeapBytes=16546112 retainedBytes=14699424 heapLimitBytes=33554432\nWIKI_QUERY_PROFILE query=power x1.00 matches=0 millis=1360.474483 baselineBytes=14748952 resultHeapBytes=18463760 retainedBytes=14748872 heapLimitBytes=33554432\nWIKI_QUERY_PROFILE query=tech matches=73260 millis=0.087929 baselineBytes=14748872 resultHeapBytes=14978840 retainedBytes=14748872 heapLimitBytes=33554432\n"
+  }
+]

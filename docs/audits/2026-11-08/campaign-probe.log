@@ -1,0 +1,5 @@
+REPRODUCED CF-01: mission31 available=true, unlocked=2, actualCap=5; dock keeps active=1; notice=Mission fleet cap reached
+REPRODUCED CF-03: actual pointer Retry handler leaves campaign screen=RESULTS, no new battle.
+REPRODUCED CF-06: authorizing license7 changes selected card to license6; selectedCost=15000000; actualQuote=28000000
+REPRODUCED CF-04: invalid primary+backup blocks both restore and actual New Campaign handler; screen=CAMPAIGN_SETUP; notice=CAMPAIGN SAVE FAILED: credits and fleet unchanged; free space and retry.
+REPRODUCED CF-02: real finishEngagement write fault -> victory Results reward0; remove fault -> Return opens dock; ledger remains generation1, earned mission not committed.

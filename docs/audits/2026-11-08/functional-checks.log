@@ -1,0 +1,420 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :core:compileJava UP-TO-DATE
+> Task :prepareLegacyFactionArt UP-TO-DATE
+> Task :prepareStage1Art UP-TO-DATE
+> Task :bakeApprovedHardpoints UP-TO-DATE
+> Task :core:processResources UP-TO-DATE
+> Task :core:classes UP-TO-DATE
+> Task :core:compileTestJava UP-TO-DATE
+> Task :core:processTestResources NO-SOURCE
+> Task :core:testClasses UP-TO-DATE
+
+> Task :core:ammunitionResearchSmoke
+PASS research-locked ammo: 11 races, 3 launcher types, 4 exclusive trees x 6 ranks, per-bank intersection, live ballistic rounds and frozen salvo warheads
+
+> Task :core:ammunitionSelectionSmoke
+PASS CD-SHIP-1/2/3 compatibility, player ammo fitting, 11 race save parity, anti-downgrade lockouts and live EMP launches
+
+> Task :core:ammunitionTypesSmoke
+PASS 5 ballistic ammunition and 6 missile payloads: physical rounds, AP penetration, explosions, EMP, shield attack and replay
+
+> Task :core:battleTerminationSmoke
+PASS real disarmed 1v1 stalemate at tick 3600
+PASS campaign unresolved draw, unchanged wave and actual-win distinction
+PASS deterministic finite battle end policy, damage grace, delayed threats and survivor accounting
+
+> Task :core:worldScaleAndPropulsionSmoke
+PASS fixed one-light-minute diagonal and 60:1 compressed clock
+PASS bare, one-ENG, two-ENG and upgraded-drive tiers
+PASS bounded impulse, one-tank reserve, paid economy thrust and coast
+PASS 60 Hz ship-position substeps; 30Hz error 0.012565518, 60Hz error 0.006080089, fuel parity
+PASS 50%-size fitted hull, physical kinetic radius and source-art muzzle
+PASS half-scale ship physical geometry and sublight thrust integration
+
+> Task :core:battleArenaSmoke
+PASS fixed arena, 200v200, ship bounds, six projectile types and timeouts
+
+> Task :core:campaignLaunchRuntimeSmoke
+PASS campaign start/save/restore + mission 1/2 live 30-tick combat for 11 factions, 22 missions
+
+> Task :core:crewAccommodationSmoke
+PASS crew habitat: 506 staffed faction/chassis combinations, intrinsic hull berths and life support, optional upgrades, no unmanned gunfire and version-1 migration
+
+> Task :core:demoWeaponSmoke
+PASS demo 200v200: six weapon families fired, impacts=6621 hits=3780 craft=326 ordnance=247 fingerprint=8ccb3dfec5fb4f19
+PASS demo 200v200: six weapon families fired, impacts=6621 hits=3780 craft=326 ordnance=247 fingerprint=8ccb3dfec5fb4f19
+
+> Task :core:hullCoverageSmoke
+PASS hull coverage: 11 x 1v1, 11v11 mixed, 194 physical module anchors, 22 varied layouts, shields-first and deterministic fleet replay
+
+> Task :core:hullFoundationSmoke
+PASS physical hull baseline: 506 chassis/faction combinations, 11 native module rosters, 73260 tech upgrades, unarmed fits, symmetric combat
+
+> Task :core:hullVoiceSmoke
+PASS: 598 hull/event checks, 11 voice themes, deterministic choices
+
+> Task :core:moduleVersionsSmoke
+PASS 40700 module manufacturing versions, exclusive six-rank research retention, fitted sidegrades and CD-SHIP-1/2 compatibility
+
+> Task :core:ordnanceDoctrineSmoke
+PASS 14 physical missile/torpedo schematics, finite reload and ammo, decoys, cold ignition, PD and replay
+
+> Task :core:ordnancePropulsionSmoke
+PASS inertial coasting, cold ejection, finite acceleration, dynamic PD signatures, physical terminal sprint and motor phases
+
+> Task :core:ordnanceConfigurationSmoke
+PASS independent salvo/propulsion/seeker configuration, real offset guidance, cold launch, ammo, snapshot and deterministic replay
+
+> Task :core:ordnanceBlueprintSmoke
+PASS versioned launcher blueprint, 9-tier research, old designs, editing invariants, real battle spawn, missile flight and authorization
+
+> Task :core:ordnanceRacksSmoke
+PASS CD-SHIP-5 separate socket research, magazines, reloading, real muzzles, physical missiles, payloads, tamper rejection and replay
+
+> Task :core:ordnanceSeekerSmoke
+PASS seeded seeker ECM loss/reacquisition, cold-coast PD counterplay and replay
+
+> Task :core:ordnanceSubmunitionsSmoke
+PASS live cluster carrier and cascade swarm: PD, ammo, damage, art-independent split and replay
+
+> Task :core:photonCacheParitySmoke
+PASS cache parity 4v4 ticks=45 fingerprint=a88a76d5b43e9710 hits=1152 misses=2104 reuseMs=14.774064 legacyMs=15.102336 (timings diagnostic only)
+PASS cache parity 16v16 ticks=35 fingerprint=e1563d66a6e3ee34 hits=13312 misses=19900 reuseMs=21.07488 legacyMs=23.307015 (timings diagnostic only)
+PASS cache parity 200v200 ticks=60 fingerprint=9ce4b4f4b8f4b9e5 hits=3979223 misses=4794459 reuseMs=767.365744 legacyMs=1168.008082 (timings diagnostic only)
+
+> Task :core:rocketBarrageSmoke
+PASS four native rocket sizes, 4/8/16 cheap physical volleys, two fixed-bearing motor envelopes, long reloads, PD, dodge, hit and replay
+
+> Task :core:beamPhotonFlightSmoke
+PASS delayed laser photons, real hull impact, physical dodge
+PASS delayed photon replay and pending pulse fingerprint
+
+> Task :core:beamRaySmoke
+PASS physical beam grazing, bounded reach, occlusion and imperfect-aim hit/miss
+PASS live LASER physical beam fire/impact parity; 6 rays, 6 hull intersections
+PASS live PLASMA physical beam fire/impact parity; 4 rays, 4 hull intersections
+PASS live PARTICLE physical beam fire/impact parity; 3 rays, 3 hull intersections
+
+> Task :core:fighterCountermeasureSmoke
+PASS independent real flak and rotary CHAFF diversions, flare spectra, finite ammo/cooldowns
+PASS seeded independently replayed fighter/chaff/flak combat
+
+> Task :core:fighterEscapePodSmoke
+PASS physical drift, exact pickup range, enemy isolation, crew capacity and capsule expiry
+PASS real launched pilot debit, intact fighter retrieval and idempotent campaign roster
+PASS real ejection capsule, finite friendly pickup, after-action crew settlement
+PASS distant ejection remains adrift and cannot mint campaign personnel
+
+> Task :core:fighterInfraredSeekerSmoke
+PASS actual fitted fighter interceptors, passive photon tracks, finite flare competition
+IR_COMBAT_PROFILE interceptor_launches=4 protected_flare_launches=4 ir_decoy_acquisitions=4 flare_proximity_fuzes=0 protected_real_hits=2 unprotected_real_hits=3
+PASS deterministic live infrared fighter missiles and flares
+
+> Task :core:fighterOpticalSeekerSmoke
+PASS independent optical range/cone, real photon age, glare alignment and band isolation
+PASS optical nebula path attenuation, solar burst edges, spectral isolation, photon causality
+PASS exclusive researched FTR optical selection and finite optical measurement
+PASS real equipped optical interceptors, delayed photons, IR/radar isolation and replay
+PASS real fitted optical wing in seeded nebula weather
+
+> Task :core:fighterRadarSeekerSmoke
+PASS causal active radar transmission/return, geometry, chaff vs flare bands
+PASS finite IR/radar seeker error, spectral resolution, signal, delay and replay
+PASS fitted radar fighter missiles, chaff, IR isolation, replay
+
+> Task :core:fighterSeekerBlueprintSmoke
+PASS CD-SHIP-7, FTR licences, legacy defaults, mutation and fleet export
+PASS persisted FTR doctrine, real distinct missile heads, delayed photons and replay
+
+> Task :core:fighterSurvivabilitySmoke
+PASS all six fighter hulls, paid rank progression and bounded independent pilot ejection probabilities
+PASS actual single shield then single armor cell, hit cooldown, finite recharge and stock fallback
+PASS real fatal-hit ejection across three seats, exact-once survivor bookkeeping and deterministic replay
+PASS fitted FTR rank 9 inherited by physically constructed fighter
+
+> Task :core:fighterWingLinkSmoke
+PASS 60-unit direct radio, one-tick delay, no team leaks or multi-hop
+PASS real close-formation fighter scout contact, no remote weapon lock and replay
+
+> Task :core:guidedSalvoCausalitySmoke
+PASS sixteen guided rounds preserve original received fix after evasive target maneuver
+
+> Task :core:guidedTrajectoryPredictionSmoke
+PASS finite trajectory path, ETA, determinism and read-only projectile state
+PASS thrust/coast/cold launch, last-fix deception and lock loss
+PASS guided prediction never queries current hostile truth
+
+> Task :core:ordnanceSeekerPhotonSmoke
+PASS seeker optical light-cone delay, historical movement and delayed ECM
+PASS historical hologram emission, movement and power-loss delay
+PASS finite moving receiver light-front intersection, prior passage and replay
+PASS bounded finite seeker noise, paid quality, photon-delayed ECM and deterministic replay
+PASS deterministic seeker observations without current-target oracle
+
+> Task :core:rocketTrajectorySmoke
+PASS 16 thrust/research cases share actual rocket velocity and finite lifetime
+PASS causal motor lead pips, reachability, accuracy and researched thrust
+
+> Task :core:sensorActiveScanSmoke
+PASS powered passive, wide radar, focus radar, X-ray probe, pulse clock and no-free-hardware modes
+
+> Task :core:sensorCausalAcquisitionSmoke
+PASS STANDARD radar obeys physical roundtrip, powered hardware and no-free-TRK
+PASS radar power-on cannot fabricate historical outbound photons
+PASS non-powered passive optics cannot outrun light
+PASS causal STANDARD acquisition and passive optical contact
+
+> Task :core:sensorComputeBudgetSmoke
+PASS finite per-tick work, replay, contention, replenishment and power loss
+PASS RES/TRK/ACU compute throughput, CAP-only parallel slots and nonlinear age/range load
+PASS historical ghost hypotheses spend finite processing and shutdown refunds only after light delay
+PASS finite paid FCM work, two-way signal delay, allied competition, power loss and replay
+
+> Task :core:sensorFalseContactRelaySmoke
+PASS bounded false-hypothesis packets, delayed shutoff and radio replay
+PASS real SHR false reports, causal blackout and non-locking phantoms
+PASS false-contact deterministic battle replay
+
+> Task :core:sensorHistoricalSignaturesSmoke
+PASS fire-control lock penalty retains historical emitter timing
+PASS delayed RCS/range uses real reflected profile, not current hull truth
+PASS optical cloak timing retains older light without future truth
+PASS active sensor fitting cannot create past radar illumination
+PASS temporal RCS, optical cloak, movement and sender hardware profiles
+
+> Task :core:sensorLeadProjectionSmoke
+PASS velocity lead pips, age/compute uncertainty, physical trajectory and firing-solution parity
+
+> Task :core:sensorRelayBufferSmoke
+PASS bounded actual scout transmissions, in-flight history and one-way receiver delay
+
+> Task :core:sensorLightTimeSmoke
+PASS passive and active photon light time, bounded history, relay latency
+
+> Task :core:sensorTacticalPictureSmoke
+PASS SHR relay provenance and loss-of-power cutover
+PASS no retroactive scout acquisition; only genuinely sent delayed packets
+PASS TRK/LNK stale coordinates, expiry topology and no-lock guarantee
+PASS remotely observed optical return stays marked relayed
+PASS default fitted command-anchor selection and power fallback
+PASS bounded read-only real fleet sensor picture
+
+> Task :core:sensorTargetingSolutionSmoke
+PASS bounded deterministic aim, measured velocity lead and finite compute benefit
+PASS imperfect aim can intersect real 12-unit hulls; hits=133 misses=27 nonzero-error-hits=133
+PASS physically meaningful historical sensor targeting estimation
+
+> Task :core:sensorTrackRelayBufferSmoke
+PASS finite actual LNK transmissions, order, replay and photon arrival
+
+> Task :core:sensorNetworkSmoke
+PASS six fleet sensor-network modules, 24 variants, research, amplification, finite relay, command fusion, track memory and CAP
+
+> Task :core:sensingModulesSmoke
+PASS sensing module fittings, research, persistence and detection
+
+> Task :core:survivalModulesSmoke
+PASS twelve survival roots and 48 physical variants including unsafe engineering
+
+> Task :core:weaponBehaviorSmoke
+PASS authoritative weapon behavior: 6 ship guns, 3 delivery modes, 4 PD toggles, 66 fighter loadouts, ammo/power/heat/range/reload/accuracy and live FIRE events
+
+> Task :core:gameFlowSmoke
+PASS game flow: real skirmishes, sequential campaign waves, map, saves and rewards
+
+> Task :core:screensaverSmoke
+PASS screensaver seeded fitted battles, distinct replayable captain orders and safe escorts
+
+> Task :core:campaignResearchSmoke
+PASS research/branching: paid progression, three routes, individual first-clears, v1-v5 saves
+
+> Task :core:researchVictoryFloorSmoke
+PASS 10 instant and 20 mission-timed technology combinations, plus 4 paid laboratory projects
+
+> Task :core:campaignOppositionSmoke
+PASS campaign opposition: 500 map systems, 0..IX physical tech, mixed faction fleets, seeded replay and active battle reinforcements
+
+> Task :core:campaignDeploymentSmoke
+PASS campaign deployment: 4 stages, all formations, real coordinates, fleet caps, reward balance
+
+> Task :core:shipPlacementOrdersSmoke
+PASS placement and individual orders: full 200-ship zones, collision rejection, 250 commands, independent queues and live ordered navigation
+
+> Task :core:shipStandingOrdersSmoke
+PASS individual standing orders: 23 simultaneous doctrines, 200 saved hull policies, withdrawal behavior, real combat and wave retention
+
+> Task :core:shipTacticalDirectivesSmoke
+PASS rich tactical directives: slot binding, relation guards, fighter, PD and speed controls
+
+> Task :core:fleetDoctrineGroupSmoke
+PASS group standing orders: 200 hulls, independent targets, deployment, save, live battle
+
+> Task :core:battleRetreatSmoke
+PASS withdrawal: physical left/right exits, hull/shield latch, last stand, waypoint precedence, wave resolution and credit exclusion
+
+> Task :core:campaignFleetSmoke
+PASS persistent campaign fleet: active/reserve, safe retreat, destroyed replacement, paid hull/crew/fuel/ammo/Service All, multiple name cultures and manual names, fighter/capital chatter
+
+> Task :core:fleetNameRangeSmoke
+PASS cultural ship naming: 38 themes, 22800 distinct commissioned roster names, rerolls, lengths, identity separation and deterministic replay
+
+> Task :core:squadronOperationsSmoke
+PASS commissioned squadrons: 8 persistent groups, mixed styles/voices, actual battle subtitle overrides, unique ID ownership, v4 checksum, paid service, reserve, casualties and 16-digit name independence
+
+> Task :core:campaignAfterActionSmoke
+PASS named after-action ledger: casualty ships, returned hulls, stores, 13-ship pagination
+
+> Task :core:campaignLedgerSmoke
+PASS atomic campaign ledger: purchase/research consistency, recovery, stale writes and corruption protection
+
+> Task :core:campaignTechnologySmoke
+PASS campaign technology: faction ownership, prerequisites, debit, victories, authorization, atomic ledger
+
+> Task :core:shipTechnologyFitSmoke
+PASS independent ship technology snapshots, per-socket/parallel/matching/doctrine unlock enforcement
+
+> Task :core:skirmishTechSmoke
+PASS skirmish challenge: independent caps, hulls, branch/ID bans, fitting and portable exchange
+
+> Task :core:vesselIdentifiersSmoke
+PASS 500 missions x 200 ships x 5 campaign namespaces = 500000 permanent unique 16-digit IDs, independent names and battle slots
+
+> Task :core:mixedTierFleetSmoke
+PASS mixed-tier fleets: inclusive challenge rank, individual designs, battle, portable export
+
+> Task :core:updaterPolicySmoke
+PASS stable + prerelease + nightly + same-name incremented versionCode; manifest optional
+
+> Task :core:desktopUpdaterPolicySmoke
+PASS: desktop prerelease updater detects newest published GitHub release; Windows MSI and Linux ZIP
+
+> Task :core:jar
+> Task :server:compileJava UP-TO-DATE
+> Task :server:processResources NO-SOURCE
+> Task :server:classes UP-TO-DATE
+> Task :server:compileTestJava UP-TO-DATE
+> Task :server:processTestResources NO-SOURCE
+> Task :server:testClasses UP-TO-DATE
+
+> Task :server:terminalProtocolSmoke
+PASS LAN terminal STALEMATE first player and late spectator, tick 3
+PASS LAN terminal TIME_LIMIT first player and late spectator, tick 3
+PASS LAN terminal LEFT_VICTORY first player and late spectator, tick 3
+PASS LAN terminal NO_FIELD_CONTROL first player and late spectator, tick 3
+
+> Task :server:networkSmoke
+PASS BattleServerTest ships=2 tick=43 max_tick_us=9279 queued_bytes=5677
+PASS BattleServerTest ships=32 tick=43 max_tick_us=2716 queued_bytes=92129
+PASS BattleServerTest ships=400 tick=39 max_tick_us=23982 queued_bytes=1017276
+
+> Task :server:pvpFleetSmoke
+PASS PVP two-client host-published Tech III/VI rules, mixed fleets, Tier IV rejection and real TCP snapshots
+
+> Task :server:fleetLobbySmoke
+PASS two-client fleet lobby Tech3/6, mixed tiers, bad/oversize/spoof rejection and real battle snapshots
+
+> Task :server:test
+> Task :server:check
+> Task :game:compileJava UP-TO-DATE
+> Task :game:processResources NO-SOURCE
+> Task :game:classes UP-TO-DATE
+> Task :game:compileTestJava UP-TO-DATE
+> Task :game:processTestResources NO-SOURCE
+> Task :game:testClasses UP-TO-DATE
+
+> Task :game:battlePlaylistSmoke
+PASS battle playlist shuffle-bag, exhaustion, and boundary repeat checks
+
+> Task :game:audioSmoke
+PASS shared-platform audio cue classification
+
+> Task :game:spatialAudioSmoke
+PASS spatial zoom culling, stereo, fleet audio and 9 synthesized WAV types
+
+> Task :game:announcerSmoke
+PASS: 30 unique ordered announcer voice cue paths
+
+> Task :game:combatAftermathSmoke
+PASS final hull aftermath, pause fidelity and round reset
+
+> Task :game:combatHitFeedbackSmoke
+PASS shield/armor/hull hit layers, location, no phantom hits, 400-ship cap
+
+> Task :game:combatPerformanceSmoke
+PASS discrete combat speeds, adaptive governor and ZIP telemetry readback
+
+> Task :game:combatShipStatusSmoke
+PASS selected-hull stats, live deception and engineering status
+
+> Task :game:combatVisibilitySmoke
+PASS combat view bounds: edge-safe hulls, long beams, zoom and pan
+
+> Task :game:radioVoiceProximitySmoke
+PASS: ship radio camera-proximity fades in/out smoothly
+
+> Task :game:fighterVoiceSmoke
+PASS: 260 unique original recorded cues across 10 fixed hull voices
+
+> Task :game:guidedShipyardSmoke
+PASS UI fighter seeker selection and saved design
+PASS touch-sized guided shipyard tabs, selection arrows, researched skip, salvo/motor/seeker/warhead edits, saved blueprint and compatibility
+
+> Task :game:instancedBucketsSmoke
+PASS single-pass hull grouping, exact order, sprite exclusion, and reset
+
+> Task :game:combatPropulsionFxSmoke
+PASS cold-launch, coasting gaps, terminal restart and bounded FX timelines
+
+> Task :game:lightingSmoke
+PASS combat lighting: event correlation, missile smoke, expiration, pause and budgets
+
+> Task :game:renderPerformanceSmoke
+PASS: full frame vs simulation/lighting split, per-frame batching, binds and reset
+
+> Task :game:renderPosesSmoke
+PASS low-speed muzzle, network tween, real projectile replay, event history cursor and camera easing
+
+> Task :game:rocketHudSmoke
+PASS real rocket HUD 46px touch buttons, 4/8/16 selection, two motors, mounted sockets and friendly-only control
+
+> Task :game:screensaverCameraSmoke
+PASS: multi-faction autonomous tracking, smooth shots and death retargeting
+
+> Task :game:screensaverWakeSmoke
+PASS: double tap wake; single tap, drag, pinch, hold and distance safety
+
+> Task :game:shipDeathSmoke
+PASS: unique, seeded, closed fracture wedges, 400-loss cap, no physics mutation
+
+> Task :game:shipInspectionSmoke
+PASS ship tap, translucent inspection layout hitboxes, live range/ammo/reload, zoom and overlays
+
+> Task :game:shipLightProbesSmoke
+PASS: bounded local lights, distance LOD, alpha-safe scorch and shader
+
+> Task :game:shipSurfaceSmoke
+PASS: normal/emissive UVs, shader alpha, strategic unlit path
+
+> Task :game:voiceMenuSmoke
+PASS voice step buttons and UI tones
+
+> Task :game:wikiSmoke
+PROFILE wiki broad full-text search ms=0 matchingIds=73260
+PASS game wiki: 75476 articles including 46 physical hulls, 2035 actual modules, 73260 real research upgrades, searchable Android/desktop navigation
+
+> Task :game:menuFlowSmoke
+PASS functional menu hit regions: six home actions, 11 skirmishes, 11 factions, 500 map nodes
+
+> Task :game:battleTouchSmoke
+PASS battle gestures and 3x weapon effect scale
+[Incubating] Problems report is available at: file:///workspace/scratch/2c6cab9e5294/Catastrophic-Diplomacy/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 35s
+118 actionable tasks: 108 executed, 10 up-to-date

@@ -1,0 +1,9 @@
+{
+  "audited_source": "0159042e47a9271e5e3b077756f5c4d57763a688",
+  "compiler": "Temurin17.0.21+9",
+  "release": 17,
+  "production_and_test_source_files": 392,
+  "dependency_origin": "SHA256-verified public Linux release cd-v0.1.5-dev.693; project JARs excluded from classpath",
+  "exit_code": 0,
+  "elapsed_seconds": 5.64
+}
