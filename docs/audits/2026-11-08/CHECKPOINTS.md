@@ -22,3 +22,18 @@ Every finding will distinguish **reproduced defect**, **source-confirmed defect*
 ### Next checkpoint
 
 Record actual compile/test results, first verified flow breakages, and source references. Final deliverables will be `docs/PROJECT_AUDIT_2026-11-08.md` and `docs/DEVELOPMENT_REPAIR_PLAN.md`, with bounded evidence under this audit directory. No result will be called fixed merely because it appears in a plan.
+
+## CP1 — compilation and first verified findings (08:26 AKST)
+
+- **Fresh compile PASS:** Gradle 8.11.1 with Temurin 17.0.21+9 compiled `:core:compileTestJava :game:compileTestJava :server:compileTestJava :desktop:compileJava`. Initial plugin-resolution failure was resolved by honoring the executor's configured HTTP proxy and system CA truststore; it was not a source defect. Independent `javac --release 17` also compiled all 392 relevant production/test files, with project release JARs excluded from the compile classpath. Android packaging not claimed locally.
+- **Tool checks PASS:** all 22 existing Python unit tests; Android API compatibility scan; story atlas integrity (500 missions, 250 optional schematic lanes, 231 unrecorded unique voice cues).
+- **Release bytes verified:** published Linux ZIP `dev.693`, 195,158,254 bytes, SHA-256 `321e46748165638c56ee661295dd4f71e5eb8b5133cfa151dd4ac20b18e71ac7`, matches published FULL-SHA256SUMS. Exact release-baked hardpoint resource retained for direct tests.
+- **Reproduced constrained-heap defect:** `WikiMemoryProfile` passes at 16 MiB with 75,476 articles / 73,260 upgrades. `WikiArbitrarySearchProfile` fails at 16 MiB with `OutOfMemoryError` at `TechnologyCatalog.get:297` / `GameWikiCatalog.search:639`. At 32 MiB it passes; `plasma` took ~667 ms, `power x1.00` ~1,360 ms, broad `tech` ~0.088 ms in this host run. Timings are diagnostic; this is not physical Android acceptance.
+- **Source-confirmed campaign mismatch under reproduction:** dock activation caps selected branching mission using `min(selectedMission, campaign.unlocked())`, despite `CampaignProgress.available()` allowing later front missions. Example after mission 1: available mission 31 has cap 5; linear frontier 2 has cap 1. Detailed handler-level check pending.
+- **Source-confirmed PvP integration gap:** server emits missiles/ballistics/craft but remote client consumes only ship rows and maps hulls to CORVETTE. The authoritative host battle may be functional while client presentation/selection lacks actual entity fidelity. Exact repro/repair criteria under review.
+- **Source-confirmed unreachable configuration:** active-scan and fighter optical/radar configuration methods have test callers but no normal game/server selection path. Core mechanics do not establish playable integration.
+- **Historical issues reconciled:** continuous FREE maneuvering, explicit HOLD_RANGE, fighter landing/rearm, atomic campaign ledger and detailed after-action code exist; older documents describing them as absent are stale. Remaining lifecycle failures are still being traced.
+- **Verification boundary:** local Xvfb could not create its Unix display sockets (`EPERM`); no fresh graphical launch or screenshot claimed. Existing hosted-runner evidence must be attributed to its exact source SHA.
+- Normal functional Gradle regression groups are running, including campaign, mixed fleets, standing orders, update policies, real server checks, menu routing and timing. No results will be inferred before the processes complete.
+
+Next: reconcile functional failures with source and preserve focused reproductions; finish coverage matrix, risk classification and dependency-ordered repair batches.
