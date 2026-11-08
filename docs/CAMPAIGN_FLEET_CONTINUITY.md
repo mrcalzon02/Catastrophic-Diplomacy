@@ -1,5 +1,11 @@
 # Campaign fleet continuity — implementation and qualification
 
+## Current status override — 8 November 2026
+
+The [project audit](PROJECT_AUDIT_2026-11-08.md) and [repair plan](DEVELOPMENT_REPAIR_PLAN.md) supersede the historical remaining-work list below. The combined atomic progress/fleet/technology ledger, named after-action report, and advisory service warnings are implemented. Current source-matched hosted release jobs pass. Remaining priorities are failed-settlement recovery, explicit damaged-save recovery, actual Results actions, branching mission context, late-license card consistency and rendered report readability. Physical-device and real saved-state upgrade acceptance are still separate evidence requirements.
+
+Earlier observations and design receipts below are retained as history; do not use their obsolete “not yet implemented” claims as the present backlog.
+
 This document tracks the active ship-ownership implementation in the authoritative
 `main` source tree. Treat feature existence and CI/release qualification as different
 claims. The stable source of truth is the committed code and GitHub Actions evidence.
@@ -61,7 +67,7 @@ claims. The stable source of truth is the committed code and GitHub Actions evid
   battle mechanics. Platform builds and signed Android artifacts are gated by
   GitHub Actions; do not claim release qualification before the whole gate passes.
 
-## Remaining milestones — not yet represented as complete
+## Historical remaining milestones — superseded by the status override
 
 1. **Atomic wallet/fleet durability:** wallet and fleet still live in separate
    files, so power loss between the two writes can desynchronize a purchase or

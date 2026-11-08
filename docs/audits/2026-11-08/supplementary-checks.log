@@ -1,0 +1,66 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.11.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :core:compileJava UP-TO-DATE
+> Task :prepareLegacyFactionArt UP-TO-DATE
+> Task :prepareStage1Art UP-TO-DATE
+> Task :bakeApprovedHardpoints UP-TO-DATE
+> Task :core:processResources UP-TO-DATE
+> Task :core:classes UP-TO-DATE
+> Task :core:compileTestJava UP-TO-DATE
+> Task :core:processTestResources NO-SOURCE
+> Task :core:testClasses UP-TO-DATE
+
+> Task :core:battlePhaseObserverSmoke
+PASS diagnostic-only ordered combat phases and 40-tick deterministic parity
+PASS diagnostic 200v200 phased combat PREPARATIONMsPerTick=0.03303871428571428 SENSOR_NETWORKMsPerTick=0.0726734 CAPTAINSMsPerTick=10.850709685714286 SUPPORTMsPerTick=0.10174675714285714 PROJECTILESMsPerTick=1.8430292857142858 CRAFT_AND_CLEANUPMsPerTick=0.6568101857142857 ticks=90 fingerprint=946639bebf6b681a (JVM timing diagnostic only)
+
+> Task :core:opponentIndexParitySmoke
+PASS opponent-index 200v200 parity ticks=90 fingerprint=946639bebf6b681a indexedMs=895.581864 fullFleetScanMs=916.05097 (same-run JVM timing diagnostic only)
+
+> Task :core:photonArrivalPruningSmoke
+PASS photon shell exact oracle checks=104204 arrivals=9924 optimizedMs=4.749458 exactMs=10.123161 (JVM timings diagnostic, not a release gate)
+
+> Task :core:photonCacheParitySmoke
+PASS cache parity 4v4 ticks=45 fingerprint=a88a76d5b43e9710 hits=1152 misses=2104 reuseMs=16.908196 legacyMs=17.431838 (timings diagnostic only)
+PASS cache parity 16v16 ticks=35 fingerprint=e1563d66a6e3ee34 hits=13312 misses=19900 reuseMs=18.950225 legacyMs=23.544076 (timings diagnostic only)
+PASS cache parity 200v200 ticks=60 fingerprint=9ce4b4f4b8f4b9e5 hits=3979223 misses=4794459 reuseMs=682.520238 legacyMs=1047.641281 (timings diagnostic only)
+
+> Task :core:sensorLightTimeSmoke
+PASS passive and active photon light time, bounded history, relay latency
+
+> Task :core:sweptProjectileBroadphaseSmoke
+PASS swept projectile broadphase parity cases=150080 nearPathCases=37500 hits=228 narrowOnlyMs=15.111783 broadphaseMs=6.884989 (timings diagnostic only)
+
+> Task :core:massMixedOnlySmoke
+PASS 200v200 combined arms: ticks=480 hits=3797 destroyed=104 peak-missiles=410 peak-craft=274 fighter-types=[INTERCEPTOR, ASSAULT_GUNSHIP, LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER] fighter-payloads=719/74/199/112/72 visible-beam-types=[LASER, PLASMA, PARTICLE] tracked-kinetics=true fingerprint=9192d36f3d2785df
+PASS 200v200 combined arms: ticks=480 hits=3797 destroyed=104 peak-missiles=410 peak-craft=274 fighter-types=[INTERCEPTOR, ASSAULT_GUNSHIP, LASER_FIGHTER, PARTICLE_FIGHTER, MISSILE_FIGHTER, TORPEDO_BOMBER] fighter-payloads=719/74/199/112/72 visible-beam-types=[LASER, PLASMA, PARTICLE] tracked-kinetics=true fingerprint=9192d36f3d2785df
+PASS focused real 200v200 all-weapon mixed replay
+
+> Task :core:fighterCraftSmoke
+PASS campaign flight wing codec: legacy stock, organic/FTR mixed bays, save/reload, refit guard, ownership and checksum
+PASS fighter type INTERCEPTOR -> CANNON
+PASS fighter type ASSAULT_GUNSHIP -> CANNON
+PASS fighter type LASER_FIGHTER -> LASER
+PASS fighter type PARTICLE_FIGHTER -> PARTICLE
+PASS fighter type MISSILE_FIGHTER -> MISSILE
+PASS fighter type TORPEDO_BOMBER -> TORPEDO
+PASS six armed fighter loadouts, air-to-air targeting, PD signatures, ammo, saves and replay
+
+> Task :core:approvedHardpointsSmoke
+PASS approved hardpoints: 506 graphics/headless-identical hulls, 9515 original socket anchors, fingerprint 3060a0147a828cf5
+
+> Task :core:jar UP-TO-DATE
+> Task :game:compileJava UP-TO-DATE
+> Task :game:processResources NO-SOURCE
+> Task :game:classes UP-TO-DATE
+> Task :game:compileTestJava UP-TO-DATE
+> Task :game:processTestResources NO-SOURCE
+> Task :game:testClasses UP-TO-DATE
+
+> Task :game:combatTimelineDiagnostic
+PASS six variable-frame timeline tests with 250ms stalls
+PASS 18 fixed-step presentation environments (six speeds x three FPS); pause/resume and shared camera checks in BattleRenderPosesTest
+Evidence: /workspace/scratch/2c6cab9e5294/Catastrophic-Diplomacy/test-output/combat-timeline
+
+BUILD SUCCESSFUL in 29s
+19 actionable tasks: 10 executed, 9 up-to-date

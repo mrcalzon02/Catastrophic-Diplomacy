@@ -1,0 +1,10 @@
+{
+  "tasks": [
+    ":core:massMixedOnlySmoke",
+    ":core:fighterCraftSmoke",
+    ":core:approvedHardpointsSmoke",
+    ":game:combatTimelineDiagnostic"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 29.682
+}

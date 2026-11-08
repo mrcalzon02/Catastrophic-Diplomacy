@@ -1,0 +1,28 @@
+{
+  "purpose": "Verify documented reproduction commands against Gradle-built classes and resources; exit 0 here reproduces the recorded defects, not repaired product behavior.",
+  "audited_source": "0159042e47a9271e5e3b077756f5c4d57763a688",
+  "probe_compile_exit": 0,
+  "results": [
+    {
+      "class": "diplomacy.client.CampaignFlowAuditProbe",
+      "exit_code": 0,
+      "elapsed_seconds": 0.997,
+      "stdout": "REPRODUCED CF-01: mission31 available=true, unlocked=2, actualCap=5; dock keeps active=1; notice=Mission fleet cap reached\nREPRODUCED CF-03: actual pointer Retry handler leaves campaign screen=RESULTS, no new battle.\nREPRODUCED CF-06: authorizing license7 changes selected card to license6; selectedCost=15000000; actualQuote=28000000\nREPRODUCED CF-04: invalid primary+backup blocks both restore and actual New Campaign handler; screen=CAMPAIGN_SETUP; notice=CAMPAIGN SAVE FAILED: credits and fleet unchanged; free space and retry.\nREPRODUCED CF-02: real finishEngagement write fault -> victory Results reward0; remove fault -> Return opens dock; ledger remains generation1, earned mission not committed.\n",
+      "stderr": ""
+    },
+    {
+      "class": "diplomacy.sim.CombatAuditProbe",
+      "exit_code": 0,
+      "elapsed_seconds": 1.228,
+      "stdout": "NAV tick=13 sameDelayedFix=true fixA=(600.000,100.000,t9) fixB=(600.000,100.000,t9) enemyTruthA=(600.000,100.000) enemyTruthB=(600.000,250.000)\nNAV observer velocity A=(0.000802876,-0.000321150) B=(0.000829312,-0.000244926) delta=0.000080678 headings=(-0.380506377,-0.287173044)\nCONFIRMED navigation reacted to changed present truth while the measured enemy fix stayed identical\nPPD withdrawing=false realIncomingLaunches=5 paidBeamTicks=70 alive=true escaped=false\nPPD withdrawing=true realIncomingLaunches=5 paidBeamTicks=0 alive=true escaped=false\nFCM tick=600 donor=1 assignedDonor=1 capacity=0.600000 separation=80.117194 localAllocations=19 localExhausted=19 sharedAllocations=0 sharedExhausted=0\nCONFIRMED noncolocated FCM donor is never debited despite assigned ally with real exhausted firing compute\nCONFIRMED withdrawing PPD suppresses all beam ticks despite an otherwise armed, powered, targetable defensive fixture\n",
+      "stderr": ""
+    },
+    {
+      "class": "diplomacy.client.NetworkMirrorAuditProbe",
+      "exit_code": 0,
+      "elapsed_seconds": 0.138,
+      "stdout": "SAME_TICK_NEW_CONNECTION: x=5.0 team=0 (new connection fixture x=999 team=1 discarded)\nLATER_TICK_NEW_CONNECTION: initial_x=5.0 (new connection fixture x=999 blends from previous server)\nMIRROR_DEFAULT: hullClass=CORVETTE missiles=0 ballistics=0 crafts=0\nMALFORMED_SNAPSHOT: accepted_by_connection=true throws_in_render_parser=true\nUNVALIDATED_STATE: accepted_team=9 accepted_hull=NaN\n",
+      "stderr": ""
+    }
+  ]
+}

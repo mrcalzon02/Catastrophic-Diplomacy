@@ -1,34 +1,52 @@
-# GitHub Actions — single release owner
+# GitHub Actions — current workflow ownership
 
-The repository intentionally has **four** active workflow entry points.
+Reconciled on **8 November 2026** against production source `0159042e47a9271e5e3b077756f5c4d57763a688`. This documentation update changes no workflow, trigger, job or release request. See the [full audit](PROJECT_AUDIT_2026-11-08.md) and [development repair plan](DEVELOPMENT_REPAIR_PLAN.md).
 
-| Workflow | Trigger | Purpose | Can block publication? |
-| --- | --- | --- | --- |
-| `continuous-functional-release.yml` | Every push to `main` or manual dispatch | Create exactly one source-matched Android APK, Windows MSI and Linux ZIP; test installed desktop apps, Android emulator gameplay and signed build; publish prerelease after exact SHA/checksum verification | **Yes — functional/build/installation/runtime checks only** |
-| `fighter-wings.yml` | Relevant pull requests only | Cross-platform desktop compilation, gameplay, network, updater and 200v200 acceptance; debug Android compile; nonblocking art diagnostics | **No — does not publish** |
-| `fleet-logistics-diagnostics.yml` | Narrow logistics source changes on `main`, or manual | Support/projector/drone simulation evidence | **No** |
-| `hull-coverage-diagnostics.yml` | Narrow hull test/source changes on `main`, or manual | Hull damage and combat diagnostic evidence | **No** |
+## Actual activation
 
-## Release policy
+There are **22 workflow definitions**, with **one automatic main-push smoke job** for the explicitly listed source paths and **no scheduled workflow**.
 
-1. **One automatic publisher:** `continuous-functional-release.yml` owns releases for every push to `main`. No other workflow creates or replaces release assets. Release runs are never cancelled merely because another commit arrives.
-2. **Preserve the full functional gate:** gameplay/combat (including 200v200), launch/menu, LAN/PvP authoritative server checks, updater version selection, actual Linux ZIP extraction and launcher execution, actual Windows MSI install/start/uninstall, Android signing verification plus emulator combat/menu, package checksums and published-asset readback.
-3. **Non-functional observations are not release blockers:** sprite/texture inventories, artwork, appearance, design and balance checks are informational. A missing resource that objectively prevents a game from building or running remains a functional failure.
-4. **No duplicate platform publishing:** PR checks never package or publish signed releases. Legacy fixed-tag RC1 workflows were retired; the original commits and historical Action runs remain accessible in Git.
-5. **Compatibility:** Android retains the established signing identity. Fire tablet manifest/ABI preflight is optional and is not certification on physical Fire hardware.
-6. **Versioning:** each release run has its own `cd-v0.1.5-dev.<run-number>` tag. Its Android versionCode and desktop update identity match that run. Pre-release status does not prevent discovery by the updater.
+| Workflow/category | Trigger | Purpose and job scope |
+| --- | --- | --- |
+| `release-blocker-smoke.yml` | Selected main source paths, or manual dispatch | One `objective-regressions` job; no APK/MSI packaging |
+| `continuous-functional-release.yml` | Deliberate change to `.github/release-request.json` on main, or manual dispatch | Verified Linux, Windows and Android packages, runtime checks and publication |
+| `fighter-wings.yml` | Relevant pull requests | Three jobs: desktop/server, Android compilation, advisory art diagnostics; no signed release |
+| Eighteen specialist diagnostics | Manual dispatch only | Targeted mechanics, art, balance, audio and performance evidence |
+| `publish-verified-artifacts.yml` | Manual dispatch only | Recover publication from an eligible already-tested source run |
 
-## Retired workflow entry points
+Routine documentation changes and ordinary main commits outside the smoke path filter do not schedule a full release. The release workflow has six job definitions; its eleven faction-runtime matrix entries make the current explicit release **16 actual jobs**: 15 build/runtime jobs plus publication. The campaign matrix allows three concurrent emulators.
 
-Obsolete feature-branch or fixed-release workflows removed from current `main`:
-`alien-faction-art.yml`, `authoritative-weapons.yml`,
-`combined-200v200-apk.yml`, `crew-life-support.yml`,
-`full-platform-release.yml`, `hull-foundation-parity.yml`,
-`ordnance-doctrines.yml`, `research-ammunition.yml`,
-`signed-android-rc.yml`, `updater-integration-qualification.yml`,
-`windows-msi-release.yml`.
+Release concurrency cancels an older same-ref explicit release run when a later release request starts. Ordinary development commits do not match the release request-file filter. The tested source remains pinned; publication checks that it is still an ancestor of main, so a subsequent documentation commit does not by itself invalidate the candidate.
 
-Their underlying tests and implementation are **not removed**. In particular,
-the command `gradle --no-daemon :core:weaponBehaviorSmoke :core:ordnanceDoctrineSmoke :core:ammunitionResearchSmoke :core:ammunitionSelectionSmoke :core:crewAccommodationSmoke :core:hullFoundationSmoke :core:alienFactionSmoke :core:massBattleSmoke` remains available for detailed manual regression passes. Use the two retained diagnostic workflows for their specialized evidence. The previous RC1 releases and exact source history are preserved.
+## Manual diagnostic inventory
 
-A passing release confirms the tested functions on hosted runners; it does not establish performance on a user's device, production WAN reliability or full visual quality.
+- Armor: `armor-damage-visual-diagnostic`, `armor-live-combat-diagnostic`, `armor-mask-48-ab`.
+- Audio/timeline: `audio-pitch-diagnostics`, `combat-timeline-diagnostic`.
+- Logistics/coverage: `fleet-logistics-diagnostics`, `fleet-tender-logistics`, `hull-coverage-diagnostics`.
+- PD/ordnance: `particle-pd-diagnostic`, `pd-flak-wave-diagnostic`, `rail-pd-diagnostic`, `rocket-pd-balance-diagnostic`, `rotary-ciws-diagnostic`.
+- Performance/endurance: `position-fidelity-diagnostic`, `randomized-combat-endurance`, `technology-efficiency-diagnostics`, `technology-memory-diagnostic`.
+- Assets: `weapon-art-diagnostics`.
+
+Names above omit the common `.yml` suffix. These jobs remain available; routine pushes do not launch them.
+
+## Release contract
+
+1. Build, launch/run and required multiplayer/updater functionality are release-blocking. Art, visual style, balance and numerical performance are diagnostics. A missing required resource that prevents launch remains a real functional failure.
+2. Use the retained Android signing identity and package ID. Never rotate secrets as part of ordinary development or audit work.
+3. Each release receives its own tag. Do not retag or overwrite a different source's published package. Published prereleases count as updates; drafts do not.
+4. Check actual platform packages, source identity, hashes and published asset readback. Successful packaging is not physical-device certification.
+5. Keep routine verification within the single intended main smoke job and existing platform release route. Do not add unrelated workflows or dispatch diagnostic jobs merely to generate activity.
+
+## Audit findings requiring follow-up
+
+- **F18: coverage holes.** The one smoke path filter misses server/network/hbnet, Android/desktop and much campaign/persistence source. Expand relevant coverage within the existing job.
+- **F19: transitive convention checks.** Mandatory Gradle tasks still pull some source-spelling or visual convention assertions. Preserve actual runtime/resource safety tests while making artistic/implementation-convention checks advisory.
+- **F24: recovery mismatch.** Main release permits `workflow_dispatch`, but recovery currently requires the source event to be `push`. Align supported entrypoints without weakening source/artifact/job verification.
+
+These are planned repairs, not changes performed by this audit. The full register and acceptance criteria are in the development plan.
+
+## Source-matched release evidence
+
+[Release `cd-v0.1.5-dev.693`](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/tag/cd-v0.1.5-dev.693) targets the audited source and includes Android APK, Windows MSI, Linux ZIP, full checksums, package identity, release manifest and signing evidence.
+
+[Release run 42349197474](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/42349197474) has all 16 jobs successful. [Objective smoke 42349197600](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/42349197600) has its one job successful. These are exact-source hosted results; fresh local audit results are separately recorded in the [audit evidence](audits/2026-11-08/README.md). Historical PR #23 and old failed receipts must not replace this current-source evidence.

@@ -1,0 +1,142 @@
+# Multiplayer, updater and release audit
+
+The [master audit](../../PROJECT_AUDIT_2026-11-08.md) assigns F06–F11, F18–F19 and F23–F26 to these findings. The [master repair plan](../../DEVELOPMENT_REPAIR_PLAN.md) governs cross-domain order.
+
+**Audited code:** `0159042e47a9271e5e3b077756f5c4d57763a688` (current production code at checkpoint). The subsequent `43296e95bb675dfef6588f715046673ad0331258` commit is documentation only. Audit date: 2026-11-08. No production files, workflows, packages or remote repository state changed by this audit agent.
+
+## Outcome
+
+The transport and authoritative fleet/order core are real and verified. Current multiplayer presentation is still a partial slice: it loses hull identities and dynamic combat entities, has no ready/start state, keeps hidden controls active in battle view, cannot reliably distinguish a new connection from an old tick stream, and can hand malformed host entity data to an uncaught render parser. These are the main repairs before calling the full PvP flow complete. No confirmed global P0 release blocker was found in this scope.
+
+The latest published Windows/Linux/Android release is `cd-v0.1.5-dev.693`, published 2026-11-07T07:11:21Z, a prerelease targeting the exact audited code. Two other releases remain drafts; they are correctly ineligible for update selection. Current CI is quieter than older documentation says: one narrowly filtered automatic main smoke job, deliberate full-release builds, one path-filtered PR workflow and manual diagnostics. Runtime coverage holes remain in the ordinary smoke trigger.
+
+## Evidence levels and boundaries
+
+- **Confirmed source defect:** direct trace across production caller/callee, with consequence and acceptance criteria below.
+- **Executed focused reproduction:** scratch Java17 probe against exact compiled production classes, no application source mutation.
+- **Fresh root verification:** root reports real `:server:check` success, including pinned TLS at 2/32/400 ships, LAN fleet authorization and terminal protocol; root owns the complete run log.
+- **Exact-SHA historical evidence:** same-source GitHub release job logs and artifacts, November 7. This is stronger than an unrelated old PR result and separate from this session's executions.
+- **Unverified or incomplete goal:** two-machine/WAN/mobile interaction, physical devices, full installer continuation and saved-state upgrade migration have not been certified by this review. Source or emulator results do not substitute for those claims.
+
+The local GUI/Xvfb attempt was blocked by environment AF_UNIX socket EPERM according to root. No new visual screenshots were claimed. The scratch probe is `/workspace/scratch/2c6cab9e5294/audit-work/NetworkMirrorAuditProbe.java`, output `/workspace/scratch/2c6cab9e5294/audit-work/logs/network-mirror-audit-probe.json`.
+
+## Confirmed multiplayer repair register
+
+| ID | Priority / classification | Evidence and player consequence | Repair acceptance |
+|---|---|---|---|
+| N1 | P1, incomplete authoritative presentation | Server snapshots contain SHIP/MISSILE/BALLISTIC/CRAFT rows, but `drawRemoteBattle` keeps only SHIP. SHIP does not contain hull class or fitting identity. `RemoteFleetMirrors.present` assigns every mirror CORVETTE and never fills the other entity collections. A legal mixed carrier/dreadnought fleet appears as corvettes; its craft and ordnance disappear from the network view. | Version the authoritative presentation schema; preserve host hull/variant/fitting identity, dynamic entity IDs and removals. Two clients observing a mixed fleet must show the same hull classes, launched/recovered craft, missiles and kinetics. Never simulate damage locally. |
+| N2 | P1, intended lobby state missing | `receiveFleet` constructs Battle and broadcasts BATTLE_START as soon as the second accepted fleet arrives. The UI explicitly says “no ready-up yet”. Submitting a fleet is the only start consent; there is no ready/unready or host-start authority. | Accepted loadout, readiness and match start are distinct states. Editing/replacing fleet or disconnect invalidates readiness. Explicit host start requires both ready seats. No battle ticks before the start transition. |
+| N3 | P2, secure-lobby entrypoint/verification gap | **Correction to checkpoint 1:** `BattleServer.openLobby(...,Hbnet.Server)` exists and uses TLS. However the shipped secure `BattleServer.main` exposes only fixed-count starter corvettes; the LAN CLI exposes the actual `lobby [tier]` command. `FleetLobbyTest` uses LAN only. | Expose the existing secure lobby in the supported launcher/config path and test custom-fleet submission over real pinned TLS. Do not add a TLS downgrade or rewrite the working lobby factory. |
+| N4 | P1 if sensor-limited player PvP is intended; confirmed requirement gap | `snapshot()` has no viewer parameter and sends exact position/resources for every ship to every peer. `drawRemoteBattle` renders all mirrored ships. Current network clients are omniscient even when local sensors/fog would conceal information. This is not a seat-authentication bypass; it is data disclosure inherent in the current gameplay protocol. | Define player versus spectator visibility. For player seats, authorize sensor/contact information before serialization, including uncertainty and last-observed timing. Test hidden hostiles are absent from player payloads, not merely hidden in the renderer. Spectator policy can remain separately omniscient. |
+| N5 | P1, terminal/disconnect feedback missing in active battle view | `MultiplayerPanel.draw()` returns into `drawBattle` before its connection-ended/result status path. The remote battle renderer displays only tick and a Tab hint. At termination or disconnect a player sees a frozen battlefield without the outcome/reason. | Render terminal status, disconnected/reconnecting state and a visible return/exit control above the remote battle. Preserve final snapshot and distinguish winner/stalemate/time limit from network loss. Exercise touch-only navigation. |
+| N6 | P1, invisible controls remain active | Panel construction installs its Stage as global input processor. Selecting battle view changes a boolean; draw stops drawing Stage but never disables/detaches its actors. Mouse/touch events continue reaching invisible directory buttons, including disconnect and server/contact actions. | Switch input ownership with screen state. A tap anywhere in the battle must not trigger hidden directory actions. Provide explicit HUD controls and a tested return path. |
+| N7 | P1, new-session reset is not reliable | WELCOME includes a server UUID at field 2; BattleConnection discards it. Game reset logic treats only tick regression as a new session. Probe: new connection at the same tick with x999/team1 retained previous x5/team0; later-tick connection blended from previous x5. Existing tests only cover lower-tick restart. | Carry/retain session identity and explicitly reset remote interpolation/mirrors on a new connection/session. Verify lower/equal/higher tick reconnection and cross-server reuse of IDs. Preserve continuity only when deliberately reconnecting to the same authoritative session. |
+| N8 | P1, entity validation occurs too late | BattleConnection verifies frame shape/prefix/checksum but accepts malformed SHIP values. Probe supplied a checksummed INVALID_FACTION row through an in-memory Socket fixture: connection published it; RemoteShipInterpolation threw during rendering. The game render caller has no containment for that parser exception. Probe also accepted team9 and hullNaN; only position/facing are finite-checked. | Fully validate typed entity data on the network reader before replacing the last valid snapshot: enum/team/ID/count/finiteness/range/duplicate checks. Reject incompatible schema with a neutral reason and keep final good view. A malformed trusted host must not crash the game/render thread. |
+
+### Source anchors
+
+- [BattleServer: lobby factory, seat/order validation, snapshots, main](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/server/src/main/java/diplomacy/server/BattleServer.java) — `openLobby` 102–119; seat assignment 173–203; order authorization 215–225; automatic start 268–272; shared snapshot 333–342; fixed-count main 347–352.
+- [BattleConnection](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/main/java/diplomacy/net/BattleConnection.java) — welcome parser 40–48, reader 84–108.
+- [MultiplayerPanel](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/src/main/java/diplomacy/client/MultiplayerPanel.java) — screen callbacks 59–67, Stage binding77, connection callbacks89–100, draw140–157.
+- [RemoteFleetMirrors](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/src/main/java/diplomacy/client/RemoteFleetMirrors.java) — generic creation44–48, forced hull class76.
+- [RemoteShipInterpolation](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/src/main/java/diplomacy/client/RemoteShipInterpolation.java) — tick dedup35–37, parsed record validation42–64.
+- [CatastrophicGame remote renderer](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/src/main/java/diplomacy/client/CatastrophicGame.java) —3876–3908.
+- [Existing network interpolation test](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/src/test/java/diplomacy/client/BattleRenderPosesTest.java) —150–201; verifies lower-tick restart, not a new equal/higher-tick session.
+- [LAN lobby test](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/server/src/test/java/diplomacy/server/FleetLobbyTest.java).
+
+## Network properties that already work
+
+Preserve these while repairing the visible flow:
+
+- Explicit pinned TLS1.3 transport, password and signed application identity. No automatic insecure fallback. OPEN_LAN is explicitly trusted and restricted to loopback/private/link-local addresses.
+- Server-owned seats and fleets. Spectators cannot issue player orders. Orders check seat team, monotonic sequence, tick window and enum values. TLS reconnect recovers signer-owned team and sequence watermark.
+- Host-authoritative fleet rule validation after a bounded, ordered, SHA256-checked multipart upload. Client preview is advisory. Bad/oversize/spoofed/over-tier fleets are rejected. Lobby disconnect removes that seat's accepted fleet; LAN replacement must submit anew.
+- Bounded admission/output queues, per-peer frame rate limit, idle timeouts and periodic heartbeat. Slow output closes the socket rather than growing queues without bound. Simulation catch-up is capped.
+- Client installs only complete checksum-matching snapshot batches and retains the last accepted batch when the link closes. This is a useful base, but N8 shows it needs semantic validation as well.
+- Final snapshot precedes distinct terminal RESULT; a late spectator receives the same terminal outcome. No campaign rewards are awarded by remote snapshots.
+
+Root's fresh `:server:check` passed `BattleServerTest` (TLS, orders, 2/32/400 ships, identity reconnect/sequence), `BattleTerminalProtocolTest`, `PvpFleetTest`, `FleetLobbyTest`. The same-SHA Linux release log independently records those passes. **Do not repeat the old documentation's TLS failure as a current failure.** Full `HbnetTest` adversarial transport suite, two-machine gameplay, TLS custom-fleet lobby, mobile IME/certificate UX, sustained loss/reconnect and actual WAN remain distinct future acceptance items unless root obtains additional execution evidence.
+
+Sources: [Hbnet](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/main/java/hbnet/Hbnet.java), [server build task chain](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/server/build.gradle), [secure server test](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/server/src/test/java/diplomacy/server/BattleServerTest.java).
+
+### Additional incomplete systems and bounded risks
+
+- Replay export currently writes seed/tick/fingerprint/order log, without the complete initial custom fleets/host rules and without a replay restoration path found in the inspected code. This is a diagnostic session record, not proof of replayability. Before promising reproducible custom-fleet replays, serialize initial state/version/content identity and replay to the exact final fingerprint.
+- TLS signer seats remain reserved for the life of the server. This supports reconnect, but absent a host release/expiry policy abandoned players cannot be replaced by a new identity. There is also a lifetime64-identity cap. Define deliberate seat release versus temporary disconnect; do not blindly free a secure seat on every disconnect.
+- Server snapshots hard-fail over8192 entities and shut down the authoritative battle. The core has several independent projectile/craft populations. No legal-fleet reproduction exceeding the cap was performed; classify as a stress/capacity risk, not a demonstrated crash.
+- Directory/friends are local CRUD/card states. “Block” is not a tested remote request/permission system; presence refresh, invitation transport/one-use/revocation, ACL UI and backup/key migration are still incomplete. The local-first doc already records most boundaries; update it to reflect working fleet lobbies and fresh TLS proof.
+- PvP UI currently exposes only three PD choices and sets positionFREE. The full local standing/tactical/fleet orders model is not presented in network UI. Establish parity requirements before expanding protocol.
+
+Source: [Local-first multiplayer scope](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/docs/network/LOCAL_FIRST_MULTIPLAYER.md), [LocalProfile](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/main/java/hbnet/LocalProfile.java), [OpenLanBattleServer](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/server/src/main/java/diplomacy/server/OpenLanBattleServer.java).
+
+## Updater audit
+
+### Verified source behavior
+
+Both platform updaters include stable releases and prereleases, exclude drafts and select by publication time. They do not use GitHub `/releases/latest`, which would omit prereleases. Current API inventory contains151 published releases and2 drafts. The newest eligible result is693 even though draft692 appears first in the returned creation-ordered feed.
+
+**Android:** homepage UPDATES invokes the production updater. Startup checks quietly; manual requests display progress and directly download a newer candidate. A manual request arriving during an existing check is retained. It validates GitHub repository/tag/filename/HTTPS redirect hosts, bounded size and optional GitHub SHA256. The optional manifest is checked; the downloaded archive is then checked for package identity, increasing versionCode, expected version and the same installed signer before FileProvider/Android installer handoff. Unknown-source permission has a return-and-press-UPDATE path through retained pendingApk. Google/Amazon managed installs bypass sideload updates. Closed activity hides UI and stops executor.
+
+**Desktop:** packaged release tag is embedded and read by DesktopLauncher. Manual checks show progress, select current platform MSI/ZIP, download to a release-specific Downloads destination, enforce size and optional SHA256, and validate Windows compound-file magic. User receives Open-installer/Open-folder handoff with manual-path fallback. Linux extraction remains user-operated. Startup check logs availability without a modal.
+
+No current, demonstrated update-selection or signing-continuity blocker was found. Current published assets all include GitHub SHA256 values. Desktop signature authentication beyond trusted HTTPS/repository/digest was not present; do not claim Windows Authenticode verification. Digest authenticates content relative to its trusted metadata source, not an independent publisher.
+
+Sources: [Android updater](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/android/src/main/java/diplomacy/android/SideloadUpdater.java), [Android launcher](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/android/src/main/java/diplomacy/android/AndroidLauncher.java), [shared update policy](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/main/java/diplomacy/update/UpdatePolicy.java), [desktop updater](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/desktop/src/main/java/diplomacy/desktop/DesktopReleaseUpdater.java), [desktop policy](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/main/java/diplomacy/update/DesktopUpdatePolicy.java), [packager](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/tools/package_desktop.py).
+
+### Updater repair/verification order
+
+| ID | Classification | Required development/acceptance |
+|---|---|---|
+| U1 | P1 verification gap, actual production flow | Android's `showAvailableUpdate` is used only by debug `showVerificationDialog`; manual production check now calls `downloadUpdate` directly. Yet `android_verify_update_dialog.sh` still calls the debug intent, asserts Update/Later/View release and taps Later. It proves the old dialog exists, not the current manual button→check→download→permission→installer flow. Test the actual path with controlled release metadata, offline/no-update/download/error/install outcomes. Keep button tests attached to the production call path. |
+| U2 | P1 save-retention acceptance gap | API29 faction0 installs old released APK and immediately `adb install -r` new APK. It does not create and fingerprint an old-version campaign/profile/fleet before upgrading. Subsequent save/resume tests prove latest-version restart, not cross-version migration. Add a pre-upgrade saved fixture, preferences/network identity/export data fingerprints, upgrade, load and continue battle/research, then compare identity/state. Windows MSI fresh install/launch/uninstall is likewise not an old-version saved-game upgrade test. |
+| U3 | P2 efficiency/rate-budget risk | Android scans10 releases/page, all history, on every startup/manual check. At151 public releases it takes16 metadata calls before manifest/download work. No ETag/cache/backoff was found. Repeated starts/checks increase latency and exposure to API throttling. Optimize bounded streaming/caching while preserving newest *published* semantics; do not assume creation-order page1 is sufficient or exclude prereleases. |
+| U4 | P2 conditional recovery defect | Desktop lookup first fetches installed-tag metadata and aborts if it was removed/unpublished or lacks a valid published_at. Newer available releases then cannot be discovered. Prefer durable embedded source/publication identity or a safe recovery policy for unavailable old tags; simulate old-tag404 and verify newest eligible update is still offered without downgrade. No current installed-tag404 was observed. |
+
+Sources: [obsolete dialog test path](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/tools/android_verify_update_dialog.sh), [API29 install sequence](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/tools/android_install_campaign_apk.sh), [release workflow](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/.github/workflows/continuous-functional-release.yml), [updater policy tests](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/test/java/diplomacy/update/UpdatePolicyTest.java), [desktop policy tests](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/core/src/test/java/diplomacy/update/DesktopUpdatePolicyTest.java). The policy tests cover pure eligibility/URL/version/size rules; they are not end-to-end GUI/downloader/installer tests.
+
+## CI/release audit
+
+### Actual trigger inventory
+
+There are22 workflow files, not22 automatic pipelines. No schedule trigger was found.
+
+| Workflow group | Actual activation | Jobs / implication |
+|---|---|---|
+| release-blocker-smoke.yml | main push only for explicit narrow file list; manual dispatch | One `objective-regressions` job. |
+| continuous-functional-release.yml | main push only changing `.github/release-request.json`; manual dispatch | Six definitions: linux/windows/android-build/android-runtime/android-campaign-runtime/publish. Eleven faction matrix entries yield16 actual jobs. Latest-only concurrency cancels an older same-ref run. |
+| fighter-wings.yml | path-filtered pull_request | Three jobs: desktop-and-server/android-compile/art-diagnostics. Relevant PRs can still start more than one job. |
+| publish-verified-artifacts.yml | manual dispatch only | One recovery publication job; no build. |
+|18 specialist workflows | manual dispatch only | Armor(3), audio pitch, combat timeline, logistics(2), hull coverage, particle PD, flak waves, positional fidelity, rail PD, random endurance, rocket PD balance, rotary CIWS, tech efficiency, tech memory, weapon art. They are not ordinary main-push queue noise now. |
+
+Source: [workflow directory](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/.github/workflows), [automatic smoke filter](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/.github/workflows/release-blocker-smoke.yml).
+
+### Defects and policy drift
+
+**C1 — P1 validation coverage hole.** The ordinary smoke filter omits `server/**`, `core/.../hbnet/**`, `core/.../diplomacy/net/**`, `android/**`, `desktop/**` and most persistence/campaign implementation. A commit touching only these runtime-critical paths runs no objective smoke unless a release request is also changed. Retain one lightweight job, expand module/runtime coverage and run narrowly relevant safety/flow regressions. Do not restore every art diagnostic on main pushes.
+
+**C2 — P2 hidden mandatory convention checks.** Mandatory menuFlowSmoke pulls in `shipSurfaceSmoke`; `ShipSurfaceShaderTest` asserts exact shader source substrings and strategic flat-pass thresholds. Thus a valid shader refactor can fail the required build despite no observed launch/gameplay failure. It also pulls voice mapping counts and various lighting/death presentation tests. Review assertions individually: preserve actual shader compilation/NaN/visibility/required-resource/runtime safety checks, move implementation spelling/appearance/taste conventions to advisory diagnostics. Do not remove all rendering/audio checks indiscriminately. Current named visual workflows are manual and release art diagnostic steps use continue-on-error; the residual issue is transitive Gradle dependencies.
+
+**C3 — P2 recovery contract bug.** Recovery claims it can publish a completed failed release whose only failed job was publish, but explicitly requires `run.event == push`. The primary release also supports workflow_dispatch. An otherwise eligible manually dispatched release with an authorization-only publishing failure is rejected by recovery. Accept the supported authorized entrypoints while preserving exact-SHA/artifact/job validation; also remove stale run-ID defaults or require deliberate selection.
+
+**C4 — P2 documentation drift.** `docs/CI_WORKFLOWS.md` says four entrypoints, full release every main push, and other formerly automatic diagnostics; present source is different. Some network receipts still call TLS unverified/failing, while fresh common tests and exact-SHA CI prove loopback TLS. Mark receipts historical and maintain an authoritative current status with source SHA, test command, environment and limitations. Comments claiming main must remain exactly current conflict with release code's actual “source remains ancestor of main” rule; document the real policy.
+
+Sources: [game task dependencies](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/build.gradle), [shader convention test](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/game/src/test/java/diplomacy/client/ShipSurfaceShaderTest.java), [recovery predicate](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/.github/workflows/publish-verified-artifacts.yml), [stale CI documentation](https://github.com/mrcalzon02/Catastrophic-Diplomacy/blob/0159042e47a9271e5e3b077756f5c4d57763a688/docs/CI_WORKFLOWS.md).
+
+### Current exact-source evidence
+
+- [Release693](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/tag/cd-v0.1.5-dev.693), prerelease, non-draft, exact source0159042. Assets: AndroidAPK131,381,286 bytes; LinuxZIP195,158,254; WindowsMSI192,340,383; manifest, package identity, signature proof and FULL-SHA256SUMS also present.
+- [Full release run42349197474](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/42349197474), exact head0159042:16 jobs, all success (15 build/runtime+publish). Linux job128333497301 explicitly logged secure BattleServerTest at2/32/400 ships, terminal outcomes and mixed-tier fleet lobby passes.
+- [Objective smoke run42349197600](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/42349197600), exact head0159042: one job successful.
+- Release run contains15 nonexpired artifacts at exact same SHA: three platform artifact sets, Android functional report, eleven API29 faction reports. Android functional artifact13565157528; faction0 artifact13564847414. These metadata were checked; contents were not visually inspected during this audit.
+- Draft692 and draft`cd-v0.1.2-rc.1` remain drafts. Do not delete/retag as part of audit. Old PR23 is unrelated to the current source's acceptance.
+
+## Dependency-aware repair sequence
+
+1. **Stabilize state boundaries:** N8 semantic decoder validation and N7 explicit session identity/reset. Build the typed authoritative schema these fixes require, with backward/version incompatibility handling. Preserve host authority, bounded frames and last-good snapshot.
+2. **Complete match lifecycle:** N2 readiness/host start, N3 secure launcher/config, deliberately documented reconnect/seat-release semantics. Prove legal/illegal and disconnect paths over actual TLS as well as LAN.
+3. **Connect battle presentation and interaction:** N1 full supported entity/hull schema, N6 screen/input isolation, N5 result/disconnect HUD. Make desktop and touch controls follow the same state machine. Add per-player projection N4 before claiming sensor-limited competitive PvP.
+4. **Verify upgrade continuity:** U1 production updater flow, U2 saved data through real upgrade. Then U3 throttling/caching and U4 unavailable-tag recovery. Preserve same package/signer and draft exclusion.
+5. **Make verification match release policy:** C1 single automatic job covers runtime changes; C2 assertions classified by actual blocking consequence; C3 recovery handles every supported release entrypoint. Update C4 docs only from verified source/test evidence.
+6. **Complete advanced local-first features separately:** replay round-trip, invitations/presence/ACL UI/backups, richer network orders, sustained WAN/disconnect/capacity measurements. These must not obscure the earlier broken playable flow.
+
+For each checkpoint record source SHA, changed files, reproduction, decisive regression command, result, outstanding platform evidence and next dependency. A successful socket test closes transport acceptance only; a successful installer run closes package acceptance only; neither closes end-to-end visible gameplay without its corresponding path proof.

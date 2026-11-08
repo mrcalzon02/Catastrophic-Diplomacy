@@ -1,5 +1,11 @@
 # Catastrophic Diplomacy
 
+## Current engineering status — 8 November 2026
+
+[Comprehensive project audit](docs/PROJECT_AUDIT_2026-11-08.md) · [Development repair order](docs/DEVELOPMENT_REPAIR_PLAN.md) · [Reproducible audit evidence](docs/audits/2026-11-08/README.md)
+
+The dated audit reconciles current implementation, fresh Java 17 tests, source-matched release evidence, reproduced player-flow defects and remaining device acceptance. Use that status and the repair plan when selecting the next development task.
+
 ### Gritty military UI — first production asset intake
 
 The native menu now renders eight textless, nine-patch gritty button skins, drawn underneath live labels. The complete 182 edge-filtered source candidates and nine background panels are stored in checksummed `asset_packs/gritty-ui/` archives, **not** injected into the runtime indiscriminately. The source sprites remain subject to visual approval; only the eight hand-selected controls are currently live. See [UI design authority](docs/AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) and `assets/ui/gritty/README.md`. Windows/Linux and Android/Fire OS use the same shared game resources. The Gradle `verifyGrittyUiAssets` task prevents altered images or lost source archives from shipping.
@@ -8,7 +14,7 @@ The native menu now renders eight textless, nine-patch gritty button skins, draw
 **Authoritative interface direction:** [Gritty Military / Industrial Fleet Command Console](docs/AUTHORITATIVE_UI_DESIGN_LANGUAGE.md) (user-approved 2026-10-27). This standard governs menus, buttons, HUDs, squadron/dock controls and native desktop icons. Current code integrates initial procedural steel-and-instrument chrome without replacing audited assets; visual acceptance and complete icon exports remain pending.
 
 
-*An Unreasonable Space Warfare Simulator* — six rival civilizations, engineering-driven fleet combat and entirely unnecessary quantities of ordnance.
+*An Unreasonable Space Warfare Simulator* — eleven rival civilizations, engineering-driven fleet combat and entirely unnecessary quantities of ordnance.
 
 
 ## Combat audio and soundtrack
@@ -21,7 +27,9 @@ with persistent preferences and graceful audio-device failure handling. See
 [combat audio, Drive provenance and verification](docs/AUDIO_SYSTEM.md).
 Hardware playback and release music-rights clearance are still acceptance gates.
 
-## Graphics stage 2 (faction hull silhouettes and source-backed UI)
+## Historical graphics stage 2 receipt
+
+The following records the earlier six-faction asset intake, not the current faction count or release qualification. Use the dated audit for present implementation and evidence.
 
 All six factions now receive class-specific fallback tactical silhouettes derived from the
 existing shipyard hull profiles (66 combinations; no runtime dependence on alien concept
@@ -38,13 +46,13 @@ an Android hardware acceptance claim.
 - **Java 17 shared `:core`** is deterministic, renderer independent and physically advances combat at 30 Hz. It has faction-specific ship stats, self-directed target selection with uncertainty, movement, power/heat/shield budgets, ablative armor, SIF, lasers, homing missiles, point defense, subsystem casualties and destruction.
 - **`:game`** is the same libGDX client on desktop and Android. The tactical arena has pause, speed, reset, faction cycling and touch/keyboard controls, including the shared **Shipyard**; the GPU path uses OpenGL 3 instanced ship geometry with a fallback renderer when GL30 is unavailable.
 - **`:desktop`** is LWJGL3. **`:android`** is the Android launcher. Both share every rules implementation. Desktop/Android graphics and native APK packaging are not yet accepted on physical devices.
-- A headless 16-vs-16 Java 17 smoke test passed locally. The online repository must be inspected at the commit SHA before claiming deployment. Balance and large-fleet GPU performance remain unverified.
+- The 8 November audit passed fresh Java 17 compilation, 106 named Smoke tasks, 22 Python tests and supplementary deterministic 200v200 checks. The matching published `dev.693` build has 16 successful hosted jobs across Android, Linux and Windows. Physical-device usability, sustained GPU performance and balance remain separate acceptance work; see the audit evidence above.
 
-## Exclusive six-rank module doctrines and fleet servicing
+## Exclusive nine-rank module doctrines and fleet servicing
 
-Every installed module chooses **one** mutually exclusive technology tree from **OUTPUT, EFFICIENCY, RESILIENCE, SPECIALIST**, with six incremental ranks per path. Weapon and point-defense branches now change actual damage, firing interval, range, tracking and missile guidance in addition to the existing research cost, mass, power and heat tradeoffs. A second installed copy of the same base module may select a different branch without violating exclusivity.
+Every installed module chooses **one** mutually exclusive technology tree from **OUTPUT, EFFICIENCY, RESILIENCE, SPECIALIST**, with nine incremental ranks per path. Weapon and point-defense branches now change actual damage, firing interval, range, tracking and missile guidance in addition to the existing research cost, mass, power and heat tradeoffs. A second installed copy of the same base module may select a different branch without violating exclusivity.
 
-Functional support mechanics include **powered self hull repair**, **allied hull repair beams**, **allied directional shield charging beams**, and **finite autonomous repair drones** from Specialist drone-controller modules. Non-specialist controllers retain independently tracked interception drones; a mixed-fitting ship can launch both types. The support visual links reuse the existing curated green and blue beam atlases, with honest rendering fallbacks when assets are missing. [Module Support Branches](docs/MODULE_SUPPORT_BRANCHES.md) documents mechanics, balance parameters, ongoing limitations and the `:core:supportSystemsSmoke` acceptance suite. This source change is **not** proof of passing Java/desktop/Android regression tests.
+Functional support mechanics include **powered self hull repair**, **allied hull repair beams**, **allied directional shield charging beams**, and **finite autonomous repair drones** from Specialist drone-controller modules. Non-specialist controllers retain independently tracked interception drones; a mixed-fitting ship can launch both types. The support visual links reuse the existing curated green and blue beam atlases, with honest rendering fallbacks when assets are missing. [Module Support Branches](docs/MODULE_SUPPORT_BRANCHES.md) documents mechanics, balance parameters, ongoing limitations and the `:core:supportSystemsSmoke` acceptance suite. Current test and platform evidence is recorded in the dated audit; source integration alone does not certify physical-device behavior.
 
 ## Projectile and point-defense module attributes
 
@@ -52,9 +60,11 @@ Fitted kinetic, missile and torpedo modules now define **speed, projectile healt
 
 ## Tactical orders and point defense
 
-Ships now support switchable point-defense fire control: **Balanced**, **Intercept Only**, **Anti-Craft** and **Hold Fire**. While in battle press **P** (left fleet) or **O** (right fleet) to cycle PD modes, or open the **Tactical Command** menu and choose **Fleet Orders Editor** (keyboard **F**). The two-column editor controls per-fleet class priorities and engagement ranges, targeting doctrines (nearest/cooperate/vulture/retaliate/protect), movement stances and cautious retreat. These settings persist in `fleet/orders-v1.dat` independently of the existing ship-fitting saves. Per-ship escort and formation orders are supported in the simulation API; individual parent assignment and multi-select deployment UI remain work to do. See [Fleet Orders System](docs/FLEET_ORDERS_SYSTEM.md). Run `gradle :core:battleOrdersSmoke` for the new headless rule tests; desktop/Android visuals still need actual build verification.
+Ships now support switchable point-defense fire control: **Balanced**, **Intercept Only**, **Anti-Craft** and **Hold Fire**. While in battle press **P** (left fleet) or **O** (right fleet) to cycle PD modes, or open the **Tactical Command** menu and choose **Fleet Orders Editor** (keyboard **F**). The two-column editor controls per-fleet class priorities and engagement ranges, targeting doctrines (nearest/cooperate/vulture/retaliate/protect), movement stances and cautious retreat. These settings persist in `fleet/orders-v1.dat` independently of the existing ship-fitting saves. Per-ship escort and formation orders are supported in the simulation API; individual parent assignment and multi-select deployment UI remain work to do. See [Fleet Orders System](docs/FLEET_ORDERS_SYSTEM.md). Run `gradle :core:battleOrdersSmoke` for the new headless rule tests; rendered touch/keyboard and physical-device acceptance remain separate from the current passing hosted builds.
 
-## Modular weapon visuals
+## Historical modular weapon visual intake
+
+This receipt describes the initial asset transfer. Its uncommitted-asset and toolchain statements are historical; current build evidence is in the dated audit.
 
 Weapon animation is split into **three independently controlled stages**: a muzzle/firing clip, an authoritative moving beam/projectile payload, and a true hit/interception impact clip. Timing events and projectile IDs are emitted by the deterministic core; libGDX only renders existing textures. The initial four beam families have 63 original-atlas firing/impact cutouts plus 35 existing beam payload frames preserved in the project's binary transfer package (not yet GitHub PNG commits). No new artwork or procedural-pill replacement was generated. See [Modular Weapon FX](docs/MODULAR_WEAPON_FX.md); run `gradle :core:weaponFxSmoke` once the Java toolchain is available.
 
@@ -89,17 +99,19 @@ This generates and privately stores one Android PKCS12 upload key and password s
 
 ## Roadmap
 
-The first actual slice is the sandbox: accurate ship-fitting constraints, physics and component damage, fleet AI, shared clients, technology CSV ingestion (strict catalog now checked in), fleet editor and replay tests. Campaign strategy and diplomacy follow a playable combat loop. Technology planning and primary lore are staged in the Catastrophic Diplomacy Google Drive workspace.
+The [development repair plan](docs/DEVELOPMENT_REPAIR_PLAN.md) orders the current work: campaign outcome recovery and controller fixes, narrow causal combat repairs, complete multiplayer state/presentation/lifecycle, bounded encyclopedia search, real updater continuity, and advanced scan/flight-wing integration. Campaign ownership, paid research, the fitting system and shared combat already exist. Longer-term diplomacy and additional strategy remain distinct design scope.
 
 Inspirations include the *concept* of preprogrammed space fleet battle sandboxes. All code, lore, graphics and rules here are original and not copied from proprietary games.
 
 ## Technology database (data-backed)
 
-The repository includes **120 base components and 2,880 upgrades** in Java-resource CSVs under `core/src/main/resources/technology/`. `TechnologyCatalog.loadDefault()` loads both sources and rejects noncanonical IDs, duplicate IDs, broken same-track prerequisites, missing base components, invalid faction/track names, nonfinite or nonpositive multipliers and invalid costs. Four tracks — OUTPUT, EFFICIENCY, RESILIENCE and SPECIALIST — each provide six ranks per faction/subsystem pairing. **Only one branch may be chosen per installed module socket**; identical modules in other sockets may choose different branches. [Exclusive Module Research](docs/MODULE_RESEARCH_EXCLUSIVITY.md) describes enforcement and legacy-save handling. The authoritative editable source is the native Google Sheet in the project Drive folder; any updated CSV export must pass `:core:technologySmoke` before it is considered game data. Module-level fitted upgrades and their combat effects are implemented, but a campaign-wide research wallet, purchasing/unlock progression and final balancing are **not yet implemented**. Catalogue presence alone does not prove that every upgrade is balanced or available through a playable research campaign.
+The current generated catalog contains **2,035 base components and 73,260 upgrades**, spanning eleven factions, nine ranks and the four mutually exclusive OUTPUT, EFFICIENCY, RESILIENCE and SPECIALIST tracks. Java-resource CSVs provide the seed data; catalog generation expands the current native faction and hardware families. `TechnologyCatalog.loadDefault()` validates identifiers, prerequisites, faction/track values, multipliers and costs. **Only one branch may be chosen per installed module socket**; identical modules in other sockets may choose different branches.
 
-## Shipyard — first integrated fitting slice
+Campaign-wide credits, paid licenses/labs, individual funded discovery projects and combined progress/fleet/technology persistence are implemented. All 48 survival variants remain supported. The current defects are specific integration failures, including the late-license budget-card mismatch, not an absent research economy. See the [current audit](docs/PROJECT_AUDIT_2026-11-08.md) and [exclusive-module rules](docs/MODULE_RESEARCH_EXCLUSIVITY.md). Catalog inclusion and passing functional tests do not establish final balance or complete device acceptance.
 
-Open **SHIPYARD** (keyboard **Y**/**Tab**, or the upper-right touch button). Choose the left/right fleet, cycle all eleven supported fitting hulls (from Interceptor to Dreadnought, including the saved legacy Cruiser), change the faction inside the shipyard, select a physical hardpoint on the faction-specific top-down hull diagram or in the synchronized scrollable list, install a compatible faction component, then choose exactly **one** mutually exclusive OUTPUT/EFFICIENCY/RESILIENCE/SPECIALIST research branch for each equipped module and advance it from stage 1 to 6. Competing branches are visually marked **LOCKED**. To switch, explicitly lower the current branch to 0 before choosing another; changes affect only the selected socket. The fitting report accumulates the chosen branch's rank 1–N research/industry costs, and the highest selected rank defines its multipliers rather than recursively compounding stages. **APPLY** deploys the design to the battle only if the fitting is legal. **SAVE/LOAD** preserve class-and-faction-specific text blueprints under the application's local `shipyard/` directory; legacy filenames are read only when the selected hull matches, and loaded designs must pass schema and engineering validation. Android and desktop call the identical `Shipyard` rules and same `Battle` simulation.
+## Shipyard — fitting and blueprint persistence
+
+Open **SHIPYARD** (keyboard **Y**/**Tab**, or the upper-right touch button). Choose the left/right fleet, cycle eleven base hull families plus specialist chassis, subject to progression (including the saved legacy Cruiser), change the faction inside the shipyard, select a physical hardpoint on the faction-specific top-down hull diagram or in the synchronized scrollable list, install a compatible faction component, then choose exactly **one** mutually exclusive OUTPUT/EFFICIENCY/RESILIENCE/SPECIALIST research branch for each equipped module and advance it from stage 1 to 9, subject to the current license, discovery and scenario rules. Competing branches are visually marked **LOCKED**. To switch, explicitly lower the current branch to 0 before choosing another; changes affect only the selected socket. The fitting report accumulates the chosen branch's rank 1–N research/industry costs, and the highest selected rank defines its multipliers rather than recursively compounding stages. **APPLY** deploys the design to the battle only if the fitting is legal. **SAVE/LOAD** preserve class-and-faction-specific text blueprints under the application's local `shipyard/` directory; legacy filenames are read only when the selected hull matches, and loaded designs must pass schema and engineering validation. Android and desktop call the identical `Shipyard` rules and same `Battle` simulation.
 
 The fitting checks mount category, faction ownership, hull mass/volume, reactor generation versus installed draw, thermal rejection, basic propulsion and at least one weapon. [Fitting-slot counts, racial placement doctrines and acceptance limits](docs/SHIPYARD_HULL_LAYOUTS.md). The battle actually uses installed shield capacity, armor, SIF, engines, laser and missile damage, point-defense range, output headroom, radiator capacity and active repair bays. A missing missile mount means no missiles fire. Launchers remain shared, with no duplicated platform rules. The simulator's original faction-presets can still be used by existing tests.
 
@@ -114,9 +126,9 @@ java -cp out:core/src/main/resources diplomacy.sim.ShipyardTest
 java -cp out:core/src/main/resources diplomacy.sim.HullLayoutsTest
 ```
 
-**Still gated:** actual libGDX/Android builds, platform-specific loading/saving, touch usability on devices, physical compartment damage, custom weapons with distinct projectile behaviors, and mass-fleet performance profiling. Fighter hangars, drone control, electronic warfare and ordnance magazine mechanics are not yet active beyond their fitting loads, costs and prerequisites; do not treat these as implemented combat effects. Do not infer successful physical device verification from headless Java tests.
+**Current acceptance boundary:** the exact-source hosted desktop/Android builds and runtime jobs pass. Physical-device touch, storage-provider workflows, sustained GPU behavior and the remaining campaign/network integration defects still need their own proof. Fighter hangars, drone control, electronic warfare and finite magazines have active combat effects. Physical fighter recovery and paid rearm also exist; complete per-bay mixed-wing ownership remains integration work. See the audit for the implemented/pending distinction.
 
-## Fleet persistence, mobile input and combat machinery (next development slice)
+## Fleet persistence, mobile input and combat machinery
 
 Fitted left/right fleets are now serialized into a checksummed, versioned, cross-platform `CD-FLEETS-1` save under the app-private libGDX local storage. The client restores on startup, saves when a fleet changes, retains a validated previous save as backup, and refuses corrupt or incompatible fittings. Shipyard touch actions occur on release rather than on finger-down, so a long-list drag is not misinterpreted as a component tap; secondary pointers cannot hijack the active scroll.
 
@@ -131,7 +143,7 @@ cp -r core/src/main/resources/* out/
 for test in BattleSmokeTest TechnologyCatalogTest ShipyardTest PlatformPersistenceTest CombatMachineryTest FleetScaleTest; do java -cp out diplomacy.sim.$test; done
 ```
 
-Gradle `:core:smoke` chains these suites. See [platform acceptance checklist](docs/PLATFORM_ACCEPTANCE.md) for outstanding real desktop and Android builds, signing verification, save/restore device tests, and release gates. No GitHub Actions workflow was introduced.
+Gradle `:core:smoke` chains these suites. The [dated audit](docs/PROJECT_AUDIT_2026-11-08.md) records successful current builds and their exact-source evidence. The [platform checklist](docs/PLATFORM_ACCEPTANCE.md) remains useful for physical-device/save-upgrade paths, with historical failures reconciled against that audit. The [CI guide](docs/CI_WORKFLOWS.md) documents the actual trigger and gate policy.
 
 ## Massed fleet verification (200v200)
 
@@ -169,14 +181,13 @@ Game controls: `[ / ]` or on-screen **− / +** adjust each side's fleet from **
 by fixed steps, `Y` opens the shipyard, `Q / E` change factions, `R` restarts,
 `Space` pauses, `+ / -` adjusts simulation speed. Large engagements use a separate
 world camera that zooms to keep surviving ships inside the battle panel; the HUD stays fixed.
-The hulls are presently simple colored top-down geometry with visible engine trails,
-not finished sprites or 3D ship art. Directed-fire lines are colored by laser, kinetic,
-plasma and particle weapon type; missiles, torpedoes, fighters and defensive drones
-are separate on-screen shapes. See `docs/MASS_BATTLE_ACCEPTANCE.md`.
+**Historical visual receipt:** the early mass-battle slice used simple colored geometry and separate projectile/craft shapes. Current rendering includes authored hull assets, surface lighting, structural materials and damage masks. Their integration does not certify complete art quality or physical-device performance. The early receipt remains in `docs/MASS_BATTLE_ACCEPTANCE.md`; current acceptance boundaries are in the dated audit.
 
-## Directional protection, damage and first-faction sprite placeholders
+## Historical directional-protection and sprite receipt
+
+The following records the initial damage/sprite implementation. Its “not yet implemented” visual list is superseded by current surface lighting, structural materials and authored damage-mask integration. Visual completeness and physical-device acceptance remain separate work.
 
 The combat core now separates four powered shield facings from 16x16 localized armor tiles and an exposed structural sublayer. Damage types have independent shielding, armor and structural multipliers; per-facing armor and shield upgrade APIs are present. The external Terran fleet sprite cutouts may be installed under `assets/ships/terran/`; missing PNGs keep the tested fallback renderer. A basic visual damage marker exists, but transparent armor gouging, normal maps and custom structural-image compositing are **not yet implemented**. [Directional design and acceptance](docs/DIRECTIONAL_DAMAGE.md) · [Sprite placeholder manifest](docs/TERRAN_SPRITE_ATLAS.md) · [Level System I roadmap](docs/LEVEL_SYSTEM_I.md).
 
 
-Local-first multiplayer implementation (2026-10-28): [working slices and unfinished gates](docs/network/LOCAL_FIRST_MULTIPLAYER.md), [dedicated commands](docs/network/DEDICATED_SERVER.md), and [actual test receipts](docs/network/TEST_RECEIPTS.md). Strict TLS game acceptance is currently blocked by certificate-pin rejection in the local test environment; this change is not an Internet-ready multiplayer release.
+Local-first multiplayer implementation (2026-10-28): [working slices and unfinished gates](docs/network/LOCAL_FIRST_MULTIPLAYER.md), [dedicated commands](docs/network/DEDICATED_SERVER.md), and [actual test receipts](docs/network/TEST_RECEIPTS.md). The earlier certificate-pin rejection is historical: current source passes real loopback TLS at 2, 32 and 400 ships, including authenticated reconnect. Full custom-fleet TLS lobby entry, readiness, session reset, complete battle presentation and multi-device/WAN acceptance remain open; see the dated audit and repair plan.

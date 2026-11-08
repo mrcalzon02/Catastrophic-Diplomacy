@@ -1,5 +1,9 @@
 # Level System I — hundreds of replayable wave battles
 
+## Current status override — 8 November 2026
+
+This document preserves the early design/foundation receipt. Its six-license catalog, missing component-purchase ledger and mandatory one-victory research floor are superseded. Current code has nine licenses, individually funded technology research and a combined campaign authority. License/lab projects can reach zero duration where accelerators fully cover required work; individual module-discovery projects currently retain a one-victory minimum. Completed sorties settle the owned roster and remaining stores; a new sortie does not automatically replenish them from a blueprint. See the [project audit](PROJECT_AUDIT_2026-11-08.md) for current implemented behavior, controller defects and unresolved restart/abandon policy, and the [repair plan](DEVELOPMENT_REPAIR_PLAN.md) for development order. Historical prices and pending lists below are not current authorization rules.
+
 **Design goal (partially implemented and playable):** a 500-level initial campaign comprising ten sectors of fifty stages, each with increasingly demanding enemy waves, distinct doctrines, sustained ammunition attrition, sector bosses and optional replay grinding. Preserve Sandbox and the deterministic simulation as independent modes. Do not conflate this with a strategy layer.
 
 Every level supplies its own fixed maximum deployment count C, base credits B and a wave roster. D is the number of commissioned vessels deployed (1..C); S is the number of those vessels that survive the **entire level** (0..D). Fighters, defensive drones and expendables do not increase D or S.

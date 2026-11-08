@@ -1,0 +1,187 @@
+{
+  "audited_production_source": "0159042e47a9271e5e3b077756f5c4d57763a688",
+  "prior_evidence_checkpoint": "26f852a005750e0fd06588f4b93a7ea157f22a13",
+  "scope": "Documentation and evidence only. Hashes describe this delivery; the manifest excludes itself.",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 21120,
+      "sha256": "bb331888e461de40795eb8573faf54314d5ae3655e8b9f259eaf2c95100f0919",
+      "git_blob_sha1": "f69f3e96188218310096f3228160384815d1accc"
+    },
+    {
+      "path": "docs/CI_WORKFLOWS.md",
+      "bytes": 5316,
+      "sha256": "7b329e9f5a708d264c309b0c735ffac7acb5be0d1b637cc7091cf2ff973248fc",
+      "git_blob_sha1": "59896bef1eb6681ba229d5630fefeb3c3d155b8e"
+    },
+    {
+      "path": "docs/CAMPAIGN_FLEET_CONTINUITY.md",
+      "bytes": 7231,
+      "sha256": "dc8089612b24f2d78d47ee40bfcbeb8b71ecff6f59964cbbc8467b0dc4963c75",
+      "git_blob_sha1": "56a5d2e42ce8fc95e723ef7704da92601cd72295"
+    },
+    {
+      "path": "docs/LEVEL_SYSTEM_I.md",
+      "bytes": 6514,
+      "sha256": "53ae47ef43134af490ebf272d004691ec3ba7c4bc7d51fabc3b76e62e8d78ac3",
+      "git_blob_sha1": "c98213f898a2379e85e4432d7452e49ec7da14cd"
+    },
+    {
+      "path": "docs/PROJECT_AUDIT_2026-11-08.md",
+      "bytes": 48055,
+      "sha256": "8203b60b717f25effb8446d1e3ccf8c2a65cfc8c967e9910d91717d4365fcf8e",
+      "git_blob_sha1": "b626d7bef743917792e709e9bfc3905201806fc0"
+    },
+    {
+      "path": "docs/DEVELOPMENT_REPAIR_PLAN.md",
+      "bytes": 25321,
+      "sha256": "c4ae7df0e721b3a4355fe8e0a0f11adadc1bdb0cc959b6c21c1f33de7c4839ae",
+      "git_blob_sha1": "e847bfb73c7238dd8e1c966e7bc5cfc89ef328e8"
+    },
+    {
+      "path": "docs/audits/2026-11-08/CAMPAIGN_REVIEW.md",
+      "bytes": 31489,
+      "sha256": "7a8f47c429e4f7b592caa06269bdbbed3d5c31ee2bb0341a978700626ae50cd8",
+      "git_blob_sha1": "5fcf338871f99fffcdf9898921b2e7715cddea81"
+    },
+    {
+      "path": "docs/audits/2026-11-08/CHECKPOINTS.md",
+      "bytes": 13057,
+      "sha256": "138226d8b11d44931d10f7c931c8b3c6b9e11cc1d2b5c412f817cb360fd7cc55",
+      "git_blob_sha1": "330e5b997f7c3979a11ca14e3cd9f372480da14a"
+    },
+    {
+      "path": "docs/audits/2026-11-08/COMBAT_REVIEW.md",
+      "bytes": 30632,
+      "sha256": "6cb5b62011fb9ef3bb037ec580dc81fd72f928334fda666c761b69f16e00e36f",
+      "git_blob_sha1": "0edffdaf8d51c9fd25f9a140eba9f468c23cccc4"
+    },
+    {
+      "path": "docs/audits/2026-11-08/CampaignFlowAuditProbe.java",
+      "bytes": 8681,
+      "sha256": "73d8ebddeff070d06a33d506628e9e34c86e993063556783d71ddb8fb8d2db72",
+      "git_blob_sha1": "52508ce45c417c569a9f6ea363eaea3af8619766"
+    },
+    {
+      "path": "docs/audits/2026-11-08/CombatAuditProbe.java",
+      "bytes": 8618,
+      "sha256": "2ed2784bce98337825c397b3a0014e934ac5d5cc1ee3177632dbecd1cc78b927",
+      "git_blob_sha1": "5e78d520544fdedd568583c58bb9f63f29b405ec"
+    },
+    {
+      "path": "docs/audits/2026-11-08/INDEPENDENT_REVIEW.md",
+      "bytes": 10700,
+      "sha256": "55c2774dfb1e015de15db3c0c73ce58037d8a04c19c34006a8d18ad02b617672",
+      "git_blob_sha1": "961175477563a65e26e1c0eb529c9d58bb1cbd5e"
+    },
+    {
+      "path": "docs/audits/2026-11-08/NETWORK_RELEASE_REVIEW.md",
+      "bytes": 28497,
+      "sha256": "39e092b73cac35d9c627a445eca01148ad2e4f63f4a2867c0cde88317cfe614f",
+      "git_blob_sha1": "ab7000c7f6848b473791924bbc16f6dd2026786a"
+    },
+    {
+      "path": "docs/audits/2026-11-08/NetworkMirrorAuditProbe.java",
+      "bytes": 2934,
+      "sha256": "c78607d9430722b8fe8078c656e00c340df5fda57755baea365a2ebd81a475b4",
+      "git_blob_sha1": "96884c9ff10626359e4a17e89baf14d2f6f72183"
+    },
+    {
+      "path": "docs/audits/2026-11-08/README.md",
+      "bytes": 10852,
+      "sha256": "9f635dda722542a7890c58a455a80f6561fd1597bd2a5ce26e5182bc9e501700",
+      "git_blob_sha1": "181b0f807f84d00486aa06ed1b83b94105ccc2bc"
+    },
+    {
+      "path": "docs/audits/2026-11-08/android-api-check.log",
+      "bytes": 150,
+      "sha256": "3f72649663edcdff0bbeb339378d05aecce9fad0df4e9774ccc064aef8404966",
+      "git_blob_sha1": "12385e7b14ac3b3e544d48a002d221fa59efc176"
+    },
+    {
+      "path": "docs/audits/2026-11-08/campaign-atlas-check.log",
+      "bytes": 149,
+      "sha256": "38f92b99bb1be4ab60bc558b9bc349db0b8da9dbc82ef6cdb70d4ec878368b5c",
+      "git_blob_sha1": "fcde45dc7935485e96300c052116ad427033859c"
+    },
+    {
+      "path": "docs/audits/2026-11-08/campaign-probe.log",
+      "bytes": 705,
+      "sha256": "d167dafbfd131b5f3d89e3172c72f4da151a58696bfd71c2f715f22956cd892a",
+      "git_blob_sha1": "eff50c911d1b78f0ffa5c223c6a7b5484d3e4b2e"
+    },
+    {
+      "path": "docs/audits/2026-11-08/combat-probe.log",
+      "bytes": 928,
+      "sha256": "862625c87753416538b5d46b5253e24ac54b80d5c12ab0963b638b00fb60326b",
+      "git_blob_sha1": "54f847d4506124cb61c260aa4235bac5d9b54229"
+    },
+    {
+      "path": "docs/audits/2026-11-08/compile-result.json",
+      "bytes": 325,
+      "sha256": "b6d9549d929f95ec2bf7c590665262ecc96f396b97b114643de084ddb2f0ae44",
+      "git_blob_sha1": "e8652daf8d822090bb16b35a8ae8d22c5b67de80"
+    },
+    {
+      "path": "docs/audits/2026-11-08/documented-probes-result.json",
+      "bytes": 2809,
+      "sha256": "ff8898f9b0f639361f54f9061cdb61ca7525d00219fa7a4ecc9746f49958a2fb",
+      "git_blob_sha1": "a67153169123c091d94b1a73e999f883ab622517"
+    },
+    {
+      "path": "docs/audits/2026-11-08/functional-checks.log",
+      "bytes": 20690,
+      "sha256": "dbcb54f78f4a8aca07f11ff6b0e0e123e3dc56b9a6c6d8c913be119d46d04ad5",
+      "git_blob_sha1": "ab3feb92b67abb63d38d8d6b844b74f435c75e21"
+    },
+    {
+      "path": "docs/audits/2026-11-08/functional-result.json",
+      "bytes": 4338,
+      "sha256": "c0a0bb733174364693c715766098e411c2d423eea1264ca57809fce4e8b2b538",
+      "git_blob_sha1": "6d34415a6329ffe3fa22e483f39d25a0a1d7374c"
+    },
+    {
+      "path": "docs/audits/2026-11-08/network-mirror-audit-probe.json",
+      "bytes": 486,
+      "sha256": "b1ec5f61ff5b1b2ad1d4588561b5c4ddef82a12ec8a01bb20f08716a40f7ffdb",
+      "git_blob_sha1": "457e6c11a0de05f140d385d5482d41f89c17feef"
+    },
+    {
+      "path": "docs/audits/2026-11-08/python-checks.log",
+      "bytes": 422,
+      "sha256": "d0cd20b793fb2a60eb4175658a4c2e7f76312edbe4ff8c7844753268a73296e2",
+      "git_blob_sha1": "c183eefe98cccfadce0340c069e4c6e0b9ca4e51"
+    },
+    {
+      "path": "docs/audits/2026-11-08/supplementary-checks.log",
+      "bytes": 4340,
+      "sha256": "1da25968beb9ab85853bf0d10727c19c6ec5b59c8d1507f91a962aa244c28ac9",
+      "git_blob_sha1": "4cb4e12ea61499f8d0b4f8608c849b6bf847d1dd"
+    },
+    {
+      "path": "docs/audits/2026-11-08/supplementary-result.json",
+      "bytes": 205,
+      "sha256": "bcf6f1777734347ecfe8c76d4b4c46ac3856771006b3d4ba5ea5a7fe663a51d7",
+      "git_blob_sha1": "a0b4ab6e5340f80e21a408195e3e123cff476720"
+    },
+    {
+      "path": "docs/audits/2026-11-08/timeline-irregular-frame-scenarios.csv",
+      "bytes": 281,
+      "sha256": "5eeadf3863c0d1420f6b670df100741056b3d43e0a3dd3937d54e62b35328f3a",
+      "git_blob_sha1": "eae6c4892e89e16cd46a3538ec64e2284722ae0d"
+    },
+    {
+      "path": "docs/audits/2026-11-08/timeline-scenarios.csv",
+      "bytes": 887,
+      "sha256": "5a0d02328d5e9a2b85b2c3975f379fe72f9b7b6c7499b7bbaafa67d45966aa7c",
+      "git_blob_sha1": "048909b8b43444560031d300a707a2359fb4aa0e"
+    },
+    {
+      "path": "docs/audits/2026-11-08/wiki-results.json",
+      "bytes": 2027,
+      "sha256": "089b84aaab9604fd912b3ed216cc718c287641ca8c8e5cdbb270e95ef06bc019",
+      "git_blob_sha1": "e39025c8acf208045a0c488e06a7d041c200f3ba"
+    }
+  ]
+}
