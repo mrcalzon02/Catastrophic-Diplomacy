@@ -212,8 +212,22 @@ public final class CampaignLedger {
         }
     }
     private static boolean knownMissing(Path path){
-        try{return Files.notExists(path,LinkOption.NOFOLLOW_LINKS);}
-        catch(SecurityException|UnsupportedOperationException unavailable){return false;}
+        try{
+            if(!Files.notExists(path,LinkOption.NOFOLLOW_LINKS))return false;
+            // Windows may report a child as "not exists" when an ancestor is
+            // actually a regular file (ENOTDIR-equivalent). That is storage
+            // failure, not evidence that no campaign has ever existed.
+            Path ancestor=path.getParent();
+            while(ancestor!=null&&Files.notExists(
+                    ancestor,LinkOption.NOFOLLOW_LINKS))
+                ancestor=ancestor.getParent();
+            if(ancestor==null)return false;
+            BasicFileAttributes attributes=Files.readAttributes(
+                    ancestor,BasicFileAttributes.class,LinkOption.NOFOLLOW_LINKS);
+            return attributes.isDirectory();
+        }catch(IOException|SecurityException|UnsupportedOperationException unavailable){
+            return false;
+        }
     }
     private static Path backup(Path path){
         return path.resolveSibling(path.getFileName().toString()+".bak");
