@@ -2921,17 +2921,35 @@ public final class Battle {
                                   double x,double y,double vx,double vy,
                                   long observedTick,float confidence,
                                   boolean relayed,boolean stale,
-                                  long emittedTick,long receivedTick){
+                                  long emittedTick,long receivedTick,
+                                  int corroboratingSourceId,
+                                  long corroboratingObservedTick,
+                                  double uncertainty){
         public TacticalContact{
             if(targetId<=0||sourceId<=0||observedTick<0||channels<0||
                     emittedTick<0||emittedTick>observedTick||
                     receivedTick<observedTick||
                     !Double.isFinite(x)||!Double.isFinite(y)||
                     !Double.isFinite(vx)||!Double.isFinite(vy)||
-                    !Float.isFinite(confidence)||confidence<0||confidence>1)
+                    !Float.isFinite(confidence)||confidence<0||confidence>1||
+                    corroboratingSourceId<0||corroboratingSourceId==sourceId||
+                    corroboratingObservedTick<0||
+                    (corroboratingSourceId==0&&corroboratingObservedTick!=0)||
+                    (corroboratingSourceId>0&&(stale||
+                            corroboratingObservedTick>receivedTick))||
+                    !Double.isFinite(uncertainty)||uncertainty<0)
                 throw new IllegalArgumentException("Invalid physical sensor observation");
             if(stale&&channels!=0)
                 throw new IllegalArgumentException("Historical memory is not a live sensor");
+        }
+        /** Existing instrument records retain their source and bounded age error. */
+        public TacticalContact(int targetId,int sourceId,int channels,
+                double x,double y,double vx,double vy,long observedTick,
+                float confidence,boolean relayed,boolean stale,
+                long emittedTick,long receivedTick){
+            this(targetId,sourceId,channels,x,y,vx,vy,observedTick,
+                    confidence,relayed,stale,emittedTick,receivedTick,0,0,
+                    stale?0:32+2*StrictMath.max(0,receivedTick-observedTick));
         }
         /** Preserve constructor compatibility for older display adapters. */
         public TacticalContact(int targetId,int sourceId,int channels,
@@ -2939,6 +2957,9 @@ public final class Battle {
                 float confidence,boolean relayed,boolean stale){
             this(targetId,sourceId,channels,x,y,vx,vy,observedTick,
                     confidence,relayed,stale,observedTick,observedTick);
+        }
+        public int independentSources(){
+            return stale?0:corroboratingSourceId>0?2:1;
         }
     }
 
@@ -3123,15 +3144,86 @@ public final class Battle {
                     .20+.50*(source.network.resolutionGain()-1)*working
                     +.09*StrictMath.max(0,Integer.bitCount(observation.channels())-1)
                     +.20*source.commandAssist));
-            picture.put(target.id,new TacticalContact(target.id,source.id,
+            TacticalContact primary=new TacticalContact(target.id,source.id,
                     observation.channels(),measured.x(),measured.y(),
                     measured.vx(),measured.vy(),observation.measuredTick(),
                     confidence,relayed,false,observation.emittedTick(),
-                    observation.receivedTick()));
+                    observation.receivedTick());
+            picture.put(target.id,fuseCommandPicture(viewer,target,primary));
         }
         List<TacticalContact> sorted=new ArrayList<>(picture.values());
         sorted.sort((a,b)->Integer.compare(a.targetId(),b.targetId()));
         return List.copyOf(sorted);
+    }
+
+    /**
+     * One independent SHR corroboration of a physically received live fix.
+     * Command recipients are pre-selected by refreshCommandAssistance's
+     * maximum-40 nearest-allied-hulls budget. Recheck powered center/radius
+     * on every display read to prevent damage-time ghost confidence.
+     * This read-only calculation never authorizes firing or samples hidden
+     * present enemy position, and cannot convert stale TRK to live data.
+     */
+    private TacticalContact fuseCommandPicture(
+            Ship viewer,Ship target,TacticalContact primary){
+        if(primary.stale()||viewer.commandSourceId<=0||
+                viewer.commandAssist<=0||viewer.power<=3||
+                viewer.sensorsCondition<=.05||viewer.crewReadiness()<.05)
+            return primary;
+        Ship center=findShip(viewer.commandSourceId);
+        if(center==null||!center.alive()||center.team!=viewer.team||
+                center.power<=3||center.commandCondition<=.15||
+                center.sensorsCondition<=.15||center.crewReadiness()<.05||
+                center.network.commandCapacity()<=0)return primary;
+        double radius=center.network.fusionRange()*
+                StrictMath.min(center.commandCondition,center.sensorsCondition);
+        if(radius<=0||StrictMath.hypot(viewer.x-center.x,
+                viewer.y-center.y)>radius)return primary;
+        for(Ship scout:ships){
+            if(scout==viewer||scout.id==primary.sourceId()||
+                    scout.team!=viewer.team||!scout.alive()||
+                    scout.power<=3||scout.sensorsCondition<=.05||
+                    scout.crewReadiness()<.05||
+                    scout.network.sharingCapacity()<=0)continue;
+            if(StrictMath.hypot(scout.x-center.x,scout.y-center.y)>radius)
+                continue;
+            double link=1000+scout.network.sharingRange()*
+                    StrictMath.min(1,scout.sensorsCondition)+
+                    viewer.network.trackRelayRange()*
+                    StrictMath.max(0,viewer.sensorsCondition);
+            if(StrictMath.hypot(viewer.x-scout.x,viewer.y-scout.y)>link)
+                continue;
+            SensorLightTimeHistory.Observation second=
+                    receivedContact(viewer,target,scout);
+            if(second==null||second.channels()==0||
+                    StrictMath.abs(second.measuredTick()-primary.observedTick())>2)
+                continue;
+            SensorLightTimeHistory.Sample measured=second.sample();
+            double discrepancy=StrictMath.hypot(measured.x()-primary.x(),
+                    measured.y()-primary.y());
+            if(discrepancy>60)continue; // conflicting historical fixes do not boost precision
+            float corroboration=(float)StrictMath.min(.65,
+                    .20+.09*StrictMath.max(0,
+                            Integer.bitCount(second.channels())-1)
+                    +.15*StrictMath.max(0,
+                            scout.network.resolutionGain()-1));
+            float confidence=(float)StrictMath.min(.99,
+                    1-(1-primary.confidence())*(1-corroboration));
+            double age=StrictMath.max(0,
+                    tick-StrictMath.min(primary.observedTick(),
+                            second.measuredTick()));
+            double uncertainty=StrictMath.min(primary.uncertainty(),
+                    22+2*age+.15*discrepancy);
+            return new TacticalContact(primary.targetId(),primary.sourceId(),
+                    primary.channels(),(primary.x()+measured.x())*.5,
+                    (primary.y()+measured.y())*.5,
+                    (primary.vx()+measured.vx())*.5,
+                    (primary.vy()+measured.vy())*.5,
+                    primary.observedTick(),confidence,primary.relayed(),false,
+                    primary.emittedTick(),primary.receivedTick(),
+                    scout.id,second.measuredTick(),uncertainty);
+        }
+        return primary;
     }
 
     private static TacticalContact historicalContact(int id,int sourceId,

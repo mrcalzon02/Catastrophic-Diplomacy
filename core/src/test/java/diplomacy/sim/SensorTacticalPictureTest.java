@@ -196,6 +196,52 @@ public final class SensorTacticalPictureTest {
                 "Dead command core continued controlling the sensor picture");
         System.out.println("PASS default fitted command-anchor selection and power fallback");
     }
+    /** Two physically acquired fixes cannot reveal current hidden state. */
+    private static void fusion(TechnologyCatalog catalog){
+        Battle b=new Battle(56780);
+        b.configureWeather(SpaceWeather.forLevel(1));
+        Battle.Ship command=b.addShip(0,Battle.Faction.TERRAN,600,100);
+        Battle.Ship scoutA=b.addShip(0,Battle.Faction.TERRAN,550,100);
+        Battle.Ship scoutB=b.addShip(0,Battle.Faction.TERRAN,580,120);
+        Battle.Ship hostile=b.addShip(1,Battle.Faction.DRAXIAN,750,100);
+        stationary(b);
+        command.network=network(catalog,"FCM");
+        scoutA.network=network(catalog,"SHR");
+        scoutB.network=network(catalog,"SHR");
+        command.sensorRange=scoutA.sensorRange=scoutB.sensorRange=850;
+        for(int i=0;i<28;i++)b.step(); // Real echo plus transmitter and radio delay.
+        Battle.TacticalContact merged=report(b,command.id,hostile.id);
+        require(merged!=null&&!merged.stale()&&merged.sourceId()==command.id,
+                "FCM lost its own real primary observation");
+        require(merged.independentSources()==2&&
+                        (merged.corroboratingSourceId()==scoutA.id||
+                         merged.corroboratingSourceId()==scoutB.id)&&
+                        merged.corroboratingObservedTick()<=b.tick,
+                "FCM did not correlate a physically arrived independent SHR fix");
+        long fingerprint=b.fingerprint();
+        b.tacticalPicture(0,command.id);
+        require(b.fingerprint()==fingerprint,
+                "FCM display changed deterministic firing or track memory");
+        hostile.x+=450; // Hidden current physics must not enter historical samples.
+        Battle.TacticalContact frozen=report(b,command.id,hostile.id);
+        require(frozen!=null&&frozen.x()!=hostile.x&&
+                        frozen.corroboratingSourceId()==merged.corroboratingSourceId(),
+                "FCM used hidden present enemy position");
+        scoutA.powerRegen=scoutB.powerRegen=0;
+        scoutA.power=scoutB.power=0;
+        Battle.TacticalContact alone=report(b,command.id,hostile.id);
+        require(alone!=null&&alone.independentSources()==1&&
+                        alone.corroboratingSourceId()==0&&
+                        merged.confidence()>alone.confidence()&&
+                        merged.uncertainty()<alone.uncertainty(),
+                "Unpowered scouts provided fictitious FCM confidence");
+        scoutA.power=scoutB.power=100;
+        command.powerRegen=0;command.power=0;
+        Battle.TacticalContact offline=report(b,command.id,hostile.id);
+        require(offline==null||offline.independentSources()==1,
+                "Unpowered command core continued two-source fusion");
+        System.out.println("PASS physical FCM two-source confidence/provenance, hidden-state and power-loss gates");
+    }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         sharing(catalog);
@@ -203,6 +249,7 @@ public final class SensorTacticalPictureTest {
         historical(catalog);
         optical(catalog);
         command(catalog);
+        fusion(catalog);
         System.out.println("PASS bounded read-only real fleet sensor picture");
     }
 }
