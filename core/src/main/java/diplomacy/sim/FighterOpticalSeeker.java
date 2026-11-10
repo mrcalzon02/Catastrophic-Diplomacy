@@ -75,7 +75,7 @@ public final class FighterOpticalSeeker {
                 !Double.isFinite(currentX)||!Double.isFinite(currentY)||
                 !Double.isFinite(headingX)||!Double.isFinite(headingY))
             throw new IllegalArgumentException("Invalid optical receiver worldline");
-        double c=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
+        double c=WorldScale.SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
         int horizon=StrictMath.min(FighterInfraredSeeker.History.CAPACITY-1,
                 SensorLightTimeHistory.propagationTicks(
                         WorldScale.DIAGONAL_WORLD_UNITS)+2);

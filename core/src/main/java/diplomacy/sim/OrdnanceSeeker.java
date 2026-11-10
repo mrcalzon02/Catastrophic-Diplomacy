@@ -63,7 +63,7 @@ public final class OrdnanceSeeker {
         int horizon=StrictMath.min(SensorLightTimeHistory.CAPACITY-1,
                 SensorLightTimeHistory.propagationTicks(
                         WorldScale.DIAGONAL_WORLD_UNITS)+2);
-        final double lightStep=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
+        final double lightStep=WorldScale.SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
         for(int age=0;age<=horizon&&age<=now;age++){
             long emittedTick=now-age;
             SensorLightTimeHistory.Sample measured=

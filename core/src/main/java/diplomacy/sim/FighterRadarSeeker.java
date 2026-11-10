@@ -113,7 +113,7 @@ public final class FighterRadarSeeker {
                 !Double.isFinite(toX)||!Double.isFinite(toY)||
                 !Double.isFinite(headingX)||!Double.isFinite(headingY))
             throw new IllegalArgumentException("Invalid radar echo receiver");
-        double c=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
+        double c=WorldScale.SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
         int oneWay=(int)StrictMath.ceil(head.range/c)+2;
         int horizon=StrictMath.min(PulseHistory.CAPACITY-1,
                 oneWay*2+3);

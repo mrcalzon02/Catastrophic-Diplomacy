@@ -110,7 +110,7 @@ public final class FighterInfraredSeeker {
         int limit=StrictMath.min(History.CAPACITY-1,
                 SensorLightTimeHistory.propagationTicks(
                         WorldScale.DIAGONAL_WORLD_UNITS)+2);
-        double lightStep=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
+        double lightStep=WorldScale.SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND*Battle.DT;
         Reading best=null;
         double brightest=0;
         for(int age=1;age<=limit&&age<=tick;age++){
