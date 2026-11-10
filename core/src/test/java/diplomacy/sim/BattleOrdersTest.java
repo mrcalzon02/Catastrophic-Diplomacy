@@ -96,6 +96,28 @@ public final class BattleOrdersTest {
                 "category zero priority must select the first causally acquired capital");
         check(nearby.orders.equals(BattleOrders.DEFAULT),"ship order must not overwrite enemy policies");
         check(capital.orders.equals(BattleOrders.DEFAULT),"unchanged ship orders remain default");
+
+        // Equal class priorities are now a strict nearest-contact ordering,
+        // with stable ID tie-breaks and no random/readiness score perturbation.
+        Battle nearest=new Battle(450);
+        Battle.Ship selector=nearest.addShip(0,Battle.Faction.TERRAN,100,300);
+        Battle.Ship far=nearest.addShip(1,Battle.Faction.DRAXIAN,390,300);
+        Battle.Ship close=nearest.addShip(1,Battle.Faction.ZIPPLEDROW,260,300);
+        selector.speed=far.speed=close.speed=0;
+        for(int frame=0;frame<100&&selector.lastTargetId!=close.id;frame++)nearest.step();
+        check(selector.lastTargetId==close.id,
+                "Default targeting must deterministically choose the nearest received contact");
+
+        // A deliberate class priority is lexicographic, not a weighted soup:
+        // higher configured priority overrides distance; zero remains exclusion.
+        nearest.setShipOrders(selector.id,BattleOrders.DEFAULT
+                .withEngagement(BattleOrders.Size.ESCORT,50,210)
+                .withEngagement(BattleOrders.Size.CAPITAL,100,210));
+        far.hullClass=Shipyard.Hull.DREADNOUGHT;
+        close.hullClass=Shipyard.Hull.FRIGATE;
+        for(int frame=0;frame<18&&selector.lastTargetId!=far.id;frame++)nearest.step();
+        check(selector.lastTargetId==far.id,
+                "Explicit class priority must override nearest-distance ordering");
         // Friendly escort links are validated rather than silently allowing enemy anchors.
         try{
             b.setShipOrders(attacker.id,antiCapital.withAnchor(capital.id,140));

@@ -3159,95 +3159,106 @@ public final class Battle {
                   +actor.commandAssist);
     }
 
+    private static final int TARGET_DECISION_INTERVAL_TICKS=6;
+
+    /**
+     * Deterministic captain target policy. Physics remains 30 Hz, but target
+     * choice is a 5 Hz tactical decision staggered by ship ID. Between decision
+     * ticks a living, non-excluded target is retained; weapon fire still
+     * requires a current authorized contact, so retention never grants a lock.
+     *
+     * Priority order:
+     *  1) explicit protection/retaliation relationship,
+     *  2) configured target-class priority (zero excludes),
+     *  3) doctrine-specific deterministic preference,
+     *  4) nearest received contact,
+     *  5) stable ship ID tie-break.
+     */
     private Ship chooseTarget(Ship actor) {
-        // Preserve old target selection and RNG stream for baseline fleet tests.
-        if(actor.standingOrders==null&&
-                actor.orders.equals(BattleOrders.DEFAULT.withPointDefense(actor.orders.pointDefense()))){
-            Ship choice = null;
-            double best = Double.POSITIVE_INFINITY;
-            // This observer's fitted tracking precision is fixed during
-            // target selection; do not recompute it for 200 enemy candidates.
-            double uncertaintyDenominator=
-                    1+actor.commanderSkill*.4+tacticalPrecision(actor);
-            for (Ship s : opponentCandidates(actor.team))
-                if (s.team != actor.team && s.alive()) {
-                // The old current-position distance argument was ignored by
-                // liveContactSource. Avoid a costly, omniscient hypot that
-                // cannot authorize a causal contact anyway.
-                SensorLightTimeHistory.Observation contact=
-                        authorizedContact(actor,s,0);
-                if(contact==null)continue;
-                // Target preference cannot rank by an as-yet unseen trajectory.
-                double distance=StrictMath.hypot(
-                        contact.sample().x()-actor.x,contact.sample().y()-actor.y);
-                double estimationError = (random.nextDouble() - 0.5) * 0.52 /
-                        uncertaintyDenominator;
-                double assessed = distance * (1 + estimationError) + s.combatReadiness() * 32;
-                if (assessed < best) { best = assessed; choice = s; }
-            }
-            updateFocus(actor,choice);
-            return choice;
-        }
         BattleOrders.Orders orders=actor.orders;
-        Ship choice=null;double best=Double.POSITIVE_INFINITY;
-        double uncertaintyDenominator=
-                1+actor.commanderSkill*.4+tacticalPrecision(actor);
-        // Gather protected assets once per acting ship, never for each hostile
-        // candidate: 200v200 targeting must not grow into a quadratic ally scan.
-        java.util.ArrayList<Integer> guardedIds=new java.util.ArrayList<>(5);
+        Ship retained=findShip(actor.lastTargetId);
+        if(retained!=null&&retained.alive()&&retained.team!=actor.team
+                &&orders.forSize(BattleOrders.size(retained)).priority()>0
+                &&Math.floorMod(tick+actor.id,TARGET_DECISION_INTERVAL_TICKS)!=0)
+            return retained;
+
         java.util.ArrayList<Integer> attackerIds=new java.util.ArrayList<>(5);
         if(actor.standingOrders!=null){
             for(int id:actor.defendedShipIds){
                 Ship asset=findShip(id);
-                if(asset!=null&&asset.alive()){
-                    guardedIds.add(asset.id);
-                    if(asset.lastAttackerId!=0)attackerIds.add(asset.lastAttackerId);
-                }
+                if(asset!=null&&asset.alive()&&asset.lastAttackerId!=0)
+                    attackerIds.add(asset.lastAttackerId);
             }
             Ship escort=findShip(actor.escortShipId);
-            if(escort!=null&&escort.alive()){
-                guardedIds.add(escort.id);
-                if(escort.lastAttackerId!=0)attackerIds.add(escort.lastAttackerId);
-            }
+            if(escort!=null&&escort.alive()&&escort.lastAttackerId!=0)
+                attackerIds.add(escort.lastAttackerId);
         }
-        // Zero priority disables a class rather than silently turning it into
-        // another target. PD continues according to its independent selector.
-        for(Ship candidate:opponentCandidates(actor.team))
-            if(candidate.team!=actor.team&&candidate.alive()){
+        Ship protectAnchor=orders.targeting()==BattleOrders.Targeting.PROTECT
+                ?findShip(orders.anchorShipId()):null;
+        int protectAttacker=protectAnchor!=null&&protectAnchor.alive()
+                ?protectAnchor.lastAttackerId:0;
+
+        Ship choice=null;
+        SensorLightTimeHistory.Observation choiceContact=null;
+        int choiceHard=Integer.MAX_VALUE;
+        int choiceClass=-1;
+        int choiceDoctrine=Integer.MAX_VALUE;
+        double choiceDistance=Double.POSITIVE_INFINITY;
+
+        for(Ship candidate:opponentCandidates(actor.team)){
+            if(candidate.team==actor.team||!candidate.alive())continue;
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
-            // liveContactSource ignores the enemy's current position.
-            SensorLightTimeHistory.Observation contact=
-                    authorizedContact(actor,candidate,0);
+
+            SensorLightTimeHistory.Observation contact=authorizedContact(actor,candidate,0);
             if(contact==null)continue;
-            double distance=StrictMath.hypot(contact.sample().x()-actor.x,
-                    contact.sample().y()-actor.y);
-            double error=(random.nextDouble()-.5)*.52/
-                    uncertaintyDenominator;
-            double assessed=distance*(1+error)*100.0/classOrder.priority()
-                    +candidate.combatReadiness()*32;
-            if(actor.standingOrders!=null &&
-                    (attackerIds.contains(candidate.id)||guardedIds.contains(candidate.lastTargetId)))
-                assessed-=260;
+
+            int hard=1;
+            if(attackerIds.contains(candidate.id)
+                    ||(orders.targeting()==BattleOrders.Targeting.RETALIATE
+                        &&candidate.id==actor.lastAttackerId)
+                    ||(orders.targeting()==BattleOrders.Targeting.PROTECT
+                        &&candidate.id==protectAttacker))
+                hard=0;
+
+            int doctrine=0;
             switch(orders.targeting()){
-                case NEAREST -> { }
-                case VULTURE -> assessed-=(1-Math.max(0,candidate.hull/candidate.maxHull))*160;
+                case NEAREST,RETALIATE,PROTECT -> doctrine=0;
                 case COOPERATE -> {
                     int allies=focusCounts.getOrDefault(candidate.id,0)
                             -(actor.lastTargetId==candidate.id?1:0);
-                    assessed-=Math.min(6,Math.max(0,allies))
-                            *(25+18*actor.commandAssist);
+                    doctrine=-StrictMath.min(6,StrictMath.max(0,allies));
                 }
-                case RETALIATE -> {
-                    if(candidate.id==actor.lastAttackerId)assessed-=225;
-                }
-                case PROTECT -> {
-                    Ship friend=findShip(orders.anchorShipId());
-                    if(friend!=null&&candidate.id==friend.lastAttackerId)assessed-=240;
+                case VULTURE -> {
+                    double fraction=candidate.maxHull<=0?1:
+                            StrictMath.max(0,StrictMath.min(1,
+                                    candidate.hull/candidate.maxHull));
+                    doctrine=(int)StrictMath.floor(fraction*20.0);
                 }
             }
-            if(assessed<best){best=assessed;choice=candidate;}
+            double distance=StrictMath.hypot(
+                    contact.sample().x()-actor.x,contact.sample().y()-actor.y);
+
+            boolean better=choice==null
+                    ||hard<choiceHard
+                    ||(hard==choiceHard&&classOrder.priority()>choiceClass)
+                    ||(hard==choiceHard&&classOrder.priority()==choiceClass
+                        &&doctrine<choiceDoctrine)
+                    ||(hard==choiceHard&&classOrder.priority()==choiceClass
+                        &&doctrine==choiceDoctrine&&distance<choiceDistance-1e-9)
+                    ||(hard==choiceHard&&classOrder.priority()==choiceClass
+                        &&doctrine==choiceDoctrine
+                        &&StrictMath.abs(distance-choiceDistance)<=1e-9
+                        &&candidate.id<choice.id);
+            if(better){
+                choice=candidate;choiceContact=contact;choiceHard=hard;
+                choiceClass=classOrder.priority();choiceDoctrine=doctrine;
+                choiceDistance=distance;
+            }
         }
+        // choiceContact is deliberately retained only as proof that the winner
+        // came from a received contact; fire() performs its own current lock gate.
+        if(choiceContact==null)choice=null;
         updateFocus(actor,choice);
         return choice;
     }
