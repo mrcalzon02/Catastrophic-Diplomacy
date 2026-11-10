@@ -40,9 +40,9 @@ public final class ProjectileModel {
     public static final Defense STANDARD_PD=new Defense(1,1,2.7);
     public static Spec standard(Kind type) {
         return switch(type){
-            case KINETIC -> new Spec(285,1.60,0.24,0.54);
-            case MISSILE -> new Spec(220,2.50,0.82,1.25);
-            case TORPEDO -> new Spec(135,5.10,1.35,1.65);
+            case KINETIC -> new Spec(285*WorldScale.PROJECTILE_SPEED_SCALE,1.60,0.24,0.54);
+            case MISSILE -> new Spec(220*WorldScale.PROJECTILE_SPEED_SCALE,2.50,0.82,1.25);
+            case TORPEDO -> new Spec(135*WorldScale.PROJECTILE_SPEED_SCALE,5.10,1.35,1.65);
         };
     }
     /** All six factions get different propulsive/stealth/armor trade-offs. */
@@ -141,7 +141,10 @@ public final class ProjectileModel {
                                             double actualSpeed){
         if(target==null||system==null)return 0;
         double area=clamp(StrictMath.sqrt(target.crossSection),0.32,1.8);
-        double speedFactor=clamp(220.0/StrictMath.max(10,actualSpeed),0.42,1.60);
+        // Preserve the previous tracking balance while every physical body is
+        // deliberately slowed by the shared cinematic/tactical scale factor.
+        double speedFactor=clamp((220.0*WorldScale.PROJECTILE_SPEED_SCALE)/
+                StrictMath.max(10,actualSpeed),0.42,1.60);
         return clamp(0.68*clamp(crewCondition,0,1)
                 *clamp(weatherAccuracy,0,1.5)*system.tracking
                 *area*speedFactor,0,0.96);

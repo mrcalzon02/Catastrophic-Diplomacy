@@ -24,9 +24,11 @@ public final class RocketBarrage {
         public final double reloadSeconds,sustainedThrust,boostThrust;
         Size(String id,double damage,double speed,double hp,double emissions,
              int rounds,double seconds,double sustained,double boost) {
-            code=id;damageMultiplier=damage;terminalSpeed=speed;health=hp;
-            signature=emissions;magazine=rounds;reloadSeconds=seconds;
-            sustainedThrust=sustained;boostThrust=boost;
+            code=id;damageMultiplier=damage;
+            terminalSpeed=speed*WorldScale.PROJECTILE_SPEED_SCALE;
+            health=hp;signature=emissions;magazine=rounds;reloadSeconds=seconds;
+            sustainedThrust=sustained*WorldScale.PROJECTILE_SPEED_SCALE;
+            boostThrust=boost*WorldScale.PROJECTILE_SPEED_SCALE;
         }
         public static Size forCode(String code){
             for(Size value:values())if(value.code.equals(code))return value;

@@ -8,7 +8,7 @@ package diplomacy.sim;
  */
 public final class RailPointDefense {
     private RailPointDefense(){}
-    public static final double PENETRATOR_SPEED=1210.0;
+    public static final double PENETRATOR_SPEED=1210.0*WorldScale.PROJECTILE_SPEED_SCALE;
     public static final double MIN_ENGAGEMENT_RANGE=120.0;
     public static final int CARTRIDGES_PER_SHOT=3;
     public static final int MAX_ACTIVE_PENETRATORS=512;

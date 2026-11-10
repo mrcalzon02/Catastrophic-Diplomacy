@@ -51,6 +51,12 @@ public final class ProjectileModuleTest {
     }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        check(StrictMath.abs(ProjectileModel.standard(ProjectileModel.Kind.KINETIC).speed()-142.5)<1e-12,
+                "kinetic speed must be globally halved");
+        check(StrictMath.abs(ProjectileModel.standard(ProjectileModel.Kind.MISSILE).speed()-110.0)<1e-12,
+                "missile speed must be globally halved");
+        check(StrictMath.abs(ProjectileModel.standard(ProjectileModel.Kind.TORPEDO).speed()-67.5)<1e-12,
+                "torpedo speed must be globally halved");
         Shipyard.Hull hull=Shipyard.Hull.DREADNOUGHT;
         int missileSlot=slot(hull,Shipyard.Mount.WEAPON,1);
         int kineticSlot=slot(hull,Shipyard.Mount.WEAPON,2);

@@ -22,18 +22,36 @@ public final class WorldScaleAndPropulsionTest {
         close(WorldScale.PHYSICAL_SECONDS_PER_SIM_SECOND,60,0,"Physical clock");
         close(WorldScale.DIAGONAL_WORLD_UNITS,StrictMath.hypot(3840,2160),
                 1e-9,"Fixed arena");
+        close(WorldScale.REPRESENTED_DIAGONAL_LIGHT_MINUTES,.5,0,
+                "Representative arena light-minute ratio");
         close(WorldScale.physicalSecondsForLight(WorldScale.DIAGONAL_WORLD_UNITS),
-                60,1e-9,"One-way diagonal photon transit");
+                30,1e-9,"One-way diagonal photon transit");
         close(WorldScale.signalDelayTicks(WorldScale.DIAGONAL_WORLD_UNITS,false),
-                30,1e-9,"One-way diagonal in combat ticks");
+                15,1e-9,"One-way diagonal in combat ticks");
         close(WorldScale.signalDelayTicks(WorldScale.DIAGONAL_WORLD_UNITS,true),
-                60,1e-9,"Two-way radar burst in combat ticks");
+                30,1e-9,"Two-way radar burst in combat ticks");
         close(WorldScale.simSpeedForLightFraction(.01)/
                 WorldScale.C_WORLD_UNITS_PER_SIM_SECOND,.01,1e-15,
                 "One percent of c speed mapping");
         ok(WorldScale.SHIP_WORLD_SCALE==.5,
                 "All physical and rendering hulls must use shared half-size");
-        System.out.println("PASS fixed one-light-minute diagonal and 60:1 compressed clock");
+        close(WorldScale.PROJECTILE_SPEED_SCALE,.5,0,
+                "Global non-beam projectile speed scale");
+        close(ProjectileModel.standard(ProjectileModel.Kind.KINETIC).speed(),142.5,1e-12,
+                "Kinetic projectile half-speed");
+        close(ProjectileModel.standard(ProjectileModel.Kind.MISSILE).speed(),110,1e-12,
+                "Missile half-speed");
+        close(ProjectileModel.standard(ProjectileModel.Kind.TORPEDO).speed(),67.5,1e-12,
+                "Torpedo half-speed");
+        close(RocketBarrage.Size.SMALL.terminalSpeed,250,1e-12,
+                "Rocket half-speed");
+        close(Battle.FLAK_SHELL_SPEED,195,1e-12,
+                "Flak half-speed");
+        close(RailPointDefense.PENETRATOR_SPEED,605,1e-12,
+                "Rail interceptor half-speed");
+        close(RotaryPointDefense.BULLET_SPEED,352.5,1e-12,
+                "Rotary CIWS half-speed");
+        System.out.println("PASS half-light-minute represented arena, doubled visible ship scale and half-speed projectiles");
     }
     private static void installedDrives(){
         Shipyard.Design bare=Shipyard.bareHull(

@@ -8,7 +8,7 @@ package diplomacy.sim;
  */
 public final class RotaryPointDefense {
     private RotaryPointDefense(){}
-    public static final double BULLET_SPEED=705.0;
+    public static final double BULLET_SPEED=705.0*WorldScale.PROJECTILE_SPEED_SCALE;
     public static final double MIN_RANGE=16.0;
     public static final int MAX_ACTIVE_ROUNDS=2048;
 

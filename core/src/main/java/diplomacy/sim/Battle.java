@@ -804,7 +804,7 @@ public final class Battle {
      * only when this paid, world-space projectile reaches its preset fuze
      * point, never at a time inferred from the target's last known range.
      * Projected lead/error are fixed at launch; the shell cannot retarget. */
-    public static final double FLAK_SHELL_SPEED=390.0;
+    public static final double FLAK_SHELL_SPEED=390.0*WorldScale.PROJECTILE_SPEED_SCALE;
     public static final int MAX_ACTIVE_FLAK_SHELLS=3000;
     public static final class FlakRound {
         public final int team,shooterId,slotId;

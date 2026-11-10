@@ -15,10 +15,20 @@ public final class WorldScale {
     public static final double C_KM_PER_SECOND=299_792.458;
     public static final double PHYSICAL_SECONDS_PER_SIM_SECOND=60;
     public static final double LIGHT_MINUTE_KM=C_KM_PER_SECOND*60;
+    /**
+     * The fixed tactical arena now represents half a light-minute across its
+     * diagonal. World coordinates and weapon ranges are unchanged; only the
+     * physical interpretation is tighter so installed drives visibly traverse
+     * the same battle space instead of spending most of a fight nearly static.
+     */
+    public static final double REPRESENTED_DIAGONAL_LIGHT_MINUTES=0.50;
+    /** Global physical-body travel-speed factor for non-beam ordnance. */
+    public static final double PROJECTILE_SPEED_SCALE=0.50;
     public static final double DIAGONAL_WORLD_UNITS=StrictMath.hypot(
             BattleArena.MAX_X-BattleArena.MIN_X,
             BattleArena.MAX_Y-BattleArena.MIN_Y);
-    public static final double KM_PER_WORLD_UNIT=LIGHT_MINUTE_KM/DIAGONAL_WORLD_UNITS;
+    public static final double KM_PER_WORLD_UNIT=
+            LIGHT_MINUTE_KM*REPRESENTED_DIAGONAL_LIGHT_MINUTES/DIAGONAL_WORLD_UNITS;
     /** In world units per PHYSICAL second. */
     public static final double C_WORLD_UNITS_PER_PHYSICAL_SECOND=
             C_KM_PER_SECOND/KM_PER_WORLD_UNIT;
