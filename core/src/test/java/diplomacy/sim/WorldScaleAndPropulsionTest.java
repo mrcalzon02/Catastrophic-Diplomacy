@@ -27,9 +27,12 @@ public final class WorldScaleAndPropulsionTest {
         close(WorldScale.physicalSecondsForLight(WorldScale.DIAGONAL_WORLD_UNITS),
                 30,1e-9,"One-way diagonal photon transit");
         close(WorldScale.signalDelayTicks(WorldScale.DIAGONAL_WORLD_UNITS,false),
-                15,1e-9,"One-way diagonal in combat ticks");
+                30,1e-9,"One-way diagonal causal signal ticks");
         close(WorldScale.signalDelayTicks(WorldScale.DIAGONAL_WORLD_UNITS,true),
-                30,1e-9,"Two-way radar burst in combat ticks");
+                60,1e-9,"Two-way radar burst causal ticks");
+        close(WorldScale.SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND,
+                WorldScale.DIAGONAL_WORLD_UNITS,1e-9,
+                "Signal chronology retains one-light-minute arena timing");
         close(WorldScale.simSpeedForLightFraction(.01)/
                 WorldScale.C_WORLD_UNITS_PER_SIM_SECOND,.01,1e-15,
                 "One percent of c speed mapping");

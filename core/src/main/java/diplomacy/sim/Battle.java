@@ -3536,7 +3536,7 @@ public final class Battle {
      * the ray that actually arrives this tick against CURRENT enemy geometry.
      * Point-defense/fighter beams retain their separate combat semantics. */
     private void advanceBeamPhotons(){
-        final double lightStep=WorldScale.C_WORLD_UNITS_PER_SIM_SECOND*DT;
+        final double lightStep=WorldScale.SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND*DT;
         for(int i=pendingBeamPhotons.size()-1;i>=0;i--){
             BeamPhoton photon=pendingBeamPhotons.get(i);
             if(photon.spawnTick>=tick)continue;

@@ -29,12 +29,25 @@ public final class WorldScale {
             BattleArena.MAX_Y-BattleArena.MIN_Y);
     public static final double KM_PER_WORLD_UNIT=
             LIGHT_MINUTE_KM*REPRESENTED_DIAGONAL_LIGHT_MINUTES/DIAGONAL_WORLD_UNITS;
-    /** In world units per PHYSICAL second. */
+    /** In world units per PHYSICAL second under the compressed maneuver scale.
+     * Sublight drive speed/acceleration use this tighter representation. */
     public static final double C_WORLD_UNITS_PER_PHYSICAL_SECOND=
             C_KM_PER_SECOND/KM_PER_WORLD_UNIT;
-    /** In world units per COMBAT simulation second. */
+    /** In world units per COMBAT simulation second for maneuver physics. */
     public static final double C_WORLD_UNITS_PER_SIM_SECOND=
             C_WORLD_UNITS_PER_PHYSICAL_SECOND*PHYSICAL_SECONDS_PER_SIM_SECOND;
+    /**
+     * Sensor/photon chronology deliberately retains the former one-light-minute
+     * arena timing. This is a gameplay causality scale, decoupled from the new
+     * half-size maneuver representation so compression does not collapse
+     * historical sensor epochs into same-tick observations.
+     */
+    public static final double SIGNAL_KM_PER_WORLD_UNIT=
+            LIGHT_MINUTE_KM/DIAGONAL_WORLD_UNITS;
+    public static final double SIGNAL_C_WORLD_UNITS_PER_PHYSICAL_SECOND=
+            C_KM_PER_SECOND/SIGNAL_KM_PER_WORLD_UNIT;
+    public static final double SIGNAL_C_WORLD_UNITS_PER_SIM_SECOND=
+            SIGNAL_C_WORLD_UNITS_PER_PHYSICAL_SECOND*PHYSICAL_SECONDS_PER_SIM_SECOND;
 
     public static double physicalSecondsForLight(double worldDistance){
         if(!Double.isFinite(worldDistance)||worldDistance<0)
@@ -42,7 +55,10 @@ public final class WorldScale {
         return worldDistance/C_WORLD_UNITS_PER_PHYSICAL_SECOND;
     }
     public static double signalDelayTicks(double worldDistance,boolean roundTrip){
-        return physicalSecondsForLight(worldDistance)*(roundTrip?2:1)
+        if(!Double.isFinite(worldDistance)||worldDistance<0)
+            throw new IllegalArgumentException("Invalid distance");
+        double physicalSeconds=worldDistance/SIGNAL_C_WORLD_UNITS_PER_PHYSICAL_SECOND;
+        return physicalSeconds*(roundTrip?2:1)
                 /PHYSICAL_SECONDS_PER_SIM_SECOND*30;
     }
     public static double fractionOfLightSpeed(double worldUnitsPerSimSecond){
