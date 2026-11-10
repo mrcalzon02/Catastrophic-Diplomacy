@@ -21,8 +21,9 @@ public final class WorldScale {
      * physical interpretation is tighter so installed drives visibly traverse
      * the same battle space instead of spending most of a fight nearly static.
      */
+    /** Playtest tuning knob: changes physical maneuver representation without resizing the arena. */
     public static final double REPRESENTED_DIAGONAL_LIGHT_MINUTES=0.50;
-    /** Global physical-body travel-speed factor for non-beam ordnance. */
+    /** Playtest tuning knob: scales all non-beam physical-body travel speeds together. */
     public static final double PROJECTILE_SPEED_SCALE=0.50;
     public static final double DIAGONAL_WORLD_UNITS=StrictMath.hypot(
             BattleArena.MAX_X-BattleArena.MIN_X,
