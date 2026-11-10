@@ -55,8 +55,23 @@ jobs:
         run: python -m pip install Pillow==11.3.0
       - name: Prepare Android compile SDK
         run: |
+          platform="$ANDROID_HOME/platforms/android-36/android.jar"
+          build_tools="$ANDROID_HOME/build-tools/35.0.0"
+          if [[ -f "$platform" && -d "$build_tools" ]]; then
+            echo "Using preinstalled Android 36 / Build Tools 35.0.0"
+            exit 0
+          fi
           manager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
-          "$manager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;35.0.0'
+          for attempt in 1 2 3; do
+            if timeout 90s "$manager" --sdk_root="$ANDROID_HOME" \
+                'platforms;android-36' 'build-tools;35.0.0'; then
+              exit 0
+            fi
+            echo "Android SDK provisioning attempt $attempt failed; retrying with bounded backoff."
+            sleep $((attempt * 5))
+          done
+          echo "Android SDK 36 / Build Tools 35.0.0 unavailable after bounded retries." >&2
+          exit 1
       - name: Check Android runtime API compatibility and update manifests
         run: |
           python3 tools/check_android_api26_compat.py
