@@ -51,7 +51,7 @@ public final class WorldScaleAndPropulsionTest {
                 "Rail interceptor half-speed");
         close(RotaryPointDefense.BULLET_SPEED,352.5,1e-12,
                 "Rotary CIWS half-speed");
-        System.out.println("PASS half-light-minute represented arena, doubled visible ship scale and half-speed projectiles");
+        System.out.println("PASS half-light-minute represented arena, doubled visible propulsion scale and half-speed projectiles");
     }
     private static void installedDrives(){
         Shipyard.Design bare=Shipyard.bareHull(
