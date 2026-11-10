@@ -1,8 +1,8 @@
 {
   "action": "verified-three-platform-release",
   "requested_by": "user",
-  "request_date": "2026-11-06",
-  "revision": 19,
-  "source_base_commit": "2250916dab76d6988afa6f59c8ecc5064e23cbe0",
-  "note": "User requested current-project UI/operational audit, unified volume buttons and centered labels, open-source readable font, responsive update checks with actual downloads, reduced automatic diagnostic Actions, and published APK. Build current main with existing retained signing credentials, real Android menu/volume/updater/upgrade/campaign checks, required functional multiplayer tests, and Windows/Linux packages. Include bounded draft-publication retries after previous HTTP 500. Publish a new prerelease without retagging, and verify public assets."
+  "request_date": "2026-11-09",
+  "revision": 20,
+  "source_base_commit": "96a5a555b33a2f46a4afd8c08d01f8798efa0066",
+  "note": "User playtest requested a combat readability pass: halve non-beam projectile travel speeds, halve the representative maneuver-distance scale while preserving the same tactical arena coordinates and weapon ranges, and retain the established causal sensor/light-time scale. Build and publish a fresh prerelease APK plus existing Windows/Linux packages from the verified source, retaining signing identity, updater behavior, multiplayer gates, and no retagging."
 }
