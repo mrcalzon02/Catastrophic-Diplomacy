@@ -128,11 +128,15 @@ public final class AmmunitionTableTest {
         blast.setShipKineticAmmunition(blast.ships().get(0).id,
                 AmmunitionTable.Kinetic.HIGH_EXPLOSIVE);
         double neighborBefore=blast.ships().get(2).hull;
-        double heSpeed=ProjectileModel.standard(ProjectileModel.Kind.KINETIC).speed()*
-                AmmunitionTable.kinetic(AmmunitionTable.Kinetic.HIGH_EXPLOSIVE).speed();
-        int heTravelTicks=(int)StrictMath.ceil(295/heSpeed/Battle.DT);
-        int heContactTicks=2*SensorLightTimeHistory.propagationTicks(295);
-        fly(blast,heContactTicks+heTravelTicks+20);
+        // The shell is intentionally slower now. Do not predict an exact
+        // impact tick from nominal range: causal contact, reload cadence and
+        // the physical ballistic body all contribute. Wait for the real
+        // collateral event with a generous deterministic upper bound.
+        int blastTicks=0;
+        while(blastTicks<240&&blast.ships().get(2).hull>=neighborBefore){
+            blast.step();
+            blastTicks++;
+        }
         check(blast.ships().get(2).hull<neighborBefore,
                 "Nearby actual hull receives explosive falloff, not a texture-only explosion");
         Set<Long> unique=new HashSet<>();
