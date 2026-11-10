@@ -135,6 +135,79 @@ public final class BattleOrdersTest {
         check(attacker.orders.pointDefense()==BattleOrders.PointDefense.INTERCEPT_ONLY,
                 "Individual ships must receive updated PD doctrine");
     }
+    /**
+     * A captain must select the nearest physically received contact, obey an
+     * explicit higher-priority class order, and stop starting offensive shots
+     * as soon as its only live sensor fails. An old selected target ID is
+     * retention for decision cadence, NOT permission to keep shooting.
+     */
+    private static void checkCausalCaptainFire(){
+        Battle battle=new Battle(202611100630L);
+        Battle.Ship captain=battle.addShip(0,Battle.Faction.TERRAN,100,330);
+        // Deliberately add the farther hostile FIRST: ship ID must not win
+        // over measured distance when captain priorities are equal.
+        Battle.Ship far=battle.addShip(1,Battle.Faction.DRAXIAN,340,330);
+        Battle.Ship near=battle.addShip(1,Battle.Faction.ZIPPLEDROW,250,330);
+        for(Battle.Ship hostile:new Battle.Ship[]{far,near}){
+            battle.registerDiagnosticStationaryTarget(hostile.id);
+            hostile.power=100;
+            hostile.ecmCondition=1;
+            hostile.opticalSignature=.01;
+            hostile.hull=hostile.maxHull=10000;
+        }
+        captain.sensorRange=700;
+        captain.infraredRange=captain.xrayRange=captain.graviticRange=0;
+        captain.laserDamage=2;
+        captain.kineticDamage=captain.plasmaDamage=captain.particleDamage=0;
+        captain.missileDamage=captain.torpedoDamage=0;
+        battle.setShipOrders(captain.id,
+                BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD));
+        check(!battle.hasTargetContact(captain,near,150),
+                "Captain obtained a radar target before any echo arrived");
+        for(int tick=0;tick<90;tick++)battle.step();
+        check(battle.hasTargetContact(captain,near,150)&&
+                        battle.hasTargetContact(captain,far,240),
+                "Fixture never established actual radar-only live contacts");
+        check(captain.lastTargetId==near.id,
+                "Default captain ignored the nearer received hostile");
+        long fires=battle.visualEvents().stream().filter(event->
+                event.sourceId()==captain.id&&
+                event.phase()==Battle.VisualPhase.FIRE&&
+                event.weapon().startsWith("LASER")).count();
+        check(fires>0,"Fixture never exercised physical offensive laser firing");
+
+        far.hullClass=Shipyard.Hull.DREADNOUGHT;
+        near.hullClass=Shipyard.Hull.FRIGATE;
+        battle.setShipOrders(captain.id,BattleOrders.DEFAULT
+                .withPosition(BattleOrders.Position.HOLD)
+                .withEngagement(BattleOrders.Size.ESCORT,20,210)
+                .withEngagement(BattleOrders.Size.CAPITAL,100,400));
+        for(int tick=0;tick<18;tick++)battle.step();
+        check(captain.lastTargetId==far.id,
+                "Higher explicit capital priority did not override nearest contact");
+
+        // The power plant remains live and the captain has a retained ID.
+        // Only its radar/other live channels fail; cloaked hostiles remain
+        // beyond their actual passive-optical acquisition footprint.
+        captain.sensorsCondition=0;
+        check(captain.power>3&&
+                        !battle.hasTargetContact(captain,near,150)&&
+                        !battle.hasTargetContact(captain,far,240),
+                "Damaged electronics still supplied live targeting");
+        long before=battle.visualEvents().stream().filter(event->
+                event.sourceId()==captain.id&&
+                event.phase()==Battle.VisualPhase.FIRE&&
+                event.weapon().startsWith("LASER")).count();
+        for(int tick=0;tick<24;tick++)battle.step();
+        long after=battle.visualEvents().stream().filter(event->
+                event.sourceId()==captain.id&&
+                event.phase()==Battle.VisualPhase.FIRE&&
+                event.weapon().startsWith("LASER")).count();
+        check(captain.power>3&&after==before,
+                "Stale selected hostile authorized a fresh laser shot");
+        System.out.println("PASS captain contact: nearest, explicit class order and no stale-lock firing");
+    }
+
     private static void checkReplay(){
         Battle a=threat(682,false,BattleOrders.PointDefense.INTERCEPT_ONLY);
         Battle b=threat(682,false,BattleOrders.PointDefense.INTERCEPT_ONLY);
@@ -323,7 +396,7 @@ public final class BattleOrdersTest {
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,
                 "PD control must cycle through all four modes");
-        checkTargeting();checkReplay();checkPersistence();
+        checkTargeting();checkCausalCaptainFire();checkReplay();checkPersistence();
         System.out.println("PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay");
     }
 }
