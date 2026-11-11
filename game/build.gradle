@@ -460,3 +460,14 @@ tasks.register('remoteSessionSmoke', JavaExec) {
 tasks.matching { it.name == 'menuFlowSmoke' }.configureEach {
     dependsOn(tasks.named('remoteSessionSmoke'))
 }
+
+tasks.register('multiplayerBattleOverlaySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify battle-view return/status wording for live, disconnected and terminal multiplayer frames.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.MultiplayerBattleOverlayTest'
+    dependsOn testClasses
+}
+tasks.matching { it.name == 'menuFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('multiplayerBattleOverlaySmoke'))
+}

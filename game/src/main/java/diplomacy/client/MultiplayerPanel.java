@@ -31,7 +31,8 @@ final class MultiplayerPanel implements AutoCloseable {
     private final LocalProfile profile;
     private final TextField address,port,pin,password,label,card,notes,fleetFile;
     private final com.badlogic.gdx.scenes.scene2d.ui.List<String> servers,friends,fleetChecks;
-    private final Label status,matchRule;
+    private final Label status,matchRule,battleStatus;
+    private final Table battleOverlay=new Table();
     private volatile BattleConnection connection;
     private volatile boolean busy,closed;
     private Hbnet.Client secure;
@@ -56,8 +57,9 @@ final class MultiplayerPanel implements AutoCloseable {
         fleetChecks=new com.badlogic.gdx.scenes.scene2d.ui.List<>(skin);
         status=new Label("Known servers only. Presence: Unknown/unreachable.",skin);
         matchRule=new Label("HOST RULE: Connect to a capped PvP battle",skin);
+        battleStatus=new Label("",skin);
         root.setFillParent(true);root.pad(22);root.defaults().pad(4);root.add(new Label("MULTIPLAYER / PRIVATE DIRECTORY",skin)).colspan(4).left().row();
-        button(root,"Stream Safe: "+(profile.streamSafe()?"ON":"OFF"),()->{profile.streamSafe(!profile.streamSafe());refresh();status.setText("Stream Safe "+(profile.streamSafe()?"ON":"OFF"));});button(root,"Back",this::close);button(root,"Battle view (Tab returns)",()->battleView=true);root.row();
+        button(root,"Stream Safe: "+(profile.streamSafe()?"ON":"OFF"),()->{profile.streamSafe(!profile.streamSafe());refresh();status.setText("Stream Safe "+(profile.streamSafe()?"ON":"OFF"));});button(root,"Back",this::close);button(root,"Battle view (Tab returns)",this::enterBattleView);root.row();
         row("DNS/IP (masked)",address,"Port (masked)",port);row("Verified fingerprint",pin,"Room password/key",password);row("Private label",label,"Private notes",notes);
         button(root,"Connect TLS",()->join(false));button(root,"Trusted OPEN_LAN",()->join(true));button(root,"Reconnect TLS",()->reconnect());button(root,"Disconnect",()->{if(connection!=null)connection.close();matchRule.setText("HOST RULE: disconnected");fleetChecks.setItems(new String[0]);});root.row();
         root.add(matchRule).colspan(4).left().row();
@@ -74,7 +76,24 @@ final class MultiplayerPanel implements AutoCloseable {
         button(root,"Import friend",()->{profile.importCard(card.getText(),label.getText());card.setText("");refresh();});button(root,"Private copy: confirm",()->{copyArmed=true;status.setText("Clipboard/other apps may be captured. Press Copy own card to confirm private export.");});button(root,"Copy own card",()->{if(!copyArmed)throw Hbnet.failure();copyArmed=false;Gdx.app.getClipboard().setContents(profile.identity.card());status.setText("Private card copied; clipboard/OS capture remains outside game control.");});button(root,"Remove friend",()->{var f=selectedFriend();if(f!=null)profile.removeFriend(f.id());refresh();});root.row();
         button(root,"PD: balanced",()->order(BattleOrders.PointDefense.BALANCED));button(root,"PD: hold fire",()->order(BattleOrders.PointDefense.HOLD_FIRE));button(root,"PD: anti craft",()->order(BattleOrders.PointDefense.ANTI_CRAFT));button(root,"Edit/favorite friend",()->{var f=selectedFriend();if(f!=null)profile.edit(f.id(),label.getText(),notes.getText(),!f.favorite());refresh();});root.row();
         root.add(status).colspan(4).left().row();root.add(new Label("Authenticated snapshots / no local outcomes or campaign rewards. Esc returns.",skin)).colspan(4).left();
-        stage.addActor(root);refresh();Gdx.input.setInputProcessor(stage);
+
+        battleOverlay.setFillParent(true);
+        battleOverlay.top().pad(12);
+        battleOverlay.defaults().pad(5);
+        battleOverlay.add(battleStatus).expandX().left();
+        TextButton returnBattle=new TextButton("RETURN TO MULTIPLAYER  [TAB / BACK]",skin);
+        returnBattle.addListener(new ChangeListener(){
+            @Override public void changed(ChangeEvent event,Actor actor){
+                setBattleView(false);
+            }
+        });
+        battleOverlay.add(returnBattle).width(360).height(42).right();
+        battleOverlay.setVisible(false);
+        battleOverlay.setTouchable(Touchable.disabled);
+
+        stage.addActor(root);
+        stage.addActor(battleOverlay);
+        refresh();Gdx.input.setInputProcessor(stage);
     }
     private TextField field(String value,int max){TextField f=new TextField(value,skin);f.setPasswordMode(true);f.setPasswordCharacter('*');f.setMaxLength(max);f.setTextFieldFilter((field,c)->c>=32&&c<=126);return f;}
     private interface Action{void run()throws Exception;}
@@ -91,6 +110,29 @@ final class MultiplayerPanel implements AutoCloseable {
         Hbnet.Client tls=lan?null:new Hbnet.Client(pin.getText(),"catastrophic-diplomacy",profile.identity,password.getText().toCharArray());joinedAddress=host;joinedPort=p;openLan=lan;secure=tls;connectAsync(host,p,tls,lan);
     }
     private void reconnect()throws Exception{if(openLan||secure==null)throw Hbnet.failure();connectAsync(joinedAddress,joinedPort,secure,false);}
+    private void enterBattleView(){
+        BattleConnection link=connection;
+        if(link==null||link.snapshot()==null){
+            status.setText("No authoritative battle frame is available yet.");
+            return;
+        }
+        setBattleView(true);
+    }
+    private void setBattleView(boolean enabled){
+        if(battleView==enabled)return;
+        battleView=enabled;
+        root.setVisible(!enabled);
+        root.setTouchable(enabled?Touchable.disabled:Touchable.enabled);
+        battleOverlay.setVisible(enabled);
+        battleOverlay.setTouchable(enabled?Touchable.childrenOnly:Touchable.disabled);
+        if(enabled){
+            // A finger/key that began on a directory control cannot complete
+            // after the directory disappears underneath the battle framebuffer.
+            stage.cancelTouchFocus();
+            stage.unfocusAll();
+            Gdx.input.setOnscreenKeyboardVisible(false);
+        }
+    }
     private void connectAsync(String host,int p,Hbnet.Client tls,boolean lan){
         if(busy)return;busy=true;status.setText("Connecting privately...");
         Thread t=new Thread(()->{try{BattleConnection link=lan?BattleConnection.openLan(host,p,false):new BattleConnection(host,p,tls,false);Gdx.app.postRunnable(()->{busy=false;if(closed){link.close();return;}connection=link;fleetChecks.setItems(new String[0]);
@@ -140,11 +182,33 @@ final class MultiplayerPanel implements AutoCloseable {
     }
     private void order(BattleOrders.PointDefense pd)throws Exception{if(connection==null)throw Hbnet.failure();connection.order(pd,BattleOrders.Position.FREE);}
     void draw(){
-        if(Gdx.input.isKeyJustPressed(Input.Keys.TAB))battleView=!battleView;
-        if(Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)||Gdx.input.isKeyJustPressed(Input.Keys.BACK)){if(battleView){battleView=false;return;}close();return;}
-        if(battleView&&connection!=null&&connection.snapshot()!=null){drawBattle.accept(connection.snapshot());return;}
-        Gdx.gl.glClearColor(.015f,.025f,.055f,1);Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);stage.getViewport().update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight(),true);stage.act(Math.min(.05f,Gdx.graphics.getDeltaTime()));stage.draw();
-        BattleConnection link=connection;if(link!=null&&!link.connected())matchRule.setText("HOST RULE: disconnected");
+        if(Gdx.input.isKeyJustPressed(Input.Keys.TAB)){
+            if(battleView)setBattleView(false);else enterBattleView();
+        }
+        if(Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)||
+                Gdx.input.isKeyJustPressed(Input.Keys.BACK)){
+            if(battleView){setBattleView(false);return;}
+            close();return;
+        }
+        BattleConnection link=connection;
+        if(battleView&&link!=null&&link.snapshot()!=null){
+            BattleConnection.Snapshot snapshot=link.snapshot();
+            drawBattle.accept(snapshot);
+            battleStatus.setText(MultiplayerBattleOverlay.status(
+                    link.terminalOutcome(),link.connected(),link.team,snapshot.tick()));
+            // Draw only the battle overlay. The hidden directory root is both
+            // invisible and non-touchable, so no stale button can activate.
+            stage.getViewport().update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight(),true);
+            stage.act(Math.min(.05f,Gdx.graphics.getDeltaTime()));
+            stage.draw();
+            return;
+        }
+        Gdx.gl.glClearColor(.015f,.025f,.055f,1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        stage.getViewport().update(Gdx.graphics.getWidth(),Gdx.graphics.getHeight(),true);
+        stage.act(Math.min(.05f,Gdx.graphics.getDeltaTime()));
+        stage.draw();
+        if(link!=null&&!link.connected())matchRule.setText("HOST RULE: disconnected");
         if(link!=null&&link.snapshot()!=null){var s=link.snapshot();
             String result=link.terminalOutcome();
             status.setText(result.isEmpty()?"Authoritative tick "+s.tick()+" / fleet "+
@@ -152,7 +216,8 @@ final class MultiplayerPanel implements AutoCloseable {
                     (link.connected()?"connected":"connection ended"):
                     "BATTLE RESULT: "+result.replace('_',' ')+" / authoritative tick "+s.tick());
         }
-        else if(link!=null&&link.matchRules!=null)status.setText(link.fleetStatus()+" / "+link.lobbyStatus());
+        else if(link!=null&&link.matchRules!=null)
+            status.setText(link.fleetStatus()+" / "+link.lobbyStatus());
     }
     boolean closed(){return closed;}
     public void close(){if(closed)return;closed=true;if(connection!=null)connection.close();if(secure!=null)secure.clear();Gdx.input.setOnscreenKeyboardVisible(false);Gdx.input.setInputProcessor(previous);stage.dispose();shapes.dispose();skin.get("pixel",Texture.class).dispose();/* shared font belongs to game */back.run();}
