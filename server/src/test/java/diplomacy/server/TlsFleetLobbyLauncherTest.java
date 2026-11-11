@@ -35,12 +35,12 @@ public final class TlsFleetLobbyLauncherTest {
             Shipyard.Design right=Shipyard.starter(
                     Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE);
 
+            Hbnet.Client aTransport=new Hbnet.Client(provisioned.fingerprint,
+                    "catastrophic-diplomacy",one,room);
+            Hbnet.Client bTransport=new Hbnet.Client(provisioned.fingerprint,
+                    "catastrophic-diplomacy",two,room);
             try(BattleServer host=BattleServer.openConfigured(new String[]{
                         root.toString(),"0","lobby","3","127.0.0.1"});
-                Hbnet.Client aTransport=new Hbnet.Client(provisioned.fingerprint,
-                        "catastrophic-diplomacy",one,room);
-                Hbnet.Client bTransport=new Hbnet.Client(provisioned.fingerprint,
-                        "catastrophic-diplomacy",two,room);
                 BattleConnection a=new BattleConnection(
                         "127.0.0.1",host.port(),aTransport,false);
                 BattleConnection b=new BattleConnection(
@@ -72,6 +72,8 @@ public final class TlsFleetLobbyLauncherTest {
                         .filter(entity->entity instanceof BattleConnection.ShipEntity).count();
                 check(ships==4,"TLS launcher lost submitted fleet ships");
             }finally{
+                aTransport.clear();
+                bTransport.clear();
                 Arrays.fill(room,'\0');
             }
 
