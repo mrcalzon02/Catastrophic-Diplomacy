@@ -1273,3 +1273,14 @@ tasks.register('positionSubstepAB', JavaExec) {
     dependsOn tasks.named('testClasses')
     workingDir = rootProject.projectDir
 }
+
+tasks.register('networkSnapshotValidationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Reject malformed checksummed authoritative snapshots before replacing last-good client state.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.net.BattleConnectionSnapshotTest'
+    dependsOn testClasses
+}
+tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('networkSnapshotValidationSmoke'))
+}
