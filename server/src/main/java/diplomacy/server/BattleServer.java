@@ -46,7 +46,12 @@ public final class BattleServer implements AutoCloseable {
     private boolean terminalSent;
     private long lastPump=System.nanoTime(),accumulator,maxTickNanos,bytesQueued;
     private static final long STEP=1_000_000_000L/30;
-    private static final class Seat {final int team;long sequence;boolean active;Seat(int team){this.team=team;}}
+    private static final class Seat {
+        final int team;
+        long sequence;
+        boolean active,ready;
+        Seat(int team){this.team=team;}
+    }
     private static final class Peer {
         final Socket socket;final Seat seat;
         final ArrayBlockingQueue<List<String>> output=new ArrayBlockingQueue<>(16);
@@ -224,7 +229,11 @@ public final class BattleServer implements AutoCloseable {
         }catch(IOException|RuntimeException expected){/* neutral close: never echo peer data */}
         finally{if(peer!=null)synchronized(lock){
             peers.remove(peer);peer.seat.active=false;
-            if(battle==null&&peer.seat.team>=0){submitted[peer.seat.team]=null;broadcastLobby();}
+            if(battle==null&&peer.seat.team>=0){
+                peer.seat.ready=false;
+                submitted[peer.seat.team]=null;
+                broadcastLobby();
+            }
             if(transport==null)seats.remove(signer); // LAN has no persistent signer; reclaim its seat.
         }if(peer!=null)peer.output.offer(List.of());}
     }
@@ -238,6 +247,39 @@ public final class BattleServer implements AutoCloseable {
             return;
         }
         if(p[0].startsWith("FLEET_")){receiveFleet(peer,p);return;}
+        if(p[0].equals("READY")){
+            if(p.length!=2||(!"0".equals(p[1])&&!"1".equals(p[1]))||
+                    hostRules==null||battle!=null||peer.seat.team<0)
+                throw Hbnet.failure();
+            boolean next="1".equals(p[1]);
+            if(next&&submitted[peer.seat.team]==null){
+                peer.send(List.of("REJECT|NO_FLEET"));
+                return;
+            }
+            peer.seat.ready=next;
+            broadcastLobby();
+            return;
+        }
+        if(p.length==1&&p[0].equals("START")){
+            if(hostRules==null||battle!=null||peer.seat.team!=0){
+                peer.send(List.of("REJECT|HOST_ONLY"));
+                return;
+            }
+            Seat left=seatForTeam(0),right=seatForTeam(1);
+            if(submitted[0]==null||submitted[1]==null||
+                    left==null||right==null||!left.ready||!right.ready){
+                peer.send(List.of("REJECT|NOT_READY"));
+                return;
+            }
+            TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+            battle=Battle.duel(matchSeed,submitted[0].ships(),submitted[1].ships(),catalog);
+            List<String> initial=snapshot();
+            for(Peer connected:peers){
+                connected.send(List.of("BATTLE_START|"+matchSeed));
+                connected.sendState(initial);
+            }
+            return;
+        }
         if(battle==null){peer.send(List.of("REJECT|NOT_READY"));return;}
         if(p.length!=6||!p[0].equals("ORDER")||!p[1].matches("[0-9]{1,15}")||!p[2].matches("[0-9]{1,15}")||!p[3].matches("[01]"))throw Hbnet.failure();
         long sequence=Long.parseLong(p[1]),at=Long.parseLong(p[2]);int team=Integer.parseInt(p[3]);
@@ -267,6 +309,7 @@ public final class BattleServer implements AutoCloseable {
                         throw new IllegalArgumentException("Fleet wire limit");
                     peer.clearUpload();peer.upload=new StringBuilder(length);
                     peer.expectedLength=length;peer.expectedParts=parts;peer.expectedHash=p[3];
+                    peer.seat.ready=false;
                     submitted[team]=null;broadcastLobby();
                 }
                 case "FLEET_PART" -> {
@@ -289,27 +332,29 @@ public final class BattleServer implements AutoCloseable {
                     TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
                     SkirmishFleet fleet=SkirmishFleetCodec.decode(new String(raw,StandardCharsets.UTF_8),catalog);
                     fleet.requireAllowed(hostRules,catalog); // actual fittings, not claimed tier
-                    submitted[team]=fleet;peer.clearUpload();
+                    submitted[team]=fleet;
+                    peer.seat.ready=false;
+                    peer.clearUpload();
                     peer.send(List.of("FLEET_ACCEPT|"+team+"|"+fleet.size()));
                     broadcastLobby();
-                    if(submitted[0]!=null&&submitted[1]!=null){
-                        battle=Battle.duel(matchSeed,submitted[0].ships(),submitted[1].ships(),catalog);
-                        List<String> initial=snapshot();
-                        for(Peer connected:peers){
-                            connected.send(List.of("BATTLE_START|"+matchSeed));
-                            connected.sendState(initial);
-                        }
-                    }
                 }
                 default -> throw new IllegalArgumentException("Unknown fleet command");
             }
         }catch(IllegalArgumentException invalid){
-            peer.clearUpload();submitted[team]=null;
+            peer.clearUpload();
+            peer.seat.ready=false;
+            submitted[team]=null;
             peer.send(List.of("FLEET_REJECT|INVALID"));broadcastLobby();
         }
     }
+    private Seat seatForTeam(int team){
+        for(Seat seat:seats.values())if(seat.team==team)return seat;
+        return null;
+    }
     private void broadcastLobby(){
-        String state="LOBBY|"+(submitted[0]==null?0:1)+"|"+(submitted[1]==null?0:1);
+        Seat left=seatForTeam(0),right=seatForTeam(1);
+        String state="LOBBY|"+(submitted[0]==null?0:1)+"|"+(submitted[1]==null?0:1)+
+                "|"+(left!=null&&left.ready?1:0)+"|"+(right!=null&&right.ready?1:0);
         for(Peer connected:peers)connected.send(List.of(state));
     }
     private void pump(){
@@ -369,7 +414,11 @@ public final class BattleServer implements AutoCloseable {
         return value.isEmpty()?"-":value;
     }
     private List<String> snapshot(){
-        if(battle==null)return List.of("LOBBY|"+(submitted[0]==null?0:1)+"|"+(submitted[1]==null?0:1));
+        if(battle==null){
+            Seat left=seatForTeam(0),right=seatForTeam(1);
+            return List.of("LOBBY|"+(submitted[0]==null?0:1)+"|"+(submitted[1]==null?0:1)+
+                    "|"+(left!=null&&left.ready?1:0)+"|"+(right!=null&&right.ready?1:0));
+        }
         List<String> body=new ArrayList<>();
         for(Battle.Ship s:battle.ships()){
             Shipyard.Hull hull=s.hullClass==null?Shipyard.Hull.CORVETTE:s.hullClass;

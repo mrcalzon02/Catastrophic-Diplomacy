@@ -66,7 +66,12 @@ final class MultiplayerPanel implements AutoCloseable {
         row("Fleet file",fleetFile,"Local directory",new Label("shipyard/ (read-only preview)",skin));
         button(root,"Check fleet vs host",this::checkFleet);
         button(root,"Submit fleet to host",this::submitFleet);
-        root.add(new Label("Host validates both fleets before spawning; no ready-up yet",skin)).colspan(2).left().row();
+        button(root,"READY",()->setReady(true));
+        button(root,"UNREADY",()->setReady(false));
+        root.row();
+        button(root,"START BATTLE (HOST)",this::startBattle);
+        root.add(new Label("Both accepted fleets must be ready. Team 0 is the authenticated host seat.",skin))
+                .colspan(3).left().row();
         root.add(new ScrollPane(fleetChecks,skin)).height(78).growX().colspan(4).row();
         root.add(new Label("SAVED SERVERS",skin)).colspan(2);root.add(new Label("FRIENDS / NO GLOBAL PRESENCE",skin)).colspan(2).row();
         root.add(new ScrollPane(servers,skin)).height(95).growX().colspan(2);root.add(new ScrollPane(friends,skin)).height(95).growX().colspan(2).row();
@@ -179,6 +184,18 @@ final class MultiplayerPanel implements AutoCloseable {
         fleet.requireAllowed(link.matchRules,catalog); // early UI feedback; host checks again
         link.submitFleet(saved);
         status.setText("Fleet submitted for independent host validation");
+    }
+    private void setReady(boolean value)throws Exception{
+        BattleConnection link=connection;
+        if(link==null)throw Hbnet.failure();
+        link.ready(value);
+        status.setText(value?"Ready request sent to host":"Unready request sent to host");
+    }
+    private void startBattle()throws Exception{
+        BattleConnection link=connection;
+        if(link==null||!link.hostSeat())throw Hbnet.failure();
+        link.startBattle();
+        status.setText("Host start requested; both seats must remain ready");
     }
     private void order(BattleOrders.PointDefense pd)throws Exception{if(connection==null)throw Hbnet.failure();connection.order(pd,BattleOrders.Position.FREE);}
     void draw(){

@@ -17,6 +17,17 @@ public final class FleetLobbyTest {
         while(System.nanoTime()<end){if(yes.getAsBoolean())return;Thread.sleep(20);}
         throw new AssertionError("Fleet lobby deadline");
     }
+    private static void readyAndStart(BattleConnection hostSeat,
+                                      BattleConnection other)throws Exception{
+        hostSeat.ready(true);
+        other.ready(true);
+        until(()->hostSeat.lobbyReady(0)&&hostSeat.lobbyReady(1)&&
+                other.lobbyReady(0)&&other.lobbyReady(1));
+        check(hostSeat.snapshot()==null&&other.snapshot()==null,
+                "Ready state spawned battle before explicit host start");
+        hostSeat.startBattle();
+        until(()->hostSeat.snapshot()!=null&&other.snapshot()!=null);
+    }
     private static Shipyard.Design rank(Shipyard.Design basic,TechnologyCatalog tech,int stage){
         int laser=-1;
         for(int i=0;i<basic.slots();i++)
@@ -48,8 +59,13 @@ public final class FleetLobbyTest {
             until(()->a.fleetStatus().startsWith("Accepted"));
             check(host.lobbyWaiting()&&b.snapshot()==null,"One accepted seat must not spawn");
             b.submitFleet(SkirmishFleetCodec.encode(SkirmishFleet.repeat(other,2),tech));
-            until(()->a.snapshot()!=null&&b.snapshot()!=null);
-            check(!host.lobbyWaiting()&&host.tick()>=0,"Two legal submissions start battle");
+            until(()->a.lobbyAccepted(0)&&a.lobbyAccepted(1));
+            check(host.lobbyWaiting()&&host.tick()==0&&a.snapshot()==null&&b.snapshot()==null,
+                    "Two legal submissions must wait for ready/start");
+            try{b.startBattle();throw new AssertionError("Non-host start call allowed");}
+            catch(java.io.IOException expected){/* client rejects non-host start */}
+            readyAndStart(a,b);
+            check(!host.lobbyWaiting()&&host.tick()>=0,"Host start did not create battle");
             check(a.snapshot().entities().stream().filter(s->s.startsWith("SHIP|")).count()==4,
                     "Authoritative battle must contain four fitted ships");
         }
@@ -61,6 +77,18 @@ public final class FleetLobbyTest {
             until(()->a.fleetStatus().startsWith("Accepted"));
             check(a.snapshot()==null,"No premature mixed-tier spawn");
             b.submitFleet(SkirmishFleetCodec.encode(SkirmishFleet.repeat(other,2),tech));
+            until(()->a.lobbyAccepted(0)&&a.lobbyAccepted(1));
+            a.ready(true);b.ready(true);
+            until(()->a.lobbyReady(0)&&a.lobbyReady(1));
+            a.submitFleet(SkirmishFleetCodec.encode(new SkirmishFleet(List.of(basic,t3,t6)),tech));
+            until(()->a.lobbyAccepted(0)&&!a.lobbyReady(0));
+            a.startBattle();
+            Thread.sleep(120);
+            check(a.snapshot()==null&&b.snapshot()==null,
+                    "Fleet replacement retained stale readiness");
+            a.ready(true);
+            until(()->a.lobbyReady(0)&&a.lobbyReady(1));
+            a.startBattle();
             until(()->a.snapshot()!=null&&b.snapshot()!=null);
             check(a.snapshot().entities().stream().filter(s->s.startsWith("SHIP|")).count()==5,
                     "Tech 6 must preserve mixed lower-tier ships");
@@ -72,16 +100,17 @@ public final class FleetLobbyTest {
             BattleConnection a=BattleConnection.openLan("127.0.0.1",host.port(),false);
             BattleConnection b=BattleConnection.openLan("127.0.0.1",host.port(),false)){
             a.submitFleet(SkirmishFleetCodec.encode(new SkirmishFleet(List.of(basic,t3)),tech));
-            until(()->b.lobbyStatus().equals("Accepted seats 1/0"));
+            until(()->b.lobbyAccepted(0)&&!b.lobbyAccepted(1));
             a.close();
-            until(()->b.lobbyStatus().equals("Accepted seats 0/0"));
+            until(()->!b.lobbyAccepted(0)&&!b.lobbyAccepted(1));
             check(host.lobbyWaiting()&&host.tick()==0&&b.snapshot()==null,
                     "Disconnect must invalidate its accepted fleet");
             try(BattleConnection replacement=BattleConnection.openLan("127.0.0.1",host.port(),false)){
                 check(replacement.team==0,"LAN disconnect must free the original seat");
                 replacement.submitFleet(SkirmishFleetCodec.encode(new SkirmishFleet(List.of(basic,t3)),tech));
                 b.submitFleet(SkirmishFleetCodec.encode(SkirmishFleet.repeat(other,2),tech));
-                until(()->replacement.snapshot()!=null&&b.snapshot()!=null);
+                until(()->replacement.lobbyAccepted(0)&&replacement.lobbyAccepted(1));
+                readyAndStart(replacement,b);
                 check(replacement.snapshot().entities().stream().filter(s->s.startsWith("SHIP|")).count()==4,
                         "Replacement must submit a fresh legal fleet");
             }
@@ -101,6 +130,6 @@ public final class FleetLobbyTest {
             for(int i=0;i<4;i++)if(Hbnet.read(raw.getInputStream()).equals("FLEET_REJECT|INVALID")){rejected=true;break;}
             check(rejected&&host.tick()==0,"Spoofed team header rejected");
         }
-        System.out.println("PASS two-client fleet lobby Tech3/6, mixed tiers, bad/oversize/spoof rejection and real battle snapshots");
+        System.out.println("PASS two-client fleet lobby: accepted fleets, explicit ready/unready, host-only start, readiness invalidation, Tech3/6 and malformed rejection");
     }
 }

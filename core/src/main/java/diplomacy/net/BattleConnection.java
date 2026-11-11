@@ -87,11 +87,21 @@ public final class BattleConnection implements AutoCloseable {
     private volatile Snapshot snapshot;
     private volatile long acknowledged;
     private volatile boolean connected=true;
+    private volatile boolean leftAccepted,rightAccepted,leftReady,rightReady;
     private volatile String fleetStatus="No fleet submitted",lobbyStatus="Waiting for lobby";
     /** Host-issued real outcome, independent from whichever ship remains on screen. */
     private volatile String terminalOutcome="";
     public String fleetStatus(){return fleetStatus;}
     public String lobbyStatus(){return lobbyStatus;}
+    public boolean lobbyAccepted(int side){
+        if(side<0||side>1)throw new IllegalArgumentException("Invalid lobby side");
+        return side==0?leftAccepted:rightAccepted;
+    }
+    public boolean lobbyReady(int side){
+        if(side<0||side>1)throw new IllegalArgumentException("Invalid lobby side");
+        return side==0?leftReady:rightReady;
+    }
+    public boolean hostSeat(){return team==0;}
     public String terminalOutcome(){return terminalOutcome;}
     public BattleConnection(String address,int port,Hbnet.Client transport,boolean spectate)throws IOException{
         this(transport.connect(address,port),spectate);
@@ -151,6 +161,14 @@ public final class BattleConnection implements AutoCloseable {
         for(int i=0;i<parts;i++)Hbnet.write(socket.getOutputStream(),
                 "FLEET_PART|"+i+"|"+wire.substring(i*2800,Math.min(wire.length(),(i+1)*2800)));
         Hbnet.write(socket.getOutputStream(),"FLEET_END");
+    }
+    public synchronized void ready(boolean value)throws IOException{
+        if(!connected||team<0||matchRules==null||snapshot!=null)throw Hbnet.failure();
+        Hbnet.write(socket.getOutputStream(),"READY|"+(value?1:0));
+    }
+    public synchronized void startBattle()throws IOException{
+        if(!connected||team!=0||matchRules==null||snapshot!=null)throw Hbnet.failure();
+        Hbnet.write(socket.getOutputStream(),"START");
     }
     private static IllegalArgumentException malformed(){
         return new IllegalArgumentException("Malformed authoritative snapshot");
@@ -330,7 +348,15 @@ public final class BattleConnection implements AutoCloseable {
             if(p[0].equals("ACK")&&p.length==3){acknowledged=Long.parseLong(p[1]);continue;}
             if(p[0].equals("FLEET_ACCEPT")&&p.length==3){fleetStatus="Accepted by host: "+p[2]+" ships for seat "+p[1];continue;}
             if(p[0].equals("FLEET_REJECT")&&p.length==2){fleetStatus="Rejected by host: "+p[1];continue;}
-            if(p[0].equals("LOBBY")&&p.length==3){lobbyStatus="Accepted seats "+p[1]+"/"+p[2];continue;}
+            if(p[0].equals("LOBBY")&&(p.length==3||p.length==5)){
+                leftAccepted="1".equals(p[1]);rightAccepted="1".equals(p[2]);
+                if(p.length==5){
+                    leftReady="1".equals(p[3]);rightReady="1".equals(p[4]);
+                }else leftReady=rightReady=false;
+                lobbyStatus="Accepted seats "+(leftAccepted?1:0)+"/"+(rightAccepted?1:0)+
+                        " | Ready "+(leftReady?1:0)+"/"+(rightReady?1:0);
+                continue;
+            }
             if(p[0].equals("BATTLE_START")&&p.length==2){lobbyStatus="Authoritative battle started";continue;}
             if(p[0].equals("RESULT")&&p.length==3){
                 // Preserve the authoritative, fully parsed last snapshot.
