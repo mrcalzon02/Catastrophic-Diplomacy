@@ -3,6 +3,8 @@ package diplomacy.server;
 import diplomacy.net.BattleConnection;
 import diplomacy.shipyard.*;
 import diplomacy.sim.Battle;
+import diplomacy.sim.SensorActiveScan;
+import diplomacy.sim.SensorScanOrder;
 import diplomacy.tech.TechnologyCatalog;
 import hbnet.*;
 import java.net.*;
@@ -69,12 +71,17 @@ public final class TlsFleetLobbyLauncherTest {
                         b.lobbyAccepted(0)&&b.lobbyAccepted(1));
                 check(a.snapshot()==null&&b.snapshot()==null,
                         "Accepted TLS fleets auto-started without readiness");
+                a.scanOrder(0,new SensorScanOrder(SensorActiveScan.Mode.XRAY_BURST,0));
+                until(()->a.scanStatus().startsWith("Accepted"));
                 a.ready(true);b.ready(true);
                 until(()->a.lobbyReady(0)&&a.lobbyReady(1));
                 a.startBattle();
                 until(()->a.snapshot()!=null&&b.snapshot()!=null);
                 check(!host.lobbyWaiting()&&a.protocolVersion==2&&b.protocolVersion==2,
                         "Configured TLS lobby did not start authoritative v2 battle");
+                check(host.scanMode(0,0)==SensorActiveScan.Mode.XRAY_BURST&&
+                                host.scanFocusTargetId(0,0)==host.shipIdAt(1,0),
+                        "Pinned-TLS lobby lost authorized focused scan setup");
                 long ships=a.snapshot().decodedEntities().stream()
                         .filter(entity->entity instanceof BattleConnection.ShipEntity).count();
                 check(ships==4,"TLS launcher lost submitted fleet ships");
@@ -94,7 +101,7 @@ public final class TlsFleetLobbyLauncherTest {
                         root.resolve("missing").toString(),Integer.toString(loopbackPort()),"lobby","3","127.0.0.1"});
                 throw new AssertionError("Missing TLS identity silently downgraded");
             }catch(Exception expected){/* no plaintext fallback */}
-            System.out.println("PASS dedicated TLS lobby launcher: persistent pin, Tech III rules, two submitted fleets, ready/start and no plaintext fallback");
+            System.out.println("PASS dedicated TLS lobby launcher: persistent pin, Tech III rules, submitted fleets, scan setup, ready/start and no plaintext fallback");
         }finally{
             try(var files=Files.walk(root)){
                 for(Path p:files.sorted(Comparator.reverseOrder()).toList())

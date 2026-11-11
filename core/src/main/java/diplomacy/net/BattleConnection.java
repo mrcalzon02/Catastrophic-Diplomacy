@@ -5,6 +5,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.BattleArena;
 import diplomacy.sim.BattleOrders;
 import diplomacy.sim.FighterModel;
+import diplomacy.sim.SensorScanOrder;
 import diplomacy.sim.WeaponMuzzles;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.SkirmishTechnologyRules;
@@ -91,10 +92,12 @@ public final class BattleConnection implements AutoCloseable {
     private volatile String disconnectStatus="CONNECTED";
     private volatile boolean leftAccepted,rightAccepted,leftReady,rightReady;
     private volatile String fleetStatus="No fleet submitted",lobbyStatus="Waiting for lobby";
+    private volatile String scanStatus="No scan overrides submitted";
     /** Host-issued real outcome, independent from whichever ship remains on screen. */
     private volatile String terminalOutcome="";
     public String fleetStatus(){return fleetStatus;}
     public String lobbyStatus(){return lobbyStatus;}
+    public String scanStatus(){return scanStatus;}
     public boolean lobbyAccepted(int side){
         if(side<0||side>1)throw new IllegalArgumentException("Invalid lobby side");
         return side==0?leftAccepted:rightAccepted;
@@ -164,6 +167,14 @@ public final class BattleConnection implements AutoCloseable {
         for(int i=0;i<parts;i++)Hbnet.write(socket.getOutputStream(),
                 "FLEET_PART|"+i+"|"+wire.substring(i*2800,Math.min(wire.length(),(i+1)*2800)));
         Hbnet.write(socket.getOutputStream(),"FLEET_END");
+    }
+    public synchronized void scanOrder(int shipSlot,SensorScanOrder order)throws IOException{
+        if(!connected||team<0||matchRules==null||snapshot!=null||
+                shipSlot<0||shipSlot>=BattleArena.MAX_SHIPS_PER_SIDE||order==null)
+            throw Hbnet.failure();
+        Hbnet.write(socket.getOutputStream(),"SCAN|"+shipSlot+"|"+
+                order.mode()+"|"+order.hostileSlot());
+        scanStatus="Submitting scan doctrine for ship "+(shipSlot+1);
     }
     public synchronized void ready(boolean value)throws IOException{
         if(!connected||team<0||matchRules==null||snapshot!=null)throw Hbnet.failure();
@@ -362,6 +373,16 @@ public final class BattleConnection implements AutoCloseable {
             if(p[0].equals("ACK")&&p.length==3){acknowledged=Long.parseLong(p[1]);continue;}
             if(p[0].equals("FLEET_ACCEPT")&&p.length==3){fleetStatus="Accepted by host: "+p[2]+" ships for seat "+p[1];continue;}
             if(p[0].equals("FLEET_REJECT")&&p.length==2){fleetStatus="Rejected by host: "+p[1];continue;}
+            if(p[0].equals("SCAN_ACCEPT")&&p.length==4){
+                scanStatus="Accepted ship "+(Integer.parseInt(p[1])+1)+" / "+
+                        p[2].replace('_',' ')+(Integer.parseInt(p[3])>=0?
+                        " / hostile "+(Integer.parseInt(p[3])+1):"");
+                continue;
+            }
+            if(p[0].equals("SCAN_REJECT")&&p.length==2){
+                scanStatus="Rejected scan order: "+p[1];
+                continue;
+            }
             if(p[0].equals("LOBBY")&&(p.length==3||p.length==5)){
                 leftAccepted="1".equals(p[1]);rightAccepted="1".equals(p[2]);
                 if(p.length==5){

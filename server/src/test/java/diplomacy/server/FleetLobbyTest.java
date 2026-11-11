@@ -3,6 +3,8 @@ package diplomacy.server;
 import diplomacy.net.BattleConnection;
 import diplomacy.shipyard.*;
 import diplomacy.sim.Battle;
+import diplomacy.sim.SensorActiveScan;
+import diplomacy.sim.SensorScanOrder;
 import diplomacy.tech.TechnologyCatalog;
 import hbnet.Hbnet;
 import java.net.Socket;
@@ -62,10 +64,17 @@ public final class FleetLobbyTest {
             until(()->a.lobbyAccepted(0)&&a.lobbyAccepted(1));
             check(host.lobbyWaiting()&&host.tick()==0&&a.snapshot()==null&&b.snapshot()==null,
                     "Two legal submissions must wait for ready/start");
+            a.scanOrder(0,new SensorScanOrder(SensorActiveScan.Mode.FOCUSED_RADAR,0));
+            b.scanOrder(1,new SensorScanOrder(SensorActiveScan.Mode.PASSIVE,-1));
+            until(()->a.scanStatus().startsWith("Accepted")&&b.scanStatus().startsWith("Accepted"));
             try{b.startBattle();throw new AssertionError("Non-host start call allowed");}
             catch(java.io.IOException expected){/* client rejects non-host start */}
             readyAndStart(a,b);
             check(!host.lobbyWaiting()&&host.tick()>=0,"Host start did not create battle");
+            check(host.scanMode(0,0)==SensorActiveScan.Mode.FOCUSED_RADAR&&
+                            host.scanFocusTargetId(0,0)==host.shipIdAt(1,0)&&
+                            host.scanMode(1,1)==SensorActiveScan.Mode.PASSIVE,
+                    "Authorized prebattle scan orders did not reach real server ships");
             check(a.snapshot().entities().stream().filter(s->s.startsWith("SHIP|")).count()==4,
                     "Authoritative battle must contain four fitted ships");
         }
@@ -79,6 +88,10 @@ public final class FleetLobbyTest {
             b.submitFleet(SkirmishFleetCodec.encode(SkirmishFleet.repeat(other,2),tech));
             until(()->a.lobbyAccepted(0)&&a.lobbyAccepted(1));
             a.ready(true);b.ready(true);
+            until(()->a.lobbyReady(0)&&a.lobbyReady(1));
+            a.scanOrder(0,new SensorScanOrder(SensorActiveScan.Mode.BOOSTED_RADAR,-1));
+            until(()->a.scanStatus().startsWith("Accepted")&&!a.lobbyReady(0));
+            a.ready(true);
             until(()->a.lobbyReady(0)&&a.lobbyReady(1));
             a.submitFleet(SkirmishFleetCodec.encode(new SkirmishFleet(List.of(basic,t3,t6)),tech));
             until(()->a.lobbyAccepted(0)&&!a.lobbyReady(0));
@@ -130,6 +143,6 @@ public final class FleetLobbyTest {
             for(int i=0;i<4;i++)if(Hbnet.read(raw.getInputStream()).equals("FLEET_REJECT|INVALID")){rejected=true;break;}
             check(rejected&&host.tick()==0,"Spoofed team header rejected");
         }
-        System.out.println("PASS two-client fleet lobby: accepted fleets, explicit ready/unready, host-only start, readiness invalidation, Tech3/6 and malformed rejection");
+        System.out.println("PASS two-client fleet lobby: accepted fleets, persistent prebattle scan orders, ready/unready, host-only start, readiness invalidation, Tech3/6 and malformed rejection");
     }
 }

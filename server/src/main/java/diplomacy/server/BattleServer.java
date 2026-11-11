@@ -48,6 +48,7 @@ public final class BattleServer implements AutoCloseable {
     private static final long STEP=1_000_000_000L/30;
     private static final class Seat {
         final int team;
+        final Map<Integer,SensorScanOrder> scans=new HashMap<>();
         long sequence;
         boolean active,ready;
         Seat(int team){this.team=team;}
@@ -231,6 +232,7 @@ public final class BattleServer implements AutoCloseable {
             peers.remove(peer);peer.seat.active=false;
             if(battle==null&&peer.seat.team>=0){
                 peer.seat.ready=false;
+                peer.seat.scans.clear();
                 submitted[peer.seat.team]=null;
                 broadcastLobby();
             }
@@ -247,6 +249,45 @@ public final class BattleServer implements AutoCloseable {
             return;
         }
         if(p[0].startsWith("FLEET_")){receiveFleet(peer,p);return;}
+        if(p[0].equals("SCAN")){
+            if(p.length!=4||hostRules==null||battle!=null||peer.seat.team<0){
+                peer.send(List.of("SCAN_REJECT|UNAVAILABLE"));
+                return;
+            }
+            int slot,focus;
+            SensorActiveScan.Mode mode;
+            try{
+                slot=Integer.parseInt(p[1]);
+                mode=SensorActiveScan.Mode.valueOf(p[2]);
+                focus=Integer.parseInt(p[3]);
+            }catch(RuntimeException invalid){
+                peer.send(List.of("SCAN_REJECT|INVALID"));
+                return;
+            }
+            int team=peer.seat.team,other=1-team;
+            if(submitted[team]==null||slot<0||slot>=submitted[team].size()){
+                peer.send(List.of("SCAN_REJECT|SHIP_SLOT"));
+                return;
+            }
+            SensorScanOrder scan;
+            try{scan=new SensorScanOrder(mode,focus);}
+            catch(IllegalArgumentException invalid){
+                peer.send(List.of("SCAN_REJECT|INVALID"));
+                return;
+            }
+            if(scan.focused()&&(submitted[other]==null||
+                    scan.hostileSlot()>=submitted[other].size())){
+                peer.send(List.of("SCAN_REJECT|HOSTILE_SLOT"));
+                return;
+            }
+            SensorScanOrder previous=peer.seat.scans.put(slot,scan);
+            if(!scan.equals(previous)){
+                peer.seat.ready=false;
+                broadcastLobby();
+            }
+            peer.send(List.of("SCAN_ACCEPT|"+slot+"|"+mode+"|"+focus));
+            return;
+        }
         if(p[0].equals("READY")){
             if(p.length!=2||(!"0".equals(p[1])&&!"1".equals(p[1]))||
                     hostRules==null||battle!=null||peer.seat.team<0)
@@ -273,6 +314,7 @@ public final class BattleServer implements AutoCloseable {
             }
             TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
             battle=Battle.duel(matchSeed,submitted[0].ships(),submitted[1].ships(),catalog);
+            applySubmittedScans();
             List<String> initial=snapshot();
             for(Peer connected:peers){
                 connected.send(List.of("BATTLE_START|"+matchSeed));
@@ -310,6 +352,7 @@ public final class BattleServer implements AutoCloseable {
                     peer.clearUpload();peer.upload=new StringBuilder(length);
                     peer.expectedLength=length;peer.expectedParts=parts;peer.expectedHash=p[3];
                     peer.seat.ready=false;
+                    peer.seat.scans.clear();
                     submitted[team]=null;broadcastLobby();
                 }
                 case "FLEET_PART" -> {
@@ -343,6 +386,7 @@ public final class BattleServer implements AutoCloseable {
         }catch(IllegalArgumentException invalid){
             peer.clearUpload();
             peer.seat.ready=false;
+            peer.seat.scans.clear();
             submitted[team]=null;
             peer.send(List.of("FLEET_REJECT|INVALID"));broadcastLobby();
         }
@@ -350,6 +394,50 @@ public final class BattleServer implements AutoCloseable {
     private Seat seatForTeam(int team){
         for(Seat seat:seats.values())if(seat.team==team)return seat;
         return null;
+    }
+    private List<Battle.Ship> teamShips(int team){
+        ArrayList<Battle.Ship> result=new ArrayList<>();
+        if(battle!=null)for(Battle.Ship ship:battle.ships())
+            if(ship.team==team)result.add(ship);
+        return result;
+    }
+    private void applySubmittedScans(){
+        if(battle==null||battle.tick!=0)
+            throw new IllegalStateException("Scan setup must precede authoritative tick 1");
+        List<Battle.Ship> left=teamShips(0),right=teamShips(1);
+        for(int team=0;team<2;team++){
+            Seat seat=seatForTeam(team);
+            if(seat==null)continue;
+            List<Battle.Ship> own=team==0?left:right;
+            List<Battle.Ship> hostile=team==0?right:left;
+            for(var entry:seat.scans.entrySet()){
+                int slot=entry.getKey();
+                if(slot<0||slot>=own.size())
+                    throw new IllegalStateException("Accepted scan references missing ship");
+                entry.getValue().apply(battle,own.get(slot),hostile);
+            }
+        }
+    }
+    SensorActiveScan.Mode scanMode(int team,int slot){
+        synchronized(lock){
+            List<Battle.Ship> ships=teamShips(team);
+            if(slot<0||slot>=ships.size())throw new IllegalArgumentException("Missing scan ship");
+            return ships.get(slot).scan.mode();
+        }
+    }
+    int scanFocusTargetId(int team,int slot){
+        synchronized(lock){
+            List<Battle.Ship> ships=teamShips(team);
+            if(slot<0||slot>=ships.size())throw new IllegalArgumentException("Missing scan ship");
+            return ships.get(slot).scan.focusTargetId();
+        }
+    }
+    int shipIdAt(int team,int slot){
+        synchronized(lock){
+            List<Battle.Ship> ships=teamShips(team);
+            if(slot<0||slot>=ships.size())throw new IllegalArgumentException("Missing ship slot");
+            return ships.get(slot).id;
+        }
     }
     private void broadcastLobby(){
         Seat left=seatForTeam(0),right=seatForTeam(1);
