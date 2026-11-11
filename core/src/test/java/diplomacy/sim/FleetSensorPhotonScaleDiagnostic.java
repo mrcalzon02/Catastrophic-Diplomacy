@@ -88,7 +88,11 @@ public final class FleetSensorPhotonScaleDiagnostic {
                         finalReport.explanation());
         return design;
     }
-    private static Battle create(TechnologyCatalog catalog,int count,long seed){
+
+    /** Preserve the real approved fitter and deployment for the short
+     * required 200v200 sensor-budget acceptance; it is not a synthetic
+     * test-only ship or unlimited target-information shortcut. */
+    static Battle create(TechnologyCatalog catalog,int count,long seed){
         Battle sim=new Battle(seed);
         Battle.Faction[] factions={Battle.Faction.TERRAN,Battle.Faction.DRAXIAN};
         for(int team=0;team<2;team++){

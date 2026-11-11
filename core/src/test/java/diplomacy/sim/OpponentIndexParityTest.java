@@ -67,6 +67,43 @@ public final class OpponentIndexParityTest {
                 local,limited,shared,sharedLimited);
     }
 
+
+    /**
+     * Two real 30Hz seconds using the paid DREADNOUGHT RDR/SHR/RES/TRK/LNK/
+     * FCM/CAP fleet. Complement the separate ordinary demonstration A/B;
+     * the latter deliberately has no such network equipment installed.
+     * This is a functional causality/budget gate, never a GPU/FPS threshold.
+     */
+    private static void inspectFittedOpening(TechnologyCatalog catalog){
+        Battle fitted=FleetSensorPhotonScaleDiagnostic.create(
+                catalog,200,2026110308L);
+        check(fitted.ships().size()==400 && fitted.alive(0)==200 &&
+                        fitted.alive(1)==200,
+                "Fitted sensor test did not construct 200v200 real ships");
+        int fcmHulls=0,capHulls=0;
+        for(Battle.Ship ship:fitted.ships()){
+            if(ship.network.commandCapacity()>0)fcmHulls++;
+            if(ship.network.targetCapacity()>1)capHulls++;
+        }
+        check(fcmHulls>0&&capHulls>0,
+                "200v200 opening lacks physical FCM and CAP hardware");
+        SensorSnapshot previous=null;
+        for(int i=1;i<=60;i++){
+            fitted.step();
+            if(i!=30&&i!=60)continue;
+            check(fitted.tick==i,"200v200 sensor simulation did not advance");
+            SensorSnapshot snapshot=inspectSensors(fitted);
+            if(previous!=null)
+                check(snapshot.localSolves()>=previous.localSolves()&&
+                                snapshot.fcmSolves()>=previous.fcmSolves(),
+                        "200v200 work-counter history regressed");
+            previous=snapshot;
+            System.out.println("MEASURE fitted 200v200 30Hz sensor-budget tick="+
+                    i+" FCM_hulls="+fcmHulls+" CAP_hulls="+capHulls+
+                    " "+snapshot);
+        }
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -107,6 +144,7 @@ public final class OpponentIndexParityTest {
         }
         check(indexed.ships().size()==400,
                 "A/B must contain the real 200v200 fixture");
+        inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+
                 " indexedMs="+indexedNs/1e6+
