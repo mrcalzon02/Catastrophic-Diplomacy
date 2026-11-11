@@ -818,6 +818,48 @@ public final class Battle {
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
     private final List<Rocket> rockets = new ArrayList<>();
+    /**
+     * Reused hostile-body indexes for defensive scans. Filtering the global
+     * insertion-ordered lists by team every mount/tick was pure repeated work
+     * in 200v200 battles. These lists preserve the exact relative order of the
+     * old filtered scan, so target choice and replay determinism are unchanged.
+     */
+    private final List<Missile> teamZeroMissiles=new ArrayList<>();
+    private final List<Missile> teamOneMissiles=new ArrayList<>();
+    private final List<Ballistic> teamZeroBallistics=new ArrayList<>();
+    private final List<Ballistic> teamOneBallistics=new ArrayList<>();
+    private final List<Rocket> teamZeroRockets=new ArrayList<>();
+    private final List<Rocket> teamOneRockets=new ArrayList<>();
+    private boolean indexedDefensiveThreats=true;
+    public void configureDefensiveThreatIndexForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Defensive threat index A/B must be configured before battle");
+        indexedDefensiveThreats=enabled;
+    }
+    private void refreshDefensiveThreatIndex(){
+        if(!indexedDefensiveThreats)return;
+        teamZeroMissiles.clear();teamOneMissiles.clear();
+        teamZeroBallistics.clear();teamOneBallistics.clear();
+        teamZeroRockets.clear();teamOneRockets.clear();
+        for(Missile body:missiles)
+            (body.team==0?teamZeroMissiles:teamOneMissiles).add(body);
+        for(Ballistic body:ballistics)
+            (body.team==0?teamZeroBallistics:teamOneBallistics).add(body);
+        for(Rocket body:rockets)
+            (body.team==0?teamZeroRockets:teamOneRockets).add(body);
+    }
+    private List<Missile> defensiveMissiles(int defenderTeam){
+        if(!indexedDefensiveThreats)return missiles;
+        return defenderTeam==0?teamOneMissiles:teamZeroMissiles;
+    }
+    private List<Ballistic> defensiveBallistics(int defenderTeam){
+        if(!indexedDefensiveThreats)return ballistics;
+        return defenderTeam==0?teamOneBallistics:teamZeroBallistics;
+    }
+    private List<Rocket> defensiveRockets(int defenderTeam){
+        if(!indexedDefensiveThreats)return rockets;
+        return defenderTeam==0?teamOneRockets:teamZeroRockets;
+    }
     /** Actual finite, unguided fragmentation shell. The blast is resolved
      * only when this paid, world-space projectile reaches its preset fuze
      * point, never at a time inferred from the target's last known range.
@@ -5890,8 +5932,8 @@ public final class Battle {
                 // or close-in last-ditch screening. Aircraft remain preferred
                 // when craft engagement is enabled, matching flak's role.
                 if(best==null&&defender.orders.pointDefense().ordnance()){
-                    for(Missile m:missiles){
-                        if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+                    for(Missile m:defensiveMissiles(defender.team)){
+                        if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
                         double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
                         if(d<15||d>ProjectileModel.acquisitionRange(
                                 mount.nominalRange,defender.sensorsCondition,
@@ -5904,8 +5946,8 @@ public final class Battle {
                         if(priority<bestPriority){bestPriority=priority;
                             best=new FlakAim(m.x,m.y,m.vx,m.vy,m.sourceId,m.targetId,priority,0);}
                     }
-                    for(Rocket r:rockets){
-                        if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
+                    for(Rocket r:defensiveRockets(defender.team)){
+                        if(r.integrity<=0||r.team==defender.team||!coversThreat(defender,r.targetId))continue;
                         double d=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
                         if(d<15||d>ProjectileModel.acquisitionRange(
                                 mount.nominalRange,defender.sensorsCondition,
@@ -5918,8 +5960,8 @@ public final class Battle {
                         if(priority<bestPriority){bestPriority=priority;
                             best=new FlakAim(r.x,r.y,r.vx,r.vy,r.sourceId,r.targetId,priority,0);}
                     }
-                    for(Ballistic p:ballistics){
-                        if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
+                    for(Ballistic p:defensiveBallistics(defender.team)){
+                        if(p.integrity<=0||p.team==defender.team||!coversThreat(defender,p.targetId))continue;
                         double d=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
                         if(d<15||d>ProjectileModel.acquisitionRange(
                                 mount.nominalRange,defender.sensorsCondition,
@@ -5978,8 +6020,8 @@ public final class Battle {
         RailTrack best=null;
         double bestPriority=Double.POSITIVE_INFINITY;
         if(!defender.orders.pointDefense().ordnance())return null;
-        for(Missile m:missiles){
-            if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+        for(Missile m:defensiveMissiles(defender.team)){
+            if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
             if(committedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
                 continue;
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
@@ -6000,8 +6042,8 @@ public final class Battle {
                         m.targetId,m.sourceId,m.spec,emission);
             }
         }
-        for(Rocket m:rockets){
-            if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+        for(Rocket m:defensiveRockets(defender.team)){
+            if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
             if(committedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
                 continue;
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
@@ -6022,8 +6064,8 @@ public final class Battle {
                         m.targetId,m.sourceId,m.spec,emission);
             }
         }
-        for(Ballistic m:ballistics){
-            if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+        for(Ballistic m:defensiveBallistics(defender.team)){
+            if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
             if(committedDamage.getOrDefault(m.visualId,0.0)>=m.integrity)
                 continue;
             double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
@@ -6252,8 +6294,8 @@ public final class Battle {
         RotaryTrack best=null;
         double rank=Double.POSITIVE_INFINITY;
         if(defender.orders.pointDefense().ordnance()){
-            for(Rocket body:rockets){
-                if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+            for(Rocket body:defensiveRockets(defender.team)){
+                if(body.integrity<=0||body.team==defender.team||!coversThreat(defender,body.targetId))continue;
                 double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
                 if(d<RotaryPointDefense.MIN_RANGE||d>
                         RotaryPointDefense.acquisitionRange(defender,gun,body.spec,
@@ -6267,8 +6309,8 @@ public final class Battle {
                         body.x,body.y,body.vx,body.vy,body.targetId,body.sourceId,
                         body.spec,RocketBarrage.hotEmission(body.motor,body.burning()));}
             }
-            for(Missile body:missiles){
-                if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+            for(Missile body:defensiveMissiles(defender.team)){
+                if(body.integrity<=0||body.team==defender.team||!coversThreat(defender,body.targetId))continue;
                 double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
                 if(d<RotaryPointDefense.MIN_RANGE||d>
                         RotaryPointDefense.acquisitionRange(defender,gun,body.spec,
@@ -6284,8 +6326,8 @@ public final class Battle {
             }
             // Fast tiny kinetic slugs are allowed tracks, but lead and real
             // physical collision geometry make them a poor rotary target.
-            for(Ballistic body:ballistics){
-                if(body.team==defender.team||!coversThreat(defender,body.targetId))continue;
+            for(Ballistic body:defensiveBallistics(defender.team)){
+                if(body.integrity<=0||body.team==defender.team||!coversThreat(defender,body.targetId))continue;
                 double d=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
                 if(d<RotaryPointDefense.MIN_RANGE||d>
                         RotaryPointDefense.acquisitionRange(defender,gun,body.spec,
@@ -6503,8 +6545,8 @@ public final class Battle {
         ParticleContact chosen=null;
         double best=Double.POSITIVE_INFINITY;
         if(defender.orders.pointDefense().ordnance()){
-            for(Missile body:missiles){
-                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+            for(Missile body:defensiveMissiles(defender.team)){
+                if(body.integrity<=0||body.team==defender.team||!coversThreat(defender,body.targetId))
                     continue;
                 double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
                 double reach=ProjectileModel.acquisitionRange(gun.nominalRange,
@@ -6524,8 +6566,8 @@ public final class Battle {
                             body,null,null,null);
                 }
             }
-            for(Rocket body:rockets){
-                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+            for(Rocket body:defensiveRockets(defender.team)){
+                if(body.integrity<=0||body.team==defender.team||!coversThreat(defender,body.targetId))
                     continue;
                 double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
                 double reach=ProjectileModel.acquisitionRange(gun.nominalRange,
@@ -6545,8 +6587,8 @@ public final class Battle {
                             null,body,null,null);
                 }
             }
-            for(Ballistic body:ballistics){
-                if(body.team==defender.team||!coversThreat(defender,body.targetId))
+            for(Ballistic body:defensiveBallistics(defender.team)){
+                if(body.integrity<=0||body.team==defender.team||!coversThreat(defender,body.targetId))
                     continue;
                 double range=StrictMath.hypot(body.x-defender.x,body.y-defender.y);
                 double reach=ProjectileModel.acquisitionRange(gun.nominalRange,
@@ -6906,6 +6948,7 @@ public final class Battle {
 
     private void updateMissiles() {
         resolveFlakBursts();
+        refreshDefensiveThreatIndex();
         firePhysicalFlak();
         fireRotaryCiws();
         fireRailPointDefense();
@@ -6935,8 +6978,8 @@ public final class Battle {
             Missile chosenMissile=null;Ballistic chosenShell=null;Rocket chosenRocket=null;
             double quickest=Double.POSITIVE_INFINITY;
             int acquiredRockets=0,acquiredTracks=0;
-            for(Missile m:missiles){
-                if(m.team==defender.team||!coversThreat(defender,m.targetId))continue;
+            for(Missile m:defensiveMissiles(defender.team)){
+                if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
                 double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
@@ -6959,8 +7002,8 @@ public final class Battle {
                     quickest=score;chosenMissile=m;chosenShell=null;chosenRocket=null;
                 }
             }
-            for(Ballistic p:ballistics){
-                if(p.team==defender.team||!coversThreat(defender,p.targetId))continue;
+            for(Ballistic p:defensiveBallistics(defender.team)){
+                if(p.integrity<=0||p.team==defender.team||!coversThreat(defender,p.targetId))continue;
                 double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
@@ -6984,8 +7027,8 @@ public final class Battle {
             }
             // Even a coasting rocket retains a large, hot physical signature.
             // Its flimsy construction makes one accurate laser hit lethal.
-            for(Rocket r:rockets){
-                if(r.team==defender.team||!coversThreat(defender,r.targetId))continue;
+            for(Rocket r:defensiveRockets(defender.team)){
+                if(r.integrity<=0||r.team==defender.team||!coversThreat(defender,r.targetId))continue;
                 double distance=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),

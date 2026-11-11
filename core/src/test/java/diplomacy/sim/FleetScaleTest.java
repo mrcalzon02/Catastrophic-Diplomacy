@@ -29,5 +29,21 @@ public final class FleetScaleTest {
         System.out.println("PASS 200-ship headless scale | 2 x 300 ticks | combined-ms="
                 + String.format(java.util.Locale.ROOT,"%.1f",elapsed/1e6)
                 + " | fingerprint="+Long.toHexString(first));
+
+        Battle indexed=Battle.duel(778L,100,left,right,catalog);
+        Battle legacy=Battle.duel(778L,100,left,right,catalog);
+        legacy.configureDefensiveThreatIndexForDiagnostic(false);
+        long indexedNs=0,legacyNs=0;
+        for(int tick=0;tick<120;tick++){
+            long start=System.nanoTime();indexed.step();indexedNs+=System.nanoTime()-start;
+            start=System.nanoTime();legacy.step();legacyNs+=System.nanoTime()-start;
+            check(indexed.fingerprint()==legacy.fingerprint(),
+                    "Defensive team index changed deterministic combat at tick "+indexed.tick);
+        }
+        System.out.println("PASS defensive-threat index 200v200 parity ticks=120 fingerprint="
+                +Long.toHexString(indexed.fingerprint())
+                +" indexedMs="+String.format(java.util.Locale.ROOT,"%.2f",indexedNs/1e6)
+                +" fullGlobalMs="+String.format(java.util.Locale.ROOT,"%.2f",legacyNs/1e6)
+                +" (timings diagnostic only)");
     }
 }
