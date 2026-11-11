@@ -47,12 +47,31 @@ public final class AndroidLauncher extends AndroidApplication {
         // a signed production APK even if passed through an external Intent.
         boolean updateDialogReview=debug && getIntent()!=null &&
                 getIntent().getBooleanExtra("cd.verify_update_dialog",false);
+        // updaterTest-only fixtures. A production APK cannot enter either path
+        // because FLAG_DEBUGGABLE is absent even if an external Intent spoofs extras.
+        boolean seedUpdateFixture=debug && getIntent()!=null &&
+                getIntent().getBooleanExtra("cd.seed_update_fixture",false);
+        boolean realUpdateReview=debug && getIntent()!=null &&
+                getIntent().getBooleanExtra("cd.verify_real_update",false);
+        if(seedUpdateFixture){
+            try{
+                UpdateUpgradeFixture.seed(this);
+                Log.i("CD-UPDATER-E2E","SEEDED");
+            }catch(Exception failure){
+                Log.e("CD-UPDATER-E2E","Fixture seed failed",failure);
+                throw new IllegalStateException("Updater fixture seed failed",failure);
+            }
+        }
         Log.i(LIFECYCLE_TAG,"BEFORE_GDX_INITIALIZE gl3="+gl3);
         initialize(new CatastrophicGame(updater::checkForUpdates,verify,review,
                 this::sharePerformanceCapture), config);
         Log.i(LIFECYCLE_TAG,"AFTER_GDX_INITIALIZE");
         if(updateDialogReview)updater.showVerificationDialog();
-        else if(!verify && !review)updater.checkForUpdates(false); // prereleases eligible
+        else if(realUpdateReview){
+            Log.i("CD-UPDATER-E2E","PRODUCTION_CHECK");
+            updater.checkForUpdates(true);
+        }else if(!verify && !review && !seedUpdateFixture)
+            updater.checkForUpdates(false); // prereleases eligible
     }
     /** Share the verified app-private ZIP using the existing read-grant FileProvider. */
     private void sharePerformanceCapture(String relativePath){

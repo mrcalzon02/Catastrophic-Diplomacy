@@ -215,6 +215,29 @@ jobs:
           python3 tools/verify_android_signer_continuity.py \
             --reference package/reference/signature-verification.txt \
             --candidate package/signature-verification.txt
+      - name: Build release-signed non-shipping updater acceptance fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$ANDROID_HOME/build-tools/35.0.0:$PATH"
+          bash -n tools/android_verify_real_update.sh
+          CD_ANDROID_BUILD_SEQUENCE=693 CD_ANDROID_VERSION_NAME=0.1.5-dev.693 \
+            gradle --no-daemon :android:assembleUpdaterTest
+          old="$(find android/build/outputs/apk/updaterTest -type f -name '*.apk' -print -quit)"
+          test -n "$old" && test -s "$old"
+          cp "$old" package/updater-fixture-old.apk
+          CD_ANDROID_BUILD_SEQUENCE="$CD_ANDROID_BUILD_SEQUENCE" \
+          CD_ANDROID_VERSION_NAME="$CD_ANDROID_VERSION_NAME" \
+            gradle --no-daemon :android:assembleUpdaterTest
+          current="$(find android/build/outputs/apk/updaterTest -type f -name '*.apk' -print -quit)"
+          test -n "$current" && test -s "$current"
+          cp "$current" package/updater-verifier-current.apk
+          apksigner verify --verbose package/updater-fixture-old.apk
+          apksigner verify --verbose package/updater-verifier-current.apk
+          aapt dump badging package/updater-fixture-old.apk | grep -F \
+            "name='games.catastrophicdiplomacy' versionCode='1693' versionName='0.1.5-dev.693'"
+          aapt dump badging package/updater-verifier-current.apk | grep -F \
+            "name='games.catastrophicdiplomacy' versionCode='$((1000+CD_ANDROID_BUILD_SEQUENCE))' versionName='$CD_ANDROID_VERSION_NAME'"
       - name: Optional Fire tablet sideload compatibility diagnostic
         continue-on-error: true
         run: |
@@ -268,6 +291,12 @@ jobs:
             # Gate the real Android release dialog: UPDATE must be an actionable
             # button, not a hidden list masked by an explanatory message.
             bash tools/android_verify_update_dialog.sh test-output/android
+            # Exercise the actual production updater from a lower-version,
+            # release-signed fixture through GitHub metadata/download validation,
+            # Android Package Installer, state readback and the real candidate.
+            bash tools/android_verify_real_update.sh test-output/android \
+              package/updater-fixture-old.apk package/updater-verifier-current.apk \
+              package/Catastrophic-Diplomacy-Android.apk
             adb uninstall games.catastrophicdiplomacy
             # Android PackageManager must accept a real upgrade from our first
             # public release without wiping its app data or changing the signer.

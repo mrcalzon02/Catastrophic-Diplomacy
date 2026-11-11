@@ -41,6 +41,16 @@ android {
             minifyEnabled false
             if (signingAvailable) signingConfig signingConfigs.release
         }
+        // CI-only updater fixture: same package and release signer so Android
+        // performs a genuine in-place package upgrade. Debuggable enables
+        // run-as state fingerprinting; this variant is never published.
+        updaterTest {
+            initWith debug
+            debuggable true
+            minifyEnabled false
+            if (signingAvailable) signingConfig signingConfigs.release
+            matchingFallbacks = ['debug']
+        }
     }
     sourceSets { main { assets.srcDirs = ['../assets', rootProject.layout.buildDirectory.dir('generated/cd-ui').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-music').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-stage1').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-weapon-fx').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-laser-mobile').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-missile-engine').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-fighters').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-legacy-factions').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-ship-surfaces').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-announcer').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-fighter-voice').get().asFile, rootProject.layout.buildDirectory.dir('generated/cd-hull-voices').get().asFile] } }
     packaging { resources { excludes += ['/META-INF/{AL2.0,LGPL2.1}'] } }
@@ -108,9 +118,14 @@ dependencies {
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-x86'
     natives 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-x86_64'
 }
-// Build unsigned debug APKs without a keystore. Fail closed for release builds.
+// Build unsigned ordinary debug APKs without a keystore. Release and the
+// non-shipping updaterTest fixture both require the retained production signer.
 gradle.taskGraph.whenReady { graph ->
-    if (graph.allTasks.any { it.project == project && it.name.toLowerCase().contains('release') } && !signingAvailable) {
+    boolean signedTask = graph.allTasks.any {
+        it.project == project && (it.name.toLowerCase().contains('release') ||
+                it.name.toLowerCase().contains('updatertest'))
+    }
+    if (signedTask && !signingAvailable) {
         throw new GradleException('Release signing unavailable. Run python tools/bootstrap_secrets.py and ensure local signing material exists.')
     }
 }
