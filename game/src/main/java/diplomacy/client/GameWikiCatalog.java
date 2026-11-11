@@ -524,6 +524,8 @@ final class GameWikiCatalog {
             case 29 -> "Select unrestricted thrust, economy, protected fuel reserve or automatic withdrawal at reserve. All modes use one actual fuel tank.";
             case 30 -> "Specify the fraction of physical onboard fuel reserved from discretionary thrust or used as the automatic withdrawal threshold. It is not a separate fuel tank.";
             case 31 -> "Start reducing acceleration and target speed below this remaining fuel percentage when the chosen fuel policy economizes.";
+            case 32 -> "Select STANDARD, PASSIVE, BOOSTED RADAR, FOCUSED RADAR or XRAY BURST before engagement. Active modes still require fitted hardware and pay real power and heat.";
+            case 33 -> "Choose the hostile deployment slot painted by focused radar or X-ray burst. If that hostile is absent, the saved doctrine remains but runtime search safely falls back to passive.";
             default -> throw new IllegalArgumentException("Unknown doctrine row");
         };
     }

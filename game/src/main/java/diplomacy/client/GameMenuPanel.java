@@ -1170,7 +1170,7 @@ final class GameMenuPanel {
                 label(batch,font,standingPage==0?"PAGE 1: COMBAT / NEXT >":
                         standingPage==1?"PAGE 2: SUPPORT / NEXT >":
                         standingPage==2?"PAGE 3: FIRE / AMMO / NEXT >":
-                        "PAGE 4: FUEL / THRUST / NEXT >",799,585,Color.GOLD);
+                        "PAGE 4: FUEL / THRUST / SENSORS >",799,585,Color.GOLD);
                 int start=standingPage==0?0:standingPage==1?13:standingPage==2?23:29;
                 int end=standingPage==0?13:standingPage==1?23:standingPage==2?29:
                         ShipStandingOrders.SETTINGS.length;
