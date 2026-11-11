@@ -216,7 +216,6 @@ public final class SensorComputeBudgetTest {
         Battle.Ship second=battle.addShip(0,Battle.Faction.TERRAN,200,110);
         Battle.Ship hostile=battle.addShip(1,Battle.Faction.DRAXIAN,620,100);
         for(Battle.Ship ship:battle.ships()){
-            battle.registerDiagnosticStationaryTarget(ship.id);
             ship.speed=ship.vx=ship.vy=0;
             ship.maxPower=ship.power=1000;
             ship.powerRegen=0;
@@ -224,6 +223,10 @@ public final class SensorComputeBudgetTest {
             ship.fighterReserve=ship.droneReserve=ship.repairDroneReserve=0;
             ship.pdRange=0;
         }
+        // Freeze only entities that do not need captain/fire-control execution.
+        // Recipients remain ordinary AI ships; speed=0 keeps their positions fixed.
+        battle.registerDiagnosticStationaryTarget(flagship.id);
+        battle.registerDiagnosticStationaryTarget(hostile.id);
         flagship.network=fcm;
         flagship.laserDamage=flagship.kineticDamage=flagship.plasmaDamage=0;
         flagship.particleDamage=flagship.missileDamage=flagship.torpedoDamage=0;
