@@ -1,5 +1,18 @@
 # Multiplayer test receipts — 2026-10-28
 
+## Current Catastrophic Diplomacy network repair checkpoint — 2026-11-11
+
+Historical 2026-10-28 receipts below remain preserved, but they are superseded for current Catastrophic Diplomacy source status by exact-source hosted run **43107564226** at **5c7397da0be49be40f77e0085af5c61c76264db3**. That run passed the single focused job with:
+- pinned TLS authoritative BattleServer at 2, 32 and 400 total ships; the 400-ship case reached tick 38 with max observed host tick 25,965 µs and 1,329,630 queued bytes,
+- typed v1/v2 snapshot validation and last-good preservation,
+- real remote v2 presentation of hull identity, fitted hardpoints, missiles, ballistics and fighter identity,
+- host session reset for equal/higher-tick new sessions,
+- two-client accepted-fleet READY/UNREADY, host-only START and readiness invalidation,
+- the supported dedicated-JAR pinned-TLS submitted-fleet lobby launcher with persistent pin, Tech III rules and no plaintext fallback.
+
+These are hosted loopback results, not physical Ethernet/Wi-Fi, Android↔desktop or WAN acceptance.
+
+
 Source base: `94b328c206be99952e64336a44e787f69233cac7`. Platform: Windows, Oracle Java 17.0.12 targeting `--release 17`. Local implementation SHA and remote read-back are recorded below after publication. These are source-development results, not production release acceptance.
 
 Final test invocations: **51 passed, 2 failed**. Compilation/package command invocations: 2 passed, 0 failed. Repeated manifest entries count as separate invocations. Exact argv, duration, exit code and local log hash are in [delivery.json](receipts/delivery.json); [output](receipts/delivery.log) retains failures. Full-suite failures are not waived. The `local` hbnet invocation deliberately does not run socket acceptance; its 39 local cases are independent results.
