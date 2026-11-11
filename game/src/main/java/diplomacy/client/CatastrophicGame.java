@@ -701,7 +701,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     if(action==2)closeWiki();
                     else if(action==1){
                         Gdx.input.getTextInput(new Input.TextInputListener(){
-                            @Override public void input(String text){wiki.setQuery(text);}
+                            @Override public void input(String text){wiki.setQueryAsync(text);}
                             @Override public void canceled(){}
                         },"Search field encyclopedia",wiki.query(),"");
                     }

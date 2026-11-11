@@ -615,6 +615,53 @@ final class GameWikiCatalog {
         }
         return false;
     }
+    private record NumericUpgradeQuery(int field,long cents){
+        private static final String[] PREFIXES={
+                "mass x","power x","heat x","output x","accuracy x",
+                "integrity x","shields x","thrust x","cooling x","maintenance x"};
+        static NumericUpgradeQuery parse(String needle){
+            for(int field=0;field<PREFIXES.length;field++){
+                String prefix=PREFIXES[field];
+                if(!needle.startsWith(prefix))continue;
+                int start=prefix.length(),dot=needle.indexOf('.',start);
+                if(dot<=start||dot+3!=needle.length())return null;
+                long whole=0;
+                for(int i=start;i<dot;i++){
+                    char c=needle.charAt(i);
+                    if(c<'0'||c>'9')return null;
+                    whole=Math.addExact(Math.multiplyExact(whole,10),c-'0');
+                }
+                char a=needle.charAt(dot+1),b=needle.charAt(dot+2);
+                if(a<'0'||a>'9'||b<'0'||b>'9')return null;
+                long cents=Math.addExact(Math.multiplyExact(whole,100),
+                        (a-'0')*10L+(b-'0'));
+                return new NumericUpgradeQuery(field,cents);
+            }
+            return null;
+        }
+        private static long hundredths(double value){
+            // Technology multipliers are positive canonical finite decimals.
+            // The tiny epsilon protects exact .005 boundaries from binary
+            // representation while matching the authored %.2f display.
+            return StrictMath.round(value*100.0+1e-9);
+        }
+        boolean matches(TechnologyCatalog.Upgrade u){
+            double value=switch(field){
+                case 0 -> u.mass;
+                case 1 -> u.power;
+                case 2 -> u.heat;
+                case 3 -> u.output;
+                case 4 -> u.accuracy;
+                case 5 -> u.integrity;
+                case 6 -> u.shield;
+                case 7 -> u.thrust;
+                case 8 -> u.cooling;
+                case 9 -> u.maintenance;
+                default -> throw new IllegalStateException("Unknown wiki numeric field");
+            };
+            return hundredths(value)==cents;
+        }
+    }
     private static boolean matchesUpgradeText(TechnologyCatalog.Upgrade u,
                                               String needle,UpgradeTextProbe m){
         if(u==null)throw new IllegalStateException("Missing wiki technology");
@@ -689,12 +736,22 @@ final class GameWikiCatalog {
         long[] matchedBits=new long[(upgradeIds.size()+63)>>>6];
         int matchedCount=0;
         UpgradeTextProbe probe=new UpgradeTextProbe(needle);
+        NumericUpgradeQuery numeric=NumericUpgradeQuery.parse(needle);
         for(int index=0;index<upgradeIds.size();index++){
+            if((index&255)==0&&Thread.currentThread().isInterrupted())
+                throw new java.util.concurrent.CancellationException("Wiki search superseded");
             String id=upgradeIds.get(index);
-            // Canonical IDs are ASCII. Avoid a 73k-per-query lowercase String
-            // allocation; a compact bitset retains exact canonical ordering.
-            if(asciiContainsFolded(id,needle)||
-                    matchesUpgradeText(technology.get(id),needle,probe)){
+            // Exact displayed multiplier queries bypass ten expensive %.2f
+            // formatting steps per virtual row. Other queries retain exact
+            // authored-text KMP semantics.
+            boolean match;
+            if(asciiContainsFolded(id,needle))match=true;
+            else{
+                TechnologyCatalog.Upgrade upgrade=technology.get(id);
+                match=numeric!=null?numeric.matches(upgrade):
+                        matchesUpgradeText(upgrade,needle,probe);
+            }
+            if(match){
                 matchedBits[index>>>6]|=1L<<(index&63);
                 matchedCount++;
             }

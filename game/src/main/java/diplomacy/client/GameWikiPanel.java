@@ -22,8 +22,12 @@ final class GameWikiPanel {
     private int category,listPage,scroll;
     private String query="";
     private boolean queryDirty;
-    private long queryApplyAfterNanos;
+    private long queryApplyAfterNanos,queryGeneration;
+    private volatile SearchResult completedSearch;
+    private volatile Thread searchThread;
     private static final long QUERY_DEBOUNCE_NANOS=120_000_000L;
+    private record SearchResult(long generation,int category,String query,
+                                List<GameWikiCatalog.Article> hits){}
     private List<String> wrapped=List.of();
     GameWikiPanel(GameWikiCatalog catalog,boolean mobile){
         if(catalog==null)throw new IllegalArgumentException("Missing encyclopedia");
@@ -36,10 +40,9 @@ final class GameWikiPanel {
     int categoryIndex(){return category;}
     int listPage(){return listPage;}
     int textScroll(){return scroll;}
-    private void refresh(){
-        queryDirty=false;
+    private void applyHits(List<GameWikiCatalog.Article> next){
         String previous=chosen==null?null:chosen.id;
-        hits=catalog.search(GameWikiCatalog.CATEGORIES[category],query);
+        hits=next;
         chosen=null;
         int chosenIndex=0;
         if(previous!=null){
@@ -51,6 +54,18 @@ final class GameWikiPanel {
         if(chosen==null&&!hits.isEmpty())chosen=hits.get(0);
         listPage=chosen==null?0:chosenIndex/ROWS;
         scroll=0;buildText();
+    }
+    private void cancelAsyncSearch(){
+        queryGeneration++;
+        Thread worker=searchThread;
+        searchThread=null;
+        completedSearch=null;
+        if(worker!=null&&worker.isAlive())worker.interrupt();
+    }
+    private void refresh(){
+        cancelAsyncSearch();
+        queryDirty=false;
+        applyHits(catalog.search(GameWikiCatalog.CATEGORIES[category],query));
     }
     private static String cleanQuery(String text){
         if(text==null)text="";
@@ -66,16 +81,64 @@ final class GameWikiPanel {
         queryDirty=false;
         if(!query.equals(next)){query=next;refresh();}
     }
+    /** Real UI/native-keyboard commit: never perform the 73k-row search on
+     * the render thread. Direct setQuery remains deterministic for tests and
+     * non-interactive callers. */
+    void setQueryAsync(String text){
+        String next=cleanQuery(text);
+        if(query.equals(next)&&!queryPending())return;
+        cancelAsyncSearch();
+        query=next;
+        queryDirty=true;
+        queryApplyAfterNanos=0;
+    }
     private void queueQuery(String text){
         String next=cleanQuery(text);
         if(query.equals(next))return;
+        cancelAsyncSearch();
         query=next;
         queryDirty=true;
         queryApplyAfterNanos=System.nanoTime()+QUERY_DEBOUNCE_NANOS;
     }
-    boolean queryPending(){return queryDirty;}
+    boolean queryPending(){
+        Thread worker=searchThread;
+        return queryDirty||completedSearch!=null||(worker!=null&&worker.isAlive());
+    }
+    private void startAsyncSearch(){
+        queryDirty=false;
+        final long generation=queryGeneration;
+        final int selectedCategory=category;
+        final String selectedQuery=query;
+        Thread worker=new Thread(()->{
+            try{
+                List<GameWikiCatalog.Article> result=catalog.search(
+                        GameWikiCatalog.CATEGORIES[selectedCategory],selectedQuery);
+                if(!Thread.currentThread().isInterrupted())
+                    completedSearch=new SearchResult(generation,selectedCategory,
+                            selectedQuery,result);
+            }catch(java.util.concurrent.CancellationException superseded){
+                // A newer keystroke/category owns the search now.
+            }
+        },"CD-Wiki-Search");
+        worker.setDaemon(true);
+        searchThread=worker;
+        worker.start();
+    }
     void flushQueuedQuery(long nowNanos){
-        if(queryDirty&&nowNanos>=queryApplyAfterNanos)refresh();
+        SearchResult ready=completedSearch;
+        if(ready!=null){
+            completedSearch=null;
+            if(ready.generation()==queryGeneration&&ready.category()==category&&
+                    ready.query().equals(query))
+                applyHits(ready.hits());
+            Thread worker=searchThread;
+            if(worker!=null&&!worker.isAlive())searchThread=null;
+        }
+        if(queryDirty&&nowNanos>=queryApplyAfterNanos)startAsyncSearch();
+        else{
+            Thread worker=searchThread;
+            if(worker!=null&&!worker.isAlive()&&completedSearch==null)searchThread=null;
+        }
     }
     void type(char character){
         // BACKSPACE is handled by keyDown; keyTyped can also deliver ASCII 8.

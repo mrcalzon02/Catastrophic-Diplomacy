@@ -13,6 +13,15 @@ import java.util.List;
  * pagination and touch actions, not pixel-perfect visual assertions. */
 public final class GameWikiTest {
     private static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
+    private static void finishQueued(GameWikiPanel ui)throws Exception{
+        ui.flushQueuedQuery(Long.MAX_VALUE);
+        long end=System.nanoTime()+5_000_000_000L;
+        while(ui.queryPending()&&System.nanoTime()<end){
+            Thread.sleep(2);
+            ui.flushQueuedQuery(Long.MAX_VALUE);
+        }
+        check(!ui.queryPending(),"Asynchronous wiki query did not complete");
+    }
     public static void main(String[] args)throws Exception {
         TechnologyCatalog technology=TechnologyCatalog.loadDefault();
         GameWikiCatalog catalog=GameWikiCatalog.build(technology);
@@ -196,8 +205,8 @@ public final class GameWikiTest {
         check(ui.query().equals("hull"),"Keyboard query editing regressed");
         check(ui.queryPending(),
                 "Key-by-key wiki edit was not coalesced before full search");
-        ui.flushQueuedQuery(Long.MAX_VALUE);
-        check(!ui.queryPending()&&ui.resultCount()>0,
+        finishQueued(ui);
+        check(ui.resultCount()>0,
                 "Coalesced wiki query did not refresh after debounce");
         ui.setQuery("bad\ntext");
         check(!ui.query().contains("\n"),"Control characters must not enter native search");
