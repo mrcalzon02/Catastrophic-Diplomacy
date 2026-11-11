@@ -6,15 +6,27 @@ package diplomacy.sim;
  */
 public record ShipStandingOrders(
         BattleOrders.Orders tactics,int aggression,int caution,int shieldWithdrawPercent,
-        ShipTacticalDirectives directives,ShipResourceOrders resources) {
-    /** Old caller signatures remain valid and inherit unlimited default fire. */
+        ShipTacticalDirectives directives,ShipResourceOrders resources,
+        SensorScanOrder scanOrder) {
+    /** Old caller signatures remain valid and inherit historical scan defaults. */
+    public ShipStandingOrders(BattleOrders.Orders tactics,int aggression,int caution,
+            int shieldWithdrawPercent,ShipTacticalDirectives directives,
+            ShipResourceOrders resources){
+        this(tactics,aggression,caution,shieldWithdrawPercent,directives,resources,
+                SensorScanOrder.DEFAULT);
+    }
     public ShipStandingOrders(BattleOrders.Orders tactics,int aggression,int caution,
             int shieldWithdrawPercent,ShipTacticalDirectives directives){
-        this(tactics,aggression,caution,shieldWithdrawPercent,directives,ShipResourceOrders.DEFAULT);
+        this(tactics,aggression,caution,shieldWithdrawPercent,directives,
+                ShipResourceOrders.DEFAULT,SensorScanOrder.DEFAULT);
     }
     public ShipStandingOrders withResources(ShipResourceOrders orders){
         return new ShipStandingOrders(tactics,aggression,caution,shieldWithdrawPercent,
-                directives,orders);
+                directives,orders,scanOrder);
+    }
+    public ShipStandingOrders withScanOrder(SensorScanOrder order){
+        return new ShipStandingOrders(tactics,aggression,caution,shieldWithdrawPercent,
+                directives,resources,order);
     }
     public ShipStandingOrders(BattleOrders.Orders tactics,int aggression,int caution,int shieldWithdrawPercent){
         this(tactics,aggression,caution,shieldWithdrawPercent,ShipTacticalDirectives.DEFAULT);
@@ -31,7 +43,8 @@ public record ShipStandingOrders(
             "DEFEND TARGET 3", "DEFEND TARGET 4", "ESCORT ASSIGNMENT", "ESCORT DISTANCE",
             "OFFENSIVE FIRE", "AMMUNITION DOCTRINE", "RATION BELOW", "HARD RESERVE",
             "MINIMUM ROUNDS", "VOLLEY SPACING",
-            "FUEL POSTURE", "FUEL RESERVE", "ECONOMY BELOW"
+            "FUEL POSTURE", "FUEL RESERVE", "ECONOMY BELOW",
+            "SENSOR SEARCH", "SENSOR FOCUS"
     };
     private static final BattleOrders.Position[] MOVEMENTS={
             BattleOrders.Position.FREE,BattleOrders.Position.HOLD,
@@ -41,7 +54,7 @@ public record ShipStandingOrders(
     public ShipStandingOrders {
         if(tactics==null||aggression<0||aggression>100||caution<0||caution>100||
                 shieldWithdrawPercent<0||shieldWithdrawPercent>100||directives==null
-                ||resources==null)
+                ||resources==null||scanOrder==null)
             throw new IllegalArgumentException("Invalid standing doctrine");
         if(tactics.anchorShipId()!=0||tactics.position()==BattleOrders.Position.ESCORT
                 ||tactics.position()==BattleOrders.Position.FORMATION)
@@ -56,6 +69,7 @@ public record ShipStandingOrders(
         BattleOrders.Orders next=tactics;
         ShipTacticalDirectives d=directives;
         ShipResourceOrders resource=resources;
+        SensorScanOrder scan=scanOrder;
         int a=aggression,c=caution,shield=shieldWithdrawPercent;
         switch(setting){
             case 0 -> a=moved(a,step,10,0,100);
@@ -119,9 +133,11 @@ public record ShipStandingOrders(
                     moved(resource.fuelReservePercent(),step,5,0,95));
             case 31 -> resource=resource.withEconomyStart(
                     moved(resource.economyStartPercent(),step,5,10,95));
+            case 32 -> scan=scan.cycleMode(step);
+            case 33 -> scan=scan.adjustFocus(step);
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         }
-        return new ShipStandingOrders(next,a,c,shield,d,resource);
+        return new ShipStandingOrders(next,a,c,shield,d,resource,scan);
     }
     public String display(int setting){
         return switch(setting){
@@ -155,6 +171,8 @@ public record ShipStandingOrders(
             case 29 -> resources.fuelPolicy().name().replace('_',' ');
             case 30 -> resources.fuelReservePercent()+"%";
             case 31 -> resources.economyStartPercent()+"% remaining";
+            case 32 -> scanOrder.mode().name().replace('_',' ');
+            case 33 -> scanOrder.focusLabel();
             default -> throw new IllegalArgumentException("Unknown standing orders row");
         };
     }

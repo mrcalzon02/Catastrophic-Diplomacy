@@ -14,7 +14,8 @@ public final class ShipStandingOrdersTest {
     }
     public static void main(String[] args)throws Exception {
         ShipStandingOrders policy=ShipStandingOrders.DEFAULT;
-        check(ShipStandingOrders.SETTINGS.length==32,"Missing persistent fuel policy controls");
+        check(ShipStandingOrders.SETTINGS.length==34,
+                "Missing persistent fuel or sensor doctrine controls");
         for(int i=0;i<ShipStandingOrders.SETTINGS.length;i++)
             check(!policy.display(i).isBlank(),"Invisible standing policy row "+i);
         ShipStandingOrders attack=policy.adjust(0,4).adjust(1,-3);
@@ -73,6 +74,22 @@ public final class ShipStandingOrdersTest {
                 "Fuel posture, protected fraction or economy threshold editor inert");
         check(policy.resources().fuelPolicy()==ShipResourceOrders.FuelPolicy.UNRESTRICTED,
                 "Existing captains should retain unrestricted historical thrust by default");
+        check(policy.scanOrder().equals(SensorScanOrder.DEFAULT),
+                "Existing captains should retain STANDARD sensor search by default");
+        ShipStandingOrders focusedCaptain=policy.adjust(32,3).adjust(33,2);
+        check(focusedCaptain.scanOrder().mode()==SensorActiveScan.Mode.FOCUSED_RADAR
+                        &&focusedCaptain.scanOrder().hostileSlot()==2
+                        &&focusedCaptain.display(32).equals("FOCUSED RADAR")
+                        &&focusedCaptain.display(33).equals("HOSTILE 3"),
+                "Focused radar mode/hostile reference editor is inert");
+        ShipStandingOrders xrayCaptain=focusedCaptain.adjust(32,1);
+        check(xrayCaptain.scanOrder().mode()==SensorActiveScan.Mode.XRAY_BURST
+                        &&xrayCaptain.scanOrder().hostileSlot()==2,
+                "X-ray scan mode lost the focused hostile reference");
+        ShipStandingOrders passiveCaptain=policy.adjust(32,1);
+        check(passiveCaptain.scanOrder().mode()==SensorActiveScan.Mode.PASSIVE
+                        &&passiveCaptain.scanOrder().hostileSlot()==-1,
+                "Passive scan retained an invalid focused target");
         Battle.Ship rationSample=new Battle(78901).addShip(0,Battle.Faction.TERRAN,200,320);
         rationSample.maxFuel=100;rationSample.fuel=20;
         rationSample.orders=fuelCaptain.tactics();
@@ -90,28 +107,33 @@ public final class ShipStandingOrdersTest {
                 "200-hull standing orders failed checksum round-trip");
         check(encoded.equals(ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved)),
                 "Nondeterministic doctrine save serialization");
-        check(encoded.startsWith("CD-STANDING-4"+(char)10),
-                "New versioned policy format not written");
+        check(encoded.startsWith("CD-STANDING-5"+(char)10),
+                "New versioned sensor policy format not written");
         ShipResourceOrders ration=ShipResourceOrders.DEFAULT
                 .withAmmunition(ShipResourceOrders.AmmoPolicy.AUTO_RATION)
                 .withRationStart(60).withReserve(10,1).withSpacingTicks(45)
                 .withFuelPolicy(ShipResourceOrders.FuelPolicy.WITHDRAW_AT_RESERVE)
                 .withFuelReserve(35).withEconomyStart(65);
-        ShipStandingOrders rationCaptain=advanced.withResources(ration);
+        ShipStandingOrders rationCaptain=advanced.withResources(ration)
+                .withScanOrder(new SensorScanOrder(
+                        SensorActiveScan.Mode.XRAY_BURST,4));
         check(rationCaptain.adjust(1,1).resources().equals(ration),
                 "Editing old standing rows discarded separate resource policy");
         saved.put(7L,rationCaptain);
         String resourceSave=ShipStandingOrdersCodec.encode(Battle.Faction.TERRAN,saved);
-        check(ShipStandingOrdersCodec.decode(resourceSave).policies().get(7L)
-                        .resources().equals(ration),
-                "CD-STANDING-4 lost ammunition rationing or fuel withdrawal policy");
-        // Authentic V1/V2/V3 checksummed migration: V3 retains ammunition
-        // policy but inherits unrestricted fuel orders; V1/V2 retain defaults.
-        for(int previous=1;previous<=3;previous++){
+        ShipStandingOrders roundTripCaptain=
+                ShipStandingOrdersCodec.decode(resourceSave).policies().get(7L);
+        check(roundTripCaptain.resources().equals(ration),
+                "CD-STANDING-5 lost ammunition rationing or fuel withdrawal policy");
+        check(roundTripCaptain.scanOrder().equals(rationCaptain.scanOrder()),
+                "CD-STANDING-5 lost sensor scan doctrine or hostile reference");
+        // Authentic V1/V2/V3/V4 migration: V4 retains fuel/ammunition
+        // policy; older formats inherit the scan STANDARD/no-focus default.
+        for(int previous=1;previous<=4;previous++){
             String[] rows=resourceSave.split("\\n",-1);
             StringBuilder older=new StringBuilder("CD-STANDING-").append(previous)
                     .append('\n').append("TERRAN").append('\n');
-            int fields=previous==1?14:previous==2?24:30;
+            int fields=previous==1?14:previous==2?24:previous==3?30:33;
             for(int i=2;i<rows.length-2;i++){
                 String[] values=rows[i].split(",",-1);
                 older.append(String.join(",",java.util.Arrays.copyOf(values,fields)))
@@ -127,12 +149,14 @@ public final class ShipStandingOrdersTest {
             var migrated=ShipStandingOrdersCodec.decode(older.toString());
             var priorResource=migrated.policies().get(7L).resources();
             check(migrated.policies().size()==200
-                            &&priorResource.fuelPolicy()==ShipResourceOrders.FuelPolicy.UNRESTRICTED
-                            &&priorResource.fuelReservePercent()==25
-                            &&priorResource.economyStartPercent()==60
-                            &&(previous==3?priorResource.ammunition()==ShipResourceOrders.AmmoPolicy.AUTO_RATION
-                                    :priorResource.equals(ShipResourceOrders.DEFAULT)),
-                    "CD-STANDING-"+previous+" migration lost captain or legacy fuel defaults");
+                            &&migrated.policies().get(7L).scanOrder().equals(SensorScanOrder.DEFAULT)
+                            &&(previous>=4?priorResource.equals(ration):
+                               previous==3?priorResource.ammunition()==ShipResourceOrders.AmmoPolicy.AUTO_RATION
+                                    &&priorResource.fuelPolicy()==ShipResourceOrders.FuelPolicy.UNRESTRICTED
+                                    &&priorResource.fuelReservePercent()==25
+                                    &&priorResource.economyStartPercent()==60
+                               :priorResource.equals(ShipResourceOrders.DEFAULT)),
+                    "CD-STANDING-"+previous+" migration lost captain/resource/scan defaults");
         }
         reject(()->ShipStandingOrdersCodec.decode(resourceSave.replace("AUTO_RATION","ENERGY_ONLY")),
                 "An edited resource order bypassed the doctrine checksum");
@@ -156,9 +180,12 @@ public final class ShipStandingOrdersTest {
                 "Invalid aggression outside slider accepted");
 
         var deployment=new CampaignDeployment.Loadout(3,CampaignDeployment.Formation.LINE)
-                .withStanding(0,retreat).withStanding(1,attack);
-        check(deployment.standingFor(0).equals(retreat)&&
-                        deployment.standingFor(1).equals(attack)&&
+                .withStanding(0,retreat.withScanOrder(new SensorScanOrder(
+                        SensorActiveScan.Mode.FOCUSED_RADAR,0)))
+                .withStanding(1,attack.withScanOrder(new SensorScanOrder(
+                        SensorActiveScan.Mode.BOOSTED_RADAR,-1)));
+        check(deployment.standingFor(0).tactics().equals(retreat.tactics())&&
+                        deployment.standingFor(1).tactics().equals(attack.tactics())&&
                         deployment.standingFor(2).equals(policy),
                 "Per-vessel standing order independence failed");
         check(deployment.withFormation(1).standingFor(1).equals(attack),
@@ -184,11 +211,18 @@ public final class ShipStandingOrdersTest {
         var a=battle.ships().get(0);
         var b=battle.ships().get(1);
         var c=battle.ships().get(2);
-        check(a.standingOrders.equals(retreat)&&b.standingOrders.equals(attack)
-                        &&c.standingOrders==null,
+        check(a.standingOrders!=null&&b.standingOrders!=null&&c.standingOrders==null,
                 "Individual policies did not reach real ships");
         check(a.orders.equals(retreat.tactics())&&b.orders.equals(attack.tactics()),
                 "Standing policy did not alter actual battle AI tactical orders");
+        Battle.Ship firstHostile=battle.ships().stream().filter(ship->ship.team==1)
+                .findFirst().orElseThrow();
+        check(a.scan.mode()==SensorActiveScan.Mode.FOCUSED_RADAR
+                        &&a.scan.focusTargetId()==firstHostile.id
+                        &&b.scan.mode()==SensorActiveScan.Mode.BOOSTED_RADAR,
+                "Saved scan doctrines did not resolve to real hostile identity before tick 1");
+        a.sensorRange=1200;a.power=1000;a.maxHeat=1000;a.heat=0;
+        b.sensorRange=1200;b.power=1000;b.maxHeat=1000;b.heat=0;
         battle.setTeamOrders(0,BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD));
         check(a.orders.equals(retreat.tactics())&&b.orders.equals(attack.tactics())
                         &&c.orders.position()==BattleOrders.Position.HOLD,
@@ -210,10 +244,29 @@ public final class ShipStandingOrdersTest {
         for(Battle.Ship enemy:encounter.battle().ships())if(enemy.team==1)enemy.hull=0;
         check(encounter.advance()==CampaignEncounter.Advance.NEXT_WAVE,
                 "First campaign wave failed to deploy real reinforcements");
-        check(a.standingOrders.equals(retreat)&&b.standingOrders.equals(attack),
-                "Reinforcements reset persistent ship doctrine");
+        check(a.standingOrders.scanOrder().mode()==SensorActiveScan.Mode.FOCUSED_RADAR
+                        &&b.standingOrders.scanOrder().mode()==SensorActiveScan.Mode.BOOSTED_RADAR,
+                "Reinforcements reset persistent ship/scan doctrine");
         battle.step();
-        check(battle.tick==1,"Standing doctrines prevented live combat tick");
+        check(battle.tick==1&&a.scan.emissions==1&&b.scan.emissions==1
+                        &&a.scan.powerSpent>0&&b.scan.powerSpent>0,
+                "Persisted active scan doctrine did not perform paid tick-1 emission");
+        Battle unavailable=Battle.duel(81234,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
+        Battle.Ship unavailableScanner=unavailable.ships().get(0);
+        SensorScanOrder unavailableOrder=new SensorScanOrder(
+                SensorActiveScan.Mode.XRAY_BURST,5);
+        check(unavailableOrder.disabledReason(unavailableScanner,1)
+                        .equals("FOCUS TARGET UNAVAILABLE"),
+                "Unavailable focused hostile had no disabled reason");
+        new CampaignDeployment.Loadout(1,CampaignDeployment.Formation.LINE)
+                .withStanding(0,policy.withScanOrder(unavailableOrder)).apply(unavailable);
+        check(unavailableScanner.scan.mode()==SensorActiveScan.Mode.PASSIVE,
+                "Missing focused target silently became broad STANDARD search");
+        unavailableScanner.sensorRange=0;
+        check(new SensorScanOrder(SensorActiveScan.Mode.BOOSTED_RADAR,-1)
+                        .disabledReason(unavailableScanner,1).equals("NO RADAR FITTED"),
+                "Unfitted boosted radar had no disabled reason");
+
         var connected=new CampaignDeployment.Loadout(6,CampaignDeployment.Formation.LINE)
                 .withStanding(0,advanced);
         CampaignEncounter linked=CampaignEncounter.start(50,connected,friendly,hostile,tech);
@@ -227,7 +280,6 @@ public final class ShipStandingOrdersTest {
         linked.battle().setTeamOrders(0,BattleOrders.DEFAULT);
         check(captain.standingOrders.equals(advanced),
                 "Fleet order edits must not erase complex individual behavior stacks");
-        System.out.println("PASS individual standing orders: 23 simultaneous doctrines, "+
-                "200 saved hull policies, withdrawal behavior, real combat and wave retention");
+        System.out.println("PASS individual standing orders: 34 controls, CD-STANDING-5 sensor migration, paid tick-1 scans, 200 saved hull policies and combat retention");
     }
 }

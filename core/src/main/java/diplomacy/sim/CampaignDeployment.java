@@ -155,6 +155,10 @@ public final class CampaignDeployment {
         }
         public void apply(Battle battle) {
             if(battle==null)throw new IllegalArgumentException("Battle required");
+            if(battle.tick!=0)throw new IllegalArgumentException(
+                    "Deployment doctrines must be applied before tick 1");
+            java.util.ArrayList<Battle.Ship> hostiles=new java.util.ArrayList<>();
+            for(Battle.Ship ship:battle.ships())if(ship.team==1&&ship.alive())hostiles.add(ship);
             int i=0;
             for(Battle.Ship ship:battle.ships())if(ship.team==0) {
                 if(i>=ships)throw new IllegalArgumentException("Too many allied ships in battle");
@@ -163,7 +167,10 @@ public final class CampaignDeployment {
                 ship.vx=0;ship.vy=0;
                 battle.setShipCommandQueue(ship.id,ordersFor(i));
                 ShipStandingOrders policy=standings.get(i);
-                if(policy!=null)battle.setShipStandingOrders(ship.id,policy);
+                if(policy!=null){
+                    battle.setShipStandingOrders(ship.id,policy);
+                    policy.scanOrder().apply(battle,ship,hostiles);
+                }
                 i++;
             }
             if(i!=ships)throw new IllegalArgumentException("Insufficient allied ships in battle");

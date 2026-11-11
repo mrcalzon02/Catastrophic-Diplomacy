@@ -38,8 +38,10 @@ public final class CampaignEncounter {
         // Each owned ship has its own fitting; do not clone one generic design.
         for(Shipyard.Design friendly:friendlies)
             battle.spawnWing(0,friendly,catalog,1,310,335);
-        deployment.apply(battle);
+        // Hostile hulls must physically exist before persistent focused-scan
+        // slots can resolve to transient battle ship IDs.
         deployHostiles();
+        deployment.apply(battle);
     }
 
     public static CampaignEncounter start(int level,int deployed,Shipyard.Design friendly,
