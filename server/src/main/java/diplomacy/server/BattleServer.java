@@ -48,13 +48,32 @@ public final class BattleServer implements AutoCloseable {
     private static final long STEP=1_000_000_000L/30;
     private static final class Seat {final int team;long sequence;boolean active;Seat(int team){this.team=team;}}
     private static final class Peer {
-        final Socket socket;final Seat seat;final ArrayBlockingQueue<List<String>> output=new ArrayBlockingQueue<>(16);
+        final Socket socket;final Seat seat;
+        final ArrayBlockingQueue<List<String>> output=new ArrayBlockingQueue<>(16);
         StringBuilder upload;
         int expectedLength,expectedParts,nextPart;
         String expectedHash;
+        long staleSnapshotsDropped;
         Peer(Socket socket,Seat seat){this.socket=socket;this.seat=seat;}
         void clearUpload(){upload=null;expectedLength=expectedParts=nextPart=0;expectedHash=null;}
-        void send(List<String> batch){if(!output.offer(batch))try{socket.close();}catch(IOException ignored){}}
+        void send(List<String> batch){
+            if(!output.offer(batch))try{socket.close();}catch(IOException ignored){}
+        }
+        /** Snapshot state is supersedable. Never disconnect a slow 400-ship
+         * viewer merely because obsolete complete frames queued faster than
+         * its socket could drain; control/ACK/result batches remain reliable. */
+        void sendState(List<String> batch){
+            if(batch==null||batch.isEmpty()||!batch.get(0).startsWith("SNAP|")){
+                send(batch);return;
+            }
+            if(output.offer(batch))return;
+            for(List<String> queued:output)
+                if(!queued.isEmpty()&&queued.get(0).startsWith("SNAP|")&&
+                        output.remove(queued)){
+                    staleSnapshotsDropped++;break;
+                }
+            if(!output.offer(batch))try{socket.close();}catch(IOException ignored){}
+        }
     }
     public BattleServer(String bind,int port,long seed,int count,Hbnet.Server transport)throws Exception{
         this(bind,port,seed,count,Objects.requireNonNull(transport),false);
@@ -184,7 +203,8 @@ public final class BattleServer implements AutoCloseable {
                 Hbnet.write(socket.getOutputStream(),"WELCOME|"+SNAPSHOT_PROTOCOL_VERSION+"|"+session+"|"+seat.team+"|"+matchSeed+"|"+seat.sequence+
                         (matchRulesWire==null?"":"|"+matchRulesWire));
                 peers.add(peer);
-                peer.send(snapshot());
+                List<String> firstState=snapshot();
+                if(battle==null)peer.send(firstState);else peer.sendState(firstState);
                 // Late spectators must receive the same terminal status as
                 // peers who watched the actual final tick.
                 if(battle!=null&&battle.finished())
@@ -206,7 +226,8 @@ public final class BattleServer implements AutoCloseable {
     private void handle(Peer peer,String frame)throws IOException{
         String[] p=frame.split("\\|",-1);
         if(p.length==1&&p[0].equals("SNAPSHOT")){
-            peer.send(snapshot());
+            List<String> current=snapshot();
+            if(battle==null)peer.send(current);else peer.sendState(current);
             if(battle!=null&&battle.finished())
                 peer.send(List.of(terminalResultFrame()));
             return;
@@ -269,7 +290,10 @@ public final class BattleServer implements AutoCloseable {
                     if(submitted[0]!=null&&submitted[1]!=null){
                         battle=Battle.duel(matchSeed,submitted[0].ships(),submitted[1].ships(),catalog);
                         List<String> initial=snapshot();
-                        for(Peer connected:peers){connected.send(List.of("BATTLE_START|"+matchSeed));connected.send(initial);}
+                        for(Peer connected:peers){
+                            connected.send(List.of("BATTLE_START|"+matchSeed));
+                            connected.sendState(initial);
+                        }
                     }
                 }
                 default -> throw new IllegalArgumentException("Unknown fleet command");
@@ -294,7 +318,7 @@ public final class BattleServer implements AutoCloseable {
                         List<String> last=snapshot();
                         long size=last.stream().mapToLong(line->line.length()+4L).sum();
                         bytesQueued+=size*peers.size();
-                        for(Peer peer:peers)peer.send(last);
+                        for(Peer peer:peers)peer.sendState(last);
                     }
                     sendTerminalResult();
                     accumulator=0;
@@ -307,7 +331,7 @@ public final class BattleServer implements AutoCloseable {
                     List<String> current=snapshot();
                     long size=current.stream().mapToLong(line->line.length()+4L).sum();
                     bytesQueued+=size*peers.size();
-                    for(Peer peer:peers)peer.send(current);
+                    for(Peer peer:peers)peer.sendState(current);
                 }
                 if(battle.finished())sendTerminalResult();
             }

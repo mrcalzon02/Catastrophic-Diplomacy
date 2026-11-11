@@ -1,8 +1,16 @@
 package diplomacy.client;
+import diplomacy.net.BattleConnection;
 import diplomacy.sim.Battle;
+import diplomacy.shipyard.Shipyard;
+import java.util.Map;
 public final class BattleRenderPosesTest {
     static void check(boolean b,String m){if(!b)throw new AssertionError(m);}
     static void close(double a,double b,String m){check(Math.abs(a-b)<.002,m+" "+a+" / "+b);}
+    static BattleConnection.ShipEntity remoteShip(int id,int team,Battle.Faction faction,
+                                                   double x,double y,double facing){
+        return new BattleConnection.ShipEntity(id,team,faction,Shipyard.Hull.CORVETTE,
+                x,y,facing,100,100,10,10,10,10,10,10,0,Map.of());
+    }
     public static void main(String[] ignored){
         Battle b=new Battle(7L);
         Battle.Ship ship=b.addShip(0,Battle.Faction.TERRAN,100,200);
@@ -148,8 +156,8 @@ public final class BattleRenderPosesTest {
         // much more often. Presentation must not jump on receipt, reorder
         // ships by index or change authoritative tick positions.
         RemoteShipInterpolation remote=new RemoteShipInterpolation();
-        String a0="SHIP|11|0|TERRAN|0|5|3.124139|100|10|10|10|10";
-        String a3="SHIP|11|0|TERRAN|30|5|-3.124139|100|10|10|10|10";
+        var a0=remoteShip(11,0,Battle.Faction.TERRAN,0,5,3.124139);
+        var a3=remoteShip(11,0,Battle.Faction.TERRAN,30,5,-3.124139);
         remote.observe(0,java.util.List.of(a0));
         close(remote.pose(11).x(),0,"first remote snapshot snaps");
         remote.observe(3,java.util.List.of(a3));
@@ -159,8 +167,8 @@ public final class BattleRenderPosesTest {
         check(Math.abs(remote.pose(11).facing())>3.12,
                 "Remote heading must use shortest angle through 180 degrees");
         remote.observe(6,java.util.List.of(
-                "SHIP|22|1|DRAXIAN|400|20|0|100|10|10|10|10",
-                "SHIP|11|0|TERRAN|60|5|0|100|10|10|10|10"));
+                remoteShip(22,1,Battle.Faction.DRAXIAN,400,20,0),
+                remoteShip(11,0,Battle.Faction.TERRAN,60,5,0)));
         close(remote.pose(11).x(),15,"reordered snapshot continuity");
         close(remote.pose(22).x(),400,"new ship spawns in correct host location");
         remote.advance(.05f);
@@ -185,7 +193,7 @@ public final class BattleRenderPosesTest {
         remote.observe(6,java.util.List.of(a0));
         close(remote.pose(11).x(),60,"duplicate server tick cannot rewind");
         remote.observe(2,java.util.List.of(
-                "SHIP|11|0|TERRAN|7|5|0|100|10|10|10|10"));
+                remoteShip(11,0,Battle.Faction.TERRAN,7,5,0)));
         close(remote.pose(11).x(),7,"session restart resets network tracking");
         check(remote.tracked()==1,"old ship tracks leaked across restarted session");
         mirrors.present(remote,true);
@@ -193,8 +201,8 @@ public final class BattleRenderPosesTest {
         check(restarted11!=hosted11&&mirrors.byHostId(22)==null,
                 "New network session must rebuild the previous sprite identities");
         remote.observe(9,java.util.List.of(
-                "SHIP|11|0|TERRAN|72|5|0|100|10|10|10|10",
-                "SHIP|22|1|DRAXIAN|420|20|0|100|10|10|10|10"));
+                remoteShip(11,0,Battle.Faction.TERRAN,72,5,0),
+                remoteShip(22,1,Battle.Faction.DRAXIAN,420,20,0)));
         mirrors.present(remote,false);
         check(mirrors.byHostId(11)==restarted11&&mirrors.byHostId(22)!=null,
                 "Roster update altered surviving host ship identity");
