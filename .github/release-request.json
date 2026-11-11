@@ -1,8 +1,8 @@
 {
   "action": "verified-three-platform-release",
   "requested_by": "user",
-  "request_date": "2026-11-09",
-  "revision": 20,
-  "source_base_commit": "96a5a555b33a2f46a4afd8c08d01f8798efa0066",
-  "note": "User playtest requested a combat readability pass: halve non-beam projectile travel speeds, halve the representative maneuver-distance scale while preserving the same tactical arena coordinates and weapon ranges, and retain the established causal sensor/light-time scale. Build and publish a fresh prerelease APK plus existing Windows/Linux packages from the verified source, retaining signing identity, updater behavior, multiplayer gates, and no retagging."
+  "request_date": "2026-11-10",
+  "revision": 21,
+  "source_base_commit": "a6641b11099e27ecd6e71d764e5d556077da8fa3",
+  "note": "Publish a fresh playtest prerelease from the verified tactical-movement build. This source retains the half-speed non-beam projectile and compressed representative maneuver scale, deterministic staggered nearest-contact captain targeting, preserved causal sensor/light-time scale, and replaces literal g-derived capital-ship acceleration with readable tactical drive acceleration plus 0.20 tactical propellant debit. Exact-source focused regression is green, including 200v200 combined arms, campaign fleet persistence, fuel reserve/economy behavior, Android/desktop compile, updater and networking. Build signed Android APK and existing Windows/Linux packages; include prereleases in updater semantics, exclude drafts, do not retag."
 }
