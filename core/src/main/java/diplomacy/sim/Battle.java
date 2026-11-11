@@ -196,6 +196,13 @@ public final class Battle {
         public double commandAssist;
         /** The ONE selected, powered FCM compute donor, if any. */
         public int commandSourceId;
+        /**
+         * One bounded remote-work session for the currently engaged hostile.
+         * A fresh sensor report updates local fire control without restarting
+         * the actor<->FCM request/return handshake every tick.
+         */
+        public int commandWorkSourceId,commandWorkTargetId;
+        public long commandWorkRequestTick=-1,commandWorkLastContactTick=-1;
         /** Only contacts actually acquired during this battle are recorded.
          * Never refresh these coordinates from a currently invisible enemy. */
         public final Map<Integer,ContactTrack> knownTracks=new HashMap<>();
@@ -3609,14 +3616,43 @@ public final class Battle {
     /** Main/kinetic/rocket weapons use one actual on-hull processor pool.
      * A fitted FCM may additionally lend finite shared work after a
      * round-trip command delay, never future target evidence or free CPU. */
-    private SensorComputeBudget.Allocation targetWork(Ship observer,
+    private SensorComputeBudget.Allocation targetWork(Ship observer,int targetId,
             SensorLightTimeHistory.Observation received,double range,
             double bestPrecision,int competing){
         Ship command=observer.commandSourceId>0?
                 findShip(observer.commandSourceId):null;
+        long requestTick=command!=null&&
+                observer.commandWorkSourceId==command.id&&
+                observer.commandWorkTargetId==targetId
+                ?observer.commandWorkRequestTick:-1;
         return SensorComputeBudget.solveWithCommand(
                 observer.targetCompute,observer,received,tick,range,
-                bestPrecision,competing,command);
+                bestPrecision,competing,command,requestTick);
+    }
+
+    /** Establish a continuous per-target remote-work session from a real
+     * locally received observation. Loss of the command source, a target
+     * switch, or a real contact gap forces a new reciprocal handshake. */
+    private void noteCommandWorkSession(Ship observer,int targetId,
+            SensorLightTimeHistory.Observation received){
+        if(observer==null||received==null||targetId<=0)
+            throw new IllegalArgumentException("Command work requires a received target");
+        int source=observer.commandSourceId;
+        if(source<=0){
+            observer.commandWorkSourceId=observer.commandWorkTargetId=0;
+            observer.commandWorkRequestTick=observer.commandWorkLastContactTick=-1;
+            return;
+        }
+        boolean continuous=observer.commandWorkSourceId==source&&
+                observer.commandWorkTargetId==targetId&&
+                observer.commandWorkRequestTick>=0&&
+                observer.commandWorkLastContactTick>=tick-2;
+        if(!continuous){
+            observer.commandWorkSourceId=source;
+            observer.commandWorkTargetId=targetId;
+            observer.commandWorkRequestTick=tick;
+        }
+        observer.commandWorkLastContactTick=tick;
     }
 
     /** Count alternative hypotheses from the ACTUALLY MEASURED emission
@@ -3642,7 +3678,7 @@ public final class Battle {
             double maximumRange,double rawDamage,double lockChance,
             String label,LaserFamilies.Type laserType){
         SensorComputeBudget.Allocation allocation=targetWork(
-                shooter,track,observedRange,tacticalPrecision(shooter),
+                shooter,intended.id,track,observedRange,tacticalPrecision(shooter),
                 targetingHypothesisLoad(shooter,intended,track));
         SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                 track,tick,muzzle.x(),muzzle.y(),
@@ -3791,10 +3827,10 @@ public final class Battle {
         // An actual selected shot uses the captain's received measurement,
         // not the target's present hidden coordinates. The source/relay gate
         // remains the same one that authorized captain target selection.
-        double routeDistance=StrictMath.hypot(target.x-s.x,target.y-s.y);
         SensorLightTimeHistory.Observation firingFix=receivedContact(
-                s,target,liveContactSource(s,target,routeDistance));
+                s,target,liveContactSource(s,target,0));
         if(firingFix==null)return;
+        noteCommandWorkSession(s,target.id,firingFix);
         double distance=StrictMath.hypot(firingFix.sample().x()-s.x,
                 firingFix.sample().y()-s.y);
         SensorLightTimeHistory.Profile measuredSignature=
@@ -3884,7 +3920,7 @@ public final class Battle {
             WeaponMuzzles.Origin muzzle=WeaponMuzzles.at(s,WeaponMuzzles.Family.KINETIC,shotId);
             ProjectileModel.Spec body=shell.physical(s.kineticProjectile);
             SensorComputeBudget.Allocation work=targetWork(
-                    s,firingFix,distance,tacticalPrecision(s),
+                    s,target.id,firingFix,distance,tacticalPrecision(s),
                     targetingHypothesisLoad(s,target,firingFix));
             SensorTargetingSolution.Solution solution=SensorTargetingSolution.solve(
                     firingFix,tick,muzzle.x(),muzzle.y(),body.speed(),
@@ -3991,7 +4027,7 @@ public final class Battle {
             // the actual unguided body, not its terminal speed as a constant.
             // A committed salvo will NOT reacquire or alter its bearing.
             SensorComputeBudget.Allocation budget=targetWork(
-                    ship,firingFix,distance,tacticalPrecision(ship),
+                    ship,target.id,firingFix,distance,tacticalPrecision(ship),
                     targetingHypothesisLoad(ship,target,firingFix));
             long solutionId=1L+ship.id*1_000_003L+
                     ((long)rack.slot)*137L+tick*31L;
@@ -7537,6 +7573,10 @@ public final class Battle {
             hash=mix(hash,s.fighterRadarSelected?1:0);
             hash=mix(hash,s.fighterOpticalSelected?1:0);
             hash = mix(hash,s.commandSourceId);
+            hash = mix(hash,s.commandWorkSourceId);
+            hash = mix(hash,s.commandWorkTargetId);
+            hash = mix(hash,s.commandWorkRequestTick);
+            hash = mix(hash,s.commandWorkLastContactTick);
             hash = mix(hash,s.navigationTargetId);
             hash = mix(hash,s.navigationFixTick);
             hash = mix(hash,Double.doubleToLongBits(s.navigationFixX));

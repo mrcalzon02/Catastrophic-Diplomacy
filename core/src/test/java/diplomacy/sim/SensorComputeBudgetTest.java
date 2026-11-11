@@ -192,7 +192,106 @@ public final class SensorComputeBudgetTest {
                 "Dead command power granted an unearned processor credit");
         System.out.println("PASS finite paid FCM work, two-way signal delay, allied competition, power loss and replay");
     }
+    /**
+     * Ordinary Battle.fire path: two real recipients establish continuous
+     * contact sessions, must wait for reciprocal command transit, exhaust
+     * their own local target solvers, then debit ONE finite FCM pool.
+     */
+    private static void ordinaryBattleCommandSharing()throws Exception{
+        var catalog=diplomacy.tech.TechnologyCatalog.loadDefault();
+        var bare=Shipyard.bareHull(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        int support=-1;
+        for(Shipyard.Slot slot:bare.hull.slots)
+            if(slot.mount()==Shipyard.Mount.SUPPORT){support=slot.index();break;}
+        require(support>=0,"No FCM socket for ordinary battle fixture");
+        var fitted=bare.install(support,"BASE-TER-FCM");
+        require(Shipyard.inspect(fitted,catalog).valid(),
+                "Ordinary battle FCM fitting invalid");
+        var fcm=Shipyard.fit(fitted,catalog).network();
+
+        Battle battle=new Battle(93783);
+        Battle.Ship flagship=battle.addShip(0,Battle.Faction.TERRAN,100,100);
+        Battle.Ship first=battle.addShip(0,Battle.Faction.TERRAN,180,100);
+        Battle.Ship second=battle.addShip(0,Battle.Faction.TERRAN,200,110);
+        Battle.Ship hostile=battle.addShip(1,Battle.Faction.DRAXIAN,620,100);
+        for(Battle.Ship ship:battle.ships()){
+            battle.registerDiagnosticStationaryTarget(ship.id);
+            ship.speed=ship.vx=ship.vy=0;
+            ship.maxPower=ship.power=1000;
+            ship.powerRegen=0;
+            ship.maxHeat=10000;ship.heat=0;
+            ship.fighterReserve=ship.droneReserve=ship.repairDroneReserve=0;
+            ship.pdRange=0;
+        }
+        flagship.network=fcm;
+        flagship.laserDamage=flagship.kineticDamage=flagship.plasmaDamage=0;
+        flagship.particleDamage=flagship.missileDamage=flagship.torpedoDamage=0;
+        hostile.laserDamage=hostile.kineticDamage=hostile.plasmaDamage=0;
+        hostile.particleDamage=hostile.missileDamage=hostile.torpedoDamage=0;
+        hostile.maxHull=hostile.hull=100000;
+        for(Battle.Ship recipient:new Battle.Ship[]{first,second}){
+            recipient.laserDamage=8;
+            recipient.kineticDamage=recipient.plasmaDamage=recipient.particleDamage=0;
+            recipient.missileDamage=recipient.torpedoDamage=0;
+            // Establish contact/work session without firing before maturity.
+            recipient.laserReload=999;
+        }
+
+        for(int i=0;i<120&&(first.commandWorkRequestTick<0||
+                second.commandWorkRequestTick<0);i++)battle.step();
+        require(first.commandSourceId==flagship.id&&
+                        second.commandSourceId==flagship.id,
+                "Ordinary recipients never entered the fitted FCM cell");
+        require(first.commandWorkRequestTick>=0&&second.commandWorkRequestTick>=0,
+                "Fresh ordinary contacts never opened command-work sessions");
+        require(flagship.fleetCompute.allocations==0,
+                "Ordinary FCM spent compute before any weapon requested work");
+
+        long request=StrictMath.max(first.commandWorkRequestTick,
+                second.commandWorkRequestTick);
+        int roundTrip=StrictMath.max(
+                2*SensorLightTimeHistory.propagationTicks(
+                        StrictMath.hypot(first.x-flagship.x,first.y-flagship.y)),
+                2*SensorLightTimeHistory.propagationTicks(
+                        StrictMath.hypot(second.x-flagship.x,second.y-flagship.y)));
+        while(battle.tick<request+roundTrip){
+            battle.step();
+            require(flagship.fleetCompute.allocations==0,
+                    "FCM ordinary fire control bypassed reciprocal command transit");
+        }
+
+        first.laserReload=second.laserReload=0;
+        long before=flagship.fleetCompute.allocations;
+        battle.step();
+        long granted=flagship.fleetCompute.allocations-before;
+        require(first.targetCompute.exhausted>0&&second.targetCompute.exhausted>0,
+                "Recipients did not exhaust finite local fire-control compute");
+        require(granted==2&&flagship.fleetCompute.lastTick()==battle.tick-1,
+                "Two ordinary firing recipients did not debit the same mature FCM tick");
+        double capacity=SensorComputeBudget.fleetCapacity(flagship);
+        require(flagship.fleetCompute.remaining()>=0&&
+                        flagship.fleetCompute.remaining()<capacity,
+                "Ordinary FCM work did not consume a finite donor pool");
+        long fireCount=battle.visualEvents().stream().filter(e->
+                e.phase()==Battle.VisualPhase.FIRE&&
+                "LASER".equals(e.weapon())&&
+                (e.sourceId()==first.id||e.sourceId()==second.id)).count();
+        require(fireCount>=2,
+                "FCM ordinary regression never exercised real weapon firing");
+
+        long allocations=flagship.fleetCompute.allocations;
+        flagship.power=0;
+        first.laserReload=second.laserReload=0;
+        battle.step();
+        require(first.commandSourceId==0&&second.commandSourceId==0&&
+                        flagship.fleetCompute.allocations==allocations,
+                "Dead FCM authority still supplied ordinary shared compute");
+        System.out.println("PASS ordinary Battle.fire FCM handshake, finite donor contention and power loss");
+    }
+
     public static void main(String[] args)throws Exception{
+        ordinaryBattleCommandSharing();
         finiteOneTick();
         hardwareDifferentiation();
         historicalFalseComputeBudget();

@@ -106,12 +106,33 @@ public final class SensorComputeBudget {
             Battle.Ship actor,SensorLightTimeHistory.Observation received,
             long tick,double range,double bestPrecision,int hypotheses,
             Battle.Ship commander){
+        // Compatibility for isolated callers which deliberately reuse one
+        // historical report object. Production Battle supplies the retained
+        // request tick from its bounded per-target work session below.
+        return solveWithCommand(local,actor,received,tick,range,bestPrecision,
+                hypotheses,commander,received.receivedTick());
+    }
+
+    /**
+     * Production FCM path. commandRequestTick is the actor's first continuous
+     * request for this target/source session, not the receipt timestamp of the
+     * newest sensor sample. Fresh reports therefore cannot perpetually restart
+     * the reciprocal command delay. The donor still spends one finite shared
+     * pool and contributes no target discovery of its own.
+     */
+    public static Allocation solveWithCommand(State local,
+            Battle.Ship actor,SensorLightTimeHistory.Observation received,
+            long tick,double range,double bestPrecision,int hypotheses,
+            Battle.Ship commander,long commandRequestTick){
         Allocation paid=solve(local,actor,received,tick,range,
                 bestPrecision,hypotheses);
         if(!paid.limited()||commander==null||
                 actor.commandSourceId!=commander.id||
-                commander.team!=actor.team||fleetCapacity(commander)<=0)
+                commander.team!=actor.team||fleetCapacity(commander)<=0||
+                commandRequestTick<0)
             return paid;
+        if(commandRequestTick>tick)
+            throw new IllegalArgumentException("Command work request is from the future");
         double distance=StrictMath.hypot(actor.x-commander.x,
                 actor.y-commander.y);
         double operationalRadius=commander.network.fusionRange()*
@@ -119,7 +140,7 @@ public final class SensorComputeBudget {
                         commander.sensorsCondition);
         if(distance>operationalRadius)return paid;
         int roundTrip=2*SensorLightTimeHistory.propagationTicks(distance);
-        if(tick-received.receivedTick()<roundTrip)return paid;
+        if(tick-commandRequestTick<roundTrip)return paid;
         double outstanding=paid.requestedCost()-paid.spent();
         if(outstanding<=1e-9)return paid;
         Allocation shared=commander.fleetCompute.reserve(tick,
