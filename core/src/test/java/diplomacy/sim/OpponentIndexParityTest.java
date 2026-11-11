@@ -8,6 +8,65 @@ public final class OpponentIndexParityTest {
     private static void check(boolean condition,String reason){
         if(!condition)throw new AssertionError(reason);
     }
+
+    /**
+     * Read the real 200v200 sensor and finite-solver state at 1s and 2s.
+     * Both variants must observe exactly the same historical contacts. The
+     * read-only tactical display must neither create information nor change
+     * the battle. Work pools are bounded per vessel, not by an arbitrary
+     * runner wall-clock/FPS target.
+     */
+    private record SensorSnapshot(int contacts,int relayed,int historical,
+            long localSolves,long localLimited,long fcmSolves,long fcmLimited){}
+    private static SensorSnapshot inspectSensors(Battle battle){
+        long local=0,limited=0,shared=0,sharedLimited=0;
+        for(Battle.Ship ship:battle.ships()){
+            SensorComputeBudget.State own=ship.targetCompute;
+            SensorComputeBudget.State fcm=ship.fleetCompute;
+            check(own.lastTick()<=battle.tick&&fcm.lastTick()<=battle.tick,
+                    "200v200 fire-control computation used a future tick");
+            check(Double.isFinite(own.remaining())&&own.remaining()>=0
+                            &&own.remaining()<=10+1e-8,
+                    "200v200 vessel exceeded finite local compute capacity");
+            check(Double.isFinite(fcm.remaining())&&fcm.remaining()>=0
+                            &&fcm.remaining()<=5+1e-8,
+                    "200v200 FCM minted unlimited shared compute");
+            check(own.allocations>=0&&own.exhausted>=0&&
+                            own.exhausted<=own.allocations&&
+                            fcm.allocations>=0&&fcm.exhausted>=0&&
+                            fcm.exhausted<=fcm.allocations,
+                    "200v200 solver work counters were inconsistent");
+            for(Battle.ContactTrack track:ship.knownTracks.values())
+                check(track.tick>=0&&track.tick<=battle.tick&&
+                                Double.isFinite(track.x)&&Double.isFinite(track.y),
+                        "200v200 stored a future/non-finite sensor track");
+            local+=own.allocations;limited+=own.exhausted;
+            shared+=fcm.allocations;sharedLimited+=fcm.exhausted;
+        }
+        long unchanged=battle.fingerprint();
+        int contacts=0,relayed=0,historical=0;
+        for(int team=0;team<2;team++){
+            Battle.Ship viewer=battle.tacticalViewer(team);
+            if(viewer==null)continue;
+            for(Battle.TacticalContact report:battle.tacticalPicture(team,viewer.id)){
+                check(report.observedTick()<=battle.tick&&
+                                report.receivedTick()<=battle.tick&&
+                                report.emittedTick()<=report.observedTick(),
+                        "200v200 command scope received future/unsent evidence");
+                check(Double.isFinite(report.x())&&Double.isFinite(report.y())&&
+                                Double.isFinite(report.uncertainty()),
+                        "200v200 command scope received invalid observations");
+                contacts++;
+                if(report.relayed())relayed++;
+                if(report.stale())historical++;
+            }
+        }
+        check(battle.fingerprint()==unchanged,
+                "Reading 200v200 command contacts changed live combat");
+        return new SensorSnapshot(contacts,relayed,historical,
+                local,limited,shared,sharedLimited);
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -35,6 +94,16 @@ public final class OpponentIndexParityTest {
             check(indexed.fingerprint()==fullScan.fingerprint(),
                     "Indexed traversal changed deterministic battle at tick "+
                             indexed.tick);
+            if(indexed.tick==30||indexed.tick==60){
+                SensorSnapshot observed=inspectSensors(indexed);
+                SensorSnapshot reference=inspectSensors(fullScan);
+                check(observed.equals(reference),
+                        "200v200 sensor or finite fire-control state diverged at tick "+
+                                indexed.tick+": indexed="+observed+
+                                " full-scan="+reference);
+                System.out.println("MEASURE 200v200 sensor-budget tick="+
+                        indexed.tick+" "+observed);
+            }
         }
         check(indexed.ships().size()==400,
                 "A/B must contain the real 200v200 fixture");
