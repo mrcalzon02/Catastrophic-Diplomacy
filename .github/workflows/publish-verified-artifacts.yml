@@ -48,7 +48,8 @@ jobs:
           run=json.loads(pathlib.Path('source-run.json').read_text())
           jobs=json.loads(pathlib.Path('source-jobs.json').read_text())['jobs']
           if (run.get('name')!='Manual verified three-platform release' or
-              run.get('head_branch')!='main' or run.get('event')!='push' or
+              run.get('head_branch')!='main' or
+              run.get('event') not in ('push','workflow_dispatch') or
               run.get('status')!='completed' or run.get('conclusion')!='failure'):
               raise SystemExit('BLOCKED: source is not a completed failed main-branch release run')
           sha=run.get('head_sha','')

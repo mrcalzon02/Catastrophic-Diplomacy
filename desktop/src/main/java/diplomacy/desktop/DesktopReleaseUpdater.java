@@ -84,11 +84,17 @@ final class DesktopReleaseUpdater {
     private Release lookup() throws Exception {
         if(ownTag==null||ownTag.isBlank())
             throw new IllegalStateException("This desktop build has no embedded release tag");
-        JsonValue installed=json(API+"/tags/"+java.net.URLEncoder.encode(ownTag,java.nio.charset.StandardCharsets.UTF_8));
-        if(installed.getBoolean("draft",false))
-            throw new IllegalStateException("Installed release is not publicly published");
-        String installedDate=installed.getString("published_at","");
-        Instant.parse(installedDate);
+        JsonValue installed=installedRelease(ownTag);
+        String installedDate=null;
+        boolean sequenceFallback=false;
+        if(installed!=null&&!installed.getBoolean("draft",false)){
+            String published=installed.getString("published_at","");
+            try{Instant.parse(published);installedDate=published;}
+            catch(RuntimeException invalid){sequenceFallback=true;}
+        }else sequenceFallback=true;
+        if(sequenceFallback&&DesktopUpdatePolicy.canonicalBuildSequence(ownTag)<0)
+            throw new IllegalStateException(
+                    "Installed release metadata is unavailable and this build tag cannot be safely ordered; no downgrade was attempted");
         Release best=null;
         boolean complete=false;
         for(int page=1;page<=MAX_PAGES;page++){
@@ -102,7 +108,9 @@ final class DesktopReleaseUpdater {
                 if(tag.equals(ownTag))continue;
                 String published=release.getString("published_at","");
                 try{
-                    if(!DesktopUpdatePolicy.isPublishedAfter(published,installedDate))continue;
+                    if(sequenceFallback){
+                        if(!DesktopUpdatePolicy.canonicalNewerThan(tag,ownTag))continue;
+                    }else if(!DesktopUpdatePolicy.isPublishedAfter(published,installedDate))continue;
                 }catch(IllegalArgumentException invalid){continue;}
                 JsonValue assets=release.get("assets");
                 if(assets==null)continue;
@@ -207,6 +215,15 @@ final class DesktopReleaseUpdater {
         throw new IllegalStateException("Too many GitHub redirects");
     }
 
+    private static JsonValue installedRelease(String tag)throws Exception{
+        String url=API+"/tags/"+java.net.URLEncoder.encode(
+                tag,java.nio.charset.StandardCharsets.UTF_8);
+        try{return json(url);}
+        catch(IllegalStateException missing){
+            if("GitHub returned HTTP 404".equals(missing.getMessage()))return null;
+            throw missing;
+        }
+    }
     private static JsonValue json(String url)throws Exception{
         HttpURLConnection conn=connect(url);
         try(InputStream input=conn.getInputStream()){

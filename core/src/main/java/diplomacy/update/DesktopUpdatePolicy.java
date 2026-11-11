@@ -33,6 +33,33 @@ public final class DesktopUpdatePolicy {
         }
     }
 
+    /**
+     * Canonical development packages embed their monotonic release workflow
+     * sequence in the tag. This is the ONLY safe fallback when GitHub no
+     * longer exposes the installed release metadata: arbitrary/legacy tags
+     * remain incomparable rather than being guessed "older".
+     */
+    public static long canonicalBuildSequence(String tag){
+        if(tag==null)return -1;
+        String prefix="cd-v0.1.5-dev.";
+        if(!tag.startsWith(prefix)||tag.length()==prefix.length())return -1;
+        long value=0;
+        for(int i=prefix.length();i<tag.length();i++){
+            char c=tag.charAt(i);
+            if(c<'0'||c>'9')return -1;
+            try{value=Math.addExact(Math.multiplyExact(value,10),c-'0');}
+            catch(ArithmeticException overflow){return -1;}
+        }
+        return value>0?value:-1;
+    }
+    public static boolean canonicalNewerThan(String candidateTag,String installedTag){
+        long installed=canonicalBuildSequence(installedTag);
+        long candidate=canonicalBuildSequence(candidateTag);
+        if(installed<0||candidate<0)
+            throw new IllegalArgumentException("Release tags are not safely orderable without publication metadata");
+        return candidate>installed;
+    }
+
     public static void requireAsset(String tag,String fileName,String url,long bytes) {
         if (tag==null || !tag.matches("[A-Za-z0-9][A-Za-z0-9._+/-]{0,199}") ||
             tag.contains("//")||tag.contains("/../")||tag.contains("/./"))

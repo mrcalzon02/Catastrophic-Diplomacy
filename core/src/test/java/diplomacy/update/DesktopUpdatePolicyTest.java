@@ -24,6 +24,18 @@ public final class DesktopUpdatePolicyTest {
         reject(()->DesktopUpdatePolicy.requireAsset(tag,"game.exe",url,100000));
         reject(()->DesktopUpdatePolicy.requireAsset("../other",file,url,100000));
         reject(()->DesktopUpdatePolicy.requireAsset(tag,file,url,10));
-        System.out.println("PASS: desktop prerelease updater detects newest published GitHub release; Windows MSI and Linux ZIP");
+        check(DesktopUpdatePolicy.canonicalBuildSequence("cd-v0.1.5-dev.695")==695,
+                "Canonical dev sequence was not decoded");
+        check(DesktopUpdatePolicy.canonicalNewerThan(
+                        "cd-v0.1.5-dev.700","cd-v0.1.5-dev.695"),
+                "Missing-tag fallback missed a genuinely newer canonical build");
+        check(!DesktopUpdatePolicy.canonicalNewerThan(
+                        "cd-v0.1.5-dev.690","cd-v0.1.5-dev.695"),
+                "Missing-tag fallback allowed a downgrade");
+        reject(()->DesktopUpdatePolicy.canonicalNewerThan(
+                "experimental-2026.11.rc","cd-v0.1.5-dev.695"));
+        reject(()->DesktopUpdatePolicy.canonicalNewerThan(
+                "cd-v0.1.5-dev.700","legacy-install"));
+        System.out.println("PASS: desktop prerelease updater detects newest published GitHub release; missing-tag fallback is monotonic and downgrade-safe; Windows MSI and Linux ZIP");
     }
 }
