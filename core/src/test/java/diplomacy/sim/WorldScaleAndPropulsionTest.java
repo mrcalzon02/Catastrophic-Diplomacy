@@ -95,6 +95,8 @@ public final class WorldScaleAndPropulsionTest {
         }
         close(SublightPropulsion.Drive.FUSION_TORCH.tacticalAcceleration,14,0,
                 "Fusion tactical acceleration");
+        close(SublightPropulsion.TACTICAL_FUEL_COST_SCALE,.20,0,
+                "Tactical delta-V fuel scale");
         System.out.println("PASS bare, one-ENG, two-ENG and upgraded tactical-drive tiers");
     }
     private static void physicalMovement(){
@@ -149,8 +151,10 @@ public final class WorldScaleAndPropulsionTest {
 
         rationed.vx=0;rationed.vy=0;rationed.fuel=.000001;
         SublightPropulsion.advance(rationed,100,0,Battle.DT);
-        ok(rationed.vx<=.000001/rationed.propulsion.fuelPerDeltaV+1e-9,
-                "Final partial fuel unit provided more delta-V than physically available");
+        ok(rationed.vx<=.000001/
+                        (rationed.propulsion.fuelPerDeltaV*
+                         SublightPropulsion.TACTICAL_FUEL_COST_SCALE)+1e-9,
+                "Final partial fuel unit provided more tactical delta-V than available");
 
         // Economy must physically spend LESS fuel even before a low-gee ship
         // reaches its speed cap. A cosmetic speed setting is not sufficient.

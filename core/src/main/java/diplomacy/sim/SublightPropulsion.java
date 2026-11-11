@@ -18,6 +18,13 @@ public final class SublightPropulsion {
      * sensors, projectile firing, resource regeneration or tick counters twice.
      */
     public static final int POSITION_SUBSTEPS=2;
+    /**
+     * Tactical screen-space maneuvering is intentionally cheaper than the old
+     * literal world-unit delta-V debit. Relative engine efficiency and every
+     * reserve/economy order remain intact; this only keeps useful maneuvering
+     * from emptying a warship's tank after one broad turn.
+     */
+    public static final double TACTICAL_FUEL_COST_SCALE=0.20;
     public enum Drive {
         AUXILIARY_ELECTRIC(.001,0.3,4.0,0.65),
         FUSION_TORCH(.006,3.0,14.0,1.0),
@@ -129,13 +136,15 @@ public final class SublightPropulsion {
             double maxStep=ship.fuel>0&&ship.engineCondition>.01&&ship.crewReadiness()>0?
                     acceleration*halfDt:0;
             double spendable=StrictMath.max(0,ship.fuel-protectedFuel);
-            double fuelStep=spendable/ship.propulsion.fuelPerDeltaV;
+            double fuelPerDeltaV=ship.propulsion.fuelPerDeltaV*
+                    TACTICAL_FUEL_COST_SCALE;
+            double fuelStep=spendable/fuelPerDeltaV;
             double applied=StrictMath.min(difference,StrictMath.min(maxStep,fuelStep));
             if(applied>0&&difference>0){
                 ship.vx+=differenceX*applied/difference;
                 ship.vy+=differenceY*applied/difference;
                 ship.fuel=StrictMath.max(0,ship.fuel-
-                        applied*ship.propulsion.fuelPerDeltaV);
+                        applied*fuelPerDeltaV);
             }
             // Semi-implicit integration at half-DT reduces distance error
             // without modifying the total physical time or creating fuel.
