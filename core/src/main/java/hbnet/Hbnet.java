@@ -66,10 +66,31 @@ public final class Hbnet {
     public static boolean trustedLan(InetAddress address){return address.isLoopbackAddress()||address.isSiteLocalAddress()||address.isLinkLocalAddress();}
     public static InetAddress lanAddress(String address)throws IOException{InetAddress target=InetAddress.getByName(host(address));if(!trustedLan(target))throw new IOException("Verified TLS required (NET-05)");return target;}
     public static String pin(String value){if(value==null||!value.matches("[a-f0-9]{64}"))throw new IllegalArgumentException("Verify the server fingerprint privately (NET-03)");return value;}
-    public static void write(OutputStream out,String value)throws IOException{
+    private static byte[] frameBytes(String value)throws IOException{
+        if(value==null)throw failure();
         byte[] bytes=value.getBytes(StandardCharsets.US_ASCII);
         if(bytes.length>MAX_FRAME||value.chars().anyMatch(c->c<32||c>126))throw failure();
-        DataOutputStream d=new DataOutputStream(out);d.writeInt(bytes.length);d.write(bytes);d.flush();
+        return bytes;
+    }
+    public static void write(OutputStream out,String value)throws IOException{
+        byte[] bytes=frameBytes(value);
+        DataOutputStream d=new DataOutputStream(out);
+        d.writeInt(bytes.length);d.write(bytes);d.flush();
+    }
+    /**
+     * Preserve the exact length-prefixed hbnet frame format while coalescing
+     * a complete already-bounded batch into one socket flush. Individual
+     * frame validation and MAX_FRAME remain unchanged.
+     */
+    public static void writeBatch(OutputStream out,List<String> values)throws IOException{
+        if(out==null||values==null||values.isEmpty()||values.size()>8194)throw failure();
+        DataOutputStream d=new DataOutputStream(out);
+        for(String value:values){
+            byte[] bytes=frameBytes(value);
+            d.writeInt(bytes.length);
+            d.write(bytes);
+        }
+        d.flush();
     }
     public static String read(InputStream in)throws IOException{
         DataInputStream d=new DataInputStream(in);int n=d.readInt();if(n<1||n>MAX_FRAME)throw failure();

@@ -211,7 +211,12 @@ public final class BattleServer implements AutoCloseable {
                     peer.send(List.of(terminalResultFrame()));
             }
             final Peer current=peer;
-            workers.execute(()->{try{while(!closed&&!socket.isClosed())for(String frame:current.output.take())Hbnet.write(socket.getOutputStream(),frame);}catch(IOException|InterruptedException e){try{socket.close();}catch(IOException ignored){}}});
+            workers.execute(()->{try{
+                while(!closed&&!socket.isClosed())
+                    Hbnet.writeBatch(socket.getOutputStream(),current.output.take());
+            }catch(IOException|InterruptedException e){
+                try{socket.close();}catch(IOException ignored){}
+            }});
             long window=System.nanoTime();int rate=0;
             while(!closed){String frame=Hbnet.read(socket.getInputStream());if(System.nanoTime()-window>1_000_000_000L){window=System.nanoTime();rate=0;}if(++rate>60)throw Hbnet.failure();
                 synchronized(lock){handle(peer,frame);}
