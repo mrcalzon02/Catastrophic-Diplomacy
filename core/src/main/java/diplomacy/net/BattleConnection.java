@@ -173,164 +173,175 @@ public final class BattleConnection implements AutoCloseable {
         if(!connected||team!=0||matchRules==null||snapshot!=null)throw Hbnet.failure();
         Hbnet.write(socket.getOutputStream(),"START");
     }
-    private static IllegalArgumentException malformed(){
-        return new IllegalArgumentException("Malformed authoritative snapshot");
+    private static final class SnapshotFormatException extends IllegalArgumentException {
+        final String code;
+        SnapshotFormatException(String code){
+            super("Malformed authoritative snapshot ["+code+"]");
+            this.code=code;
+        }
+    }
+    private static SnapshotFormatException malformed(String code){
+        return new SnapshotFormatException(code);
     }
     private static long positiveId(String raw){
         long id=Long.parseLong(raw);
-        if(id<=0)throw malformed();
+        if(id<=0)throw malformed("ID");
         return id;
     }
     private static int nonNegativeId(String raw){
         int id=Integer.parseInt(raw);
-        if(id<0)throw malformed();
+        if(id<0)throw malformed("REFERENCE");
         return id;
     }
     private static int team(String raw){
         int value=Integer.parseInt(raw);
-        if(value<0||value>1)throw malformed();
+        if(value<0||value>1)throw malformed("TEAM");
         return value;
     }
     private static boolean flag(String raw){
         if("true".equals(raw))return true;
         if("false".equals(raw))return false;
-        throw malformed();
+        throw malformed("FLAG");
     }
-    private static double finite(String raw,double low,double high){
+    private static double finite(String raw,double low,double high,String code){
         double value=Double.parseDouble(raw);
-        if(!Double.isFinite(value)||value<low||value>high)throw malformed();
+        if(!Double.isFinite(value)||value<low||value>high)throw malformed(code);
         return value;
     }
     private static double coordinate(String raw,boolean x){
-        double value=finite(raw,-100_000,100_000);
+        double value=finite(raw,-100_000,100_000,x?"X":"Y");
         if(x){
-            if(value<BattleArena.MIN_X||value>BattleArena.MAX_X)throw malformed();
-        }else if(value<BattleArena.MIN_Y||value>BattleArena.MAX_Y)throw malformed();
+            if(value<BattleArena.MIN_X||value>BattleArena.MAX_X)throw malformed("X_ARENA");
+        }else if(value<BattleArena.MIN_Y||value>BattleArena.MAX_Y)throw malformed("Y_ARENA");
         return value;
     }
     private static Map<Integer,String> weaponFittings(String raw){
-        if(raw==null||raw.length()>1200)throw malformed();
+        if(raw==null||raw.length()>1200)throw malformed("FITTINGS");
         if("-".equals(raw))return Map.of();
         TreeMap<Integer,String> result=new TreeMap<>();
         for(String token:raw.split(",",-1)){
             String[] parts=token.split("~",-1);
-            if(parts.length!=2)throw malformed();
+            if(parts.length!=2)throw malformed("FITTINGS");
             int slot=Integer.parseInt(parts[0]);
             String component=parts[1];
             if(slot<0||slot>63||
                     !component.matches("BASE-[A-Z]{3}-[A-Z]{2,4}")||
                     WeaponMuzzles.family(component)==null||
                     result.putIfAbsent(slot,component)!=null)
-                throw malformed();
+                throw malformed("FITTINGS");
         }
         return Map.copyOf(result);
     }
     static Entity decodeEntity(String line){return decodeEntity(line,1);}
     static Entity decodeEntity(String line,int version){
-        if(line==null||(version!=1&&version!=2))throw malformed();
+        if(line==null||(version!=1&&version!=2))throw malformed("VERSION");
         String[] p=line.split("\\|",-1);
         try{
             if(version==1)return switch(p[0]){
                 case "SHIP" -> {
-                    if(p.length!=12)throw malformed();
+                    if(p.length!=12)throw malformed("SHIP_FIELDS");
                     long id=positiveId(p[1]);int side=team(p[2]);
                     Battle.Faction faction=Battle.Faction.valueOf(p[3]);
                     double x=coordinate(p[4],true),y=coordinate(p[5],false);
-                    double facing=finite(p[6],-StrictMath.PI-1e-9,StrictMath.PI+1e-9);
-                    double hull=finite(p[7],0,1_000_000_000);
-                    double shields=finite(p[8],0,1_000_000_000);
-                    double armor=finite(p[9],0,1_000_000_000);
-                    double power=finite(p[10],0,1_000_000_000);
-                    double fuel=finite(p[11],0,1_000_000_000);
+                    double facing=finite(p[6],-StrictMath.PI-1e-9,StrictMath.PI+1e-9,"FACING");
+                    double hull=finite(p[7],0,1_000_000_000,"HULL");
+                    double shields=finite(p[8],0,1_000_000_000,"SHIELDS");
+                    double armor=finite(p[9],0,1_000_000_000,"ARMOR");
+                    double power=finite(p[10],0,1_000_000_000,"POWER");
+                    double fuel=finite(p[11],0,1_000_000_000,"FUEL");
                     yield new ShipEntity(id,side,faction,Shipyard.Hull.CORVETTE,
                             x,y,facing,hull,StrictMath.max(1,hull),
                             shields,StrictMath.max(1,shields),
                             armor,StrictMath.max(1,armor),power,fuel,0,Map.of());
                 }
                 case "MISSILE" -> {
-                    if(p.length!=6)throw malformed();
+                    if(p.length!=6)throw malformed("MISSILE_FIELDS");
                     yield new MissileEntity(positiveId(p[1]),team(p[2]),0,0,
                             coordinate(p[3],true),coordinate(p[4],false),
-                            finite(p[5],0,1_000_000_000),false,false,false);
+                            finite(p[5],0,1_000_000_000,"BODY_INTEGRITY"),false,false,false);
                 }
                 case "BALLISTIC" -> {
-                    if(p.length!=6)throw malformed();
+                    if(p.length!=6)throw malformed("BALLISTIC_FIELDS");
                     yield new BallisticEntity(positiveId(p[1]),team(p[2]),0,0,
                             coordinate(p[3],true),coordinate(p[4],false),
-                            finite(p[5],0,1_000_000_000),false);
+                            finite(p[5],0,1_000_000_000,"BODY_INTEGRITY"),false);
                 }
                 case "CRAFT" -> {
-                    if(p.length!=6)throw malformed();
+                    if(p.length!=6)throw malformed("CRAFT_FIELDS");
                     yield new CraftEntity(positiveId(p[1]),team(p[2]),0,0,
                             coordinate(p[3],true),coordinate(p[4],false),
-                            finite(p[5],0,1_000_000_000),false,false,null);
+                            finite(p[5],0,1_000_000_000,"CRAFT_INTEGRITY"),false,false,null);
                 }
-                default -> throw malformed();
+                default -> throw malformed("ENTITY_KIND");
             };
             return switch(p[0]){
                 case "SHIP" -> {
-                    if(p.length!=18)throw malformed();
+                    if(p.length!=18)throw malformed("SHIP_FIELDS");
                     long id=positiveId(p[1]);int side=team(p[2]);
                     Battle.Faction faction=Battle.Faction.valueOf(p[3]);
                     Shipyard.Hull hullClass=Shipyard.Hull.valueOf(p[4]);
                     double x=coordinate(p[5],true),y=coordinate(p[6],false);
-                    double facing=finite(p[7],-StrictMath.PI-1e-9,StrictMath.PI+1e-9);
-                    double hull=finite(p[8],0,1_000_000_000);
-                    double maxHull=finite(p[9],1,1_000_000_000);
-                    double shields=finite(p[10],0,1_000_000_000);
-                    double maxShields=finite(p[11],0,1_000_000_000);
-                    double armor=finite(p[12],0,1_000_000_000);
-                    double maxArmor=finite(p[13],0,1_000_000_000);
-                    double power=finite(p[14],0,1_000_000_000);
-                    double fuel=finite(p[15],0,1_000_000_000);
+                    double facing=finite(p[7],-StrictMath.PI-1e-9,StrictMath.PI+1e-9,"FACING");
+                    double hull=finite(p[8],0,1_000_000_000,"HULL");
+                    double maxHull=finite(p[9],1,1_000_000_000,"MAX_HULL");
+                    double shields=finite(p[10],0,1_000_000_000,"SHIELDS");
+                    double maxShields=finite(p[11],0,1_000_000_000,"MAX_SHIELDS");
+                    double armor=finite(p[12],0,1_000_000_000,"ARMOR");
+                    double maxArmor=finite(p[13],0,1_000_000_000,"MAX_ARMOR");
+                    double power=finite(p[14],0,1_000_000_000,"POWER");
+                    double fuel=finite(p[15],0,1_000_000_000,"FUEL");
                     int lastTarget=nonNegativeId(p[16]);
                     Map<Integer,String> fittings=weaponFittings(p[17]);
-                    if(hull>maxHull||shields>maxShields||armor>maxArmor)throw malformed();
+                    if(hull>maxHull+1e-7)throw malformed("HULL_LIMIT");
+                    if(shields>maxShields+1e-7)throw malformed("SHIELD_LIMIT");
+                    if(armor>maxArmor+1e-7)throw malformed("ARMOR_LIMIT");
                     yield new ShipEntity(id,side,faction,hullClass,x,y,facing,
                             hull,maxHull,shields,maxShields,armor,maxArmor,power,fuel,
                             lastTarget,fittings);
                 }
                 case "MISSILE" -> {
-                    if(p.length!=11)throw malformed();
+                    if(p.length!=11)throw malformed("MISSILE_FIELDS");
                     yield new MissileEntity(positiveId(p[1]),team(p[2]),
                             nonNegativeId(p[3]),nonNegativeId(p[4]),
                             coordinate(p[5],true),coordinate(p[6],false),
-                            finite(p[7],0,1_000_000_000),
+                            finite(p[7],0,1_000_000_000,"BODY_INTEGRITY"),
                             flag(p[8]),flag(p[9]),flag(p[10]));
                 }
                 case "BALLISTIC" -> {
-                    if(p.length!=9)throw malformed();
+                    if(p.length!=9)throw malformed("BALLISTIC_FIELDS");
                     yield new BallisticEntity(positiveId(p[1]),team(p[2]),
                             nonNegativeId(p[3]),nonNegativeId(p[4]),
                             coordinate(p[5],true),coordinate(p[6],false),
-                            finite(p[7],0,1_000_000_000),flag(p[8]));
+                            finite(p[7],0,1_000_000_000,"BODY_INTEGRITY"),flag(p[8]));
                 }
                 case "CRAFT" -> {
-                    if(p.length!=11)throw malformed();
+                    if(p.length!=11)throw malformed("CRAFT_FIELDS");
                     boolean fighter=flag(p[8]),repair=flag(p[9]);
                     FighterModel.Hull fighterHull="NONE".equals(p[10])?null:
                             FighterModel.Hull.valueOf(p[10]);
                     yield new CraftEntity(positiveId(p[1]),team(p[2]),
                             nonNegativeId(p[3]),nonNegativeId(p[4]),
                             coordinate(p[5],true),coordinate(p[6],false),
-                            finite(p[7],0,1_000_000_000),
+                            finite(p[7],0,1_000_000_000,"CRAFT_INTEGRITY"),
                             fighter,repair,fighterHull);
                 }
-                default -> throw malformed();
+                default -> throw malformed("ENTITY_KIND");
             };
+        }catch(SnapshotFormatException known){
+            throw known;
         }catch(IllegalArgumentException invalid){
-            throw malformed();
+            throw malformed("PARSE");
         }
     }
     static List<Entity> decodeEntities(List<String> rows){return decodeEntities(rows,1);}
     static List<Entity> decodeEntities(List<String> rows,int version){
-        if(rows==null||rows.size()>8192||(version!=1&&version!=2))throw malformed();
+        if(rows==null||rows.size()>8192||(version!=1&&version!=2))throw malformed("FRAME");
         ArrayList<Entity> decoded=new ArrayList<>(rows.size());
         HashSet<String> identities=new HashSet<>();
         for(String row:rows){
             Entity entity=decodeEntity(row,version);
             String key=entity.kind().name()+":"+entity.id();
-            if(!identities.add(key))throw malformed();
+            if(!identities.add(key))throw malformed("DUPLICATE");
             decoded.add(entity);
         }
         if(version==2){
@@ -340,7 +351,7 @@ public final class BattleConnection implements AutoCloseable {
                 int source=entity instanceof MissileEntity m?m.sourceId():
                         entity instanceof BallisticEntity b?b.sourceId():
                         entity instanceof CraftEntity c?c.sourceId():0;
-                if(source>0&&!ships.contains((long)source))throw malformed();
+                if(source>0&&!ships.contains((long)source))throw malformed("SOURCE");
             }
         }
         return List.copyOf(decoded);
@@ -396,7 +407,9 @@ public final class BattleConnection implements AutoCloseable {
         // bad-frame disconnect as a slow socket.
         disconnectStatus="TRANSPORT_CLOSED";
     }catch(RuntimeException invalidState){
-        disconnectStatus="INVALID_AUTHORITY";
+        disconnectStatus=invalidState instanceof SnapshotFormatException formatted
+                ?"INVALID_AUTHORITY:"+formatted.code
+                :"INVALID_AUTHORITY";
     }finally{close();}}
     public void close(){
         connected=false;
