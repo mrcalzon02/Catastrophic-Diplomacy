@@ -87,6 +87,8 @@ public final class BattleConnection implements AutoCloseable {
     private volatile Snapshot snapshot;
     private volatile long acknowledged;
     private volatile boolean connected=true;
+    /** Neutral operator-facing disconnect category; never includes peer data. */
+    private volatile String disconnectStatus="CONNECTED";
     private volatile boolean leftAccepted,rightAccepted,leftReady,rightReady;
     private volatile String fleetStatus="No fleet submitted",lobbyStatus="Waiting for lobby";
     /** Host-issued real outcome, independent from whichever ship remains on screen. */
@@ -142,6 +144,7 @@ public final class BattleConnection implements AutoCloseable {
     }
     public Snapshot snapshot(){return snapshot;}
     public boolean connected(){return connected;}
+    public String disconnectStatus(){return disconnectStatus;}
     public long acknowledged(){return acknowledged;}
     public synchronized long order(BattleOrders.PointDefense pd,BattleOrders.Position position)throws IOException{
         if(team<0||snapshot==null)throw Hbnet.failure();long next=++sequence;Hbnet.write(socket.getOutputStream(),"ORDER|"+next+"|"+snapshot.tick()+"|"+team+"|"+pd+"|"+position);return next;
@@ -387,6 +390,17 @@ public final class BattleConnection implements AutoCloseable {
                 throw Hbnet.failure();
             snapshot=new Snapshot(sessionId,tick,hash,body,decoded);
         }
-    }catch(IOException|RuntimeException e){/* presentation remains at last complete authoritative frame */}finally{close();}}
-    public void close(){connected=false;try{socket.close();}catch(IOException ignored){}}
+    }catch(IOException transportFailure){
+        // Do not expose raw peer/error content; distinguish transport loss from
+        // semantic rejection so diagnostics do not misclassify an immediate
+        // bad-frame disconnect as a slow socket.
+        disconnectStatus="TRANSPORT_CLOSED";
+    }catch(RuntimeException invalidState){
+        disconnectStatus="INVALID_AUTHORITY";
+    }finally{close();}}
+    public void close(){
+        connected=false;
+        if("CONNECTED".equals(disconnectStatus))disconnectStatus="CLOSED";
+        try{socket.close();}catch(IOException ignored){}
+    }
 }

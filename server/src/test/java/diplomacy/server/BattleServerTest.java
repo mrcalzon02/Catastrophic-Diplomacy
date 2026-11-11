@@ -8,7 +8,26 @@ import java.util.*;
 import java.util.function.BooleanSupplier;
 
 public final class BattleServerTest {
-    private static void until(BooleanSupplier condition)throws Exception{long end=System.nanoTime()+8_000_000_000L;while(System.nanoTime()<end){if(condition.getAsBoolean())return;Thread.sleep(20);}throw new AssertionError("Battle socket deadline");}
+    private static void until(BooleanSupplier condition)throws Exception{
+        long end=System.nanoTime()+8_000_000_000L;
+        while(System.nanoTime()<end){if(condition.getAsBoolean())return;Thread.sleep(20);}
+        throw new AssertionError("Battle socket deadline");
+    }
+    private static void untilSnapshots(BattleConnection first,BattleConnection second,
+                                       BattleServer server)throws Exception{
+        long end=System.nanoTime()+8_000_000_000L;
+        while(System.nanoTime()<end){
+            if(first.snapshot()!=null&&second.snapshot()!=null)return;
+            if(!first.connected()||!second.connected())
+                throw new AssertionError("Initial snapshot connection closed: left="+
+                        first.disconnectStatus()+" right="+second.disconnectStatus()+
+                        " hostTick="+server.tick());
+            Thread.sleep(20);
+        }
+        throw new AssertionError("Initial snapshot deadline: left="+first.disconnectStatus()+
+                " right="+second.disconnectStatus()+" hostTick="+server.tick()+
+                " queuedBytes="+server.bytesQueued());
+    }
     public static void main(String[] args)throws Exception{
         Path root=Files.createTempDirectory("diplomacy-tls-");
         try{
@@ -17,7 +36,7 @@ public final class BattleServerTest {
                 Hbnet.Client a=new Hbnet.Client(tls.fingerprint,"catastrophic-diplomacy",one,key),b=new Hbnet.Client(tls.fingerprint,"catastrophic-diplomacy",two,key);
                 try(BattleServer server=new BattleServer("127.0.0.1",0,2479,size,tls);
                     BattleConnection first=new BattleConnection("localhost",server.port(),a,false);BattleConnection second=new BattleConnection("localhost",server.port(),b,false)){
-                    until(()->first.snapshot()!=null&&second.snapshot()!=null);
+                    untilSnapshots(first,second,server);
                     if(first.protocolVersion!=2||second.protocolVersion!=2)
                         throw new AssertionError("Snapshot v2 not negotiated");
                     if(first.team!=0||second.team!=1)throw new AssertionError("server-owned fleets");
