@@ -133,20 +133,51 @@ final class GameWikiCatalog {
     private final class IndexedArticles extends AbstractList<Article> {
         private final List<Article> fixed;
         /** Null means the complete canonical upgrade index. Arbitrary queries
-         * retain only primitive positions, never thousands of formatted IDs. */
-        private final int[] matchedIndexes;
+         * retain one BIT per possible upgrade rather than one int or String
+         * per match. 73k upgrades therefore cost ~9 KiB regardless of hit
+         * density and never trigger array-resize copy spikes on tiny heaps. */
+        private final long[] matchedBits;
         private final int matchedCount;
-        IndexedArticles(List<Article> fixed,int[] matchedIndexes,int matchedCount){
+        IndexedArticles(List<Article> fixed,long[] matchedBits,int matchedCount){
             this.fixed=List.copyOf(fixed);
-            this.matchedIndexes=matchedIndexes;
-            this.matchedCount=matchedIndexes==null?upgradeIds.size():matchedCount;
-            if(this.matchedCount<0||
-                    (matchedIndexes!=null&&this.matchedCount>matchedIndexes.length))
+            this.matchedBits=matchedBits;
+            this.matchedCount=matchedBits==null?upgradeIds.size():matchedCount;
+            if(this.matchedCount<0||this.matchedCount>upgradeIds.size())
                 throw new IllegalArgumentException("Invalid wiki match index");
         }
+        private boolean matched(int canonical){
+            return matchedBits==null||
+                    (matchedBits[canonical>>>6]&(1L<<(canonical&63)))!=0;
+        }
         private int canonicalIndex(int relative){
-            if(relative<0||relative>=matchedCount)throw new IndexOutOfBoundsException(relative);
-            return matchedIndexes==null?relative:matchedIndexes[relative];
+            if(relative<0||relative>=matchedCount)
+                throw new IndexOutOfBoundsException(relative);
+            if(matchedBits==null)return relative;
+            int remaining=relative;
+            for(int wordIndex=0;wordIndex<matchedBits.length;wordIndex++){
+                long word=matchedBits[wordIndex];
+                int bits=Long.bitCount(word);
+                if(remaining>=bits){remaining-=bits;continue;}
+                while(word!=0){
+                    int bit=Long.numberOfTrailingZeros(word);
+                    if(remaining--==0){
+                        int canonical=(wordIndex<<6)+bit;
+                        if(canonical>=upgradeIds.size())
+                            throw new IllegalStateException("Wiki bit index overflow");
+                        return canonical;
+                    }
+                    word&=word-1;
+                }
+            }
+            throw new IllegalStateException("Wiki match count/index drift");
+        }
+        private int ordinalBefore(int canonical){
+            if(matchedBits==null)return canonical;
+            int words=canonical>>>6,count=0;
+            for(int i=0;i<words;i++)count+=Long.bitCount(matchedBits[i]);
+            int bit=canonical&63;
+            if(bit>0)count+=Long.bitCount(matchedBits[words]&((1L<<bit)-1));
+            return count;
         }
         @Override public int size(){return fixed.size()+matchedCount;}
         @Override public Article get(int index){
@@ -160,15 +191,8 @@ final class GameWikiCatalog {
             if(id.startsWith("upgrade.")){
                 String key=id.substring("upgrade.".length());
                 int canonical=Collections.binarySearch(upgradeIds,key);
-                if(canonical<0)return -1;
-                if(matchedIndexes==null)return fixed.size()+canonical;
-                int low=0,high=matchedCount-1;
-                while(low<=high){
-                    int mid=(low+high)>>>1,value=matchedIndexes[mid];
-                    if(value<canonical)low=mid+1;
-                    else if(value>canonical)high=mid-1;
-                    else return fixed.size()+mid;
-                }
+                if(canonical<0||!matched(canonical))return -1;
+                return fixed.size()+ordinalBefore(canonical);
             }
             return -1;
         }
@@ -662,18 +686,20 @@ final class GameWikiCatalog {
                 RESEARCH_ID_SEARCH_PREFIX.contains(needle))
             return fixed.isEmpty()?upgradeArticles:new IndexedArticles(fixed,null,upgradeIds.size());
 
-        int[] matchedIndexes=new int[upgradeIds.size()];
+        long[] matchedBits=new long[(upgradeIds.size()+63)>>>6];
         int matchedCount=0;
         UpgradeTextProbe probe=new UpgradeTextProbe(needle);
         for(int index=0;index<upgradeIds.size();index++){
             String id=upgradeIds.get(index);
             // Canonical IDs are ASCII. Avoid a 73k-per-query lowercase String
-            // allocation, and retain only primitive index positions for hits.
+            // allocation; a compact bitset retains exact canonical ordering.
             if(asciiContainsFolded(id,needle)||
-                    matchesUpgradeText(technology.get(id),needle,probe))
-                matchedIndexes[matchedCount++]=index;
+                    matchesUpgradeText(technology.get(id),needle,probe)){
+                matchedBits[index>>>6]|=1L<<(index&63);
+                matchedCount++;
+            }
         }
-        return new IndexedArticles(fixed,matchedIndexes,matchedCount);
+        return new IndexedArticles(fixed,matchedBits,matchedCount);
     }
 
 }
