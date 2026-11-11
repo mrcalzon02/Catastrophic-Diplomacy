@@ -115,35 +115,38 @@ public final class BattleConnection implements AutoCloseable {
                 "FLEET_PART|"+i+"|"+wire.substring(i*2800,Math.min(wire.length(),(i+1)*2800)));
         Hbnet.write(socket.getOutputStream(),"FLEET_END");
     }
+    private static IllegalArgumentException malformed(){
+        return new IllegalArgumentException("Malformed authoritative snapshot");
+    }
     private static long positiveId(String raw){
         long id=Long.parseLong(raw);
-        if(id<=0)throw Hbnet.failure();
+        if(id<=0)throw malformed();
         return id;
     }
     private static int team(String raw){
         int value=Integer.parseInt(raw);
-        if(value<0||value>1)throw Hbnet.failure();
+        if(value<0||value>1)throw malformed();
         return value;
     }
     private static double finite(String raw,double low,double high){
         double value=Double.parseDouble(raw);
-        if(!Double.isFinite(value)||value<low||value>high)throw Hbnet.failure();
+        if(!Double.isFinite(value)||value<low||value>high)throw malformed();
         return value;
     }
     private static double coordinate(String raw,boolean x){
         double value=finite(raw,-100_000,100_000);
         if(x){
-            if(value<BattleArena.MIN_X||value>BattleArena.MAX_X)throw Hbnet.failure();
-        }else if(value<BattleArena.MIN_Y||value>BattleArena.MAX_Y)throw Hbnet.failure();
+            if(value<BattleArena.MIN_X||value>BattleArena.MAX_X)throw malformed();
+        }else if(value<BattleArena.MIN_Y||value>BattleArena.MAX_Y)throw malformed();
         return value;
     }
     static Entity decodeEntity(String line){
-        if(line==null)throw Hbnet.failure();
+        if(line==null)throw malformed();
         String[] p=line.split("\\|",-1);
         try{
             return switch(p[0]){
                 case "SHIP" -> {
-                    if(p.length!=12)throw Hbnet.failure();
+                    if(p.length!=12)throw malformed();
                     long id=positiveId(p[1]);
                     int side=team(p[2]);
                     Battle.Faction faction=Battle.Faction.valueOf(p[3]);
@@ -158,7 +161,7 @@ public final class BattleConnection implements AutoCloseable {
                             hull,shields,armor,power,fuel);
                 }
                 case "MISSILE","BALLISTIC","CRAFT" -> {
-                    if(p.length!=6)throw Hbnet.failure();
+                    if(p.length!=6)throw malformed();
                     EntityKind kind=EntityKind.valueOf(p[0]);
                     long id=positiveId(p[1]);
                     int side=team(p[2]);
@@ -166,20 +169,20 @@ public final class BattleConnection implements AutoCloseable {
                     double integrity=finite(p[5],0,1_000_000_000);
                     yield new BodyEntity(kind,id,side,x,y,integrity);
                 }
-                default -> throw Hbnet.failure();
+                default -> throw malformed();
             };
         }catch(IllegalArgumentException invalid){
-            throw Hbnet.failure();
+            throw malformed();
         }
     }
     static List<Entity> decodeEntities(List<String> rows){
-        if(rows==null||rows.size()>8192)throw Hbnet.failure();
+        if(rows==null||rows.size()>8192)throw malformed();
         ArrayList<Entity> decoded=new ArrayList<>(rows.size());
         HashSet<String> identities=new HashSet<>();
         for(String row:rows){
             Entity entity=decodeEntity(row);
             String key=entity.kind().name()+":"+entity.id();
-            if(!identities.add(key))throw Hbnet.failure();
+            if(!identities.add(key))throw malformed();
             decoded.add(entity);
         }
         return List.copyOf(decoded);
