@@ -270,7 +270,7 @@ public final class SensorComputeBudgetTest {
         long granted=flagship.fleetCompute.allocations-before;
         require(first.targetCompute.exhausted>0&&second.targetCompute.exhausted>0,
                 "Recipients did not exhaust finite local fire-control compute");
-        require(granted==2&&flagship.fleetCompute.lastTick()==battle.tick-1,
+        require(granted==2&&flagship.fleetCompute.lastTick()==battle.tick,
                 "Two ordinary firing recipients did not debit the same mature FCM tick");
         double capacity=SensorComputeBudget.fleetCapacity(flagship);
         require(flagship.fleetCompute.remaining()>=0&&
