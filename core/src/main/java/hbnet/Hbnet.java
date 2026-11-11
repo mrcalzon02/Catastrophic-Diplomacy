@@ -84,13 +84,25 @@ public final class Hbnet {
      */
     public static void writeBatch(OutputStream out,List<String> values)throws IOException{
         if(out==null||values==null||values.isEmpty()||values.size()>8194)throw failure();
-        DataOutputStream d=new DataOutputStream(out);
+        // DataOutputStream directly on SSLSocket still turns each writeInt and
+        // payload write into separate TLS writes. Stage bounded framed bytes
+        // first, then emit large chunks without changing a single wire byte.
+        final int chunkLimit=512*1024;
+        ByteArrayOutputStream buffer=new ByteArrayOutputStream(
+                StrictMath.min(chunkLimit,StrictMath.max(4096,values.size()*96)));
+        DataOutputStream framed=new DataOutputStream(buffer);
         for(String value:values){
             byte[] bytes=frameBytes(value);
-            d.writeInt(bytes.length);
-            d.write(bytes);
+            int needed=4+bytes.length;
+            if(buffer.size()>0&&buffer.size()+needed>chunkLimit){
+                out.write(buffer.toByteArray());
+                buffer.reset();
+            }
+            framed.writeInt(bytes.length);
+            framed.write(bytes);
         }
-        d.flush();
+        if(buffer.size()>0)out.write(buffer.toByteArray());
+        out.flush();
     }
     public static String read(InputStream in)throws IOException{
         DataInputStream d=new DataInputStream(in);int n=d.readInt();if(n<1||n>MAX_FRAME)throw failure();
