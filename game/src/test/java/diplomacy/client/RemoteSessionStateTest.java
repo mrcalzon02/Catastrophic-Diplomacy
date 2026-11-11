@@ -17,7 +17,8 @@ public final class RemoteSessionStateTest {
             int id,int team,Battle.Faction faction,double x){
         String raw=row(id,team,faction,x);
         var typed=new BattleConnection.ShipEntity(id,team,faction,
-                x,300,0,100,50,40,30,20);
+                diplomacy.shipyard.Shipyard.Hull.CORVETTE,
+                x,300,0,100,100,50,50,40,40,30,20);
         return new BattleConnection.Snapshot(session,tick,0,
                 List.of(raw),List.of(typed));
     }

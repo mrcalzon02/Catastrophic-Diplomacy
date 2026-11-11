@@ -16,6 +16,10 @@ public final class BattleConnectionSnapshotTest {
         try{BattleConnection.decodeEntity(row);throw new AssertionError(why);}
         catch(RuntimeException expected){/* rejected */}
     }
+    private static void rejectsV2(String row,String why){
+        try{BattleConnection.decodeEntity(row,2);throw new AssertionError(why);}
+        catch(RuntimeException expected){/* rejected */}
+    }
     private static String ship(long id,int team,String faction,String x){
         return "SHIP|"+id+"|"+team+"|"+faction+"|"+x+"|300|0|100|50|40|30|20";
     }
@@ -39,8 +43,30 @@ public final class BattleConnectionSnapshotTest {
         check(valid instanceof BattleConnection.ShipEntity&&valid.id()==11&&valid.team()==0,
                 "Valid typed ship row rejected");
         check(BattleConnection.decodeEntity("MISSILE|9|1|500|300|2.5")
-                        instanceof BattleConnection.BodyEntity,
-                "Valid typed missile row rejected");
+                        instanceof BattleConnection.MissileEntity,
+                "Valid typed v1 missile row rejected");
+        var v2Ship=BattleConnection.decodeEntity(
+                "SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|900|1000|80|120|140|180|90|75",2);
+        check(v2Ship instanceof BattleConnection.ShipEntity ship&&
+                        ship.hullClass()==diplomacy.shipyard.Shipyard.Hull.DREADNOUGHT&&
+                        ship.maxHull()==1000,
+                "V2 ship chassis/max-state identity rejected");
+        var v2Missile=BattleConnection.decodeEntity(
+                "MISSILE|31|0|21|11|500|300|2.5|true|true|false",2);
+        check(v2Missile instanceof BattleConnection.MissileEntity missile&&
+                        missile.torpedo()&&missile.fighterLaunched()&&!missile.decoy(),
+                "V2 guided-body presentation identity rejected");
+        var v2Ballistic=BattleConnection.decodeEntity(
+                "BALLISTIC|32|0|21|11|500|300|1.5|true",2);
+        check(v2Ballistic instanceof BattleConnection.BallisticEntity shell&&
+                        shell.fighterLaunched(),
+                "V2 ballistic launch identity rejected");
+        var v2Craft=BattleConnection.decodeEntity(
+                "CRAFT|33|0|21|11|500|300|12|true|false|MISSILE_FIGHTER",2);
+        check(v2Craft instanceof BattleConnection.CraftEntity craft&&
+                        craft.fighter()&&craft.fighterHull()==
+                        diplomacy.sim.FighterModel.Hull.MISSILE_FIGHTER,
+                "V2 craft role identity rejected");
         rejects(ship(11,9,"TERRAN","200"),"Invalid team accepted");
         rejects(ship(11,0,"INVALID","200"),"Invalid faction accepted");
         rejects(ship(11,0,"TERRAN","NaN"),"NaN coordinate accepted");
@@ -48,6 +74,10 @@ public final class BattleConnectionSnapshotTest {
         rejects("MISSILE|0|1|500|300|2.5","Zero entity ID accepted");
         rejects("CRAFT|4|0|500|300|Infinity","Infinite integrity accepted");
         rejects("BALLISTIC|4|0|500|300","Wrong field count accepted");
+        rejectsV2("SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|1001|1000|80|120|140|180|90|75",
+                "V2 current hull above max accepted");
+        rejectsV2("CRAFT|33|0|21|11|500|300|12|false|false|MISSILE_FIGHTER",
+                "Non-fighter craft carried fighter hull identity");
         try{
             BattleConnection.decodeEntities(List.of(
                     "MISSILE|9|1|500|300|2.5",
@@ -81,6 +111,6 @@ public final class BattleConnectionSnapshotTest {
     public static void main(String[] args)throws Exception{
         semanticRows();
         lastGoodFrame();
-        System.out.println("PASS typed bounded snapshot decode, duplicate rejection and last-good preservation");
+        System.out.println("PASS v1/v2 typed bounded snapshot decode, presentation identity, duplicate rejection and last-good preservation");
     }
 }

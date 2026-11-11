@@ -4,6 +4,8 @@ import hbnet.Hbnet;
 import diplomacy.sim.Battle;
 import diplomacy.sim.BattleArena;
 import diplomacy.sim.BattleOrders;
+import diplomacy.sim.FighterModel;
+import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.SkirmishTechnologyRules;
 import java.io.*;
 import java.net.*;
@@ -20,11 +22,14 @@ public final class BattleConnection implements AutoCloseable {
     /** Server-instance match identity. Equal/higher ticks from another session
      * must never inherit interpolation or entity mirrors from this one. */
     public final String sessionId;
+    /** Snapshot entity schema advertised by WELCOME. v1 remains readable. */
+    public final int protocolVersion;
     /** Null for legacy/battle-only servers; never derived from a local fleet export. */
     public final SkirmishTechnologyRules matchRules;
     private long sequence;
     public enum EntityKind { SHIP, MISSILE, BALLISTIC, CRAFT }
-    public sealed interface Entity permits ShipEntity, BodyEntity {
+    public sealed interface Entity permits ShipEntity,MissileEntity,
+            BallisticEntity,CraftEntity {
         EntityKind kind();
         long id();
         int team();
@@ -32,18 +37,34 @@ public final class BattleConnection implements AutoCloseable {
         double y();
     }
     public record ShipEntity(long id,int team,Battle.Faction faction,
-                             double x,double y,double facing,double hull,
-                             double shields,double armor,double power,double fuel)
-            implements Entity {
+                             Shipyard.Hull hullClass,
+                             double x,double y,double facing,
+                             double hull,double maxHull,
+                             double shields,double maxShields,
+                             double armor,double maxArmor,
+                             double power,double fuel) implements Entity {
         @Override public EntityKind kind(){return EntityKind.SHIP;}
     }
-    public record BodyEntity(EntityKind kind,long id,int team,
-                             double x,double y,double integrity)
-            implements Entity {
-        public BodyEntity{
-            if(kind==null||kind==EntityKind.SHIP)
-                throw new IllegalArgumentException("Invalid body entity kind");
+    public record MissileEntity(long id,int team,int sourceId,int targetId,
+                                double x,double y,double integrity,
+                                boolean torpedo,boolean fighterLaunched,
+                                boolean decoy) implements Entity {
+        @Override public EntityKind kind(){return EntityKind.MISSILE;}
+    }
+    public record BallisticEntity(long id,int team,int sourceId,int targetId,
+                                  double x,double y,double integrity,
+                                  boolean fighterLaunched) implements Entity {
+        @Override public EntityKind kind(){return EntityKind.BALLISTIC;}
+    }
+    public record CraftEntity(long id,int team,int sourceId,int targetId,
+                              double x,double y,double integrity,
+                              boolean fighter,boolean repair,
+                              FighterModel.Hull fighterHull) implements Entity {
+        public CraftEntity{
+            if(fighter&&repair||fighter!=(fighterHull!=null))
+                throw new IllegalArgumentException("Invalid craft presentation identity");
         }
+        @Override public EntityKind kind(){return EntityKind.CRAFT;}
     }
     public record Snapshot(String sessionId,long tick,long simulationHash,
                            List<String> entities,List<Entity> decodedEntities){
@@ -78,10 +99,13 @@ public final class BattleConnection implements AutoCloseable {
         this.socket=socket;
         try{
             socket.setSoTimeout(5000);Hbnet.write(socket.getOutputStream(),spectate?"SPECTATE|1":"PLAYER|1");String[] hello=Hbnet.read(socket.getInputStream()).split("\\|");
-            if((hello.length!=6&&hello.length!=7)||!hello[0].equals("WELCOME")||!hello[1].equals("1"))throw Hbnet.failure();
+            if((hello.length!=6&&hello.length!=7)||!hello[0].equals("WELCOME"))
+                throw Hbnet.failure();
+            protocolVersion=Integer.parseInt(hello[1]);
             sessionId=hello[2];
             team=Integer.parseInt(hello[3]);seed=Long.parseLong(hello[4]);sequence=Long.parseLong(hello[5]);
-            if(!sessionId.matches("[A-Za-z0-9._:-]{1,128}")||
+            if((protocolVersion!=1&&protocolVersion!=2)||
+                    !sessionId.matches("[A-Za-z0-9._:-]{1,128}")||
                     team< -1||team>1||sequence<0)throw Hbnet.failure();
             // The authenticated host (or explicitly trusted OPEN_LAN endpoint) supplies
             // the complete rules. Never accept a client-selected cap or a downgrade.
@@ -130,10 +154,20 @@ public final class BattleConnection implements AutoCloseable {
         if(id<=0)throw malformed();
         return id;
     }
+    private static int nonNegativeId(String raw){
+        int id=Integer.parseInt(raw);
+        if(id<0)throw malformed();
+        return id;
+    }
     private static int team(String raw){
         int value=Integer.parseInt(raw);
         if(value<0||value>1)throw malformed();
         return value;
+    }
+    private static boolean flag(String raw){
+        if("true".equals(raw))return true;
+        if("false".equals(raw))return false;
+        throw malformed();
     }
     private static double finite(String raw,double low,double high){
         double value=Double.parseDouble(raw);
@@ -147,15 +181,15 @@ public final class BattleConnection implements AutoCloseable {
         }else if(value<BattleArena.MIN_Y||value>BattleArena.MAX_Y)throw malformed();
         return value;
     }
-    static Entity decodeEntity(String line){
-        if(line==null)throw malformed();
+    static Entity decodeEntity(String line){return decodeEntity(line,1);}
+    static Entity decodeEntity(String line,int version){
+        if(line==null||(version!=1&&version!=2))throw malformed();
         String[] p=line.split("\\|",-1);
         try{
-            return switch(p[0]){
+            if(version==1)return switch(p[0]){
                 case "SHIP" -> {
                     if(p.length!=12)throw malformed();
-                    long id=positiveId(p[1]);
-                    int side=team(p[2]);
+                    long id=positiveId(p[1]);int side=team(p[2]);
                     Battle.Faction faction=Battle.Faction.valueOf(p[3]);
                     double x=coordinate(p[4],true),y=coordinate(p[5],false);
                     double facing=finite(p[6],-StrictMath.PI-1e-9,StrictMath.PI+1e-9);
@@ -164,17 +198,76 @@ public final class BattleConnection implements AutoCloseable {
                     double armor=finite(p[9],0,1_000_000_000);
                     double power=finite(p[10],0,1_000_000_000);
                     double fuel=finite(p[11],0,1_000_000_000);
-                    yield new ShipEntity(id,side,faction,x,y,facing,
-                            hull,shields,armor,power,fuel);
+                    yield new ShipEntity(id,side,faction,Shipyard.Hull.CORVETTE,
+                            x,y,facing,hull,StrictMath.max(1,hull),
+                            shields,StrictMath.max(1,shields),
+                            armor,StrictMath.max(1,armor),power,fuel);
                 }
-                case "MISSILE","BALLISTIC","CRAFT" -> {
+                case "MISSILE" -> {
                     if(p.length!=6)throw malformed();
-                    EntityKind kind=EntityKind.valueOf(p[0]);
-                    long id=positiveId(p[1]);
-                    int side=team(p[2]);
-                    double x=coordinate(p[3],true),y=coordinate(p[4],false);
-                    double integrity=finite(p[5],0,1_000_000_000);
-                    yield new BodyEntity(kind,id,side,x,y,integrity);
+                    yield new MissileEntity(positiveId(p[1]),team(p[2]),0,0,
+                            coordinate(p[3],true),coordinate(p[4],false),
+                            finite(p[5],0,1_000_000_000),false,false,false);
+                }
+                case "BALLISTIC" -> {
+                    if(p.length!=6)throw malformed();
+                    yield new BallisticEntity(positiveId(p[1]),team(p[2]),0,0,
+                            coordinate(p[3],true),coordinate(p[4],false),
+                            finite(p[5],0,1_000_000_000),false);
+                }
+                case "CRAFT" -> {
+                    if(p.length!=6)throw malformed();
+                    yield new CraftEntity(positiveId(p[1]),team(p[2]),0,0,
+                            coordinate(p[3],true),coordinate(p[4],false),
+                            finite(p[5],0,1_000_000_000),false,false,null);
+                }
+                default -> throw malformed();
+            };
+            return switch(p[0]){
+                case "SHIP" -> {
+                    if(p.length!=16)throw malformed();
+                    long id=positiveId(p[1]);int side=team(p[2]);
+                    Battle.Faction faction=Battle.Faction.valueOf(p[3]);
+                    Shipyard.Hull hullClass=Shipyard.Hull.valueOf(p[4]);
+                    double x=coordinate(p[5],true),y=coordinate(p[6],false);
+                    double facing=finite(p[7],-StrictMath.PI-1e-9,StrictMath.PI+1e-9);
+                    double hull=finite(p[8],0,1_000_000_000);
+                    double maxHull=finite(p[9],1,1_000_000_000);
+                    double shields=finite(p[10],0,1_000_000_000);
+                    double maxShields=finite(p[11],0,1_000_000_000);
+                    double armor=finite(p[12],0,1_000_000_000);
+                    double maxArmor=finite(p[13],0,1_000_000_000);
+                    double power=finite(p[14],0,1_000_000_000);
+                    double fuel=finite(p[15],0,1_000_000_000);
+                    if(hull>maxHull||shields>maxShields||armor>maxArmor)throw malformed();
+                    yield new ShipEntity(id,side,faction,hullClass,x,y,facing,
+                            hull,maxHull,shields,maxShields,armor,maxArmor,power,fuel);
+                }
+                case "MISSILE" -> {
+                    if(p.length!=11)throw malformed();
+                    yield new MissileEntity(positiveId(p[1]),team(p[2]),
+                            nonNegativeId(p[3]),nonNegativeId(p[4]),
+                            coordinate(p[5],true),coordinate(p[6],false),
+                            finite(p[7],0,1_000_000_000),
+                            flag(p[8]),flag(p[9]),flag(p[10]));
+                }
+                case "BALLISTIC" -> {
+                    if(p.length!=9)throw malformed();
+                    yield new BallisticEntity(positiveId(p[1]),team(p[2]),
+                            nonNegativeId(p[3]),nonNegativeId(p[4]),
+                            coordinate(p[5],true),coordinate(p[6],false),
+                            finite(p[7],0,1_000_000_000),flag(p[8]));
+                }
+                case "CRAFT" -> {
+                    if(p.length!=11)throw malformed();
+                    boolean fighter=flag(p[8]),repair=flag(p[9]);
+                    FighterModel.Hull fighterHull="NONE".equals(p[10])?null:
+                            FighterModel.Hull.valueOf(p[10]);
+                    yield new CraftEntity(positiveId(p[1]),team(p[2]),
+                            nonNegativeId(p[3]),nonNegativeId(p[4]),
+                            coordinate(p[5],true),coordinate(p[6],false),
+                            finite(p[7],0,1_000_000_000),
+                            fighter,repair,fighterHull);
                 }
                 default -> throw malformed();
             };
@@ -182,15 +275,26 @@ public final class BattleConnection implements AutoCloseable {
             throw malformed();
         }
     }
-    static List<Entity> decodeEntities(List<String> rows){
-        if(rows==null||rows.size()>8192)throw malformed();
+    static List<Entity> decodeEntities(List<String> rows){return decodeEntities(rows,1);}
+    static List<Entity> decodeEntities(List<String> rows,int version){
+        if(rows==null||rows.size()>8192||(version!=1&&version!=2))throw malformed();
         ArrayList<Entity> decoded=new ArrayList<>(rows.size());
         HashSet<String> identities=new HashSet<>();
         for(String row:rows){
-            Entity entity=decodeEntity(row);
+            Entity entity=decodeEntity(row,version);
             String key=entity.kind().name()+":"+entity.id();
             if(!identities.add(key))throw malformed();
             decoded.add(entity);
+        }
+        if(version==2){
+            HashSet<Long> ships=new HashSet<>();
+            for(Entity entity:decoded)if(entity instanceof ShipEntity ship)ships.add(ship.id());
+            for(Entity entity:decoded){
+                int source=entity instanceof MissileEntity m?m.sourceId():
+                        entity instanceof BallisticEntity b?b.sourceId():
+                        entity instanceof CraftEntity c?c.sourceId():0;
+                if(source>0&&!ships.contains((long)source))throw malformed();
+            }
         }
         return List.copyOf(decoded);
     }
@@ -224,7 +328,7 @@ public final class BattleConnection implements AutoCloseable {
             // Semantic decode happens before publication. A checksummed frame
             // with invalid enums, nonfinite values or duplicate identities
             // never becomes the current authoritative view.
-            List<Entity> decoded=decodeEntities(body);
+            List<Entity> decoded=decodeEntities(body,protocolVersion);
             String end=Hbnet.read(socket.getInputStream());
             if(!end.equals("END|"+tick+"|"+Hbnet.hash(
                     String.join("\n",body).getBytes(StandardCharsets.US_ASCII))))
