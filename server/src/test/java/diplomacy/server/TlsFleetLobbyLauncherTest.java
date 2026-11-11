@@ -5,6 +5,7 @@ import diplomacy.shipyard.*;
 import diplomacy.sim.Battle;
 import diplomacy.tech.TechnologyCatalog;
 import hbnet.*;
+import java.net.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.function.BooleanSupplier;
@@ -23,6 +24,11 @@ public final class TlsFleetLobbyLauncherTest {
         }
         throw new AssertionError("TLS fleet lobby deadline");
     }
+    private static int loopbackPort()throws Exception{
+        try(ServerSocket socket=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"))){
+            return socket.getLocalPort();
+        }
+    }
     public static void main(String[] args)throws Exception{
         Path root=Files.createTempDirectory("diplomacy-tls-lobby-");
         try{
@@ -39,8 +45,9 @@ public final class TlsFleetLobbyLauncherTest {
                     "catastrophic-diplomacy",one,room);
             Hbnet.Client bTransport=new Hbnet.Client(provisioned.fingerprint,
                     "catastrophic-diplomacy",two,room);
+            int port=loopbackPort();
             try(BattleServer host=BattleServer.openConfigured(new String[]{
-                        root.toString(),"0","lobby","3","127.0.0.1"});
+                        root.toString(),Integer.toString(port),"lobby","3","127.0.0.1"});
                 BattleConnection a=new BattleConnection(
                         "127.0.0.1",host.port(),aTransport,false);
                 BattleConnection b=new BattleConnection(
@@ -79,12 +86,12 @@ public final class TlsFleetLobbyLauncherTest {
 
             try{
                 BattleServer.openConfigured(new String[]{
-                        root.toString(),"0","lobby","10","127.0.0.1"});
+                        root.toString(),Integer.toString(loopbackPort()),"lobby","10","127.0.0.1"});
                 throw new AssertionError("Invalid TLS lobby tech ceiling accepted");
             }catch(IllegalArgumentException expected){/* bounded config rejected */}
             try{
                 BattleServer.openConfigured(new String[]{
-                        root.resolve("missing").toString(),"0","lobby","3","127.0.0.1"});
+                        root.resolve("missing").toString(),Integer.toString(loopbackPort()),"lobby","3","127.0.0.1"});
                 throw new AssertionError("Missing TLS identity silently downgraded");
             }catch(Exception expected){/* no plaintext fallback */}
             System.out.println("PASS dedicated TLS lobby launcher: persistent pin, Tech III rules, two submitted fleets, ready/start and no plaintext fallback");
