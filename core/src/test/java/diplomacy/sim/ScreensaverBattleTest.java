@@ -32,7 +32,8 @@ public final class ScreensaverBattleTest {
             previousX[i]=initial.get(i).x;
             previousY[i]=initial.get(i).y;
         }
-        int firstContact=-1,firstFire=-1,firstHit=-1,observedSeconds=0;
+        long firstContact=-1,firstFire=-1,firstHit=-1;
+        int observedSeconds=0;
         StringBuilder motion=new StringBuilder();
         final int horizonTicks=12*30;
         for(int step=0;step<horizonTicks&&!battle.finished();step++){
