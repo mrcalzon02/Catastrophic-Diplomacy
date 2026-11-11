@@ -12,8 +12,79 @@ public final class ScreensaverBattleTest {
     private static void check(boolean result,String why){
         if(!result)throw new AssertionError(why);
     }
+
+    /**
+     * Measure the ACTUAL screensaver path (legal randomized fittings, captain
+     * orders, entry cruise, level weather, and Battle.step) at 30 Hz. World
+     * displacement is a tactical readability metric, not physical metres or
+     * rendered pixels. Absence of a shot is reported rather than fabricated.
+     */
+    private static void measureEngagementReadability(
+            TechnologyCatalog catalog,long seed,int perSide){
+        ScreensaverBattle.Round round=ScreensaverBattle.createSized(seed,catalog,perSide);
+        Battle battle=round.battle();
+        battle.initializeBattleApproach();
+        battle.configureWeather(LevelEnvironment.forLevel(round.environmentLevel()).weather());
+        List<Battle.Ship> initial=List.copyOf(battle.ships());
+        double[] previousX=new double[initial.size()];
+        double[] previousY=new double[initial.size()];
+        for(int i=0;i<initial.size();i++){
+            previousX[i]=initial.get(i).x;
+            previousY[i]=initial.get(i).y;
+        }
+        int firstContact=-1,firstFire=-1,firstHit=-1,observedSeconds=0;
+        StringBuilder motion=new StringBuilder();
+        final int horizonTicks=12*30;
+        for(int step=0;step<horizonTicks&&!battle.finished();step++){
+            battle.step();
+            if(firstContact<0){
+                for(Battle.Ship ship:initial)if(ship.lastTargetId!=0){
+                    firstContact=battle.tick;break;
+                }
+            }
+            if(firstFire<0){
+                for(Battle.VisualEvent event:battle.visualEvents()){
+                    if(event.tick()==battle.tick && event.phase()==Battle.VisualPhase.FIRE){
+                        firstFire=battle.tick;break;
+                    }
+                }
+            }
+            if(firstHit<0 && battle.hitCount>0)firstHit=battle.tick;
+            if(battle.tick%30!=0)continue;
+            double total=0;
+            int mobile=0;
+            for(int i=0;i<initial.size();i++){
+                Battle.Ship ship=initial.get(i);
+                double traveled=StrictMath.hypot(ship.x-previousX[i],ship.y-previousY[i]);
+                check(Double.isFinite(traveled),"Non-finite screensaver ship displacement");
+                total+=traveled;
+                if(traveled>=.5)mobile++;
+                previousX[i]=ship.x;
+                previousY[i]=ship.y;
+            }
+            double mean=total/initial.size();
+            // This protects against the original frozen-capital-ship failure;
+            // it is NOT an arbitrary first-shot or graphics/balance gate.
+            if(observedSeconds<2)
+                check(mean>.5 && mobile>0,
+                        "Screensaver "+perSide+"v"+perSide+
+                        " stationary in second "+(observedSeconds+1)+
+                        ": mean displacement="+mean+" moving="+mobile);
+            if(motion.length()>0)motion.append(",");
+            motion.append(String.format(java.util.Locale.ROOT,"%.2f",mean));
+            observedSeconds++;
+        }
+        check(observedSeconds>0,"No full 30Hz screensaver movement second measured");
+        System.out.printf(java.util.Locale.ROOT,
+                "MEASURE screensaver %dv%d seed=%d weather=%s motion_world_units_per_second=[%s] first_contact_tick=%d first_fire_tick=%d first_hit_tick=%d observed_seconds=%d hits=%d%n",
+                perSide,perSide,seed,round.environmentLevel(),motion,
+                firstContact,firstFire,firstHit,observedSeconds,battle.hitCount);
+    }
+
     public static void main(String[] args)throws Exception {
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        measureEngagementReadability(catalog,719912L,1);
+        measureEngagementReadability(catalog,719912L,16);
         Set<Battle.Faction> seen=new HashSet<>();
         Set<Shipyard.Hull> hulls=new HashSet<>();
         Set<Integer> environments=new HashSet<>();
