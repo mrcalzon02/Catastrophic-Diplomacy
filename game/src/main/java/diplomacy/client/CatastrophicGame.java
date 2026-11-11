@@ -127,6 +127,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private Battle remotePresentation;
     private final RemoteShipInterpolation remoteShipInterpolation=new RemoteShipInterpolation();
     private final RemoteFleetMirrors remoteFleetMirrors=new RemoteFleetMirrors();
+    private final RemoteSessionState remoteSessionState=new RemoteSessionState();
     private GameMenuPanel menuPanel;
     private GameWikiPanel wiki;
     private boolean wikiVisible,wikiRestoreRunning;
@@ -4035,8 +4036,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
      * Parse a snapshot only once; reuse its stable ship identities across
      * every interpolated graphics frame. */
     private void drawRemoteBattle(diplomacy.net.BattleConnection.Snapshot snapshot){
-        boolean newSession=remoteShipInterpolation.tick()!=Long.MIN_VALUE&&
-                snapshot.tick()<remoteShipInterpolation.tick();
+        boolean newSession=remoteSessionState.apply(
+                snapshot,remoteShipInterpolation,remoteFleetMirrors);
         if(snapshot.tick()!=remoteShipInterpolation.tick()){
             java.util.List<String> rows=new java.util.ArrayList<>();
             for(String entity:snapshot.entities())

@@ -449,3 +449,14 @@ tasks.register('combatTimelineDiagnostic', JavaExec) {
     mainClass = 'diplomacy.client.CombatTimelineDiagnostic'
     workingDir = rootProject.projectDir
 }
+
+tasks.register('remoteSessionSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Reset interpolation and host-ID mirrors on authoritative network session changes.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.RemoteSessionStateTest'
+    dependsOn testClasses
+}
+tasks.matching { it.name == 'menuFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('remoteSessionSmoke'))
+}

@@ -17,6 +17,9 @@ public final class BattleConnection implements AutoCloseable {
     private final Socket socket;
     public final int team;
     public final long seed;
+    /** Server-instance match identity. Equal/higher ticks from another session
+     * must never inherit interpolation or entity mirrors from this one. */
+    public final String sessionId;
     /** Null for legacy/battle-only servers; never derived from a local fleet export. */
     public final SkirmishTechnologyRules matchRules;
     private long sequence;
@@ -42,10 +45,12 @@ public final class BattleConnection implements AutoCloseable {
                 throw new IllegalArgumentException("Invalid body entity kind");
         }
     }
-    public record Snapshot(long tick,long simulationHash,List<String> entities,
-                           List<Entity> decodedEntities){
+    public record Snapshot(String sessionId,long tick,long simulationHash,
+                           List<String> entities,List<Entity> decodedEntities){
         public Snapshot{
-            if(tick<0||entities==null||decodedEntities==null||
+            if(sessionId==null||
+                    !sessionId.matches("[A-Za-z0-9._:-]{1,128}")||
+                    tick<0||entities==null||decodedEntities==null||
                     entities.size()!=decodedEntities.size())
                 throw new IllegalArgumentException("Invalid authoritative snapshot");
             entities=List.copyOf(entities);
@@ -74,8 +79,10 @@ public final class BattleConnection implements AutoCloseable {
         try{
             socket.setSoTimeout(5000);Hbnet.write(socket.getOutputStream(),spectate?"SPECTATE|1":"PLAYER|1");String[] hello=Hbnet.read(socket.getInputStream()).split("\\|");
             if((hello.length!=6&&hello.length!=7)||!hello[0].equals("WELCOME")||!hello[1].equals("1"))throw Hbnet.failure();
+            sessionId=hello[2];
             team=Integer.parseInt(hello[3]);seed=Long.parseLong(hello[4]);sequence=Long.parseLong(hello[5]);
-            if(team< -1||team>1||sequence<0)throw Hbnet.failure();
+            if(!sessionId.matches("[A-Za-z0-9._:-]{1,128}")||
+                    team< -1||team>1||sequence<0)throw Hbnet.failure();
             // The authenticated host (or explicitly trusted OPEN_LAN endpoint) supplies
             // the complete rules. Never accept a client-selected cap or a downgrade.
             matchRules=hello.length==7?SkirmishTechnologyRules.decode(new String(
@@ -222,7 +229,7 @@ public final class BattleConnection implements AutoCloseable {
             if(!end.equals("END|"+tick+"|"+Hbnet.hash(
                     String.join("\n",body).getBytes(StandardCharsets.US_ASCII))))
                 throw Hbnet.failure();
-            snapshot=new Snapshot(tick,hash,body,decoded);
+            snapshot=new Snapshot(sessionId,tick,hash,body,decoded);
         }
     }catch(IOException|RuntimeException e){/* presentation remains at last complete authoritative frame */}finally{close();}}
     public void close(){connected=false;try{socket.close();}catch(IOException ignored){}}
