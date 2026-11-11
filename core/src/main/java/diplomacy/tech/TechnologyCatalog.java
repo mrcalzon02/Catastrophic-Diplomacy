@@ -233,6 +233,48 @@ public final class TechnologyCatalog {
     private static final String[] STAGE_SUFFIXES={
             "01","02","03","04","05","06","07","08","09"};
 
+    /** Hot-path canonical text builders avoid StringConcatFactory bootstrap and
+     * temporary concat chains while low-heap wiki/search resolves virtual rows. */
+    private static String baseId(String faction,String subsystem){
+        return new StringBuilder(6+faction.length()+subsystem.length())
+                .append("BASE-").append(faction).append('-').append(subsystem).toString();
+    }
+    private static String techId(String faction,String subsystem,
+                                 String track,String stageSuffix){
+        return new StringBuilder(8+faction.length()+subsystem.length()+
+                track.length()+stageSuffix.length())
+                .append("TECH-").append(faction).append('-').append(subsystem)
+                .append('-').append(track).append('-').append(stageSuffix).toString();
+    }
+    private static String stemStage(String stem,int stage){
+        return new StringBuilder(stem.length()+2)
+                .append(stem).append(STAGE_SUFFIXES[stage-1]).toString();
+    }
+    private static String slashStageName(String name,int stage){
+        return new StringBuilder(name.length()+12)
+                .append(name).append(" / Stage ").append(stage).toString();
+    }
+    private static String branchStageName(String name,String track,int stage){
+        StringBuilder out=new StringBuilder(name.length()+track.length()+16)
+                .append(name).append(' ').append(track).append(' ');
+        if(stage<=6)return out.append(stage).toString();
+        return out.append("6 / Stage ").append(stage).toString();
+    }
+    private static String variantStageName(String name,String track,int stage){
+        return new StringBuilder(name.length()+track.length()+5)
+                .append(name).append(" / ").append(track).append(' ')
+                .append(stage).toString();
+    }
+    private static String prefixedTradeoff(String name,String tradeoff){
+        return new StringBuilder(name.length()+tradeoff.length()+2)
+                .append(name).append(": ").append(tradeoff).toString();
+    }
+    private static String higherStageTradeoff(String tradeoff){
+        return new StringBuilder(tradeoff.length()+39)
+                .append(tradeoff).append("; higher-stage engineering and upkeep")
+                .toString();
+    }
+
     /** Parse the canonical virtual-ID shape with only a subsystem substring
      * and a five-reference array. String.split allocated fresh copies of
      * TECH, faction, track and stage for every virtual query and nested
@@ -293,8 +335,8 @@ public final class TechnologyCatalog {
         char tens=id.charAt(end-2),unit=id.charAt(end-1);
         if(tens!='0'||unit<'7'||unit>'9')return null;
         String stem=id.substring(0,end-2);
-        Upgrade stageSix=sixStages.get(stem+"06");
-        Upgrade stageFive=sixStages.get(stem+"05");
+        Upgrade stageSix=sixStages.get(stemStage(stem,6));
+        Upgrade stageFive=sixStages.get(stemStage(stem,5));
         if(stageSix==null||stageFive==null)return null;
         int stage=unit-'0';
         long research=Math.round(stageSix.researchCost*StrictMath.pow(stage/6.0,2));
@@ -317,10 +359,10 @@ public final class TechnologyCatalog {
             current[i]=Math.round(evolved*1_000_000d)/1_000_000d;
         }
         return new Upgrade(stageSix,id,stage,
-                stageSix.name+" / Stage "+stage,
-                stem+"0"+(stage-1),
+                slashStageName(stageSix.name,stage),
+                stemStage(stem,stage-1),
                 (int)Math.max(1,research),(int)Math.max(1,industry),
-                current,stageSix.tradeoff+"; higher-stage engineering and upkeep");
+                current,higherStageTradeoff(stageSix.tradeoff));
     }
 
     /** All nine ranks have their own IDs, costs and precursor chain while
@@ -331,15 +373,13 @@ public final class TechnologyCatalog {
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !isStageSuffix(parts[4]))return null;
         SurvivalHardwareCatalog.Variant v=SurvivalHardwareCatalog.findVariant(parts[2]);
-        if(v==null||!baseComponents.containsKey("BASE-"+parts[1]+"-"+v.code()))
+        if(v==null||!baseComponents.containsKey(baseId(parts[1],v.code())))
             return null;
         int stage=parts[4].charAt(1)-'0';
-        Upgrade source=get("TECH-"+parts[1]+"-"+v.root()+"-"+
-                parts[3]+"-"+parts[4]);
+        Upgrade source=get(techId(parts[1],v.root(),parts[3],parts[4]));
         if(source==null)return null;
-        String predecessor=stage==1?"BASE-"+parts[1]+"-"+v.code():
-                "TECH-"+parts[1]+"-"+v.code()+"-"+parts[3]+"-"+
-                        ("0"+(stage-1));
+        String predecessor=stage==1?baseId(parts[1],v.code()):
+                techId(parts[1],v.code(),parts[3],STAGE_SUFFIXES[stage-2]);
         long research=Math.round(source.researchCost*v.price());
         long industry=Math.round(source.industryCost*v.price());
         if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
@@ -348,9 +388,9 @@ public final class TechnologyCatalog {
         // Preserve price multiplication and independent prerequisite IDs,
         // but skip the ten expensive stringify/parse cycles.
         return new Upgrade(source,id,v.code(),
-                v.name()+" / "+parts[3]+" "+stage,predecessor,
+                variantStageName(v.name(),parts[3],stage),predecessor,
                 (int)Math.max(1,research),(int)Math.max(1,industry),
-                v.name()+": "+source.tradeoff);
+                prefixedTradeoff(v.name(),source.tradeoff));
     }
 
     /** Network hardware generations have their own independent IX-rank
@@ -361,24 +401,22 @@ public final class TechnologyCatalog {
                 !FACTIONS.contains(parts[1])||!TRACKS.contains(parts[3])||
                 !isStageSuffix(parts[4]))return null;
         SensorNetworkCatalog.Model v=SensorNetworkCatalog.variant(parts[2]);
-        if(v==null||!baseComponents.containsKey("BASE-"+parts[1]+"-"+v.code()))
+        if(v==null||!baseComponents.containsKey(baseId(parts[1],v.code())))
             return null;
         int stage=parts[4].charAt(1)-'0';
-        Upgrade source=get("TECH-"+parts[1]+"-"+v.root()+"-"+
-                parts[3]+"-"+parts[4]);
+        Upgrade source=get(techId(parts[1],v.root(),parts[3],parts[4]));
         if(source==null)return null;
-        String predecessor=stage==1?"BASE-"+parts[1]+"-"+v.code():
-                "TECH-"+parts[1]+"-"+v.code()+"-"+parts[3]+"-"+
-                        ("0"+(stage-1));
+        String predecessor=stage==1?baseId(parts[1],v.code()):
+                techId(parts[1],v.code(),parts[3],STAGE_SUFFIXES[stage-2]);
         long research=Math.round(source.researchCost*v.price());
         long industry=Math.round(source.industryCost*v.price());
         if(research>Integer.MAX_VALUE||industry>Integer.MAX_VALUE)
             throw new IllegalArgumentException("Network research overflows "+id);
         // Exact immutable parent modifier values, without roundtrip CSV parsing.
         return new Upgrade(source,id,v.code(),
-                v.name()+" / "+parts[3]+" "+stage,predecessor,
+                variantStageName(v.name(),parts[3],stage),predecessor,
                 (int)Math.max(1,research),(int)Math.max(1,industry),
-                v.name()+": "+source.tradeoff);
+                prefixedTradeoff(v.name(),source.tradeoff));
     }
 
     /**
@@ -393,21 +431,18 @@ public final class TechnologyCatalog {
                 !isStageSuffix(parts[4]))return null;
         SensingVariantCatalog.Model model=SensingVariantCatalog.find(parts[2]);
         if(model==null||!baseComponents.containsKey(
-                "BASE-"+parts[1]+"-"+model.code()))return null;
+                baseId(parts[1],model.code())))return null;
         int stage=parts[4].charAt(1)-'0';
-        Upgrade parent=get("TECH-"+parts[1]+"-"+model.base()+"-"+
-                parts[3]+"-"+parts[4]);
+        Upgrade parent=get(techId(parts[1],model.base(),parts[3],parts[4]));
         if(parent==null)return null;
-        String prerequisite=stage==1?"BASE-"+parts[1]+"-"+model.code():
-                "TECH-"+parts[1]+"-"+model.code()+"-"+parts[3]+"-"+
-                        ("0"+(stage-1));
-        String name=model.name()+" "+parts[3]+" "+
-                (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
+        String prerequisite=stage==1?baseId(parts[1],model.code()):
+                techId(parts[1],model.code(),parts[3],STAGE_SUFFIXES[stage-2]);
+        String name=branchStageName(model.name(),parts[3],stage);
         // The model changes its research identity, not its parent's physical
         // multipliers or economics. Preserve all ten values bit-for-bit.
         return new Upgrade(parent,id,model.code(),name,prerequisite,
                 parent.researchCost,parent.industryCost,
-                model.name()+": "+parent.tradeoff);
+                prefixedTradeoff(model.name(),parent.tradeoff));
     }
 
     /** Native survival hardware retains unique fitted identities without
@@ -419,22 +454,19 @@ public final class TechnologyCatalog {
                 !isStageSuffix(parts[4]))return null;
         SurvivalHardwareCatalog.Family family=SurvivalHardwareCatalog.find(parts[2]);
         if(family==null||!baseComponents.containsKey(
-                "BASE-"+parts[1]+"-"+family.code()))return null;
+                baseId(parts[1],family.code())))return null;
         int stage=parts[4].charAt(1)-'0';
-        Upgrade parent=get("TECH-"+parts[1]+"-"+family.parent()+"-"+
-                parts[3]+"-"+parts[4]);
+        Upgrade parent=get(techId(parts[1],family.parent(),parts[3],parts[4]));
         if(parent==null)return null;
-        String prerequisite=stage==1?"BASE-"+parts[1]+"-"+family.code():
-                "TECH-"+parts[1]+"-"+family.code()+"-"+parts[3]+"-"+
-                        ("0"+(stage-1));
-        String name=family.name()+" "+parts[3]+" "+
-                (stage<=6?Integer.toString(stage):"6 / Stage "+stage);
+        String prerequisite=stage==1?baseId(parts[1],family.code()):
+                techId(parts[1],family.code(),parts[3],STAGE_SUFFIXES[stage-2]);
+        String name=branchStageName(family.name(),parts[3],stage);
         // Parent numbers are already canonical six-decimal values. Copying
         // them directly is numerically identical to ratio(value,1) + parse,
         // and avoids ten Formatter objects and temporary CSV cell strings.
         return new Upgrade(parent,id,family.code(),name,prerequisite,
                 parent.researchCost,parent.industryCost,
-                family.name()+": "+parent.tradeoff);
+                prefixedTradeoff(family.name(),parent.tradeoff));
     }
 
     /**
@@ -451,14 +483,12 @@ public final class TechnologyCatalog {
         for(String[] entry:SUPPORT_FAMILY_TYPES)
             if(entry[0].equals(parts[2])){family=entry;break;}
         if(family==null||!baseComponents.containsKey(
-                "BASE-"+parts[1]+"-"+family[0]))return null;
+                baseId(parts[1],family[0])))return null;
         int stage=parts[4].charAt(1)-'0';
-        Upgrade source=get("TECH-"+parts[1]+"-"+family[2]+"-"+
-                parts[3]+"-"+parts[4]);
+        Upgrade source=get(techId(parts[1],family[2],parts[3],parts[4]));
         if(source==null)return null;
-        String predecessor=stage==1?"BASE-"+parts[1]+"-"+family[0]:
-                "TECH-"+parts[1]+"-"+family[0]+"-"+parts[3]+"-"+
-                        ("0"+(stage-1));
+        String predecessor=stage==1?baseId(parts[1],family[0]):
+                techId(parts[1],family[0],parts[3],STAGE_SUFFIXES[stage-2]);
         String sourceName=family[2].equals("DRN")?
                 "Drone Controller":"Shield Transfer Projector";
         // Retain the source's ten validated numeric modifiers and its exact
@@ -466,7 +496,7 @@ public final class TechnologyCatalog {
         return new Upgrade(source,id,family[0],
                 source.name.replace(sourceName,family[1]),predecessor,
                 source.researchCost,source.industryCost,
-                family[1]+": "+source.tradeoff);
+                prefixedTradeoff(family[1],source.tradeoff));
     }
 
     public boolean hasBase(String id) { return components.contains(id); }
