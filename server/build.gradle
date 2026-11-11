@@ -36,3 +36,12 @@ tasks.register('fleetLobbySmoke', JavaExec) {
     mainClass = 'diplomacy.server.FleetLobbyTest'
 }
 tasks.named('pvpFleetSmoke') { finalizedBy(tasks.named('fleetLobbySmoke')) }
+
+tasks.register('secureFleetLobbySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Exercise the supported dedicated-JAR pinned-TLS submitted-fleet lobby entrypoint.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.server.TlsFleetLobbyLauncherTest'
+}
+tasks.named('fleetLobbySmoke') { finalizedBy(tasks.named('secureFleetLobbySmoke')) }

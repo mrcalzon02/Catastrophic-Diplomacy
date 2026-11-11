@@ -452,12 +452,61 @@ public final class BattleServer implements AutoCloseable {
     /** Versioned checksummed replay export; never modifies a campaign save or trusts a client outcome. */
     public void saveReplay(Path file)throws IOException{synchronized(lock){if(battle==null)throw new IOException("No battle before both accepted fleets");Properties p=new Properties();p.setProperty("game","catastrophic-diplomacy");p.setProperty("seed",Long.toString(battle.seed()));p.setProperty("tick",Long.toString(battle.tick));p.setProperty("fingerprint",Long.toString(battle.fingerprint()));for(int i=0;i<orders.size();i++)p.setProperty("order."+i,orders.get(i));new Hbnet.Store(file).save(p);}}
     public void close(){if(closed)return;closed=true;try{listener.close();}catch(IOException ignored){}for(Socket s:sockets)try{s.close();}catch(IOException ignored){}clock.shutdownNow();workers.shutdownNow();}
+
+    private static IllegalArgumentException launchUsage(){
+        return new IllegalArgumentException(
+                "Use BattleServer network-data [port] [ships-per-side] [explicit-bind], "+
+                "or BattleServer network-data [port] lobby [match-tech-0..9] [explicit-bind]");
+    }
+    /**
+     * Supported pinned-TLS operator entrypoint. The same persistent hbnet
+     * identity directory is used for fixed starter battles or submitted-fleet
+     * lobbies; there is no plaintext fallback from this launcher.
+     */
+    static BattleServer openConfigured(String[] args)throws Exception{
+        if(args==null||args.length<1||args.length>5)throw launchUsage();
+        Path root=Path.of(args[0]);
+        int port=args.length>1?Hbnet.port(args[1]):27817;
+        if(args.length>=3&&"lobby".equals(args[2])){
+            if(args.length<4||args.length>5)throw launchUsage();
+            int ceiling;
+            try{ceiling=Integer.parseInt(args[3]);}
+            catch(NumberFormatException invalid){throw launchUsage();}
+            if(ceiling<0||ceiling>9)throw new IllegalArgumentException(
+                    "Lobby technology ceiling must be 0-9");
+            String bind=args.length>4?Hbnet.host(args[4]):"127.0.0.1";
+            return openLobby(bind,port,2479L,
+                    SkirmishTechnologyRules.unrestricted().withStage(ceiling),
+                    Hbnet.Server.load(root));
+        }
+        if(args.length>4)throw launchUsage();
+        int count=args.length>2?Integer.parseInt(args[2]):16;
+        String bind=args.length>3?Hbnet.host(args[3]):"127.0.0.1";
+        return new BattleServer(bind,port,2479L,count,Hbnet.Server.load(root));
+    }
     public static void main(String[] args)throws Exception{
-        if(args.length<1||args.length>4)throw new IllegalArgumentException("Use BattleServer network-data [port] [ships-per-side] [explicit-bind]");
-        Path root=Path.of(args[0]);try(BattleServer server=new BattleServer(args.length>3?args[3]:"127.0.0.1",args.length>1?Hbnet.port(args[1]):27817,2479,args.length>2?Integer.parseInt(args[2]):16,Hbnet.Server.load(root))){
-            Runtime.getRuntime().addShutdownHook(new Thread(server::close));System.out.println("Private battle ready. Local console: status, save, stop. Endpoints hidden.");BufferedReader in=new BufferedReader(new InputStreamReader(System.in));String line;
-            while((line=in.readLine())!=null){if(line.equals("stop"))break;if(line.equals("status"))System.out.println("Authoritative tick "+server.tick());if(line.equals("save")){server.saveReplay(root.resolve("battle.replay"));System.out.println("Replay saved");}}
-            server.saveReplay(root.resolve("battle.replay"));
+        if(args==null||args.length<1)throw launchUsage();
+        Path root=Path.of(args[0]);
+        boolean lobby=args.length>=3&&"lobby".equals(args[2]);
+        try(BattleServer server=openConfigured(args)){
+            Runtime.getRuntime().addShutdownHook(new Thread(server::close));
+            System.out.println(lobby
+                    ?"Private TLS fleet lobby ready. Submit fleets, READY both seats, then team 0 START."
+                    :"Private battle ready. Local console: status, save, stop. Endpoints hidden.");
+            BufferedReader in=new BufferedReader(new InputStreamReader(System.in));
+            String line;
+            while((line=in.readLine())!=null){
+                if(line.equals("stop"))break;
+                if(line.equals("status"))
+                    System.out.println(server.lobbyWaiting()
+                            ?"Authoritative TLS lobby waiting for accepted/ready seats"
+                            :"Authoritative tick "+server.tick());
+                if(line.equals("save")){
+                    if(server.lobbyWaiting())System.out.println("No battle exists yet; replay not written.");
+                    else{server.saveReplay(root.resolve("battle.replay"));System.out.println("Replay saved");}
+                }
+            }
+            if(!server.lobbyWaiting())server.saveReplay(root.resolve("battle.replay"));
         }
     }
 }
