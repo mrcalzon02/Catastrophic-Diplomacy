@@ -63,6 +63,17 @@ public final class Battle {
         /** Per-hull sequential mission plan, independent of weapons and fleet doctrine. */
         public ShipCommandQueue commandQueue=new ShipCommandQueue(List.of());
         public int lastTargetId,lastAttackerId;
+        /**
+         * Hostile navigation is driven by the received observation which
+         * justified target selection, never by the target object's hidden
+         * present coordinates. This coarse fix exists even without paid TRK
+         * memory because a captain must remember what they just saw long
+         * enough to steer between the 5 Hz decision updates.
+         */
+        public int navigationTargetId;
+        public long navigationFixTick=-1;
+        public double navigationFixX,navigationFixY,
+                navigationFixVX,navigationFixVY;
         public double anchorOffsetX,anchorOffsetY;
         public Shipyard.Hull hullClass;
         /** Campaign-only visual override; weapon loadout and damage are still real fitted modules. */
@@ -3271,6 +3282,7 @@ public final class Battle {
         Ship retained=findShip(actor.lastTargetId);
         if(retained!=null&&retained.alive()&&retained.team!=actor.team
                 &&orders.forSize(BattleOrders.size(retained)).priority()>0
+                &&actor.navigationTargetId==retained.id&&actor.navigationFixTick>=0
                 &&Math.floorMod(tick+actor.id,TARGET_DECISION_INTERVAL_TICKS)!=0)
             return retained;
 
@@ -3348,11 +3360,41 @@ public final class Battle {
                 choiceDistance=distance;
             }
         }
-        // choiceContact is deliberately retained only as proof that the winner
-        // came from a received contact; fire() performs its own current lock gate.
         if(choiceContact==null)choice=null;
+        rememberNavigationFix(actor,choice,choiceContact);
         updateFocus(actor,choice);
         return choice;
+    }
+    private static void rememberNavigationFix(Ship actor,Ship selected,
+            SensorLightTimeHistory.Observation received){
+        if(actor==null)throw new IllegalArgumentException("Captain required");
+        if(selected==null||received==null){
+            actor.navigationTargetId=0;
+            actor.navigationFixTick=-1;
+            actor.navigationFixX=actor.navigationFixY=0;
+            actor.navigationFixVX=actor.navigationFixVY=0;
+            return;
+        }
+        SensorLightTimeHistory.Sample sample=received.sample();
+        actor.navigationTargetId=selected.id;
+        actor.navigationFixTick=sample.tick();
+        actor.navigationFixX=sample.x();
+        actor.navigationFixY=sample.y();
+        actor.navigationFixVX=sample.vx();
+        actor.navigationFixVY=sample.vy();
+    }
+    private record NavigationAim(double x,double y) {}
+    private NavigationAim navigationAim(Ship actor,Ship target){
+        if(actor==null||target==null||
+                actor.navigationTargetId!=target.id||actor.navigationFixTick<0)
+            return null;
+        double age=StrictMath.max(0,(tick-actor.navigationFixTick)*DT);
+        // Linear dead reckoning is intentionally bounded. Beyond this point
+        // a stale contact remains a search cue, not clairvoyant pursuit.
+        double horizon=StrictMath.min(6.0,age);
+        return new NavigationAim(
+                actor.navigationFixX+actor.navigationFixVX*horizon,
+                actor.navigationFixY+actor.navigationFixVY*horizon);
     }
     private void updateFocus(Ship actor,Ship selected){
         int old=actor.lastTargetId,next=selected==null?0:selected.id;
@@ -3434,13 +3476,20 @@ public final class Battle {
                 }
             }
         }
+        NavigationAim observed=navigationAim(ship,target);
+        if(observed==null){
+            // No authorized hostile position means no hostile-directed thrust.
+            // Preserve inertial motion while the sensor/search system works.
+            SublightPropulsion.coast(ship,DT);
+            return;
+        }
         BattleOrders.Engagement engage=orders.forSize(BattleOrders.size(target));
         double preferredRange=engage.range()*(ship.standingOrders==null?
                 1:ship.standingOrders.engagementRangeMultiplier());
         // Never park at an empty long-range magazine's obsolete weapon reach.
         double reach=activeWeaponReach(ship);
         if(reach>0)preferredRange=StrictMath.min(preferredRange,reach*.80);
-        double dx=target.x-ship.x,dy=target.y-ship.y;
+        double dx=observed.x()-ship.x,dy=observed.y()-ship.y;
         double distance=StrictMath.hypot(dx,dy);
 
         if(posture==BattleOrders.Position.HOLD_RANGE){
@@ -3451,7 +3500,7 @@ public final class Battle {
                 double length=StrictMath.max(1,distance);
                 steerToward(ship,ship.x-dx/length*preferredRange,
                         ship.y-dy/length*preferredRange);
-            }else steerToward(ship,target.x,target.y);
+            }else steerToward(ship,observed.x(),observed.y());
             return;
         }
 
@@ -7488,6 +7537,12 @@ public final class Battle {
             hash=mix(hash,s.fighterRadarSelected?1:0);
             hash=mix(hash,s.fighterOpticalSelected?1:0);
             hash = mix(hash,s.commandSourceId);
+            hash = mix(hash,s.navigationTargetId);
+            hash = mix(hash,s.navigationFixTick);
+            hash = mix(hash,Double.doubleToLongBits(s.navigationFixX));
+            hash = mix(hash,Double.doubleToLongBits(s.navigationFixY));
+            hash = mix(hash,Double.doubleToLongBits(s.navigationFixVX));
+            hash = mix(hash,Double.doubleToLongBits(s.navigationFixVY));
             hash = mix(hash, Double.doubleToLongBits(s.hull));
             hash = mix(hash, Double.doubleToLongBits(s.crewCount));
             hash = mix(hash, Double.doubleToLongBits(s.fuel));

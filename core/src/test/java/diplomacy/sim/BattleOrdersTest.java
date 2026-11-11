@@ -208,6 +208,67 @@ public final class BattleOrdersTest {
         System.out.println("PASS captain contact: nearest, explicit class order and no stale-lock firing");
     }
 
+    /**
+     * Two captains with the same received hostile history must steer identically
+     * even when the hidden current target coordinates differ. They may diverge
+     * only after photons from those different positions actually arrive.
+     */
+    private static void checkCausalNavigation(){
+        Battle left=new Battle(2026111101L);
+        Battle right=new Battle(2026111101L);
+        Battle.Ship a=left.addShip(0,Battle.Faction.TERRAN,100,330);
+        Battle.Ship b=right.addShip(0,Battle.Faction.TERRAN,100,330);
+        Battle.Ship hiddenA=left.addShip(1,Battle.Faction.DRAXIAN,320,330);
+        Battle.Ship hiddenB=right.addShip(1,Battle.Faction.DRAXIAN,320,330);
+        for(Battle.Ship captain:new Battle.Ship[]{a,b}){
+            captain.sensorRange=1200;
+            captain.infraredRange=captain.xrayRange=captain.graviticRange=0;
+            captain.laserDamage=captain.kineticDamage=captain.plasmaDamage=0;
+            captain.particleDamage=captain.missileDamage=captain.torpedoDamage=0;
+            captain.maxFuel=captain.fuel=500;
+        }
+        for(Battle.Ship hostile:new Battle.Ship[]{hiddenA,hiddenB}){
+            hostile.speed=0;hostile.vx=hostile.vy=0;
+            hostile.laserDamage=hostile.kineticDamage=hostile.plasmaDamage=0;
+            hostile.particleDamage=hostile.missileDamage=hostile.torpedoDamage=0;
+            hostile.hull=hostile.maxHull=10000;
+        }
+        for(int frame=0;frame<120&&(a.lastTargetId==0||b.lastTargetId==0);frame++){
+            left.step();right.step();
+        }
+        check(a.lastTargetId==hiddenA.id&&b.lastTargetId==hiddenB.id&&
+                        a.navigationFixTick>=0&&
+                        a.navigationFixTick==b.navigationFixTick,
+                "Causal navigation fixture never established the same received fix");
+        check(Math.abs(a.x-b.x)<1e-10&&Math.abs(a.y-b.y)<1e-10&&
+                        Math.abs(a.facing-b.facing)<1e-10,
+                "Identical received histories diverged before hidden-position test");
+
+        // Move the real hostile bodies to different unobserved locations.
+        // The very next captain step must not react to this hidden truth.
+        hiddenA.x=450;hiddenA.y=260;
+        hiddenB.x=850;hiddenB.y=470;
+        left.step();right.step();
+        check(Math.abs(a.x-b.x)<1e-10&&Math.abs(a.y-b.y)<1e-10&&
+                        Math.abs(a.vx-b.vx)<1e-10&&Math.abs(a.vy-b.vy)<1e-10&&
+                        Math.abs(a.facing-b.facing)<1e-10,
+                "Captain steering leaked the hostile's current hidden coordinates");
+
+        boolean diverged=false;
+        for(int frame=0;frame<45;frame++){
+            left.step();right.step();
+            if(Math.hypot(a.x-b.x,a.y-b.y)>.05||
+                    Math.abs(a.facing-b.facing)>.01){
+                diverged=true;break;
+            }
+        }
+        check(diverged&&
+                        (a.navigationFixX!=b.navigationFixX||
+                         a.navigationFixY!=b.navigationFixY),
+                "Captains failed to react after different observations physically arrived");
+        System.out.println("PASS causal navigation: hidden truth ignored until received observations diverge");
+    }
+
     private static void checkReplay(){
         Battle a=threat(682,false,BattleOrders.PointDefense.INTERCEPT_ONLY);
         Battle b=threat(682,false,BattleOrders.PointDefense.INTERCEPT_ONLY);
@@ -396,7 +457,8 @@ public final class BattleOrdersTest {
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,
                 "PD control must cycle through all four modes");
-        checkTargeting();checkCausalCaptainFire();checkReplay();checkPersistence();
+        checkTargeting();checkCausalCaptainFire();checkCausalNavigation();
+        checkReplay();checkPersistence();
         System.out.println("PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay");
     }
 }
