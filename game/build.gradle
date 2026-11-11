@@ -430,6 +430,16 @@ tasks.register('wikiArbitrarySearchProfile', JavaExec) {
     maxHeapSize = providers.gradleProperty('cdProfileHeap').orElse('16m').get()
 }
 
+tasks.register('wikiArbitrarySearchSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Required 16 MiB arbitrary encyclopedia search: plasma, numeric multipliers and broad technology IDs.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.WikiArbitrarySearchProfile'
+    maxHeapSize = '16m'
+}
+tasks.named('wikiSmoke') { dependsOn tasks.named('wikiArbitrarySearchSmoke') }
+
 // Diagnostic-only: cosmetic size ratios must not block APK or desktop releases.
 tasks.register('fighterScaleArtDiagnostic') {
     group = 'verification'

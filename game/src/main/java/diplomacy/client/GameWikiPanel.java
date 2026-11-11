@@ -21,6 +21,9 @@ final class GameWikiPanel {
     private GameWikiCatalog.Article chosen;
     private int category,listPage,scroll;
     private String query="";
+    private boolean queryDirty;
+    private long queryApplyAfterNanos;
+    private static final long QUERY_DEBOUNCE_NANOS=120_000_000L;
     private List<String> wrapped=List.of();
     GameWikiPanel(GameWikiCatalog catalog,boolean mobile){
         if(catalog==null)throw new IllegalArgumentException("Missing encyclopedia");
@@ -34,6 +37,7 @@ final class GameWikiPanel {
     int listPage(){return listPage;}
     int textScroll(){return scroll;}
     private void refresh(){
+        queryDirty=false;
         String previous=chosen==null?null:chosen.id;
         hits=catalog.search(GameWikiCatalog.CATEGORIES[category],query);
         chosen=null;
@@ -48,24 +52,41 @@ final class GameWikiPanel {
         listPage=chosen==null?0:chosenIndex/ROWS;
         scroll=0;buildText();
     }
-    void setQuery(String text){
+    private static String cleanQuery(String text){
         if(text==null)text="";
-        StringBuilder clean=new StringBuilder();
+        StringBuilder clean=new StringBuilder(StrictMath.min(72,text.length()));
         for(int i=0;i<text.length()&&clean.length()<72;i++){
             char c=text.charAt(i);
             if(c>=32&&c!=127)clean.append(c);
         }
-        String next=clean.toString();
+        return clean.toString();
+    }
+    void setQuery(String text){
+        String next=cleanQuery(text);
+        queryDirty=false;
         if(!query.equals(next)){query=next;refresh();}
+    }
+    private void queueQuery(String text){
+        String next=cleanQuery(text);
+        if(query.equals(next))return;
+        query=next;
+        queryDirty=true;
+        queryApplyAfterNanos=System.nanoTime()+QUERY_DEBOUNCE_NANOS;
+    }
+    boolean queryPending(){return queryDirty;}
+    void flushQueuedQuery(long nowNanos){
+        if(queryDirty&&nowNanos>=queryApplyAfterNanos)refresh();
     }
     void type(char character){
         // BACKSPACE is handled by keyDown; keyTyped can also deliver ASCII 8.
-        // Never erase twice for the same key press.
+        // Never erase twice for the same key press. Desktop key-by-key search
+        // is coalesced so ten fast characters do not run ten 73k-row scans.
         if(character==8)return;
-        if(character>=32&&character!=127&&query.length()<72)setQuery(query+character);
+        if(character>=32&&character!=127&&query.length()<72)
+            queueQuery(query+character);
     }
     void erase(){
-        if(!query.isEmpty())setQuery(query.substring(0,query.length()-1));
+        if(!query.isEmpty())queueQuery(query.substring(0,query.length()-1));
     }
     void setCategory(int index){
         if(index<0||index>=GameWikiCatalog.CATEGORIES.length)return;
@@ -130,6 +151,7 @@ final class GameWikiPanel {
         font.setColor(c);font.draw(batch,text,x,y);
     }
     void draw(ShapeRenderer shapes,SpriteBatch batch,BitmapFont font){
+        flushQueuedQuery(System.nanoTime());
         float original=font.getData().scaleX;
         float scale=mobile?1.42f:1.16f;
         shapes.begin(ShapeRenderer.ShapeType.Filled);

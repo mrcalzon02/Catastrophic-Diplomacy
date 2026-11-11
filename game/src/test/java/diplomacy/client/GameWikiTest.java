@@ -194,6 +194,11 @@ public final class GameWikiTest {
         ui.setQuery("hull");
         ui.erase();ui.type('l');
         check(ui.query().equals("hull"),"Keyboard query editing regressed");
+        check(ui.queryPending(),
+                "Key-by-key wiki edit was not coalesced before full search");
+        ui.flushQueuedQuery(Long.MAX_VALUE);
+        check(!ui.queryPending()&&ui.resultCount()>0,
+                "Coalesced wiki query did not refresh after debounce");
         ui.setQuery("bad\ntext");
         check(!ui.query().contains("\n"),"Control characters must not enter native search");
         check(GameMenuPanel.homeHit(965,653,true)==8 &&
