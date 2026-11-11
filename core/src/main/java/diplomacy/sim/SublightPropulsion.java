@@ -3,9 +3,12 @@ package diplomacy.sim;
 import diplomacy.shipyard.Shipyard;
 
 /**
- * Relates existing installed ENG machinery to bounded, accelerating sublight
- * propulsion. Speeds are physical fractions of c, not 62% of lightspeed.
- * Uses world units per combat second only after explicit 60:1 clock mapping.
+ * Relates existing installed ENG machinery to bounded tactical propulsion.
+ * Top speeds still respect installed drive class and the compressed sublight
+ * scale, but screen-space acceleration is deliberately a gameplay quantity.
+ * Realistic g-to-world conversion made capital ships effectively stationary
+ * while fighters used direct world-unit motion; battle maneuvering now wins
+ * over that false precision.
  */
 public final class SublightPropulsion {
     private SublightPropulsion(){}
@@ -16,14 +19,16 @@ public final class SublightPropulsion {
      */
     public static final int POSITION_SUBSTEPS=2;
     public enum Drive {
-        AUXILIARY_ELECTRIC(.001,0.3,0.65),
-        FUSION_TORCH(.006,3.0,1.0),
-        ADVANCED_FUSION(.012,6.0,1.4),
-        HIGH_ENERGY_TORCH(.018,9.0,1.8);
-        public final double maxFractionOfC,accelerationGee,fuelPerDeltaV;
-        Drive(double maxFraction,double gee,double fuelRate){
+        AUXILIARY_ELECTRIC(.001,0.3,4.0,0.65),
+        FUSION_TORCH(.006,3.0,14.0,1.0),
+        ADVANCED_FUSION(.012,6.0,22.0,1.4),
+        HIGH_ENERGY_TORCH(.018,9.0,32.0,1.8);
+        public final double maxFractionOfC,accelerationGee,
+                tacticalAcceleration,fuelPerDeltaV;
+        Drive(double maxFraction,double gee,double tacticalAccel,double fuelRate){
             maxFractionOfC=maxFraction;
             accelerationGee=gee;
+            tacticalAcceleration=tacticalAccel;
             fuelPerDeltaV=fuelRate;
         }
     }
@@ -112,9 +117,12 @@ public final class SublightPropulsion {
             wantedX*=maxSpeed/requested;wantedY*=maxSpeed/requested;
         }
         double halfDt=dt/substeps;
-        double acceleration=WorldScale.accelerationUnitsPerSimSecondSquared(
-                ship.propulsion.accelerationGee)*ship.engineCondition*
-                ship.crewReadiness()*thrustFraction;
+        // Tactical acceleration is intentionally NOT derived from real-world g.
+        // Fighters already move directly in world units; capital ships need the
+        // same readable tactical coordinate system while retaining slower caps,
+        // finite fuel, engine damage and crew/throttle penalties.
+        double acceleration=ship.propulsion.tacticalAcceleration*
+                ship.engineCondition*ship.crewReadiness()*thrustFraction;
         for(int substep=0;substep<substeps;substep++){
             double differenceX=wantedX-ship.vx,differenceY=wantedY-ship.vy;
             double difference=StrictMath.hypot(differenceX,differenceY);

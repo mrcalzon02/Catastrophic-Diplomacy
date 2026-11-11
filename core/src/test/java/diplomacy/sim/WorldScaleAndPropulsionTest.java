@@ -83,13 +83,19 @@ public final class WorldScaleAndPropulsionTest {
                 "BASE-TER-ENG");
         ok(SublightPropulsion.fitted(two)==SublightPropulsion.Drive.ADVANCED_FUSION,
                 "Two paid mounted engines did not improve propulsion");
+        double previousAcceleration=0;
         for(SublightPropulsion.Drive drive:SublightPropulsion.Drive.values()){
             ok(drive.maxFractionOfC>0&&drive.maxFractionOfC<.02,
                     "Ship drive exceeds 2 percent of c: "+drive);
             ok(drive.accelerationGee>0&&drive.accelerationGee<=10,
-                    "Crewed drive acceleration implausibly high: "+drive);
+                    "Descriptive drive gee is invalid: "+drive);
+            ok(drive.tacticalAcceleration>previousAcceleration,
+                    "Higher drive tier failed to improve tactical acceleration: "+drive);
+            previousAcceleration=drive.tacticalAcceleration;
         }
-        System.out.println("PASS bare, one-ENG, two-ENG and upgraded-drive tiers");
+        close(SublightPropulsion.Drive.FUSION_TORCH.tacticalAcceleration,14,0,
+                "Fusion tactical acceleration");
+        System.out.println("PASS bare, one-ENG, two-ENG and upgraded tactical-drive tiers");
     }
     private static void physicalMovement(){
         Battle b=new Battle(24789);
@@ -112,8 +118,10 @@ public final class WorldScaleAndPropulsionTest {
                     StrictMath.hypot(ship.vx,ship.vy))<=.006+1e-12,
                     "A crewed ship accelerated toward lightspeed");
         }
-        ok(ship.x>initialX&&ship.fuel<before,
-                "Powered engine failed to produce physical thrust and consume fuel");
+        ok(ship.x>initialX+120&&ship.fuel<before,
+                "Fusion ship still failed to traverse a readable tactical distance");
+        ok(ship.vx>cap*.90,
+                "Fusion ship did not reach useful tactical speed within five seconds");
         double speedBefore=ship.vx,position=ship.x;
         ship.fuel=0;
         for(int i=0;i<6;i++)
@@ -161,7 +169,7 @@ public final class WorldScaleAndPropulsionTest {
         }
         ok(economical.fuel>unrestricted.fuel&&economical.vx<unrestricted.vx,
                 "Economy posture failed to save actual reaction mass during acceleration");
-        System.out.println("PASS bounded impulse, one-tank reserve, paid economy thrust and coast");
+        System.out.println("PASS tactical capital-ship acceleration, one-tank reserve, paid economy thrust and coast");
     }
     /** Enter an actual fitted fleet engagement with already established,
      * physically bounded pre-battle approach momentum. Slow acceleration
