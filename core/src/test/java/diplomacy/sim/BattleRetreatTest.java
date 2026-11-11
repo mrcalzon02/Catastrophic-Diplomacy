@@ -18,6 +18,61 @@ public final class BattleRetreatTest {
         ok(ship.team==0?ship.x<=0:ship.x>=1280,
                 "A ship escaped across the enemy's boundary");
     }
+    private static Shipyard.Design oneWeapon(TechnologyCatalog tech,String module){
+        Shipyard.Design design=Shipyard.bareHull(
+                Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT);
+        for(Shipyard.Slot slot:design.hull.slots)
+            if(slot.mount()==Shipyard.Mount.WEAPON){
+                design=design.install(slot.index(),module);
+                ok(Shipyard.inspect(design,tech).valid(),
+                        "Invalid fitted withdrawal-defense fixture "+module);
+                return design;
+            }
+        throw new AssertionError("Dreadnought has no weapon socket for "+module);
+    }
+    private record WithdrawalPdResult(int missileFires,int beamFires,
+                                      int illuminatedTicks,double powerSpent,
+                                      boolean withdrew) {}
+    private static WithdrawalPdResult withdrawalParticleDefense(
+            TechnologyCatalog tech,BattleOrders.PointDefense mode,boolean powered){
+        Battle battle=new Battle(778811L+mode.ordinal()+(powered?17:0));
+        battle.spawnWing(0,oneWeapon(tech,"BASE-TER-MSL"),tech,1,700,320);
+        battle.spawnWing(1,oneWeapon(tech,"BASE-TER-PPD"),tech,1,900,320);
+        Battle.Ship attacker=battle.ships().get(0);
+        Battle.Ship defender=battle.ships().get(1);
+        attacker.speed=0;attacker.vx=attacker.vy=0;
+        attacker.maxPower=attacker.power=10000;attacker.powerRegen=0;
+        attacker.maxHeat=10000;attacker.heat=0;
+        attacker.fighterReserve=attacker.droneReserve=attacker.repairDroneReserve=0;
+        defender.powerRegen=0;
+        if(!powered)defender.power=0;
+        double beforePower=defender.power;
+        battle.setShipStandingOrders(defender.id,new ShipStandingOrders(
+                BattleOrders.DEFAULT.withPointDefense(mode).withRetreat(.95),
+                50,50,0));
+        defender.hull=defender.maxHull*.60;
+        int missileFires=0,beamFires=0;
+        long seen=0;
+        for(int t=0;t<180&&defender.alive()&&!defender.escaped;t++){
+            battle.step();
+            for(Battle.VisualEvent event:battle.visualEvents()){
+                if(event.sequence()<=seen)continue;
+                seen=event.sequence();
+                if(event.team()==attacker.team&&
+                        event.phase()==Battle.VisualPhase.FIRE&&
+                        "MISSILE".equals(event.weapon()))missileFires++;
+                if(event.team()==defender.team&&
+                        event.sourceId()==defender.id&&
+                        event.phase()==Battle.VisualPhase.FIRE&&
+                        "PARTICLE_PD".equals(event.weapon()))beamFires++;
+            }
+        }
+        int illuminated=0;
+        for(ParticlePointDefense.Mount gun:defender.particlePdMounts)
+            illuminated+=gun.illuminatedTicks;
+        return new WithdrawalPdResult(missileFires,beamFires,illuminated,
+                StrictMath.max(0,beforePower-defender.power),defender.withdrawing);
+    }
     public static void main(String[] argv)throws Exception{
         // A commanded HOLD should arrest momentum by coasting, not
         // continuously charge a fuel store for movement with no engine burn.
@@ -124,6 +179,24 @@ public final class BattleRetreatTest {
         escapes(fuelEscape,escapeFuel,800);
         ok(escapeFuel.commandQueue.nextIndex()==0,
                 "Fuel-triggered retreat executed an abandoned waypoint");
+
+        TechnologyCatalog pdTech=TechnologyCatalog.loadDefault();
+        WithdrawalPdResult defensive=withdrawalParticleDefense(
+                pdTech,BattleOrders.PointDefense.INTERCEPT_ONLY,true);
+        ok(defensive.withdrew()&&defensive.missileFires()>0,
+                "Withdrawal PPD fixture never entered retreat under real missile attack");
+        ok(defensive.beamFires()>0&&defensive.illuminatedTicks()>0&&
+                        defensive.powerSpent()>0,
+                "Withdrawing ship failed to perform paid particle point defense");
+        WithdrawalPdResult hold=withdrawalParticleDefense(
+                pdTech,BattleOrders.PointDefense.HOLD_FIRE,true);
+        ok(hold.missileFires()>0&&hold.beamFires()==0&&hold.illuminatedTicks()==0,
+                "HOLD_FIRE withdrawal emitted particle defense");
+        WithdrawalPdResult powerless=withdrawalParticleDefense(
+                pdTech,BattleOrders.PointDefense.INTERCEPT_ONLY,false);
+        ok(powerless.missileFires()>0&&powerless.beamFires()==0&&
+                        powerless.illuminatedTicks()==0,
+                "Powerless withdrawing PPD emitted free defensive damage");
 
         Battle stand=Battle.duel(993,1,Battle.Faction.TERRAN,Battle.Faction.DRAXIAN);
         Battle.Ship defender=stand.ships().get(0);

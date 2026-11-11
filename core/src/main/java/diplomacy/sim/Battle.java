@@ -6515,7 +6515,7 @@ public final class Battle {
     private void fireParticlePointDefense(){
         for(Ship defender:ships){
             if(!defender.alive()||defender.particlePdMounts.isEmpty()||
-                    defender.withdrawing||defender.crewReadiness()<.05||
+                    defender.crewReadiness()<.05||
                     defender.pointDefenseCondition<=.20||
                     defender.orders.pointDefense()==BattleOrders.PointDefense.HOLD_FIRE)
                 continue;
