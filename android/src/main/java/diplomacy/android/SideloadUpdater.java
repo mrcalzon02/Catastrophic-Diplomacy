@@ -30,8 +30,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -40,15 +42,19 @@ import org.json.JSONObject;
 
 /** User-initiated, HTTPS-only GitHub release installer for sideloaded Android builds. */
 final class SideloadUpdater {
-    private static final int PER_PAGE = 10;
+    private static final int PER_PAGE = 20;
     private static final String RELEASE_API = "https://api.github.com/repos/" +
             UpdatePolicy.REPOSITORY + "/releases?per_page=" + PER_PAGE + "&page=";
     // A single 100-release JSON page previously allocated a contiguous 2 MiB
-    // array while the game was launching on a 16 MiB Android 10 VM. Scan in
-    // small pages with the SAME 2000-release horizon and newest-published
-    // comparison; do not drop prereleases or silently claim no update.
-    private static final int MAX_PAGES = 200;
-    private static final int MAX_RELEASE_JSON = 256 * 1024;
+    // array while the game was launching on a 16 MiB Android 10 VM. Stream
+    // twenty releases per page: half the metadata requests of the former
+    // 10/page scan, with the SAME 2000-release horizon and newest-published
+    // comparison. Parsed pages are short-lived cached/revalidated below.
+    private static final int MAX_PAGES = 100;
+    private static final int MAX_RELEASE_JSON = 512 * 1024;
+    private static final int MAX_CACHED_RELEASE_PAGES = 16;
+    private static final long RELEASE_PAGE_FRESH_MS = 5 * 60 * 1000L;
+    private static final int METADATA_ATTEMPTS = 3;
     private static final String MANIFEST_NAME = "release-manifest.json";
     private static final int MAX_MANIFEST_JSON = 16 * 1024;
     private final Activity activity;
@@ -62,6 +68,9 @@ final class SideloadUpdater {
     private volatile boolean manualRequested;
     private volatile File pendingApk;
     private ProgressDialog progress;
+    /** LRU parsed-page cache. Only the updater's single IO worker mutates it. */
+    private final LinkedHashMap<Integer,CachedPage> releasePageCache=
+            new LinkedHashMap<>(MAX_CACHED_RELEASE_PAGES,0.75f,true);
 
     SideloadUpdater(Activity activity) { this.activity = activity; }
 
@@ -436,6 +445,13 @@ final class SideloadUpdater {
     private record ReleaseInfo(String tag,String publishedAt,boolean draft,
                                boolean prerelease,List<AssetInfo> assets) { }
     private record ReleasePage(int count,List<ReleaseInfo> releases) { }
+    private record CachedPage(String etag,long fetchedAt,ReleasePage page) { }
+    private static final class RetryableMetadataException extends IOException {
+        final long retryAfterMs;
+        RetryableMetadataException(String message,long retryAfterMs){
+            super(message);this.retryAfterMs=retryAfterMs;
+        }
+    }
 
     private static String optionalString(JsonReader json) throws IOException {
         if(json.peek()==JsonToken.NULL){json.nextNull();return "";}
@@ -471,8 +487,108 @@ final class SideloadUpdater {
         json.endArray();
         return assets;
     }
-    private static ReleasePage readReleasePage(int page) throws IOException {
-        HttpURLConnection connection=connect(RELEASE_API+page);
+    private ReleasePage readReleasePage(int page) throws IOException {
+        if(page<1||page>MAX_PAGES)throw new IOException("Release page outside bounded scan");
+        long now=android.os.SystemClock.elapsedRealtime();
+        CachedPage cached=releasePageCache.get(page);
+        if(cached!=null&&now-cached.fetchedAt()<RELEASE_PAGE_FRESH_MS)
+            return cached.page();
+
+        IOException last=null;
+        for(int attempt=0;attempt<METADATA_ATTEMPTS;attempt++){
+            try{
+                HttpURLConnection connection=connectMetadata(RELEASE_API+page,
+                        cached==null?null:cached.etag(),attempt);
+                try{
+                    if(connection.getResponseCode()==HttpURLConnection.HTTP_NOT_MODIFIED){
+                        if(cached==null)throw new IOException("GitHub returned 304 without cached metadata");
+                        CachedPage refreshed=new CachedPage(cached.etag(),now,cached.page());
+                        putCachedPage(page,refreshed);
+                        return refreshed.page();
+                    }
+                    ReleasePage parsed=parseReleasePage(connection);
+                    String etag=safeEtag(connection.getHeaderField("ETag"));
+                    CachedPage refreshed=new CachedPage(etag,now,parsed);
+                    putCachedPage(page,refreshed);
+                    return parsed;
+                }finally{connection.disconnect();}
+            }catch(IOException failure){
+                last=failure;
+                if(!retryableMetadata(failure)||attempt+1>=METADATA_ATTEMPTS)throw failure;
+                long delay=failure instanceof RetryableMetadataException retry&&retry.retryAfterMs>0
+                        ?retry.retryAfterMs
+                        :StrictMath.min(2000L,250L<<attempt);
+                try{Thread.sleep(delay);}
+                catch(InterruptedException interrupted){
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Update metadata check interrupted",interrupted);
+                }
+            }
+        }
+        throw last==null?new IOException("Release metadata unavailable"):last;
+    }
+    private void putCachedPage(int page,CachedPage value){
+        releasePageCache.put(page,value);
+        while(releasePageCache.size()>MAX_CACHED_RELEASE_PAGES){
+            Integer eldest=releasePageCache.keySet().iterator().next();
+            releasePageCache.remove(eldest);
+        }
+    }
+    private static String safeEtag(String value){
+        if(value==null||value.length()>256)return null;
+        for(int i=0;i<value.length();i++){
+            char c=value.charAt(i);
+            if(c<32||c==127)return null;
+        }
+        return value;
+    }
+    private static boolean retryableMetadata(IOException failure){
+        return failure instanceof RetryableMetadataException||
+                failure instanceof java.net.SocketTimeoutException||
+                failure instanceof java.net.ConnectException||
+                failure instanceof java.net.NoRouteToHostException;
+    }
+    private static long retryAfterMillis(HttpURLConnection connection,int attempt){
+        String header=connection.getHeaderField("Retry-After");
+        if(header!=null&&header.matches("[0-9]{1,2}")){
+            long seconds=Long.parseLong(header);
+            if(seconds<=5)return seconds*1000L;
+        }
+        return StrictMath.min(2000L,250L<<attempt);
+    }
+    private static HttpURLConnection connectMetadata(String url,String etag,int attempt)
+            throws IOException {
+        URI current=UpdatePolicy.allowedUrl(url);
+        for(int redirects=0;redirects<=5;redirects++){
+            HttpURLConnection conn=(HttpURLConnection)current.toURL().openConnection();
+            conn.setInstanceFollowRedirects(false);
+            conn.setConnectTimeout(12000);
+            conn.setReadTimeout(25000);
+            conn.setRequestProperty("User-Agent","CatastrophicDiplomacy-AndroidUpdater/1");
+            conn.setRequestProperty("Accept","application/vnd.github+json");
+            if(etag!=null)conn.setRequestProperty("If-None-Match",etag);
+            int response=conn.getResponseCode();
+            if(response==301||response==302||response==303||response==307||response==308){
+                String destination=conn.getHeaderField("Location");
+                conn.disconnect();
+                if(destination==null)throw new IOException("Missing release metadata redirect destination");
+                current=UpdatePolicy.allowedUrl(current.resolve(destination).toString());
+                continue;
+            }
+            if(response==200||response==HttpURLConnection.HTTP_NOT_MODIFIED)return conn;
+            if(response==403||response==429||response==500||response==502||
+                    response==503||response==504){
+                long delay=retryAfterMillis(conn,attempt);
+                conn.disconnect();
+                throw new RetryableMetadataException(
+                        "GitHub release metadata temporarily unavailable (HTTP "+response+")",delay);
+            }
+            conn.disconnect();
+            throw new IOException("GitHub release metadata returned HTTP "+response);
+        }
+        throw new IOException("Too many GitHub release metadata redirects");
+    }
+    private static ReleasePage parseReleasePage(HttpURLConnection connection) throws IOException {
         try(InputStream stream=new BufferedInputStream(connection.getInputStream());
             InputStream bounded=new FilterInputStream(stream){
                 private int remaining=MAX_RELEASE_JSON;
@@ -514,12 +630,10 @@ final class SideloadUpdater {
                 releases.add(new ReleaseInfo(tag,publishedAt,draft,prerelease,assets));
             }
             json.endArray();
-            // Fail closed on trailing data rather than accepting a truncated,
-            // adversarial or ambiguously parsed release listing.
             if(json.peek()!=JsonToken.END_DOCUMENT)
                 throw new IOException("Unexpected content after GitHub release feed");
-            return new ReleasePage(count,releases);
-        }finally{connection.disconnect();}
+            return new ReleasePage(count,List.copyOf(releases));
+        }
     }
 
     private static HttpURLConnection connect(String url) throws IOException {
@@ -593,6 +707,11 @@ final class SideloadUpdater {
     private void endProgress() {
         if(progress!=null){progress.dismiss();progress=null;}
     }
-    void close() { closed = true; io.shutdownNow(); activity.runOnUiThread(this::endProgress); }
+    void close() {
+        closed=true;
+        io.shutdownNow();
+        releasePageCache.clear();
+        activity.runOnUiThread(this::endProgress);
+    }
     private record Release(UpdatePolicy.Candidate candidate, String apkUrl, boolean prerelease) { }
 }
