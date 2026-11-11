@@ -471,3 +471,14 @@ tasks.register('multiplayerBattleOverlaySmoke', JavaExec) {
 tasks.matching { it.name == 'menuFlowSmoke' }.configureEach {
     dependsOn(tasks.named('multiplayerBattleOverlaySmoke'))
 }
+
+tasks.register('remoteNetworkPresentationSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Preserve authoritative v2 hull/fitting and missile/ballistic/craft presentation identity without local simulation.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.RemoteNetworkPresentationTest'
+    dependsOn testClasses
+}
+tasks.matching { it.name == 'menuFlowSmoke' }.configureEach {
+    dependsOn(tasks.named('remoteNetworkPresentationSmoke'))
+}

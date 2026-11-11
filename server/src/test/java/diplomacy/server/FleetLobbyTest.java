@@ -90,7 +90,7 @@ public final class FleetLobbyTest {
             Socket raw=new Socket("127.0.0.1",host.port())){
             raw.setSoTimeout(5000);
             Hbnet.write(raw.getOutputStream(),"PLAYER|1");
-            check(Hbnet.read(raw.getInputStream()).startsWith("WELCOME|1|"),"Raw seat handshake");
+            check(Hbnet.read(raw.getInputStream()).startsWith("WELCOME|2|"),"Raw seat handshake");
             Hbnet.write(raw.getOutputStream(),"FLEET_BEGIN|160001|58|"+
                     "a".repeat(64)); // oversized payload rejected before allocation
             boolean rejected=false;

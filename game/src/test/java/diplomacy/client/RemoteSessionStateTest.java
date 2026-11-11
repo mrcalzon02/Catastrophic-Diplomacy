@@ -18,7 +18,7 @@ public final class RemoteSessionStateTest {
         String raw=row(id,team,faction,x);
         var typed=new BattleConnection.ShipEntity(id,team,faction,
                 diplomacy.shipyard.Shipyard.Hull.CORVETTE,
-                x,300,0,100,100,50,50,40,40,30,20);
+                x,300,0,100,100,50,50,40,40,30,20,0,java.util.Map.of());
         return new BattleConnection.Snapshot(session,tick,0,
                 List.of(raw),List.of(typed));
     }
@@ -26,7 +26,8 @@ public final class RemoteSessionStateTest {
             RemoteShipInterpolation interpolation,RemoteFleetMirrors mirrors,
             BattleConnection.Snapshot snapshot){
         boolean changed=state.apply(snapshot,interpolation,mirrors);
-        interpolation.observe(snapshot.tick(),snapshot.entities());
+        interpolation.observe(snapshot.tick(),
+                RemoteEntityPresentation.from(snapshot).ships());
         mirrors.present(interpolation,changed);
     }
     public static void main(String[] args){

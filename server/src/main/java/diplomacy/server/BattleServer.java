@@ -31,6 +31,7 @@ public final class BattleServer implements AutoCloseable {
     private final SkirmishTechnologyRules hostRules;
     private final SkirmishFleet[] submitted=new SkirmishFleet[2];
     private static final int MAX_FLEET_WIRE=160_000, FLEET_CHUNK=2800;
+    public static final int SNAPSHOT_PROTOCOL_VERSION=2;
     private final Object lock=new Object();
     private final String session=UUID.randomUUID().toString();
     private final ExecutorService workers=Executors.newCachedThreadPool();
@@ -180,7 +181,7 @@ public final class BattleServer implements AutoCloseable {
                     if(seats.size()>=64)throw Hbnet.failure();seat=new Seat(team);seats.put(signer,seat);
                 }
                 if(seat.active)throw Hbnet.failure();seat.active=true;peer=new Peer(socket,seat);
-                Hbnet.write(socket.getOutputStream(),"WELCOME|1|"+session+"|"+seat.team+"|"+matchSeed+"|"+seat.sequence+
+                Hbnet.write(socket.getOutputStream(),"WELCOME|"+SNAPSHOT_PROTOCOL_VERSION+"|"+session+"|"+seat.team+"|"+matchSeed+"|"+seat.sequence+
                         (matchRulesWire==null?"":"|"+matchRulesWire));
                 peers.add(peer);
                 peer.send(snapshot());
@@ -330,16 +331,45 @@ public final class BattleServer implements AutoCloseable {
         for(Peer peer:peers)peer.send(List.of(result));
         terminalSent=true;
     }
+    private static String weaponFittings(Battle.Ship ship){
+        StringJoiner out=new StringJoiner(",");
+        for(WeaponMuzzles.Emitter emitter:ship.weaponEmitters)
+            if(emitter.component()!=null&&!emitter.component().isBlank())
+                out.add(emitter.slotId()+"~"+emitter.component());
+        String value=out.toString();
+        return value.isEmpty()?"-":value;
+    }
     private List<String> snapshot(){
         if(battle==null)return List.of("LOBBY|"+(submitted[0]==null?0:1)+"|"+(submitted[1]==null?0:1));
         List<String> body=new ArrayList<>();
-        for(Battle.Ship s:battle.ships())body.add("SHIP|"+s.id+"|"+s.team+"|"+s.faction+"|"+s.x+"|"+s.y+"|"+s.facing+"|"+s.hull+"|"+s.shields+"|"+s.armor+"|"+s.power+"|"+s.fuel);
-        for(Battle.Missile m:battle.missiles())body.add("MISSILE|"+m.visualId+"|"+m.team+"|"+m.x+"|"+m.y+"|"+m.integrity);
-        for(Battle.Ballistic m:battle.ballistics())body.add("BALLISTIC|"+m.visualId+"|"+m.team+"|"+m.x+"|"+m.y+"|"+m.integrity);
-        for(Battle.Craft m:battle.crafts())body.add("CRAFT|"+m.id+"|"+m.team+"|"+m.x+"|"+m.y+"|"+m.integrity);
+        for(Battle.Ship s:battle.ships()){
+            Shipyard.Hull hull=s.hullClass==null?Shipyard.Hull.CORVETTE:s.hullClass;
+            body.add("SHIP|"+s.id+"|"+s.team+"|"+s.faction+"|"+hull+"|"+
+                    s.x+"|"+s.y+"|"+s.facing+"|"+s.hull+"|"+s.maxHull+"|"+
+                    s.shields+"|"+s.maxShields+"|"+s.armor+"|"+s.maxArmor+"|"+
+                    s.power+"|"+s.fuel+"|"+StrictMath.max(0,s.lastTargetId)+"|"+
+                    weaponFittings(s));
+        }
+        for(Battle.Missile m:battle.missiles())
+            body.add("MISSILE|"+m.visualId+"|"+m.team+"|"+m.sourceId+"|"+
+                    StrictMath.max(0,m.targetId)+"|"+m.x+"|"+m.y+"|"+m.integrity+
+                    "|"+m.torpedo+"|"+m.fighterLaunched+"|"+m.decoy);
+        for(Battle.Ballistic m:battle.ballistics())
+            body.add("BALLISTIC|"+m.visualId+"|"+m.team+"|"+m.sourceId+"|"+
+                    StrictMath.max(0,m.targetId)+"|"+m.x+"|"+m.y+"|"+m.integrity+
+                    "|"+m.fighterLaunched);
+        for(Battle.Craft m:battle.crafts())
+            body.add("CRAFT|"+m.id+"|"+m.team+"|"+m.sourceId+"|"+
+                    StrictMath.max(0,m.targetId)+"|"+m.x+"|"+m.y+"|"+m.integrity+
+                    "|"+m.fighter+"|"+m.repair+"|"+
+                    (m.profile==null?"NONE":m.profile.hull().name()));
         if(body.size()>8192)throw new IllegalStateException("Snapshot capacity exceeded");
         String viewHash=Hbnet.hash(String.join("\n",body).getBytes(StandardCharsets.US_ASCII));
-        List<String> result=new ArrayList<>();result.add("SNAP|"+battle.tick+"|"+battle.fingerprint()+"|"+body.size());result.addAll(body);result.add("END|"+battle.tick+"|"+viewHash);return List.copyOf(result);
+        List<String> result=new ArrayList<>();
+        result.add("SNAP|"+battle.tick+"|"+battle.fingerprint()+"|"+body.size());
+        result.addAll(body);
+        result.add("END|"+battle.tick+"|"+viewHash);
+        return List.copyOf(result);
     }
     /** Versioned checksummed replay export; never modifies a campaign save or trusts a client outcome. */
     public void saveReplay(Path file)throws IOException{synchronized(lock){if(battle==null)throw new IOException("No battle before both accepted fleets");Properties p=new Properties();p.setProperty("game","catastrophic-diplomacy");p.setProperty("seed",Long.toString(battle.seed()));p.setProperty("tick",Long.toString(battle.tick));p.setProperty("fingerprint",Long.toString(battle.fingerprint()));for(int i=0;i<orders.size();i++)p.setProperty("order."+i,orders.get(i));new Hbnet.Store(file).save(p);}}

@@ -4036,36 +4036,72 @@ public final class CatastrophicGame extends ApplicationAdapter {
      * Parse a snapshot only once; reuse its stable ship identities across
      * every interpolated graphics frame. */
     private void drawRemoteBattle(diplomacy.net.BattleConnection.Snapshot snapshot){
+        RemoteEntityPresentation.Frame frame=RemoteEntityPresentation.from(snapshot);
         boolean newSession=remoteSessionState.apply(
                 snapshot,remoteShipInterpolation,remoteFleetMirrors);
-        if(snapshot.tick()!=remoteShipInterpolation.tick()){
-            java.util.List<String> rows=new java.util.ArrayList<>();
-            for(String entity:snapshot.entities())
-                if(entity.startsWith("SHIP|"))rows.add(entity);
-            remoteShipInterpolation.observe(snapshot.tick(),rows);
-        }
+        if(snapshot.tick()!=remoteShipInterpolation.tick())
+            remoteShipInterpolation.observe(snapshot.tick(),frame.ships());
         remoteShipInterpolation.advance(Math.min(.08f,Gdx.graphics.getDeltaTime()));
         remotePresentation=remoteFleetMirrors.present(remoteShipInterpolation,newSession);
         Gdx.gl.glClearColor(.015f,.025f,.055f,1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT|GL20.GL_DEPTH_BUFFER_BIT);
         viewport.apply();
         battleCamera.update();
+        CombatViewBounds view=CombatViewBounds.from(battleCamera);
         Battle solo=battle;
         try{
             battle=remotePresentation;
             renderPoses.sync(remotePresentation);
-            drawShipsFallback();
+            drawShipsFallback(view);
         }finally{battle=solo;}
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null&&terranSprites.loaded()>0)
             terranSprites.render(remotePresentation,batch);
         batch.setProjectionMatrix(battleCamera.combined);
-        if(craftSprites!=null)craftSprites.render(remotePresentation,batch);
+        if(craftSprites!=null)
+            craftSprites.renderRemote(remotePresentation,frame.crafts(),
+                    remoteFleetMirrors,batch,view);
+        drawRemoteBodies(frame,view,craftSprites==null);
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+
                 " / TAB: CONNECTION AND FLEET ORDERS",24,696);
         batch.end();
+    }
+
+    /** Host-owned moving bodies only. No local step(), hits, guidance or damage. */
+    private void drawRemoteBodies(RemoteEntityPresentation.Frame frame,
+                                  CombatViewBounds view,boolean craftFallback){
+        shapes.setProjectionMatrix(battleCamera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for(var missile:frame.missiles()){
+            if(view!=null&&!view.circle((float)missile.x(),(float)missile.y(),6))continue;
+            shapes.setColor(missile.decoy()?Color.LIGHT_GRAY:
+                    missile.torpedo()?Color.ORANGE:
+                    missile.team()==0?Color.CYAN:Color.SCARLET);
+            float radius=CombatEffectScale.forLauncher(
+                    CombatEffectScale.of(missile.torpedo()?4.4f:2.8f),
+                    missile.fighterLaunched(),CombatEffectScale.FIGHTER_GUIDED);
+            shapes.circle((float)missile.x(),(float)missile.y(),radius,7);
+        }
+        for(var shell:frame.ballistics()){
+            if(view!=null&&!view.circle((float)shell.x(),(float)shell.y(),4))continue;
+            shapes.setColor(Color.GOLD);
+            float radius=CombatEffectScale.forLauncher(
+                    CombatEffectScale.of(2.1f),shell.fighterLaunched(),
+                    CombatEffectScale.FIGHTER_KINETIC);
+            shapes.circle((float)shell.x(),(float)shell.y(),radius,6);
+        }
+        if(craftFallback)for(var craft:frame.crafts()){
+            if(view!=null&&!view.circle((float)craft.x(),(float)craft.y(),8))continue;
+            shapes.setColor(craft.team()==0?Color.CYAN:Color.SCARLET);
+            float radius=craft.fighter()?
+                    FighterCraftSprites.fighterHeight(craft.fighterHull())*.26f:
+                    FighterCraftSprites.droneHeight()*.28f;
+            shapes.circle((float)craft.x(),(float)craft.y(),
+                    Math.max(1.2f,radius),7);
+        }
+        shapes.end();
     }
     @Override public void resize(int width, int height) { viewport.update(width, height, true); }
     @Override public void pause() {

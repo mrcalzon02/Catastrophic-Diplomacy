@@ -46,10 +46,11 @@ public final class BattleConnectionSnapshotTest {
                         instanceof BattleConnection.MissileEntity,
                 "Valid typed v1 missile row rejected");
         var v2Ship=BattleConnection.decodeEntity(
-                "SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|900|1000|80|120|140|180|90|75",2);
+                "SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|900|1000|80|120|140|180|90|75|11|0~BASE-DRA-LAS,1~BASE-DRA-MSL",2);
         check(v2Ship instanceof BattleConnection.ShipEntity ship&&
                         ship.hullClass()==diplomacy.shipyard.Shipyard.Hull.DREADNOUGHT&&
-                        ship.maxHull()==1000,
+                        ship.maxHull()==1000&&ship.lastTargetId()==11&&
+                        ship.weaponFittings().size()==2,
                 "V2 ship chassis/max-state identity rejected");
         var v2Missile=BattleConnection.decodeEntity(
                 "MISSILE|31|0|21|11|500|300|2.5|true|true|false",2);
@@ -74,10 +75,12 @@ public final class BattleConnectionSnapshotTest {
         rejects("MISSILE|0|1|500|300|2.5","Zero entity ID accepted");
         rejects("CRAFT|4|0|500|300|Infinity","Infinite integrity accepted");
         rejects("BALLISTIC|4|0|500|300","Wrong field count accepted");
-        rejectsV2("SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|1001|1000|80|120|140|180|90|75",
+        rejectsV2("SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|1001|1000|80|120|140|180|90|75|0|-",
                 "V2 current hull above max accepted");
         rejectsV2("CRAFT|33|0|21|11|500|300|12|false|false|MISSILE_FIGHTER",
                 "Non-fighter craft carried fighter hull identity");
+        rejectsV2("SHIP|21|1|DRAXIAN|DREADNOUGHT|600|300|0|900|1000|80|120|140|180|90|75|0|0~NOT-A-WEAPON",
+                "Invalid fitted weapon identity accepted");
         try{
             BattleConnection.decodeEntities(List.of(
                     "MISSILE|9|1|500|300|2.5",

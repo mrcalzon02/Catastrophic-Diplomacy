@@ -62,6 +62,13 @@ public final class PvpFleetTest {
                     (playerA.snapshot()==null||playerB.snapshot()==null))Thread.sleep(20);
             check(playerA.snapshot()!=null&&playerB.snapshot()!=null,
                     "Host failed to deliver authoritative battle snapshots");
+            check(playerA.protocolVersion==2&&playerB.protocolVersion==2,
+                    "PvP clients did not negotiate snapshot v2");
+            check(playerA.snapshot().decodedEntities().stream()
+                    .filter(BattleConnection.ShipEntity.class::isInstance)
+                    .map(BattleConnection.ShipEntity.class::cast)
+                    .allMatch(s->s.hullClass()!=null&&s.maxHull()>=s.hull()),
+                    "V2 host omitted hull presentation identity");
             check(high.equals(playerA.matchRules)&&high.equals(playerB.matchRules),
                     "Two clients did not receive identical authoritative Tech VI rules");
             low.requireAllowed(basic,tech);

@@ -5,6 +5,7 @@ import diplomacy.sim.Battle;
 import diplomacy.sim.BattleArena;
 import diplomacy.sim.BattleOrders;
 import diplomacy.sim.FighterModel;
+import diplomacy.sim.WeaponMuzzles;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.SkirmishTechnologyRules;
 import java.io.*;
@@ -42,7 +43,12 @@ public final class BattleConnection implements AutoCloseable {
                              double hull,double maxHull,
                              double shields,double maxShields,
                              double armor,double maxArmor,
-                             double power,double fuel) implements Entity {
+                             double power,double fuel,int lastTargetId,
+                             Map<Integer,String> weaponFittings) implements Entity {
+        public ShipEntity{
+            if(weaponFittings==null)throw new IllegalArgumentException("Missing weapon fittings");
+            weaponFittings=Map.copyOf(weaponFittings);
+        }
         @Override public EntityKind kind(){return EntityKind.SHIP;}
     }
     public record MissileEntity(long id,int team,int sourceId,int targetId,
@@ -181,6 +187,23 @@ public final class BattleConnection implements AutoCloseable {
         }else if(value<BattleArena.MIN_Y||value>BattleArena.MAX_Y)throw malformed();
         return value;
     }
+    private static Map<Integer,String> weaponFittings(String raw){
+        if(raw==null||raw.length()>1200)throw malformed();
+        if("-".equals(raw))return Map.of();
+        TreeMap<Integer,String> result=new TreeMap<>();
+        for(String token:raw.split(",",-1)){
+            String[] parts=token.split("~",-1);
+            if(parts.length!=2)throw malformed();
+            int slot=Integer.parseInt(parts[0]);
+            String component=parts[1];
+            if(slot<0||slot>63||
+                    !component.matches("BASE-[A-Z]{3}-[A-Z]{2,4}")||
+                    WeaponMuzzles.family(component)==null||
+                    result.putIfAbsent(slot,component)!=null)
+                throw malformed();
+        }
+        return Map.copyOf(result);
+    }
     static Entity decodeEntity(String line){return decodeEntity(line,1);}
     static Entity decodeEntity(String line,int version){
         if(line==null||(version!=1&&version!=2))throw malformed();
@@ -201,7 +224,7 @@ public final class BattleConnection implements AutoCloseable {
                     yield new ShipEntity(id,side,faction,Shipyard.Hull.CORVETTE,
                             x,y,facing,hull,StrictMath.max(1,hull),
                             shields,StrictMath.max(1,shields),
-                            armor,StrictMath.max(1,armor),power,fuel);
+                            armor,StrictMath.max(1,armor),power,fuel,0,Map.of());
                 }
                 case "MISSILE" -> {
                     if(p.length!=6)throw malformed();
@@ -225,7 +248,7 @@ public final class BattleConnection implements AutoCloseable {
             };
             return switch(p[0]){
                 case "SHIP" -> {
-                    if(p.length!=16)throw malformed();
+                    if(p.length!=18)throw malformed();
                     long id=positiveId(p[1]);int side=team(p[2]);
                     Battle.Faction faction=Battle.Faction.valueOf(p[3]);
                     Shipyard.Hull hullClass=Shipyard.Hull.valueOf(p[4]);
@@ -239,9 +262,12 @@ public final class BattleConnection implements AutoCloseable {
                     double maxArmor=finite(p[13],0,1_000_000_000);
                     double power=finite(p[14],0,1_000_000_000);
                     double fuel=finite(p[15],0,1_000_000_000);
+                    int lastTarget=nonNegativeId(p[16]);
+                    Map<Integer,String> fittings=weaponFittings(p[17]);
                     if(hull>maxHull||shields>maxShields||armor>maxArmor)throw malformed();
                     yield new ShipEntity(id,side,faction,hullClass,x,y,facing,
-                            hull,maxHull,shields,maxShields,armor,maxArmor,power,fuel);
+                            hull,maxHull,shields,maxShields,armor,maxArmor,power,fuel,
+                            lastTarget,fittings);
                 }
                 case "MISSILE" -> {
                     if(p.length!=11)throw malformed();

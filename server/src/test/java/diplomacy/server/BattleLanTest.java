@@ -12,7 +12,9 @@ public final class BattleLanTest {
     public static void main(String[] args)throws Exception{
         for(int size:new int[]{1,16,200})try(BattleServer server=BattleServer.openLan("127.0.0.1",0,2479,size);
             BattleConnection a=BattleConnection.openLan("localhost",server.port(),false);BattleConnection b=BattleConnection.openLan("localhost",server.port(),false)){
-            until(()->a.snapshot()!=null&&b.snapshot()!=null);if(a.team!=0||b.team!=1)throw new AssertionError("fleet authority");
+            until(()->a.snapshot()!=null&&b.snapshot()!=null);
+            if(a.protocolVersion!=2||b.protocolVersion!=2)throw new AssertionError("snapshot v2");
+            if(a.team!=0||b.team!=1)throw new AssertionError("fleet authority");
             if(a.matchRules!=null||b.matchRules!=null)
                 throw new AssertionError("Ordinary battle server falsely advertised a PvP host cap");
             final long seq=a.order(BattleOrders.PointDefense.HOLD_FIRE,BattleOrders.Position.HOLD);until(()->a.acknowledged()==seq&&server.pointDefense(0)==BattleOrders.PointDefense.HOLD_FIRE);

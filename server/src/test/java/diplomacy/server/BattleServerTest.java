@@ -18,6 +18,8 @@ public final class BattleServerTest {
                 try(BattleServer server=new BattleServer("127.0.0.1",0,2479,size,tls);
                     BattleConnection first=new BattleConnection("localhost",server.port(),a,false);BattleConnection second=new BattleConnection("localhost",server.port(),b,false)){
                     until(()->first.snapshot()!=null&&second.snapshot()!=null);
+                    if(first.protocolVersion!=2||second.protocolVersion!=2)
+                        throw new AssertionError("Snapshot v2 not negotiated");
                     if(first.team!=0||second.team!=1)throw new AssertionError("server-owned fleets");
                     long ack=first.order(BattleOrders.PointDefense.HOLD_FIRE,BattleOrders.Position.HOLD);until(()->first.acknowledged()==ack&&server.pointDefense(0)==BattleOrders.PointDefense.HOLD_FIRE);
                     long ack2=second.order(BattleOrders.PointDefense.ANTI_CRAFT,BattleOrders.Position.KEEP_MOVING);until(()->second.acknowledged()==ack2&&server.pointDefense(1)==BattleOrders.PointDefense.ANTI_CRAFT);

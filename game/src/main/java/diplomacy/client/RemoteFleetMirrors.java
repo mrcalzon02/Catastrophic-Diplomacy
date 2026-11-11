@@ -1,6 +1,9 @@
 package diplomacy.client;
 
 import diplomacy.sim.Battle;
+import diplomacy.sim.WeaponMuzzles;
+import diplomacy.shipyard.HullLayouts;
+import diplomacy.shipyard.Shipyard;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -68,15 +71,35 @@ final class RemoteFleetMirrors {
             ship.x=rendered.x();
             ship.y=rendered.y();
             ship.facing=rendered.facing();
-            ship.hull=state.hull();
-            ship.shields=state.shields();
-            ship.armor=state.armor();
+            ship.maxHull=state.maxHull();ship.hull=state.hull();
+            ship.maxShields=state.maxShields();ship.shields=state.shields();
+            ship.maxArmor=state.maxArmor();ship.armor=state.armor();
             ship.power=state.power();
             ship.fuel=state.fuel();
-            ship.hullClass=diplomacy.shipyard.Shipyard.Hull.CORVETTE;
+            ship.hullClass=state.hullClass();
+            ship.lastTargetId=state.lastTargetId();
+            ship.weaponEmitters=emitters(state);
         }
         battle.tick=networkTick;
         return battle;
+    }
+
+    private static java.util.List<WeaponMuzzles.Emitter> emitters(
+            RemoteShipInterpolation.HostShip state){
+        if(state.weaponFittings().isEmpty())return java.util.List.of();
+        java.util.ArrayList<WeaponMuzzles.Emitter> result=new java.util.ArrayList<>();
+        java.util.Map<Integer,Shipyard.Slot> slots=new java.util.HashMap<>();
+        for(Shipyard.Slot slot:HullLayouts.slots(state.faction(),state.hullClass()))
+            slots.put(slot.index(),slot);
+        for(var entry:state.weaponFittings().entrySet()){
+            Shipyard.Slot slot=slots.get(entry.getKey());
+            WeaponMuzzles.Family family=WeaponMuzzles.family(entry.getValue());
+            if(slot==null||family==null)
+                throw new IllegalStateException("Host weapon fitting has no visible hull socket");
+            result.add(new WeaponMuzzles.Emitter(slot.index(),family,
+                    slot.x(),slot.y(),entry.getValue()));
+        }
+        return java.util.List.copyOf(result);
     }
 
     Battle.Ship byHostId(int hostId){return byHostId.get(hostId);}

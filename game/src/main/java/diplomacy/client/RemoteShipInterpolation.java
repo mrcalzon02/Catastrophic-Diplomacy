@@ -1,6 +1,8 @@
 package diplomacy.client;
 
+import diplomacy.net.BattleConnection;
 import diplomacy.sim.Battle;
+import diplomacy.shipyard.Shipyard;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,8 +15,10 @@ import java.util.Map;
 final class RemoteShipInterpolation {
     record Pose(double x,double y,double facing){}
     /** Parsed once per NEW trusted snapshot, not once per GL frame. */
-    record HostShip(int id,int team,Battle.Faction faction,
-                    double hull,double shields,double armor,double power,double fuel){}
+    record HostShip(int id,int team,Battle.Faction faction,Shipyard.Hull hullClass,
+                    double hull,double maxHull,double shields,double maxShields,
+                    double armor,double maxArmor,double power,double fuel,
+                    int lastTargetId,Map<Integer,String> weaponFittings){}
     private static final class Track {
         final Pose from,to;
         Track(Pose first,Pose last){from=first;to=last;}
@@ -30,7 +34,7 @@ final class RemoteShipInterpolation {
 
     /** Identical snapshots leave the current presentation clock untouched.
      * A reset/out-of-order session start snaps to new identity safely. */
-    void observe(long nextTick,List<String> shipRows){
+    void observe(long nextTick,List<BattleConnection.ShipEntity> shipRows){
         if(shipRows==null)throw new IllegalArgumentException("Ship rows required");
         if(nextTick==tick)return;
         boolean reset=tick==Long.MIN_VALUE||nextTick<tick;
@@ -38,25 +42,18 @@ final class RemoteShipInterpolation {
         float oldFraction=duration>0?Math.min(1f,elapsed/duration):1f;
         Map<Integer,Track> next=new HashMap<>(Math.max(16,shipRows.size()*2));
         java.util.ArrayList<HostShip> parsed=new java.util.ArrayList<>(shipRows.size());
-        for(String row:shipRows){
-            String[] p=row.split("[|]",-1);
-            if(p.length!=12||!"SHIP".equals(p[0]))
-                throw new IllegalArgumentException("Invalid ship record");
-            int id=Integer.parseInt(p[1]);
-            Pose endpoint=new Pose(Double.parseDouble(p[4]),Double.parseDouble(p[5]),
-                    Double.parseDouble(p[6]));
-            if(id<=0||!Double.isFinite(endpoint.x())||
-                    !Double.isFinite(endpoint.y())||!Double.isFinite(endpoint.facing())||
-                    next.containsKey(id))
+        for(BattleConnection.ShipEntity row:shipRows){
+            int id=Math.toIntExact(row.id());
+            Pose endpoint=new Pose(row.x(),row.y(),row.facing());
+            if(id<=0||next.containsKey(id))
                 throw new IllegalArgumentException("Invalid authoritative ship position");
             Track old=tracks.get(id);
             Pose start=reset||old==null?endpoint:blend(old.from,old.to,oldFraction);
             next.put(id,new Track(start,endpoint));
-            parsed.add(new HostShip(id,Integer.parseInt(p[2]),
-                    Battle.Faction.valueOf(p[3]),
-                    Double.parseDouble(p[7]),Double.parseDouble(p[8]),
-                    Double.parseDouble(p[9]),Double.parseDouble(p[10]),
-                    Double.parseDouble(p[11])));
+            parsed.add(new HostShip(id,row.team(),row.faction(),row.hullClass(),
+                    row.hull(),row.maxHull(),row.shields(),row.maxShields(),
+                    row.armor(),row.maxArmor(),row.power(),row.fuel(),
+                    row.lastTargetId(),row.weaponFittings()));
         }
         ships=List.copyOf(parsed);
         long gap=reset?0:nextTick-tick;

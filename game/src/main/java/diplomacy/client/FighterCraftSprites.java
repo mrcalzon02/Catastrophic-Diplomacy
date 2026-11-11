@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.utils.Disposable;
+import diplomacy.net.BattleConnection;
 import diplomacy.sim.Battle;
 import diplomacy.sim.FighterModel;
 import diplomacy.sim.WorldScale;
@@ -238,6 +239,62 @@ public final class FighterCraftSprites implements Disposable {
             trimAfterFrame(usedThisFrame);
         }
     }
+    /** Render host-owned network craft without constructing or stepping local craft simulation. */
+    void renderRemote(Battle presentation,
+                      java.util.List<BattleConnection.CraftEntity> crafts,
+                      RemoteFleetMirrors mirrors,SpriteBatch batch,
+                      CombatViewBounds view){
+        if(crafts==null||mirrors==null||crafts.isEmpty())return;
+        usedThisFrame.clear();
+        offscreenCraftRejectedLastFrame=0;
+        surfaces.begin(batch,presentation,view);
+        try{
+            batch.setColor(1,1,1,1);
+            for(BattleConnection.CraftEntity craft:crafts){
+                Battle.Ship source=mirrors.byHostId(craft.sourceId());
+                if(source==null)continue; // v1 compatibility body lacks source identity.
+                float height=craft.fighter()?
+                        fighterHeight(craft.fighterHull()):droneHeight();
+                BattleRenderPoses.Pose position=new BattleRenderPoses.Pose(
+                        (float)craft.x(),(float)craft.y(),0);
+                if(!potentiallyVisible(view,position,height)){
+                    offscreenCraftRejectedLastFrame++;continue;
+                }
+                String artRole;
+                if(!craft.fighter())artRole=craft.repair()?
+                        "support_drone":"point_defense_fighter";
+                else artRole=switch(craft.fighterHull()){
+                    case INTERCEPTOR -> "interceptor";
+                    case ASSAULT_GUNSHIP -> "assault_gunship";
+                    case LASER_FIGHTER -> "superiority_fighter";
+                    case PARTICLE_FIGHTER -> "electronic_warfare";
+                    case MISSILE_FIGHTER -> "missile_fighter";
+                    case TORPEDO_BOMBER -> "torpedo_bomber";
+                };
+                String path=spritePath(source.faction,artRole);
+                Texture picture=art(path);
+                if(picture==null)continue;
+                usedThisFrame.add(path);
+                float width=height*picture.getWidth()/(float)picture.getHeight();
+                if(view!=null&&!view.circle(position.x(),position.y(),
+                        Math.max(width,height)*.72))continue;
+                Battle.Ship target=mirrors.byHostId(craft.targetId());
+                double bearing=target==null?source.facing:
+                        StrictMath.atan2(target.y-position.y(),target.x-position.x());
+                float rotation=(float)StrictMath.toDegrees(bearing)-90f;
+                surfaces.bind(batch,picture);
+                surfaces.color(batch,rotation);
+                batch.draw(picture,position.x()-width/2,position.y()-height/2,
+                        width/2,height/2,width,height,1,1,rotation,
+                        0,0,picture.getWidth(),picture.getHeight(),false,false);
+            }
+        }finally{
+            surfaces.end(batch);
+            batch.setColor(1f,1f,1f,1f);
+            trimAfterFrame(usedThisFrame);
+        }
+    }
+
     @Override public void dispose(){
         surfaces.dispose();
         for(Texture texture:originals.values())texture.dispose();
