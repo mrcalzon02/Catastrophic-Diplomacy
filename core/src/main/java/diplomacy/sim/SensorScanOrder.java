@@ -14,9 +14,11 @@ public record SensorScanOrder(SensorActiveScan.Mode mode,int hostileSlot) {
     public SensorScanOrder {
         if(mode==null||hostileSlot< -1||hostileSlot>=BattleArena.MAX_SHIPS_PER_SIDE)
             throw new IllegalArgumentException("Invalid sensor scan order");
-        if(focused()&&hostileSlot<0)
+        boolean needsFocus=mode==SensorActiveScan.Mode.FOCUSED_RADAR||
+                mode==SensorActiveScan.Mode.XRAY_BURST;
+        if(needsFocus&&hostileSlot<0)
             throw new IllegalArgumentException("Focused scan requires a hostile slot");
-        if(!focused()&&hostileSlot!=-1)
+        if(!needsFocus&&hostileSlot!=-1)
             throw new IllegalArgumentException("Non-focused scan cannot retain a target slot");
     }
     public boolean focused(){

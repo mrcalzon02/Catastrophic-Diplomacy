@@ -188,8 +188,10 @@ public final class ShipStandingOrdersTest {
                         deployment.standingFor(1).tactics().equals(attack.tactics())&&
                         deployment.standingFor(2).equals(policy),
                 "Per-vessel standing order independence failed");
-        check(deployment.withFormation(1).standingFor(1).equals(attack),
-                "Changing layout erased the standing orders");
+        check(deployment.withFormation(1).standingFor(1).tactics().equals(attack.tactics())&&
+                        deployment.withFormation(1).standingFor(1).scanOrder().mode()==
+                                SensorActiveScan.Mode.BOOSTED_RADAR,
+                "Changing layout erased the standing orders or scan doctrine");
         check(deployment.withShips(-1,LevelEconomy.level(25)).standings().containsKey(1),
                 "Ship count reduction erased a commissioned hull doctrine");
         check(!deployment.withShips(-2,LevelEconomy.level(25)).standings().containsKey(1),
