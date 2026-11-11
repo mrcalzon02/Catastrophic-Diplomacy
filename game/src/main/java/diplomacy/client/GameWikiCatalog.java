@@ -132,26 +132,43 @@ final class GameWikiCatalog {
      */
     private final class IndexedArticles extends AbstractList<Article> {
         private final List<Article> fixed;
-        private final List<String> matchedIds;
-        IndexedArticles(List<Article> fixed,List<String> matchedIds){
+        /** Null means the complete canonical upgrade index. Arbitrary queries
+         * retain only primitive positions, never thousands of formatted IDs. */
+        private final int[] matchedIndexes;
+        private final int matchedCount;
+        IndexedArticles(List<Article> fixed,int[] matchedIndexes,int matchedCount){
             this.fixed=List.copyOf(fixed);
-            // The canonical research index is already immutable and sorted;
-            // do not copy another 73k references for an ALL-category query.
-            this.matchedIds=matchedIds==upgradeIds?upgradeIds:List.copyOf(matchedIds);
+            this.matchedIndexes=matchedIndexes;
+            this.matchedCount=matchedIndexes==null?upgradeIds.size():matchedCount;
+            if(this.matchedCount<0||
+                    (matchedIndexes!=null&&this.matchedCount>matchedIndexes.length))
+                throw new IllegalArgumentException("Invalid wiki match index");
         }
-        @Override public int size(){return fixed.size()+matchedIds.size();}
+        private int canonicalIndex(int relative){
+            if(relative<0||relative>=matchedCount)throw new IndexOutOfBoundsException(relative);
+            return matchedIndexes==null?relative:matchedIndexes[relative];
+        }
+        @Override public int size(){return fixed.size()+matchedCount;}
         @Override public Article get(int index){
             if(index<0||index>=size())throw new IndexOutOfBoundsException(index);
             if(index<fixed.size())return fixed.get(index);
-            return upgradeArticle(technology.get(matchedIds.get(index-fixed.size())));
+            return upgradeArticle(technology.get(
+                    upgradeIds.get(canonicalIndex(index-fixed.size()))));
         }
         int indexOfId(String id){
             for(int i=0;i<fixed.size();i++)if(fixed.get(i).id.equals(id))return i;
             if(id.startsWith("upgrade.")){
                 String key=id.substring("upgrade.".length());
-                // Matched IDs remain sorted because their source index is sorted.
-                int i=Collections.binarySearch(matchedIds,key);
-                if(i>=0)return fixed.size()+i;
+                int canonical=Collections.binarySearch(upgradeIds,key);
+                if(canonical<0)return -1;
+                if(matchedIndexes==null)return fixed.size()+canonical;
+                int low=0,high=matchedCount-1;
+                while(low<=high){
+                    int mid=(low+high)>>>1,value=matchedIndexes[mid];
+                    if(value<canonical)low=mid+1;
+                    else if(value>canonical)high=mid-1;
+                    else return fixed.size()+mid;
+                }
             }
             return -1;
         }
@@ -546,6 +563,22 @@ final class GameWikiCatalog {
             return feed(number(value));
         }
     }
+    private static boolean asciiContainsFolded(String source,String needle){
+        if(needle.isEmpty())return true;
+        int limit=source.length()-needle.length();
+        for(int start=0;start<=limit;start++){
+            int i=0;
+            while(i<needle.length()){
+                char c=source.charAt(start+i);
+                if(c>='A'&&c<='Z')c=(char)(c+('a'-'A'));
+                else if(c=='_')c=' ';
+                if(c!=needle.charAt(i))break;
+                i++;
+            }
+            if(i==needle.length())return true;
+        }
+        return false;
+    }
     private static boolean needsUnicodeCaseFold(String source){
         // Existing authored technology uses U+2014 em-dashes extensively.
         // Punctuation does not change under Locale.ROOT case folding and
@@ -627,19 +660,20 @@ final class GameWikiCatalog {
         // ALL-category static results are still filtered independently.
         if(RESEARCH_COST_SEARCH.contains(needle)||
                 RESEARCH_ID_SEARCH_PREFIX.contains(needle))
-            return fixed.isEmpty()?upgradeArticles:new IndexedArticles(fixed,upgradeIds);
+            return fixed.isEmpty()?upgradeArticles:new IndexedArticles(fixed,null,upgradeIds.size());
 
-        List<String> matchedIds=new ArrayList<>();
+        int[] matchedIndexes=new int[upgradeIds.size()];
+        int matchedCount=0;
         UpgradeTextProbe probe=new UpgradeTextProbe(needle);
-        for(String id:upgradeIds){
-            // ID matches can skip all expensive virtual technology metadata.
-            // Other queries stream the exact authored article text without
-            // allocating its 7-line searchable paragraph and formatted page.
-            if(id.toLowerCase(Locale.ROOT).contains(needle)||
+        for(int index=0;index<upgradeIds.size();index++){
+            String id=upgradeIds.get(index);
+            // Canonical IDs are ASCII. Avoid a 73k-per-query lowercase String
+            // allocation, and retain only primitive index positions for hits.
+            if(asciiContainsFolded(id,needle)||
                     matchesUpgradeText(technology.get(id),needle,probe))
-                matchedIds.add(id);
+                matchedIndexes[matchedCount++]=index;
         }
-        return new IndexedArticles(fixed,matchedIds);
+        return new IndexedArticles(fixed,matchedIndexes,matchedCount);
     }
 
 }
