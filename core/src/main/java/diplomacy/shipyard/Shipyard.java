@@ -800,10 +800,10 @@ public final class Shipyard {
         Map<Integer,RocketBarrage.Fitting> programs=design.rocketFittings;
         Map<Integer,OrdnanceFitting.Mounted> guided=design.launcherFittings;
         if(programs.containsKey(slot)){
-            programs=new TreeMap<>(programs);programs.remove(slot);
+            programs=new java.util.TreeMap<>(programs);programs.remove(slot);
         }
         if(guided.containsKey(slot)){
-            guided=new TreeMap<>(guided);guided.remove(slot);
+            guided=new java.util.TreeMap<>(guided);guided.remove(slot);
         }
         Design comparison=new Design(design.faction,design.hull,design.name,changed,
                 design.fighterHull,design.ammoSelection,design.missileOrdnance,
