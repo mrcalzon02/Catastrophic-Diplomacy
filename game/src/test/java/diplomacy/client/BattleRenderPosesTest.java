@@ -11,7 +11,141 @@ public final class BattleRenderPosesTest {
         return new BattleConnection.ShipEntity(id,team,faction,Shipyard.Hull.CORVETTE,
                 x,y,facing,100,100,10,10,10,10,10,10,0,Map.of());
     }
-    public static void main(String[] ignored){
+
+    /**
+     * L03 viewport-level playback diagnostic: reuses the actual 30Hz
+     * accumulator policy, fixed-step world, ship pose interpolation, auto-fit
+     * framing and camera smoothing. Reports what an observer would see on a
+     * 1280x720 tactical canvas at 30 display frames/second.
+     *
+     * This is neither a GPU screenshot nor a device FPS measurement. It does
+     * not change campaign scale, physical movement, orders, or default pace.
+     */
+    private static void reportScreenMotion() throws Exception {
+        var catalog=diplomacy.tech.TechnologyCatalog.loadDefault();
+        for(int shipsPerSide:new int[]{16,200}){
+            for(float displayedSpeed:new float[]{1f,2f}){
+                Battle battle=shipsPerSide==200
+                        ?diplomacy.sim.DemonstrationBattle.create(catalog)
+                        :Battle.duel(20261127L,shipsPerSide,
+                                Shipyard.starter(Battle.Faction.TERRAN,
+                                        Shipyard.Hull.DREADNOUGHT),
+                                Shipyard.starter(Battle.Faction.DRAXIAN,
+                                        Shipyard.Hull.DREADNOUGHT),catalog);
+                BattleRenderPoses poses=new BattleRenderPoses();
+                int count=battle.ships().size();
+                double[][] priorX=new double[2][count],priorY=new double[2][count];
+                boolean[][] priorVisible=new boolean[2][count];
+                double[] cameraX=new double[2],cameraY=new double[2];
+                float[] cameraZoom=new float[2];
+                double[] travelledPixels=new double[2],maxStepPixels=new double[2];
+                double[] zoomSum=new double[2],cameraPath=new double[2];
+                long[] comparedVisible=new long[2],stillVisible=new long[2];
+                long[] visibleSamples=new long[2],eligibleSamples=new long[2];
+                int frames=0,ticks=0;
+                float accumulator=0;
+                final float wallFrameSeconds=1f/30f;
+                final int maximumFrames=600; // 20 displayed seconds at 30 FPS
+                for(int frame=0;frame<maximumFrames&&!battle.finished();frame++){
+                    accumulator+=wallFrameSeconds*
+                            CombatPace.simulationMultiplier(displayedSpeed);
+                    int steps=0;
+                    while(accumulator>=Battle.DT&&steps++<64){
+                        if(BattleRenderPoses.captureBeforeLastStep(
+                                accumulator,steps,64))poses.beforeStep(battle);
+                        battle.step();
+                        accumulator-=Battle.DT;
+                        ticks++;
+                    }
+                    poses.fraction(battle,(float)(accumulator/Battle.DT));
+                    diplomacy.sim.BattleView.Frame fit=poses.frame(battle);
+                    for(int mode=0;mode<2;mode++){
+                        // 0: existing whole-fleet auto-fit.
+                        // 1: same moving center with a 50% manual zoom factor.
+                        float wantedZoom=(float)Math.max(.16,Math.min(8,
+                                fit.zoom()*(mode==0?1.0:.5)));
+                        float oldX=(float)cameraX[mode],oldY=(float)cameraY[mode];
+                        if(frame==0){
+                            cameraX[mode]=fit.centerX();
+                            cameraY[mode]=fit.centerY();
+                            cameraZoom[mode]=wantedZoom;
+                        }else{
+                            cameraX[mode]=CombatCameraSmoothing.toward(
+                                    oldX,(float)fit.centerX(),wallFrameSeconds);
+                            cameraY[mode]=CombatCameraSmoothing.toward(
+                                    oldY,(float)fit.centerY(),wallFrameSeconds);
+                            cameraZoom[mode]=CombatCameraSmoothing.toward(
+                                    cameraZoom[mode],wantedZoom,wallFrameSeconds);
+                            cameraPath[mode]+=Math.hypot(
+                                    cameraX[mode]-oldX,cameraY[mode]-oldY);
+                        }
+                        zoomSum[mode]+=cameraZoom[mode];
+                        for(int i=0;i<count;i++){
+                            Battle.Ship ship=battle.ships().get(i);
+                            if(!ship.alive()||
+                                    diplomacy.sim.BattleOrders.size(ship)!=
+                                    diplomacy.sim.BattleOrders.Size.CAPITAL){
+                                priorVisible[mode][i]=false;
+                                continue;
+                            }
+                            eligibleSamples[mode]++;
+                            BattleRenderPoses.Pose shown=poses.ship(ship);
+                            double sx=640+(shown.x()-cameraX[mode])/cameraZoom[mode];
+                            double sy=360+(shown.y()-cameraY[mode])/cameraZoom[mode];
+                            // Shared HUD excludes the top 71 and bottom 50 px.
+                            boolean visible=sx>=0&&sx<=1280&&sy>=50&&sy<=649;
+                            if(visible)visibleSamples[mode]++;
+                            if(visible&&priorVisible[mode][i]){
+                                double step=Math.hypot(sx-priorX[mode][i],
+                                        sy-priorY[mode][i]);
+                                check(Double.isFinite(step),
+                                        "Nonfinite screen-space ship motion");
+                                travelledPixels[mode]+=step;
+                                maxStepPixels[mode]=Math.max(
+                                        maxStepPixels[mode],step);
+                                comparedVisible[mode]++;
+                                if(step<.20)stillVisible[mode]++;
+                            }
+                            priorX[mode][i]=sx;
+                            priorY[mode][i]=sy;
+                            priorVisible[mode][i]=visible;
+                        }
+                    }
+                    frames++;
+                }
+                check(ticks==battle.tick,"Viewport diagnostic changed tick ownership");
+                check(frames>0&&ticks>0,"Empty playback trace");
+                for(int mode=0;mode<2;mode++){
+                    check(comparedVisible[mode]>0&&
+                            Double.isFinite(travelledPixels[mode]),
+                            "No visible comparable capital motion");
+                    double pxPerWallSecond=travelledPixels[mode]*
+                            30.0/comparedVisible[mode];
+                    double stillPercent=stillVisible[mode]*100.0/
+                            comparedVisible[mode];
+                    double visibility=eligibleSamples[mode]==0?0:
+                            visibleSamples[mode]*100.0/eligibleSamples[mode];
+                    System.out.printf(java.util.Locale.ROOT,
+                            "CD-L03-SCREEN perSide=%d seed=%d pace=%.1f "+
+                            "zoomMode=%s wallFrames=%d simulatedTicks=%d "+
+                            "meanCameraZoom=%.4f visibleCapitalPct=%.2f "+
+                            "meanVisibleCapitalPixelsPerWallSecond=%.4f "+
+                            "stillFramesUnder0.2pxPct=%.2f maxStepPixels=%.4f "+
+                            "cameraPathWorld=%.3f synthetic30fps=true "+
+                            "renderedGpu=false diagnosticOnly=true%n",
+                            shipsPerSide,shipsPerSide==200
+                                    ?diplomacy.sim.DemonstrationBattle.SEED
+                                    :20261127L,displayedSpeed,
+                            mode==0?"AUTO_FIT":"ZOOM_50_PERCENT",
+                            frames,ticks,zoomSum[mode]/frames,visibility,
+                            pxPerWallSecond,stillPercent,
+                            maxStepPixels[mode],cameraPath[mode]);
+                }
+            }
+        }
+    }
+
+    public static void main(String[] ignored) throws Exception{
         Battle b=new Battle(7L);
         Battle.Ship ship=b.addShip(0,Battle.Faction.TERRAN,100,200);
         BattleRenderPoses p=new BattleRenderPoses();
@@ -268,6 +402,7 @@ public final class BattleRenderPosesTest {
         check(CombatEventCursor.needsRefresh(20,8291,20,laterEvents) &&
                 CombatEventCursor.firstUnseen(laterEvents,8291)==8192,
                 "Late event in the same simulation tick was skipped");
+        reportScreenMotion();
         System.out.println("PASS low-speed muzzle, network tween, real projectile replay, event history cursor and camera easing");
     }
 }
