@@ -863,6 +863,14 @@ public final class Battle {
      */
     private final Map<Integer,Ship> shipById = new HashMap<>();
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
+    /** One reused primitive buffer for a captain's protected-asset attackers.
+     * Battle.step is single-threaded; ship targeting decisions are sequential.
+     * Avoid per-captain boxed Integer + ArrayList allocation every 6th tick.
+     * Expanded only if a legitimate protected-asset roster exceeds capacity. */
+    private int[] captainProtectedThreatScratch=new int[8];
+    /** Opt-in read-only target-selection counts. Null in normal gameplay:
+     * no benchmark clock calls or allocations on the targeting hot path. */
+    private long[] captainTargetDiagnostic;
     private static final int MAX_GUIDED_BODIES=12000;
     private final List<Missile> missiles = new ArrayList<>();
     private final List<Ballistic> ballistics = new ArrayList<>();
@@ -3392,6 +3400,22 @@ public final class Battle {
 
     private static final int TARGET_DECISION_INTERVAL_TICKS=6;
 
+    public record CaptainTargetingMetrics(long decisions,long retained,
+            long fullSearches,long candidateSlots,long eligibleCandidates,
+            long authorizedContacts,long selectedContacts) { }
+    /** Does not change acquisition, orders, damage or simulation RNG. */
+    public void configureCaptainTargetingMetrics(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Captain diagnostic must be configured before tick one");
+        captainTargetDiagnostic=enabled?new long[7]:null;
+    }
+    public CaptainTargetingMetrics captainTargetingMetrics(){
+        long[] c=captainTargetDiagnostic;
+        if(c==null)return new CaptainTargetingMetrics(0,0,0,0,0,0,0);
+        return new CaptainTargetingMetrics(
+                c[0],c[1],c[2],c[3],c[4],c[5],c[6]);
+    }
+
     /**
      * Deterministic captain target policy. Physics remains 30 Hz, but target
      * choice is a 5 Hz tactical decision staggered by ship ID. Between decision
@@ -3406,24 +3430,40 @@ public final class Battle {
      *  5) stable ship ID tie-break.
      */
     private Ship chooseTarget(Ship actor) {
+        long[] metrics=captainTargetDiagnostic;
+        if(metrics!=null)metrics[0]++;
         BattleOrders.Orders orders=actor.orders;
         Ship retained=findShip(actor.lastTargetId);
         if(retained!=null&&retained.alive()&&retained.team!=actor.team
                 &&orders.forSize(BattleOrders.size(retained)).priority()>0
                 &&actor.navigationTargetId==retained.id&&actor.navigationFixTick>=0
-                &&Math.floorMod(tick+actor.id,TARGET_DECISION_INTERVAL_TICKS)!=0)
+                &&Math.floorMod(tick+actor.id,TARGET_DECISION_INTERVAL_TICKS)!=0){
+            if(metrics!=null)metrics[1]++;
             return retained;
+        }
+        if(metrics!=null)metrics[2]++;
 
-        java.util.ArrayList<Integer> attackerIds=new java.util.ArrayList<>(5);
+        int[] attackerIds=captainProtectedThreatScratch;
+        int attackerCount=0;
         if(actor.standingOrders!=null){
             for(int id:actor.defendedShipIds){
                 Ship asset=findShip(id);
-                if(asset!=null&&asset.alive()&&asset.lastAttackerId!=0)
-                    attackerIds.add(asset.lastAttackerId);
+                if(asset!=null&&asset.alive()&&asset.lastAttackerId!=0){
+                    if(attackerCount==attackerIds.length){
+                        attackerIds=Arrays.copyOf(attackerIds,attackerIds.length*2);
+                        captainProtectedThreatScratch=attackerIds;
+                    }
+                    attackerIds[attackerCount++]=asset.lastAttackerId;
+                }
             }
             Ship escort=findShip(actor.escortShipId);
-            if(escort!=null&&escort.alive()&&escort.lastAttackerId!=0)
-                attackerIds.add(escort.lastAttackerId);
+            if(escort!=null&&escort.alive()&&escort.lastAttackerId!=0){
+                if(attackerCount==attackerIds.length){
+                    attackerIds=Arrays.copyOf(attackerIds,attackerIds.length*2);
+                    captainProtectedThreatScratch=attackerIds;
+                }
+                attackerIds[attackerCount++]=escort.lastAttackerId;
+            }
         }
         Ship protectAnchor=orders.targeting()==BattleOrders.Targeting.PROTECT
                 ?findShip(orders.anchorShipId()):null;
@@ -3438,15 +3478,23 @@ public final class Battle {
         double choiceDistance=Double.POSITIVE_INFINITY;
 
         for(Ship candidate:opponentCandidates(actor.team)){
+            if(metrics!=null)metrics[3]++;
             if(candidate.team==actor.team||!candidate.alive())continue;
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
+            if(metrics!=null)metrics[4]++;
 
             SensorLightTimeHistory.Observation contact=authorizedContact(actor,candidate,0);
             if(contact==null)continue;
+            if(metrics!=null)metrics[5]++;
 
+            // Equivalent to the old boxed ArrayList.contains(id), but without
+            // transient Integer/ArrayList objects or a per-decision collection.
+            boolean defendedAttacker=false;
+            for(int i=0;i<attackerCount;i++)
+                if(attackerIds[i]==candidate.id){defendedAttacker=true;break;}
             int hard=1;
-            if(attackerIds.contains(candidate.id)
+            if(defendedAttacker
                     ||(orders.targeting()==BattleOrders.Targeting.RETALIATE
                         &&candidate.id==actor.lastAttackerId)
                     ||(orders.targeting()==BattleOrders.Targeting.PROTECT
@@ -3489,6 +3537,7 @@ public final class Battle {
             }
         }
         if(choiceContact==null)choice=null;
+        if(metrics!=null&&choice!=null)metrics[6]++;
         rememberNavigationFix(actor,choice,choiceContact);
         updateFocus(actor,choice);
         return choice;

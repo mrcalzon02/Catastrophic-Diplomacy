@@ -109,6 +109,10 @@ public final class OpponentIndexParityTest {
         Battle indexed=DemonstrationBattle.create(catalog);
         Battle fullScan=DemonstrationBattle.create(catalog);
         fullScan.configureOpponentIndexForDiagnostic(false);
+        // Opt-in event counts have no wall-clock calls or changes to captain
+        // decisions. The normal uninstrumented game leaves counters absent.
+        indexed.configureCaptainTargetingMetrics(true);
+        fullScan.configureCaptainTargetingMetrics(true);
         int steps=90;
         long indexedNs=0,fullNs=0;
         for(int i=0;i<steps;i++){
@@ -144,6 +148,35 @@ public final class OpponentIndexParityTest {
         }
         check(indexed.ships().size()==400,
                 "A/B must contain the real 200v200 fixture");
+        var indexedTargeting=indexed.captainTargetingMetrics();
+        var fullTargeting=fullScan.captainTargetingMetrics();
+        check(indexedTargeting.decisions()>0&&
+                indexedTargeting.fullSearches()>0&&
+                indexedTargeting.receivedContacts()>0,
+                "Opt-in captain diagnostic must observe real contact searches");
+        check(indexedTargeting.decisions()==indexedTargeting.retained()+
+                        indexedTargeting.fullSearches(),
+                "Retained versus full target decisions are not exhaustive");
+        check(indexedTargeting.eligibleCandidates()>=
+                        indexedTargeting.authorizedContacts()&&
+                indexedTargeting.fullSearches()>=
+                        indexedTargeting.selectedContacts(),
+                "Candidate/contact counters exceeded real authorization opportunities");
+        check(indexedTargeting.decisions()==fullTargeting.decisions()&&
+                indexedTargeting.retained()==fullTargeting.retained()&&
+                indexedTargeting.fullSearches()==fullTargeting.fullSearches()&&
+                indexedTargeting.eligibleCandidates()==
+                        fullTargeting.eligibleCandidates()&&
+                indexedTargeting.authorizedContacts()==
+                        fullTargeting.authorizedContacts()&&
+                indexedTargeting.selectedContacts()==fullTargeting.selectedContacts(),
+                "Indexed scan changed real captain target eligibility/selection");
+        check(fullTargeting.candidateSlots()==
+                        indexedTargeting.candidateSlots()*2,
+                "Indexed 200v200 opponent scan must visit half as many slots");
+        System.out.println("MEASURE captain-targeting 200v200 indexed="+
+                indexedTargeting+" fullFleet="+fullTargeting+
+                " (counts functional; timings JVM diagnostic only)");
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+

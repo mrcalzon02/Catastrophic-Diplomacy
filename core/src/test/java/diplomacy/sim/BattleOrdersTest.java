@@ -145,6 +145,41 @@ public final class BattleOrdersTest {
         check(attacker.orders.pointDefense()==BattleOrders.PointDefense.INTERCEPT_ONLY,
                 "Individual ships must receive updated PD doctrine");
     }
+    /** All four valid protected assets plus the escort share one priority
+     * evaluation without allocating a temporary boxed-list per captain turn. */
+    private static void checkFullProtectedThreatRoster(){
+        Battle battle=new Battle(2026111102L);
+        Battle.Ship captain=battle.addShip(0,Battle.Faction.TERRAN,100,330);
+        Battle.Ship near=battle.addShip(1,Battle.Faction.DRAXIAN,240,330);
+        Battle.Ship far=battle.addShip(1,Battle.Faction.ZIPPLEDROW,380,330);
+        Battle.Ship[] protectedShips=new Battle.Ship[4];
+        for(int i=0;i<protectedShips.length;i++)
+            protectedShips[i]=battle.addShip(0,Battle.Faction.TERRAN,
+                    110+i*9,385);
+        Battle.Ship escort=battle.addShip(0,Battle.Faction.TERRAN,160,410);
+        for(Battle.Ship ship:battle.ships()){
+            ship.speed=0;
+            ship.laserDamage=ship.kineticDamage=ship.plasmaDamage=0;
+            ship.particleDamage=ship.missileDamage=ship.torpedoDamage=0;
+            ship.fighterReserve=0;ship.droneReserve=0;
+        }
+        captain.standingOrders=ShipStandingOrders.DEFAULT;
+        battle.setShipOrders(captain.id,
+                BattleOrders.DEFAULT.withPosition(BattleOrders.Position.HOLD));
+        for(int i=0;i<100&&captain.lastTargetId!=near.id;i++)battle.step();
+        check(captain.lastTargetId==near.id,
+                "Baseline captain failed to select nearby observed hostile");
+        protectedShips[3].lastAttackerId=far.id;
+        battle.setShipProtection(captain.id,escort.id,
+                java.util.List.of(protectedShips[0].id,protectedShips[1].id,
+                        protectedShips[2].id,protectedShips[3].id));
+        for(int i=0;i<120&&captain.lastTargetId!=far.id;i++)battle.step();
+        check(captain.lastTargetId==far.id,
+                "Protected-asset attacker failed to override nearest hostile");
+        check(captain.defendedShipIds.size()==4&&
+                        captain.escortShipId==escort.id,
+                "Full protected roster or escort identity was lost");
+    }
     /**
      * A captain must select the nearest physically received contact, obey an
      * explicit higher-priority class order, and stop starting offensive shots
@@ -563,7 +598,7 @@ public final class BattleOrdersTest {
         checkModes(false);checkModes(true);
         check(BattleOrders.PointDefense.HOLD_FIRE.next()==BattleOrders.PointDefense.BALANCED,
                 "PD control must cycle through all four modes");
-        checkTargeting();checkCausalCaptainFire();checkCausalNavigation();
+        checkTargeting();checkFullProtectedThreatRoster();checkCausalCaptainFire();checkCausalNavigation();
         checkReplay();checkPersistence();
         reportCombatMovementAudit();
         System.out.println("PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay");
