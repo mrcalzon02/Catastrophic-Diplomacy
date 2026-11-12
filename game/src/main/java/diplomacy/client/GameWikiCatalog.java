@@ -652,6 +652,12 @@ final class GameWikiCatalog {
         boolean matches(TechnologyCatalog catalog,String id){
             return hundredths(catalog.physicalMultiplier(id,field))==cents;
         }
+        boolean matches(TechnologyCatalog catalog,
+                        TechnologyCatalog.Component component,
+                        String track,int stage){
+            return hundredths(catalog.physicalMultiplier(
+                    component,track,stage,field))==cents;
+        }
     }
     private static boolean matchesUpgradeText(TechnologyCatalog.Upgrade u,
                                               String needle,UpgradeTextProbe m){
@@ -731,14 +737,23 @@ final class GameWikiCatalog {
         for(int index=0;index<upgradeIds.size();index++){
             if((index&255)==0&&Thread.currentThread().isInterrupted())
                 throw new java.util.concurrent.CancellationException("Wiki search superseded");
-            String id=upgradeIds.get(index);
-            // Exact displayed multiplier queries bypass ten expensive %.2f
-            // formatting steps per virtual row. Other queries retain exact
-            // authored-text KMP semantics.
+            // Compact numeric searches operate on a real base component,
+            // track and stage without manufacturing or reparsing a virtual
+            // research ID. Numeric phrases cannot occur in a TECH-* ID.
+            // Imported/nonuniform catalogs retain the original ID route.
             boolean match;
-            if(asciiContainsFolded(id,needle))match=true;
-            else if(numeric!=null)match=numeric.matches(technology,id);
-            else match=matchesUpgradeText(technology.get(id),needle,probe);
+            if(numeric!=null && upgradeIds instanceof CompactUpgradeIds compact){
+                int remainder=index%RESEARCH_PER_COMPONENT;
+                match=numeric.matches(technology,
+                        compact.components.get(index/RESEARCH_PER_COMPONENT),
+                        SORTED_RESEARCH_TRACKS[remainder/RESEARCH_STAGES],
+                        remainder%RESEARCH_STAGES+1);
+            }else{
+                String id=upgradeIds.get(index);
+                if(asciiContainsFolded(id,needle))match=true;
+                else if(numeric!=null)match=numeric.matches(technology,id);
+                else match=matchesUpgradeText(technology.get(id),needle,probe);
+            }
             if(match){
                 matchedBits[index>>>6]|=1L<<(index&63);
                 matchedCount++;

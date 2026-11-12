@@ -387,6 +387,70 @@ public final class TechnologyCatalog {
         return Math.round(evolved*1_000_000d)/1_000_000d;
     }
 
+
+    /**
+     * Indexed wiki numeric projection. The encyclopedia already knows each
+     * canonical base component, ordered branch and rank; reconstructing
+     * 73,260 separate TECH IDs solely to parse them back into those same
+     * coordinates creates unnecessary garbage on a 16 MiB Android heap.
+     *
+     * This preserves the resident-stage override, clone-parent hierarchy and
+     * six-decimal Stage VII-IX extrapolation of physicalMultiplier(String).
+     * No virtual Upgrade, article text or permanent multiplier cache is built.
+     */
+    public double physicalMultiplier(Component component,String track,int stage,int field){
+        if(component==null||track==null||stage<1||stage>9||
+                field<0||field>9||!VARIANT_TRACKS.contains(track)||
+                baseComponents.get(component.id)!=component)return Double.NaN;
+        String faction=component.faction,subsystem=component.subsystem;
+        if(stage<=6){
+            Upgrade resident=sixStages.get(techId(
+                    faction,subsystem,track,STAGE_SUFFIXES[stage-1]));
+            if(resident!=null)return multiplier(resident,field);
+        }
+        if(deferredHigherStages){
+            String parent=null;
+            SurvivalHardwareCatalog.Variant survival=
+                    SurvivalHardwareCatalog.findVariant(subsystem);
+            if(survival!=null)parent=survival.root();
+            if(parent==null){
+                SensorNetworkCatalog.Model network=
+                        SensorNetworkCatalog.variant(subsystem);
+                if(network!=null)parent=network.root();
+            }
+            if(parent==null){
+                SensingVariantCatalog.Model sensing=
+                        SensingVariantCatalog.find(subsystem);
+                if(sensing!=null)parent=sensing.base();
+            }
+            if(parent==null){
+                SurvivalHardwareCatalog.Family family=
+                        SurvivalHardwareCatalog.find(subsystem);
+                if(family!=null)parent=family.parent();
+            }
+            if(parent==null)
+                for(String[] family:SUPPORT_FAMILY_TYPES)
+                    if(family[0].equals(subsystem)){
+                        parent=family[2];
+                        break;
+                    }
+            if(parent!=null){
+                Component root=baseComponents.get(baseId(faction,parent));
+                // Invalid/missing root cannot invent a physical multiplier.
+                if(root==null||root==component)return Double.NaN;
+                return physicalMultiplier(root,track,stage,field);
+            }
+        }
+        if(!deferredHigherStages||stage<=6)return Double.NaN;
+        Upgrade sixth=sixStages.get(techId(faction,subsystem,track,"06"));
+        Upgrade fifth=sixStages.get(techId(faction,subsystem,track,"05"));
+        if(sixth==null||fifth==null)return Double.NaN;
+        double current=multiplier(sixth,field);
+        double previous=multiplier(fifth,field);
+        double evolved=StrictMath.max(.05,current+(current-previous)*(stage-6));
+        return Math.round(evolved*1_000_000d)/1_000_000d;
+    }
+
     public Upgrade get(String id) {
         // Common fitted/early-stage technology is resident. Resolve it before
         // parsing the names of all four families of virtual higher-tier nodes.
