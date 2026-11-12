@@ -74,8 +74,14 @@ public final class FlightWingManifest {
             Shipyard.Installed installed=design.at(slot.index());
             if(slot.mount()!=Shipyard.Mount.SUPPORT||installed==null||
                     !installed.component.endsWith("-FTR"))continue;
-            int without=Shipyard.fit(design.install(slot.index(),null),technology)
-                    .fighterCapacity();
+            // Capacity probing removes this hangar only. A saved OPTICAL/RADAR
+            // doctrine may be licensed solely by the removed FTR, making that
+            // temporary comparison blueprint invalid even though seeker choice
+            // cannot affect storage volume. Neutralize seeker doctrine for the
+            // no-hangar comparison rather than rejecting the legal source fit.
+            Shipyard.Design comparison=design.install(slot.index(),null)
+                    .withFighterSeeker(FighterModel.Seeker.INFRARED);
+            int without=Shipyard.fit(comparison,technology).fighterCapacity();
             int capacity=total-without;
             if(capacity<=0)throw new IllegalStateException("FTR socket has no storage");
             capacities.put("FTR:"+slot.index(),capacity);

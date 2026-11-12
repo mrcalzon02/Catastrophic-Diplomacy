@@ -45,6 +45,11 @@ public final class BattleOrdersTest {
             // The laser-armed craft cannot pollute this craft-only fixture
             // with independent interceptable missile or ballistic projectiles.
             launcher.fighterProfile=FighterModel.standard(FighterModel.Hull.LASER_FIGHTER);
+            // New live bay authority owns both launchable stock and fighter
+            // type. Initialize this deliberately synthetic fixture through the
+            // same legacy migration bridge instead of mutating only the old
+            // aggregate reserve counter.
+            launcher.setLegacyFighterReserve(1);
         }
         launcher.fighterLaunchBays=launcher.fighterBays.size();
         defender.laserDamage=defender.missileDamage=0;
