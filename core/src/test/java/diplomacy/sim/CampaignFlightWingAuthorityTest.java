@@ -31,7 +31,7 @@ public final class CampaignFlightWingAuthorityTest {
         }
         return FlightWingManifest.of(design,tech,paid,wings);
     }
-    public static void main(String[] args){
+    public static void main(String[] args)throws Exception{
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         Shipyard.Design carrier=Shipyard.starter(
                 Battle.Faction.TERRAN,Shipyard.Hull.CARRIER);
