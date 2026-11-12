@@ -187,6 +187,75 @@ public final class FighterCraftTest {
                 "Mixed wing launch did not consume exact per-bay stock");
     }
 
+    /** Mixed paid wings must survive the COMPLETE physical lifecycle:
+     * launch from their owning bay, return there, consume the correct carrier
+     * magazines during service, and relaunch as the same fighter type. */
+    private static void mixedBayRecoveryAndRearm(TechnologyCatalog tech){
+        Shipyard.Design design=Shipyard.starter(
+                Battle.Faction.TERRAN,Shipyard.Hull.CARRIER);
+        Battle battle=new Battle(2026111201L);
+        battle.spawnWing(0,design,tech,1,290,350);
+        battle.spawnWing(1,Shipyard.starter(
+                Battle.Faction.DRAXIAN,Shipyard.Hull.CRUISER),tech,1,620,350);
+        Battle.Ship carrier=battle.ships().get(0);
+        carrier.setLegacyFighterReserve(2);
+        battle.setFlightWingManifest(carrier.id,
+                FlightWingManifest.of(design,tech,2,java.util.List.of(
+                        new FlightWingManifest.FlightWing("ORG:0",
+                                FighterModel.Hull.INTERCEPTOR,0,1,0,0,0,0),
+                        new FlightWingManifest.FlightWing("ORG:1",
+                                FighterModel.Hull.TORPEDO_BOMBER,0,1,0,0,0,0))));
+        carrier.maxKineticAmmo=carrier.kineticAmmo=240;
+        carrier.maxMissileAmmo=carrier.missileAmmo=240;
+        carrier.maxTorpedoAmmo=carrier.torpedoAmmo=80;
+
+        awaitPhysicalSorties(battle,carrier,2);
+        java.util.Map<String,FighterModel.Hull> firstLaunch=new java.util.HashMap<>();
+        for(Battle.Craft craft:battle.crafts())
+            if(craft.fighter&&craft.sourceId==carrier.id){
+                firstLaunch.put(craft.launchBayId,craft.profile.hull());
+                // Force a real expended return without destroying/replacing
+                // the physical airframe. Service must pay for these rounds.
+                craft.ammunition=0;
+                craft.returning=true;
+            }
+        check(firstLaunch.get("ORG:0")==FighterModel.Hull.INTERCEPTOR&&
+                        firstLaunch.get("ORG:1")==FighterModel.Hull.TORPEDO_BOMBER,
+                "Mixed lifecycle fixture launched the wrong bay/type identity");
+        int kineticBefore=carrier.kineticAmmo;
+        int torpedoBefore=carrier.torpedoAmmo;
+
+        for(int t=0;t<600&&carrier.fightersRearmed<2;t++)battle.step();
+        check(carrier.fightersRecovered>=2,
+                "Mixed paid wings failed to return to physical bays");
+        check(carrier.fightersRearmed>=2,
+                "Mixed paid wings failed paid service/rearm");
+        check(carrier.dockedFighters.isEmpty()&&carrier.fighterReserve==2,
+                "Mixed service did not restore exactly two launchable airframes");
+        check(carrier.fighterBay("ORG:0").readyFighters==1&&
+                        carrier.fighterBay("ORG:1").readyFighters==1,
+                "Returned mixed wings did not repopulate their owning bays");
+        check(carrier.kineticAmmo<kineticBefore,
+                "Interceptor rearm did not debit real kinetic stores");
+        check(carrier.torpedoAmmo<torpedoBefore,
+                "Torpedo bomber rearm did not debit real torpedo stores");
+
+        int launchedBefore=carrier.fightersLaunched;
+        carrier.fighterReload=0;
+        for(int t=0;t<180&&carrier.fightersLaunched<launchedBefore+2;t++)battle.step();
+        check(carrier.fightersLaunched>=launchedBefore+2,
+                "Serviced mixed wings did not become usable sorties again");
+        java.util.Map<String,FighterModel.Hull> relaunched=new java.util.HashMap<>();
+        for(Battle.Craft craft:battle.crafts())
+            if(craft.fighter&&craft.sourceId==carrier.id)
+                relaunched.put(craft.launchBayId,craft.profile.hull());
+        check(relaunched.get("ORG:0")==FighterModel.Hull.INTERCEPTOR&&
+                        relaunched.get("ORG:1")==FighterModel.Hull.TORPEDO_BOMBER,
+                "Mixed wing type/bay identity changed after recovery and paid service");
+        check(carrier.fighterReserve==0,
+                "Relaunch did not debit the two restored per-bay fighter stocks");
+    }
+
     /** A fighter launch requires real resolved enemy contact. Light-travel
      * acquisition cannot authorize a first-tick magical carrier sortie.
      * Wait only up to four sim seconds; all inventory/bay assertions remain
@@ -482,6 +551,7 @@ public final class FighterCraftTest {
         clearFlightDeck(tech);
         flightWingManifest(tech);
         mixedBayLaunchAuthority(tech);
+        mixedBayRecoveryAndRearm(tech);
         CampaignFlightWingCodecTest.run(tech);
         saves(tech);
         hangarCapacityAndSorties(tech);
