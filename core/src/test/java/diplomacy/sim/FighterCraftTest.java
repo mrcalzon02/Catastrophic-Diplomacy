@@ -152,7 +152,7 @@ public final class FighterCraftTest {
         for(Battle.Ship ship:battle.ships())disarm(ship);
         Battle.Ship carrier=battle.ships().get(0);
         carrier.setLegacyFighterReserve(2);
-        FlightWingManifest manifest=FlightWingManifest.of(design,tech,2,List.of(
+        FlightWingManifest manifest=FlightWingManifest.of(design,tech,2,java.util.List.of(
                 new FlightWingManifest.FlightWing("ORG:0",
                         FighterModel.Hull.INTERCEPTOR,0,1,0,0,0,0),
                 new FlightWingManifest.FlightWing("ORG:1",
