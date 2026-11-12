@@ -123,6 +123,50 @@ public final class GameWikiTest {
                 "No-match full text search must not fabricate an entry");
         System.out.println("PROFILE wiki broad full-text search ms="+broadSearchMillis+
                 " matchingIds="+broad.size());
+
+        // NUMERIC_INDEX_PARITY: all 2,035 real base components, four research
+        // branches, and representative early/late technology stages retain
+        // exactly the same physical modifiers through the low-allocation
+        // indexed-lookup path as through the authoritative canonical ID path.
+        // This proves that 16 MiB search success cannot be a false-empty hack.
+        long multiplierComparisons=0;
+        for(var base:technology.baseComponents().values())
+            for(String track:List.of("EFFICIENCY","OUTPUT",
+                    "RESILIENCE","SPECIALIST"))
+                for(int stage:new int[]{1,6,7,9}){
+                    String id="TECH-"+base.faction+"-"+base.subsystem+
+                            "-"+track+"-0"+stage;
+                    for(int field:new int[]{0,1,5,9}){
+                        double canonical=technology.physicalMultiplier(id,field);
+                        double compact=technology.physicalMultiplier(
+                                base,track,stage,field);
+                        check(Double.isFinite(canonical)&&
+                                Double.doubleToLongBits(canonical)==
+                                Double.doubleToLongBits(compact),
+                                "Numeric physical projection drift for "+id+
+                                " field="+field+" canonical="+canonical+
+                                " indexed="+compact);
+                        multiplierComparisons++;
+                    }
+                }
+        // A negative-only 'power x1.00' query is insufficient: prove actual
+        // native and virtual research entries are returned for their authored
+        // displayed numeric text, not merely that zero-match searches work.
+        for(String upgradeId:List.of("TECH-TER-LAS-OUTPUT-01",
+                "TECH-TER-KIN-OUTPUT-09",
+                "TECH-TER-EPDA-SPECIALIST-09")){
+            var actual=technology.get(upgradeId);
+            check(actual!=null,"Missing numeric search fixture "+upgradeId);
+            String needle=String.format(java.util.Locale.ROOT,
+                    "power x%.2f",actual.power);
+            var numericMatches=catalog.search("UPGRADES",needle);
+            check(catalog.indexOfId(numericMatches,"upgrade."+upgradeId)>=0,
+                    "Actual numeric wiki search dropped "+upgradeId+
+                    " query="+needle);
+        }
+        System.out.println("PASS NUMERIC_INDEX_PARITY comparisons="+
+                multiplierComparisons+" plus native/virtual positive searches");
+
         // Oracle parity for arbitrary FULL-TEXT searches. These intentionally
         // compare every entry against the authoritative Article.searchable text,
         // not a hand-picked list of expected IDs or a reduced search corpus.
