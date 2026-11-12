@@ -148,6 +148,58 @@ public final class OpponentIndexParityTest {
                 " (candidate counts functional; speed advisory only)");
     }
 
+    /** Physical FCM command cells assign at most their fitted recipient
+     * capacity. An ordered friendly index must reproduce the old global scan
+     * even when a command emitter loses power or health mid-engagement. */
+    private static void verifyCommandRecipientsIndex(TechnologyCatalog catalog){
+        long seed=20261112088L;
+        Battle indexed=FleetSensorPhotonScaleDiagnostic.create(catalog,16,seed);
+        Battle full=FleetSensorPhotonScaleDiagnostic.create(catalog,16,seed);
+        full.configureCommandRecipientIndexForDiagnostic(false);
+        indexed.configureCommandRecipientIndexForDiagnostic(true);
+        for(int t=0;t<65;t++){
+            if(t==34){
+                for(int side=0;side<2;side++){
+                    for(Battle battle:new Battle[]{indexed,full}){
+                        for(Battle.Ship ship:battle.ships())
+                            if(ship.team==side&&ship.network.commandCapacity()>0){
+                                // Both variants lose the very same physical
+                                // command circuit; remaining allied hubs
+                                // must take over without a ghost controller.
+                                ship.commandCondition=0;break;
+                            }
+                    }
+                }
+            }
+            indexed.step();full.step();
+            check(indexed.fingerprint()==full.fingerprint(),
+                    "FCM indexed recipient assignment changed battle at tick "+
+                    indexed.tick);
+            if(indexed.tick==30||indexed.tick==60)
+                for(int i=0;i<indexed.ships().size();i++){
+                    Battle.Ship a=indexed.ships().get(i);
+                    Battle.Ship b=full.ships().get(i);
+                    check(Double.doubleToLongBits(a.commandAssist)==
+                            Double.doubleToLongBits(b.commandAssist)&&
+                            a.commandSourceId==b.commandSourceId,
+                        "Power-damaged FCM command source differs for ship "+a.id);
+                }
+        }
+        var fast=indexed.commandRecipientMetrics();
+        var legacy=full.commandRecipientMetrics();
+        check(fast.activeCommanders()>0&&fast.assignments()>0&&
+                fast.activeCommanders()==legacy.activeCommanders()&&
+                fast.liveAllies()==legacy.liveAllies()&&
+                fast.assignments()==legacy.assignments(),
+                "FCM index altered the recipients or physical command assistance");
+        check(legacy.candidateSlots()==fast.candidateSlots()*2,
+                "FCM friendly-team index should halve scanned global slots");
+        System.out.println("PASS fitted 16v16 command-cell recipient index 65 ticks "+
+                "with disabled FCM damage: indexed="+fast+" fullFleet="+legacy+
+                " fingerprint="+Long.toHexString(indexed.fingerprint())+
+                " (visits diagnostic, not FPS gate)");
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -222,6 +274,7 @@ public final class OpponentIndexParityTest {
                 indexedTargeting+" fullFleet="+fullTargeting+
                 " (counts functional; timings JVM diagnostic only)");
         verifyRelayScanIndex(catalog);
+        verifyCommandRecipientsIndex(catalog);
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+

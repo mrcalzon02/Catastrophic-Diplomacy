@@ -878,6 +878,26 @@ public final class Battle {
      */
     private final Map<Integer,Ship> shipById = new HashMap<>();
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
+    /** Commander assignment scratch reused at 30 Hz, rather than creating
+     * two forty-element arrays on every battle tick. */
+    private final Ship[] commandRecipientScratch=new Ship[40];
+    private final double[] commandDistanceScratch=new double[40];
+    /** Original mixed-fleet scan retained only for deterministic A/B proof. */
+    private boolean indexedCommandRecipients=true;
+    private long[] commandRecipientDiagnostics;
+    public record CommandRecipientMetrics(long activeCommanders,
+            long candidateSlots,long liveAllies,long assignments){ }
+    public void configureCommandRecipientIndexForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Command-recipient index must be configured before battle");
+        indexedCommandRecipients=enabled;
+        commandRecipientDiagnostics=new long[4];
+    }
+    public CommandRecipientMetrics commandRecipientMetrics(){
+        long[] c=commandRecipientDiagnostics;
+        return c==null?new CommandRecipientMetrics(0,0,0,0):
+                new CommandRecipientMetrics(c[0],c[1],c[2],c[3]);
+    }
     /** One reused primitive buffer for a captain's protected-asset attackers.
      * Battle.step is single-threaded; ship targeting decisions are sequential.
      * Avoid per-captain boxed Integer + ArrayList allocation every 6th tick.
@@ -2880,14 +2900,15 @@ public final class Battle {
             ship.commandAssist=0;
             ship.commandSourceId=0;
         }
-        Ship[] recipients=new Ship[40];
-        double[] closest=new double[40];
+        Ship[] recipients=commandRecipientScratch;
+        double[] closest=commandDistanceScratch;
         for(Ship command:ships){
             int slots=command.network.commandCapacity();
             if(!command.alive()||slots<=0||command.power<=3||
                     command.commandCondition<=.15||command.sensorsCondition<=.15
                     ||command.crewReadiness()<.05)continue;
             slots=StrictMath.min(slots,40);
+            if(commandRecipientDiagnostics!=null)commandRecipientDiagnostics[0]++;
             double power=StrictMath.min(command.commandCondition,command.sensorsCondition);
             double radius=command.network.fusionRange()*power;
             if(radius<=0)continue;
@@ -2898,11 +2919,15 @@ public final class Battle {
             }
             Arrays.fill(recipients,0,slots,null);
             Arrays.fill(closest,0,slots,Double.POSITIVE_INFINITY);
-            for(Ship friend:ships){
+            double radiusSquared=radius*radius;
+            for(Ship friend:indexedCommandRecipients?
+                    friendlyShips(command.team):ships){
+                if(commandRecipientDiagnostics!=null)commandRecipientDiagnostics[1]++;
                 if(friend==command||friend.team!=command.team||!friend.alive())continue;
+                if(commandRecipientDiagnostics!=null)commandRecipientDiagnostics[2]++;
                 double dx=friend.x-command.x,dy=friend.y-command.y;
                 double d2=dx*dx+dy*dy;
-                if(d2>radius*radius)continue;
+                if(d2>radiusSquared)continue;
                 for(int k=0;k<slots;k++)if(d2<closest[k]){
                     for(int j=slots-1;j>k;j--){
                         closest[j]=closest[j-1];recipients[j]=recipients[j-1];
@@ -2919,6 +2944,8 @@ public final class Battle {
                 if(assist>recipient.commandAssist){
                     recipient.commandAssist=assist;
                     recipient.commandSourceId=command.id;
+                    if(commandRecipientDiagnostics!=null)
+                        commandRecipientDiagnostics[3]++;
                 }
             }
         }
