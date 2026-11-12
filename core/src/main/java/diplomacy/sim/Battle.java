@@ -4951,7 +4951,8 @@ public final class Battle {
         if(craft==null||!craft.fighter||craft.integrity<=0)return false;
         Ship threat=null;
         double best=Double.POSITIVE_INFINITY;
-        for(Ship ship:ships)if(ship.alive()&&ship.team!=craft.team){
+        for(Ship ship:opponentCandidates(craft.team))
+                if(ship.alive()&&ship.team!=craft.team){
             double range=StrictMath.hypot(ship.x-craft.x,ship.y-craft.y);
             if(range<best){best=range;threat=ship;}
         }
@@ -5060,9 +5061,12 @@ public final class Battle {
             }
             Ship threat=null;
             double nearest=Double.POSITIVE_INFINITY;
-            for(Ship defender:ships)if(defender.alive()&&
-                    defender.team!=craft.team&&defender.power>4&&
-                    defender.pointDefenseCondition>.2&&
+            // Only hostile radar ships can spend an aircraft's chaff.
+            // Stable enemy insertion order preserves closest/tie behavior;
+            // use the same opponent index as captain target selection.
+            for(Ship defender:opponentCandidates(craft.team))
+                    if(defender.alive()&&defender.team!=craft.team&&
+                    defender.power>4&&defender.pointDefenseCondition>.2&&
                     defender.orders.pointDefense().craft()){
                 double reach=0;
                 for(Ship.FlakMount mount:defender.flakMounts)

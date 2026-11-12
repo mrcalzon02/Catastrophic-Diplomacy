@@ -48,6 +48,11 @@ public final class FighterCountermeasureTest {
     }
     private static Battle fixture(TechnologyCatalog tech,long seed,
                                   boolean disabled,String defenseKind){
+        return fixture(tech,seed,disabled,defenseKind,true);
+    }
+    private static Battle fixture(TechnologyCatalog tech,long seed,
+                                  boolean disabled,String defenseKind,
+                                  boolean indexedOpponents){
         if(!defenseKind.equals("FLK")&&!defenseKind.equals("RCW"))
             throw new IllegalArgumentException("Only real fitted radar guns");
         var hull=Shipyard.Hull.CRUISER;
@@ -62,6 +67,7 @@ public final class FighterCountermeasureTest {
                 Shipyard.inspect(flak,tech).valid(),
                 "Fighter and flak must be physically legal installed hardware");
         Battle battle=new Battle(seed);
+        battle.configureOpponentIndexForDiagnostic(indexedOpponents);
         battle.spawnWing(0,carrier,tech,1,300,350);
         battle.spawnWing(1,flak,tech,1,510,350);
         Battle.Ship parent=battle.ships().get(0);
@@ -151,10 +157,39 @@ public final class FighterCountermeasureTest {
                 "Rotary chaff diversion test did not physically discharge CIWS");
         System.out.println("PASS independent real flak and rotary CHAFF diversions, flare spectra, finite ammo/cooldowns");
     }
+    /**
+     * Hostile-only chaff radar scans must have byte-identical effects to
+     * full-ship traversal. FLK and RCW each provoke real fighter dispensers,
+     * so a quiet zero-activity parity check cannot masquerade as acceptance.
+     */
+    private static void opponentIndexRadarParity(TechnologyCatalog tech){
+        for(String kind:new String[]{"FLK","RCW"}){
+            long seed=kind.equals("FLK")?810420L:810421L;
+            Battle indexed=fixture(tech,seed,false,kind,true);
+            Battle legacy=fixture(tech,seed,false,kind,false);
+            for(int t=0;t<190;t++){
+                indexed.step();legacy.step();
+                check(indexed.fingerprint()==legacy.fingerprint(),
+                        "Hostile-only radar/chaff lookup changed real combat "+
+                        "at tick "+indexed.tick+" defense="+kind);
+            }
+            check(indexed.fighterChaffDeployed>0 &&
+                    indexed.fighterChaffDeployed==legacy.fighterChaffDeployed,
+                    "Actual "+kind+" radar did not exercise finite chaff parity");
+            boolean refused=false;
+            try{indexed.configureOpponentIndexForDiagnostic(false);}
+            catch(IllegalStateException expected){refused=true;}
+            check(refused,"Opponent-index diagnostic accepted a midbattle toggle");
+        }
+        System.out.println("PASS FLK/RCW chaff hostile-index full-scan parity: "+
+                "2 fitted defenders, 190 ticks each, live finite countermeasures");
+    }
+
     public static void main(String[] args)throws Exception{
         spectralHardware();
         var tech=TechnologyCatalog.loadDefault();
         actualRadarDiversion(tech);
+        opponentIndexRadarParity(tech);
         Battle a=fixture(tech,810412L,false);
         Battle b=fixture(tech,810412L,false);
         for(int tick=0;tick<95;tick++){
