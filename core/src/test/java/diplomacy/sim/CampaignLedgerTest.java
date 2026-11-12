@@ -70,8 +70,42 @@ public final class CampaignLedgerTest {
                             Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE),tech)),
                     "Mixing campaigns across factions accepted");
             reject(()->CampaignLedger.decode(CampaignLedger.encode(initial)
-                            .replace("CD-CAMPAIGN-LEDGER-2","CD-CAMPAIGN-LEDGER-3"),tech),
+                            .replace("CD-CAMPAIGN-LEDGER-2","CD-CAMPAIGN-LEDGER-99"),tech),
                     "Unknown authority format accepted");
+            // Ledger v3 carries the exact per-physical-bay fighter complement
+            // atomically with wallet/fleet/research while v1/v2 remain readable.
+            Shipyard.Design carrier=Shipyard.starter(
+                    Battle.Faction.TERRAN,Shipyard.Hull.CARRIER);
+            CampaignFleet.Roster wingFleet=CampaignFleet.startSolo(
+                    Battle.Faction.TERRAN,carrier,tech,771122L);
+            long wingId=wingFleet.ships().get(0).id();
+            int paid=wingFleet.get(wingId).stores().fighters();
+            FlightWingManifest legacyWings=FlightWingManifest.legacy(carrier,tech,paid);
+            java.util.ArrayList<FlightWingManifest.FlightWing> mixed=
+                    new java.util.ArrayList<>(legacyWings.wings());
+            if(!mixed.isEmpty()){
+                var first=mixed.get(0);
+                mixed.set(0,new FlightWingManifest.FlightWing(first.bayId(),
+                        FighterModel.Hull.TORPEDO_BOMBER,first.stored(),first.ready(),
+                        first.launched(),first.returning(),first.servicing(),first.destroyed()));
+            }
+            FlightWingManifest manifest=FlightWingManifest.of(carrier,tech,paid,mixed);
+            var wingSnapshot=new CampaignLedger.Snapshot(1,
+                    CampaignProgress.start(Battle.Faction.TERRAN),wingFleet,
+                    new CampaignTechnology.State(Battle.Faction.TERRAN),
+                    java.util.Map.of(wingId,manifest));
+            String wingEncoded=CampaignLedger.encode(wingSnapshot);
+            check(wingEncoded.startsWith("CD-CAMPAIGN-LEDGER-3\n"),
+                    "Explicit wing authority did not select ledger v3");
+            var wingRestored=CampaignLedger.decode(wingEncoded,tech);
+            check(wingRestored.flightWings().get(wingId).wings().equals(manifest.wings()),
+                    "Ledger v3 lost mixed fighter bay identity");
+            check(CampaignLedger.equivalent(wingRestored,wingSnapshot),
+                    "Ledger v3 wing authority did not round-trip canonically");
+            check(CampaignLedger.decode(CampaignLedger.encode(initial),tech)
+                            .flightWings().isEmpty(),
+                    "Ledger v2 migration fabricated explicit wing state before game migration");
+
             check(Files.exists(directory.resolve("campaign.dat.bak")),
                     "Last-generation recovery record not retained");
             recoverableTransactions(directory,initial,bought,tech);

@@ -17,7 +17,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -27,22 +30,48 @@ import java.util.Optional;
  * atomic rename: the entire transaction is already committed on next boot.
  */
 public final class CampaignLedger {
-    private static final String MAGIC="CD-CAMPAIGN-LEDGER-2";
+    private static final String MAGIC="CD-CAMPAIGN-LEDGER-3";
+    private static final String V2="CD-CAMPAIGN-LEDGER-2";
     private static final String PREVIOUS="CD-CAMPAIGN-LEDGER-1";
+    private static final String WINGS_MAGIC="CD-CAMPAIGN-WINGS-1";
     private static final int MAX_BYTES=4_500_000;
     private CampaignLedger(){}
     public record Snapshot(long generation,CampaignProgress.State progress,
-                           CampaignFleet.Roster fleet,CampaignTechnology.State technology){
+                           CampaignFleet.Roster fleet,CampaignTechnology.State technology,
+                           Map<Long,FlightWingManifest> flightWings){
         public Snapshot(long generation,CampaignProgress.State progress,CampaignFleet.Roster fleet){
-            this(generation,progress,fleet,new CampaignTechnology.State(progress.faction()));
+            this(generation,progress,fleet,new CampaignTechnology.State(progress.faction()),Map.of());
+        }
+        public Snapshot(long generation,CampaignProgress.State progress,
+                        CampaignFleet.Roster fleet,CampaignTechnology.State technology){
+            this(generation,progress,fleet,technology,Map.of());
         }
         public Snapshot {
             if(generation<1||progress==null||fleet==null||technology==null||
+                    flightWings==null||
                     progress.faction()!=fleet.faction()||progress.faction()!=technology.faction())
                 throw new IllegalArgumentException("Campaign wallet/fleet/technology identity mismatch");
+            flightWings=Map.copyOf(flightWings);
+            for(var entry:flightWings.entrySet()){
+                CampaignFleet.Vessel vessel=fleet.get(entry.getKey());
+                if(entry.getValue()==null||
+                        entry.getValue().paid()!=vessel.stores().fighters())
+                    throw new IllegalArgumentException("Campaign fighter inventory mismatch");
+            }
         }
         public Snapshot next(CampaignProgress.State state,CampaignFleet.Roster roster){
-            return new Snapshot(Math.addExact(generation,1),state,roster,technology);
+            if(!flightWings.isEmpty()){
+                if(roster.ships().size()!=fleet.ships().size())
+                    throw new IllegalArgumentException(
+                            "Fleet topology change requires explicit fighter wing state");
+                for(CampaignFleet.Vessel vessel:roster.ships()){
+                    CampaignFleet.Vessel before=fleet.get(vessel.id());
+                    if(vessel.stores().fighters()!=before.stores().fighters())
+                        throw new IllegalArgumentException(
+                                "Fighter inventory change requires explicit wing state");
+                }
+            }
+            return new Snapshot(Math.addExact(generation,1),state,roster,technology,flightWings);
         }
     }
     private static String checksum(String value){
@@ -64,12 +93,50 @@ public final class CampaignLedger {
     private static String unb64(String s){
         return new String(Base64.getUrlDecoder().decode(s),StandardCharsets.UTF_8);
     }
+    private static String encodeWings(Snapshot snapshot){
+        if(snapshot.flightWings().size()!=snapshot.fleet().ships().size())
+            throw new IllegalArgumentException("Campaign wing state is incomplete");
+        StringBuilder body=new StringBuilder(WINGS_MAGIC).append('\n');
+        snapshot.fleet().ships().stream()
+                .sorted(Comparator.comparingLong(CampaignFleet.Vessel::id))
+                .forEach(vessel->{
+                    FlightWingManifest manifest=snapshot.flightWings().get(vessel.id());
+                    if(manifest==null||manifest.paid()!=vessel.stores().fighters())
+                        throw new IllegalArgumentException("Campaign wing inventory mismatch");
+                    body.append(vessel.id()).append(',')
+                            .append(b64(manifest.encode())).append('\n');
+                });
+        return body.toString();
+    }
+    private static Map<Long,FlightWingManifest> decodeWings(
+            String encoded,CampaignFleet.Roster fleet,TechnologyCatalog catalog){
+        String[] rows=encoded.split("\n",-1);
+        if(rows.length<2||rows.length>203||!WINGS_MAGIC.equals(rows[0])||
+                !rows[rows.length-1].isEmpty())
+            throw new IllegalArgumentException("Invalid campaign wing envelope");
+        HashMap<Long,FlightWingManifest> result=new HashMap<>();
+        for(int i=1;i<rows.length-1;i++){
+            String[] pair=rows[i].split(",",-1);
+            if(pair.length!=2)throw new IllegalArgumentException("Invalid campaign wing row");
+            long id=Long.parseLong(pair[0]);
+            CampaignFleet.Vessel vessel=fleet.get(id);
+            FlightWingManifest manifest=FlightWingManifest.decode(
+                    unb64(pair[1]),vessel.fitting(),catalog,vessel.stores().fighters());
+            if(result.putIfAbsent(id,manifest)!=null)
+                throw new IllegalArgumentException("Duplicate campaign wing owner");
+        }
+        if(result.size()!=fleet.ships().size())
+            throw new IllegalArgumentException("Missing campaign wing owner");
+        return Map.copyOf(result);
+    }
     public static String encode(Snapshot snapshot){
         if(snapshot==null)throw new IllegalArgumentException("Missing campaign snapshot");
-        String body=MAGIC+"\n"+snapshot.generation()+"\n"+
+        boolean explicitWings=!snapshot.flightWings().isEmpty();
+        String body=(explicitWings?MAGIC:V2)+"\n"+snapshot.generation()+"\n"+
                 b64(CampaignProgress.encode(snapshot.progress()))+"\n"+
                 b64(CampaignFleetCodec.encode(snapshot.fleet()))+"\n"+
-                b64(CampaignTechnology.encode(snapshot.technology()))+"\n";
+                b64(CampaignTechnology.encode(snapshot.technology()))+"\n"+
+                (explicitWings?b64(encodeWings(snapshot))+"\n":"");
         String payload=body+checksum(body)+"\n";
         if(payload.getBytes(StandardCharsets.UTF_8).length>MAX_BYTES)
             throw new IllegalArgumentException("Campaign snapshot exceeds capacity");
@@ -85,8 +152,9 @@ public final class CampaignLedger {
             throw new IllegalArgumentException("Missing or oversized campaign snapshot");
         String[] rows=data.split("\n",-1);
         boolean old=rows.length==6&&PREVIOUS.equals(rows[0]);
-        boolean current=rows.length==7&&MAGIC.equals(rows[0]);
-        if((!old&&!current)||!rows[rows.length-1].isEmpty())
+        boolean v2=rows.length==7&&V2.equals(rows[0]);
+        boolean current=rows.length==8&&MAGIC.equals(rows[0]);
+        if((!old&&!v2&&!current)||!rows[rows.length-1].isEmpty())
             throw new IllegalArgumentException("Unknown campaign snapshot version");
         StringBuilder payload=new StringBuilder();
         for(int i=0;i<rows.length-2;i++)payload.append(rows[i]).append('\n');
@@ -100,7 +168,9 @@ public final class CampaignLedger {
             CampaignTechnology.State research=old?
                     new CampaignTechnology.State(progress.faction()):
                     CampaignTechnology.decode(unb64(rows[4]),catalog);
-            return new Snapshot(generation,progress,fleet,research);
+            Map<Long,FlightWingManifest> wings=current?
+                    decodeWings(unb64(rows[5]),fleet,catalog):Map.of();
+            return new Snapshot(generation,progress,fleet,research,wings);
         }catch(RuntimeException invalid){
             throw new IllegalArgumentException("Invalid saved campaign wallet or fleet",invalid);
         }
