@@ -27,8 +27,13 @@ public final class BattleOrdersTest {
             for(Shipyard.Slot slot:deck.hull.slots)
                 if(slot.mount()==Shipyard.Mount.SUPPORT){socket=slot.index();break;}
             if(socket<0)throw new AssertionError("Cruiser missing FTR support socket");
-            launcher.fighterBays=Battle.Ship.baysFor(
-                    deck.install(socket,"BASE-TER-FTR"));
+            try{
+                launcher.fighterBays=Battle.Ship.baysFor(
+                        deck.install(socket,"BASE-TER-FTR"),
+                        diplomacy.tech.TechnologyCatalog.loadDefault());
+            }catch(java.io.IOException missingTechnology){
+                throw new AssertionError("Technology catalogue unavailable",missingTechnology);
+            }
             // Unlike missile ammo, a fighter must carry an actual pilot.
             // Manually created legacy ships do not come with crew onboard.
             launcher.crewRequired=16;
