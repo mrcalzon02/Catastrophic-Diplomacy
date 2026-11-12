@@ -458,7 +458,103 @@ public final class BattleOrdersTest {
         check(searcher.fuel<fuel,"Mobile patrol obtained free thrust");
     }
 
-    public static void main(String[] args){
+
+    /**
+     * L01 audit: observable movement and contact timing on real deterministic
+     * 1v1 / 16v16 / 200v200 fixtures. All numbers are diagnostics, not FPS
+     * gates. Sampling occurs AFTER the timed authoritative battle.step().
+     * Never patch ship speed, fuel, AI orders, sensors or projectile rules here.
+     */
+    private static void reportCombatMovementAudit() throws Exception {
+        var catalog=diplomacy.tech.TechnologyCatalog.loadDefault();
+        for(int perSide:new int[]{1,16,200}){
+            long seed=perSide==200?DemonstrationBattle.SEED:20261111L+perSide;
+            Battle battle=perSide==200?DemonstrationBattle.create(catalog):
+                    Battle.duel(seed,perSide,
+                            Shipyard.starter(Battle.Faction.TERRAN,Shipyard.Hull.DREADNOUGHT),
+                            Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.DREADNOUGHT),
+                            catalog);
+            var ships=battle.ships();
+            int count=ships.size();
+            double[] previousX=new double[count],previousY=new double[count];
+            double[] path=new double[count];
+            for(int i=0;i<count;i++){
+                previousX[i]=ships.get(i).x;
+                previousY[i]=ships.get(i).y;
+            }
+            long[] stepNanos=new long[480];
+            int sampled=0,firstTarget=-1,firstFix=-1,firstFire=-1,firstHit=-1;
+            int fires=0,peakCraft=0;
+            long lastVisualSequence=-1;
+            long nominalMoving=0,nominalStill=0;
+            for(int frame=0;frame<480&&!battle.finished();frame++){
+                long start=System.nanoTime();
+                battle.step();
+                stepNanos[sampled++]=System.nanoTime()-start;
+                for(int i=0;i<count;i++){
+                    Battle.Ship ship=ships.get(i);
+                    double travel=StrictMath.hypot(ship.x-previousX[i],
+                            ship.y-previousY[i]);
+                    if(Double.isFinite(travel))path[i]+=travel;
+                    previousX[i]=ship.x;
+                    previousY[i]=ship.y;
+                    if(ship.alive()&&ship.speed>0&&ship.fuel>0&&
+                            (ship.orders.position()==BattleOrders.Position.FREE||
+                             ship.orders.position()==BattleOrders.Position.KEEP_MOVING)){
+                        nominalMoving++;
+                        if(travel<0.005)nominalStill++;
+                    }
+                    if(firstTarget<0&&ship.lastTargetId!=0)firstTarget=(int)battle.tick;
+                    if(firstFix<0&&ship.navigationFixTick>=0)firstFix=(int)battle.tick;
+                }
+                if(firstHit<0&&battle.hitCount>0)firstHit=(int)battle.tick;
+                var visuals=battle.visualEvents();
+                for(int i=visuals.size()-1;i>=0;i--){
+                    var event=visuals.get(i);
+                    if(event.sequence()<=lastVisualSequence)break;
+                    if(event.phase()==Battle.VisualPhase.FIRE){
+                        fires++;
+                        if(firstFire<0)firstFire=(int)battle.tick;
+                    }
+                }
+                if(!visuals.isEmpty())
+                    lastVisualSequence=visuals.get(visuals.size()-1).sequence();
+                peakCraft=Math.max(peakCraft,battle.crafts().size());
+            }
+            double totalCapital=0,totalEscort=0;
+            int capitals=0,escorts=0;
+            for(int i=0;i<count;i++){
+                if(BattleOrders.size(ships.get(i))==BattleOrders.Size.CAPITAL){
+                    totalCapital+=path[i];
+                    capitals++;
+                }else{
+                    totalEscort+=path[i];
+                    escorts++;
+                }
+            }
+            java.util.Arrays.sort(stepNanos,0,sampled);
+            double p50=sampled==0?0:stepNanos[(sampled-1)/2]/1e6;
+            double p95=sampled==0?0:
+                    stepNanos[(int)Math.ceil(sampled*.95)-1]/1e6;
+            double stillPercent=nominalMoving==0?0:
+                    100.0*nominalStill/nominalMoving;
+            System.out.printf(java.util.Locale.ROOT,
+                    "CD-L01-MOTION perSide=%d seed=%d ticks=%d ships=%d "+
+                    "capitals=%d escorts=%d meanCapitalPath=%.5f "+
+                    "meanEscortPath=%.5f nominalStillPct_lt0.005PerTick=%.2f "+
+                    "firstTargetTick=%d firstObservedFixTick=%d "+
+                    "firstFireEventTick=%d firstHitTick=%d fireEvents=%d "+
+                    "hits=%d peakCraft=%d stepP50ms=%.4f stepP95ms=%.4f "+
+                    "candidateVisitCount=NOT_INSTRUMENTED cpuOnly=true fpsGate=false%n",
+                    perSide,seed,battle.tick,count,capitals,escorts,
+                    capitals==0?0:totalCapital/capitals,
+                    escorts==0?0:totalEscort/escorts,
+                    stillPercent,firstTarget,firstFix,firstFire,firstHit,
+                    fires,battle.hitCount,peakCraft,p50,p95);
+        }
+    }
+
+    public static void main(String[] args) throws Exception{
         checkFreeMovement();
         checkMobilePostures();
         checkHoldFiringRange();
@@ -469,6 +565,7 @@ public final class BattleOrdersTest {
                 "PD control must cycle through all four modes");
         checkTargeting();checkCausalCaptainFire();checkCausalNavigation();
         checkReplay();checkPersistence();
+        reportCombatMovementAudit();
         System.out.println("PASS orders: four live PD modes, craft/ordnance discrimination, class priorities, escort safety and deterministic replay");
     }
 }
