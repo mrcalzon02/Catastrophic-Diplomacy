@@ -41,6 +41,44 @@ public final class SensorLightTimeHistoryTest {
         ok(historical!=null&&historical.sample().x()!=target.x&&
                         historical.sample().vx()!=target.vx,
                 "Hidden target current truth leaked into historical sample");
+        // The original active-return scan spends ages searching for a
+        // pulse that PASSIVE, unfocused radar or unfocused X-ray can never
+        // have emitted. The early-stop variant must return the identical
+        // actual historical observation, not a synthetic fresh fix.
+        for(SensorActiveScan.Mode mode:new SensorActiveScan.Mode[]{
+                SensorActiveScan.Mode.PASSIVE,
+                SensorActiveScan.Mode.FOCUSED_RADAR,
+                SensorActiveScan.Mode.XRAY_BURST,
+                SensorActiveScan.Mode.STANDARD}){
+            int focused=mode==SensorActiveScan.Mode.FOCUSED_RADAR||
+                    mode==SensorActiveScan.Mode.XRAY_BURST?target.id+17:0;
+            source.scan.configure(mode,focused);
+            long[] work=new long[3],old=new long[3];
+            for(int age=0;age<=echoTime;age++){
+                var quick=SensorLightTimeHistory.receive(source,target,age,
+                        channels,0,true,work);
+                var full=SensorLightTimeHistory.receive(source,target,age,
+                        channels,0,false,old);
+                ok(java.util.Objects.equals(quick,full),
+                        "Impossible active echo pruning changed "+mode+
+                                " observation at received tick "+age);
+            }
+            ok(work[0]==old[0]&&
+                    (mode==SensorActiveScan.Mode.STANDARD||
+                            work[1]>0&&work[2]<old[2]),
+                    "No historical work avoided for incapable active "+mode);
+            // An active-only query may be rejected immediately if there
+            // is no possible physical emission; the original returns null.
+            if(mode!=SensorActiveScan.Mode.STANDARD){
+                var fast=SensorLightTimeHistory.receive(source,target,echoTime,
+                        Battle.CONTACT_RADAR|Battle.CONTACT_XRAY,0,true,null);
+                var control=SensorLightTimeHistory.receive(source,target,echoTime,
+                        Battle.CONTACT_RADAR|Battle.CONTACT_XRAY,0,false,null);
+                ok(fast==null&&control==null,
+                        "No-emission active-only query created a phantom radar lock");
+            }
+        }
+        source.scan.configure(SensorActiveScan.Mode.STANDARD,0);
         target.x=600;
         ok(SensorLightTimeHistory.receive(source,target,echoTime,channels,echoTime)==null,
                 "Datalink relay granted unarrived photons");
@@ -51,6 +89,7 @@ public final class SensorLightTimeHistoryTest {
             target.sensorHistory.capture(tick,target);
         ok(target.sensorHistory.at(0)==null,
                 "Ancient contact did not expire at bounded ring capacity");
-        System.out.println("PASS passive and active photon light time, bounded history, relay latency");
+        System.out.println("PASS passive/focused/X-ray impossible active-return pruning, "+
+                "exact delayed photon A/B, ring expiry and relay latency");
     }
 }

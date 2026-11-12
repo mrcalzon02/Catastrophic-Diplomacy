@@ -1292,6 +1292,24 @@ public final class Battle {
      * No global scan cache, per-pair allocation, or deferred authorization.
      */
     private boolean reusePhotonObservation=true;
+    /** Only skip active light-return scans when the selected pulse mode
+     * mathematically cannot emit for this requested physical target.
+     * No persistent per-pair photon cache or additional Android heap use. */
+    private boolean pruneImpossibleActivePhotons=true;
+    private long[] activePhotonScanDiagnostic;
+    public record ActivePhotonScanMetrics(long requests,long impossibleActive,
+                                          long historySlotsExamined) { }
+    public void configureActivePhotonPruningForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure active photon pruning before battle");
+        pruneImpossibleActivePhotons=enabled;
+        activePhotonScanDiagnostic=new long[3];
+    }
+    public ActivePhotonScanMetrics activePhotonScanMetrics(){
+        long[] c=activePhotonScanDiagnostic;
+        return c==null?new ActivePhotonScanMetrics(0,0,0):
+                new ActivePhotonScanMetrics(c[0],c[1],c[2]);
+    }
     private long reusedPhotonObservations,rawPhotonSearches;
     private final Ship[] relayCandidates=new Ship[32];
     private final double[] relayCandidateDistances=new double[32];
@@ -2968,7 +2986,8 @@ public final class Battle {
         rawPhotonSearches++;
         SensorLightTimeHistory.Observation candidate=SensorLightTimeHistory.receive(
                 source,target,tick,CONTACT_OPTICAL|CONTACT_RADAR|
-                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0);
+                        CONTACT_INFRARED|CONTACT_XRAY|CONTACT_GRAVITIC,0,
+                pruneImpossibleActivePhotons,activePhotonScanDiagnostic);
         if(candidate==null)return null;
         int valid=candidate.channels()&historicalSensorChannels(
                 source,target,candidate);

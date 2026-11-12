@@ -113,6 +113,16 @@ public final class SensorLightTimeHistory {
      * against the historical profile by the caller. */
     public static Observation receive(Battle.Ship source,Battle.Ship target,
             long receivedTick,int hardwareChannels,int linkTicks){
+        return receive(source,target,receivedTick,hardwareChannels,linkTicks,
+                true,null);
+    }
+    /** Optional comparison against the original full active-return scan.
+     * Zero extra arrays in ordinary gameplay. Diagnostic counters, if
+     * supplied, store query count, provably impossible active searches
+     * avoided, and historical sample slots visited. */
+    static Observation receive(Battle.Ship source,Battle.Ship target,
+            long receivedTick,int hardwareChannels,int linkTicks,
+            boolean pruneImpossibleActive,long[] diagnostic){
         if(source==null||target==null||receivedTick<0||linkTicks<0)
             throw new IllegalArgumentException("Invalid sensor route");
         if(hardwareChannels==0)return null;
@@ -131,9 +141,26 @@ public final class SensorLightTimeHistory {
         int passive=hardwareChannels&(Battle.CONTACT_OPTICAL|
                 Battle.CONTACT_INFRARED|Battle.CONTACT_GRAVITIC);
         int active=hardwareChannels&(Battle.CONTACT_RADAR|Battle.CONTACT_XRAY);
+        if(diagnostic!=null)diagnostic[0]++;
+        if(pruneImpossibleActive&&active!=0){
+            SensorActiveScan.Mode mode=source.scan.mode();
+            // These orders can NEVER emit an active return for this real
+            // source/target pair. The old search examined all history ages
+            // even after its passive image was already found.
+            boolean impossible=mode==SensorActiveScan.Mode.PASSIVE||
+                    (mode==SensorActiveScan.Mode.FOCUSED_RADAR||
+                     mode==SensorActiveScan.Mode.XRAY_BURST)&&
+                    source.scan.focusTargetId()!=target.id;
+            if(impossible){
+                active=0;
+                if(diagnostic!=null)diagnostic[1]++;
+            }
+        }
+        if(active==0&&passive==0)return null;
         Sample passiveFix=null,activeFix=null;
         long activeEmission=-1;
         for(int age=0;age<=ONE_WAY_SEARCH_LIMIT&&age<=sensorTick;age++){
+            if(diagnostic!=null)diagnostic[2]++;
             long reflectedTick=sensorTick-age;
             Sample reflected=target.sensorHistory.at(reflectedTick);
             if(reflected==null||!reflected.alive())continue;

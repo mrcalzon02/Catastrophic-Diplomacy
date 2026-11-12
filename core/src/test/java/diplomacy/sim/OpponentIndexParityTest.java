@@ -496,6 +496,75 @@ public final class OpponentIndexParityTest {
         }
     }
 
+    /**
+     * Physically fitted PASSIVE/FOCUSED_RADAR/XRAY_BURST targets can never
+     * produce an active photon return for an unselected contact. The old
+     * age-by-age scan is a causality reference, not a desired CPU workload.
+     * A/B state, actual command reports and emission costs remain identical.
+     */
+    private static void verifyImpossibleActivePhotonPruning(
+            TechnologyCatalog catalog){
+        long reducedSlots=0,legacySlots=0,prunedRequests=0;
+        for(int perSide:new int[]{16,200}){
+            long seed=202611122032L+perSide;
+            Battle fast=FleetSensorPhotonScaleDiagnostic.create(catalog,perSide,seed);
+            Battle original=FleetSensorPhotonScaleDiagnostic.create(catalog,perSide,seed);
+            fast.configureActivePhotonPruningForDiagnostic(true);
+            original.configureActivePhotonPruningForDiagnostic(false);
+            for(Battle battle:new Battle[]{fast,original}){
+                int[] firstEnemy={0,0};
+                for(Battle.Ship ship:battle.ships())
+                    if(firstEnemy[ship.team]==0)firstEnemy[ship.team]=ship.id;
+                for(Battle.Ship ship:battle.ships()){
+                    SensorActiveScan.Mode mode=switch(ship.id%5){
+                        case 0 -> SensorActiveScan.Mode.PASSIVE;
+                        case 1 -> SensorActiveScan.Mode.FOCUSED_RADAR;
+                        case 2 -> SensorActiveScan.Mode.XRAY_BURST;
+                        case 3 -> SensorActiveScan.Mode.BOOSTED_RADAR;
+                        default -> SensorActiveScan.Mode.STANDARD;
+                    };
+                    int focus=mode==SensorActiveScan.Mode.FOCUSED_RADAR||
+                            mode==SensorActiveScan.Mode.XRAY_BURST?
+                                    firstEnemy[1-ship.team]:0;
+                    battle.configureSensorScan(ship.id,mode,focus);
+                }
+            }
+            int ticks=perSide==16?72:35;
+            for(int i=0;i<ticks;i++){
+                fast.step();original.step();
+                check(fast.fingerprint()==original.fingerprint(),
+                        "Active photon pruning changed fitted "+perSide+
+                                "v"+perSide+" battle at tick "+fast.tick);
+                if(i==29||i==59){
+                    for(int team=0;team<2;team++)
+                        check(fast.tacticalPicture(team).equals(
+                                original.tacticalPicture(team)),
+                                "Pruned photon ages fabricated/staled "+
+                                "a tactical report at tick "+fast.tick);
+                }
+            }
+            var a=fast.activePhotonScanMetrics();
+            var b=original.activePhotonScanMetrics();
+            check(a.requests()>0&&a.requests()==b.requests()&&
+                    a.impossibleActive()>0&&
+                    a.historySlotsExamined()<b.historySlotsExamined()&&
+                    b.impossibleActive()==0,
+                    "Skipping an impossible active emitter failed to "+
+                            "preserve actual request count or reduce work "+
+                            a+" / "+b);
+            reducedSlots+=a.historySlotsExamined();
+            legacySlots+=b.historySlotsExamined();
+            prunedRequests+=a.impossibleActive();
+            System.out.println("PASS physically fitted active-return pruning "+
+                    perSide+"v"+perSide+" ticks="+ticks+
+                    " optimized="+a+" original="+b+" fingerprint="+
+                    Long.toHexString(fast.fingerprint())+
+                    " (history counts diagnostic only)");
+        }
+        check(prunedRequests>0&&reducedSlots<legacySlots,
+                "Active-emission pruning never reduced historical age scans");
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -574,6 +643,7 @@ public final class OpponentIndexParityTest {
         verifyCooperativeFocusIndex(catalog);
         verifyHistoricalChannelMask(catalog);
         verifyTrackPacketTopK(catalog);
+        verifyImpossibleActivePhotonPruning(catalog);
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+
