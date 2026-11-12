@@ -136,6 +136,59 @@ public final class FighterRadarSeekerTest {
         }
         System.out.println("PASS fitted radar fighter missiles, chaff, IR isolation, replay");
     }
+    /** Fighter-carried seeker warnings are indexed from actual in-flight
+     * missiles, not inferred target positions. These paired live battles
+     * prove arrival, cartridge expenditure and seeker band causality survive
+     * the optimized lookup at every authoritative 30Hz tick. */
+    private static void warningIndexParity(TechnologyCatalog tech){
+        long indexedVisits=0,legacyVisits=0;
+        long observedRelevant=0;
+        for(boolean radar:new boolean[]{false,true}){
+            long seed=radar?815108L:815107L;
+            Battle indexed=fitted(tech,seed,radar);
+            Battle control=fitted(tech,seed,radar);
+            indexed.configureFighterWarningIndexForDiagnostic(true);
+            control.configureFighterWarningIndexForDiagnostic(false);
+            for(int tick=0;tick<190;tick++){
+                indexed.step();control.step();
+                require(indexed.fingerprint()==control.fingerprint(),
+                        "Indexed fighter warning changed real "+
+                        (radar?"RADAR":"INFRARED")+" combat at tick "+
+                        indexed.tick);
+            }
+            var fast=indexed.fighterWarningMetrics();
+            var full=control.fighterWarningMetrics();
+            require(indexed.fighterInterceptorsLaunched>0&&
+                    (radar?indexed.fighterChaffDeployed>0:
+                           indexed.fighterFlaresDeployed>0),
+                    "Seeker warning parity fixture had no real missile "+
+                    "or paid countermeasure");
+            require(fast.relevantSeekerChecks()==full.relevantSeekerChecks(),
+                    "Index dropped/duplicated candidate seeker geometry checks");
+            // CPU/work counts are advisory, not release blockers.
+            if(fast.candidateVisits()>full.candidateVisits())
+                System.out.println("ADVISORY indexed warning scans exceeded "+
+                        "legacy scan visits in "+(radar?"RADAR":"IR")+" fixture");
+            require(indexed.fighterWarningActiveBucketsForDiagnostic()<=
+                    indexed.fighterWarningBucketHighwaterForDiagnostic(),
+                    "Per-tick warning index retained more buckets than its pool");
+            indexedVisits+=fast.candidateVisits();
+            legacyVisits+=full.candidateVisits();
+            observedRelevant+=fast.relevantSeekerChecks();
+            boolean refused=false;
+            try{indexed.configureFighterWarningIndexForDiagnostic(false);}
+            catch(IllegalStateException expected){refused=true;}
+            require(refused,"Warning-index toggle accepted mid-combat mutation");
+        }
+        require(observedRelevant>0,
+                "Live seeker regression never exercised real targeted missiles");
+        System.out.println("PASS fighter warning-index IR/radar parity "+
+                "ticksPerPair=190 indexedVisits="+indexedVisits+
+                " fullScanVisits="+legacyVisits+
+                " exactSeekerGeometryChecks="+observedRelevant+
+                " (counts diagnostic only)");
+    }
+
     private static void finiteSpectralEstimates(){
         // Two bands may receive the SAME delayed coordinate and still
         // resolve it differently. No fresh position is permitted as input.
@@ -198,6 +251,8 @@ public final class FighterRadarSeekerTest {
     public static void main(String[] args)throws Exception{
         photonChronology();
         finiteSpectralEstimates();
-        live(TechnologyCatalog.loadDefault());
+        TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
+        live(catalog);
+        warningIndexParity(catalog);
     }
 }
