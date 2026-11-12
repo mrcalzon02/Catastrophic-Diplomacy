@@ -140,6 +140,53 @@ public final class FighterCraftTest {
                                 java.util.List.of("ORG:0","ORG:1","ORG:2")),
                 "Legacy carrier save must reconstruct stable native bay identities");
     }
+    /** Real physical bays, not the blueprint-wide legacy fighter profile,
+     * own launch type and launchable stock. */
+    private static void mixedBayLaunchAuthority(TechnologyCatalog tech){
+        Shipyard.Design design=Shipyard.starter(
+                Battle.Faction.TERRAN,Shipyard.Hull.CARRIER);
+        Battle battle=new Battle(919181L);
+        battle.spawnWing(0,design,tech,1,290,350);
+        battle.spawnWing(1,Shipyard.starter(Battle.Faction.DRAXIAN,
+                Shipyard.Hull.CRUISER),tech,1,550,350);
+        for(Battle.Ship ship:battle.ships())disarm(ship);
+        Battle.Ship carrier=battle.ships().get(0);
+        carrier.setLegacyFighterReserve(2);
+        FlightWingManifest manifest=FlightWingManifest.of(design,tech,2,List.of(
+                new FlightWingManifest.FlightWing("ORG:0",
+                        FighterModel.Hull.INTERCEPTOR,0,1,0,0,0,0),
+                new FlightWingManifest.FlightWing("ORG:1",
+                        FighterModel.Hull.TORPEDO_BOMBER,0,1,0,0,0,0)));
+        battle.setFlightWingManifest(carrier.id,manifest);
+        check(carrier.fighterBay("ORG:0").fighterHull==FighterModel.Hull.INTERCEPTOR&&
+                        carrier.fighterBay("ORG:1").fighterHull==
+                                FighterModel.Hull.TORPEDO_BOMBER,
+                "Mixed manifest did not become live per-bay fighter identity");
+
+        carrier.fighterBay("ORG:0").condition=0;
+        awaitPhysicalSorties(battle,carrier,1);
+        check(battle.crafts().stream().filter(c->c.fighter&&c.sourceId==carrier.id)
+                        .allMatch(c->c.profile.hull()==FighterModel.Hull.TORPEDO_BOMBER&&
+                                c.launchBayId.equals("ORG:1")),
+                "Disabled interceptor bay leaked stock or global fighter profile overrode bay type");
+        check(carrier.fighterReserve==1&&carrier.fighterBay("ORG:0").readyFighters==1&&
+                        carrier.fighterBay("ORG:1").readyFighters==0,
+                "First mixed sortie did not debit only its owning bay");
+
+        carrier.fighterBay("ORG:0").condition=1;
+        carrier.fighterReload=0;
+        awaitPhysicalSorties(battle,carrier,2);
+        java.util.Map<String,FighterModel.Hull> launched=new java.util.HashMap<>();
+        for(Battle.Craft craft:battle.crafts())
+            if(craft.fighter&&craft.sourceId==carrier.id)
+                launched.put(craft.launchBayId,craft.profile.hull());
+        check(launched.get("ORG:0")==FighterModel.Hull.INTERCEPTOR&&
+                        launched.get("ORG:1")==FighterModel.Hull.TORPEDO_BOMBER,
+                "Two paid wing types failed to launch their configured physical profiles");
+        check(carrier.fighterReserve==0&&carrier.fighterBay("ORG:0").readyFighters==0,
+                "Mixed wing launch did not consume exact per-bay stock");
+    }
+
     /** A fighter launch requires real resolved enemy contact. Light-travel
      * acquisition cannot authorize a first-tick magical carrier sortie.
      * Wait only up to four sim seconds; all inventory/bay assertions remain
@@ -434,6 +481,7 @@ public final class FighterCraftTest {
         sensorAndArmor();
         clearFlightDeck(tech);
         flightWingManifest(tech);
+        mixedBayLaunchAuthority(tech);
         CampaignFlightWingCodecTest.run(tech);
         saves(tech);
         hangarCapacityAndSorties(tech);

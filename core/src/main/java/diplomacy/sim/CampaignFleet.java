@@ -61,7 +61,8 @@ public final class CampaignFleet {
             ship.hull=hull;ship.shields=ship.defense.totalShields();
             ship.armor=ship.defense.totalArmor();
             ship.crewCount=crew;ship.kineticAmmo=kinetic;ship.missileAmmo=missiles;
-            ship.torpedoAmmo=torpedoes;ship.fighterReserve=fighters;ship.droneReserve=drones;
+            ship.torpedoAmmo=torpedoes;ship.setLegacyFighterReserve(fighters);
+            ship.droneReserve=drones;
             ship.repairDroneReserve=repairDrones;ship.fuel=fuel;
         }
     }

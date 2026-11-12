@@ -276,11 +276,25 @@ public final class Battle {
             public final String id;
             public final int socketIndex;
             public final boolean organic;
+            public final int capacity;
+            /** Live per-bay wing identity. Legacy fleets initialize every bay
+             * from the blueprint's single selected fighter type. */
+            public FighterModel.Hull fighterHull;
+            /** Intact unlaunched airframes. Stored stock remains paid but is
+             * not on the launch line until campaign service promotes it. */
+            public int readyFighters,storedFighters;
             public double condition=1.0;
-            HangarBay(String identity,int socket,boolean builtIn){
-                id=identity;socketIndex=socket;organic=builtIn;
+            HangarBay(String identity,int socket,boolean builtIn,int storage,
+                      FighterModel.Hull type){
+                if(identity==null||storage<0||type==null)
+                    throw new IllegalArgumentException("Invalid fighter bay");
+                id=identity;socketIndex=socket;organic=builtIn;capacity=storage;
+                fighterHull=type;readyFighters=storage;
             }
             public boolean operational(){return condition>=0.20;}
+            public int unlaunched(){
+                return Math.addExact(readyFighters,storedFighters);
+            }
         }
         public List<HangarBay> fighterBays=List.of();
         /** Legacy total launch-lane count remains available to existing UI/telemetry. */
@@ -288,6 +302,23 @@ public final class Battle {
         public HangarBay fighterBay(String identity){
             for(HangarBay bay:fighterBays)if(bay.id.equals(identity))return bay;
             return null;
+        }
+        /** Historical campaign stores had one fighter type and one reserve
+         * number. Distribute that stock deterministically across the real bays. */
+        public void setLegacyFighterReserve(int count){
+            int capacity=0;
+            for(HangarBay bay:fighterBays)capacity=Math.addExact(capacity,bay.capacity);
+            if(count<0||count>capacity)
+                throw new IllegalArgumentException("Fighter stock exceeds physical bays");
+            int remaining=count;
+            for(HangarBay bay:fighterBays){
+                bay.fighterHull=fighterProfile.hull();
+                bay.storedFighters=0;
+                bay.readyFighters=StrictMath.min(remaining,bay.capacity);
+                remaining-=bay.readyFighters;
+            }
+            if(remaining!=0)throw new IllegalStateException("Fighter stock distribution failed");
+            fighterReserve=count;
         }
         /** A module hit targets its actual FTR socket; unlocated native-deck damage
          * targets one organic catapult. Other hangar subsystem hits retain the
@@ -302,16 +333,24 @@ public final class Battle {
             }
             hangarCondition=Math.max(0,hangarCondition-loss);
         }
-        static List<HangarBay> baysFor(Shipyard.Design design){
+        static List<HangarBay> baysFor(Shipyard.Design design,
+                                          TechnologyCatalog catalog){
+            Map<String,Integer> capacities=FlightWingManifest.bayCapacities(design,catalog);
             List<HangarBay> bays=new ArrayList<>();
             int nativeCount=diplomacy.shipyard.HullBaseline.builtInLaunchBays(design.hull);
-            for(int n=0;n<nativeCount;n++)
-                bays.add(new HangarBay("ORG:"+n,-1,true));
+            for(int n=0;n<nativeCount;n++){
+                String id="ORG:"+n;
+                bays.add(new HangarBay(id,-1,true,
+                        capacities.getOrDefault(id,0),design.fighterHull));
+            }
             for(Shipyard.Slot slot:design.hull.slots){
                 Shipyard.Installed part=design.at(slot.index());
                 if(slot.mount()==Shipyard.Mount.SUPPORT && part!=null
-                        &&part.component.endsWith("-FTR"))
-                    bays.add(new HangarBay("FTR:"+slot.index(),slot.index(),false));
+                        &&part.component.endsWith("-FTR")){
+                    String id="FTR:"+slot.index();
+                    bays.add(new HangarBay(id,slot.index(),false,
+                            capacities.getOrDefault(id,0),design.fighterHull));
+                }
             }
             return List.copyOf(bays);
         }
@@ -686,12 +725,22 @@ public final class Battle {
                             repair?0.67:0.98);
         }
         Craft(int identifier, Ship source, boolean offensive, int target) {
-            this(identifier,source,offensive,false,target);
+            this(identifier,source,offensive,false,target,
+                    offensive?source.fighterProfile:null);
+        }
+        Craft(int identifier,Ship source,FighterModel.Profile fighterProfile,int target){
+            this(identifier,source,true,false,target,
+                    java.util.Objects.requireNonNull(fighterProfile));
         }
         Craft(int identifier, Ship source,boolean offensive,boolean service,int target) {
+            this(identifier,source,offensive,service,target,
+                    offensive?source.fighterProfile:null);
+        }
+        private Craft(int identifier,Ship source,boolean offensive,boolean service,
+                      int target,FighterModel.Profile selectedProfile) {
             id=identifier;sourceId=source.id;team=source.team;
             fighter=offensive;repair=service;targetId=target;x=source.x;y=source.y;
-            profile=offensive?source.fighterProfile:null;
+            profile=offensive?java.util.Objects.requireNonNull(selectedProfile):null;
             if(offensive){
                 var pack=FighterCountermeasures.forHull(profile.hull(),
                         source.fighterCountermeasureTier);
@@ -1659,9 +1708,9 @@ public final class Battle {
         s.kineticDamage=machinery.kineticDamage();s.plasmaDamage=machinery.plasmaDamage();
         s.particleDamage=machinery.particleDamage();s.torpedoDamage=machinery.torpedoDamage();
         s.ecmStrength=machinery.ecmStrength();
-        s.fighterReserve=machinery.fighterCapacity();
-        s.fighterBays=Ship.baysFor(design);
+        s.fighterBays=Ship.baysFor(design,catalog);
         s.fighterLaunchBays=s.fighterBays.size();
+        s.setLegacyFighterReserve(machinery.fighterCapacity());
         // Actual researched blueprint policy, before paid craft launch.
         s.fighterRadarSelected=design.fighterSeeker==FighterModel.Seeker.RADAR;
         s.fighterOpticalSelected=design.fighterSeeker==FighterModel.Seeker.OPTICAL;
@@ -1714,6 +1763,36 @@ public final class Battle {
      * rest for stationary damage/aim regression tests; player and exhibition
      * battles inherit realistic pre-engagement approach momentum only after
      * orders and campaign stores have been installed. */
+    /**
+     * Tick-zero live bridge from the checked per-bay campaign manifest. This
+     * first live boundary accepts intact prebattle stock only; in-flight and
+     * servicing states are resolved by the campaign lifecycle before launch.
+     */
+    public void setFlightWingManifest(int shipId,FlightWingManifest manifest){
+        if(tick!=0||manifest==null)throw new IllegalArgumentException(
+                "Flight wing setup is a prebattle operation");
+        Ship ship=findShip(shipId);
+        if(ship==null||manifest.paid()!=ship.fighterReserve)
+            throw new IllegalArgumentException("Flight wing inventory mismatch");
+        for(Ship.HangarBay bay:ship.fighterBays){
+            bay.readyFighters=0;
+            bay.storedFighters=0;
+        }
+        int unlaunched=0;
+        for(FlightWingManifest.FlightWing wing:manifest.wings()){
+            Ship.HangarBay bay=ship.fighterBay(wing.bayId());
+            if(bay==null||wing.paid()>bay.capacity||
+                    wing.launched()!=0||wing.returning()!=0||wing.servicing()!=0)
+                throw new IllegalArgumentException("Unsupported live fighter bay state");
+            bay.fighterHull=wing.type();
+            bay.readyFighters=wing.ready();
+            bay.storedFighters=wing.stored();
+            unlaunched=Math.addExact(unlaunched,bay.unlaunched());
+        }
+        if(unlaunched!=ship.fighterReserve)
+            throw new IllegalArgumentException("Live fighter stock does not balance");
+    }
+
     public void initializeBattleApproach(){
         for(Ship ship:ships){
             if(!ship.alive()||ship.escaped||ship.withdrawing
@@ -4697,14 +4776,16 @@ public final class Battle {
             int launched=0;
             for(Ship.HangarBay bay:ship.fighterBays){
                 if(launched>=slots)break;
-                if(!bay.operational())continue;
+                if(!bay.operational()||bay.readyFighters<=0)continue;
                 if(ship.power<7||ship.heat+3>ship.maxHeat*0.9)break;
+                FighterModel.Profile profile=FighterModel.forFaction(
+                        bay.fighterHull,ship.faction);
                 int seats=FighterSurvivability.installed(
-                        ship.fighterProfile,ship.fighterCountermeasureTier).crew();
+                        profile,ship.fighterCountermeasureTier).crew();
                 // Pilots must leave a real occupied berth to board a sortie,
                 // and enough crew stays aboard to operate the carrier.
                 if(ship.crewCount<seats+StrictMath.max(1,ship.crewRequired*.05))break;
-                Craft launchedCraft=new Craft(nextCraftId++,ship,true,fighterTarget.id);
+                Craft launchedCraft=new Craft(nextCraftId++,ship,profile,fighterTarget.id);
                 launchedCraft.crewEmbarked=true;
                 ship.crewCount-=seats;
                 ship.fighterPilotsCommitted+=seats;
@@ -4713,6 +4794,7 @@ public final class Battle {
                 visual(nextVisualShotId++,VisualPhase.FIRE,"FIGHTER",
                         ship.team,ship.id,fighterTarget.id,
                         ship.x,ship.y,fighterTarget.x,fighterTarget.y);
+                bay.readyFighters--;
                 ship.fighterReserve--;ship.fightersLaunched++;launched++;
                 ship.power-=7;ship.heat+=3;
             }
@@ -5227,13 +5309,28 @@ public final class Battle {
     /** A recovery is a physical return, not a replacement airframe or free reload.
      * Damaged decks can use a surviving fitted bay; a fully disabled hangar
      * cannot magically swallow a fighter. The pilot rejoins the original crew. */
+    private int fighterBayOccupancy(Ship source,Ship.HangarBay bay,Craft arriving){
+        int occupied=bay.unlaunched();
+        for(Craft docked:source.dockedFighters)
+            if(docked.fighter&&bay.id.equals(docked.launchBayId))occupied++;
+        for(Craft active:crafts)
+            if(active!=arriving&&active.fighter&&active.sourceId==source.id&&
+                    active.integrity>0&&bay.id.equals(active.launchBayId))occupied++;
+        return occupied;
+    }
+    private boolean eligibleLandingBay(Ship source,Ship.HangarBay bay,Craft craft){
+        return bay!=null&&bay.operational()&&craft.profile!=null&&
+                bay.fighterHull==craft.profile.hull()&&
+                fighterBayOccupancy(source,bay,craft)<bay.capacity;
+    }
+
     private boolean recoverFighter(Craft craft,Ship source){
         if(source==null||!source.alive()||source.escaped)return false;
         Ship.HangarBay landingBay=source.fighterBay(craft.launchBayId);
-        if(landingBay==null||!landingBay.operational()){
+        if(!eligibleLandingBay(source,landingBay,craft)){
             landingBay=null;
             for(Ship.HangarBay bay:source.fighterBays)
-                if(bay.operational()){landingBay=bay;break;}
+                if(eligibleLandingBay(source,bay,craft)){landingBay=bay;break;}
         }
         double dx=source.x-craft.x,dy=source.y-craft.y;
         double distance=StrictMath.hypot(dx,dy);
@@ -5305,6 +5402,9 @@ public final class Battle {
             source.kineticAmmo-=kinetic;
             source.missileAmmo-=missiles;
             source.torpedoAmmo-=torpedoes;
+            if(bay.readyFighters>=bay.capacity)
+                throw new IllegalStateException("Fighter bay service exceeds capacity");
+            bay.readyFighters++;
             source.fighterReserve++;
             source.fightersRearmed++;
             source.dockedFighters.remove(i);
@@ -7676,6 +7776,10 @@ public final class Battle {
             hash=mix(hash,s.fighterPilotsCommitted);
             for(Ship.HangarBay bay:s.fighterBays){
                 hash=mix(hash,bay.id.hashCode());
+                hash=mix(hash,bay.capacity);
+                hash=mix(hash,bay.fighterHull.ordinal());
+                hash=mix(hash,bay.readyFighters);
+                hash=mix(hash,bay.storedFighters);
                 hash=mix(hash,Double.doubleToLongBits(bay.condition));
             }
             hash=mix(hash,s.repairDroneReserve);
