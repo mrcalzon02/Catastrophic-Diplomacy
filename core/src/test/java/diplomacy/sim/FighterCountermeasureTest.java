@@ -53,6 +53,11 @@ public final class FighterCountermeasureTest {
     private static Battle fixture(TechnologyCatalog tech,long seed,
                                   boolean disabled,String defenseKind,
                                   boolean indexedOpponents){
+        return fixture(tech,seed,disabled,defenseKind,indexedOpponents,true);
+    }
+    private static Battle fixture(TechnologyCatalog tech,long seed,
+                                  boolean disabled,String defenseKind,
+                                  boolean indexedOpponents,boolean indexedRadarDefenders){
         if(!defenseKind.equals("FLK")&&!defenseKind.equals("RCW"))
             throw new IllegalArgumentException("Only real fitted radar guns");
         var hull=Shipyard.Hull.CRUISER;
@@ -68,6 +73,7 @@ public final class FighterCountermeasureTest {
                 "Fighter and flak must be physically legal installed hardware");
         Battle battle=new Battle(seed);
         battle.configureOpponentIndexForDiagnostic(indexedOpponents);
+        battle.configureRadarDefenderIndexForDiagnostic(indexedRadarDefenders);
         battle.spawnWing(0,carrier,tech,1,300,350);
         battle.spawnWing(1,flak,tech,1,510,350);
         Battle.Ship parent=battle.ships().get(0);
@@ -165,8 +171,8 @@ public final class FighterCountermeasureTest {
     private static void opponentIndexRadarParity(TechnologyCatalog tech){
         for(String kind:new String[]{"FLK","RCW"}){
             long seed=kind.equals("FLK")?810420L:810421L;
-            Battle indexed=fixture(tech,seed,false,kind,true);
-            Battle legacy=fixture(tech,seed,false,kind,false);
+            Battle indexed=fixture(tech,seed,false,kind,true,true);
+            Battle legacy=fixture(tech,seed,false,kind,false,false);
             for(int t=0;t<190;t++){
                 indexed.step();legacy.step();
                 check(indexed.fingerprint()==legacy.fingerprint(),
@@ -176,10 +182,24 @@ public final class FighterCountermeasureTest {
             check(indexed.fighterChaffDeployed>0 &&
                     indexed.fighterChaffDeployed==legacy.fighterChaffDeployed,
                     "Actual "+kind+" radar did not exercise finite chaff parity");
+            var fast=indexed.radarDefenderMetrics();
+            var full=legacy.radarDefenderMetrics();
+            check(fast.qualifiedThreats()>0 &&
+                    fast.qualifiedThreats()==full.qualifiedThreats(),
+                    "Radar defense index lost real fitted FLK/RCW threats");
+            // Counts are advisory and must not become a release score gate.
+            System.out.println("MEASURE "+kind+" fighter radar candidate visits "+
+                    "indexed="+fast.visitedSlots()+
+                    " fullFleet="+full.visitedSlots()+
+                    " qualified="+fast.qualifiedThreats());
             boolean refused=false;
             try{indexed.configureOpponentIndexForDiagnostic(false);}
             catch(IllegalStateException expected){refused=true;}
             check(refused,"Opponent-index diagnostic accepted a midbattle toggle");
+            refused=false;
+            try{indexed.configureRadarDefenderIndexForDiagnostic(false);}
+            catch(IllegalStateException expected){refused=true;}
+            check(refused,"Radar-index diagnostic accepted a midbattle toggle");
         }
         System.out.println("PASS FLK/RCW chaff hostile-index full-scan parity: "+
                 "2 fitted defenders, 190 ticks each, live finite countermeasures");

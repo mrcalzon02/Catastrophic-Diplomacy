@@ -89,3 +89,13 @@ jobs:
             :core:projectileModuleSmoke :game:combatVisibilitySmoke \
             :core:massMixedOnlySmoke :core:hardpointsLowHeapSmoke \
             :game:wikiSmoke :game:menuFlowSmoke
+      # Art/style checks are advisory. They must not block runnable builds,
+      # multiplayer, updater safety, or publish decisions. One job only.
+      - name: Advisory projectile sprite footprint and atlas routing
+        if: success()
+        continue-on-error: true
+        run: |
+          gradle --no-daemon \
+            :game:guidedOrdnanceArtSmoke \
+            :game:kineticOrdnanceArtSmoke \
+            :game:weaponStageArtSmoke

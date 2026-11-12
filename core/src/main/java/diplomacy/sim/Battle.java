@@ -1015,6 +1015,24 @@ public final class Battle {
     }
     private final Map<Integer,FighterWarningBucket> fighterWarnings=new HashMap<>();
     private final ArrayList<FighterWarningBucket> fighterWarningPool=new ArrayList<>();
+    /** Ordered radar-equipped hostile captains, refreshed after flare phase.
+     * Built only while a live fighter can actually spend a chaff cartridge. */
+    private final ArrayList<Ship> teamZeroRadarDefenders=new ArrayList<>();
+    private final ArrayList<Ship> teamOneRadarDefenders=new ArrayList<>();
+    private boolean indexedRadarDefenders=true;
+    private long[] radarDefenderDiagnostics;
+    public record RadarDefenderMetrics(long visitedSlots,long qualifiedThreats) { }
+    public void configureRadarDefenderIndexForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure radar defender index before battle");
+        indexedRadarDefenders=enabled;
+        radarDefenderDiagnostics=new long[2];
+    }
+    public RadarDefenderMetrics radarDefenderMetrics(){
+        long[] c=radarDefenderDiagnostics;
+        return c==null?new RadarDefenderMetrics(0,0):
+                new RadarDefenderMetrics(c[0],c[1]);
+    }
     private int fighterWarningPoolUsed;
     private boolean indexedFighterWarnings=true;
     private long[] fighterWarningDiagnostics;
@@ -5116,6 +5134,7 @@ public final class Battle {
             if(incoming!=null)emitFighterCountermeasure(craft,
                     FighterCountermeasures.Kind.FLARE,incoming.x,incoming.y);
         }
+        refreshRadarDefenders();
         for(Craft craft:crafts)if(craft.fighter&&craft.chaffRemaining>0&&
                 craft.integrity>0&&tick>=craft.nextCountermeasureTick){
             // Defend against the actual onboard radar band; unlike chaff
@@ -5147,10 +5166,11 @@ public final class Battle {
             // Only hostile radar ships can spend an aircraft's chaff.
             // Stable enemy insertion order preserves closest/tie behavior;
             // use the same opponent index as captain target selection.
-            for(Ship defender:opponentCandidates(craft.team))
-                    if(defender.alive()&&defender.team!=craft.team&&
-                    defender.power>4&&defender.pointDefenseCondition>.2&&
-                    defender.orders.pointDefense().craft()){
+            for(Ship defender:radarDefenderCandidates(craft.team)){
+                if(radarDefenderDiagnostics!=null)radarDefenderDiagnostics[0]++;
+                if(!defender.alive()||defender.team==craft.team||
+                        defender.power<=4||defender.pointDefenseCondition<=.2||
+                        !defender.orders.pointDefense().craft())continue;
                 double reach=0;
                 for(Ship.FlakMount mount:defender.flakMounts)
                     reach=StrictMath.max(reach,mount.nominalRange);
@@ -5158,15 +5178,44 @@ public final class Battle {
                     reach=StrictMath.max(reach,mount.nominalRange);
                 double dist=StrictMath.hypot(defender.x-craft.x,
                         defender.y-craft.y);
-                if(reach>0&&dist<nearest&&
-                        dist<=reach*weather.sensorFactor()){
-                    nearest=dist;threat=defender;
+                if(reach>0&&dist<=reach*weather.sensorFactor()){
+                    if(radarDefenderDiagnostics!=null)radarDefenderDiagnostics[1]++;
+                    if(dist<nearest){nearest=dist;threat=defender;}
                 }
             }
             if(threat!=null)emitFighterCountermeasure(craft,
                     FighterCountermeasures.Kind.CHAFF,threat);
         }
     }
+    /** Preserve the old global insertion ordering and eligibility tests:
+     * only *physically fitted*, powered radar-controlled FLK/RCW vessels can
+     * threaten a fighter with radar fire. Source lists are stale neither
+     * across combat ticks nor after a ship loses its actual fitted hardware. */
+    private void refreshRadarDefenders(){
+        teamZeroRadarDefenders.clear();
+        teamOneRadarDefenders.clear();
+        if(!indexedRadarDefenders)return;
+        boolean anyChaffCandidate=false;
+        for(Craft craft:crafts){
+            if(craft.fighter&&craft.chaffRemaining>0&&craft.integrity>0&&
+                    tick>=craft.nextCountermeasureTick){
+                anyChaffCandidate=true;break;
+            }
+        }
+        if(!anyChaffCandidate)return;
+        for(Ship ship:ships)
+            if(ship.alive()&&ship.power>4&&
+                    ship.pointDefenseCondition>.2&&
+                    ship.orders.pointDefense().craft()&&
+                    (!ship.flakMounts.isEmpty()||!ship.rotaryMounts.isEmpty()))
+                (ship.team==0?teamZeroRadarDefenders:teamOneRadarDefenders)
+                        .add(ship);
+    }
+    private List<Ship> radarDefenderCandidates(int fighterTeam){
+        if(!indexedRadarDefenders)return opponentCandidates(fighterTeam);
+        return fighterTeam==0?teamOneRadarDefenders:teamZeroRadarDefenders;
+    }
+
     /** One physically adjacent radar cloud can compete with its parent
      * aircraft, but cannot fabricate a new target ID or fool optics. */
     private FighterCountermeasures.Cloud radarFighterGhost(
