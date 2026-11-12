@@ -782,6 +782,35 @@ public final class Shipyard {
         }
         return bays;
     }
+    /**
+     * Marginal storage contributed by one physical FTR socket. This comparison
+     * deliberately resets fighter seeker doctrine on the temporary no-hangar
+     * clone before validation; removing the very module that licenses OPTICAL
+     * or RADAR must not make capacity accounting reject the legal source ship.
+     */
+    public static int fighterCapacityWithoutHangar(Design design,int slot,
+                                                    TechnologyCatalog catalog){
+        if(design==null||catalog==null||slot<0||slot>=design.slots())
+            throw new IllegalArgumentException("Invalid fighter capacity probe");
+        Installed existing=design.at(slot);
+        if(existing==null||!existing.component.endsWith("-FTR"))
+            throw new IllegalArgumentException("Capacity probe requires fitted FTR socket");
+        List<Installed> changed=new ArrayList<>(design.parts);
+        changed.set(slot,null);
+        Map<Integer,RocketBarrage.Fitting> programs=design.rocketFittings;
+        Map<Integer,OrdnanceFitting.Mounted> guided=design.launcherFittings;
+        if(programs.containsKey(slot)){
+            programs=new TreeMap<>(programs);programs.remove(slot);
+        }
+        if(guided.containsKey(slot)){
+            guided=new TreeMap<>(guided);guided.remove(slot);
+        }
+        Design comparison=new Design(design.faction,design.hull,design.name,changed,
+                design.fighterHull,design.ammoSelection,design.missileOrdnance,
+                design.torpedoOrdnance,guided,programs,FighterModel.Seeker.INFRARED)
+                .verifyAmmo();
+        return fit(comparison,catalog).fighterCapacity();
+    }
     /** Fitted physical sensor suite. One empty hull has normal optics and radar,
      * but no fictional free x-ray, thermal, gravitic or holographic array. */
     public record Sensing(double radarGain,double infraredRange,double xrayRange,
