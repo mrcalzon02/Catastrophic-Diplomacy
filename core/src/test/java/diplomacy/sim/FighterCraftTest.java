@@ -545,9 +545,55 @@ public final class FighterCraftTest {
                 "Torpedo bomber remains stacked on its carrier after launch");
     }
 
+    /** SCREEN needs real launch-ready inventory before searching hundreds of
+     * opponents. A destroyed bay retains paid stock but cannot launch it. */
+    private static void screenLaunchEligibility(TechnologyCatalog tech){
+        Battle noHangar=new Battle(2026111201L);
+        noHangar.spawnWing(0,Shipyard.starter(Battle.Faction.TERRAN,
+                Shipyard.Hull.CRUISER),tech,1,290,350);
+        noHangar.spawnWing(1,Shipyard.starter(Battle.Faction.DRAXIAN,
+                Shipyard.Hull.CRUISER),tech,1,550,350);
+        for(Battle.Ship ship:noHangar.ships())disarm(ship);
+        Battle.Ship empty=noHangar.ships().get(0);
+        empty.standingOrders=ShipStandingOrders.DEFAULT.adjust(16,1);
+        check(empty.standingOrders.directives().fighterMission()==
+                        ShipTacticalDirectives.FighterMission.SCREEN &&
+                empty.fighterReserve==0,
+                "Fighterless SCREEN fixture is not unstocked");
+        noHangar.configureCaptainTargetingMetrics(true);
+        for(int t=0;t<80;t++)noHangar.step();
+        check(noHangar.fighterThreatSearchesForDiagnostic()==0 &&
+                        empty.fightersLaunched==0,
+                "Unstocked SCREEN captain wasted an all-opponent fighter search");
+
+        Battle ready=scenario(tech,FighterModel.Hull.INTERCEPTOR,2026111202L);
+        Battle.Ship stocked=ready.ships().get(0);
+        check(stocked.fighterReserve>0&&stocked.fighterLaunchBays>0,
+                "Fitted SCREEN fixture has no physical carrier inventory");
+        stocked.standingOrders=ShipStandingOrders.DEFAULT.adjust(16,1);
+        ready.configureCaptainTargetingMetrics(true);
+        for(int t=0;t<180&&stocked.fightersLaunched==0;t++)ready.step();
+        check(ready.fighterThreatSearchesForDiagnostic()>0&&
+                        stocked.fightersLaunched>0,
+                "Launch-ready SCREEN failed to find a hostile and launch a fighter");
+
+        Battle damaged=scenario(tech,FighterModel.Hull.INTERCEPTOR,2026111203L);
+        Battle.Ship grounded=damaged.ships().get(0);
+        int paidStock=grounded.fighterReserve;
+        grounded.standingOrders=ShipStandingOrders.DEFAULT.adjust(16,1);
+        for(Battle.Ship.HangarBay bay:grounded.fighterBays)bay.condition=0;
+        damaged.configureCaptainTargetingMetrics(true);
+        for(int t=0;t<80;t++)damaged.step();
+        check(damaged.fighterThreatSearchesForDiagnostic()==0&&
+                        grounded.fightersLaunched==0&&
+                        grounded.fighterReserve==paidStock,
+                "Destroyed fighter bays scanned threats, launched or lost paid stock");
+    }
+
     public static void main(String[] args)throws IOException {
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         sensorAndArmor();
+        screenLaunchEligibility(tech);
         clearFlightDeck(tech);
         flightWingManifest(tech);
         mixedBayLaunchAuthority(tech);

@@ -868,6 +868,9 @@ public final class Battle {
      * Avoid per-captain boxed Integer + ArrayList allocation every 6th tick.
      * Expanded only if a legitimate protected-asset roster exceeds capacity. */
     private int[] captainProtectedThreatScratch=new int[8];
+    /** Reused across sequential fighter SCREEN/PROTECT decisions. No retained
+     * per-captain asset lists or per-tick boxed objects in crowded fleets. */
+    private Ship[] fighterProtectedAssetsScratch=new Ship[8];
     /** Opt-in read-only target-selection counts. Null in normal gameplay:
      * no benchmark clock calls or allocations on the targeting hot path. */
     private long[] captainTargetDiagnostic;
@@ -3407,7 +3410,12 @@ public final class Battle {
     public void configureCaptainTargetingMetrics(boolean enabled){
         if(tick!=0)throw new IllegalStateException(
                 "Captain diagnostic must be configured before tick one");
-        captainTargetDiagnostic=enabled?new long[7]:null;
+        captainTargetDiagnostic=enabled?new long[8]:null;
+    }
+    /** Number of actual fighter SCREEN/PROTECT world searches in an opt-in
+     * diagnostic battle; zero when no profiler is configured. */
+    public long fighterThreatSearchesForDiagnostic(){
+        return captainTargetDiagnostic==null?0:captainTargetDiagnostic[7];
     }
     public CaptainTargetingMetrics captainTargetingMetrics(){
         long[] c=captainTargetDiagnostic;
@@ -4777,26 +4785,44 @@ public final class Battle {
     }
 
     /** Screen nearby threats; protect responds to actual attack orders and last attackers. */
+    private static boolean hasReadyFighterBay(Ship source){
+        for(Ship.HangarBay bay:source.fighterBays)
+            if(bay.operational()&&bay.readyFighters>0)return true;
+        return false;
+    }
     private Ship protectedThreat(Ship source,boolean screen){
+        if(captainTargetDiagnostic!=null)captainTargetDiagnostic[7]++;
         Ship chosen=null;
         double best=Double.POSITIVE_INFINITY;
-        java.util.ArrayList<Ship> assets=new java.util.ArrayList<>();
+        Ship[] assets=fighterProtectedAssetsScratch;
+        int assetCount=0;
         Ship escort=findShip(source.escortShipId);
-        if(escort!=null&&escort.alive())assets.add(escort);
+        if(escort!=null&&escort.alive())assets[assetCount++]=escort;
         for(int id:source.defendedShipIds){
             Ship friend=findShip(id);
-            if(friend!=null&&friend.alive())assets.add(friend);
-        }
-        if(assets.isEmpty())assets.add(source);
-        for(Ship enemy:ships)if(enemy.team!=source.team&&enemy.alive()){
-            for(Ship asset:assets){
-                double distance=StrictMath.hypot(enemy.x-asset.x,enemy.y-asset.y);
-                boolean attacking=enemy.lastTargetId==asset.id||asset.lastAttackerId==enemy.id;
-                if(!attacking&&(!screen||distance>300))continue;
-                double score=distance-(attacking?320:0);
-                if(score<best){best=score;chosen=enemy;}
+            if(friend==null||!friend.alive())continue;
+            if(assetCount==assets.length){
+                assets=Arrays.copyOf(assets,assets.length*2);
+                fighterProtectedAssetsScratch=assets;
             }
+            assets[assetCount++]=friend;
         }
+        if(assetCount==0)assets[assetCount++]=source;
+        // The indexed enemy list retains the same stable insertion order as
+        // the former full-fleet filter. Physical proximity decisions are
+        // permitted only for fighter SCREEN/PROTECT, not offensive fire locks.
+        for(Ship enemy:opponentCandidates(source.team))
+            if(enemy.team!=source.team&&enemy.alive()){
+                for(int i=0;i<assetCount;i++){
+                    Ship asset=assets[i];
+                    double distance=StrictMath.hypot(enemy.x-asset.x,enemy.y-asset.y);
+                    boolean attacking=enemy.lastTargetId==asset.id||
+                            asset.lastAttackerId==enemy.id;
+                    if(!attacking&&(!screen||distance>300))continue;
+                    double score=distance-(attacking?320:0);
+                    if(score<best){best=score;chosen=enemy;}
+                }
+            }
         return chosen;
     }
     private void launchAuxiliary(Ship ship, Ship enemy) {
@@ -4810,8 +4836,14 @@ public final class Battle {
         var fighterPlan=ship.standingOrders==null?
                 ShipTacticalDirectives.FighterMission.STRIKE:
                 ship.standingOrders.directives().fighterMission();
-        if(fighterPlan==ShipTacticalDirectives.FighterMission.SCREEN||
-                fighterPlan==ShipTacticalDirectives.FighterMission.PROTECT)
+        // This search is used ONLY to choose a newly launched aircraft's
+        // target. Skip it entirely when no stocked/operational launch can
+        // occur; drones still use the unchanged independent enemy route.
+        if(!withdrawing&&ship.fighterReserve>0&&ship.fighterLaunchBays>0&&
+                ship.fighterReload<=0&&crafts.size()<2000&&
+                (fighterPlan==ShipTacticalDirectives.FighterMission.SCREEN||
+                 fighterPlan==ShipTacticalDirectives.FighterMission.PROTECT)&&
+                hasReadyFighterBay(ship))
             fighterTarget=protectedThreat(ship,fighterPlan==
                     ShipTacticalDirectives.FighterMission.SCREEN);
         if(!withdrawing&&fighterPlan!=ShipTacticalDirectives.FighterMission.RESERVE&&
