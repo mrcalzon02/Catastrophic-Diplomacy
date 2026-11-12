@@ -189,6 +189,36 @@ public final class FighterRadarSeekerTest {
                 " (counts diagnostic only)");
     }
 
+    /** Expend every live seeker motor while its warning bucket is populated.
+     * The following tick must forget those real bodies, not retain references
+     * in a pooled list and spend a phantom countermeasure. */
+    private static void staleWarningBuckets(TechnologyCatalog tech){
+        Battle fixture=fitted(tech,815109L,true);
+        fixture.configureFighterWarningIndexForDiagnostic(true);
+        for(int tick=0;tick<190&&
+                fixture.fighterWarningActiveBucketsForDiagnostic()==0;tick++)
+            fixture.step();
+        require(fixture.fighterWarningActiveBucketsForDiagnostic()>0,
+                "Stale-warning fixture never held a real targeted seeker");
+        int highwater=fixture.fighterWarningBucketHighwaterForDiagnostic();
+        int exhausted=0;
+        for(Battle.Missile missile:fixture.missiles())
+            if(missile.targetCraftId>0){
+                missile.fuel=0;
+                exhausted++;
+            }
+        require(exhausted>0,"No live seeker motor available to expire");
+        // Prevent a fresh aircraft salvo during the same snapshot boundary.
+        for(Battle.Craft craft:fixture.crafts())craft.reload=10000;
+        fixture.step();
+        require(fixture.fighterWarningActiveBucketsForDiagnostic()==0,
+                "Expired missiles survived the next warning-index refresh");
+        require(fixture.fighterWarningBucketHighwaterForDiagnostic()==highwater,
+                "Warning bucket pool unexpectedly grew after all threats expired");
+        System.out.println("PASS expired fighter missiles cannot leave stale "+
+                "warnings or grow the pooled seeker-index storage");
+    }
+
     private static void finiteSpectralEstimates(){
         // Two bands may receive the SAME delayed coordinate and still
         // resolve it differently. No fresh position is permitted as input.
@@ -254,5 +284,6 @@ public final class FighterRadarSeekerTest {
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         live(catalog);
         warningIndexParity(catalog);
+        staleWarningBuckets(catalog);
     }
 }

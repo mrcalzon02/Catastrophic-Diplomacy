@@ -293,12 +293,40 @@ public final class FighterOpticalSeekerTest {
         }
         System.out.println("PASS real equipped optical interceptors, delayed photons, IR/radar isolation and replay");
     }
+    /** Optical warnings share the real IR/visible-glare flare channel.
+     * The indexed lookup must never alter when real fighter cameras receive
+     * photons, when finite flares are dispensed, or which missile is nearest. */
+    private static void opticalWarningIndexParity(TechnologyCatalog tech){
+        Battle indexed=fitted(tech,815826L,true);
+        Battle reference=fitted(tech,815826L,true);
+        indexed.configureFighterWarningIndexForDiagnostic(true);
+        reference.configureFighterWarningIndexForDiagnostic(false);
+        for(int tick=0;tick<190;tick++){
+            indexed.step();reference.step();
+            require(indexed.fingerprint()==reference.fingerprint(),
+                    "Indexed visible-light fighter warning diverged at tick "+
+                    indexed.tick);
+        }
+        var fast=indexed.fighterWarningMetrics();
+        var legacy=reference.fighterWarningMetrics();
+        require(indexed.fighterInterceptorsLaunched>0&&
+                fast.relevantSeekerChecks()>0&&
+                fast.relevantSeekerChecks()==legacy.relevantSeekerChecks(),
+                "No live optical warnings, or index dropped a physical seeker");
+        System.out.println("PASS optical fighter warning-index parity "+
+                "ticks=190 indexedVisits="+fast.candidateVisits()+
+                " fullScanVisits="+legacy.candidateVisits()+
+                " relevantChecks="+fast.relevantSeekerChecks()+
+                " (scan counts advisory only)");
+    }
+
     public static void main(String[] args)throws Exception{
         opticalPhotonAndBandIsolation();
         atmosphericVisibility();
         var tech=TechnologyCatalog.loadDefault();
         selectedHardware(tech);
         live(tech);
+        opticalWarningIndexParity(tech);
         weatherBattleReplay(tech);
     }
 }
