@@ -1284,3 +1284,12 @@ tasks.register('networkSnapshotValidationSmoke', JavaExec) {
 tasks.matching { it.name == 'gameFlowSmoke' }.configureEach {
     dependsOn(tasks.named('networkSnapshotValidationSmoke'))
 }
+
+tasks.register('campaignFlightWingAuthoritySmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify campaign physical fighter-wing authority across refit, battle loss and paid replenishment.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.sim.CampaignFlightWingAuthorityTest'
+}
+tasks.named('fighterCraftSmoke') { finalizedBy(tasks.named('campaignFlightWingAuthoritySmoke')) }
