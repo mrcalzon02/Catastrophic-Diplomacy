@@ -30,6 +30,30 @@ public final class WeaponStageArtTest {
         check(WeaponStageArt.row(WeaponFxProfile.forType(
                 Battle.DamageType.MISSILE).firing())==-1,
                 "Do not fake a missile launch using unrelated laser FX");
+        // Diagnostic only: keep the small physical body distinguishable from
+        // launch effects, without shrinking impacts or unrelated weapon types.
+        for(String guided:new String[]{"MISSILE","TORPEDO","ROCKET","DECOY",
+                "FIGHTER_MISSILE"}){
+            check(ModularWeaponFxRenderer.projectileLaunchScale(
+                        guided,Battle.VisualPhase.FIRE)==.55f,
+                    "Oversized guided/rocket launch flare: "+guided);
+            check(ModularWeaponFxRenderer.projectileLaunchScale(
+                        guided,Battle.VisualPhase.IMPACT)==1f &&
+                    ModularWeaponFxRenderer.projectileLaunchScale(
+                        guided,Battle.VisualPhase.INTERCEPT)==1f,
+                    "Physical hit/point-defense VFX cannot inherit launch shrink");
+        }
+        for(String family:new String[]{"LASER","KINETIC","PLASMA","PARTICLE",
+                "POINT_DEFENSE","RAIL_PD","ROTARY_CIWS"}){
+            check(ModularWeaponFxRenderer.projectileLaunchScale(
+                        family,Battle.VisualPhase.FIRE)==1f,
+                    "Unrelated firing art changed: "+family);
+        }
+        check(CombatEffectScale.of(
+                WeaponFxProfile.forType(Battle.DamageType.MISSILE).firing().width()*
+                ModularWeaponFxRenderer.projectileLaunchScale(
+                        "MISSILE",Battle.VisualPhase.FIRE))<4.1f,
+                "Missile flash remains disproportionately large");
         System.out.println("PASS all authored laser/kinetic/plasma/particle muzzle and impact atlas rows");
     }
 }

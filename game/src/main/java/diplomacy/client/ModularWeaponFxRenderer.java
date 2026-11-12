@@ -223,6 +223,15 @@ final class ModularWeaponFxRenderer implements Disposable {
         if(family==Battle.DamageType.KINETIC)return .55f;
         return 1f;
     }
+    /** Launch flashes for moving guided/rocket bodies must not read as a
+     * second, oversized projectile. Beam and kinetic muzzle effects retain
+     * their authored footprint; terminal IMPACT/INTERCEPT are independent. */
+    static float projectileLaunchScale(String weapon,Battle.VisualPhase phase){
+        if(phase!=Battle.VisualPhase.FIRE||weapon==null)return 1f;
+        return weapon.equals("MISSILE")||weapon.equals("TORPEDO")||
+                weapon.equals("ROCKET")||weapon.equals("DECOY")||
+                weapon.endsWith("_MISSILE")?.55f:1f;
+    }
     /**
      * This stage is driven strictly by simulation tick, including when paused.
      * Rendering multiple frames per tick does not speed up animation.
@@ -256,14 +265,6 @@ final class ModularWeaponFxRenderer implements Disposable {
                      event.phase()==Battle.VisualPhase.INTERCEPT)&&
                     poses.fraction()<.80f)continue;
             if(lasers.handlesFire(event))continue; // Full authored shot replaces old muzzle cutout.
-            if(view!=null&&!view.circle(event.x(),event.y(),
-                    Math.max(shot.clip().width(),shot.clip().height())*.5f))continue;
-            long elapsed=battle.tick-event.tick();
-            TextureRegion authored=authoredStage(shot.clip(),elapsed);
-            Texture image=authored==null?frame(shot.clip(),elapsed):null;
-            if(authored==null&&image==null)continue;
-            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
-                    event.targetY()-event.y(),event.targetX()-event.x()));
             diplomacy.sim.LaserFamilies.Type laser=
                     diplomacy.sim.LaserFamilies.fromWeapon(event.weapon());
             float size=(laser==null?1f:switch(laser){
@@ -272,7 +273,20 @@ final class ModularWeaponFxRenderer implements Disposable {
                 case LANCE -> 1.25f;
                 case OVERDRIVE -> 1.35f;
                 case NEEDLE -> .62f;
-            })*impactStageScale(event.weapon(),event.phase());
+            })*impactStageScale(event.weapon(),event.phase())*
+                    projectileLaunchScale(event.weapon(),event.phase());
+            // Cull with the EFFECTIVE draw size, not the unscaled authored
+            // clip. This retains clipped edge flashes and skips fully offscreen
+            // atlas work in 200v200 fights.
+            float radius=CombatEffectScale.of(Math.max(
+                    shot.clip().width(),shot.clip().height())*size)*.5f;
+            if(view!=null&&!view.circle(event.x(),event.y(),radius))continue;
+            long elapsed=battle.tick-event.tick();
+            TextureRegion authored=authoredStage(shot.clip(),elapsed);
+            Texture image=authored==null?frame(shot.clip(),elapsed):null;
+            if(authored==null&&image==null)continue;
+            float angle=(float)StrictMath.toDegrees(StrictMath.atan2(
+                    event.targetY()-event.y(),event.targetX()-event.x()));
             if(laser!=null){
                 var tint=CombatLightingRenderer.laserColor(laser);
                 batch.setColor(tint.r,tint.g,tint.b,1);
