@@ -882,6 +882,25 @@ public final class Battle {
      * array: ship IDs are monotonic and strictly bounded by deployed ships. */
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
     private int[] focusCountsByShipId=new int[16];
+    /** Historical channels that cannot occur in this physical photon
+     * observation need no RCS/IR/gravity/radar math at all. Retain the
+     * previous full-five-family route for controlled tick-zero A/B checks. */
+    private boolean selectiveHistoricalChannels=true;
+    private long[] historicalChannelCounters;
+    public record HistoricalChannelMetrics(long validHistoryQueries,
+                                           long possibleFamilyChecks,
+                                           long executedFamilyChecks) { }
+    public void configureHistoricalChannelsForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure sensor channel A/B before combat");
+        selectiveHistoricalChannels=enabled;
+        historicalChannelCounters=new long[3];
+    }
+    public HistoricalChannelMetrics historicalChannelMetrics(){
+        long[] c=historicalChannelCounters;
+        return c==null?new HistoricalChannelMetrics(0,0,0):
+                new HistoricalChannelMetrics(c[0],c[1],c[2]);
+    }
     private boolean indexedFocusCounts=true;
     private long[] focusWorkDiagnostic;
     public record FocusWorkMetrics(long rebuildEntries,long lookups,
@@ -2819,42 +2838,66 @@ public final class Battle {
         double resolution=condition>0
                 ?StrictMath.min(2.2,sourceProfile.resolutionGain()*
                         (1+.30*sourceProfile.commandAssist())):1;
-        double rcs=StrictMath.max(.06,StrictMath.min(4,targetProfile.radarCrossSection()));
-        double radarFactor=switch(sourceProfile.scanMode()){
-            case STANDARD -> 1;
-            case BOOSTED_RADAR -> 1.55;
-            case FOCUSED_RADAR -> sourceProfile.focusId()==target.id?1.28:0;
-            default -> 0;
-        };
-        double xrayFactor=sourceProfile.scanMode()==SensorActiveScan.Mode.STANDARD?1:
-                (sourceProfile.scanMode()==SensorActiveScan.Mode.XRAY_BURST&&
-                 sourceProfile.focusId()==target.id?1.45:0);
-        double radar=sourceProfile.sensorRange()*condition*weatherRange*resolution
-                *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1))
-                *radarFactor;
-        double cloak=targetProfile.power()>4&&targetProfile.ecmCondition()>.15
-                ?targetProfile.opticalSignature():1;
-        double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
-                StrictMath.sqrt(StrictMath.max(1,targetProfile.maxHull())/550)));
-        double optical=(weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390)
-                *cloak*silhouette;
-        double damp=1-(1-targetProfile.thermalSignature())
-                *StrictMath.max(0,targetProfile.coolingCondition());
-        double infrared=sourceProfile.infraredRange()*condition*weatherRange*resolution
-                *StrictMath.sqrt(StrictMath.max(.10,damp))*(1+.08*(acuity-1));
-        double xray=sourceProfile.xrayRange()*condition*weatherRange*resolution
-                *(1+.10*(acuity-1))/(1+.16*StrictMath.min(
-                        2,targetProfile.maxArmor()/650))*xrayFactor;
-        double mass=StrictMath.max(.45,StrictMath.min(
-                2.4,targetProfile.maxHull()/550));
-        double gravitic=sourceProfile.graviticRange()*condition*weatherRange*resolution
-                *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
+        // receive(...) already proves the exact physically arrived
+        // one-way/return photon bands. The subsequent caller intersects with
+        // fix.channels(), so evaluating absent bands cannot ever authorize a
+        // contact; avoid their comparatively expensive historical sqrt and
+        // signature computations. The original full set is a diagnostic A/B.
+        final int all=CONTACT_OPTICAL|CONTACT_RADAR|CONTACT_INFRARED|
+                CONTACT_XRAY|CONTACT_GRAVITIC;
+        final int requested=selectiveHistoricalChannels?fix.channels():all;
+        if(historicalChannelCounters!=null){
+            historicalChannelCounters[0]++;
+            historicalChannelCounters[1]+=5;
+            historicalChannelCounters[2]+=Integer.bitCount(requested&all);
+        }
         int channels=0;
-        if(distance<=optical)channels|=CONTACT_OPTICAL;
-        if(radar>0&&distance<=radar)channels|=CONTACT_RADAR;
-        if(infrared>0&&distance<=infrared)channels|=CONTACT_INFRARED;
-        if(xray>0&&distance<=xray)channels|=CONTACT_XRAY;
-        if(gravitic>0&&distance<=gravitic)channels|=CONTACT_GRAVITIC;
+        if((requested&CONTACT_RADAR)!=0){
+            double rcs=StrictMath.max(.06,StrictMath.min(
+                    4,targetProfile.radarCrossSection()));
+            double radarFactor=switch(sourceProfile.scanMode()){
+                case STANDARD -> 1;
+                case BOOSTED_RADAR -> 1.55;
+                case FOCUSED_RADAR -> sourceProfile.focusId()==target.id?1.28:0;
+                default -> 0;
+            };
+            double radar=sourceProfile.sensorRange()*condition*weatherRange*resolution
+                    *StrictMath.sqrt(StrictMath.sqrt(rcs))*(1+.09*(acuity-1))
+                    *radarFactor;
+            if(radar>0&&distance<=radar)channels|=CONTACT_RADAR;
+        }
+        if((requested&CONTACT_OPTICAL)!=0){
+            double cloak=targetProfile.power()>4&&targetProfile.ecmCondition()>.15
+                    ?targetProfile.opticalSignature():1;
+            double silhouette=StrictMath.max(.85,StrictMath.min(1.24,
+                    StrictMath.sqrt(StrictMath.max(1,targetProfile.maxHull())/550)));
+            double optical=(weather.preset().includes(SpaceWeather.Kind.NEBULA)?310:390)
+                    *cloak*silhouette;
+            if(distance<=optical)channels|=CONTACT_OPTICAL;
+        }
+        if((requested&CONTACT_INFRARED)!=0){
+            double damp=1-(1-targetProfile.thermalSignature())
+                    *StrictMath.max(0,targetProfile.coolingCondition());
+            double infrared=sourceProfile.infraredRange()*condition*weatherRange*resolution
+                    *StrictMath.sqrt(StrictMath.max(.10,damp))*(1+.08*(acuity-1));
+            if(infrared>0&&distance<=infrared)channels|=CONTACT_INFRARED;
+        }
+        if((requested&CONTACT_XRAY)!=0){
+            double xrayFactor=sourceProfile.scanMode()==SensorActiveScan.Mode.STANDARD?1:
+                    (sourceProfile.scanMode()==SensorActiveScan.Mode.XRAY_BURST&&
+                     sourceProfile.focusId()==target.id?1.45:0);
+            double xray=sourceProfile.xrayRange()*condition*weatherRange*resolution
+                    *(1+.10*(acuity-1))/(1+.16*StrictMath.min(
+                            2,targetProfile.maxArmor()/650))*xrayFactor;
+            if(xray>0&&distance<=xray)channels|=CONTACT_XRAY;
+        }
+        if((requested&CONTACT_GRAVITIC)!=0){
+            double mass=StrictMath.max(.45,StrictMath.min(
+                    2.4,targetProfile.maxHull()/550));
+            double gravitic=sourceProfile.graviticRange()*condition*weatherRange*resolution
+                    *StrictMath.sqrt(mass)*(1+.07*(acuity-1));
+            if(gravitic>0&&distance<=gravitic)channels|=CONTACT_GRAVITIC;
+        }
         // Current receiver electronics still have to be functional, even
         // if they emitted photons earlier. Optical sight works without power.
         if(source.power<=3||source.sensorsCondition<=.05||

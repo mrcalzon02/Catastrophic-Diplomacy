@@ -299,6 +299,78 @@ public final class OpponentIndexParityTest {
                 "ticks=50 fingerprint="+Long.toHexString(dense.fingerprint()));
     }
 
+    /**
+     * Actual arrived photon bands are a finite subset of the five fitted
+     * sensor families. Excluding impossible bands from historical signature
+     * validation must produce bit-identical delayed contacts and targeting,
+     * including powered, passive, focused and unlicensed X-ray modes.
+     */
+    private static void verifyHistoricalChannelMask(TechnologyCatalog catalog){
+        long seed=202611121809L;
+        Battle selective=FleetSensorPhotonScaleDiagnostic.create(catalog,16,seed);
+        Battle original=FleetSensorPhotonScaleDiagnostic.create(catalog,16,seed);
+        original.configureHistoricalChannelsForDiagnostic(false);
+        selective.configureHistoricalChannelsForDiagnostic(true);
+        for(Battle battle:new Battle[]{selective,original}){
+            int[] targets={0,0};
+            for(Battle.Ship ship:battle.ships())if(targets[ship.team]==0)
+                targets[ship.team]=ship.id;
+            for(Battle.Ship ship:battle.ships()){
+                int target=targets[1-ship.team];
+                SensorActiveScan.Mode mode=switch(ship.id%5){
+                    case 0 -> SensorActiveScan.Mode.PASSIVE;
+                    case 1 -> SensorActiveScan.Mode.BOOSTED_RADAR;
+                    case 2 -> SensorActiveScan.Mode.FOCUSED_RADAR;
+                    case 3 -> SensorActiveScan.Mode.XRAY_BURST;
+                    default -> SensorActiveScan.Mode.STANDARD;
+                };
+                battle.configureSensorScan(ship.id,mode,
+                        mode==SensorActiveScan.Mode.FOCUSED_RADAR||
+                        mode==SensorActiveScan.Mode.XRAY_BURST?target:0);
+            }
+        }
+        for(int i=0;i<80;i++){
+            selective.step();original.step();
+            check(selective.fingerprint()==original.fingerprint(),
+                    "Selective historical channels changed fitted battle at tick "+
+                            selective.tick);
+            if(selective.tick==30||selective.tick==60){
+                var fast=inspectSensors(selective);
+                var full=inspectSensors(original);
+                check(fast.equals(full),
+                        "Historical channel mask changed actual causal picture "+
+                                selective.tick+" "+fast+" vs "+full);
+            }
+        }
+        var a=selective.historicalChannelMetrics();
+        var b=original.historicalChannelMetrics();
+        check(a.validHistoryQueries()>0&&
+                a.validHistoryQueries()==b.validHistoryQueries()&&
+                a.possibleFamilyChecks()==b.possibleFamilyChecks()&&
+                a.executedFamilyChecks()<b.executedFamilyChecks()&&
+                b.executedFamilyChecks()==b.possibleFamilyChecks(),
+                "Historical channel index failed to skip absent sensor bands "+
+                        a+" / "+b);
+        System.out.println("PASS selective historical photon bands fitted "+
+                "16v16 ticks=80 optimized="+a+" original="+b+
+                " fingerprint="+Long.toHexString(selective.fingerprint())+
+                " (band checks diagnostic only)");
+        // The original combat 200v200 fixture exercises standard RDR,
+        // infrared and passive optical without requiring paid research.
+        Battle large=DemonstrationBattle.create(catalog);
+        Battle largeOld=DemonstrationBattle.create(catalog);
+        largeOld.configureHistoricalChannelsForDiagnostic(false);
+        large.configureHistoricalChannelsForDiagnostic(true);
+        for(int i=0;i<36;i++){
+            large.step();largeOld.step();
+            check(large.fingerprint()==largeOld.fingerprint(),
+                    "200v200 historical-channel optimization changed battle tick "+
+                            large.tick);
+        }
+        System.out.println("PASS historical sensor-channel 200v200 parity "+
+                "ticks=36 fingerprint="+Long.toHexString(large.fingerprint()));
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -375,6 +447,7 @@ public final class OpponentIndexParityTest {
         verifyRelayScanIndex(catalog);
         verifyCommandRecipientsIndex(catalog);
         verifyCooperativeFocusIndex(catalog);
+        verifyHistoricalChannelMask(catalog);
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+
