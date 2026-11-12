@@ -29,8 +29,18 @@ public final class DesktopLauncher {
         // CI-only real-frame capture uses the same client and approved ship art.
         String captureDirectory=System.getenv("CD_ARMOR_CAPTURE_DIR");
         boolean captureArmor=captureDirectory!=null&&!captureDirectory.isBlank();
-        if(!captureArmor)updater.checkForUpdates(false);
-        Runnable updateHandler=captureArmor?null:updater::checkForUpdates;
-        new Lwjgl3Application(new CatastrophicGame(updateHandler,false,captureArmor),cfg);
+        String projectileDirectory=System.getenv("CD_PROJECTILE_CAPTURE_DIR");
+        boolean captureProjectiles=projectileDirectory!=null&&
+                !projectileDirectory.isBlank();
+        if(captureArmor&&captureProjectiles)throw new IllegalArgumentException(
+                "One real-frame diagnostic at a time");
+        // This is the real native desktop renderer and real 200v200 demo.
+        // Disabled for normal play; never delay visual tests on an updater HTTP
+        // request or change the distribution's startup/update behavior.
+        if(!captureArmor&&!captureProjectiles)updater.checkForUpdates(false);
+        Runnable updateHandler=captureArmor||captureProjectiles?
+                null:updater::checkForUpdates;
+        new Lwjgl3Application(new CatastrophicGame(updateHandler,
+                captureProjectiles,captureArmor),cfg);
     }
 }

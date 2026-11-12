@@ -240,6 +240,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private static final String FLEET_FILE = "fleet/fleets-v1.dat";
     private static final String ORDERS_FILE = "fleet/orders-v1.dat";
     private final boolean verifyDemo;
+    /** Only constructed by an explicitly requested desktop GL evidence run. */
+    private final ProjectileFrameCapture projectileFrameCapture;
     /** Hidden, debug-APK-only comparison of real armor/structure render states. */
     private final boolean verifySurfaceReview;
     /** Explicitly requested CI capture directory, absent in normal gameplay. */
@@ -265,6 +267,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     public CatastrophicGame(Runnable updater,boolean verifyDemo,boolean verifySurfaceReview,
                             java.util.function.Consumer<String> exportHandler){
         this.updateCheck=updater;this.verifyDemo=verifyDemo;
+        this.projectileFrameCapture=verifyDemo?
+                ProjectileFrameCapture.fromEnvironment():null;
         this.verifySurfaceReview=verifySurfaceReview;
         this.diagnosticExportHandler=exportHandler;
         if(verifyDemo){fleetIndex=FLEET_SIZES.length-1;speed=8;}
@@ -3079,6 +3083,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     Math.max(.08f,height/520f);
             battleCamera.update();
         }
+        if(projectileFrameCapture!=null)
+            projectileFrameCapture.beforeDraw(battle,battleCamera);
         if(audio!=null)audio.setSimulationSpeed(verifyDemo?
                 CombatPace.DEFAULT:paceGovernor.effective());
         if (audio != null) audio.advance(battle,battleCamera.position.x,
@@ -3642,6 +3648,9 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         if(verifyDemo)verifyRenderedDemoFrame();
         captureArmorFramebuffer();
+        if(projectileFrameCapture!=null)
+            projectileFrameCapture.afterDraw(battle,
+                    weaponFx==null?0:weaponFx.loadedTextures());
     }
 
     /** Small always-on overlay, above the playfield and below the battle controls. */

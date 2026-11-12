@@ -99,3 +99,66 @@ jobs:
             :game:guidedOrdnanceArtSmoke \
             :game:kineticOrdnanceArtSmoke \
             :game:weaponStageArtSmoke
+      # One deliberately labeled commit can request actual GPU pixels.
+      # Screenshots are advisory: no new workflow/job, no APK publication,
+      # and no cosmetic failure can block gameplay or updater fixes.
+      - name: Optional real desktop-GL projectile framebuffer proof
+        if: contains(github.event.head_commit.message, '[projectile-capture]')
+        continue-on-error: true
+        timeout-minutes: 6
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CD_PROJECTILE_CAPTURE_DIR="$GITHUB_WORKSPACE/test-output/projectile-real"
+          mkdir -p "$CD_PROJECTILE_CAPTURE_DIR"
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y xvfb
+          fi
+          LIBGL_ALWAYS_SOFTWARE=1 timeout --signal=TERM 150s \
+            xvfb-run -a -s '-screen 0 1280x720x24' \
+            gradle --no-daemon :desktop:run
+          python3 - <<'PY'
+          import base64, io, pathlib
+          from PIL import Image, ImageStat
+          folder=pathlib.Path('test-output/projectile-real')
+          files=sorted(folder.glob('*.png'))
+          assert len(files)==3, f'Expected three actual GL frames, got {len(files)}'
+          report=folder/'frames.csv'
+          assert report.is_file() and len(report.read_text().splitlines())==4
+          for frame in files:
+              with Image.open(frame) as source:
+                  img=source.convert('RGB')
+              assert img.width>=640 and img.height>=360
+              assert max(ImageStat.Stat(img).stddev)>2, f'Blank GL frame {frame.name}'
+              # The actual projectile is at the live camera center.
+              w,h=img.size
+              close=img.crop((w//4,h//4,3*w//4,3*h//4))
+              close=close.resize((960,540),Image.Resampling.NEAREST)
+              blob=io.BytesIO()
+              close.save(blob,format='JPEG',quality=80,optimize=True)
+              compact=blob.getvalue()
+              (folder/(frame.stem+'-center.jpg')).write_bytes(compact)
+              # Compact evidence stream permits inline review without
+              # publishing transient game diagnostics to main or using
+              # fabricated art in place of a real screenshot.
+              encoded=base64.b64encode(compact).decode('ascii')
+              for index,offset in enumerate(range(0,len(encoded),2048)):
+                  print('CD_PROJECTILE_PROOF_CHUNK name='+frame.name+
+                        ' index='+str(index)+' data='+encoded[offset:offset+2048])
+              print('CD_PROJECTILE_PROOF_COMPLETE name='+frame.name+
+                    ' chunks='+str((len(encoded)+2047)//2048))
+              print('CD_PROJECTILE_GFX_FRAME '+frame.name+
+                    f' actualBackbuffer={w}x{h} jpegBytes={len(compact)}')
+          assert len({frame.read_bytes() for frame in files})==3, \
+              'Duplicate/frozen real OpenGL projectile frames'
+          print('PASS three real OpenGL projectile frames and camera-centered crops')
+          PY
+      - name: Archive optional real projectile frames
+        if: always() && contains(github.event.head_commit.message, '[projectile-capture]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-real-projectile-gl-proof
+          path: test-output/projectile-real/
+          retention-days: 14
+          if-no-files-found: warn
