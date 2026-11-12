@@ -642,26 +642,15 @@ final class GameWikiCatalog {
             return null;
         }
         private static long hundredths(double value){
-            // Technology multipliers are positive canonical finite decimals.
-            // The tiny epsilon protects exact .005 boundaries from binary
-            // representation while matching the authored %.2f display.
-            return StrictMath.round(value*100.0+1e-9);
+            if(!Double.isFinite(value)||value<0)return Long.MIN_VALUE;
+            // Canonical technology values carry six decimal places. Convert
+            // to integer micro-units first, then round to the exact authored
+            // two-decimal display without Formatter/BigDecimal allocations.
+            long micro=StrictMath.round(value*1_000_000d);
+            return (micro+5_000L)/10_000L;
         }
-        boolean matches(TechnologyCatalog.Upgrade u){
-            double value=switch(field){
-                case 0 -> u.mass;
-                case 1 -> u.power;
-                case 2 -> u.heat;
-                case 3 -> u.output;
-                case 4 -> u.accuracy;
-                case 5 -> u.integrity;
-                case 6 -> u.shield;
-                case 7 -> u.thrust;
-                case 8 -> u.cooling;
-                case 9 -> u.maintenance;
-                default -> throw new IllegalStateException("Unknown wiki numeric field");
-            };
-            return hundredths(value)==cents;
+        boolean matches(TechnologyCatalog catalog,String id){
+            return hundredths(catalog.physicalMultiplier(id,field))==cents;
         }
     }
     private static boolean matchesUpgradeText(TechnologyCatalog.Upgrade u,
@@ -748,11 +737,8 @@ final class GameWikiCatalog {
             // authored-text KMP semantics.
             boolean match;
             if(asciiContainsFolded(id,needle))match=true;
-            else{
-                TechnologyCatalog.Upgrade upgrade=technology.get(id);
-                match=numeric!=null?numeric.matches(upgrade):
-                        matchesUpgradeText(upgrade,needle,probe);
-            }
+            else if(numeric!=null)match=numeric.matches(technology,id);
+            else match=matchesUpgradeText(technology.get(id),needle,probe);
             if(match){
                 matchedBits[index>>>6]|=1L<<(index&63);
                 matchedCount++;

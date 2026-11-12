@@ -311,6 +311,82 @@ public final class TechnologyCatalog {
     }
     public int upgradeCount() { return upgradeTotal; }
     public int componentCount() { return components.size(); }
+    private static double multiplier(Upgrade upgrade,int field){
+        if(upgrade==null||field<0||field>9)return Double.NaN;
+        return switch(field){
+            case 0 -> upgrade.mass;
+            case 1 -> upgrade.power;
+            case 2 -> upgrade.heat;
+            case 3 -> upgrade.output;
+            case 4 -> upgrade.accuracy;
+            case 5 -> upgrade.integrity;
+            case 6 -> upgrade.shield;
+            case 7 -> upgrade.thrust;
+            case 8 -> upgrade.cooling;
+            case 9 -> upgrade.maintenance;
+            default -> Double.NaN;
+        };
+    }
+    /**
+     * Low-allocation physical projection for encyclopedia numeric searches.
+     * All virtual variant/family nodes copy their ten physical multipliers
+     * from one parent/root technology. Only native Stage VII-IX extrapolate
+     * from resident Stage V/VI, so a single numeric field can be resolved
+     * without constructing names, prerequisites, tradeoffs or Upgrade records.
+     */
+    public double physicalMultiplier(String id,int field){
+        if(field<0||field>9)return Double.NaN;
+        Upgrade resident=sixStages.get(id);
+        if(resident!=null)return multiplier(resident,field);
+        if(id==null)return Double.NaN;
+        String[] parts=virtualIdParts(id);
+        if(parts!=null){
+            String parent=null;
+            SurvivalHardwareCatalog.Variant survival=
+                    SurvivalHardwareCatalog.findVariant(parts[2]);
+            if(survival!=null&&baseComponents.containsKey(baseId(parts[1],survival.code())))
+                parent=survival.root();
+            if(parent==null){
+                SensorNetworkCatalog.Model network=SensorNetworkCatalog.variant(parts[2]);
+                if(network!=null&&baseComponents.containsKey(baseId(parts[1],network.code())))
+                    parent=network.root();
+            }
+            if(parent==null){
+                SensingVariantCatalog.Model sensing=SensingVariantCatalog.find(parts[2]);
+                if(sensing!=null&&baseComponents.containsKey(baseId(parts[1],sensing.code())))
+                    parent=sensing.base();
+            }
+            if(parent==null){
+                SurvivalHardwareCatalog.Family family=SurvivalHardwareCatalog.find(parts[2]);
+                if(family!=null&&baseComponents.containsKey(baseId(parts[1],family.code())))
+                    parent=family.parent();
+            }
+            if(parent==null)
+                for(String[] family:SUPPORT_FAMILY_TYPES)
+                    if(family[0].equals(parts[2])&&
+                            baseComponents.containsKey(baseId(parts[1],family[0]))){
+                        parent=family[2];
+                        break;
+                    }
+            if(parent!=null)
+                return physicalMultiplier(
+                        techId(parts[1],parent,parts[3],parts[4]),field);
+        }
+        if(!deferredHigherStages||id.length()<4)return Double.NaN;
+        int end=id.length();
+        char tens=id.charAt(end-2),unit=id.charAt(end-1);
+        if(tens!='0'||unit<'7'||unit>'9')return Double.NaN;
+        String stem=id.substring(0,end-2);
+        Upgrade stageSix=sixStages.get(stemStage(stem,6));
+        Upgrade stageFive=sixStages.get(stemStage(stem,5));
+        if(stageSix==null||stageFive==null)return Double.NaN;
+        int stage=unit-'0';
+        double current=multiplier(stageSix,field);
+        double previous=multiplier(stageFive,field);
+        double evolved=StrictMath.max(.05,current+(current-previous)*(stage-6));
+        return Math.round(evolved*1_000_000d)/1_000_000d;
+    }
+
     public Upgrade get(String id) {
         // Common fitted/early-stage technology is resident. Resolve it before
         // parsing the names of all four families of virtual higher-tier nodes.
