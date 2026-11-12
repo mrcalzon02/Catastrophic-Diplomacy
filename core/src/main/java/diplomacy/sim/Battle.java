@@ -1297,6 +1297,28 @@ public final class Battle {
     private final double[] relayCandidateDistances=new double[32];
     private final SensorLightTimeHistory.Observation[] relayCandidateObservations=
             new SensorLightTimeHistory.Observation[32];
+    /** LNK packets are physically capped at 32 targets. Select top-K in
+     * reusable battle-local scratch instead of allocating and sorting the
+     * entire TRK memory every 30Hz tick for every equipped transmitter. */
+    private final int[] trackPacketIdsScratch=new int[SensorTrackRelayBuffer.MAX_CONTACTS];
+    private final ContactTrack[] trackPacketTracksScratch=
+            new ContactTrack[SensorTrackRelayBuffer.MAX_CONTACTS];
+    /** The historical full-copy-and-sort route remains a tick-zero A/B. */
+    private boolean boundedTrackPacketSelection=true;
+    private long[] trackPacketSelectionDiagnostic;
+    public record TrackPacketSelectionMetrics(long transmitters,
+            long scannedContacts,long packetsSent,long copiedEntries){ }
+    public void configureTrackPacketSelectionForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure LNK selection before combat");
+        boundedTrackPacketSelection=enabled;
+        trackPacketSelectionDiagnostic=new long[4];
+    }
+    public TrackPacketSelectionMetrics trackPacketSelectionMetrics(){
+        long[] c=trackPacketSelectionDiagnostic;
+        return c==null?new TrackPacketSelectionMetrics(0,0,0,0):
+                new TrackPacketSelectionMetrics(c[0],c[1],c[2],c[3]);
+    }
     /** Diagnostic A/B counters: avoided repeat searches vs actual searches. */
     public long photonCacheHits(){return reusedPhotonObservations;}
     public long photonCacheMisses(){return rawPhotonSearches;}
@@ -3179,18 +3201,37 @@ public final class Battle {
             int window=(int)(source.network.trackMemoryTicks()*
                     StrictMath.min(1,source.sensorsCondition));
             if(window<=0)continue;
-            List<Map.Entry<Integer,ContactTrack>> records=
-                    new ArrayList<>(source.knownTracks.entrySet());
-            records.removeIf(e->tick-e.getValue().tick<0||
-                    tick-e.getValue().tick>window);
-            records.sort((a,b)->{
-                int fresher=Long.compare(b.getValue().tick,a.getValue().tick);
-                return fresher!=0?fresher:Integer.compare(a.getKey(),b.getKey());
-            });
-            for(int i=0;i<StrictMath.min(cap,records.size());i++){
-                Map.Entry<Integer,ContactTrack> item=records.get(i);
-                source.trackPackets.transmit(item.getKey(),tick,
-                        item.getValue(),cap,source.x,source.y);
+            long[] count=trackPacketSelectionDiagnostic;
+            if(count!=null){
+                count[0]++;
+                count[1]+=source.knownTracks.size();
+            }
+            if(boundedTrackPacketSelection){
+                int size=TrackPacketTopK.select(source.knownTracks,tick,window,cap,
+                        trackPacketIdsScratch,trackPacketTracksScratch);
+                for(int i=0;i<size;i++){
+                    source.trackPackets.transmit(trackPacketIdsScratch[i],tick,
+                            trackPacketTracksScratch[i],cap,source.x,source.y);
+                    if(count!=null)count[2]++;
+                }
+            }else{
+                // Original copy/filter/sort for same-seed A/B diagnostics:
+                // stable oldest-track expiry and tie ordering are authority.
+                List<Map.Entry<Integer,ContactTrack>> records=
+                        new ArrayList<>(source.knownTracks.entrySet());
+                if(count!=null)count[3]+=records.size();
+                records.removeIf(e->tick-e.getValue().tick<0||
+                        tick-e.getValue().tick>window);
+                records.sort((a,b)->{
+                    int fresher=Long.compare(b.getValue().tick,a.getValue().tick);
+                    return fresher!=0?fresher:Integer.compare(a.getKey(),b.getKey());
+                });
+                for(int i=0;i<StrictMath.min(cap,records.size());i++){
+                    Map.Entry<Integer,ContactTrack> item=records.get(i);
+                    source.trackPackets.transmit(item.getKey(),tick,
+                            item.getValue(),cap,source.x,source.y);
+                    if(count!=null)count[2]++;
+                }
             }
         }
     }

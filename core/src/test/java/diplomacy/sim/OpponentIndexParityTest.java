@@ -371,6 +371,131 @@ public final class OpponentIndexParityTest {
                 "ticks=36 fingerprint="+Long.toHexString(large.fingerprint()));
     }
 
+    /**
+     * Exact reference comparator parity under repeated IDs, identical
+     * observation epochs, stale/future reports, and LNK capacities 1..32.
+     * No game uses these artificial reports; they are adversarial inputs to
+     * the pure bounded selector, not fabricated in-battle sensor knowledge.
+     */
+    private static void verifyTrackPacketTopKEdges(){
+        java.util.Random rng=new java.util.Random(0x07ACCA11L);
+        int[] ids=new int[SensorTrackRelayBuffer.MAX_CONTACTS];
+        Battle.ContactTrack[] selected=
+                new Battle.ContactTrack[SensorTrackRelayBuffer.MAX_CONTACTS];
+        int cases=0;
+        int[] caps={0,1,2,3,4,7,8,16,31,32};
+        for(int trial=0;trial<900;trial++){
+            java.util.Map<Integer,Battle.ContactTrack> tracks=
+                    new java.util.HashMap<>();
+            long now=500+trial%13;
+            int size=trial%7==0?145:rng.nextInt(85);
+            for(int j=0;j<size;j++){
+                // Many tracks have exactly equal timestamps: the ID ASC
+                // secondary sort must be stable despite HashMap iteration.
+                long at=now+(j%3==0?-(j%9):rng.nextInt(100)-26);
+                tracks.put(j+1,new Battle.ContactTrack(
+                        new SensorLightTimeHistory.Sample(at,
+                                100+j,200-j,0,0,true)));
+            }
+            int cap=caps[trial%caps.length];
+            int window=trial%11==0?0:1+rng.nextInt(55);
+            java.util.List<java.util.Map.Entry<Integer,Battle.ContactTrack>>
+                    full=new java.util.ArrayList<>(tracks.entrySet());
+            full.removeIf(e->now-e.getValue().tick<0||
+                    now-e.getValue().tick>window);
+            full.sort((a,b)->{
+                int newer=Long.compare(b.getValue().tick,a.getValue().tick);
+                return newer!=0?newer:Integer.compare(a.getKey(),b.getKey());
+            });
+            int count=TrackPacketTopK.select(tracks,now,window,cap,
+                    ids,selected);
+            check(count==StrictMath.min(cap,full.size()),
+                    "Top-K selected incorrect LNK report count in trial "+trial);
+            for(int k=0;k<count;k++)
+                check(ids[k]==full.get(k).getKey()&&
+                        selected[k]==full.get(k).getValue(),
+                        "Top-K reordered historical contact/ID on trial "+
+                                trial+" at sorted index "+k);
+            cases++;
+        }
+        boolean invalid=false;
+        try{TrackPacketTopK.select(java.util.Map.of(),10,5,33,
+                ids,selected);}
+        catch(IllegalArgumentException expected){invalid=true;}
+        check(invalid,"Excess LNK capacity bypassed finite socket limit");
+        System.out.println("PASS LNK bounded top-K comparator parity "+
+                cases+" randomized tie, stale, future and capacity cases");
+    }
+
+    /**
+     * Physically fitted TRK/LNK transmitters must produce exactly the same
+     * ordered finite packets as the original copy/filter/sort, including
+     * delayed reception, a midbattle sensor failure and reactivation.
+     */
+    private static void verifyTrackPacketTopK(TechnologyCatalog catalog){
+        verifyTrackPacketTopKEdges();
+        for(int perSide:new int[]{16,200}){
+            final long seed=202611121910L+perSide;
+            Battle bounded=FleetSensorPhotonScaleDiagnostic.create(
+                    catalog,perSide,seed);
+            Battle full=FleetSensorPhotonScaleDiagnostic.create(
+                    catalog,perSide,seed);
+            bounded.configureTrackPacketSelectionForDiagnostic(true);
+            full.configureTrackPacketSelectionForDiagnostic(false);
+            int damagedId=0;
+            for(Battle.Ship ship:bounded.ships())
+                if(ship.network.trackRelayCapacity()>0){
+                    damagedId=ship.id;break;
+                }
+            check(damagedId>0,"Real fitted LNK fixture has no transmitter");
+            final int steps=perSide==16?78:40;
+            for(int t=0;t<steps;t++){
+                if(t==28||t==37){
+                    for(Battle battle:new Battle[]{bounded,full}){
+                        for(Battle.Ship ship:battle.ships())
+                            if(ship.id==damagedId){
+                                ship.sensorsCondition=t==28?0:1;
+                                break;
+                            }
+                    }
+                }
+                bounded.step();full.step();
+                check(bounded.fingerprint()==full.fingerprint(),
+                        "LNK top-K changed physical battle in "+perSide+
+                                "v"+perSide+" at tick "+bounded.tick);
+                for(int i=0;i<bounded.ships().size();i++){
+                    Battle.Ship a=bounded.ships().get(i);
+                    Battle.Ship b=full.ships().get(i);
+                    check(a.trackPackets.fingerprint()==
+                            b.trackPackets.fingerprint(),
+                            "LNK packet ID/order/epoch changed at tick "+
+                                    bounded.tick+" emitter="+a.id);
+                }
+                if(bounded.tick==30||bounded.tick==60){
+                    SensorSnapshot fast=inspectSensors(bounded);
+                    SensorSnapshot legacy=inspectSensors(full);
+                    check(fast.equals(legacy),
+                            "LNK changed causal command picture at tick "+
+                                    bounded.tick);
+                }
+            }
+            var fast=bounded.trackPacketSelectionMetrics();
+            var old=full.trackPacketSelectionMetrics();
+            check(fast.transmitters()>0&&fast.packetsSent()>0&&
+                    fast.transmitters()==old.transmitters()&&
+                    fast.scannedContacts()==old.scannedContacts()&&
+                    fast.packetsSent()==old.packetsSent()&&
+                    fast.copiedEntries()==0&&old.copiedEntries()>0,
+                    "Bounded LNK selection failed to preserve real packets "+
+                            fast+" compared with "+old);
+            System.out.println("PASS real fitted LNK "+perSide+"v"+perSide+
+                    " top-K A/B steps="+steps+" indexed="+fast+
+                    " fullSort="+old+" fingerprint="+
+                    Long.toHexString(bounded.fingerprint())+
+                    " (work counts diagnostic only)");
+        }
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -448,6 +573,7 @@ public final class OpponentIndexParityTest {
         verifyCommandRecipientsIndex(catalog);
         verifyCooperativeFocusIndex(catalog);
         verifyHistoricalChannelMask(catalog);
+        verifyTrackPacketTopK(catalog);
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+
