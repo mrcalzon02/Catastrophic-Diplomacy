@@ -152,7 +152,7 @@ public final class OpponentIndexParityTest {
         var fullTargeting=fullScan.captainTargetingMetrics();
         check(indexedTargeting.decisions()>0&&
                 indexedTargeting.fullSearches()>0&&
-                indexedTargeting.receivedContacts()>0,
+                indexedTargeting.authorizedContacts()>0,
                 "Opt-in captain diagnostic must observe real contact searches");
         check(indexedTargeting.decisions()==indexedTargeting.retained()+
                         indexedTargeting.fullSearches(),
