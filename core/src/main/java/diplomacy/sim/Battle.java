@@ -842,6 +842,21 @@ public final class Battle {
     private List<Ship> enemyShips(int team){
         return team==0?teamOneShips:teamZeroShips;
     }
+    /** Opt-in counts of actual source-to-hostile sensor candidate work.
+     * A null default avoids counter allocation on live Android games. */
+    private long[] relayScanDiagnostic;
+    public record RelayScanMetrics(long activeScouts,long candidateSlots,
+            long receivedQueries,long validContacts){ }
+    public void configureRelayScanMetrics(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Relay scan diagnostic must be set before battle");
+        relayScanDiagnostic=enabled?new long[4]:null;
+    }
+    public RelayScanMetrics relayScanMetrics(){
+        long[] c=relayScanDiagnostic;
+        return c==null?new RelayScanMetrics(0,0,0,0):
+                new RelayScanMetrics(c[0],c[1],c[2],c[3]);
+    }
     /** The old full-fleet scan is retained solely for deterministic A/B.
      * Normal games always traverse the indexed enemy list. */
     private boolean indexedOpponents=true;
@@ -2937,6 +2952,7 @@ public final class Battle {
             if(!scout.alive()||scout.power<=3||scout.crewReadiness()<.05)continue;
             if(!legacyRelay && scout.network.sharingCapacity()<=0
                     && scout.network.trackMemoryCapacity()<=0)continue;
+            if(relayScanDiagnostic!=null)relayScanDiagnostic[0]++;
             Ship[] contacts=sharedSpotters[scout.team];
             double[] closest=sharedNearest[scout.team];
             int capacity=(int)StrictMath.ceil(scout.network.sharingCapacity()
@@ -2950,13 +2966,19 @@ public final class Battle {
                 Arrays.fill(distances,0,broadcastCapacity,Double.POSITIVE_INFINITY);
                 Arrays.fill(observations,0,broadcastCapacity,null);
             }
-            for(Ship hostile:ships){
+            // Both ordered enemy indexes contain precisely the same hostile
+            // insertion order as filtering the global physical fleet. Reuse
+            // the existing tick-zero full-scan A/B switch for parity proof.
+            for(Ship hostile:opponentCandidates(scout.team)){
+                if(relayScanDiagnostic!=null)relayScanDiagnostic[1]++;
                 if(!hostile.alive()||hostile.team==scout.team)continue;
                 // Only a measured observation can justify selection for
                 // broadcast, even if the enemy has since moved or cloaked.
+                if(relayScanDiagnostic!=null)relayScanDiagnostic[2]++;
                 SensorLightTimeHistory.Observation sensed=
                         receivedContact(scout,hostile,scout);
                 if(sensed==null)continue;
+                if(relayScanDiagnostic!=null)relayScanDiagnostic[3]++;
                 double dx=sensed.sample().x()-scout.x;
                 double dy=sensed.sample().y()-scout.y;
                 double d2=dx*dx+dy*dy;

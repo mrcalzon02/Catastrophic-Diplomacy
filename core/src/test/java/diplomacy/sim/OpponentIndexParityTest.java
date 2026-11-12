@@ -104,6 +104,50 @@ public final class OpponentIndexParityTest {
         }
     }
 
+    /**
+     * Paid SHR/TRK/FCM/CAP vessels must scan the same causally reachable
+     * enemy contacts when traversing only physically hostile ship indexes.
+     * The global-list A/B preserves original insertion ordering, delayed
+     * photons, bounded relay bandwidth and real command recipient status.
+     */
+    private static void verifyRelayScanIndex(TechnologyCatalog catalog){
+        long seed=20261112077L;
+        Battle indexed=FleetSensorPhotonScaleDiagnostic.create(catalog,16,seed);
+        Battle full=FleetSensorPhotonScaleDiagnostic.create(catalog,16,seed);
+        full.configureOpponentIndexForDiagnostic(false);
+        indexed.configureRelayScanMetrics(true);
+        full.configureRelayScanMetrics(true);
+        for(int t=0;t<65;t++){
+            indexed.step();full.step();
+            check(indexed.fingerprint()==full.fingerprint(),
+                    "Fitted SHR/TRK command relay changed physical battle at tick "+
+                    indexed.tick);
+            if(indexed.tick==30||indexed.tick==60){
+                SensorSnapshot a=inspectSensors(indexed);
+                SensorSnapshot b=inspectSensors(full);
+                check(a.equals(b),
+                        "Indexed causal relay changed actual tactical display at "+
+                        indexed.tick+" indexed="+a+" legacy="+b);
+            }
+        }
+        Battle.RelayScanMetrics a=indexed.relayScanMetrics();
+        Battle.RelayScanMetrics b=full.relayScanMetrics();
+        check(a.activeScouts()>0&&a.receivedQueries()>0&&
+                a.validContacts()>0,
+                "Fitted relay index test did not read any physical photon returns");
+        check(a.activeScouts()==b.activeScouts()&&
+                a.receivedQueries()==b.receivedQueries()&&
+                a.validContacts()==b.validContacts(),
+                "Hostile index gained/lost actual scout/target contacts");
+        check(b.candidateSlots()==a.candidateSlots()*2,
+                "Fitted 16v16 relay should visit half as many global ship slots");
+        System.out.println("PASS real fitted SHR/TRK/FCM/CAP relay index "+
+                "16v16 65 ticks fingerprint="+
+                Long.toHexString(indexed.fingerprint())+
+                " indexed="+a+" fullFleet="+b+
+                " (candidate counts functional; speed advisory only)");
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -177,6 +221,7 @@ public final class OpponentIndexParityTest {
         System.out.println("MEASURE captain-targeting 200v200 indexed="+
                 indexedTargeting+" fullFleet="+fullTargeting+
                 " (counts functional; timings JVM diagnostic only)");
+        verifyRelayScanIndex(catalog);
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+
