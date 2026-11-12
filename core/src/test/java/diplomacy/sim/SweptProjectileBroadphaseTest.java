@@ -164,6 +164,148 @@ public final class SweptProjectileBroadphaseTest {
                 " realFiringEvents="+totalShots+" (counts diagnostic only)");
     }
 
+    /**
+     * The exact mounted acquisition equation is authoritative. A conservative
+     * 2.2x upper envelope may reject distance only when NO actual researched
+     * missile, torpedo, rocket or ballistic signature could possibly be
+     * acquired. Sweep near-equality, varying motor emissions and bad floats.
+     */
+    private static void checkLaserPdRangeUpperBound(Random random){
+        long checks=0,culled=0;
+        for(int i=0;i<85_000;i++){
+            var spec=new ProjectileModel.Spec(
+                    10+random.nextDouble()*1490,
+                    .1+random.nextDouble()*199.9,
+                    .04+random.nextDouble()*7.96,
+                    .04+random.nextDouble()*7.96);
+            var pd=new ProjectileModel.Defense(
+                    .4+random.nextDouble()*2.6,
+                    .3+random.nextDouble()*3.7,
+                    .1+random.nextDouble()*39.9);
+            double base=random.nextDouble()*1500;
+            double sensors=-.2+random.nextDouble()*1.7;
+            double weather=-.3+random.nextDouble()*3.2;
+            double emission= i%4==0?.001:
+                    i%4==1?1.0:i%4==2?4.0:5.2;
+            double exact=ProjectileModel.acquisitionRange(
+                    base,sensors,weather,pd,spec,emission);
+            double bound=ProjectileModel.maxPossibleAcquisitionDistanceSquared(
+                    base,sensors,weather,pd);
+            // Exact equality and both sides of the physical acquisition
+            // threshold. Small epsilons exercise float comparison margins.
+            for(double delta:new double[]{-1e-11,0,1e-11,0.5,2000}){
+                double distance=StrictMath.max(0,exact+delta);
+                double angle=(i*0.067654)% (2*StrictMath.PI);
+                double dx=distance*StrictMath.cos(angle);
+                double dy=distance*StrictMath.sin(angle);
+                boolean rejected=ProjectileModel.definitelyOutsideAcquisition(
+                        dx,dy,bound);
+                double realDistance=StrictMath.hypot(dx,dy);
+                require(!(rejected&&realDistance<=exact),
+                        "Laser PD broadphase lost in-range real projectile "+
+                        "at spec="+spec+" emission="+emission+
+                        " radius="+exact+" distance="+realDistance);
+                if(rejected)culled++;
+                checks++;
+            }
+        }
+        require(culled>0,"Upper-bound helper cannot reject even distant bodies");
+        double one=ProjectileModel.maxPossibleAcquisitionDistanceSquared(
+                220,1,1,ProjectileModel.STANDARD_PD);
+        require(!ProjectileModel.definitelyOutsideAcquisition(
+                        Double.NaN,0,one)&&
+                !ProjectileModel.definitelyOutsideAcquisition(
+                        Double.POSITIVE_INFINITY,0,one)&&
+                !ProjectileModel.definitelyOutsideAcquisition(
+                        10,10,Double.NaN),
+                "Non-finite geometry must fall through to exact PD equations");
+        System.out.println("PASS laser PD conservative acquisition envelope "+
+                checks+" seeded boundary / motor signature checks, "+
+                culled+" distant exclusions (nonblocking work count)");
+    }
+
+    private static Battle fittedLaserPd(TechnologyCatalog tech,long seed,
+            int count){
+        var left=Shipyard.bareHull(Battle.Faction.TERRAN,
+                Shipyard.Hull.DREADNOUGHT);
+        var right=Shipyard.bareHull(Battle.Faction.DRAXIAN,
+                Shipyard.Hull.DREADNOUGHT);
+        boolean fittedLeft=false,fittedRight=false;
+        for(Shipyard.Slot slot:left.hull.slots)
+            if(!fittedLeft&&slot.mount()==Shipyard.Mount.WEAPON){
+                left=left.install(slot.index(),"BASE-TER-MSL");
+                fittedLeft=true;
+            }
+        for(Shipyard.Slot slot:right.hull.slots)
+            if(!fittedRight&&slot.mount()==Shipyard.Mount.WEAPON){
+                right=right.install(slot.index(),"BASE-DRA-PD");
+                fittedRight=true;
+            }
+        require(fittedLeft&&fittedRight&&
+                        Shipyard.inspect(left,tech).valid()&&
+                        Shipyard.inspect(right,tech).valid(),
+                "Real manufactured missile and laser point-defense designs invalid");
+        Battle battle=new Battle(seed);
+        battle.spawnWing(0,left,tech,count,460,350);
+        battle.spawnWing(1,right,tech,count,740,350);
+        for(Battle.Ship ship:battle.ships()){
+            ship.fighterReserve=ship.droneReserve=0;
+            if(ship.team==0)ship.missileAmmo=100;
+        }
+        battle.setTeamPointDefense(1,BattleOrders.PointDefense.BALANCED);
+        return battle;
+    }
+
+    /** No physical launcher, warhead, PD lock, hit or ammo budget may change.
+     * Compare exact state after every 30Hz step in two real assembled fleets,
+     * then in the canonical 200v200 demonstration with independent PD. */
+    private static void checkLaserPdPhysicalParity() throws Exception{
+        TechnologyCatalog tech=TechnologyCatalog.loadDefault();
+        long visited=0,excluded=0,exact=0,shots=0;
+        for(int scenario=0;scenario<2;scenario++){
+            Battle optimized=scenario==0?
+                    fittedLaserPd(tech,2026111223L,16):
+                    DemonstrationBattle.create(tech);
+            Battle reference=scenario==0?
+                    fittedLaserPd(tech,2026111223L,16):
+                    DemonstrationBattle.create(tech);
+            optimized.configureLaserPdRangeBroadphaseForDiagnostic(true);
+            reference.configureLaserPdRangeBroadphaseForDiagnostic(false);
+            final int steps=scenario==0?175:55;
+            for(int t=0;t<steps;t++){
+                optimized.step();reference.step();
+                require(optimized.fingerprint()==reference.fingerprint(),
+                        "Laser PD distant-contact optimization changed combat "+
+                        "at scenario="+scenario+" tick="+optimized.tick);
+            }
+            var fast=optimized.laserPdRangeMetrics();
+            var old=reference.laserPdRangeMetrics();
+            require(fast.candidates()==old.candidates()&&
+                    fast.exactDistanceChecks()+fast.excluded()==
+                        fast.candidates()&&
+                    old.excluded()==0&&
+                    old.exactDistanceChecks()==old.candidates(),
+                    "Laser PD broadphase changed actual candidate iteration");
+            long fired=optimized.visualEvents().stream().filter(event->
+                    event.phase()==Battle.VisualPhase.FIRE&&
+                    "POINT_DEFENSE".equals(event.weapon())).count();
+            visited+=fast.candidates();excluded+=fast.excluded();
+            exact+=fast.exactDistanceChecks();shots+=fired;
+            System.out.println("PASS laser PD physical range A/B scenario="+
+                    (scenario==0?"fitted 16v16":"canonical 200v200")+
+                    " ticks="+steps+" scanned="+fast.candidates()+
+                    " excluded="+fast.excluded()+
+                    " exact="+fast.exactDistanceChecks()+
+                    " PD_firing_events="+fired+" fingerprint="+
+                    Long.toHexString(optimized.fingerprint()));
+        }
+        require(visited>0&&exact>0&&shots>0,
+                "Real laser PD range test never saw live physical threats");
+        System.out.println("MEASURE laser PD conservative range totals visited="+
+                visited+" avoided="+excluded+" exact="+exact+
+                " shots="+shots+" (CPU timings advisory only)");
+    }
+
     public static void main(String[] args) throws Exception{
         Random random=new Random(0xB0A0D5E);
         long checks=0,nearby=0;
@@ -230,6 +372,8 @@ public final class SweptProjectileBroadphaseTest {
         require(exactHits==filteredHits,"Broadphase changed benchmark collision count");
         checkMovingBroadphaseParity(random);
         checkLivePdParity();
+        checkLaserPdRangeUpperBound(random);
+        checkLaserPdPhysicalParity();
         System.out.println("PASS swept projectile broadphase parity cases="+checks+
                 " nearPathCases="+nearby+" hits="+filteredHits+
                 " narrowOnlyMs="+exactNs/1e6+

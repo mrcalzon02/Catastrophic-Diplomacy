@@ -110,6 +110,37 @@ public final class ProjectileModel {
                 *clamp(weatherFactor,0,2.5)*system.detectionMultiplier
                 *clamp(StrictMath.sqrt(StrictMath.sqrt(effective)),0.30,2.2);
     }
+    /**
+     * A conservative bound for excluding a distant physical point-defense
+     * contact before doing expensive exact distance/signature calculations.
+     * The final acquisitionRange(...) still makes ALL decisions.
+     *
+     * The exact formula bounds its signature fourth-root multiplier to 2.2,
+     * for every legal fitted Spec, motor phase, and defense system. Its other
+     * factors are identical here, plus a one-micron/roundoff guard so that
+     * tangencies and equality always fall through to the original solver.
+     * Non-finite diagnostics also fall through rather than incorrectly
+     * rejecting a real body.
+     */
+    public static double maxPossibleAcquisitionDistanceSquared(
+            double baseRange,double sensorCondition,double weatherFactor,
+            Defense system){
+        if(system==null)return Double.POSITIVE_INFINITY;
+        double max=StrictMath.max(0,baseRange)*clamp(sensorCondition,0,1)
+                *clamp(weatherFactor,0,2.5)*system.detectionMultiplier()*2.2;
+        if(!Double.isFinite(max)||max<0)
+            return Double.POSITIVE_INFINITY;
+        double upper=(max+1e-6)*(1+1e-12);
+        return upper*upper;
+    }
+    /** Exclusion ONLY. NaN/overflow geometry uses the exact old path. */
+    public static boolean definitelyOutsideAcquisition(
+            double dx,double dy,double safeMaxSquared){
+        double squared=dx*dx+dy*dy;
+        return Double.isFinite(squared)&&Double.isFinite(safeMaxSquared)
+                &&squared>safeMaxSquared;
+    }
+
     /** Hardening limits laser ablation per precise hit. This is a physical
      * durability response, not a fixed chance-to-miss or immunity flag.
      * The lightest rockets/micro ordnance retain full laser vulnerability. */

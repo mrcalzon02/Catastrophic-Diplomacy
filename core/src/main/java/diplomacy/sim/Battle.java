@@ -1461,6 +1461,24 @@ public final class Battle {
     /** Conservative rail/rotary collision rejection only; exact entry times,
      * body ordering and damage stay with the existing narrow-phase solvers. */
     private boolean pdProjectileBroadphase=true;
+    /** Conservative laser PD sensor-radius exclusion before the exact range,
+     * motor emission and target selection rules. Independent of rail/rotary
+     * moving-body collision broadphase. */
+    private boolean laserPdRangeBroadphase=true;
+    private long[] laserPdRangeDiagnostic;
+    public record LaserPdRangeMetrics(long candidates,long excluded,
+                                      long exactDistanceChecks) { }
+    public void configureLaserPdRangeBroadphaseForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure laser PD range diagnostic before combat");
+        laserPdRangeBroadphase=enabled;
+        laserPdRangeDiagnostic=new long[3];
+    }
+    public LaserPdRangeMetrics laserPdRangeMetrics(){
+        long[] c=laserPdRangeDiagnostic;
+        return c==null?new LaserPdRangeMetrics(0,0,0):
+                new LaserPdRangeMetrics(c[0],c[1],c[2]);
+    }
     /** Optional external A/B counter; never populated in normal gameplay. */
     private long[] pdProjectileBroadphaseCounts;
     public record PdProjectileBroadphaseMetrics(long candidateChecks,
@@ -7566,12 +7584,26 @@ public final class Battle {
                         defender.pointDefenseProfile:pdSocket.profile;
                 double pdCycle=pdSocket==null?defender.pdCycle:pdSocket.cycle;
                 if(pdRange<=0)continue;
+                final double maxRangeSquared=laserPdRangeBroadphase?
+                        ProjectileModel.maxPossibleAcquisitionDistanceSquared(
+                                pdRange,defender.sensorsCondition,
+                                weather.sensorFactor(),pdProfile):
+                        Double.POSITIVE_INFINITY;
             Missile chosenMissile=null;Ballistic chosenShell=null;Rocket chosenRocket=null;
             double quickest=Double.POSITIVE_INFINITY;
             int acquiredRockets=0,acquiredTracks=0;
             for(Missile m:defensiveMissiles(defender.team)){
                 if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
-                double distance=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[0]++;
+                double dx=m.x-defender.x,dy=m.y-defender.y;
+                if(laserPdRangeBroadphase&&
+                        ProjectileModel.definitelyOutsideAcquisition(
+                                dx,dy,maxRangeSquared)){
+                    if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
+                    continue;
+                }
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
+                double distance=StrictMath.hypot(dx,dy);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,m.spec,
@@ -7595,7 +7627,16 @@ public final class Battle {
             }
             for(Ballistic p:defensiveBallistics(defender.team)){
                 if(p.integrity<=0||p.team==defender.team||!coversThreat(defender,p.targetId))continue;
-                double distance=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[0]++;
+                double dx=p.x-defender.x,dy=p.y-defender.y;
+                if(laserPdRangeBroadphase&&
+                        ProjectileModel.definitelyOutsideAcquisition(
+                                dx,dy,maxRangeSquared)){
+                    if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
+                    continue;
+                }
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
+                double distance=StrictMath.hypot(dx,dy);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,p.spec);
@@ -7620,7 +7661,16 @@ public final class Battle {
             // Its flimsy construction makes one accurate laser hit lethal.
             for(Rocket r:defensiveRockets(defender.team)){
                 if(r.integrity<=0||r.team==defender.team||!coversThreat(defender,r.targetId))continue;
-                double distance=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[0]++;
+                double dx=r.x-defender.x,dy=r.y-defender.y;
+                if(laserPdRangeBroadphase&&
+                        ProjectileModel.definitelyOutsideAcquisition(
+                                dx,dy,maxRangeSquared)){
+                    if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
+                    continue;
+                }
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
+                double distance=StrictMath.hypot(dx,dy);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,r.spec,
