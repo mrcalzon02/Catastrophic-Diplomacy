@@ -141,6 +141,22 @@ public final class ProjectileModel {
                 &&squared>safeMaxSquared;
     }
 
+    /**
+     * Necessary upper envelope AFTER the actual per-spec acquisition radius
+     * has been computed. When the body is farther than this padded squared
+     * radius it cannot pass the final exact hypot comparison, so skip sqrt
+     * work; near matches always defer to the existing exact calculation.
+     * Float edge cases and non-finite telemetry also defer to the old path.
+     */
+    public static boolean definitelyOutsideExactAcquisition(
+            double dx,double dy,double exactRange){
+        double squared=dx*dx+dy*dy;
+        if(!Double.isFinite(squared)||!Double.isFinite(exactRange)||
+                exactRange<0)return false;
+        double safe=(exactRange+1e-5)*(1+1e-10);
+        return Double.isFinite(safe)&&squared>safe*safe;
+    }
+
     /** Hardening limits laser ablation per precise hit. This is a physical
      * durability response, not a fixed chance-to-miss or immunity flag.
      * The lightest rockets/micro ordnance retain full laser vulnerability. */

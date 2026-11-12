@@ -171,7 +171,7 @@ public final class SweptProjectileBroadphaseTest {
      * acquired. Sweep near-equality, varying motor emissions and bad floats.
      */
     private static void checkLaserPdRangeUpperBound(Random random){
-        long checks=0,culled=0;
+        long checks=0,culled=0,exactSquaredCulled=0;
         for(int i=0;i<85_000;i++){
             var spec=new ProjectileModel.Spec(
                     10+random.nextDouble()*1490,
@@ -200,16 +200,24 @@ public final class SweptProjectileBroadphaseTest {
                 double dy=distance*StrictMath.sin(angle);
                 boolean rejected=ProjectileModel.definitelyOutsideAcquisition(
                         dx,dy,bound);
+                boolean exactSquared=ProjectileModel.definitelyOutsideExactAcquisition(
+                        dx,dy,exact);
                 double realDistance=StrictMath.hypot(dx,dy);
+                require(!(exactSquared&&realDistance<=exact),
+                        "Exact squared acquisition broadphase rejected in-range "+
+                                "target with radius "+exact+
+                                " measuredDistance "+realDistance);
                 require(!(rejected&&realDistance<=exact),
                         "Laser PD broadphase lost in-range real projectile "+
                         "at spec="+spec+" emission="+emission+
                         " radius="+exact+" distance="+realDistance);
                 if(rejected)culled++;
+                if(exactSquared)exactSquaredCulled++;
                 checks++;
             }
         }
-        require(culled>0,"Upper-bound helper cannot reject even distant bodies");
+        require(culled>0&&exactSquaredCulled>culled,
+                "Squared range exclusion failed to reject additional far targets");
         double one=ProjectileModel.maxPossibleAcquisitionDistanceSquared(
                 220,1,1,ProjectileModel.STANDARD_PD);
         require(!ProjectileModel.definitelyOutsideAcquisition(
@@ -217,11 +225,17 @@ public final class SweptProjectileBroadphaseTest {
                 !ProjectileModel.definitelyOutsideAcquisition(
                         Double.POSITIVE_INFINITY,0,one)&&
                 !ProjectileModel.definitelyOutsideAcquisition(
-                        10,10,Double.NaN),
+                        10,10,Double.NaN)&&
+                !ProjectileModel.definitelyOutsideExactAcquisition(
+                        Double.NaN,0,100)&&
+                !ProjectileModel.definitelyOutsideExactAcquisition(
+                        Double.POSITIVE_INFINITY,0,100),
                 "Non-finite geometry must fall through to exact PD equations");
         System.out.println("PASS laser PD conservative acquisition envelope "+
                 checks+" seeded boundary / motor signature checks, "+
-                culled+" distant exclusions (nonblocking work count)");
+                culled+" maximum-envelope exclusions, "+
+                exactSquaredCulled+" exact-radius exclusions "+
+                "(nonblocking work count)");
     }
 
     private static Battle fittedLaserPd(TechnologyCatalog tech,long seed,
@@ -262,16 +276,18 @@ public final class SweptProjectileBroadphaseTest {
     private static void checkLaserPdPhysicalParity() throws Exception{
         TechnologyCatalog tech=TechnologyCatalog.loadDefault();
         long visited=0,excluded=0,exact=0,shots=0;
-        for(int scenario=0;scenario<2;scenario++){
+        for(int scenario=0;scenario<3;scenario++){
             Battle optimized=scenario==0?
                     fittedLaserPd(tech,2026111223L,16):
+                    scenario==1?fittedLaserPd(tech,2026111224L,48):
                     DemonstrationBattle.create(tech);
             Battle reference=scenario==0?
                     fittedLaserPd(tech,2026111223L,16):
+                    scenario==1?fittedLaserPd(tech,2026111224L,48):
                     DemonstrationBattle.create(tech);
             optimized.configureLaserPdRangeBroadphaseForDiagnostic(true);
             reference.configureLaserPdRangeBroadphaseForDiagnostic(false);
-            final int steps=scenario==0?175:55;
+            final int steps=scenario==0?175:scenario==1?115:55;
             for(int t=0;t<steps;t++){
                 optimized.step();reference.step();
                 require(optimized.fingerprint()==reference.fingerprint(),
@@ -292,7 +308,8 @@ public final class SweptProjectileBroadphaseTest {
             visited+=fast.candidates();excluded+=fast.excluded();
             exact+=fast.exactDistanceChecks();shots+=fired;
             System.out.println("PASS laser PD physical range A/B scenario="+
-                    (scenario==0?"fitted 16v16":"canonical 200v200")+
+                    (scenario==0?"fitted 16v16":
+                     scenario==1?"fitted 48v48":"canonical 200v200")+
                     " ticks="+steps+" scanned="+fast.candidates()+
                     " excluded="+fast.excluded()+
                     " exact="+fast.exactDistanceChecks()+

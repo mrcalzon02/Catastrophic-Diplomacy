@@ -1466,6 +1466,23 @@ public final class Battle {
      * moving-body collision broadphase. */
     private boolean laserPdRangeBroadphase=true;
     private long[] laserPdRangeDiagnostic;
+    /** FLK radar uses the same mathematically maximal acquisition radius,
+     * but has its own independent physical shot/fuze doctrine. */
+    private boolean flakRangeBroadphase=true;
+    private long[] flakRangeDiagnostic;
+    public record FlakRangeMetrics(long candidates,long excluded,
+                                   long exactDistanceChecks) { }
+    public void configureFlakRangeBroadphaseForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure flak range exclusion before battle");
+        flakRangeBroadphase=enabled;
+        flakRangeDiagnostic=new long[3];
+    }
+    public FlakRangeMetrics flakRangeMetrics(){
+        long[] c=flakRangeDiagnostic;
+        return c==null?new FlakRangeMetrics(0,0,0):
+                new FlakRangeMetrics(c[0],c[1],c[2]);
+    }
     public record LaserPdRangeMetrics(long candidates,long excluded,
                                       long exactDistanceChecks) { }
     public void configureLaserPdRangeBroadphaseForDiagnostic(boolean enabled){
@@ -6487,17 +6504,37 @@ public final class Battle {
                    defender.heat>defender.maxHeat*.92||
                    pendingFlak.size()>=MAX_ACTIVE_FLAK_SHELLS)
                     continue;
+                final double maxFlakDetectionSquared=flakRangeBroadphase?
+                        ProjectileModel.maxPossibleAcquisitionDistanceSquared(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile):
+                        Double.POSITIVE_INFINITY;
                 FlakAim best=null;
                 double bestPriority=Double.POSITIVE_INFINITY;
                 if(defender.orders.pointDefense().craft()){
                     for(Craft craft:crafts){
                         if(craft.team==defender.team||
                            !coversThreat(defender,craft.targetId))continue;
-                        double d=StrictMath.hypot(craft.x-defender.x,craft.y-defender.y);
-                        if(d<15 || d>ProjectileModel.acquisitionRange(
-                                mount.nominalRange,defender.sensorsCondition,
-                                weather.sensorFactor(),mount.profile,craft.radarProfile()))
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[0]++;
+                        double dx=craft.x-defender.x,dy=craft.y-defender.y;
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideAcquisition(
+                                        dx,dy,maxFlakDetectionSquared)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
                             continue;
+                        }
+                        double detection=ProjectileModel.acquisitionRange(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile,craft.radarProfile());
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideExactAcquisition(
+                                        dx,dy,detection)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
+                            continue;
+                        }
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[2]++;
+                        double d=StrictMath.hypot(dx,dy);
+                        if(d<15||d>detection)continue;
                         var chaff=radarFighterGhost(craft,defender,mount.nominalRange);
                         double signal=chaff==null?0:
                                 chaff.signal(FighterCountermeasures.Kind.CHAFF,tick);
@@ -6523,12 +6560,27 @@ public final class Battle {
                 if(best==null&&defender.orders.pointDefense().ordnance()){
                     for(Missile m:defensiveMissiles(defender.team)){
                         if(m.integrity<=0||m.team==defender.team||!coversThreat(defender,m.targetId))continue;
-                        double d=StrictMath.hypot(m.x-defender.x,m.y-defender.y);
-                        if(d<15||d>ProjectileModel.acquisitionRange(
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[0]++;
+                        double dx=m.x-defender.x,dy=m.y-defender.y;
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideAcquisition(
+                                        dx,dy,maxFlakDetectionSquared)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
+                            continue;
+                        }
+                        double detection=ProjectileModel.acquisitionRange(
                                 mount.nominalRange,defender.sensorsCondition,
                                 weather.sensorFactor(),mount.profile,m.spec,
-                                OrdnancePropulsion.emissionMultiplier(m.thrustPhase)))
+                                OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideExactAcquisition(
+                                        dx,dy,detection)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
                             continue;
+                        }
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[2]++;
+                        double d=StrictMath.hypot(dx,dy);
+                        if(d<15||d>detection)continue;
                         double eta=approachEta(defender.x,defender.y,
                                 m.x,m.y,m.vx,m.vy,StrictMath.hypot(m.vx,m.vy));
                         double priority=defensiveScore(defender,d,eta);
@@ -6537,12 +6589,27 @@ public final class Battle {
                     }
                     for(Rocket r:defensiveRockets(defender.team)){
                         if(r.integrity<=0||r.team==defender.team||!coversThreat(defender,r.targetId))continue;
-                        double d=StrictMath.hypot(r.x-defender.x,r.y-defender.y);
-                        if(d<15||d>ProjectileModel.acquisitionRange(
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[0]++;
+                        double dx=r.x-defender.x,dy=r.y-defender.y;
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideAcquisition(
+                                        dx,dy,maxFlakDetectionSquared)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
+                            continue;
+                        }
+                        double detection=ProjectileModel.acquisitionRange(
                                 mount.nominalRange,defender.sensorsCondition,
                                 weather.sensorFactor(),mount.profile,r.spec,
-                                RocketBarrage.hotEmission(r.motor,r.burning())))
+                                RocketBarrage.hotEmission(r.motor,r.burning()));
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideExactAcquisition(
+                                        dx,dy,detection)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
                             continue;
+                        }
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[2]++;
+                        double d=StrictMath.hypot(dx,dy);
+                        if(d<15||d>detection)continue;
                         double eta=approachEta(defender.x,defender.y,
                                 r.x,r.y,r.vx,r.vy,StrictMath.hypot(r.vx,r.vy));
                         double priority=defensiveScore(defender,d,eta);
@@ -6551,11 +6618,26 @@ public final class Battle {
                     }
                     for(Ballistic p:defensiveBallistics(defender.team)){
                         if(p.integrity<=0||p.team==defender.team||!coversThreat(defender,p.targetId))continue;
-                        double d=StrictMath.hypot(p.x-defender.x,p.y-defender.y);
-                        if(d<15||d>ProjectileModel.acquisitionRange(
-                                mount.nominalRange,defender.sensorsCondition,
-                                weather.sensorFactor(),mount.profile,p.spec))
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[0]++;
+                        double dx=p.x-defender.x,dy=p.y-defender.y;
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideAcquisition(
+                                        dx,dy,maxFlakDetectionSquared)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
                             continue;
+                        }
+                        double detection=ProjectileModel.acquisitionRange(
+                                mount.nominalRange,defender.sensorsCondition,
+                                weather.sensorFactor(),mount.profile,p.spec);
+                        if(flakRangeBroadphase&&
+                                ProjectileModel.definitelyOutsideExactAcquisition(
+                                        dx,dy,detection)){
+                            if(flakRangeDiagnostic!=null)flakRangeDiagnostic[1]++;
+                            continue;
+                        }
+                        if(flakRangeDiagnostic!=null)flakRangeDiagnostic[2]++;
+                        double d=StrictMath.hypot(dx,dy);
+                        if(d<15||d>detection)continue;
                         double eta=approachEta(defender.x,defender.y,
                                 p.x,p.y,p.vx,p.vy,p.spec.speed());
                         double priority=defensiveScore(defender,d,eta);
@@ -7602,12 +7684,18 @@ public final class Battle {
                     if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
                     continue;
                 }
-                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
-                double distance=StrictMath.hypot(dx,dy);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,m.spec,
                         OrdnancePropulsion.emissionMultiplier(m.thrustPhase));
+                if(laserPdRangeBroadphase&&
+                        ProjectileModel.definitelyOutsideExactAcquisition(
+                                dx,dy,detection)){
+                    if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
+                    continue;
+                }
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
+                double distance=StrictMath.hypot(dx,dy);
                 if(distance>detection)continue;
                 acquiredTracks++;
                 if(!diagnosticDisablePrecisionReservations&&
@@ -7635,11 +7723,17 @@ public final class Battle {
                     if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
                     continue;
                 }
-                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
-                double distance=StrictMath.hypot(dx,dy);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,p.spec);
+                if(laserPdRangeBroadphase&&
+                        ProjectileModel.definitelyOutsideExactAcquisition(
+                                dx,dy,detection)){
+                    if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
+                    continue;
+                }
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
+                double distance=StrictMath.hypot(dx,dy);
                 if(distance>detection)continue;
                 acquiredTracks++;
                 if(!diagnosticDisablePrecisionReservations&&
@@ -7669,12 +7763,18 @@ public final class Battle {
                     if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
                     continue;
                 }
-                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
-                double distance=StrictMath.hypot(dx,dy);
                 double detection=ProjectileModel.acquisitionRange(
                         pdRange,defender.sensorsCondition,weather.sensorFactor(),
                         pdProfile,r.spec,
                         RocketBarrage.hotEmission(r.motor,r.burning()));
+                if(laserPdRangeBroadphase&&
+                        ProjectileModel.definitelyOutsideExactAcquisition(
+                                dx,dy,detection)){
+                    if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[1]++;
+                    continue;
+                }
+                if(laserPdRangeDiagnostic!=null)laserPdRangeDiagnostic[2]++;
+                double distance=StrictMath.hypot(dx,dy);
                 if(distance>detection)continue;
                 acquiredTracks++;
                 if(!diagnosticDisablePrecisionReservations&&

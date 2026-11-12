@@ -58,6 +58,13 @@ public final class FighterCountermeasureTest {
     private static Battle fixture(TechnologyCatalog tech,long seed,
                                   boolean disabled,String defenseKind,
                                   boolean indexedOpponents,boolean indexedRadarDefenders){
+        return fixture(tech,seed,disabled,defenseKind,
+                indexedOpponents,indexedRadarDefenders,true);
+    }
+    private static Battle fixture(TechnologyCatalog tech,long seed,
+                                  boolean disabled,String defenseKind,
+                                  boolean indexedOpponents,boolean indexedRadarDefenders,
+                                  boolean boundedFlakRange){
         if(!defenseKind.equals("FLK")&&!defenseKind.equals("RCW"))
             throw new IllegalArgumentException("Only real fitted radar guns");
         var hull=Shipyard.Hull.CRUISER;
@@ -74,6 +81,7 @@ public final class FighterCountermeasureTest {
         Battle battle=new Battle(seed);
         battle.configureOpponentIndexForDiagnostic(indexedOpponents);
         battle.configureRadarDefenderIndexForDiagnostic(indexedRadarDefenders);
+        battle.configureFlakRangeBroadphaseForDiagnostic(boundedFlakRange);
         battle.spawnWing(0,carrier,tech,1,300,350);
         battle.spawnWing(1,flak,tech,1,510,350);
         Battle.Ship parent=battle.ships().get(0);
@@ -205,11 +213,50 @@ public final class FighterCountermeasureTest {
                 "2 fitted defenders, 190 ticks each, live finite countermeasures");
     }
 
+    /** Fitted flak consumes real radar chaff while its conservative
+     * range rejection removes only provably unreachable physical targets.
+     * Compare the actual warhead/flak trajectory after every fixed tick. */
+    private static void flakRangeLiveParity(TechnologyCatalog tech){
+        Battle optimized=fixture(tech,810519L,false,"FLK",
+                true,true,true);
+        Battle original=fixture(tech,810519L,false,"FLK",
+                true,true,false);
+        check(optimized.fingerprint()==original.fingerprint(),
+                "Flak broadphase changed launcher setup before trial");
+        for(int frame=0;frame<190;frame++){
+            optimized.step();original.step();
+            check(optimized.fingerprint()==original.fingerprint(),
+                    "Flak acquisition cull changed real fitted combat tick "+
+                            optimized.tick);
+        }
+        var fast=optimized.flakRangeMetrics();
+        var slow=original.flakRangeMetrics();
+        check(fast.candidates()>0&&
+                fast.candidates()==slow.candidates()&&
+                fast.exactDistanceChecks()+fast.excluded()==fast.candidates()&&
+                slow.excluded()==0&&slow.exactDistanceChecks()==slow.candidates(),
+                "Flak scanned different real candidate bodies");
+        check(optimized.fighterChaffDeployed>0&&
+                optimized.fighterChaffFlakDiversions>0&&
+                optimized.fighterChaffDeployed==original.fighterChaffDeployed&&
+                optimized.fighterChaffFlakDiversions==
+                        original.fighterChaffFlakDiversions,
+                "Actual fitted flak/chaff cartridge diversion was altered");
+        System.out.println("PASS fitted flak range exclusion A/B "+
+                "200 fixed-tick fighter combat, candidates="+fast.candidates()+
+                " excluded="+fast.excluded()+
+                " exact="+fast.exactDistanceChecks()+
+                " chaff="+optimized.fighterChaffFlakDiversions+
+                " fingerprint="+Long.toHexString(optimized.fingerprint())+
+                " (work counters advisory only)");
+    }
+
     public static void main(String[] args)throws Exception{
         spectralHardware();
         var tech=TechnologyCatalog.loadDefault();
         actualRadarDiversion(tech);
         opponentIndexRadarParity(tech);
+        flakRangeLiveParity(tech);
         Battle a=fixture(tech,810412L,false);
         Battle b=fixture(tech,810412L,false);
         for(int tick=0;tick<95;tick++){
