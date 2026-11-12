@@ -42,6 +42,13 @@ public final class GuidedPayloadVisualTest {
                 CombatEffectScale.of(heavy.width())<5f &&
                 CombatEffectScale.of(torpedo.width())<5f,
                 "Guided projectile body art must stay far below an escort hull footprint");
+        // Both separated Library and curated/fallback art use the same
+        // small moving-body footprint. Physical hits and impacts are separate.
+        check(CombatEffectScale.PROJECTILE_FOOTPRINT==.45f &&
+                CombatEffectScale.projectile(standard.width())<1.36f &&
+                CombatEffectScale.projectile(heavy.width())<2f &&
+                CombatEffectScale.projectile(torpedo.width())<2f,
+                "Missile and torpedo bodies remain tiny at one-to-one camera zoom");
         var fighterMissile=GuidedPayloadVisual.forLauncher(standard,true);
         var fighterTorpedo=GuidedPayloadVisual.forLauncher(torpedo,true);
         check(GuidedPayloadVisual.forLauncher(standard,false)==standard &&

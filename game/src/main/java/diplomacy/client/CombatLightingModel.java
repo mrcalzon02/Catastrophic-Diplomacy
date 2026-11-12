@@ -87,7 +87,7 @@ final class CombatLightingModel {
             float speed=(float)StrictMath.hypot(missile.vx,missile.vy);
             float dx=speed>.0001f?(float)(missile.vx/speed):1f;
             float dy=speed>.0001f?(float)(missile.vy/speed):0f;
-            float tail=CombatEffectScale.of(missile.torpedo?10f:6f);
+            float tail=CombatEffectScale.projectile(missile.torpedo?10f:6f);
             float tx=x-dx*tail,ty=y-dy*tail;
             // Ignition occurs on *every* motor restart, including after a long
             // unpowered coast before terminal intercept approach.

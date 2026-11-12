@@ -198,6 +198,20 @@ final class ModularWeaponFxRenderer implements Disposable {
                 width,height,1f,1f,angle);
     }
 
+    /** Only moving physical bodies use the additional reduction. Firing,
+     * impact, interception and armor marks retain their own dimensions. */
+    private static void drawProjectileCentered(SpriteBatch batch,Texture image,
+            float x,float y,float width,float height,float angle){
+        drawCentered(batch,image,x,y,
+                width*CombatEffectScale.PROJECTILE_FOOTPRINT,
+                height*CombatEffectScale.PROJECTILE_FOOTPRINT,angle);
+    }
+    private static void drawProjectileCentered(SpriteBatch batch,TextureRegion image,
+            float x,float y,float width,float height,float angle){
+        drawCentered(batch,image,x,y,
+                width*CombatEffectScale.PROJECTILE_FOOTPRINT,
+                height*CombatEffectScale.PROJECTILE_FOOTPRINT,angle);
+    }
     /** The curated IMPACT cells include their own bright spikes. Shrink only
      * these source-art impact stamps, never the in-flight payload, FIRING stage,
      * physical collision or permanent 96px armor signature. */
@@ -291,7 +305,7 @@ final class ModularWeaponFxRenderer implements Disposable {
                         path.toY()-path.fromY(),path.toX()-path.fromX()));
                 float width=guided?11f:path.weapon().equals("RAIL_PD")?13f:8f;
                 float height=guided?5f:3f;
-                drawCentered(batch,atlas[cell],point.x(),point.y(),
+                drawProjectileCentered(batch,atlas[cell],point.x(),point.y(),
                         width,height,angle);
             }
         // Guided PAYLOAD uses the real physical body's type, fitted payload,
@@ -301,7 +315,7 @@ final class ModularWeaponFxRenderer implements Disposable {
             BattleRenderPoses.Pose pose=poses==null?
                     new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
-            float radius=CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f;
+            float radius=CombatEffectScale.projectile(Math.max(style.width(),style.height()))*.5f;
             if(view!=null&&!view.circle(pose.x(),pose.y(),radius))continue;
             if(missileLibrary.draw(batch,missile,pose,style,battle.tick))continue;
             TextureRegion[] authored=missileBodies();
@@ -310,9 +324,9 @@ final class ModularWeaponFxRenderer implements Disposable {
             float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(style.red(),style.green(),style.blue(),style.alpha());
             if(authored!=null)
-                drawCentered(batch,authored[style.cell()],pose.x(),pose.y(),
+                drawProjectileCentered(batch,authored[style.cell()],pose.x(),pose.y(),
                         style.width(),style.height(),angle);
-            else drawCentered(batch,fallback,pose.x(),pose.y(),
+            else drawProjectileCentered(batch,fallback,pose.x(),pose.y(),
                     style.width(),style.height(),angle);
             batch.setColor(1,1,1,1);
         }
@@ -326,17 +340,17 @@ final class ModularWeaponFxRenderer implements Disposable {
                     new BattleRenderPoses.Pose((float)rocket.x,(float)rocket.y,
                             (float)rocket.heading):poses.rocket(rocket);
             if(view!=null&&!view.circle(pose.x(),pose.y(),
-                    CombatEffectScale.of(Math.max(style.width(),style.height()))*.5f))
+                    CombatEffectScale.projectile(Math.max(style.width(),style.height()))*.5f))
                 continue;
             Texture fallback=rocketAtlas==null?texture(GuidedPayloadVisual.GUIDED):null;
             if(rocketAtlas==null&&fallback==null)continue;
             float heading=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(style.red(),style.green(),style.blue(),1f);
             if(rocketAtlas!=null)
-                drawCentered(batch,rocketAtlas[style.cell()],
+                drawProjectileCentered(batch,rocketAtlas[style.cell()],
                         pose.x(),pose.y(),
                         style.width(),style.height(),heading);
-            else drawCentered(batch,fallback,pose.x(),pose.y(),
+            else drawProjectileCentered(batch,fallback,pose.x(),pose.y(),
                     style.width(),style.height(),heading);
             batch.setColor(1,1,1,1);
         }
@@ -352,14 +366,14 @@ final class ModularWeaponFxRenderer implements Disposable {
                     new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
             if(view!=null&&!view.circle(pose.x(),pose.y(),
-                    CombatEffectScale.of(Math.max(spec.width(),spec.height()))*.5f))continue;
+                    CombatEffectScale.projectile(Math.max(spec.width(),spec.height()))*.5f))continue;
             Texture fallback=shells==null?frame(clip,battle.tick-shell.spawnTick):null;
             if(shells==null&&fallback==null)continue;
             float angle=(float)StrictMath.toDegrees(pose.angle());
             if(shells!=null)
-                drawCentered(batch,shells[spec.cell()],pose.x(),pose.y(),
+                drawProjectileCentered(batch,shells[spec.cell()],pose.x(),pose.y(),
                         spec.width(),spec.height(),angle);
-            else drawCentered(batch,fallback,pose.x(),pose.y(),
+            else drawProjectileCentered(batch,fallback,pose.x(),pose.y(),
                     clip.width()*(shell.fighterLaunched?CombatEffectScale.FIGHTER_KINETIC:1f),
                     clip.height()*(shell.fighterLaunched?CombatEffectScale.FIGHTER_KINETIC:1f),angle);
         }
@@ -378,9 +392,9 @@ final class ModularWeaponFxRenderer implements Disposable {
             float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(.90f,.80f,.58f,1f);
             if(shells!=null)
-                drawCentered(batch,shells[0],pose.x(),pose.y(),
+                drawProjectileCentered(batch,shells[0],pose.x(),pose.y(),
                         9,4,angle);
-            else drawCentered(batch,fallback,pose.x(),pose.y(),
+            else drawProjectileCentered(batch,fallback,pose.x(),pose.y(),
                     9,4,angle);
             batch.setColor(1,1,1,1);
         }
@@ -399,9 +413,9 @@ final class ModularWeaponFxRenderer implements Disposable {
             float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(1f,.84f,.54f,1f);
             if(shells!=null)
-                drawCentered(batch,shells[0],pose.x(),pose.y(),
+                drawProjectileCentered(batch,shells[0],pose.x(),pose.y(),
                         8,3,angle);
-            else drawCentered(batch,fallback,pose.x(),pose.y(),
+            else drawProjectileCentered(batch,fallback,pose.x(),pose.y(),
                     8,3,angle);
             batch.setColor(1,1,1,1);
         }
@@ -418,9 +432,9 @@ final class ModularWeaponFxRenderer implements Disposable {
             float angle=(float)StrictMath.toDegrees(pose.angle());
             batch.setColor(.82f,.93f,1f,1f);
             if(shells!=null)
-                drawCentered(batch,shells[4],pose.x(),pose.y(),
+                drawProjectileCentered(batch,shells[4],pose.x(),pose.y(),
                         13,4,angle);
-            else drawCentered(batch,fallback,pose.x(),pose.y(),
+            else drawProjectileCentered(batch,fallback,pose.x(),pose.y(),
                         13,4,angle);
             batch.setColor(1,1,1,1);
         }

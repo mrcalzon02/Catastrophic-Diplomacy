@@ -242,7 +242,7 @@ final class CombatLightingRenderer implements Disposable {
             float age = (float) (battle.tick - smoke.bornTick())
                     / CombatLightingModel.SMOKE_LIFETIME_TICKS;
             if (age < 0 || age >= 1) continue;
-            float radius = CombatEffectScale.of((smoke.heavy() ? 7.5f : 4.8f) * (1 + age * 1.65f));
+            float radius = CombatEffectScale.projectile((smoke.heavy() ? 7.5f : 4.8f) * (1 + age * 1.65f));
             if (radius*2f/camera.zoom < 1f
                     || !visible(camera, smoke.x(), smoke.y(), radius)) continue;
             float fade=1-age;
@@ -393,17 +393,17 @@ final class CombatLightingRenderer implements Disposable {
                     new BattleRenderPoses.Pose((float)missile.x,(float)missile.y,
                             (float)StrictMath.atan2(missile.vy,missile.vx)):poses.missile(missile);
             double dx=StrictMath.cos(pose.angle()),dy=StrictMath.sin(pose.angle());
-            double x=pose.x()-dx*CombatEffectScale.of(missile.torpedo ? 8 : 5);
-            double y=pose.y()-dy*CombatEffectScale.of(missile.torpedo ? 8 : 5);
+            double x=pose.x()-dx*CombatEffectScale.projectile(missile.torpedo ? 8 : 5);
+            double y=pose.y()-dy*CombatEffectScale.projectile(missile.torpedo ? 8 : 5);
             boolean terminal=missile.thrustPhase==OrdnancePropulsion.Phase.TERMINAL;
             Color color=missile.decoy?Color.SKY:
                     terminal?Color.SCARLET:missile.torpedo?Color.ORANGE:Color.GOLD;
             float strength=missile.thrustPhase==OrdnancePropulsion.Phase.BOOST?1.16f:
                     terminal?1.28f:1f;
             spot(batch,camera,x,y,
-                    CombatEffectScale.of(missile.torpedo?30:20)*strength,color,.53f);
+                    CombatEffectScale.projectile(missile.torpedo?30:20)*strength,color,.53f);
             spot(batch,camera,x,y,
-                    CombatEffectScale.of(missile.torpedo?11:7)*strength,Color.WHITE,.70f);
+                    CombatEffectScale.projectile(missile.torpedo?11:7)*strength,Color.WHITE,.70f);
         }
 
         // Only true simulation FIRE, IMPACT or INTERCEPT events cause bursts.

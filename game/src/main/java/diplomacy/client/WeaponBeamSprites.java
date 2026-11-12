@@ -163,9 +163,9 @@ public final class WeaponBeamSprites implements Disposable {
                     new BattleRenderPoses.Pose((float)shell.x,(float)shell.y,
                             (float)StrictMath.atan2(shell.vy,shell.vx)):poses.shell(shell);
             float angle=(float)StrictMath.toDegrees(pose.angle());
-            float length=CombatEffectScale.forLauncher(CombatEffectScale.of(11.5f),
+            float length=CombatEffectScale.forLauncher(CombatEffectScale.projectile(11.5f),
                     shell.fighterLaunched,CombatEffectScale.FIGHTER_KINETIC);
-            float thickness=CombatEffectScale.forLauncher(CombatEffectScale.of(3.1f),
+            float thickness=CombatEffectScale.forLauncher(CombatEffectScale.projectile(3.1f),
                     shell.fighterLaunched,CombatEffectScale.FIGHTER_KINETIC);
             if(view!=null&&!view.circle(pose.x(),pose.y(),length))continue;
             batch.draw(image,pose.x()-length/2,pose.y()-thickness/2,

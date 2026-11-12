@@ -26,6 +26,9 @@ public final class OrdnanceLibrarySpritesTest {
             check(torpedo>=34&&torpedo<40,"Torpedo must use large torpedo silhouettes");
             seen.add(torpedo);
         }
+        check(CombatEffectScale.projectile(9f)<1.36f &&
+                CombatEffectScale.projectile(20f)<3.01f,
+                "Library body and engine-light scale must be reduced together");
         check(seen.size()>=38,"Physical variants must use nearly the entire authored atlas");
         check(!OrdnanceLibrarySprites.burning(OrdnancePropulsion.Phase.COLD_EJECT,10),
                 "Ejection must have no attached main exhaust");

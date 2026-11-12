@@ -122,7 +122,7 @@ final class OrdnanceLibrarySprites implements Disposable {
         int index=variantIndex(missile.torpedo,missile.payload,missile.warhead,
                 missile.visualId,missile.sourceId);
         TextureRegion body=bodyRegions[index];
-        float width=CombatEffectScale.of(style.width());
+        float width=CombatEffectScale.projectile(style.width());
         float height=width*body.getRegionHeight()/body.getRegionWidth();
         float angle=(float)StrictMath.toDegrees(pose.angle());
         if(burning(missile.thrustPhase,missile.propellant)){

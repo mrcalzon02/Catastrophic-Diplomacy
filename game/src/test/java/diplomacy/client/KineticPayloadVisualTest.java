@@ -20,6 +20,11 @@ public final class KineticPayloadVisualTest {
                             diplomacy.sim.FighterModel.Hull.INTERCEPTOR)/2f,
                     "Aircraft cannon shells must be sub-fighter sized");
         }
+        check(CombatEffectScale.projectile(
+                    KineticPayloadVisual.forType(AmmunitionTable.Kinetic.STANDARD).width())<3.8f &&
+                CombatEffectScale.projectile(
+                    KineticPayloadVisual.forType(AmmunitionTable.Kinetic.RELATIVISTIC).width())<5.3f,
+                "Even heavy kinetic shells must remain small against a hull");
         check(seen.size()==5,"All five arsenal sprite cells must be used");
         System.out.println("PASS five real projectile sprites assigned to five kinetic ammunition types");
     }

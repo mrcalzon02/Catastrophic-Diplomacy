@@ -4080,7 +4080,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     missile.torpedo()?Color.ORANGE:
                     missile.team()==0?Color.CYAN:Color.SCARLET);
             float radius=CombatEffectScale.forLauncher(
-                    CombatEffectScale.of(missile.torpedo()?4.4f:2.8f),
+                    CombatEffectScale.projectile(missile.torpedo()?4.4f:2.8f),
                     missile.fighterLaunched(),CombatEffectScale.FIGHTER_GUIDED);
             shapes.circle((float)missile.x(),(float)missile.y(),radius,7);
         }
@@ -4088,7 +4088,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(view!=null&&!view.circle((float)shell.x(),(float)shell.y(),4))continue;
             shapes.setColor(Color.GOLD);
             float radius=CombatEffectScale.forLauncher(
-                    CombatEffectScale.of(2.1f),shell.fighterLaunched(),
+                    CombatEffectScale.projectile(2.1f),shell.fighterLaunched(),
                     CombatEffectScale.FIGHTER_KINETIC);
             shapes.circle((float)shell.x(),(float)shell.y(),radius,6);
         }
