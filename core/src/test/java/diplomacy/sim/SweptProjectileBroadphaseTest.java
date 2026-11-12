@@ -1,6 +1,8 @@
 package diplomacy.sim;
 
 import java.util.Random;
+import diplomacy.shipyard.Shipyard;
+import diplomacy.tech.TechnologyCatalog;
 
 /** Exact segment-collision parity for the exclusion-only rocket/kinetic
  * broadphase. The original solver remains the sole impact-time authority.
@@ -30,7 +32,139 @@ public final class SweptProjectileBroadphaseTest {
                 ax+","+ay+" -> "+bx+","+by+" against "+cx+","+cy+
                 " r="+radius+" exact="+exact+" filtered="+bounded);
     }
-    public static void main(String[] args){
+    /** Rail penetrators test the ACTUAL moving other body, not a frozen
+     * endpoint. The broadphase must never suppress even an edge tangent. */
+    private static double movingFiltered(double ax,double ay,
+            double bx,double by,double oldX,double oldY,
+            double newX,double newY,double fraction,double radius){
+        if(!Battle.movingSweptAabbMayHit(
+                StrictMath.min(ax,bx),StrictMath.max(ax,bx),
+                StrictMath.min(ay,by),StrictMath.max(ay,by),
+                oldX,oldY,newX,newY,radius))
+            return Double.POSITIVE_INFINITY;
+        return Battle.movingProjectileEntry(ax,ay,bx,by,
+                oldX,oldY,newX,newY,fraction,radius);
+    }
+    private static void movingParity(double ax,double ay,double bx,double by,
+            double oldX,double oldY,double newX,double newY,
+            double fraction,double radius){
+        double exact=Battle.movingProjectileEntry(ax,ay,bx,by,
+                oldX,oldY,newX,newY,fraction,radius);
+        double fast=movingFiltered(ax,ay,bx,by,
+                oldX,oldY,newX,newY,fraction,radius);
+        require(Double.doubleToLongBits(exact)==Double.doubleToLongBits(fast),
+                "PD swept AABB discarded an exact relative-motion contact: "+
+                        exact+" vs "+fast+" radius="+radius+
+                        " fraction="+fraction+" start="+ax+","+ay);
+    }
+    private static void checkMovingBroadphaseParity(Random random){
+        int cases=90_000;
+        for(int i=0;i<cases;i++){
+            double ax=-1200+random.nextDouble()*4700;
+            double ay=-720+random.nextDouble()*2600;
+            double bx=ax+(random.nextDouble()-.5)*580;
+            double by=ay+(random.nextDouble()-.5)*580;
+            double radius=.5+random.nextDouble()*70;
+            double px,py,nx,ny;
+            if(i%5==0){
+                // Actual relative crossing: target moves across the shot
+                // between its old and new positions.
+                double fraction=random.nextDouble();
+                px=ax+(bx-ax)*fraction+(random.nextDouble()-.5)*radius;
+                py=ay+(by-ay)*fraction+(random.nextDouble()-.5)*radius;
+                nx=px+(random.nextDouble()-.5)*350;
+                ny=py+(random.nextDouble()-.5)*350;
+            }else{
+                px=-1300+random.nextDouble()*4800;
+                py=-800+random.nextDouble()*2850;
+                nx=px+(random.nextDouble()-.5)*500;
+                ny=py+(random.nextDouble()-.5)*500;
+            }
+            movingParity(ax,ay,bx,by,px,py,nx,ny,
+                    random.nextDouble(),radius);
+        }
+        for(double radius:new double[]{.001,.75,2.5,6.0,43.0})
+            for(double d:new double[]{-1e-8,-1e-10,0,1e-10,1e-8}){
+                // Crossing, zero-length segment, both swept-endpoint
+                // tangencies and a near-miss after a partial tick.
+                movingParity(0,0,100,0,50,-200,50,200,1,radius);
+                movingParity(0,0,0,0,radius+d,0,radius+d,0,1,radius);
+                movingParity(0,0,100,0,0,0,100,radius+d,.5,radius);
+                movingParity(0,0,100,0,50,radius+d,50,radius+d,1,radius);
+            }
+        System.out.println("PASS PD moving-sweep broadphase "+cases+
+                " seeded cases plus 100 tangent/crossing edge cases");
+    }
+
+    /** Two real paired 12v12 fitted encounters prove neither defensive
+     * ammunition spending nor the earliest physical hit can diverge. */
+    private static void checkLivePdParity() throws Exception{
+        TechnologyCatalog tech=TechnologyCatalog.loadDefault();
+        Shipyard.Design armed=Shipyard.starter(
+                Battle.Faction.TERRAN,Shipyard.Hull.CRUISER);
+        Shipyard.Design defender=Shipyard.bareHull(
+                Battle.Faction.DRAXIAN,Shipyard.Hull.DREADNOUGHT);
+        int mounted=0;
+        for(Shipyard.Slot slot:defender.hull.slots){
+            if(slot.mount()!=Shipyard.Mount.WEAPON||mounted>=2)continue;
+            defender=defender.install(slot.index(),
+                    mounted==0?"BASE-DRA-RPD":"BASE-DRA-RCW");
+            mounted++;
+        }
+        require(mounted==2&&Shipyard.inspect(defender,tech).valid(),
+                "Real RPD+RCW two-mount defensive fixture is not constructible");
+        long candidateChecks=0,narrowChecks=0;
+        int totalShots=0;
+        for(long seed:new long[]{2026111201L,2026111202L}){
+            Battle filtered=Battle.duel(seed,12,armed,defender,tech);
+            Battle reference=Battle.duel(seed,12,armed,defender,tech);
+            filtered.configurePdProjectileBroadphaseForDiagnostic(true);
+            reference.configurePdProjectileBroadphaseForDiagnostic(false);
+            for(Battle.Ship ship:filtered.ships())
+                if(ship.team==0){
+                    ship.missileDamage=Math.max(35,ship.missileDamage);
+                    ship.missileAmmo=100;
+                    ship.torpedoDamage=Math.max(35,ship.torpedoDamage);
+                    ship.torpedoAmmo=40;
+                }
+            for(Battle.Ship ship:reference.ships())
+                if(ship.team==0){
+                    ship.missileDamage=Math.max(35,ship.missileDamage);
+                    ship.missileAmmo=100;
+                    ship.torpedoDamage=Math.max(35,ship.torpedoDamage);
+                    ship.torpedoAmmo=40;
+                }
+            for(int t=0;t<240;t++){
+                filtered.step();
+                reference.step();
+                require(filtered.fingerprint()==reference.fingerprint(),
+                        "RPD/RCW live collision broadphase changed physical "+
+                        "combat at tick "+filtered.tick+" seed "+seed);
+            }
+            var pruned=filtered.pdProjectileBroadphaseMetrics();
+            var exact=reference.pdProjectileBroadphaseMetrics();
+            require(pruned.candidateChecks()==exact.candidateChecks()&&
+                    pruned.narrowPhaseChecks()<=exact.narrowPhaseChecks(),
+                    "PD A/B candidates differed or filtering increased work");
+            candidateChecks+=pruned.candidateChecks();
+            narrowChecks+=pruned.narrowPhaseChecks();
+            totalShots+=(int)filtered.visualEvents().stream().filter(e->
+                    e.phase()==Battle.VisualPhase.FIRE&&
+                    ("RAIL_PD".equals(e.weapon())||
+                     "ROTARY_CIWS".equals(e.weapon()))).count();
+        }
+        require(totalShots>0&&candidateChecks>0&&
+                narrowChecks<candidateChecks,
+                "Fitted PD benchmark did not fire live shots and prune "+
+                        "distant hostile collision candidates");
+        System.out.println("PASS RPD/RCW exact-source broadphase A/B "+
+                "12v12 seeds=2 ticks=240 candidateChecks="+candidateChecks+
+                " narrowPhaseChecks="+narrowChecks+
+                " avoided="+(candidateChecks-narrowChecks)+
+                " realFiringEvents="+totalShots+" (counts diagnostic only)");
+    }
+
+    public static void main(String[] args) throws Exception{
         Random random=new Random(0xB0A0D5E);
         long checks=0,nearby=0;
         for(int i=0;i<150_000;i++){
@@ -94,6 +228,8 @@ public final class SweptProjectileBroadphaseTest {
             }
         }
         require(exactHits==filteredHits,"Broadphase changed benchmark collision count");
+        checkMovingBroadphaseParity(random);
+        checkLivePdParity();
         System.out.println("PASS swept projectile broadphase parity cases="+checks+
                 " nearPathCases="+nearby+" hits="+filteredHits+
                 " narrowOnlyMs="+exactNs/1e6+

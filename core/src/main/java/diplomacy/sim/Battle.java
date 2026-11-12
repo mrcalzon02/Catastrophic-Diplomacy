@@ -1263,6 +1263,24 @@ public final class Battle {
     /** Normal battle uses actual relative-motion sweeps. Controlled pre-tick
      * A/B can temporarily restore the historical endpoint-only method. */
     private boolean diagnosticRailRelativeSweep=true;
+    /** Conservative rail/rotary collision rejection only; exact entry times,
+     * body ordering and damage stay with the existing narrow-phase solvers. */
+    private boolean pdProjectileBroadphase=true;
+    /** Optional external A/B counter; never populated in normal gameplay. */
+    private long[] pdProjectileBroadphaseCounts;
+    public record PdProjectileBroadphaseMetrics(long candidateChecks,
+                                                long narrowPhaseChecks) { }
+    public void configurePdProjectileBroadphaseForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Configure projectile broadphase before combat");
+        pdProjectileBroadphase=enabled;
+        pdProjectileBroadphaseCounts=new long[2];
+    }
+    public PdProjectileBroadphaseMetrics pdProjectileBroadphaseMetrics(){
+        long[] c=pdProjectileBroadphaseCounts;
+        return c==null?new PdProjectileBroadphaseMetrics(0,0)
+                :new PdProjectileBroadphaseMetrics(c[0],c[1]);
+    }
     /** Physical lock-time sensitivity is laboratory-only. Normal battles use 1. */
     private double diagnosticPrecisionLockMultiplier=1.0;
     /** Laboratory A/B against duplicate optical allocations. */
@@ -5693,6 +5711,32 @@ public final class Battle {
                  cy<minY-extent||cy>maxY+extent);
     }
 
+    /** Necessary (never sufficient) overlap of two independently moving
+     * segments, expanded by the true physical collision radius. The old/new
+     * target positions may straddle the whole 30Hz step; that *larger* box
+     * is deliberately conservative when a penetrator has partial life. */
+    static boolean movingSweptAabbMayHit(double minX,double maxX,
+                                         double minY,double maxY,
+                                         double oldX,double oldY,
+                                         double newX,double newY,double radius){
+        double padding=radius+1e-6;
+        return !(StrictMath.max(oldX,newX)<minX-padding||
+                 StrictMath.min(oldX,newX)>maxX+padding||
+                 StrictMath.max(oldY,newY)<minY-padding||
+                 StrictMath.min(oldY,newY)>maxY+padding);
+    }
+    private boolean pdProjectileMayHit(double minX,double maxX,
+                                       double minY,double maxY,
+                                       double oldX,double oldY,
+                                       double newX,double newY,double radius){
+        long[] counts=pdProjectileBroadphaseCounts;
+        if(counts!=null)counts[0]++;
+        boolean possible=!pdProjectileBroadphase||movingSweptAabbMayHit(
+                minX,maxX,minY,maxY,oldX,oldY,newX,newY,radius);
+        if(possible&&counts!=null)counts[1]++;
+        return possible;
+    }
+
     /** Returns the first collision fraction in [0,1], or infinity if missed. */
     static double segmentHit(double ax,double ay,double bx,double by,
                                      double cx,double cy,double radius) {
@@ -6355,12 +6399,16 @@ public final class Battle {
             }
             double dt=StrictMath.min(DT,shot.life);
             double nx=shot.x+shot.vx*dt,ny=shot.y+shot.vy*dt;
+            final double minX=StrictMath.min(shot.x,nx),maxX=StrictMath.max(shot.x,nx);
+            final double minY=StrictMath.min(shot.y,ny),maxY=StrictMath.max(shot.y,ny);
             double first=Double.POSITIVE_INFINITY;
             Missile missileHit=null;Rocket rocketHit=null;
             Ballistic shellHit=null;Craft craftHit=null;
             for(Missile target:missiles){
                 if(target.team==shot.team)continue;
                 double radius=.75+1.65*StrictMath.sqrt(target.spec.crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        target.previousX,target.previousY,target.x,target.y,radius))continue;
                 double at=diagnosticRailRelativeSweep?
                         movingProjectileEntry(shot.x,shot.y,nx,ny,
                                 target.previousX,target.previousY,
@@ -6372,6 +6420,8 @@ public final class Battle {
             for(Rocket target:rockets){
                 if(target.team==shot.team)continue;
                 double radius=.75+1.65*StrictMath.sqrt(target.spec.crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        target.previousX,target.previousY,target.x,target.y,radius))continue;
                 double at=diagnosticRailRelativeSweep?
                         movingProjectileEntry(shot.x,shot.y,nx,ny,
                                 target.previousX,target.previousY,
@@ -6383,6 +6433,8 @@ public final class Battle {
             for(Ballistic target:ballistics){
                 if(target.team==shot.team)continue;
                 double radius=.55+1.15*StrictMath.sqrt(target.spec.crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        target.previousX,target.previousY,target.x,target.y,radius))continue;
                 double at=diagnosticRailRelativeSweep?
                         movingProjectileEntry(shot.x,shot.y,nx,ny,
                                 target.previousX,target.previousY,
@@ -6394,6 +6446,8 @@ public final class Battle {
             for(Craft target:crafts){
                 if(target.team==shot.team)continue;
                 double radius=3.5+2.5*StrictMath.sqrt(target.radarProfile().crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        target.lastObservedX,target.lastObservedY,target.x,target.y,radius))continue;
                 double at=diagnosticRailRelativeSweep?
                         movingProjectileEntry(shot.x,shot.y,nx,ny,
                                 target.lastObservedX,target.lastObservedY,
@@ -6616,12 +6670,16 @@ public final class Battle {
             }
             double dt=StrictMath.min(DT,shot.life);
             double nextX=shot.x+shot.vx*dt,nextY=shot.y+shot.vy*dt;
+            final double minX=StrictMath.min(shot.x,nextX),maxX=StrictMath.max(shot.x,nextX);
+            final double minY=StrictMath.min(shot.y,nextY),maxY=StrictMath.max(shot.y,nextY);
             double earliest=Double.POSITIVE_INFINITY;
             Missile hitMissile=null;Rocket hitRocket=null;
             Ballistic hitShell=null;Craft hitAircraft=null;
             for(Missile body:missiles){
                 if(body.team==shot.team)continue;
                 double radius=1.7+2.1*StrictMath.sqrt(body.spec.crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        body.x,body.y,body.x,body.y,radius))continue;
                 double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
                 if(at<earliest){earliest=at;hitMissile=body;
                     hitRocket=null;hitShell=null;hitAircraft=null;}
@@ -6629,6 +6687,8 @@ public final class Battle {
             for(Rocket body:rockets){
                 if(body.team==shot.team)continue;
                 double radius=1.7+2.1*StrictMath.sqrt(body.spec.crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        body.x,body.y,body.x,body.y,radius))continue;
                 double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
                 if(at<earliest){earliest=at;hitRocket=body;
                     hitMissile=null;hitShell=null;hitAircraft=null;}
@@ -6636,6 +6696,8 @@ public final class Battle {
             for(Ballistic body:ballistics){
                 if(body.team==shot.team)continue;
                 double radius=1.0+StrictMath.sqrt(body.spec.crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        body.x,body.y,body.x,body.y,radius))continue;
                 double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
                 if(at<earliest){earliest=at;hitShell=body;
                     hitMissile=null;hitRocket=null;hitAircraft=null;}
@@ -6643,6 +6705,8 @@ public final class Battle {
             for(Craft body:crafts){
                 if(body.team==shot.team)continue;
                 double radius=5.0+3.1*StrictMath.sqrt(body.radarProfile().crossSection());
+                if(!pdProjectileMayHit(minX,maxX,minY,maxY,
+                        body.x,body.y,body.x,body.y,radius))continue;
                 double at=segmentHit(shot.x,shot.y,nextX,nextY,body.x,body.y,radius);
                 if(at<earliest){earliest=at;hitAircraft=body;
                     hitMissile=null;hitRocket=null;hitShell=null;}
