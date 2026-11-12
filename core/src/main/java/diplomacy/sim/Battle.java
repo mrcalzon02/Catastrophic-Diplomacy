@@ -877,7 +877,60 @@ public final class Battle {
      * projectile owners and replay telemetry remain addressable.
      */
     private final Map<Integer,Ship> shipById = new HashMap<>();
+    /** Historical Map code is retained for deterministic diagnostic A/B.
+     * Production COOPERATE focus tracking is a compact per-battle primitive
+     * array: ship IDs are monotonic and strictly bounded by deployed ships. */
     private final Map<Integer,Integer> focusCounts=new HashMap<>();
+    private int[] focusCountsByShipId=new int[16];
+    private boolean indexedFocusCounts=true;
+    private long[] focusWorkDiagnostic;
+    public record FocusWorkMetrics(long rebuildEntries,long lookups,
+                                   long transitions) { }
+    public void configureFocusIndexForDiagnostic(boolean enabled){
+        if(tick!=0)throw new IllegalStateException(
+                "Captain focus index must be configured before combat");
+        indexedFocusCounts=enabled;
+        focusWorkDiagnostic=new long[3];
+    }
+    public FocusWorkMetrics focusWorkMetrics(){
+        long[] n=focusWorkDiagnostic;
+        return n==null?new FocusWorkMetrics(0,0,0):
+                new FocusWorkMetrics(n[0],n[1],n[2]);
+    }
+    /** Read-only count for parity tests; not part of simulation fingerprints. */
+    int focusCountForDiagnostic(int targetId){
+        if(!indexedFocusCounts)return focusCounts.getOrDefault(targetId,0);
+        return targetId>0&&targetId<focusCountsByShipId.length?
+                focusCountsByShipId[targetId]:0;
+    }
+    private void rebuildFocusCounts(){
+        if(indexedFocusCounts){
+            if(focusCountsByShipId.length<nextId){
+                int capacity=focusCountsByShipId.length;
+                while(capacity<nextId)capacity*=2;
+                focusCountsByShipId=Arrays.copyOf(focusCountsByShipId,capacity);
+            }
+            Arrays.fill(focusCountsByShipId,0,nextId,0);
+            for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0){
+                // A corrupted external target ID is never a valid physical
+                // candidate; ignore it rather than allocating huge buffers.
+                if(ship.lastTargetId>0&&ship.lastTargetId<nextId)
+                    focusCountsByShipId[ship.lastTargetId]++;
+                if(focusWorkDiagnostic!=null)focusWorkDiagnostic[0]++;
+            }
+        }else{
+            focusCounts.clear();
+            for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0){
+                focusCounts.merge(ship.lastTargetId,1,Integer::sum);
+                if(focusWorkDiagnostic!=null)focusWorkDiagnostic[0]++;
+            }
+        }
+    }
+    private int focusFor(Ship candidate){
+        if(focusWorkDiagnostic!=null)focusWorkDiagnostic[1]++;
+        return indexedFocusCounts?focusCountsByShipId[candidate.id]:
+                focusCounts.getOrDefault(candidate.id,0);
+    }
     /** Commander assignment scratch reused at 30 Hz, rather than creating
      * two forty-element arrays on every battle tick. */
     private final Ship[] commandRecipientScratch=new Ship[40];
@@ -2067,9 +2120,7 @@ public final class Battle {
         // the same immutable world, including externally issued coordinates.
         containFleet();
         if(tick==1)captureSensorHistory(0);
-        focusCounts.clear();
-        for(Ship ship:ships)if(ship.alive()&&ship.lastTargetId!=0)
-            focusCounts.merge(ship.lastTargetId,1,Integer::sum);
+        rebuildFocusCounts();
         for (int i = beams.size() - 1; i >= 0; i--) {
             Beam visual=beams.get(i);
             if ((visual.lifetime-=DT)<=0&&!visual.inFlight)beams.remove(i);
@@ -3628,7 +3679,7 @@ public final class Battle {
             switch(orders.targeting()){
                 case NEAREST,RETALIATE,PROTECT -> doctrine=0;
                 case COOPERATE -> {
-                    int allies=focusCounts.getOrDefault(candidate.id,0)
+                    int allies=focusFor(candidate)
                             -(actor.lastTargetId==candidate.id?1:0);
                     doctrine=-StrictMath.min(6,StrictMath.max(0,allies));
                 }
@@ -3699,8 +3750,15 @@ public final class Battle {
     private void updateFocus(Ship actor,Ship selected){
         int old=actor.lastTargetId,next=selected==null?0:selected.id;
         if(old!=next){
-            if(old!=0)focusCounts.merge(old,-1,Integer::sum);
-            if(next!=0)focusCounts.merge(next,1,Integer::sum);
+            if(focusWorkDiagnostic!=null)focusWorkDiagnostic[2]++;
+            if(indexedFocusCounts){
+                if(old>0&&old<focusCountsByShipId.length)
+                    focusCountsByShipId[old]--;
+                if(next>0)focusCountsByShipId[next]++;
+            }else{
+                if(old!=0)focusCounts.merge(old,-1,Integer::sum);
+                if(next!=0)focusCounts.merge(next,1,Integer::sum);
+            }
             actor.lastTargetId=next;
         }
     }

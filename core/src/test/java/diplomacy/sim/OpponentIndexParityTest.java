@@ -200,6 +200,105 @@ public final class OpponentIndexParityTest {
                 " (visits diagnostic, not FPS gate)");
     }
 
+    /**
+     * Actual cooperative fire control must track each ship's selected target
+     * with EXACTLY the same signed counts when a captain retargets, a focus
+     * target dies, new ships arrive, or orders change mid-battle. The old map
+     * remains available only for a same-seed A/B; release performance is
+     * advisory, but real selected targets/fingerprints are functional.
+     */
+    private static void verifyCooperativeFocusIndex(TechnologyCatalog catalog){
+        final long seed=202611121711L;
+        Battle indexed=Battle.duel(seed,24,Battle.Faction.TERRAN,
+                Battle.Faction.DRAXIAN);
+        Battle reference=Battle.duel(seed,24,Battle.Faction.TERRAN,
+                Battle.Faction.DRAXIAN);
+        reference.configureFocusIndexForDiagnostic(false);
+        indexed.configureFocusIndexForDiagnostic(true);
+        for(Battle battle:new Battle[]{indexed,reference}){
+            for(Battle.Ship ship:battle.ships()){
+                ship.maxHull=ship.hull=50000;
+                ship.missileAmmo=64;ship.maxMissileAmmo=64;
+            }
+            for(int team=0;team<2;team++)
+                battle.setTeamOrders(team,BattleOrders.DEFAULT.withTargeting(
+                        BattleOrders.Targeting.COOPERATE));
+        }
+        for(int t=0;t<165;t++){
+            if(t==52){
+                // One more physical friendly combatant must be addressable by
+                // the primitive index without losing existing focus values.
+                indexed.addShip(0,Battle.Faction.TERRAN,120,290);
+                reference.addShip(0,Battle.Faction.TERRAN,120,290);
+            }
+            if(t==82){
+                // Controlled deletion exercises rebuilding after the focused
+                // hostile is no longer alive; it is a diagnostic fixture only.
+                indexed.ships().get(30).hull=0;
+                reference.ships().get(30).hull=0;
+            }
+            if(t==96){
+                indexed.setTeamOrders(1,BattleOrders.DEFAULT.withTargeting(
+                        BattleOrders.Targeting.VULTURE));
+                reference.setTeamOrders(1,BattleOrders.DEFAULT.withTargeting(
+                        BattleOrders.Targeting.VULTURE));
+            }
+            if(t==122){
+                indexed.setTeamOrders(1,BattleOrders.DEFAULT.withTargeting(
+                        BattleOrders.Targeting.COOPERATE));
+                reference.setTeamOrders(1,BattleOrders.DEFAULT.withTargeting(
+                        BattleOrders.Targeting.COOPERATE));
+            }
+            indexed.step();reference.step();
+            check(indexed.fingerprint()==reference.fingerprint(),
+                    "Primitive focus changed actual targeting at tick "+
+                            indexed.tick);
+            for(int i=0;i<indexed.ships().size();i++){
+                Battle.Ship ship=indexed.ships().get(i);
+                Battle.Ship twin=reference.ships().get(i);
+                check(ship.id==twin.id&&ship.lastTargetId==twin.lastTargetId,
+                        "Retargeted captain differs at tick "+indexed.tick);
+                check(indexed.focusCountForDiagnostic(ship.id)==
+                        reference.focusCountForDiagnostic(ship.id),
+                        "Cooperative target focus count diverged for id="+
+                                ship.id+" tick="+indexed.tick);
+            }
+        }
+        var fast=indexed.focusWorkMetrics();
+        var old=reference.focusWorkMetrics();
+        check(fast.rebuildEntries()==old.rebuildEntries()&&
+                fast.lookups()==old.lookups()&&
+                fast.transitions()==old.transitions()&&
+                fast.lookups()>0&&fast.transitions()>0,
+                "Focus-index A/B never exercised real cooperation/retargeting");
+        System.out.println("PASS COOPERATE primitive focus index 24v24 165 ticks"+
+                " reinforcement, death, VULTURE switch: "+fast+
+                " fingerprint="+Long.toHexString(indexed.fingerprint()));
+        // Actual 200v200 fitted/fighter/PD mass battle remains deterministic
+        // when both fleets cooperate, not just the small legacy hull fixture.
+        Battle dense=DemonstrationBattle.create(catalog);
+        Battle denseMap=DemonstrationBattle.create(catalog);
+        denseMap.configureFocusIndexForDiagnostic(false);
+        for(Battle battle:new Battle[]{dense,denseMap})
+            for(int team=0;team<2;team++)
+                battle.setTeamOrders(team,BattleOrders.DEFAULT.withTargeting(
+                        BattleOrders.Targeting.COOPERATE));
+        for(int t=0;t<50;t++){
+            dense.step();denseMap.step();
+            check(dense.fingerprint()==denseMap.fingerprint(),
+                    "200v200 fleet cooperation changed core battle tick "+
+                            dense.tick);
+            if(t==29||t==49)
+                for(Battle.Ship ship:dense.ships())
+                    check(dense.focusCountForDiagnostic(ship.id)==
+                            denseMap.focusCountForDiagnostic(ship.id),
+                            "200v200 focus array/map mismatch at tick "+
+                                    dense.tick+" id="+ship.id);
+        }
+        System.out.println("PASS COOPERATE focus 200v200 exact replay "+
+                "ticks=50 fingerprint="+Long.toHexString(dense.fingerprint()));
+    }
+
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
@@ -275,6 +374,7 @@ public final class OpponentIndexParityTest {
                 " (counts functional; timings JVM diagnostic only)");
         verifyRelayScanIndex(catalog);
         verifyCommandRecipientsIndex(catalog);
+        verifyCooperativeFocusIndex(catalog);
         inspectFittedOpening(catalog);
         System.out.println("PASS opponent-index 200v200 parity ticks="+steps+
                 " fingerprint="+Long.toHexString(indexed.fingerprint())+
