@@ -128,7 +128,70 @@ public final class SensorFalseContactRelayTest {
         }
         System.out.println("PASS false-contact deterministic battle replay");
     }
+    private record Sent(long tick,boolean active,double sx,double sy){}
+    private static void falseContactReference(SensorFalseContactRelay buffer,
+            List<Sent> retained,long now,double rx,double ry){
+        Sent arrived=null;
+        for(int j=retained.size()-1;j>=0;j--){
+            Sent row=retained.get(j);
+            if(row.tick()>now)continue;
+            int transit=SensorLightTimeHistory.propagationTicks(
+                    StrictMath.hypot(rx-row.sx(),ry-row.sy()));
+            if(now-row.tick()>=transit){arrived=row;break;}
+        }
+        boolean visible=arrived!=null&&arrived.active()&&
+                now-arrived.tick()<=SensorFalseContactRelay.MAX_REPORT_AGE_TICKS;
+        long before=buffer.fingerprint();
+        List<SensorFalseContactRelay.Packet> result=
+                buffer.delivered(now,rx,ry,1);
+        check(result.size()==(visible?1:0),
+                "Ghost radio changed arrival, tombstone or report TTL at "+now);
+        if(visible){
+            var entry=result.get(0);
+            check(entry.emitterId()==80&&entry.index()==0&&
+                    entry.sentTick()==arrived.tick()&&
+                    entry.receivedTick()==now&&
+                    entry.senderX()==arrived.sx()&&
+                    entry.senderY()==arrived.sy(),
+                    "False-contact photon arrival reordered moving sender records");
+        }
+        check(buffer.fingerprint()==before,
+                "Read-only false-contact query changed battle fingerprint");
+    }
+    private static void movingGhostChronology(){
+        int checks=0;
+        for(boolean outOfOrder:new boolean[]{false,true}){
+            SensorFalseContactRelay buffer=new SensorFalseContactRelay();
+            List<Sent> retained=new java.util.ArrayList<>();
+            var sample=new SensorLightTimeHistory.Sample(0,700,100,0,0,true);
+            for(int i=0;i<105;i++){
+                long tick=outOfOrder?500+3L*i-(i%7==0?5:0):200+i/3;
+                boolean active=i%11!=0;
+                double sx=(i%5)*350.0,sy=(i%3)*250.0;
+                buffer.transmit(80,0,active,sample,tick,sx,sy,1,1);
+                retained.add(new Sent(tick,active,sx,sy));
+                if(retained.size()>SensorFalseContactRelay.REPORTS_PER_HYPOTHESIS)
+                    retained.remove(0);
+                for(double rx:new double[]{0,200,900,1800})
+                    for(long now:new long[]{tick-1,tick,tick+5,
+                            tick+20,tick+45,tick+55}){
+                        falseContactReference(buffer,retained,now,rx,500);
+                        checks++;
+                    }
+            }
+        }
+        var sample=new SensorLightTimeHistory.Sample(0,700,100,0,0,true);
+        var late=new SensorFalseContactRelay();
+        late.transmit(80,0,true,sample,Long.MAX_VALUE-25,1800,0,1,1);
+        late.transmit(80,0,false,sample,Long.MAX_VALUE-2,0,0,1,1);
+        check(late.delivered(Long.MAX_VALUE-1,1800,0,1).size()==1,
+                "Overflowed future tombstone erased an arrived ghost");
+        check(late.delivered(Long.MAX_VALUE,0,0,1).isEmpty(),
+                "Delivered tombstone failed to clear old phantom");
+        System.out.println("PASS false-contact light-time "+checks+
+                " moving-source references, reorder/wrap, tombstones and TTL");
+    }
     public static void main(String[] args)throws Exception{
-        boundedRadio();realFleetTransit();replay();
+        boundedRadio();movingGhostChronology();realFleetTransit();replay();
     }
 }

@@ -35,21 +35,49 @@ public final class SensorFalseContactRelay {
         final Packet[] reports=new Packet[REPORTS_PER_HYPOTHESIS];
         int next,count;
         long lastSent;
+        // Only current retained timestamp inversions matter. A temporary
+        // out-of-order sender cannot permanently disable the fast path.
+        int backwardsEdges;
         Ring(int emitter,int index){this.emitter=emitter;this.index=index;}
         void append(Packet packet){
+            if(count==REPORTS_PER_HYPOTHESIS&&reports[next].sentTick()>
+                    reports[(next+1)%REPORTS_PER_HYPOTHESIS].sentTick())
+                backwardsEdges--;
+            if(count>0&&reports[(next-1+REPORTS_PER_HYPOTHESIS)%
+                    REPORTS_PER_HYPOTHESIS].sentTick()>packet.sentTick())
+                backwardsEdges++;
             reports[next]=packet;
             next=(next+1)%REPORTS_PER_HYPOTHESIS;
             count=StrictMath.min(REPORTS_PER_HYPOTHESIS,count+1);
             lastSent=packet.sentTick();
         }
         Packet received(long now,double receiverX,double receiverY){
-            for(int i=0;i<count;i++){
+            int skip=0;
+            if(backwardsEdges==0){
+                // Search only for the last report that could already be
+                // SENT. Arrival time is not monotonic: moving radios may
+                // make older packets arrive ahead of later transmissions.
+                int oldest=(next-count+REPORTS_PER_HYPOTHESIS)%
+                        REPORTS_PER_HYPOTHESIS;
+                int lo=0,hi=count;
+                while(lo<hi){
+                    int mid=(lo+hi)>>>1;
+                    int slot=(oldest+mid)%REPORTS_PER_HYPOTHESIS;
+                    if(reports[slot].sentTick()<=now)lo=mid+1;
+                    else hi=mid;
+                }
+                skip=count-lo;
+            }
+            for(int i=skip;i<count;i++){
                 Packet entry=reports[(next-1-i+REPORTS_PER_HYPOTHESIS)%
                         REPORTS_PER_HYPOTHESIS];
+                if(entry.sentTick()>now)continue;
                 int transit=SensorLightTimeHistory.propagationTicks(
                         StrictMath.hypot(receiverX-entry.senderX(),
                                 receiverY-entry.senderY()));
-                if(entry.sentTick()+transit>now)continue;
+                if(now-entry.sentTick()<transit)continue;
+                // The first arrived tombstone or aged-out report must
+                // suppress older ghosts, never resurrect a stale contact.
                 if(!entry.active()||now-entry.sentTick()>MAX_REPORT_AGE_TICKS)
                     return null;
                 return new Packet(entry.emitterId(),entry.index(),true,

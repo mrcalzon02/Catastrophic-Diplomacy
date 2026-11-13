@@ -26,12 +26,17 @@ public final class SensorRelayBuffer {
                 new SensorLightTimeHistory.Observation[REPORTS_PER_TARGET];
         int next,size;
         long newestTick;
-        // Normal simulation always transmits in order. Retain exact
-        // newest-inserted lookup semantics for accepted out-of-order reports.
-        boolean chronological=true;
+        // Track only inversions still inside the 32-report ring; recover
+        // the fast chronological path when a reordered report ages out.
+        int backwardsEdges;
         Track(int id){targetId=id;}
         void append(long at,SensorLightTimeHistory.Observation report){
-            if(size>0&&at<newestTick)chronological=false;
+            if(size==REPORTS_PER_TARGET&&
+                    sentTicks[next]>sentTicks[(next+1)%REPORTS_PER_TARGET])
+                backwardsEdges--;
+            if(size>0&&sentTicks[(next-1+REPORTS_PER_TARGET)%
+                    REPORTS_PER_TARGET]>at)
+                backwardsEdges++;
             sentTicks[next]=at;data[next]=report;
             next=(next+1)%REPORTS_PER_TARGET;
             size=StrictMath.min(REPORTS_PER_TARGET,size+1);
@@ -43,7 +48,7 @@ public final class SensorRelayBuffer {
             // overflow near Long.MAX_VALUE and fabricate future deliveries.
             long deadline=now-(long)delay;
             int index=-1;
-            if(chronological){
+            if(backwardsEdges==0){
                 // A full 32-report ring previously searched up to 32 packets
                 // per allied viewer/target. Ordered reports are searchable in
                 // at most six comparisons, including duplicates and wrap.

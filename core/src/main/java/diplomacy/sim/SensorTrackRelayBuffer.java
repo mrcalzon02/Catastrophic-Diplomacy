@@ -32,20 +32,48 @@ public final class SensorTrackRelayBuffer {
         final Packet[] reports=new Packet[HISTORY];
         int next,count;
         long newestSent;
+        // Number of backwards timestamp edges in the retained ring. This
+        // returns to zero automatically when an out-of-order report expires.
+        int backwardsEdges;
         Ring(int targetId){id=targetId;}
         void put(Packet report){
+            if(count==HISTORY&&reports[next].sentTick()>
+                    reports[(next+1)%HISTORY].sentTick())
+                backwardsEdges--;
+            if(count>0&&reports[(next-1+HISTORY)%HISTORY].sentTick()>
+                    report.sentTick())
+                backwardsEdges++;
             reports[next]=report;
             next=(next+1)%HISTORY;
             count=StrictMath.min(HISTORY,count+1);
             newestSent=report.sentTick();
         }
         Packet delivered(long now,double receiverX,double receiverY){
-            for(int i=0;i<count;i++){
+            int skip=0;
+            if(backwardsEdges==0){
+                // Only timestamps are ordered: light travel time is NOT,
+                // because a ship changes position between transmissions.
+                // Skip reports not yet sent, but examine every older
+                // candidate until the first physically arrived photon.
+                int oldest=(next-count+HISTORY)%HISTORY;
+                int lo=0,hi=count;
+                while(lo<hi){
+                    int mid=(lo+hi)>>>1;
+                    int slot=(oldest+mid)%HISTORY;
+                    if(reports[slot].sentTick()<=now)lo=mid+1;
+                    else hi=mid;
+                }
+                skip=count-lo;
+            }
+            for(int i=skip;i<count;i++){
                 Packet candidate=reports[(next-1-i+HISTORY)%HISTORY];
+                // The subtraction is safe after this check; sent+light
+                // could overflow and fabricate a future received packet.
+                if(candidate.sentTick()>now)continue;
                 int light=SensorLightTimeHistory.propagationTicks(
                         StrictMath.hypot(receiverX-candidate.senderX(),
                                 receiverY-candidate.senderY()));
-                if(candidate.sentTick()+light<=now)
+                if(now-candidate.sentTick()>=light)
                     return new Packet(candidate.targetId(),candidate.x(),
                             candidate.y(),candidate.vx(),candidate.vy(),
                             candidate.observedTick(),candidate.sentTick(),
