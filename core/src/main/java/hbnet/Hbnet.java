@@ -139,7 +139,10 @@ public final class Hbnet {
         }
     }
     public static void protect(Path file)throws IOException{
-        if(Files.getFileStore(file).supportsFileAttributeView("posix"))Files.setPosixFilePermissions(file,PosixFilePermissions.fromString(Files.isDirectory(file)?"rwx------":"rw-------"));
+        // Android's sandbox denies Files.getFileStore even for private app files.
+        // Ask for attributes on the already-owned file itself; never weaken 0600/0700.
+        var posix=Files.getFileAttributeView(file,java.nio.file.attribute.PosixFileAttributeView.class,LinkOption.NOFOLLOW_LINKS);
+        if(posix!=null)posix.setPermissions(PosixFilePermissions.fromString(Files.isDirectory(file)?"rwx------":"rw-------"));
         var acl=Files.getFileAttributeView(file,java.nio.file.attribute.AclFileAttributeView.class);
         if(acl!=null){var owner=Files.getOwner(file);acl.setAcl(List.of(java.nio.file.attribute.AclEntry.newBuilder().setType(java.nio.file.attribute.AclEntryType.ALLOW).setPrincipal(owner).setPermissions(EnumSet.allOf(java.nio.file.attribute.AclEntryPermission.class)).build()));}
         // Keys remain exportable by their OS owner; never claim hardware-backed storage.
