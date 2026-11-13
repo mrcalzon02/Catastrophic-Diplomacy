@@ -30,6 +30,20 @@ class ReleaseEmulatorInvocationTest(unittest.TestCase):
             ],
         )
 
+    def test_android_hbnet_private_storage_avoids_forbidden_filestore_probe(self):
+        source = pathlib.Path("core/src/main/java/hbnet/Hbnet.java").read_text()
+        protect = source.split("public static void protect(Path file)", 1)[1].split(
+            "public static final class Identity", 1
+        )[0]
+        executable = "\\n".join(
+            line for line in protect.splitlines()
+            if not line.lstrip().startswith("//")
+        )
+        self.assertNotIn("Files.getFileStore(", executable)
+        self.assertIn("PosixFileAttributeView.class", executable)
+        self.assertIn("posix.setPermissions(", executable)
+        self.assertIn('"rwx------":"rw-------"', executable)
+
 
 if __name__ == "__main__":
     unittest.main()
