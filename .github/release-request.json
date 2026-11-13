@@ -1,8 +1,8 @@
 {
   "action": "verified-three-platform-release",
   "requested_by": "user",
-  "request_date": "2026-11-10",
-  "revision": 21,
-  "source_base_commit": "a6641b11099e27ecd6e71d764e5d556077da8fa3",
-  "note": "Publish a fresh playtest prerelease from the verified tactical-movement build. This source retains the half-speed non-beam projectile and compressed representative maneuver scale, deterministic staggered nearest-contact captain targeting, preserved causal sensor/light-time scale, and replaces literal g-derived capital-ship acceleration with readable tactical drive acceleration plus 0.20 tactical propellant debit. Exact-source focused regression is green, including 200v200 combined arms, campaign fleet persistence, fuel reserve/economy behavior, Android/desktop compile, updater and networking. Build signed Android APK and existing Windows/Linux packages; include prereleases in updater semantics, exclude drafts, do not retag."
+  "request_date": "2026-11-13",
+  "revision": 22,
+  "source_base_commit": "7c2cc129a4477d4d926791c21b51757281ffeedc",
+  "note": "Explicit pre-development benchmark checkpoint prerelease. Audited game source d4a3d094c0e3b6e020074890d0637deef845a598 passed exact-source Java 17/Android/desktop focused regression 43352117193; reproducible headless 200v200 CPU/functional results and limitations are pinned in docs/benchmarks/2026-11-13-release-checkpoint.md. Build and runtime-test signed Android APK and Windows/Linux packages from this triggered main commit, including multiplayer, updater and persistence; publish only after every required functional gate, retained signer, checksum, source/asset readback and successful run. Visual/projectile size, balance and CPU timing are advisory only; do not claim hardware FPS. Preserve published prerelease updater semantics, exclude drafts, do not retag, do not overwrite previous assets."
 }
