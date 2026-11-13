@@ -44,6 +44,18 @@ class ReleaseEmulatorInvocationTest(unittest.TestCase):
         self.assertIn("posix.setPermissions(", executable)
         self.assertIn('"rwx------":"rw-------"', executable)
 
+    def test_production_updater_waits_for_package_installer_completion(self):
+        script = pathlib.Path("tools/android_verify_real_update.sh").read_text()
+        open_wait = script.index('if [[ -z "$open_coords" ]]')
+        user_open = script.index('adb shell input tap "$open_x" "$open_y"')
+        app_pid = script.index('adb shell pidof "$package" > "$report/public-reopen-pid.txt"')
+        self.assertIn("installer_open_button(){", script)
+        self.assertIn('public-install-complete.xml', script)
+        self.assertLess(open_wait, user_open)
+        self.assertLess(user_open, app_pid)
+
+
+
 
 if __name__ == "__main__":
     unittest.main()
