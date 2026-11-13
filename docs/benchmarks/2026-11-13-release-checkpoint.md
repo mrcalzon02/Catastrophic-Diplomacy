@@ -1,5 +1,31 @@
 # Catastrophic Diplomacy — 13 November 2026 pre-release benchmark checkpoint
 
+
+## Verified public benchmark release — 13 November 2026
+
+**Status: PUBLISHED and verified** at 2026-11-13T18:11:21Z, not a draft. This section records the final outcome of the pre-release audit below; the earlier decision text describes the prior preflight state.
+
+- **Frozen release:** [cd-v0.1.5-dev.699](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/tag/cd-v0.1.5-dev.699), public prerelease. Earlier tags were not moved or overwritten.
+- **Exact tested source, Git tag and release target:** 684db46f4347e5a2890fe4a891fdc72da9060288. Public tag, release metadata and Actions run matched independently.
+- **Acceptance:** [release run #699](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/43477599216), conclusion **success**. All 16 jobs passed: Windows MSI, bundled-Java Linux ZIP, release-signed Android APK, Android 14 combat/updater runtime, 11 Android 10 campaign-emulation shards, and final publication/checksum verification.
+- **Android 14 runtime:** Live 200v200/400-ship deterministic combat and changing GL frames passed. The real GitHub sideload updater downloaded and installed published dev.695 through Package Installer from an older release-signed fixture. After the user-like OPEN action, the public APK reopened the seeded campaign. Exact private hashes for campaign/research/fleet, settings, network profile and player identity were preserved through the upgrade. The signed candidate then reopened the same campaign. Signed-app Options, encyclopedia, skirmish, standing orders, controls and campaign interactions also passed.
+- **Blocker repair chain:** [#696](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/43470397124) exposed multiline emulator shell invocation; [#697](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/43473322024) exposed Android denial of Files.getFileStore during private file protection; [#698](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/43475750759) installed published APK successfully but prematurely asserted game PID while Package Installer was foreground; [#699](https://github.com/mrcalzon02/Catastrophic-Diplomacy/actions/runs/43477599216) passed with single-command argument routing, per-file permissions, and installer OPEN/reopen polling. No signing, runtime or persistence gates were bypassed.
+
+### Exact published package digests
+
+Read back from GitHub's **public release assets**. [Public checksum file](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/cd-v0.1.5-dev.699/FULL-SHA256SUMS.txt).
+
+| Published asset | Bytes | Public SHA-256 |
+| --- | ---: | --- |
+| [Android APK](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/cd-v0.1.5-dev.699/Catastrophic-Diplomacy-Android.apk) | 131,430,438 | ee24bf45a4e617df551a4a1646a95f10a09522b6597b8c8c1eb1c1c2843672cb |
+| [Windows x64 MSI](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/cd-v0.1.5-dev.699/Catastrophic-Diplomacy-Windows-x64.msi) | 192,438,687 | a7f8167639841ed7164239480a0cf36140e0bf48e38d2ea99b6a94737d41a703 |
+| [Linux x64 ZIP](https://github.com/mrcalzon02/Catastrophic-Diplomacy/releases/download/cd-v0.1.5-dev.699/Catastrophic-Diplomacy-Linux-x64.zip) | 195,258,334 | 640fc897d9f02bedc5c654d63a805bf7d09b9218513cf088c8ace835adf82290 |
+
+Other published assets: release-manifest.json, package-identity.txt, signature-verification.txt, FULL-SHA256SUMS.txt. Packaging checksums and manifest identity were verified before publication, then release asset names and exact commit were read back publicly.
+
+**Scope of this benchmark:** objective build, install, launch, campaign, multiplayer/updater and package-integrity reference. Software-emulated GPU CPU timings are diagnostic, **not physical-device FPS**. Projectile visual scale, campaign balance, later-game performance and real-device touch/thermal remain post-benchmark follow-ups, not claimed passes.
+
+
 ## Scope and immutable source evidence
 
 - **Audited pre-request main commit:** `d4a3d094c0e3b6e020074890d0637deef845a598`
