@@ -54,6 +54,34 @@ raise SystemExit(1)
 PY
 }
 
+installer_open_button(){
+  local xml="$1"
+  python3 - "$xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+except Exception:
+    raise SystemExit(1)
+for node in root.iter("node"):
+    if node.get("class") != "android.widget.Button":
+        continue
+    if not (node.get("package") or "").endswith(".packageinstaller"):
+        continue
+    if (node.get("text") or "").strip().casefold() != "open":
+        continue
+    if node.get("enabled") != "true":
+        continue
+    bounds = node.get("bounds", "")
+    m = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds)
+    if m:
+        x0, y0, x1, y1 = map(int, m.groups())
+        if x1 > x0 and y1 > y0:
+            print((x0+x1)//2, (y0+y1)//2)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
 adb uninstall "$package" >/dev/null 2>&1 || true
 adb install "$old_apk" > "$report/fixture-install.txt"
 before_code="$(version_code)"
@@ -118,12 +146,46 @@ if (( public_code <= before_code )); then
 fi
 printf 'fixtureVersionCode=%s\npublicUpdaterVersionCode=%s\n'   "$before_code" "$public_code" > "$report/version-transition.txt"
 
-# The downloaded public build must be able to reopen the seeded authoritative
-# campaign before CI installs any verifier/candidate APK.
+# PackageManager can expose the new versionCode while its installer activity
+# is still finishing. Do not immediately issue am start/pidof: that can target
+# InstallInstalling and falsely flag a perfectly good upgrade as an app crash.
+# Wait for the real installer success UI and press OPEN, just as a user would.
+open_coords=""
+for attempt in $(seq 1 90); do
+  adb shell uiautomator dump /sdcard/cd-public-install-complete.xml \
+    > "$report/public-install-poll.txt" 2>&1 || true
+  adb exec-out cat /sdcard/cd-public-install-complete.xml \
+    > "$report/public-install-complete.xml" 2>/dev/null || true
+  if [[ -s "$report/public-install-complete.xml" ]]; then
+    open_coords="$(installer_open_button "$report/public-install-complete.xml" 2>/dev/null || true)"
+    if [[ -n "$open_coords" ]]; then break; fi
+  fi
+  sleep 2
+done
+if [[ -z "$open_coords" ]]; then
+  adb logcat -d -v time > "$report/public-install-timeout-logcat.txt" || true
+  adb exec-out screencap -p > "$report/public-install-timeout.png" 2>/dev/null || true
+  echo "FAIL: upgraded package version appeared but Package Installer never offered OPEN" >&2
+  exit 1
+fi
+adb exec-out screencap -p > "$report/public-install-complete.png"
 adb logcat -c
-adb shell am start -W -n "$package/$activity" > "$report/public-reopen-start.txt"
-adb shell pidof "$package" > "$report/public-reopen-pid.txt"
-wait_log 'CAMPAIGN.*Loaded atomic campaign generation 1' 30   "$report/public-reopen-logcat.txt" || {
+read -r open_x open_y <<< "$open_coords"
+adb shell input tap "$open_x" "$open_y"
+reopened=0
+for attempt in $(seq 1 45); do
+  if adb shell pidof "$package" > "$report/public-reopen-pid.txt" 2>/dev/null; then
+    reopened=1
+    break
+  fi
+  sleep 1
+done
+if (( !reopened )); then
+  adb logcat -d -v time > "$report/public-reopen-crash-logcat.txt" || true
+  echo "FAIL: game did not run after user opened upgraded app from Package Installer" >&2
+  exit 1
+fi
+wait_log 'CAMPAIGN.*Loaded atomic campaign generation 1' 30 "$report/public-reopen-logcat.txt" || {
   echo "FAIL: public updater target could not reopen seeded campaign" >&2
   exit 1
 }
