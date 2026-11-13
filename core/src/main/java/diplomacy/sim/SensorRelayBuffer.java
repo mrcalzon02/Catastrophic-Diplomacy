@@ -26,24 +26,49 @@ public final class SensorRelayBuffer {
                 new SensorLightTimeHistory.Observation[REPORTS_PER_TARGET];
         int next,size;
         long newestTick;
+        // Normal simulation always transmits in order. Retain exact
+        // newest-inserted lookup semantics for accepted out-of-order reports.
+        boolean chronological=true;
         Track(int id){targetId=id;}
         void append(long at,SensorLightTimeHistory.Observation report){
+            if(size>0&&at<newestTick)chronological=false;
             sentTicks[next]=at;data[next]=report;
             next=(next+1)%REPORTS_PER_TARGET;
             size=StrictMath.min(REPORTS_PER_TARGET,size+1);
             newestTick=at;
         }
         SensorLightTimeHistory.Observation delivered(long now,int delay){
-            for(int i=0;i<size;i++){
-                int index=(next-1-i+REPORTS_PER_TARGET)%REPORTS_PER_TARGET;
-                if(sentTicks[index]+(long)delay<=now){
-                    var packet=data[index];
-                    return new SensorLightTimeHistory.Observation(
-                            packet.emittedTick(),packet.measuredTick(),now,
-                            packet.channels(),packet.sample());
+            // Subtraction cannot overflow: validated now and delay are both
+            // nonnegative, and delay is an int. Addition of sent+delay could
+            // overflow near Long.MAX_VALUE and fabricate future deliveries.
+            long deadline=now-(long)delay;
+            int index=-1;
+            if(chronological){
+                // A full 32-report ring previously searched up to 32 packets
+                // per allied viewer/target. Ordered reports are searchable in
+                // at most six comparisons, including duplicates and wrap.
+                int first=(next-size+REPORTS_PER_TARGET)%REPORTS_PER_TARGET;
+                int lo=0,hi=size;
+                while(lo<hi){
+                    int mid=(lo+hi)>>>1;
+                    int slot=(first+mid)%REPORTS_PER_TARGET;
+                    if(sentTicks[slot]<=deadline)lo=mid+1;
+                    else hi=mid;
+                }
+                if(lo>0)index=(first+lo-1)%REPORTS_PER_TARGET;
+            }else{
+                // The public transmitter accepts older timestamps; preserve
+                // its original newest-inserted-wins semantics in that case.
+                for(int i=0;i<size;i++){
+                    int slot=(next-1-i+REPORTS_PER_TARGET)%REPORTS_PER_TARGET;
+                    if(sentTicks[slot]<=deadline){index=slot;break;}
                 }
             }
-            return null;
+            if(index<0)return null;
+            var packet=data[index];
+            return new SensorLightTimeHistory.Observation(
+                    packet.emittedTick(),packet.measuredTick(),now,
+                    packet.channels(),packet.sample());
         }
     }
     /** Only actual arrived observations can enter a fitted scout transmitter. */

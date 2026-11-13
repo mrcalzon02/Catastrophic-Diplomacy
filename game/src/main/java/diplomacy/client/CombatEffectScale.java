@@ -16,5 +16,17 @@ final class CombatEffectScale {
     static float forLauncher(float size,boolean fighter,float factor){
         return fighter?size*factor:size;
     }
+    /** The same tiny fallback footprints for local simulation and remote
+     * network snapshots. Texture-backed moving solids already use projectile(). */
+    static float guidedFallbackRadius(boolean torpedo,boolean fighter){
+        return forLauncher(projectile(torpedo?4.4f:2.8f),
+                fighter,FIGHTER_GUIDED);
+    }
+    static float kineticFallbackRadius(boolean fighter){
+        return forLauncher(projectile(2.1f),fighter,FIGHTER_KINETIC);
+    }
+    static float rocketFallbackRadius(boolean siege){
+        return projectile(siege?3.6f:2f);
+    }
     private CombatEffectScale(){}
 }

@@ -44,6 +44,22 @@ public final class GuidedPayloadVisualTest {
                 "Guided projectile body art must stay far below an escort hull footprint");
         // Both separated Library and curated/fallback art use the same
         // small moving-body footprint. Physical hits and impacts are separate.
+        // Fallback dots must exactly match across local, remote and textured
+        // combat; previously local non-textured ordnance was 2.22x larger.
+        check(CombatEffectScale.guidedFallbackRadius(false,false)==
+                    CombatEffectScale.projectile(2.8f) &&
+                CombatEffectScale.guidedFallbackRadius(true,false)==
+                    CombatEffectScale.projectile(4.4f) &&
+                CombatEffectScale.guidedFallbackRadius(false,true)==
+                    CombatEffectScale.projectile(2.8f)*
+                            CombatEffectScale.FIGHTER_GUIDED &&
+                CombatEffectScale.guidedFallbackRadius(true,true)<
+                    CombatEffectScale.guidedFallbackRadius(false,false) &&
+                CombatEffectScale.rocketFallbackRadius(true)==
+                    CombatEffectScale.projectile(3.6f) &&
+                CombatEffectScale.rocketFallbackRadius(false)==
+                    CombatEffectScale.projectile(2f),
+                "Local and remote missile/rocket fallback footprints diverged");
         check(CombatEffectScale.PROJECTILE_FOOTPRINT==.45f &&
                 CombatEffectScale.projectile(standard.width())<1.36f &&
                 CombatEffectScale.projectile(heavy.width())<2f &&

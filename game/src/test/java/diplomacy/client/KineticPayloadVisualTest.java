@@ -20,6 +20,12 @@ public final class KineticPayloadVisualTest {
                             diplomacy.sim.FighterModel.Hull.INTERCEPTOR)/2f,
                     "Aircraft cannon shells must be sub-fighter sized");
         }
+        check(CombatEffectScale.kineticFallbackRadius(false)==
+                    CombatEffectScale.projectile(2.1f) &&
+                CombatEffectScale.kineticFallbackRadius(true)==
+                    CombatEffectScale.projectile(2.1f)*
+                            CombatEffectScale.FIGHTER_KINETIC,
+                "Local kinetic fallback ignored ship/aircraft projectile scaling");
         check(CombatEffectScale.projectile(
                     KineticPayloadVisual.forType(AmmunitionTable.Kinetic.STANDARD).width())<3.8f &&
                 CombatEffectScale.projectile(

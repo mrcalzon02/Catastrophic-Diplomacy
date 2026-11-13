@@ -3304,29 +3304,29 @@ public final class CatastrophicGame extends ApplicationAdapter {
             if(texturedMissiles.contains(m.visualId))continue;
             shapes.setColor(m.torpedo?Color.ORANGE:m.team==0?Color.CYAN:Color.SCARLET);
             BattleRenderPoses.Pose pose=renderPoses.missile(m);
-            if(!view.circle(pose.x(),pose.y(),4))continue;
-            shapes.circle(pose.x(),pose.y(),CombatEffectScale.forLauncher(
-                    CombatEffectScale.of(m.torpedo?4.4f:2.8f),
-                    m.fighterLaunched,CombatEffectScale.FIGHTER_GUIDED),7);
+            float radius=CombatEffectScale.guidedFallbackRadius(
+                    m.torpedo,m.fighterLaunched);
+            if(!view.circle(pose.x(),pose.y(),radius))continue;
+            shapes.circle(pose.x(),pose.y(),radius,7);
         }
         // Only when approved rocket body art is genuinely unavailable:
         // use bounded live projectile dots, never fabricate ship sprites.
         if(!texturedRockets)for(Battle.Rocket rocket:battle.rockets()){
             BattleRenderPoses.Pose pose=renderPoses.rocket(rocket);
-            if(!view.circle(pose.x(),pose.y(),4))continue;
+            float radius=CombatEffectScale.rocketFallbackRadius(
+                    rocket.size==diplomacy.sim.RocketBarrage.Size.SIEGE);
+            if(!view.circle(pose.x(),pose.y(),radius))continue;
             shapes.setColor(rocket.burning()?Color.ORANGE:Color.GOLD);
-            shapes.circle(pose.x(),pose.y(),
-                    CombatEffectScale.of(rocket.size==diplomacy.sim.RocketBarrage.Size.SIEGE?
-                            3.6f:2f),7);
+            shapes.circle(pose.x(),pose.y(),radius,7);
         }
         for (Battle.Ballistic shell:battle.ballistics()) {
             if(texturedBallistics.contains(shell.visualId))continue;
             shapes.setColor(Color.GOLD);
             BattleRenderPoses.Pose pose=renderPoses.shell(shell);
-            if(!view.circle(pose.x(),pose.y(),3))continue;
-            shapes.circle(pose.x(),pose.y(),CombatEffectScale.forLauncher(
-                    CombatEffectScale.of(2.1f),shell.fighterLaunched,
-                    CombatEffectScale.FIGHTER_KINETIC),6);
+            float radius=CombatEffectScale.kineticFallbackRadius(
+                    shell.fighterLaunched);
+            if(!view.circle(pose.x(),pose.y(),radius))continue;
+            shapes.circle(pose.x(),pose.y(),radius,6);
         }
         // Real expendable fighter emissions, not invented effect sprites:
         // one compact heated flare versus several dispersing radar-reflective
@@ -4084,21 +4084,19 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
         for(var missile:frame.missiles()){
-            if(view!=null&&!view.circle((float)missile.x(),(float)missile.y(),6))continue;
+            float radius=CombatEffectScale.guidedFallbackRadius(
+                    missile.torpedo(),missile.fighterLaunched());
+            if(view!=null&&!view.circle((float)missile.x(),(float)missile.y(),radius))continue;
             shapes.setColor(missile.decoy()?Color.LIGHT_GRAY:
                     missile.torpedo()?Color.ORANGE:
                     missile.team()==0?Color.CYAN:Color.SCARLET);
-            float radius=CombatEffectScale.forLauncher(
-                    CombatEffectScale.projectile(missile.torpedo()?4.4f:2.8f),
-                    missile.fighterLaunched(),CombatEffectScale.FIGHTER_GUIDED);
             shapes.circle((float)missile.x(),(float)missile.y(),radius,7);
         }
         for(var shell:frame.ballistics()){
-            if(view!=null&&!view.circle((float)shell.x(),(float)shell.y(),4))continue;
+            float radius=CombatEffectScale.kineticFallbackRadius(
+                    shell.fighterLaunched());
+            if(view!=null&&!view.circle((float)shell.x(),(float)shell.y(),radius))continue;
             shapes.setColor(Color.GOLD);
-            float radius=CombatEffectScale.forLauncher(
-                    CombatEffectScale.projectile(2.1f),shell.fighterLaunched(),
-                    CombatEffectScale.FIGHTER_KINETIC);
             shapes.circle((float)shell.x(),(float)shell.y(),radius,6);
         }
         if(craftFallback)for(var craft:frame.crafts()){
