@@ -20,6 +20,16 @@ public final class PhotonArrivalPruningTest {
         check(expected==actual,"Causal arrival changed age="+age+
                 " delta="+dx+","+dy+" exact="+expected+" pruned="+actual);
     }
+    private static void compareLink(double dx,double dy,long elapsed){
+        boolean impossible=SensorLightTimeHistory.definitelyNoLinkPhoton(
+                dx,dy,elapsed);
+        boolean wouldArrive=elapsed>=0&&
+                SensorLightTimeHistory.propagationTicks(
+                        StrictMath.hypot(dx,dy))<=elapsed;
+        check(!(impossible&&wouldArrive),
+                "Squared link arrival bound discarded actual photon: "+
+                        dx+","+dy+" elapsed="+elapsed);
+    }
     public static void main(String[] args){
         final double scale=WorldScale.DIAGONAL_WORLD_UNITS/30.0;
         final int limit=SensorLightTimeHistory.propagationTicks(
@@ -36,7 +46,9 @@ public final class PhotonArrivalPruningTest {
                     for(double[] d:new double[][]{
                             {distance,0},{0,distance},{-distance,0},
                             {distance*.6,distance*.8}}){
-                        compare(d[0],d[1],age);checks++;
+                        compare(d[0],d[1],age);
+                        compareLink(d[0],d[1],age);
+                        checks++;
                     }
                 }
             }
@@ -46,8 +58,18 @@ public final class PhotonArrivalPruningTest {
             double dx=(deterministic.nextDouble()*2-1)*4500;
             double dy=(deterministic.nextDouble()*2-1)*2600;
             int age=deterministic.nextInt(limit+1);
-            compare(dx,dy,age);checks++;
+            compare(dx,dy,age);
+            compareLink(dx,dy,age);
+            checks++;
         }
+        check(!SensorLightTimeHistory.definitelyNoLinkPhoton(
+                        Double.NaN,0,2)&&
+                !SensorLightTimeHistory.definitelyNoLinkPhoton(
+                        Double.POSITIVE_INFINITY,0,2)&&
+                !SensorLightTimeHistory.definitelyNoLinkPhoton(40,40,
+                        Long.MAX_VALUE)&&
+                SensorLightTimeHistory.definitelyNoLinkPhoton(40,40,-1),
+                "Link coarse rejection must defer anomalous geometry to exact math");
         // Warmed, counterbalanced microbenchmark; counts must agree.
         final int size=55000;
         double[] dx=new double[size],dy=new double[size];

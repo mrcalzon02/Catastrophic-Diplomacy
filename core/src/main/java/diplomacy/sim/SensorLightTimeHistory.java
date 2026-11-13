@@ -46,6 +46,20 @@ public final class SensorLightTimeHistory {
         return propagationTicks(StrictMath.hypot(dx,dy))==age;
     }
 
+    /** One-way datalink lower-cost exclusion: a packet sent N ticks ago
+     * cannot have crossed more than N signal-light shells. The existing
+     * squared upper bounds include a generous .001-world-unit epsilon.
+     * This is only a necessary condition; all near/valid packets still run
+     * the original exact hypot/propagationTicks formula. No target knowledge,
+     * radio power, or chronological assumption is introduced. */
+    static boolean definitelyNoLinkPhoton(double dx,double dy,long elapsedTicks){
+        if(elapsedTicks<0)return true;
+        if(elapsedTicks>ONE_WAY_SEARCH_LIMIT)return false;
+        double squared=dx*dx+dy*dy;
+        return Double.isFinite(squared)&&
+                squared>ARRIVAL_UPPER_DISTANCE_SQUARED[(int)elapsedTicks];
+    }
+
     private final Sample[] samples=new Sample[CAPACITY];
     /** Physical/EM sensor signatures and actual installed receiver capabilities
      * at the same tick as each motion sample. Never substituted with current

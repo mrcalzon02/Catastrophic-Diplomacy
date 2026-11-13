@@ -53,7 +53,9 @@ public final class SensorFalseContactRelay {
         }
         Packet received(long now,double receiverX,double receiverY){
             int skip=0;
-            if(backwardsEdges==0){
+            if(backwardsEdges==0&&count>0&&
+                    reports[(next-1+REPORTS_PER_HYPOTHESIS)%
+                            REPORTS_PER_HYPOTHESIS].sentTick()>now){
                 // Search only for the last report that could already be
                 // SENT. Arrival time is not monotonic: moving radios may
                 // make older packets arrive ahead of later transmissions.
@@ -72,10 +74,14 @@ public final class SensorFalseContactRelay {
                 Packet entry=reports[(next-1-i+REPORTS_PER_HYPOTHESIS)%
                         REPORTS_PER_HYPOTHESIS];
                 if(entry.sentTick()>now)continue;
+                long elapsed=now-entry.sentTick();
+                double dx=receiverX-entry.senderX();
+                double dy=receiverY-entry.senderY();
+                if(SensorLightTimeHistory.definitelyNoLinkPhoton(dx,dy,elapsed))
+                    continue;
                 int transit=SensorLightTimeHistory.propagationTicks(
-                        StrictMath.hypot(receiverX-entry.senderX(),
-                                receiverY-entry.senderY()));
-                if(now-entry.sentTick()<transit)continue;
+                        StrictMath.hypot(dx,dy));
+                if(elapsed<transit)continue;
                 // The first arrived tombstone or aged-out report must
                 // suppress older ghosts, never resurrect a stale contact.
                 if(!entry.active()||now-entry.sentTick()>MAX_REPORT_AGE_TICKS)

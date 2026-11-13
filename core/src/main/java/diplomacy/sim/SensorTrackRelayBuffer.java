@@ -50,7 +50,8 @@ public final class SensorTrackRelayBuffer {
         }
         Packet delivered(long now,double receiverX,double receiverY){
             int skip=0;
-            if(backwardsEdges==0){
+            if(backwardsEdges==0&&count>0&&
+                    reports[(next-1+HISTORY)%HISTORY].sentTick()>now){
                 // Only timestamps are ordered: light travel time is NOT,
                 // because a ship changes position between transmissions.
                 // Skip reports not yet sent, but examine every older
@@ -70,10 +71,17 @@ public final class SensorTrackRelayBuffer {
                 // The subtraction is safe after this check; sent+light
                 // could overflow and fabricate a future received packet.
                 if(candidate.sentTick()>now)continue;
+                long elapsed=now-candidate.sentTick();
+                double dx=receiverX-candidate.senderX();
+                double dy=receiverY-candidate.senderY();
+                // Most new LNK reports are sent but still in flight.
+                // Squared signal-shell exclusion avoids hypot for those;
+                // exact photon chronology remains final authority.
+                if(SensorLightTimeHistory.definitelyNoLinkPhoton(dx,dy,elapsed))
+                    continue;
                 int light=SensorLightTimeHistory.propagationTicks(
-                        StrictMath.hypot(receiverX-candidate.senderX(),
-                                receiverY-candidate.senderY()));
-                if(now-candidate.sentTick()>=light)
+                        StrictMath.hypot(dx,dy));
+                if(elapsed>=light)
                     return new Packet(candidate.targetId(),candidate.x(),
                             candidate.y(),candidate.vx(),candidate.vy(),
                             candidate.observedTick(),candidate.sentTick(),
