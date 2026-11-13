@@ -39,8 +39,10 @@ jobs:
         with: {python-version: '3.12'}
       - name: Install deterministic icon exporter
         run: python -m pip install Pillow==11.3.0
-      - name: Verify publication retry behavior
-        run: python3 -m unittest discover -s tools -p test_publish_release_with_retry.py
+      - name: Verify release retries and emulator updater invocation contract
+        run: |
+          python3 -m unittest discover -s tools -p test_publish_release_with_retry.py
+          python3 -m unittest discover -s tools -p test_android_release_emulator_workflow.py
       - name: Validate gameplay, 200v200, LAN/PvP, updater and installed Linux application
         run: |
           gradle --no-daemon :core:gameFlowSmoke :core:fighterCraftSmoke \
@@ -294,9 +296,7 @@ jobs:
             # Exercise the actual production updater from a lower-version,
             # release-signed fixture through GitHub metadata/download validation,
             # Android Package Installer, state readback and the real candidate.
-            bash tools/android_verify_real_update.sh test-output/android \
-              package/updater-fixture-old.apk package/updater-verifier-current.apk \
-              package/Catastrophic-Diplomacy-Android.apk
+            bash tools/android_verify_real_update.sh test-output/android package/updater-fixture-old.apk package/updater-verifier-current.apk package/Catastrophic-Diplomacy-Android.apk
             adb uninstall games.catastrophicdiplomacy
             # Android PackageManager must accept a real upgrade from our first
             # public release without wiping its app data or changing the signer.
