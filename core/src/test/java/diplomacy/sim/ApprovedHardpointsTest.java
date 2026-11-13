@@ -57,8 +57,69 @@ public final class ApprovedHardpointsTest {
                 "Headless hardpoint map lost after cache invalidation");
         require(variants==506&&sockets>9000,
                 "Incomplete 11-faction 46-variant original-art inventory");
+        checkNarrowSilhouetteMuzzles();
         System.out.println("PASS approved hardpoints: "+variants+
                 " graphics/headless-identical hulls, "+sockets+
                 " original socket anchors, fingerprint "+Long.toHexString(hash));
+    }
+
+    /**
+     * The all-506 inventory test above checks socket identity; this additional
+     * headless battle-space check catches sign/rotation drift in real fitted
+     * muzzle transforms on narrow original-art silhouettes. No renderer,
+     * graphics backend, alternate projector or synthetic hulls.
+     * The baked checksum is verified by requireBakedHardpoints() above.
+     */
+    private static void checkNarrowSilhouetteMuzzles(){
+        Battle.Faction[] factions={
+                Battle.Faction.VAERITH_PRISM,
+                Battle.Faction.NYX_BIOLITH,
+                Battle.Faction.AUREATE_SYNOD
+        };
+        Shipyard.Hull[] hulls={
+                Shipyard.Hull.INTERCEPTOR,
+                Shipyard.Hull.INTERCEPTOR_FLAK,
+                Shipyard.Hull.LIGHT_CRUISER
+        };
+        Battle headless=new Battle(20261113L);
+        int cases=0,origins=0;
+        for(Battle.Faction faction:factions)for(Shipyard.Hull hull:hulls){
+            Shipyard.Design fitted=Shipyard.starter(faction,hull);
+            List<Shipyard.Slot> sockets=ApprovedHardpointResource.get(faction,hull);
+            require(fitted.placements().equals(sockets),
+                    "Narrow source-art shipyard layout differs from headless resource");
+            var emitters=WeaponMuzzles.equipped(fitted,fitted.placements());
+            require(emitters.size()>=2,
+                    "Narrow original-art hull must retain real fitted weapon mounts");
+            Battle.Ship ship=headless.addShip(0,faction,180+cases*28,240+cases*13);
+            ship.hullClass=hull;
+            ship.weaponEmitters=emitters;
+            for(double heading:new double[]{0,Math.PI/2,Math.PI,3*Math.PI/2}){
+                ship.facing=heading;
+                double scale=34.0/154.0*ship.visualScale();
+                double cos=StrictMath.cos(heading),sin=StrictMath.sin(heading);
+                for(var emitter:emitters){
+                    Shipyard.Slot slot=sockets.get(emitter.slotId());
+                    require(slot.index()==emitter.slotId()
+                                    &&slot.x()==emitter.localX()
+                                    &&slot.y()==emitter.localY(),
+                            "Narrow source-art fitted socket ordinal or coordinates changed");
+                    var actual=WeaponMuzzles.atSlot(ship,emitter.family(),emitter.slotId());
+                    double expectedX=ship.x+slot.y()*scale*cos+slot.x()*scale*sin;
+                    double expectedY=ship.y+slot.y()*scale*sin-slot.x()*scale*cos;
+                    require(actual.slotId()==slot.index()
+                                    &&Math.abs(actual.x()-expectedX)<1e-9
+                                    &&Math.abs(actual.y()-expectedY)<1e-9,
+                            "Headless fitted muzzle differs from original-art world origin: "+
+                                    faction+"/"+hull+"/"+slot.index()+"/"+heading);
+                    origins++;
+                }
+            }
+            cases++;
+        }
+        require(cases==9&&origins>=72,
+                "Incomplete narrow original-art fitted-muzzle regression");
+        System.out.println("PASS narrow original-art headless muzzle parity: "+
+                cases+" faction/hull samples, "+origins+" rotated fitted origins");
     }
 }
