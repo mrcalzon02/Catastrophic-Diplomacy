@@ -95,7 +95,7 @@ public final class SensorTrackRelayBufferTest {
         SensorTrackRelayBuffer moving=new SensorTrackRelayBuffer();
         moving.transmit(71,30,track(0,11),1,0,0);
         moving.transmit(71,31,track(0,22),1,1800,0);
-        require(moving.delivered(71,32,0,0,1).x==11,
+        require(moving.delivered(71,32,0,0,1).x()==11,
                 "LNK assumed physical arrival order matches send order");
         // Past Long.MAX_VALUE the old sent+light would overflow and
         // incorrectly make a future distant packet appear delivered.
