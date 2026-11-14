@@ -26,6 +26,17 @@ public final class CombatPerformanceControlTest {
                 check(CombatPace.faster(levels[i])==levels[i+1],"Upper neighbor "+i);
         }
         check(CombatPace.simulationMultiplier(2f)==.2f,"Legacy perceived 2x");
+        // Stage-A input boundaries: never create a seventh manual speed.
+        check(CombatPace.clamp(-10f)==.5f&&CombatPace.clamp(99f)==3f,
+                "Out-of-range finite requests must saturate at the end positions");
+        check(CombatPace.clamp(1.25f)==1f&&CombatPace.clamp(1.26f)==1.5f,
+                "Midpoint and nearest-neighbor speed snapping");
+        check(CombatPace.clamp(Float.NaN)==1f&&
+                CombatPace.clamp(Float.POSITIVE_INFINITY)==1f&&
+                CombatPace.clamp(Float.NEGATIVE_INFINITY)==1f,
+                "Nonfinite saved/user speeds must restore the 1x default");
+        check("x2.5".equals(CombatPace.label(2.5f)),
+                "Displayed speed label must match the selectable position");
         AdaptiveCombatPace auto=new AdaptiveCombatPace();
         auto.request(3f);
         check(auto.effective()==3f&&auto.enabled(),"Requested cap starts at 3x");
@@ -57,6 +68,32 @@ public final class CombatPerformanceControlTest {
         for(int i=0;i<80;i++)auto.frame(.05,35_000_000L,20_000_000L,true);
         check(auto.effective()==.5f,"Governor floor must not breach .5x");
         auto.frame(.016,5_000_000L,1_000_000L,false);
+        // Inactive/paused gameplay must discard a partial overload window.
+        // Otherwise twenty pre-pause and twenty post-resume slow frames could
+        // trigger a governor reduction before two active seconds had elapsed.
+        AdaptiveCombatPace pauseProbe=new AdaptiveCombatPace();
+        pauseProbe.request(2.5f);
+        for(int i=0;i<20;i++)
+            check(!pauseProbe.frame(.05,35_000_000L,20_000_000L,true),
+                    "One active second must not trigger a slowdown");
+        check(!pauseProbe.frame(.5,35_000_000L,20_000_000L,false),
+                "Paused gameplay must not trigger a transition");
+        for(int i=0;i<20;i++)
+            check(!pauseProbe.frame(.05,35_000_000L,20_000_000L,true),
+                    "Paused overload samples must not carry into resume");
+        check(pauseProbe.effective()==2.5f,
+                "Effective speed must survive pause/resume unchanged");
+        boolean postResumeReduction=false;
+        for(int i=0;i<22;i++)
+            postResumeReduction|=pauseProbe.frame(.05,35_000_000L,20_000_000L,true);
+        check(postResumeReduction&&pauseProbe.effective()==2f,
+                "A fresh two-second active overload must reduce one speed position");
+        pauseProbe.request(1f);
+        check(pauseProbe.requested()==1f&&pauseProbe.effective()==1f,
+                "Manual cap reduction must take effect immediately after overload");
+        pauseProbe.request(3f);
+        check(pauseProbe.requested()==3f&&pauseProbe.effective()==3f,
+                "An explicit higher cap must restore the chosen speed when at cap");
 
         CombatDiagnosticRecorder recorder=new CombatDiagnosticRecorder();
         recorder.start(20261104L,17L,400);
