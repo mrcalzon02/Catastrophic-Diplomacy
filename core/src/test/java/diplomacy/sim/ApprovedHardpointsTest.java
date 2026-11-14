@@ -89,8 +89,23 @@ public final class ApprovedHardpointsTest {
             require(fitted.placements().equals(sockets),
                     "Narrow source-art shipyard layout differs from headless resource");
             var emitters=WeaponMuzzles.equipped(fitted,fitted.placements());
-            require(emitters.size()>=2,
-                    "Narrow original-art hull must retain real fitted weapon mounts");
+            // The specialist FLAK_SCREEN factory prototype deliberately fits one
+            // point-defense gun and leaves its second weapon socket empty.
+            // Original interceptor and light-cruiser prototypes fit two guns.
+            // Verify actual installed hardware, never count empty hull sockets.
+            int expectedFitted=hull==Shipyard.Hull.INTERCEPTOR_FLAK?1:2;
+            require(emitters.size()==expectedFitted,
+                    "Wrong number of real factory-fitted narrow-hull weapons: "+
+                            faction+"/"+hull+" expected "+expectedFitted+" got "+emitters.size());
+            if(hull==Shipyard.Hull.INTERCEPTOR_FLAK)
+                require(emitters.get(0).family()==WeaponMuzzles.Family.POINT_DEFENSE,
+                        "Flak screen lost its real point-defense fitting");
+            for(var emitter:emitters){
+                require(sockets.get(emitter.slotId()).mount()==Shipyard.Mount.WEAPON
+                                &&fitted.at(emitter.slotId())!=null
+                                &&emitter.component().equals(fitted.at(emitter.slotId()).component),
+                        "Narrow hull emitter is not backed by installed weapon hardware");
+            }
             Battle.Ship ship=headless.addShip(0,faction,180+cases*28,240+cases*13);
             ship.hullClass=hull;
             ship.weaponEmitters=emitters;
@@ -115,9 +130,27 @@ public final class ApprovedHardpointsTest {
                     origins++;
                 }
             }
+            // Negative control: removing a *real* gun must remove its emitter;
+            // world-space lookup must reject the now-unfitted saved socket.
+            var removed=emitters.get(0);
+            Shipyard.Design unfitted=fitted.install(removed.slotId(),null);
+            var remaining=WeaponMuzzles.equipped(unfitted,sockets);
+            require(remaining.size()==expectedFitted-1,
+                    "Unfitted narrow weapon is still being counted as a live muzzle");
+            ship.weaponEmitters=remaining;
+            boolean missingRejected=false;
+            try{
+                WeaponMuzzles.atSlot(ship,removed.family(),removed.slotId());
+            }catch(IllegalArgumentException expected){
+                missingRejected=true;
+            }
+            require(missingRejected,"An unfitted original-art muzzle still resolves");
+            ship.weaponEmitters=emitters;
             cases++;
         }
-        require(cases==9&&origins>=72,
+        // Per faction: interceptor 2 + flak screen 1 + light cruiser 2,
+        // each at four headings; missing mounts are tested above, not waived.
+        require(cases==9&&origins==60,
                 "Incomplete narrow original-art fitted-muzzle regression");
         System.out.println("PASS narrow original-art headless muzzle parity: "+
                 cases+" faction/hull samples, "+origins+" rotated fitted origins");
