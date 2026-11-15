@@ -270,6 +270,61 @@ public final class SensorTacticalPictureTest {
                 "Unpowered command core continued two-source fusion");
         System.out.println("PASS physical FCM two-source confidence/provenance, hidden-state and power-loss gates");
     }
+    /** An old *genuinely transmitted* SHR fix is not a second live vote
+     * after its scout loses acquisition. The FCM must age its confidence
+     * instead of treating a retained packet as a new enemy coordinate. */
+    private static void fusionLateAndConflictingFix(TechnologyCatalog catalog){
+        Battle b=new Battle(56781);
+        b.configureWeather(SpaceWeather.forLevel(1));
+        Battle.Ship command=b.addShip(0,Battle.Faction.TERRAN,600,100);
+        Battle.Ship scoutA=b.addShip(0,Battle.Faction.TERRAN,550,100);
+        Battle.Ship scoutB=b.addShip(0,Battle.Faction.TERRAN,580,120);
+        Battle.Ship blind=b.addShip(0,Battle.Faction.TERRAN,600,-450);
+        Battle.Ship hostile=b.addShip(1,Battle.Faction.DRAXIAN,750,100);
+        stationary(b);
+        command.network=network(catalog,"FCM");
+        scoutA.network=network(catalog,"SHR");
+        scoutB.network=network(catalog,"SHR");
+        command.sensorRange=scoutA.sensorRange=scoutB.sensorRange=850;
+        blind.sensorRange=blind.infraredRange=blind.xrayRange=
+                blind.graviticRange=0;
+        for(int i=0;i<28;i++)b.step();
+        Battle.TacticalContact corroborated=report(b,command.id,hostile.id);
+        require(corroborated!=null&&corroborated.independentSources()==2,
+                "Both functioning fitted scouts must produce a real initial FCM vote");
+        require(b.hasTargetContact(blind,hostile,0),
+                "Blind captain did not receive the initial genuine SHR acquisition");
+        // Move only the true target. The old packets are actual measured
+        // history, but these scouts can no longer acquire it at the new range.
+        hostile.x=1250;
+        scoutA.sensorRange=scoutB.sensorRange=0;
+        scoutA.infraredRange=scoutB.infraredRange=0;
+        scoutA.xrayRange=scoutB.xrayRange=0;
+        scoutA.graviticRange=scoutB.graviticRange=0;
+        for(int i=0;i<40;i++)b.step();
+        Battle.TacticalContact fresh=report(b,command.id,hostile.id);
+        require(fresh!=null&&!fresh.stale()&&fresh.sourceId()==command.id
+                        &&fresh.x()==1250&&fresh.observedTick()>corroborated.observedTick(),
+                "Command direct scope did not receive its own newer actual enemy fix");
+        require(fresh.independentSources()==1&&fresh.corroboratingSourceId()==0
+                        &&fresh.confidence()<corroborated.confidence()
+                        &&fresh.uncertainty()>corroborated.uncertainty(),
+                "Outdated conflicting SHR packets falsely improved new FCM confidence");
+        require(!b.hasTargetContact(blind,hostile,0),
+                "Retained former scout packets restored a blind captain's weapon lock");
+        long fingerprint=b.fingerprint();
+        scoutA.powerRegen=scoutB.powerRegen=0;
+        scoutA.power=scoutB.power=0;
+        Battle.TacticalContact withoutScouts=report(b,command.id,hostile.id);
+        require(withoutScouts!=null&&withoutScouts.x()==fresh.x()&&
+                        withoutScouts.confidence()==fresh.confidence()&&
+                        withoutScouts.uncertainty()==fresh.uncertainty(),
+                "An expired but powered scout secretly still voted in new FCM estimate");
+        scoutA.power=scoutB.power=100;
+        require(b.fingerprint()==fingerprint,
+                "Read-only late FCM evaluation changed authoritative simulation state");
+        System.out.println("PASS real SHR packet aging/conflict cannot boost FCM or renew blind fire");
+    }
     public static void main(String[] args)throws Exception{
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         sharing(catalog);
@@ -278,6 +333,7 @@ public final class SensorTacticalPictureTest {
         optical(catalog);
         command(catalog);
         fusion(catalog);
+        fusionLateAndConflictingFix(catalog);
         System.out.println("PASS bounded read-only real fleet sensor picture");
     }
 }
