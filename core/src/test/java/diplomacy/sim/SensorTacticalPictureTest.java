@@ -314,15 +314,16 @@ public final class SensorTacticalPictureTest {
                 "Outdated conflicting SHR packets falsely improved new FCM confidence");
         require(!b.hasTargetContact(blind,hostile,0),
                 "Retained former scout packets restored a blind captain's weapon lock");
+        double oldPowerA=scoutA.power,oldPowerB=scoutB.power;
         long fingerprint=b.fingerprint();
-        scoutA.powerRegen=scoutB.powerRegen=0;
         scoutA.power=scoutB.power=0;
         Battle.TacticalContact withoutScouts=report(b,command.id,hostile.id);
         require(withoutScouts!=null&&withoutScouts.x()==fresh.x()&&
                         withoutScouts.confidence()==fresh.confidence()&&
                         withoutScouts.uncertainty()==fresh.uncertainty(),
                 "An expired but powered scout secretly still voted in new FCM estimate");
-        scoutA.power=scoutB.power=100;
+        scoutA.power=oldPowerA;
+        scoutB.power=oldPowerB;
         require(b.fingerprint()==fingerprint,
                 "Read-only late FCM evaluation changed authoritative simulation state");
         System.out.println("PASS real SHR packet aging/conflict cannot boost FCM or renew blind fire");
