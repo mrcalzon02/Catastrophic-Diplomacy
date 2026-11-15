@@ -222,6 +222,34 @@ public final class SensorTacticalPictureTest {
         b.tacticalPicture(0,command.id);
         require(b.fingerprint()==fingerprint,
                 "FCM display changed deterministic firing or track memory");
+        // Both independently fitted SHR senders have physical records. A
+        // previously delivered packet must not grant independent credit once
+        // its fitted transmitter is removed, even before the next battle tick.
+        scoutA.network=network(catalog,"TRK");
+        Battle.TacticalContact onlyB=report(b,command.id,hostile.id);
+        require(onlyB!=null&&onlyB.independentSources()==2&&
+                        onlyB.corroboratingSourceId()==scoutB.id,
+                "FCM counted an uninstalled SHR or lost the second eligible scout");
+        scoutB.network=network(catalog,"TRK");
+        Battle.TacticalContact noShr=report(b,command.id,hostile.id);
+        require(noShr!=null&&noShr.independentSources()==1&&
+                        noShr.corroboratingSourceId()==0&&
+                        noShr.confidence()<onlyB.confidence(),
+                "FCM used packets after all fitted SHR transmitters were removed");
+        scoutA.network=network(catalog,"SHR");
+        scoutB.network=network(catalog,"SHR");
+        // The source must still have working sensors and the recipient a
+        // live, powered FCM. A stored report does not substitute for either.
+        scoutA.sensorsCondition=scoutB.sensorsCondition=0;
+        Battle.TacticalContact blind=report(b,command.id,hostile.id);
+        require(blind!=null&&blind.independentSources()==1,
+                "Broken physical scout receivers still boosted command confidence");
+        scoutA.sensorsCondition=scoutB.sensorsCondition=1;
+        command.network=network(catalog);
+        Battle.TacticalContact noFcm=report(b,command.id,hostile.id);
+        require(noFcm!=null&&noFcm.independentSources()==1,
+                "Uninstalled FCM continued corroborating remote observations");
+        command.network=network(catalog,"FCM");
         hostile.x+=450; // Hidden current physics must not enter historical samples.
         Battle.TacticalContact frozen=report(b,command.id,hostile.id);
         require(frozen!=null&&frozen.x()!=hostile.x&&
