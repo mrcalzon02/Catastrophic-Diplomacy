@@ -270,6 +270,64 @@ public final class SensorTacticalPictureTest {
                 "Unpowered command core continued two-source fusion");
         System.out.println("PASS physical FCM two-source confidence/provenance, hidden-state and power-loss gates");
     }
+    /** Two distinct arrived positions must be reconciled by age/precision,
+     * not averaged as if the later SHR packet were equally current.
+     * All inputs come from genuinely received battle telemetry. */
+    private static void fusionWeightsRealDisagreeingFixes(TechnologyCatalog catalog){
+        Battle b=new Battle(56782);
+        Battle.Ship command=b.addShip(0,Battle.Faction.TERRAN,600,100);
+        Battle.Ship scout=b.addShip(0,Battle.Faction.TERRAN,450,100);
+        Battle.Ship hostile=b.addShip(1,Battle.Faction.DRAXIAN,750,100);
+        stationary(b);
+        command.network=network(catalog,"FCM");
+        scout.network=network(catalog,"SHR");
+        command.sensorRange=scout.sensorRange=900;
+        boolean exercised=false;
+        for(int i=0;i<52;i++){
+            // A controlled diagnostic translation creates REAL independently
+            // timestamped echoes; neither the solver nor this comparison may
+            // use the current hostile position as an input observation.
+            hostile.x=750+4*i;
+            b.step();
+            if(i<16)continue;
+            Battle.TacticalContact merged=report(b,command.id,hostile.id);
+            if(merged==null||merged.sourceId()!=command.id||
+                    merged.corroboratingSourceId()!=scout.id)continue;
+            int linkTicks=SensorLightTimeHistory.propagationTicks(
+                    StrictMath.hypot(command.x-scout.x,command.y-scout.y));
+            SensorLightTimeHistory.Observation packet=scout.relayPackets.delivered(
+                    hostile.id,b.tick,linkTicks,scout.network.sharingCapacity());
+            if(packet==null||packet.measuredTick()!=merged.corroboratingObservedTick())
+                continue;
+            double workingPower=scout.power;
+            scout.power=0; // Read the identical primary WITHOUT independent vote.
+            Battle.TacticalContact direct=report(b,command.id,hostile.id);
+            scout.power=workingPower;
+            if(direct==null||direct.sourceId()!=command.id||
+                    direct.observedTick()<=packet.measuredTick()||
+                    direct.observedTick()-packet.measuredTick()>2||
+                    StrictMath.abs(direct.x()-packet.sample().x())<2)continue;
+            double midpoint=(direct.x()+packet.sample().x())*.5;
+            require(merged.x()>midpoint+.05&&merged.x()<direct.x(),
+                    "Late real SHR measurement was blindly averaged with fresher FCM echo");
+            require(merged.confidence()>direct.confidence()&&
+                            merged.uncertainty()<direct.uncertainty()&&
+                            merged.independentSources()==2,
+                    "Independent finite-confidence FCM contact failed covariance reduction");
+            scout.network=network(catalog,"TRK");
+            Battle.TacticalContact withoutLink=report(b,command.id,hostile.id);
+            require(withoutLink!=null&&withoutLink.independentSources()==1&&
+                            withoutLink.x()==direct.x()&&
+                            withoutLink.confidence()==direct.confidence(),
+                    "Unfitted relay retained ghost precision from a previous real report");
+            exercised=true;
+            break;
+        }
+        require(exercised,
+                "No genuinely disagreeing timestamped direct+SHR observations reached FCM");
+        System.out.println("PASS age-weighted physically measured FCM contact and stale-source exclusion");
+    }
+
     /** An old *genuinely transmitted* SHR fix is not a second live vote
      * after its scout loses acquisition. The FCM must age its confidence
      * instead of treating a retained packet as a new enemy coordinate. */
@@ -336,6 +394,7 @@ public final class SensorTacticalPictureTest {
         optical(catalog);
         command(catalog);
         fusion(catalog);
+        fusionWeightsRealDisagreeingFixes(catalog);
         fusionLateAndConflictingFix(catalog);
         System.out.println("PASS bounded read-only real fleet sensor picture");
     }
