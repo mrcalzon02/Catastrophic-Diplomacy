@@ -3663,16 +3663,28 @@ public final class Battle {
                             scout.network.resolutionGain()-1));
             float confidence=(float)StrictMath.min(.99,
                     1-(1-primary.confidence())*(1-corroboration));
-            double age=StrictMath.max(0,
-                    tick-StrictMath.min(primary.observedTick(),
-                            second.measuredTick()));
+            // Inverse-variance weighting uses only causal measured timestamps:
+            // the independently transmitted (usually older) SHR echo cannot
+            // displace a fresher local fix as much as an equally fresh echo.
+            // These are bounded age-derived variance proxies; true per-channel
+            // covariance remains a separate physical FCM workstream.
+            double primaryVariance=primary.uncertainty()*primary.uncertainty();
+            double secondaryAge=StrictMath.max(0,tick-second.measuredTick());
+            double secondarySigma=32+2*secondaryAge;
+            double secondaryVariance=secondarySigma*secondarySigma;
+            double combinedVariance=primaryVariance+secondaryVariance;
+            double secondaryWeight=primaryVariance/combinedVariance;
+            // Conflicting but eligible fixes carry residual disagreement,
+            // even as independent measurements reduce baseline uncertainty.
             double uncertainty=StrictMath.min(primary.uncertainty(),
-                    22+2*age+.15*discrepancy);
+                    StrictMath.sqrt(primaryVariance*secondaryVariance/
+                            combinedVariance+.04*discrepancy*discrepancy));
             return new TacticalContact(primary.targetId(),primary.sourceId(),
-                    primary.channels(),(primary.x()+measured.x())*.5,
-                    (primary.y()+measured.y())*.5,
-                    (primary.vx()+measured.vx())*.5,
-                    (primary.vy()+measured.vy())*.5,
+                    primary.channels(),
+                    primary.x()+secondaryWeight*(measured.x()-primary.x()),
+                    primary.y()+secondaryWeight*(measured.y()-primary.y()),
+                    primary.vx()+secondaryWeight*(measured.vx()-primary.vx()),
+                    primary.vy()+secondaryWeight*(measured.vy()-primary.vy()),
                     primary.observedTick(),confidence,primary.relayed(),false,
                     primary.emittedTick(),primary.receivedTick(),
                     scout.id,second.measuredTick(),uncertainty);
