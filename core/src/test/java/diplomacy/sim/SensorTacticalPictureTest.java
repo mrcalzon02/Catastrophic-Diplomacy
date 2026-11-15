@@ -274,8 +274,10 @@ public final class SensorTacticalPictureTest {
      * after its scout loses acquisition. The FCM must age its confidence
      * instead of treating a retained packet as a new enemy coordinate. */
     private static void fusionLateAndConflictingFix(TechnologyCatalog catalog){
+        // CLEAR weather disables the legacy uninstalled 1,000-unit
+        // short-radio path. Otherwise the healthy FCM captain itself
+        // legitimately re-shares its new fix to the supposedly blind hull.
         Battle b=new Battle(56781);
-        b.configureWeather(SpaceWeather.forLevel(1));
         Battle.Ship command=b.addShip(0,Battle.Faction.TERRAN,600,100);
         Battle.Ship scoutA=b.addShip(0,Battle.Faction.TERRAN,550,100);
         Battle.Ship scoutB=b.addShip(0,Battle.Faction.TERRAN,580,120);
