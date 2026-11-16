@@ -123,6 +123,50 @@ public final class CampaignTechnologyTest {
         reject(()->CampaignShipyardRules.requireAllowed(rescueDesign,mature,
                 variantDiscoveries,catalog),
                 "Research license alone unlocked an unpurchased survival variant");
-        System.out.println("PASS campaign technology: faction ownership, prerequisites, debit, victories, authorization, atomic ledger");
+        // NPC research must pass the same native-faction inventory gate as the
+        // player. This proves the shared authority path; actual enemy fleet
+        // research progression is a separate, still-open integration task.
+        var npcWallet=new CampaignProgress.State(Battle.Faction.DRAXIAN,2,
+                100_000,1,2,1,0,CampaignProgress.Project.NONE,0);
+        var npcUnresearched=new CampaignTechnology.State(Battle.Faction.DRAXIAN);
+        var npcBase=Shipyard.starter(Battle.Faction.DRAXIAN,Shipyard.Hull.CORVETTE);
+        int npcLaserSlot=-1;
+        for(int slot=0;slot<npcBase.slots();slot++)
+            if(npcBase.at(slot)!=null &&
+                    "BASE-DRA-LAS".equals(npcBase.at(slot).component)){
+                npcLaserSlot=slot;break;
+            }
+        check(npcLaserSlot>=0,"NPC faction lacks its native laser socket");
+        var npcUpgraded=npcBase.stage(npcLaserSlot,Shipyard.Track.OUTPUT,1);
+        check(Shipyard.inspect(npcUpgraded,catalog).valid(),
+                "NPC native technology is physically unbuildable");
+        CampaignShipyardRules.requireAllowed(npcBase,npcWallet,npcUnresearched,catalog);
+        reject(()->CampaignShipyardRules.requireAllowed(
+                npcUpgraded,npcWallet,npcUnresearched,catalog),
+                "NPC received unresearched stage I hardware for free");
+        check(!npcUnresearched.quote("TECH-TER-LAS-OUTPUT-01",npcWallet,catalog).allowed(),
+                "NPC authorized another faction's similarly numbered technology");
+
+        String npcNativeId="TECH-DRA-LAS-OUTPUT-01";
+        var npcQuote=npcUnresearched.quote(npcNativeId,npcWallet,catalog);
+        check(npcQuote.allowed()&&npcQuote.cost()>0,
+                "NPC cannot fund its legitimate native technology project");
+        var npcSpent=npcWallet.spend(npcQuote.cost());
+        var npcActive=npcUnresearched.begin(npcNativeId,npcWallet,catalog);
+        reject(()->CampaignShipyardRules.requireAllowed(
+                npcUpgraded,npcSpent,npcActive,catalog),
+                "NPC equipped technology before completing paid research");
+        var npcEarned=npcActive.victory();
+        check(npcEarned.has(npcNativeId)&&npcEarned.activeId()==null,
+                "NPC successful mission failed to complete its native research");
+        var npcRestored=CampaignTechnology.decode(
+                CampaignTechnology.encode(npcEarned),catalog);
+        CampaignShipyardRules.requireAllowed(npcUpgraded,npcSpent,npcRestored,catalog);
+        reject(()->CampaignShipyardRules.requireAllowed(
+                enhanced,npcSpent,npcRestored,catalog),
+                "NPC researched inventory authorized a foreign faction hull");
+        check(npcSpent.credits()==npcWallet.credits()-npcQuote.cost(),
+                "NPC research did not debit its own wallet exactly once");
+        System.out.println("PASS campaign technology: faction ownership, prerequisites, debit, victories, authorization, NPC native research gate, atomic ledger");
     }
 }
