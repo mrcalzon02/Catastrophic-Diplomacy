@@ -95,25 +95,42 @@ public final class SensorLightTimeHistory {
                 throw new IllegalArgumentException("Impossible sensor chronology");
         }
     }
-    // Enclose every captured position, including entries since overwritten.
-    // Old positions only widen the bound; motion and teleports cannot hide a fix.
+    // A direct observation can only use the most recent one-way search window.
+    // Periodically discard older positions so long maneuvers and teleports
+    // do not permanently enlarge the exclusion bounds.
+    private long firstBoundedTick;
     private double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY;
     private double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
 
-    boolean allPositionsBeyond(double x, double y, double distanceSquared) {
+    boolean directPositionsBeyond(long now, double x, double y, double distanceSquared) {
+        if (Math.max(0, now - ONE_WAY_SEARCH_LIMIT) < firstBoundedTick) return false;
         double dx = Math.max(0, Math.max(minX - x, x - maxX));
         double dy = Math.max(0, Math.max(minY - y, y - maxY));
         return dx * dx + dy * dy >= distanceSquared;
+    }
+
+    private void includePosition(double x, double y) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
     }
 
     public void capture(long tick,Battle.Ship ship){
         if(tick<0||ship==null)throw new IllegalArgumentException("Invalid sample");
         boolean activeReady=ship.alive()&&ship.power>3&&
                 ship.sensorsCondition>.05&&ship.crewReadiness()>=.05;
-        minX = Math.min(minX, ship.x);
-        minY = Math.min(minY, ship.y);
-        maxX = Math.max(maxX, ship.x);
-        maxY = Math.max(maxY, ship.y);
+        if (tick % ONE_WAY_SEARCH_LIMIT == 0) {
+            firstBoundedTick = Math.max(0, tick - ONE_WAY_SEARCH_LIMIT);
+            minX = minY = Double.POSITIVE_INFINITY;
+            maxX = maxY = Double.NEGATIVE_INFINITY;
+            // Include all retained samples from this window, regardless of
+            // capture order. Future-dated samples can only widen the bounds.
+            for (Sample sample : samples)
+                if (sample != null && sample.tick() >= firstBoundedTick)
+                    includePosition(sample.x(), sample.y());
+        }
+        includePosition(ship.x, ship.y);
         int slot=(int)(tick%CAPACITY);
         samples[slot]=new Sample(tick,ship.x,ship.y,ship.vx,
                 ship.vy,ship.alive(),activeReady);

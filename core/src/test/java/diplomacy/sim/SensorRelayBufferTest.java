@@ -100,6 +100,9 @@ public final class SensorRelayBufferTest {
                 "New real sender report failed to arrive after its transmission");
         buffer.transmit(42,11,observed(6,8,11,500),2);
         buffer.transmit(43,12,observed(7,9,12,600),2);
+        require(!buffer.containsTarget(41) && buffer.containsTarget(42) &&
+                        buffer.containsTarget(43) && !buffer.containsTarget(44),
+                "Relay presence must reflect eviction and both retained channels");
         require(buffer.delivered(41,60,lag,2)==null,
                 "A sender exceeded finite two-target sharing capacity");
         require(buffer.delivered(42,60,lag,2)!=null&&

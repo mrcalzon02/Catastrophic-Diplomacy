@@ -3175,7 +3175,7 @@ public final class Battle {
                 // or its bounded broadcast list. Every received fix is a captured
                 // position. If even their enclosing box cannot improve either
                 // strict ranking, there is no other use for this observation.
-                if (rankOnly && hostile.sensorHistory.allPositionsBeyond(scout.x, scout.y,
+                if (rankOnly && hostile.sensorHistory.directPositionsBeyond(tick, scout.x, scout.y,
                         Math.max(closest[hostile.id], distances[broadcastCapacity - 1])))
                     continue;
                 // Only a measured observation can justify selection for
@@ -3312,6 +3312,15 @@ public final class Battle {
         if(receivedContact(actor,hostile,actor)!=null)return actor;
         return remoteContactSource(actor,hostile);
     }
+    private boolean hasRelayPacket(Ship actor, int targetId) {
+        if (targetId >= sharedSpotters[actor.team].length) return false;
+        Ship scout = sharedSpotters[actor.team][targetId];
+        Ship transmitter = expandedSpotters[actor.team][targetId];
+        return (scout != null && scout != actor && scout.relayPackets.containsTarget(targetId))
+                || (transmitter != null && transmitter != actor &&
+                    transmitter != scout && transmitter.relayPackets.containsTarget(targetId));
+    }
+
     /** The unchanged remote-authorization path after local photons fail. */
     private Ship remoteContactSource(Ship actor,Ship hostile){
         if(actor.power<=3||actor.crewReadiness()<.05)return null;
@@ -3809,6 +3818,11 @@ public final class Battle {
         int choiceClass=-1;
         int choiceDoctrine=Integer.MAX_VALUE;
         double choiceDistance=Double.POSITIVE_INFINITY;
+        double choiceDistanceLimitSquared=Double.POSITIVE_INFINITY;
+        // Fitted TRK stores eligible observations even for losing candidates.
+        // A diagnostic captain census likewise requests every authorized contact.
+        boolean canSkipLosingContacts = indexedOpponents && metrics == null
+                && actor.network.trackMemoryCapacity() == 0;
 
         for(Ship candidate:opponentCandidates(actor.team)){
             if(metrics!=null)metrics[3]++;
@@ -3816,10 +3830,6 @@ public final class Battle {
             BattleOrders.Engagement classOrder=orders.forSize(BattleOrders.size(candidate));
             if(classOrder.priority()==0)continue;
             if(metrics!=null)metrics[4]++;
-
-            SensorLightTimeHistory.Observation contact=authorizedContact(actor,candidate,0);
-            if(contact==null)continue;
-            if(metrics!=null)metrics[5]++;
 
             // Equivalent to the old boxed ArrayList.contains(id), but without
             // transient Integer/ArrayList objects or a per-decision collection.
@@ -3849,24 +3859,34 @@ public final class Battle {
                     doctrine=(int)StrictMath.floor(fraction*20.0);
                 }
             }
+            int rank = Integer.compare(hard, choiceHard);
+            if (rank == 0) rank = Integer.compare(choiceClass, classOrder.priority());
+            if (rank == 0) rank = Integer.compare(doctrine, choiceDoctrine);
+            if (canSkipLosingContacts) {
+                if (rank > 0) continue;
+                // If the entire direct-photon window misses the tie band,
+                // only an actual packet in one of the two relay routes could win.
+                if (rank == 0 && candidate.sensorHistory.directPositionsBeyond(
+                        tick, actor.x, actor.y, choiceDistanceLimitSquared)
+                        && !hasRelayPacket(actor, candidate.id))
+                    continue;
+            }
+            SensorLightTimeHistory.Observation contact=authorizedContact(actor,candidate,0);
+            if(contact==null)continue;
+            if(metrics!=null)metrics[5]++;
             double distance=StrictMath.hypot(
                     contact.sample().x()-actor.x,contact.sample().y()-actor.y);
 
-            boolean better=choice==null
-                    ||hard<choiceHard
-                    ||(hard==choiceHard&&classOrder.priority()>choiceClass)
-                    ||(hard==choiceHard&&classOrder.priority()==choiceClass
-                        &&doctrine<choiceDoctrine)
-                    ||(hard==choiceHard&&classOrder.priority()==choiceClass
-                        &&doctrine==choiceDoctrine&&distance<choiceDistance-1e-9)
-                    ||(hard==choiceHard&&classOrder.priority()==choiceClass
-                        &&doctrine==choiceDoctrine
-                        &&StrictMath.abs(distance-choiceDistance)<=1e-9
-                        &&candidate.id<choice.id);
+            boolean better = rank < 0 || (rank == 0 &&
+                    (distance < choiceDistance - 1e-9 ||
+                            (StrictMath.abs(distance - choiceDistance) <= 1e-9 &&
+                                    candidate.id < choice.id)));
             if(better){
                 choice=candidate;choiceContact=contact;choiceHard=hard;
                 choiceClass=classOrder.priority();choiceDoctrine=doctrine;
                 choiceDistance=distance;
+                double paddedDistance = distance + 1e-6;
+                choiceDistanceLimitSquared = paddedDistance * paddedDistance;
             }
         }
         if(choiceContact==null)choice=null;

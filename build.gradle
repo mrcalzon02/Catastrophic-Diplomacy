@@ -285,6 +285,44 @@ def laserRun01Parts=(0..<17).collect {
 }
 def laserFullOutput=layout.buildDirectory.dir('generated/cd-laser-full')
 def laserMobileOutput=layout.buildDirectory.dir('generated/cd-laser-mobile')
+// Offline bounds for laser quads. Include adjacent sheet pixels because a linearly
+// filtered sample at a cell boundary can see the neighboring animation frame.
+@groovy.transform.CompileStatic
+static void writeLaserFrameBounds(java.awt.image.BufferedImage image, int frameCount,
+                                 File output) {
+    int w=Math.floorDiv(image.width,8)
+    int h=Math.floorDiv(w*160,512)
+    int[] row=new int[w+2]
+    def stream=new DataOutputStream(new BufferedOutputStream(new FileOutputStream(output)))
+    try {
+        stream.writeInt(w)
+        stream.writeInt(h)
+        for(int i=0;i<frameCount;i++){
+            int originX=(i%8)*w,originY=Math.floorDiv(i,8)*h
+            int startX=Math.max(0,originX-1),endX=Math.min(image.width,originX+w+1)
+            int startY=Math.max(0,originY-1),endY=Math.min(image.height,originY+h+1)
+            int minX=w,minY=h,maxX=-1,maxY=-1
+            for(int y=startY;y<endY;y++){
+                image.getRGB(startX,y,endX-startX,1,row,0,endX-startX)
+                for(int x=startX;x<endX;x++){
+                    if((row[x-startX]>>>24)==0)continue
+                    minX=Math.min(minX,x-originX)
+                    minY=Math.min(minY,y-originY)
+                    maxX=Math.max(maxX,x-originX)
+                    maxY=Math.max(maxY,y-originY)
+                }
+            }
+            if(maxX<minX||maxY<minY){stream.writeLong(0L);continue}
+            int left=Math.max(0,Math.min(w-1,minX-1)),top=Math.max(0,Math.min(h-1,minY-1))
+            int right=Math.min(w,Math.max(left+1,maxX+2)),bottom=Math.min(h,Math.max(top+1,maxY+2))
+            stream.writeShort(left)
+            stream.writeShort(top)
+            stream.writeShort(right-left)
+            stream.writeShort(bottom-top)
+        }
+    } finally {stream.close()}
+}
+
 tasks.register('prepareLaserRun01') {
     group = 'assets'
     description = 'Stage 10 original 30fps laser animations, including mobile-optimized atlas derivatives.'
@@ -366,6 +404,8 @@ tasks.register('prepareLaserRun01') {
                 mobileOut.parentFile.mkdirs()
                 if(!javax.imageio.ImageIO.write(reduced,'png',mobileOut))
                     throw new IllegalArgumentException('Mobile atlas encoder failed '+entry)
+                writeLaserFrameBounds(image,fx.frame_count as int,new File(originalOut.path+'.bounds'))
+                writeLaserFrameBounds(reduced,fx.frame_count as int,new File(mobileOut.path+'.bounds'))
                 staged++
             }
             for(def dest:[full,mobile]){

@@ -84,6 +84,19 @@ public final class RemoteNetworkPresentationTest {
                 frame.missiles().get(0).entity().torpedo()&&
                 frame.ballistics().get(0).entity().fighterLaunched(),
                 "Remote body presentation metadata was flattened");
+        var originalEmitters=d.weaponEmitters;
+        interpolation.observe(snapshot.tick()+3,List.of(dread,carrier));
+        mirrors.present(interpolation,false);
+        check(d.weaponEmitters==originalEmitters,"Stable host fittings rebuilt physical mounts");
+        var refit=new BattleConnection.ShipEntity(dread.id(),dread.team(),dread.faction(),dread.hullClass(),
+                dread.x(),dread.y(),dread.facing(),dread.hull(),dread.maxHull(),dread.shields(),dread.maxShields(),
+                dread.armor(),dread.maxArmor(),dread.power(),dread.fuel(),dread.lastTargetId(),Map.of());
+        interpolation.observe(snapshot.tick()+6,List.of(refit,carrier));
+        mirrors.present(interpolation,false);
+        check(d.weaponEmitters.isEmpty(),"Removed host mounts survived a refit");
+        interpolation.observe(snapshot.tick()+9,List.of(dread,carrier));
+        mirrors.present(interpolation,false);
+        check(d.weaponEmitters.equals(originalEmitters),"Returning host fittings lost their physical mounts");
         System.out.println("PASS remote v2 presentation: dreadnought/carrier chassis, fitted hardpoints, missile, ballistic and fighter identity");
     }
 }

@@ -14,7 +14,12 @@ import java.util.Map;
  * x/y/facing are borrowed from the render-only interpolation buffer.
  */
 final class RemoteFleetMirrors {
-    private final Map<Integer,Battle.Ship> byHostId=new HashMap<>();
+    private static final class Mirror {
+        final Battle.Ship ship;
+        Map<Integer,String> fittings;
+        Mirror(Battle.Ship ship){this.ship=ship;}
+    }
+    private final Map<Integer,Mirror> byHostId=new HashMap<>();
     private Battle battle;
     private long appliedTick=Long.MIN_VALUE;
 
@@ -24,7 +29,7 @@ final class RemoteFleetMirrors {
         boolean refresh=networkTick!=appliedTick;
         boolean rebuild=newSession||battle==null;
         if(!rebuild&&refresh)for(var state:states){
-            Battle.Ship ship=byHostId.get(state.id());
+            Battle.Ship ship=byHostId(state.id());
             if(ship!=null&&(ship.team!=state.team()||
                     ship.faction!=state.faction())){
                 // A host ID cannot silently change sides or species.
@@ -47,25 +52,26 @@ final class RemoteFleetMirrors {
                     // must not reset positions or visual sprites of its peers.
                     Battle.Ship ship=battle.addShip(state.team(),
                             state.faction(),0,0);
-                    byHostId.put(state.id(),ship);
+                    byHostId.put(state.id(),new Mirror(ship));
                 }
             }
-            java.util.Iterator<Map.Entry<Integer,Battle.Ship>> iter=
+            java.util.Iterator<Map.Entry<Integer,Mirror>> iter=
                     byHostId.entrySet().iterator();
             while(iter.hasNext()){
                 var entry=iter.next();
                 if(!aliveIds.contains(entry.getKey())){
                     // Battle's render registry retains hull instances; hide
                     // retired host IDs instead of reassigning survivors.
-                    entry.getValue().hull=0;
+                    entry.getValue().ship.hull=0;
                     iter.remove();
                 }
             }
             appliedTick=networkTick;
         }
         for(var state:states){
-            Battle.Ship ship=byHostId.get(state.id());
-            if(ship==null)throw new IllegalStateException("Missing authoritative ship mirror");
+            Mirror mirror=byHostId.get(state.id());
+            if(mirror==null)throw new IllegalStateException("Missing authoritative ship mirror");
+            Battle.Ship ship=mirror.ship;
             RemoteShipInterpolation.Pose rendered=interpolation.pose(state.id());
             if(rendered==null)throw new IllegalStateException("Missing network render pose");
             ship.x=rendered.x();
@@ -77,9 +83,12 @@ final class RemoteFleetMirrors {
                 ship.maxArmor=state.maxArmor();ship.armor=state.armor();
                 ship.power=state.power();
                 ship.fuel=state.fuel();
+                if(ship.hullClass!=state.hullClass() || !state.weaponFittings().equals(mirror.fittings)){
+                    ship.weaponEmitters=emitters(state);
+                    mirror.fittings=state.weaponFittings();
+                }
                 ship.hullClass=state.hullClass();
                 ship.lastTargetId=state.lastTargetId();
-                ship.weaponEmitters=emitters(state);
             }
         }
         battle.tick=networkTick;
@@ -104,7 +113,10 @@ final class RemoteFleetMirrors {
         return java.util.List.copyOf(result);
     }
 
-    Battle.Ship byHostId(int hostId){return byHostId.get(hostId);}
+    Battle.Ship byHostId(int hostId){
+        Mirror mirror=byHostId.get(hostId);
+        return mirror==null?null:mirror.ship;
+    }
     void reset(){battle=null;byHostId.clear();appliedTick=Long.MIN_VALUE;}
 
 }

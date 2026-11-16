@@ -1,10 +1,13 @@
 package diplomacy.client;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.GL30;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.FrameBuffer;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.sim.LevelSky;
@@ -87,6 +90,13 @@ public final class ProceduralStarfield implements Disposable {
     private ShaderProgram nebulaShader;
     private Texture noise;
     private LevelSky.Recipe recipe;
+    // One full-resolution color attachment, at most 8 MiB. Copy only the sky
+    // drawn immediately after the client clears its default framebuffer.
+    private FrameBuffer skyBuffer;
+    private Texture capturedAttachment;
+    private boolean sameView, allocationFailed;
+    private float previousX, previousY, previousZoom;
+    private int previousWidth, previousHeight;
 
     public ProceduralStarfield() {
         pixel = makePixel();
@@ -105,6 +115,12 @@ public final class ProceduralStarfield implements Disposable {
     /** Level changes are uniform-only: no Pixmap allocations or GPU texture uploads. */
     public void useLevel(int index) {
         recipe = LevelSky.forLevel(index);
+        invalidateView();
+    }
+
+    void invalidateView() {
+        sameView = false;
+        capturedAttachment = null;
     }
 
     public LevelSky.Recipe recipe() { return recipe; }
@@ -113,6 +129,37 @@ public final class ProceduralStarfield implements Disposable {
                        OrthographicCamera battleCamera, float width, float height) {
         if (recipe == null) return;
         batch.setProjectionMatrix(hudCamera.combined);
+        if (Gdx.gl30 == null || allocationFailed) {
+            drawSky(batch, battleCamera, width, height);
+            return;
+        }
+        int pixelsWide = Gdx.graphics.getBackBufferWidth();
+        int pixelsHigh = Gdx.graphics.getBackBufferHeight();
+        var format = Gdx.graphics.getBufferFormat();
+        boolean canCopy = pixelsWide > 0 && pixelsHigh > 0
+                && (long)pixelsWide * pixelsHigh <= 2_097_152
+                && format.samples == 0
+                && format.r == 8 && format.g == 8 && format.b == 8;
+        boolean stationary = canCopy && sameView && previousX == battleCamera.position.x
+                && previousY == battleCamera.position.y && previousZoom == battleCamera.zoom
+                && previousWidth == pixelsWide && previousHeight == pixelsHigh;
+        if (stationary && skyBuffer != null && capturedAttachment == skyBuffer.getColorBufferTexture()) {
+            copySky(GL30.GL_READ_FRAMEBUFFER, pixelsWide, pixelsHigh);
+            batch.setColor(1, 1, 1, 1);
+            return;
+        }
+        capturedAttachment = null;
+        previousX = battleCamera.position.x;
+        previousY = battleCamera.position.y;
+        previousZoom = battleCamera.zoom;
+        previousWidth = pixelsWide;
+        previousHeight = pixelsHigh;
+        sameView = canCopy;
+        drawSky(batch, battleCamera, width, height);
+        if (stationary) captureSky(pixelsWide, pixelsHigh);
+    }
+
+    private void drawSky(SpriteBatch batch, OrthographicCamera battleCamera, float width, float height) {
         if (nebulaShader != null && noise != null) {
             batch.setShader(nebulaShader);
             batch.begin();
@@ -137,6 +184,32 @@ public final class ProceduralStarfield implements Disposable {
         for (int layer = 0; layer < 3; layer++) drawStars(batch, battleCamera, width, height, layer);
         batch.setColor(1, 1, 1, 1);
         batch.end();
+    }
+
+    private void captureSky(int width, int height) {
+        if (skyBuffer == null || skyBuffer.getWidth() != width || skyBuffer.getHeight() != height) {
+            if (skyBuffer != null) skyBuffer.dispose();
+            skyBuffer = null;
+            try {
+                skyBuffer = new FrameBuffer(Pixmap.Format.RGBA8888, width, height, false);
+            } catch (RuntimeException unavailable) {
+                allocationFailed = true;
+                FrameBuffer.unbind();
+                Gdx.app.log("SKY", "Using direct sky rendering: " + unavailable.getMessage());
+                return;
+            }
+        }
+        copySky(GL30.GL_DRAW_FRAMEBUFFER, width, height);
+        capturedAttachment = skyBuffer.getColorBufferTexture();
+    }
+
+    private void copySky(int target, int width, int height) {
+        // Same-size nearest blits preserve the original blended stars and
+        // untouched letterbox. Combat, fog, lighting and HUD are drawn later.
+        Gdx.gl30.glBindFramebuffer(target, skyBuffer.getFramebufferHandle());
+        Gdx.gl30.glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                GL20.GL_COLOR_BUFFER_BIT, GL20.GL_NEAREST);
+        FrameBuffer.unbind();
     }
 
     private void drawStars(SpriteBatch batch, OrthographicCamera camera,
@@ -227,6 +300,7 @@ public final class ProceduralStarfield implements Disposable {
     @Override public void dispose() {
         if (noise != null) noise.dispose();
         if (nebulaShader != null) nebulaShader.dispose();
+        if (skyBuffer != null) skyBuffer.dispose();
         pixel.dispose(); glow.dispose();
     }
 }

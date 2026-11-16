@@ -29,12 +29,13 @@ final class LaserRun01Fx implements Disposable {
     static final int[] FRAMES={32,52,48,50,54,44,48,52,50,58};
     static final int COLUMNS=8;
     private static final int MAX_SHOTS=384;
+    private record Frame(TextureRegion region,float left,float bottom,float width,float height){}
     private record Shot(Battle.VisualEvent event,int atlas) { }
     private final List<Shot> shots=new ArrayList<>();
     private final VisualAtlasBuckets<Shot> groupedShots=new VisualAtlasBuckets<>(IDS.length);
     private boolean groupsDirty=true;
     private final Map<Integer,Texture> textures=new HashMap<>();
-    private final Map<Integer,TextureRegion[]> regions=new HashMap<>();
+    private final Map<Integer,Frame[]> regions=new HashMap<>();
     private final boolean[] checked=new boolean[IDS.length],exists=new boolean[IDS.length];
     private Battle tracked;
     private long lastSequence;
@@ -114,8 +115,8 @@ final class LaserRun01Fx implements Disposable {
             groupsDirty=true;
         }
     }
-    private TextureRegion[] load(int atlas){
-        TextureRegion[] cached=regions.get(atlas);
+    private Frame[] load(int atlas){
+        Frame[] cached=regions.get(atlas);
         if(cached!=null)return cached;
         if(!available(atlas))return null;
         try{
@@ -127,14 +128,48 @@ final class LaserRun01Fx implements Disposable {
                 throw new IllegalArgumentException("Unexpected laser atlas cell geometry");
             }
             image.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-            TextureRegion[] frames=new TextureRegion[FRAMES[atlas]];
-            for(int i=0;i<frames.length;i++)
-                frames[i]=new TextureRegion(image,(i%COLUMNS)*w,(i/COLUMNS)*h,w,h);
+            Frame[] frames=frames(image,atlas,w,h);
             textures.put(atlas,image);regions.put(atlas,frames);
             return frames;
         }catch(RuntimeException error){
             exists[atlas]=false;
             Gdx.app.error("LASER-VFX","Rejected invalid authored laser atlas "+path(atlas),error);
+            return null;
+        }
+    }
+    private Frame[] frames(Texture image,int atlas,int w,int h){
+        int count=FRAMES[atlas];
+        int[] bounds=readBounds(atlas,w,h,count);
+        Frame[] result=new Frame[count];
+        for(int i=0;i<count;i++){
+            int x=bounds==null?0:bounds[i*4],y=bounds==null?0:bounds[i*4+1];
+            int width=bounds==null?w:bounds[i*4+2],height=bounds==null?h:bounds[i*4+3];
+            if(width==0||height==0)continue;
+            TextureRegion region=new TextureRegion(image,(i%COLUMNS)*w+x,(i/COLUMNS)*h+y,width,height);
+            result[i]=new Frame(region,x/(float)w,1-(y+height)/(float)h,width/(float)w,height/(float)h);
+        }
+        return result;
+    }
+    /** Missing or incompatible optional metadata keeps the complete authored
+     * cell drawable. The source atlas remains the sole source of visual pixels. */
+    private int[] readBounds(int atlas,int w,int h,int count){
+        var file=Gdx.files.internal(path(atlas)+".bounds");
+        if(!file.exists())return null;
+        try(var input=new java.io.DataInputStream(file.read(4096))){
+            if(input.readInt()!=w||input.readInt()!=h)
+                throw new java.io.IOException("Atlas cell size mismatch");
+            int[] bounds=new int[count*4];
+            for(int i=0;i<bounds.length;i+=4){
+                int x=input.readUnsignedShort(),y=input.readUnsignedShort();
+                int width=input.readUnsignedShort(),height=input.readUnsignedShort();
+                if(x+width>w||y+height>h)
+                    throw new java.io.IOException("Frame exceeds atlas cell");
+                bounds[i]=x;bounds[i+1]=y;bounds[i+2]=width;bounds[i+3]=height;
+            }
+            if(input.read()!=-1)throw new java.io.IOException("Unexpected extra frame bounds");
+            return bounds;
+        }catch(java.io.IOException|com.badlogic.gdx.utils.GdxRuntimeException unavailable){
+            Gdx.app.log("LASER-VFX","Using full frames for "+IDS[atlas]+": "+unavailable.getMessage());
             return null;
         }
     }
@@ -150,12 +185,12 @@ final class LaserRun01Fx implements Disposable {
         for(int index=0;index<IDS.length;index++){
             List<Shot> group=groupedShots.atlas(index);
             if(group.isEmpty())continue;
-            TextureRegion[] frames=load(index);
+            Frame[] frames=load(index);
             if(frames==null)continue;
             for(Shot shot:group){
                 Battle.VisualEvent event=shot.event();
                 int frame=frameAt(index,battle.tick-event.tick());
-                if(frame<0)continue;
+                if(frame<0||frames[frame]==null)continue;
                 if(view!=null&&!view.segment(event.x(),event.y(),
                         event.targetX(),event.targetY(),8))continue;
                 float dx=(float)(event.targetX()-event.x());
@@ -164,11 +199,12 @@ final class LaserRun01Fx implements Disposable {
                 if(span<0.01f)continue;
                 float width=span*512f/430f;
                 float height=CombatEffectScale.of(21f);
-                float originX=width*35f/512f,originY=height*.5f;
+                Frame shown=frames[frame];
+                float originX=width*(35f/512f-shown.left),originY=height*(.5f-shown.bottom);
                 float rotation=(float)StrictMath.toDegrees(StrictMath.atan2(dy,dx));
-                batch.draw(frames[frame],(float)event.x()-originX,
+                batch.draw(shown.region,(float)event.x()-originX,
                         (float)event.y()-originY,originX,originY,
-                        width,height,1f,1f,rotation);
+                        width*shown.width,height*shown.height,1f,1f,rotation);
             }
         }
         batch.setColor(1,1,1,1);

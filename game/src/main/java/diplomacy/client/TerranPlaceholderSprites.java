@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Disposable;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.shipyard.FactionArt;
@@ -75,7 +76,25 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final Pixmap damagedMaterial, destroyedMaterial, shieldMaterial;
     // Four shield facings share real source pixels and alpha-masked overlays;
     // textures are created per hull, not per vessel or recharge tick.
-    private record ShieldArt(Texture atlas,Texture[] sectors) {
+    private record ShieldSlice(TextureRegion region,float left,float bottom,float width,float height){
+        /** Bounds use inclusive source pixels. A transparent texel on all four
+         * sides preserves the full support of the original bilinear filter. */
+        static ShieldSlice from(Texture atlas,int layer,int w,int h,
+                                int minX,int minY,int maxX,int maxY){
+            if(maxX<minX||maxY<minY)return null;
+            float u0=Math.max(0,minX-1)/(float)w, u1=Math.min(w,maxX+2)/(float)w;
+            float v0=Math.max(0,minY-1)/(float)h, v1=Math.min(h,maxY+2)/(float)h;
+            TextureRegion region=new TextureRegion(atlas,2*layer+u0,v0,2*layer+u1,v1);
+            return new ShieldSlice(region,u0,1-v1,u1-u0,v1-v0);
+        }
+        void draw(SpriteBatch batch,BattleRenderPoses.Pose pose,float fullWidth,
+                  float fullHeight,float rotation){
+            float originX=(.5f-left)*fullWidth,originY=(.5f-bottom)*fullHeight;
+            batch.draw(region,pose.x()-originX,pose.y()-originY,originX,originY,
+                    width*fullWidth,height*fullHeight,1f,1f,rotation);
+        }
+    }
+    private record ShieldArt(Texture atlas,Texture[] sectors,ShieldSlice[] slices) {
         void dispose(){
             if(atlas!=null)atlas.dispose();
             if(sectors!=null)for(Texture sector:sectors)if(sector!=null)sector.dispose();
@@ -86,6 +105,7 @@ public final class TerranPlaceholderSprites implements Disposable {
     /** One shared hex-texture field shell, split into the same four mechanical facings. */
     private Texture[] shieldShell;
     private Pixmap packedShieldShell;
+    private final int[][] shellBounds=new int[4][];
     // These sheet dimensions match the fixed 192x192 shell and 192x288
     // original hull overlays in ShieldMaterialShader.LAYER_VERTEX.
     private static final int SHIELD_SHEET_WIDTH=386,SHIELD_SHELL_ROWS=194,
@@ -254,6 +274,7 @@ public final class TerranPlaceholderSprites implements Disposable {
             sheet.setBlending(Pixmap.Blending.None);
             sheet.drawPixmap(packedShieldShell,0,0);
         }
+        int[][] bounds=new int[4][];
         Texture[] layers=sheet==null?new Texture[DirectionalDefense.Facing.values().length]:null;
         try {
             // One downsample of the *original* silhouette is reused for all four
@@ -264,6 +285,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                         y*source.getHeight()/MASK_H)&255;
             }
             for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+                int minX=MASK_W,minY=MASK_H,maxX=-1,maxY=-1;
                 Pixmap pix=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
                 pix.setBlending(Pixmap.Blending.None);
                 try {
@@ -288,13 +310,28 @@ public final class TerranPlaceholderSprites implements Disposable {
                         int material=shieldMaterial.getPixel(
                                 x*shieldMaterial.getWidth()/MASK_W,
                                 y*shieldMaterial.getHeight()/MASK_H);
-                        pix.drawPixel(x,y,ShieldSurfaceModel.material(material,sourceAlpha,edge));
+                        int rgba=ShieldSurfaceModel.material(material,sourceAlpha,edge);
+                        if((rgba&255)==0)continue;
+                        pix.drawPixel(x,y,rgba);
+                        minX=Math.min(minX,x);minY=Math.min(minY,y);
+                        maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
                     }
+                    bounds[face.ordinal()]=new int[]{minX,minY,maxX,maxY};
                     if(sheet!=null)packShieldFace(sheet,pix,face,SHIELD_SHELL_ROWS);
                     else layers[face.ordinal()]=linearTexture(pix);
                 } finally {pix.dispose();}
             }
-            shieldSections.put(original,new ShieldArt(sheet==null?null:linearTexture(sheet),layers));
+            Texture atlas=sheet==null?null:linearTexture(sheet);
+            ShieldSlice[] slices=null;
+            if(atlas!=null){
+                slices=new ShieldSlice[8];
+                for(int i=0;i<slices.length;i++){
+                    int[] box=i<4?shellBounds[i]:bounds[i-4];
+                    slices[i]=ShieldSlice.from(atlas,i,MASK_W,i<4?192:MASK_H,
+                            box[0],box[1],box[2],box[3]);
+                }
+            }
+            shieldSections.put(original,new ShieldArt(atlas,layers,slices));
         }catch(RuntimeException error){
             if(layers!=null)for(Texture part:layers)if(part!=null)part.dispose();
             throw error;
@@ -337,6 +374,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(shellSheet!=null)shellSheet.setBlending(Pixmap.Blending.None);
         try {
             for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+                int minX=size,minY=size,maxX=-1,maxY=-1;
                 Pixmap pixels=new Pixmap(size,size,Pixmap.Format.RGBA8888);
                 pixels.setBlending(Pixmap.Blending.None);
                 try {
@@ -350,8 +388,12 @@ public final class TerranPlaceholderSprites implements Disposable {
                                 x*shieldMaterial.getWidth()/size,
                                 y*shieldMaterial.getHeight()/size);
                         int rgba=ShieldSurfaceModel.shellMaterial(material,distance);
-                        if((rgba&255)!=0)pixels.drawPixel(x,y,rgba);
+                        if((rgba&255)==0)continue;
+                        pixels.drawPixel(x,y,rgba);
+                        minX=Math.min(minX,x);minY=Math.min(minY,y);
+                        maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
                     }
+                    shellBounds[face.ordinal()]=new int[]{minX,minY,maxX,maxY};
                     if(shellSheet!=null)packShieldFace(shellSheet,pixels,face,0);
                     else built[face.ordinal()]=linearTexture(pixels);
                 }finally{pixels.dispose();}
@@ -1261,14 +1303,9 @@ public final class TerranPlaceholderSprites implements Disposable {
                     pose,width,height,rotation);
             return;
         }
-        // Encode the atlas region on vertices, then recover the original 0..1 UV
-        // before interpolation. The recharge scan and linear filtering use
-        // exactly the same local UV as an individual unbatched shield quad.
-        Texture sheet=sectors.atlas;
         int layer=face.ordinal()+(shell?0:4);
-        batch.draw(sheet,pose.x()-width/2,pose.y()-height/2,
-                width/2,height/2,width,height,1,1,rotation,
-                2*layer*sheet.getWidth(),0,sheet.getWidth(),sheet.getHeight(),false,false);
+        ShieldSlice slice=sectors.slices[layer];
+        if(slice!=null)slice.draw(batch,pose,width,height,rotation);
     }
     private static void drawWhole(SpriteBatch batch,Texture tex,BattleRenderPoses.Pose pose,
                                   float width,float height,float rotation) {

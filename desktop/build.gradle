@@ -3,6 +3,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
 tasks.withType(JavaCompile).configureEach { options.release = 17; options.encoding = 'UTF-8' }
 dependencies {
     implementation project(':game')
+    testImplementation project(':server')
     implementation 'com.badlogicgames.gdx:gdx-backend-lwjgl3:1.14.2'
     runtimeOnly 'com.badlogicgames.gdx:gdx-platform:1.14.2:natives-desktop'
 }
@@ -116,7 +117,7 @@ tasks.register('combatFrameBenchmark', JavaExec) {
     mainClass = 'diplomacy.desktop.DesktopFrameBenchmark'
     workingDir layout.buildDirectory.dir('frame-benchmark/work').get().asFile
     doFirst { workingDir.mkdirs() }
-    ['bench.live','bench.engaged','bench.warm','bench.frames','bench.counters','bench.output'].each { key ->
+    ['bench.live','bench.engaged','bench.warm','bench.frames','bench.counters','bench.output','bench.zoom','bench.paused'].each { key ->
         if (System.getProperty(key) != null) systemProperty key, System.getProperty(key)
     }
 }

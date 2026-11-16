@@ -4066,7 +4066,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }finally{battle=solo;}
         batch.setProjectionMatrix(battleCamera.combined);
         if(terranSprites!=null&&terranSprites.loaded()>0)
-            terranSprites.render(remotePresentation,batch);
+            // Keep the remote view's existing lighting and shield detail. An offscreen
+            // ECM source may still project a visible decoy.
+            terranSprites.render(remotePresentation,batch,renderPoses,null,null,false,
+                    ship -> view.ship(renderPoses.ship(ship),ship.visualScale())
+                            || diplomacy.sim.DeceptionProjection.falseContacts(ship)>0);
         batch.setProjectionMatrix(battleCamera.combined);
         if(craftSprites!=null)
             craftSprites.renderRemote(remotePresentation,frame.crafts(),
@@ -4117,11 +4121,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         }
         shapes.end();
     }
-    @Override public void resize(int width, int height) { viewport.update(width, height, true); }
+    @Override public void resize(int width, int height) {
+        viewport.update(width, height, true);
+        if (starfield != null) starfield.invalidateView();
+    }
     @Override public void pause() {
         if (audio != null) audio.pause();
     }
     @Override public void resume() {
+        if (starfield != null) starfield.invalidateView();
         if (audio != null) audio.resume();
     }
     @Override public void dispose() {

@@ -106,6 +106,16 @@ public final class SensorRelayBuffer {
         hash(Double.doubleToLongBits(received.sample().vx()));
         hash(Double.doubleToLongBits(received.sample().vy()));
     }
+    /** A necessary condition for remote delivery. Check even slots beyond
+     * the currently powered capacity; transmit always uses the first empty slot. */
+    boolean containsTarget(int targetId) {
+        for (Track track : tracks) {
+            if (track == null) return false;
+            if (track.targetId == targetId) return true;
+        }
+        return false;
+    }
+
     /** Read-only physical delivery, never a weapon lock by itself. */
     public SensorLightTimeHistory.Observation delivered(
             int targetId,long now,int physicalDelay,int capacity){

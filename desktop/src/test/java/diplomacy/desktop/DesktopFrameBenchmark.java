@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.profiling.GLProfiler;
@@ -24,11 +25,14 @@ import java.util.zip.CRC32;
 public final class DesktopFrameBenchmark extends ApplicationAdapter {
     private final CatastrophicGame game=new CatastrophicGame();
     private final boolean live=Boolean.getBoolean("bench.live");
+    private final boolean paused=Boolean.getBoolean("bench.paused");
     private final int warm=Integer.getInteger("bench.warm",18);
     private final int samples=Integer.getInteger("bench.frames",80);
     private final String output=System.getProperty("bench.output");
     private Field delta;
     private Battle battle;
+    private OrthographicCamera camera;
+    private float lastX = Float.NaN, lastY = Float.NaN, lastZoom = Float.NaN;
     private GLProfiler profiler;
     private int index;
     private long previousStart,startingTick;
@@ -75,6 +79,9 @@ public final class DesktopFrameBenchmark extends ApplicationAdapter {
                 method(game,"reset").invoke(game);
             }
             battle=(Battle)field(game,"battle").get(game);
+            camera=(OrthographicCamera)field(game,"battleCamera").get(game);
+            if (System.getProperty("bench.zoom") != null)
+                field(game,"manualZoom").setFloat(game,Float.parseFloat(System.getProperty("bench.zoom")));
             if(battle==null||battle.ships().size()!=(live?32:400))
                 throw new IllegalStateException("Requested battle failed to deploy");
             // Keep dynamic FPS text out of the fixed-pixel comparison. Force 1x
@@ -93,6 +100,7 @@ public final class DesktopFrameBenchmark extends ApplicationAdapter {
                         battle.missiles().isEmpty()&&battle.ballistics().isEmpty())
                     throw new IllegalStateException("No active mid-battle fixture");
             }
+            if(paused)field(game,"running").setBoolean(game,false);
         }catch(ReflectiveOperationException error){
             throw new IllegalStateException("Desktop benchmark could not initialize",error);
         }
@@ -107,7 +115,7 @@ public final class DesktopFrameBenchmark extends ApplicationAdapter {
         startingTick=battle.tick;
         System.out.printf(Locale.ROOT,"BEGIN tick=%d state=%016x hits=%d missiles=%d ballistics=%d%n",battle.tick,battle.fingerprint(),
                 battle.hitCount,battle.missiles().size(),battle.ballistics().size());
-        System.out.println("frame,tick,interval_ms,submit_ms,complete_ms,draws,binds,rgba_crc32");
+        System.out.println("frame,tick,interval_ms,submit_ms,complete_ms,draws,binds,rgba_crc32,stationary_camera");
     }
 
     @Override public void resize(int width,int height){game.resize(width,height);}
@@ -124,19 +132,23 @@ public final class DesktopFrameBenchmark extends ApplicationAdapter {
         long submitted=System.nanoTime();
         if(!live)Gdx.gl.glFinish();
         long completed=System.nanoTime();
+        boolean stationary = lastX == camera.position.x && lastY == camera.position.y && lastZoom == camera.zoom;
+        lastX = camera.position.x;
+        lastY = camera.position.y;
+        lastZoom = camera.zoom;
         if(index>=warm){
             int draws=profiler==null?-1:profiler.getDrawCalls();
             int binds=profiler==null?-1:profiler.getTextureBindings();
             String checksum="";
             if(!live&&(index==warm||index==warm+samples-1))
                 checksum=capture();
-            System.out.printf(Locale.ROOT,"%d,%d,%.4f,%.4f,%.4f,%d,%d,%s%n",
+            System.out.printf(Locale.ROOT,"%d,%d,%.4f,%.4f,%.4f,%d,%d,%s,%b%n",
                     index,battle.tick,interval/1e6,(submitted-start)/1e6,
-                    live?-1.0:(completed-start)/1e6,draws,binds,checksum);
+                    live?-1.0:(completed-start)/1e6,draws,binds,checksum,stationary);
         }
         if(++index>=warm+samples){
-            if(battle.tick<=startingTick)
-                throw new IllegalStateException("No battle ticks advanced during the frame trial");
+            if(paused ? battle.tick != startingTick : battle.tick <= startingTick)
+                throw new IllegalStateException("Unexpected battle tick progression");
             System.out.printf(Locale.ROOT,"END tick=%d state=%016x hits=%d%n",
                     battle.tick,battle.fingerprint(),battle.hitCount);
             Gdx.app.exit();

@@ -26,6 +26,7 @@ on:
       # Required runtime inputs, not optional artwork diagnostic scripts.
       - assets/**
       - asset_packs/**
+      - tools/performance/**
       - tools/ApprovedHardpointBake.java
       - tools/ShipSurfaceMapGenerator.java
       - tools/generate_app_icons.py
@@ -42,7 +43,7 @@ concurrency:
 jobs:
   objective-regressions:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: ${{ contains(github.event.head_commit.message, '[frame-profile]') && 32 || 20 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -182,3 +183,81 @@ jobs:
           path: test-output/paired-fleets/
           retention-days: 14
           if-no-files-found: warn
+      - name: Compare complete desktop frames and connected multiplayer clients
+        if: success() && github.event_name == 'push' && contains(github.event.head_commit.message, '[frame-profile]')
+        timeout-minutes: 18
+        env:
+          BASE_REVISION: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if ! command -v xvfb-run >/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y xvfb
+          fi
+          git fetch --no-tags --depth=1 origin "$BASE_REVISION"
+          git worktree add --detach "$RUNNER_TEMP/frame-baseline" "$BASE_REVISION"
+          xvfb-run -a -s '-screen 0 1440x900x24' bash tools/performance/compare-frames.sh \
+            "$RUNNER_TEMP/frame-baseline" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/test-output/paired-frames"
+      - name: Archive paired client frames and snapshot measurements
+        if: always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[frame-profile]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-paired-client-frames
+          path: test-output/paired-frames/
+          retention-days: 14
+          if-no-files-found: error
+
+  android-frame-comparison:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[android-frame-profile]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.11.1'}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Build both debug APKs from the measured revisions
+        env:
+          BASE_REVISION: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          python -m pip install Pillow==11.3.0
+          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -d "$ANDROID_HOME/build-tools/35.0.0" ]]; then
+            manager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+            "$manager" 'platforms;android-36' 'build-tools;35.0.0'
+          fi
+          git fetch --depth=1 --no-tags origin "$BASE_REVISION"
+          git worktree add --detach "$RUNNER_TEMP/frame-baseline" "$BASE_REVISION"
+          mkdir -p test-output/android-frames
+          for side in base candidate; do
+            source="$GITHUB_WORKSPACE"
+            if [[ "$side" == base ]]; then source="$RUNNER_TEMP/frame-baseline"; fi
+            git -C "$source" rev-parse HEAD > "test-output/android-frames/$side.sha"
+            gradle -p "$source" --no-daemon :android:assembleDebug
+            cp "$source/android/build/outputs/apk/debug/android-debug.apk" "$RUNNER_TEMP/$side.apk"
+          done
+          unzip -Z1 "$RUNNER_TEMP/candidate.apk" | awk '/\.png\.bounds$/' > test-output/android-frames/laser-tables.txt
+          test "$(wc -l < test-output/android-frames/laser-tables.txt)" -eq 10
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+      - name: Four 400-ship trials on the same Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader -camera-back none
+          script: bash tools/performance/compare-android-frames.sh "$RUNNER_TEMP" test-output/android-frames
+      - name: Archive Android combat telemetry and framebuffers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-paired-android-combat
+          path: test-output/android-frames/
+          retention-days: 14
+          if-no-files-found: error

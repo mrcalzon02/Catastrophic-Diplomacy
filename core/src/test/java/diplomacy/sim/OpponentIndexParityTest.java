@@ -598,17 +598,59 @@ public final class OpponentIndexParityTest {
         Battle.Ship ship = ranked.ships().get(0);
         ship.x = -12; ship.y = 5;
         history.capture(0, ship);
-        check(history.allPositionsBeyond(0, 0, 169) &&
-                        !history.allPositionsBeyond(0, 0, Math.nextUp(169.0)),
+        check(history.directPositionsBeyond(0, 0, 0, 169) &&
+                        !history.directPositionsBeyond(0, 0, 0, Math.nextUp(169.0)),
                 "Equal distance may be omitted only for strict relay rankings");
         ship.x = 25; ship.y = -25;
         history.capture(1, ship);
-        check(!history.allPositionsBeyond(0, 0, 1),
+        check(!history.directPositionsBeyond(1, 0, 0, 1),
                 "A teleport must not exclude an older received position");
+        // Once the old emission can no longer arrive, the historical bound
+        // may expire it. An out-of-order replay query must still use the oracle.
+        for (int t = 2; t < 130; t++) history.capture(t, ship);
+        check(history.directPositionsBeyond(129, -12, 5, 1) &&
+                        !history.directPositionsBeyond(1, -12, 5, 1),
+                "Expired geometry or late query rejected a still-reachable photon");
+    }
+
+    private static void verifyCaptainRanking() {
+        for (BattleOrders.Targeting doctrine : BattleOrders.Targeting.values()) {
+            Battle ranked = Battle.duel(20261117, 12, Battle.Faction.TERRAN, Battle.Faction.DRAXIAN);
+            Battle exhaustive = Battle.duel(20261117, 12, Battle.Faction.TERRAN, Battle.Faction.DRAXIAN);
+            exhaustive.configureCaptainTargetingMetrics(true);
+            for (Battle battle : new Battle[]{ranked, exhaustive}) {
+                for (Battle.Ship ship : battle.ships()) {
+                    ship.x = 240 + ship.team * 180 + (ship.id % 4) * 20;
+                    ship.y = 260 + (ship.id % 3) * 10;
+                    ship.hullClass = ship.id % 3 == 0 ? diplomacy.shipyard.Shipyard.Hull.CRUISER :
+                            diplomacy.shipyard.Shipyard.Hull.FRIGATE;
+                }
+                var orders = BattleOrders.DEFAULT.withTargeting(doctrine)
+                        .withEngagement(BattleOrders.Size.ESCORT, 80, 200);
+                battle.setTeamOrders(0, orders);
+                battle.setTeamOrders(1, orders);
+            }
+            for (int t = 0; t < 90; t++) {
+                for (Battle battle : new Battle[]{ranked, exhaustive}) {
+                    if (t == 20) battle.ships().get(4).x = 2200;
+                    if (t == 40) battle.ships().get(4).x = 265;
+                    if (t == 60) battle.destroyHull(battle.ships().get(3), null);
+                    battle.step();
+                }
+                check(ranked.fingerprint() == exhaustive.fingerprint(),
+                        "Captain ranking changed orders or combat for " + doctrine + " tick " + t);
+                for (int i = 0; i < ranked.ships().size(); i++)
+                    check(ranked.ships().get(i).lastTargetId == exhaustive.ships().get(i).lastTargetId,
+                            "Captain selected a different target for " + doctrine + " tick " + t);
+            }
+            check(ranked.photonCacheMisses() < exhaustive.photonCacheMisses(),
+                    "Captain ranking never pruned an ineligible search for " + doctrine);
+        }
     }
 
     public static void main(String[] args)throws Exception{
         verifyWeatherRelayRanking();
+        verifyCaptainRanking();
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
         Battle fullScan=DemonstrationBattle.create(catalog);
