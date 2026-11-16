@@ -5,6 +5,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.PixmapIO;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.profiling.GLProfiler;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -158,7 +159,15 @@ public final class NetworkFrameBenchmark extends ApplicationAdapter {
         try{
             crc.update(pixels.getPixels().duplicate());
             String path=System.getProperty("bench.net.output");
-            if(path!=null)com.badlogic.gdx.graphics.PixmapIO.writePNG(Gdx.files.absolute(path),pixels);
+            if(path!=null){
+                PixmapIO.PNG png=new PixmapIO.PNG();
+                try{
+                    // OpenGL readback starts at the lower-left corner; PNG starts at the top.
+                    png.setFlipY(true);
+                    png.write(Gdx.files.absolute(path),pixels);
+                }catch(IOException e){throw new UncheckedIOException(e);}
+                finally{png.dispose();}
+            }
         }finally{pixels.dispose();}
         System.out.println("frame,rendered_tick,interval_ms,submit_ms,render_thread_cpu_ms,latest_entity_count,draws,binds,vertices");
         for(int i=0;i<samples;i++)System.out.printf(Locale.ROOT,"%d,%d,%.4f,%.4f,%.4f,%d,%d,%d,%d%n",
