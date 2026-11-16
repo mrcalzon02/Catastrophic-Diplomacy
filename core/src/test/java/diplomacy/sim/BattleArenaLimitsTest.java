@@ -69,12 +69,54 @@ public final class BattleArenaLimitsTest {
         ok(b.railPenetrators().isEmpty(),context+" rail penetrator survived");
         ok(b.flakRounds().isEmpty(),context+" flak projectile survived");
     }
+    private static Battle columnBoundaryVolley(boolean indexed) throws Exception {
+        Battle battle = new Battle(821L);
+        battle.configureOpponentIndexForDiagnostic(indexed);
+        Battle.Ship source = battle.addShip(0, Battle.Faction.TERRAN, 20, 500);
+        Battle.Ship first = battle.addShip(1, Battle.Faction.DRAXIAN, 66, 300);
+        // An identical second target must lose an exact entry-time tie.
+        battle.addShip(1, Battle.Faction.DRAXIAN, first.x, first.y);
+        for (int i = 0; i < 29; i++)
+            battle.addShip(0, Battle.Faction.TERRAN, 100 + i, 500);
+        for (Battle.Ship ship : battle.ships())
+            battle.registerDiagnosticStationaryTarget(ship.id);
+
+        var profile = new ProjectileModel.Spec(1500, 1.6, .24, .54);
+        // One shot crosses a column boundary, the other stays left of x=64
+        // while touching the hull centered to its right.
+        inject(battle, "ballistics", new Battle.Ballistic(1001, 0, source.id, 0,
+                first.id, 48, 300, 0, 3, profile));
+        inject(battle, "ballistics", new Battle.Ballistic(1002, 0, source.id, 0,
+                first.id, 63, 283, Math.PI / 2, 3, profile));
+        for (int i = 0; i < 6; i++)
+            inject(battle, "ballistics", new Battle.Ballistic(1003 + i, 0, source.id,
+                    0, first.id, 600, 850 + i, 0, 3, profile));
+        battle.step();
+        return battle;
+    }
+
+    private static void checkColumnBoundaryVolley() throws Exception {
+        Battle indexed = columnBoundaryVolley(true);
+        Battle control = columnBoundaryVolley(false);
+        ok(indexed.fingerprint() == control.fingerprint() &&
+                indexed.visualEvents().equals(control.visualEvents()),
+                "Column query changed a contact, impact point or tie ordering");
+        int firstTarget = indexed.ships().get(1).id;
+        long intendedHits = indexed.visualEvents().stream()
+                .filter(e -> (e.shotId() == 1001 || e.shotId() == 1002) &&
+                        e.phase() == Battle.VisualPhase.IMPACT && e.targetId() == firstTarget)
+                .count();
+        ok(intendedHits == 2 && indexed.ballistics().size() == 6,
+                "Boundary volley must actually hit both times and miss six times");
+    }
+
     public static void main(String[] args)throws Exception{
         ok(BattleArena.MAX_X-BattleArena.MIN_X==3840 &&
                 BattleArena.MAX_Y-BattleArena.MIN_Y==2160,"Arena dimensions changed");
         ok(BattleArena.MIN_X<=-1000 && BattleArena.MAX_X>=2280 &&
                 BattleArena.MIN_Y<=-600 && BattleArena.MAX_Y>=1320,
                 "Insufficient fleet maneuvering space");
+        checkColumnBoundaryVolley();
         Battle large=Battle.duel(815L,200,Battle.Faction.TERRAN,
                 Battle.Faction.DRAXIAN);
         ok(large.ships().size()==400 && large.alive(0)==200 &&

@@ -95,10 +95,25 @@ public final class SensorLightTimeHistory {
                 throw new IllegalArgumentException("Impossible sensor chronology");
         }
     }
+    // Enclose every captured position, including entries since overwritten.
+    // Old positions only widen the bound; motion and teleports cannot hide a fix.
+    private double minX = Double.POSITIVE_INFINITY, minY = Double.POSITIVE_INFINITY;
+    private double maxX = Double.NEGATIVE_INFINITY, maxY = Double.NEGATIVE_INFINITY;
+
+    boolean allPositionsBeyond(double x, double y, double distanceSquared) {
+        double dx = Math.max(0, Math.max(minX - x, x - maxX));
+        double dy = Math.max(0, Math.max(minY - y, y - maxY));
+        return dx * dx + dy * dy >= distanceSquared;
+    }
+
     public void capture(long tick,Battle.Ship ship){
         if(tick<0||ship==null)throw new IllegalArgumentException("Invalid sample");
         boolean activeReady=ship.alive()&&ship.power>3&&
                 ship.sensorsCondition>.05&&ship.crewReadiness()>=.05;
+        minX = Math.min(minX, ship.x);
+        minY = Math.min(minY, ship.y);
+        maxX = Math.max(maxX, ship.x);
+        maxY = Math.max(maxY, ship.y);
         int slot=(int)(tick%CAPACITY);
         samples[slot]=new Sample(tick,ship.x,ship.y,ship.vx,
                 ship.vy,ship.alive(),activeReady);

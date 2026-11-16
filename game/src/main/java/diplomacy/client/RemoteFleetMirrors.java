@@ -71,14 +71,16 @@ final class RemoteFleetMirrors {
             ship.x=rendered.x();
             ship.y=rendered.y();
             ship.facing=rendered.facing();
-            ship.maxHull=state.maxHull();ship.hull=state.hull();
-            ship.maxShields=state.maxShields();ship.shields=state.shields();
-            ship.maxArmor=state.maxArmor();ship.armor=state.armor();
-            ship.power=state.power();
-            ship.fuel=state.fuel();
-            ship.hullClass=state.hullClass();
-            ship.lastTargetId=state.lastTargetId();
-            ship.weaponEmitters=emitters(state);
+            if(refresh){
+                ship.maxHull=state.maxHull();ship.hull=state.hull();
+                ship.maxShields=state.maxShields();ship.shields=state.shields();
+                ship.maxArmor=state.maxArmor();ship.armor=state.armor();
+                ship.power=state.power();
+                ship.fuel=state.fuel();
+                ship.hullClass=state.hullClass();
+                ship.lastTargetId=state.lastTargetId();
+                ship.weaponEmitters=emitters(state);
+            }
         }
         battle.tick=networkTick;
         return battle;

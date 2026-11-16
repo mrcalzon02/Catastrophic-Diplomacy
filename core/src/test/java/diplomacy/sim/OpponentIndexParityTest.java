@@ -565,7 +565,50 @@ public final class OpponentIndexParityTest {
                 "Active-emission pruning never reduced historical age scans");
     }
 
+    private static void verifyWeatherRelayRanking() {
+        Battle ranked = Battle.duel(20261116, 16, Battle.Faction.TERRAN, Battle.Faction.DRAXIAN);
+        Battle oracle = Battle.duel(20261116, 16, Battle.Faction.TERRAN, Battle.Faction.DRAXIAN);
+        oracle.configureOpponentIndexForDiagnostic(false);
+        for (Battle battle : new Battle[]{ranked, oracle}) {
+            battle.configureWeather(SpaceWeather.forLevel(1));
+            battle.configureRelayScanMetrics(true);
+            for (Battle.Ship ship : battle.ships()) {
+                ship.x = 200 + ship.team * 200 + ship.id * 3;
+                ship.y = 250 + (ship.id % 5) * 10;
+            }
+        }
+        for (int t = 0; t < 120; t++) {
+            for (Battle battle : new Battle[]{ranked, oracle}) {
+                if (t == 30) battle.ships().get(3).x = 2000;
+                if (t == 50) battle.destroyHull(battle.ships().get(5), null);
+                if (t == 70) battle.addShip(1, Battle.Faction.DRAXIAN, 400, 250);
+                battle.step();
+            }
+            check(ranked.fingerprint() == oracle.fingerprint(),
+                    "Weather relay changed battle or transmitted packet at " + t);
+            if (t % 10 == 0) for (int side = 0; side < 2; side++)
+                check(ranked.tacticalPicture(side).equals(oracle.tacticalPicture(side)),
+                        "Weather relay changed tactical display at " + t);
+        }
+        check(ranked.relayScanMetrics().receivedQueries() <
+                        oracle.relayScanMetrics().receivedQueries(),
+                "Weather relay did not omit any uncompetitive contact searches");
+
+        var history = new SensorLightTimeHistory();
+        Battle.Ship ship = ranked.ships().get(0);
+        ship.x = -12; ship.y = 5;
+        history.capture(0, ship);
+        check(history.allPositionsBeyond(0, 0, 169) &&
+                        !history.allPositionsBeyond(0, 0, Math.nextUp(169.0)),
+                "Equal distance may be omitted only for strict relay rankings");
+        ship.x = 25; ship.y = -25;
+        history.capture(1, ship);
+        check(!history.allPositionsBeyond(0, 0, 1),
+                "A teleport must not exclude an older received position");
+    }
+
     public static void main(String[] args)throws Exception{
+        verifyWeatherRelayRanking();
         TechnologyCatalog catalog=TechnologyCatalog.loadDefault();
         Battle indexed=DemonstrationBattle.create(catalog);
         Battle fullScan=DemonstrationBattle.create(catalog);

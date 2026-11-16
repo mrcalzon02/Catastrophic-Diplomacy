@@ -241,22 +241,23 @@ public final class FighterCraftSprites implements Disposable {
     }
     /** Render host-owned network craft without constructing or stepping local craft simulation. */
     void renderRemote(Battle presentation,
-                      java.util.List<BattleConnection.CraftEntity> crafts,
+                      java.util.List<RemoteEntityPresentation.Body<BattleConnection.CraftEntity>> crafts,
                       RemoteFleetMirrors mirrors,SpriteBatch batch,
-                      CombatViewBounds view){
+                      CombatViewBounds view,float fraction){
         if(crafts==null||mirrors==null||crafts.isEmpty())return;
         usedThisFrame.clear();
         offscreenCraftRejectedLastFrame=0;
         surfaces.begin(batch,presentation,view);
         try{
             batch.setColor(1,1,1,1);
-            for(BattleConnection.CraftEntity craft:crafts){
+            for(var motion:crafts){
+                var craft=motion.entity();
                 Battle.Ship source=mirrors.byHostId(craft.sourceId());
                 if(source==null)continue; // v1 compatibility body lacks source identity.
                 float height=craft.fighter()?
                         fighterHeight(craft.fighterHull()):droneHeight();
                 BattleRenderPoses.Pose position=new BattleRenderPoses.Pose(
-                        (float)craft.x(),(float)craft.y(),0);
+                        motion.x(fraction),motion.y(fraction),0);
                 if(!potentiallyVisible(view,position,height)){
                     offscreenCraftRejectedLastFrame++;continue;
                 }

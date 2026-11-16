@@ -75,10 +75,21 @@ public final class TerranPlaceholderSprites implements Disposable {
     private final Pixmap damagedMaterial, destroyedMaterial, shieldMaterial;
     // Four shield facings share real source pixels and alpha-masked overlays;
     // textures are created per hull, not per vessel or recharge tick.
-    private final java.util.Map<Texture,Texture[]> shieldSections =
+    private record ShieldArt(Texture atlas,Texture[] sectors) {
+        void dispose(){
+            if(atlas!=null)atlas.dispose();
+            if(sectors!=null)for(Texture sector:sectors)if(sector!=null)sector.dispose();
+        }
+    }
+    private final java.util.Map<Texture,ShieldArt> shieldSections =
             new java.util.IdentityHashMap<>();
     /** One shared hex-texture field shell, split into the same four mechanical facings. */
     private Texture[] shieldShell;
+    private Pixmap packedShieldShell;
+    // These sheet dimensions match the fixed 192x192 shell and 192x288
+    // original hull overlays in ShieldMaterialShader.LAYER_VERTEX.
+    private static final int SHIELD_SHEET_WIDTH=386,SHIELD_SHELL_ROWS=194,
+            SHIELD_SHEET_HEIGHT=484;
     /** Optional cosmetic shader; failure must never prevent the game launching. */
     private final ShieldMaterialShader shieldInk;
     // Twice the previous coefficient resolution (4x texels) preserves fine
@@ -237,48 +248,80 @@ public final class TerranPlaceholderSprites implements Disposable {
     private void prepareShields(Texture original) {
         if(shieldSections.containsKey(original))return;
         Pixmap source=sourcePixels(original);
-        Texture[] layers=new Texture[DirectionalDefense.Facing.values().length];
-        // One downsample of the *original* silhouette is reused for all four
-        // quadrants, rather than sampling a Pixmap 4x for every neighbor.
-        int[] alpha=new int[MASK_W*MASK_H];
-        for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
-            alpha[y*MASK_W+x]=source.getPixel(x*source.getWidth()/MASK_W,
-                    y*source.getHeight()/MASK_H)&255;
+        prepareShieldShell();
+        Pixmap sheet=packedShieldShell==null?null:new Pixmap(SHIELD_SHEET_WIDTH,SHIELD_SHEET_HEIGHT,Pixmap.Format.RGBA8888);
+        if(sheet!=null){
+            sheet.setBlending(Pixmap.Blending.None);
+            sheet.drawPixmap(packedShieldShell,0,0);
         }
-        for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
-            Pixmap pix=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
-            pix.setBlending(Pixmap.Blending.None);
-            try {
-                for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
-                    double towardBow=1-(y+0.5)*2.0/MASK_H;
-                    double towardPort=1-(x+0.5)*2.0/MASK_W;
-                    if(DirectionalDefense.facingFor(towardBow,towardPort)!=face)
-                        continue;
-                    int offset=y*MASK_W+x;
-                    int sourceAlpha=alpha[offset];
-                    if(sourceAlpha==0)continue;
-                    int left=alpha[y*MASK_W+Math.max(0,x-1)];
-                    int right=alpha[y*MASK_W+Math.min(MASK_W-1,x+1)];
-                    int up=alpha[Math.max(0,y-1)*MASK_W+x];
-                    int down=alpha[Math.min(MASK_H-1,y+1)*MASK_W+x];
-                    int left2=alpha[y*MASK_W+Math.max(0,x-2)];
-                    int right2=alpha[y*MASK_W+Math.min(MASK_W-1,x+2)];
-                    int up2=alpha[Math.max(0,y-2)*MASK_W+x];
-                    int down2=alpha[Math.min(MASK_H-1,y+2)*MASK_W+x];
-                    int edge=ShieldSurfaceModel.edge(sourceAlpha,left,right,up,down,
-                            left2,right2,up2,down2);
-                    int material=shieldMaterial.getPixel(
-                            x*shieldMaterial.getWidth()/MASK_W,
-                            y*shieldMaterial.getHeight()/MASK_H);
-                    pix.drawPixel(x,y,ShieldSurfaceModel.material(material,sourceAlpha,edge));
-                }
-                Texture layer=new Texture(pix);
-                layer.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-                layers[face.ordinal()]=layer;
-            } finally {pix.dispose();}
-        }
-        shieldSections.put(original,layers);
+        Texture[] layers=sheet==null?new Texture[DirectionalDefense.Facing.values().length]:null;
+        try {
+            // One downsample of the *original* silhouette is reused for all four
+            // quadrants, rather than sampling a Pixmap 4x for every neighbor.
+            int[] alpha=new int[MASK_W*MASK_H];
+            for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
+                alpha[y*MASK_W+x]=source.getPixel(x*source.getWidth()/MASK_W,
+                        y*source.getHeight()/MASK_H)&255;
+            }
+            for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
+                Pixmap pix=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
+                pix.setBlending(Pixmap.Blending.None);
+                try {
+                    for(int y=0;y<MASK_H;y++)for(int x=0;x<MASK_W;x++){
+                        double towardBow=1-(y+0.5)*2.0/MASK_H;
+                        double towardPort=1-(x+0.5)*2.0/MASK_W;
+                        if(DirectionalDefense.facingFor(towardBow,towardPort)!=face)
+                            continue;
+                        int offset=y*MASK_W+x;
+                        int sourceAlpha=alpha[offset];
+                        if(sourceAlpha==0)continue;
+                        int left=alpha[y*MASK_W+Math.max(0,x-1)];
+                        int right=alpha[y*MASK_W+Math.min(MASK_W-1,x+1)];
+                        int up=alpha[Math.max(0,y-1)*MASK_W+x];
+                        int down=alpha[Math.min(MASK_H-1,y+1)*MASK_W+x];
+                        int left2=alpha[y*MASK_W+Math.max(0,x-2)];
+                        int right2=alpha[y*MASK_W+Math.min(MASK_W-1,x+2)];
+                        int up2=alpha[Math.max(0,y-2)*MASK_W+x];
+                        int down2=alpha[Math.min(MASK_H-1,y+2)*MASK_W+x];
+                        int edge=ShieldSurfaceModel.edge(sourceAlpha,left,right,up,down,
+                                left2,right2,up2,down2);
+                        int material=shieldMaterial.getPixel(
+                                x*shieldMaterial.getWidth()/MASK_W,
+                                y*shieldMaterial.getHeight()/MASK_H);
+                        pix.drawPixel(x,y,ShieldSurfaceModel.material(material,sourceAlpha,edge));
+                    }
+                    if(sheet!=null)packShieldFace(sheet,pix,face,SHIELD_SHELL_ROWS);
+                    else layers[face.ordinal()]=linearTexture(pix);
+                } finally {pix.dispose();}
+            }
+            shieldSections.put(original,new ShieldArt(sheet==null?null:linearTexture(sheet),layers));
+        }catch(RuntimeException error){
+            if(layers!=null)for(Texture part:layers)if(part!=null)part.dispose();
+            throw error;
+        }finally{if(sheet!=null)sheet.dispose();}
     }
+
+    private static Texture linearTexture(Pixmap pixels){
+        Texture texture=new Texture(pixels);
+        texture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+        return texture;
+    }
+
+    /** Each full-resolution half includes the first completely transparent
+     * row/column across the center. Clamping there exactly reproduces the
+     * removed empty half; hardware linear filtering cannot bleed between faces. */
+    private static void packShieldFace(Pixmap sheet,Pixmap face,DirectionalDefense.Facing side,int row){
+        int w=face.getWidth(),h=face.getHeight();
+        int halfW=w/2+1,halfH=h/2+1;
+        switch(side){
+            case FORWARD -> sheet.drawPixmap(face,0,0,w,halfH,0,row,w,halfH);
+            case PORT -> sheet.drawPixmap(face,0,0,halfW,h,w,row,halfW,h);
+            case AFT -> sheet.drawPixmap(face,0,h-halfH,w,halfH,0,row+halfH,w,halfH);
+            case STARBOARD -> sheet.drawPixmap(face,w-halfW,0,halfW,h,w+halfW,row,halfW,h);
+        }
+    }
+
+    private boolean hasShieldShell(){return shieldShell!=null||packedShieldShell!=null;}
 
     /**
      * Cache the actual authored energy-field sprite on an elliptical shell.
@@ -286,9 +329,12 @@ public final class TerranPlaceholderSprites implements Disposable {
      * Each transparent quarter corresponds to an independently powered facing.
      */
     private void prepareShieldShell(){
-        if(shieldShell!=null)return;
+        if(hasShieldShell())return;
         final int size=192;
-        Texture[] built=new Texture[DirectionalDefense.Facing.values().length];
+        Pixmap shellSheet=shieldInk!=null&&shieldInk.usesAtlas()?
+                new Pixmap(SHIELD_SHEET_WIDTH,SHIELD_SHELL_ROWS,Pixmap.Format.RGBA8888):null;
+        Texture[] built=shellSheet==null?new Texture[DirectionalDefense.Facing.values().length]:null;
+        if(shellSheet!=null)shellSheet.setBlending(Pixmap.Blending.None);
         try {
             for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
                 Pixmap pixels=new Pixmap(size,size,Pixmap.Format.RGBA8888);
@@ -306,14 +352,15 @@ public final class TerranPlaceholderSprites implements Disposable {
                         int rgba=ShieldSurfaceModel.shellMaterial(material,distance);
                         if((rgba&255)!=0)pixels.drawPixel(x,y,rgba);
                     }
-                    Texture sector=new Texture(pixels);
-                    sector.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
-                    built[face.ordinal()]=sector;
+                    if(shellSheet!=null)packShieldFace(shellSheet,pixels,face,0);
+                    else built[face.ordinal()]=linearTexture(pixels);
                 }finally{pixels.dispose();}
             }
             shieldShell=built;
+            packedShieldShell=shellSheet;
         }catch(RuntimeException error){
-            for(Texture part:built)if(part!=null)part.dispose();
+            if(built!=null)for(Texture part:built)if(part!=null)part.dispose();
+            if(shellSheet!=null)shellSheet.dispose();
             throw error;
         }
     }
@@ -654,8 +701,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         if(damaged!=null)damaged.dispose();
         Texture severe=severeLayers.remove(image);
         if(severe!=null)severe.dispose();
-        Texture[] shield=shieldSections.remove(image);
-        if(shield!=null)for(Texture sector:shield)if(sector!=null)sector.dispose();
+        ShieldArt shield=shieldSections.remove(image);
+        if(shield!=null)shield.dispose();
         Pixmap source=sourcePixels.remove(image);
         if(source!=null)source.dispose();
         alphaClouds.remove(image);
@@ -928,9 +975,15 @@ public final class TerranPlaceholderSprites implements Disposable {
             Texture tex=texture(ship);
             if(!ShipSurfaceLighting.flatAt(view))
                 surfaces.prepare(tex,originals.get(tex));
-            if(ship.shields>0){
-                prepareShields(tex);
-                prepareShieldShell();
+            if(ship.shields>0)prepareShields(tex);
+            else if(ship.maxShields>0&&shieldFx!=null&&!shieldSections.containsKey(tex)){
+                // A newly visible hull can already have lost its last shield.
+                // Prepare its collapse art before the batch starts.
+                for(ShieldFxTimeline.Effect fx:shieldFx.events())
+                    if(fx.ship==ship&&fx.kind==ShieldFxTimeline.Kind.COLLAPSE){
+                        prepareShields(tex);
+                        break;
+                    }
             }
             if(damaged){
                 exposedInterior(tex,ship.hull<ship.maxHull*0.30);
@@ -1018,7 +1071,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         }
         // A collapsed mechanical sector dissipates a last, red, ALPHA-MASKED
         // copy of the original art rather than a fabricated solid ring.
-        if(shieldFx!=null && shieldShell!=null)
+        if(shieldFx!=null && hasShieldShell())
             for(ShieldFxTimeline.Effect fx:shieldFx.events()){
                 if(fx.kind!=ShieldFxTimeline.Kind.COLLAPSE||fx.ship==null
                         ||!fx.ship.alive()||!hullVisible.test(fx.ship)
@@ -1036,7 +1089,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 float width=height*tex.getWidth()/(float)tex.getHeight();
                 float fade=1f-fx.progress();
                 batch.setColor(1f,.065f,.04f,.55f*fade*fade);
-                drawWhole(batch,shieldShell[fx.facing.ordinal()],pose,
+                drawShieldLayer(batch,shieldSections.get(tex),fx.facing,true,pose,
                         width*1.31f,height*1.27f,
                         (float)(StrictMath.toDegrees(pose.angle())-90));
             }
@@ -1044,7 +1097,7 @@ public final class TerranPlaceholderSprites implements Disposable {
         batch.end();
         // Recharge/restart scan over exactly the same source-art sector textures
         // in a separate, additive, grouped pass. No per-ship textures or uniforms.
-        if(shieldFx!=null && shieldShell!=null){
+        if(shieldFx!=null && hasShieldShell()){
             batch.setBlendFunction(com.badlogic.gdx.graphics.GL20.GL_SRC_ALPHA,
                     com.badlogic.gdx.graphics.GL20.GL_ONE);
             batch.begin();
@@ -1062,7 +1115,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                 Texture tex=texture(ship);
                 if(tex==null)continue;
                 float width=height*tex.getWidth()/(float)tex.getHeight();
-                Texture[] sectors=shieldSections.get(tex);
+                ShieldArt sectors=shieldSections.get(tex);
                 if(sectors==null)continue;
                 float rotation=(float)(StrictMath.toDegrees(pose.angle())-90);
                 for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
@@ -1076,9 +1129,9 @@ public final class TerranPlaceholderSprites implements Disposable {
                             ShieldSurfaceModel.channel(type,fraction,1),
                             ShieldSurfaceModel.channel(type,fraction,2),
                             Math.min(.48f,.34f*recharge));
-                    drawWhole(batch,shieldShell[face.ordinal()],pose,
+                    drawShieldLayer(batch,sectors,face,true,pose,
                             width*1.31f,height*1.27f,rotation);
-                    drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
+                    drawShieldLayer(batch,sectors,face,false,pose,width,height,rotation);
                 }
             }
             batch.setColor(1,1,1,1);
@@ -1172,7 +1225,7 @@ public final class TerranPlaceholderSprites implements Disposable {
                             BattleRenderPoses.Pose pose,float width,float height,
                             float rotation,long tick,ShieldFxTimeline shieldFx) {
         if(ship.maxShields<=0||ship.shields<=0)return;
-        Texture[] sectors=shieldSections.get(original);
+        ShieldArt sectors=shieldSections.get(original);
         if(sectors==null)throw new IllegalStateException("Missing actual shield texture overlay");
         for(DirectionalDefense.Facing face:DirectionalDefense.Facing.values()){
             double maximum=ship.defense.maxShields(face);
@@ -1188,16 +1241,34 @@ public final class TerranPlaceholderSprites implements Disposable {
             // The outer field is the actual blue hex-energy sprite, NOT a
             // procedural ellipse. Geometry only masks its outside pixels and
             // chooses the live powered face; the original texture is preserved.
-            if(shieldShell!=null){
+            if(hasShieldShell()){
                 batch.setColor(red,green,blue,Math.min(.85f,opacity*1.35f));
-                drawWhole(batch,shieldShell[face.ordinal()],pose,
+                drawShieldLayer(batch,sectors,face,true,pose,
                         width*1.31f,height*1.27f,rotation);
             }
             // Keep the existing on-hull material for shield contact feedback.
             batch.setColor(red,green,blue,opacity);
-            drawWhole(batch,sectors[face.ordinal()],pose,width,height,rotation);
+            drawShieldLayer(batch,sectors,face,false,pose,width,height,rotation);
         }
         batch.setColor(1,1,1,1);
+    }
+    private void drawShieldLayer(SpriteBatch batch,ShieldArt sectors,DirectionalDefense.Facing face,
+                                 boolean shell,BattleRenderPoses.Pose pose,float width,
+                                 float height,float rotation){
+        if(sectors==null)return;
+        if(sectors.atlas==null){
+            drawWhole(batch,shell?shieldShell[face.ordinal()]:sectors.sectors[face.ordinal()],
+                    pose,width,height,rotation);
+            return;
+        }
+        // Encode the atlas region on vertices, then recover the original 0..1 UV
+        // before interpolation. The recharge scan and linear filtering use
+        // exactly the same local UV as an individual unbatched shield quad.
+        Texture sheet=sectors.atlas;
+        int layer=face.ordinal()+(shell?0:4);
+        batch.draw(sheet,pose.x()-width/2,pose.y()-height/2,
+                width/2,height/2,width,height,1,1,rotation,
+                2*layer*sheet.getWidth(),0,sheet.getWidth(),sheet.getHeight(),false,false);
     }
     private static void drawWhole(SpriteBatch batch,Texture tex,BattleRenderPoses.Pose pose,
                                   float width,float height,float rotation) {
@@ -1218,8 +1289,8 @@ public final class TerranPlaceholderSprites implements Disposable {
         for(Texture image:resident.values())if(disposed.add(image))image.dispose();
         resident.clear();lastUsedFrame.clear();assetPaths.clear();unavailable.clear();
         resetPeelCache();activeBattle=null;
-        for(Texture[] sections:shieldSections.values())
-            for(Texture sector:sections)if(sector!=null)sector.dispose();
+        for(ShieldArt sections:shieldSections.values())sections.dispose();
+        if(packedShieldShell!=null){packedShieldShell.dispose();packedShieldShell=null;}
         shieldSections.clear();
         if(shieldShell!=null){
             for(Texture sector:shieldShell)if(sector!=null)sector.dispose();

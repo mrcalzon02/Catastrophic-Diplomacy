@@ -162,3 +162,23 @@ jobs:
           path: test-output/projectile-real/
           retention-days: 14
           if-no-files-found: warn
+      - name: Paired fleet CPU and two-client LAN benchmarks
+        if: success() && github.event_name == 'push' && contains(github.event.head_commit.message, '[fleet-profile]')
+        continue-on-error: true
+        timeout-minutes: 7
+        shell: bash
+        env:
+          BASE_REVISION: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_REVISION"
+          git worktree add --detach "$RUNNER_TEMP/fleet-baseline" "$BASE_REVISION"
+          bash tools/performance/compare-fleets.sh "$RUNNER_TEMP/fleet-baseline" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/test-output/paired-fleets"
+      - name: Archive paired fleet measurements
+        if: always() && github.event_name == 'push' && contains(github.event.head_commit.message, '[fleet-profile]')
+        uses: actions/upload-artifact@v4
+        with:
+          name: cd-paired-fleet-benchmarks
+          path: test-output/paired-fleets/
+          retention-days: 14
+          if-no-files-found: warn

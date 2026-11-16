@@ -22,35 +22,36 @@ public final class RemoteSessionStateTest {
         return new BattleConnection.Snapshot(session,tick,0,
                 List.of(raw),List.of(typed));
     }
-    private static void observe(RemoteSessionState state,
+    private static void observe(RemoteEntityPresentation entities, RemoteSessionState state,
             RemoteShipInterpolation interpolation,RemoteFleetMirrors mirrors,
             BattleConnection.Snapshot snapshot){
         boolean changed=state.apply(snapshot,interpolation,mirrors);
         interpolation.observe(snapshot.tick(),
-                RemoteEntityPresentation.from(snapshot).ships());
+                entities.observe(snapshot,1f).ships());
         mirrors.present(interpolation,changed);
     }
     public static void main(String[] args){
+        var entities=new RemoteEntityPresentation();
         RemoteSessionState state=new RemoteSessionState();
         RemoteShipInterpolation interpolation=new RemoteShipInterpolation();
         RemoteFleetMirrors mirrors=new RemoteFleetMirrors();
 
         var first=snapshot("session-A",300,11,0,Battle.Faction.TERRAN,5);
-        observe(state,interpolation,mirrors,first);
+        observe(entities,state,interpolation,mirrors,first);
         check(interpolation.pose(11).x()==5&&mirrors.byHostId(11).team==0,
                 "Initial session mirror incorrect");
 
         var same=snapshot("session-A",303,11,0,Battle.Faction.TERRAN,100);
         check(!state.apply(same,interpolation,mirrors),
                 "Same authoritative session was unnecessarily reset");
-        interpolation.observe(same.tick(),RemoteEntityPresentation.from(same).ships());
+        interpolation.observe(same.tick(),entities.observe(same,1f).ships());
         check(interpolation.pose(11).x()<100,
                 "Same-session update failed to interpolate from prior pose");
 
         var equalTickNew=snapshot("session-B",303,11,1,Battle.Faction.DRAXIAN,999);
         check(state.apply(equalTickNew,interpolation,mirrors),
                 "Equal-tick new server session was not recognized");
-        interpolation.observe(equalTickNew.tick(),RemoteEntityPresentation.from(equalTickNew).ships());
+        interpolation.observe(equalTickNew.tick(),entities.observe(equalTickNew,1f).ships());
         mirrors.present(interpolation,true);
         check(interpolation.pose(11).x()==999&&mirrors.byHostId(11).team==1,
                 "Equal-tick new session inherited old position/team");
@@ -58,7 +59,7 @@ public final class RemoteSessionStateTest {
         var higherTickNew=snapshot("session-C",900,11,0,Battle.Faction.TERRAN,700);
         check(state.apply(higherTickNew,interpolation,mirrors),
                 "Higher-tick new server session was not recognized");
-        interpolation.observe(higherTickNew.tick(),RemoteEntityPresentation.from(higherTickNew).ships());
+        interpolation.observe(higherTickNew.tick(),entities.observe(higherTickNew,1f).ships());
         mirrors.present(interpolation,true);
         check(interpolation.pose(11).x()==700&&mirrors.byHostId(11).team==0,
                 "Higher-tick new session blended from previous server");

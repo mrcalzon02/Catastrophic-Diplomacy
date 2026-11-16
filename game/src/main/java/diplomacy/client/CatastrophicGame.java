@@ -126,6 +126,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private MultiplayerPanel multiplayer;
     private Battle remotePresentation;
     private final RemoteShipInterpolation remoteShipInterpolation=new RemoteShipInterpolation();
+    private final RemoteEntityPresentation remoteEntities=new RemoteEntityPresentation();
     private final RemoteFleetMirrors remoteFleetMirrors=new RemoteFleetMirrors();
     private final RemoteSessionState remoteSessionState=new RemoteSessionState();
     private GameMenuPanel menuPanel;
@@ -4045,7 +4046,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
      * Parse a snapshot only once; reuse its stable ship identities across
      * every interpolated graphics frame. */
     private void drawRemoteBattle(diplomacy.net.BattleConnection.Snapshot snapshot){
-        RemoteEntityPresentation.Frame frame=RemoteEntityPresentation.from(snapshot);
+        RemoteEntityPresentation.Frame frame=remoteEntities.observe(snapshot,remoteShipInterpolation.fraction());
         boolean newSession=remoteSessionState.apply(
                 snapshot,remoteShipInterpolation,remoteFleetMirrors);
         if(snapshot.tick()!=remoteShipInterpolation.tick())
@@ -4069,8 +4070,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         batch.setProjectionMatrix(battleCamera.combined);
         if(craftSprites!=null)
             craftSprites.renderRemote(remotePresentation,frame.crafts(),
-                    remoteFleetMirrors,batch,view);
-        drawRemoteBodies(frame,view,craftSprites==null);
+                    remoteFleetMirrors,batch,view,remoteShipInterpolation.fraction());
+        drawRemoteBodies(frame,view,craftSprites==null,remoteShipInterpolation.fraction());
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         font.draw(batch,"NETWORK AUTHORITY / TICK "+snapshot.tick()+
@@ -4080,32 +4081,38 @@ public final class CatastrophicGame extends ApplicationAdapter {
 
     /** Host-owned moving bodies only. No local step(), hits, guidance or damage. */
     private void drawRemoteBodies(RemoteEntityPresentation.Frame frame,
-                                  CombatViewBounds view,boolean craftFallback){
+                                  CombatViewBounds view,boolean craftFallback,float fraction){
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for(var missile:frame.missiles()){
+        for(var motion:frame.missiles()){
+            var missile=motion.entity();
+            float x=motion.x(fraction),y=motion.y(fraction);
             float radius=CombatEffectScale.guidedFallbackRadius(
                     missile.torpedo(),missile.fighterLaunched());
-            if(view!=null&&!view.circle((float)missile.x(),(float)missile.y(),radius))continue;
+            if(view!=null&&!view.circle(x,y,radius))continue;
             shapes.setColor(missile.decoy()?Color.LIGHT_GRAY:
                     missile.torpedo()?Color.ORANGE:
                     missile.team()==0?Color.CYAN:Color.SCARLET);
-            shapes.circle((float)missile.x(),(float)missile.y(),radius,7);
+            shapes.circle(x,y,radius,7);
         }
-        for(var shell:frame.ballistics()){
+        for(var motion:frame.ballistics()){
+            var shell=motion.entity();
+            float x=motion.x(fraction),y=motion.y(fraction);
             float radius=CombatEffectScale.kineticFallbackRadius(
                     shell.fighterLaunched());
-            if(view!=null&&!view.circle((float)shell.x(),(float)shell.y(),radius))continue;
+            if(view!=null&&!view.circle(x,y,radius))continue;
             shapes.setColor(Color.GOLD);
-            shapes.circle((float)shell.x(),(float)shell.y(),radius,6);
+            shapes.circle(x,y,radius,6);
         }
-        if(craftFallback)for(var craft:frame.crafts()){
-            if(view!=null&&!view.circle((float)craft.x(),(float)craft.y(),8))continue;
+        if(craftFallback)for(var motion:frame.crafts()){
+            var craft=motion.entity();
+            float x=motion.x(fraction),y=motion.y(fraction);
+            if(view!=null&&!view.circle(x,y,8))continue;
             shapes.setColor(craft.team()==0?Color.CYAN:Color.SCARLET);
             float radius=craft.fighter()?
                     FighterCraftSprites.fighterHeight(craft.fighterHull())*.26f:
                     FighterCraftSprites.droneHeight()*.28f;
-            shapes.circle((float)craft.x(),(float)craft.y(),
+            shapes.circle(x,y,
                     Math.max(1.2f,radius),7);
         }
         shapes.end();

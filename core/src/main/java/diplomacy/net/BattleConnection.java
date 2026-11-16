@@ -19,6 +19,7 @@ import java.util.*;
  */
 public final class BattleConnection implements AutoCloseable {
     private final Socket socket;
+    private final BufferedInputStream input;
     public final int team;
     public final long seed;
     /** Server-instance match identity. Equal/higher ticks from another session
@@ -119,7 +120,11 @@ public final class BattleConnection implements AutoCloseable {
     private BattleConnection(Socket socket,boolean spectate)throws IOException{
         this.socket=socket;
         try{
-            socket.setSoTimeout(5000);Hbnet.write(socket.getOutputStream(),spectate?"SPECTATE|1":"PLAYER|1");String[] hello=Hbnet.read(socket.getInputStream()).split("\\|");
+            // The handshake and reader share one buffer so read-ahead preserves the first snapshot.
+            input = new BufferedInputStream(socket.getInputStream());
+            socket.setSoTimeout(5000);
+            Hbnet.write(socket.getOutputStream(),spectate?"SPECTATE|1":"PLAYER|1");
+            String[] hello=Hbnet.read(input).split("\\|");
             if((hello.length!=6&&hello.length!=7)||!hello[0].equals("WELCOME"))
                 throw Hbnet.failure();
             protocolVersion=Integer.parseInt(hello[1]);
@@ -245,6 +250,10 @@ public final class BattleConnection implements AutoCloseable {
     }
     static Entity decodeEntity(String line){return decodeEntity(line,1);}
     static Entity decodeEntity(String line,int version){
+        return decodeEntity(line,version,new HashMap<>());
+    }
+    private static Entity decodeEntity(String line,int version,
+                                       Map<String,Map<Integer,String>> fittingsByEncoding){
         if(line==null||(version!=1&&version!=2))throw malformed("VERSION");
         String[] p=line.split("\\|",-1);
         try{
@@ -302,7 +311,8 @@ public final class BattleConnection implements AutoCloseable {
                     double power=finite(p[14],0,1_000_000_000,"POWER");
                     double fuel=finite(p[15],0,1_000_000_000,"FUEL");
                     int lastTarget=nonNegativeId(p[16]);
-                    Map<Integer,String> fittings=weaponFittings(p[17]);
+                    Map<Integer,String> fittings=fittingsByEncoding.computeIfAbsent(
+                            p[17],BattleConnection::weaponFittings);
                     if(hull>maxHull+1e-7)throw malformed("HULL_LIMIT");
                     if(shields>maxShields+1e-7)throw malformed("SHIELD_LIMIT");
                     if(armor>maxArmor+1e-7)throw malformed("ARMOR_LIMIT");
@@ -349,8 +359,10 @@ public final class BattleConnection implements AutoCloseable {
         if(rows==null||rows.size()>8192||(version!=1&&version!=2))throw malformed("FRAME");
         ArrayList<Entity> decoded=new ArrayList<>(rows.size());
         HashSet<String> identities=new HashSet<>();
+        // Ships with the same loadout share the validated immutable map for this snapshot.
+        Map<String,Map<Integer,String>> fittingsByEncoding=new HashMap<>();
         for(String row:rows){
-            Entity entity=decodeEntity(row,version);
+            Entity entity=decodeEntity(row,version,fittingsByEncoding);
             String key=entity.kind().name()+":"+entity.id();
             if(!identities.add(key))throw malformed("DUPLICATE");
             decoded.add(entity);
@@ -369,7 +381,7 @@ public final class BattleConnection implements AutoCloseable {
     }
 
     private void read(){try{
-        while(connected){String[] p=Hbnet.read(socket.getInputStream()).split("\\|",-1);
+        while(connected){String[] p=Hbnet.read(input).split("\\|",-1);
             if(p[0].equals("ACK")&&p.length==3){acknowledged=Long.parseLong(p[1]);continue;}
             if(p[0].equals("FLEET_ACCEPT")&&p.length==3){fleetStatus="Accepted by host: "+p[2]+" ships for seat "+p[1];continue;}
             if(p[0].equals("FLEET_REJECT")&&p.length==2){fleetStatus="Rejected by host: "+p[1];continue;}
@@ -411,12 +423,12 @@ public final class BattleConnection implements AutoCloseable {
             if(tick<0||count<0||count>8192||
                     (snapshot!=null&&tick<snapshot.tick()))throw Hbnet.failure();
             List<String> body=new ArrayList<>(count);
-            for(int i=0;i<count;i++)body.add(Hbnet.read(socket.getInputStream()));
+            for(int i=0;i<count;i++)body.add(Hbnet.read(input));
             // Semantic decode happens before publication. A checksummed frame
             // with invalid enums, nonfinite values or duplicate identities
             // never becomes the current authoritative view.
             List<Entity> decoded=decodeEntities(body,protocolVersion);
-            String end=Hbnet.read(socket.getInputStream());
+            String end=Hbnet.read(input);
             if(!end.equals("END|"+tick+"|"+Hbnet.hash(
                     String.join("\n",body).getBytes(StandardCharsets.US_ASCII))))
                 throw Hbnet.failure();

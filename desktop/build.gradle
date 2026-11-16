@@ -106,3 +106,17 @@ tasks.register('generateDesktopReleaseTag') {
 }
 sourceSets.main.resources.srcDir(layout.buildDirectory.dir('generated/update-tag'))
 tasks.named('processResources') { dependsOn tasks.named('generateDesktopReleaseTag') }
+
+// Manual diagnostic. Reuse the packaged desktop resources and isolate play data.
+tasks.register('combatFrameBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Profile a deterministic 400-ship frame sequence or a live 16v16 skirmish'
+    dependsOn tasks.named('testClasses'), tasks.named('stageDesktopAssets')
+    classpath = sourceSets.test.runtimeClasspath + files(layout.buildDirectory.dir('runtime-assets'))
+    mainClass = 'diplomacy.desktop.DesktopFrameBenchmark'
+    workingDir layout.buildDirectory.dir('frame-benchmark/work').get().asFile
+    doFirst { workingDir.mkdirs() }
+    ['bench.live','bench.engaged','bench.warm','bench.frames','bench.counters','bench.output'].each { key ->
+        if (System.getProperty(key) != null) systemProperty key, System.getProperty(key)
+    }
+}

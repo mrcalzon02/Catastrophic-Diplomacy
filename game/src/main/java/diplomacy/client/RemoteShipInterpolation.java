@@ -39,7 +39,7 @@ final class RemoteShipInterpolation {
         if(nextTick==tick)return;
         boolean reset=tick==Long.MIN_VALUE||nextTick<tick;
         if(reset)tracks.clear();
-        float oldFraction=duration>0?Math.min(1f,elapsed/duration):1f;
+        float oldFraction=fraction();
         Map<Integer,Track> next=new HashMap<>(Math.max(16,shipRows.size()*2));
         java.util.ArrayList<HostShip> parsed=new java.util.ArrayList<>(shipRows.size());
         for(BattleConnection.ShipEntity row:shipRows){
@@ -69,11 +69,12 @@ final class RemoteShipInterpolation {
             elapsed=Math.min(duration,elapsed+Math.min(.08f,wallSeconds));
     }
 
+    float fraction(){return duration<=0?1f:Math.min(1f,elapsed/duration);}
+
     Pose pose(int hostShipId){
         Track track=tracks.get(hostShipId);
         if(track==null)return null;
-        return blend(track.from,track.to,
-                duration<=0?1f:Math.min(1f,elapsed/duration));
+        return blend(track.from,track.to,fraction());
     }
 
     private static Pose blend(Pose a,Pose b,float t){

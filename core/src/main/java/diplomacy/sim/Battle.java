@@ -2,6 +2,7 @@ package diplomacy.sim;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -3166,9 +3167,17 @@ public final class Battle {
             // Both ordered enemy indexes contain precisely the same hostile
             // insertion order as filtering the global physical fleet. Reuse
             // the existing tick-zero full-scan A/B switch for parity proof.
+            boolean rankOnly = indexedOpponents && legacyRelay && scout.network.trackMemoryCapacity() == 0;
             for(Ship hostile:opponentCandidates(scout.team)){
                 if(relayScanDiagnostic!=null)relayScanDiagnostic[1]++;
                 if(!hostile.alive()||hostile.team==scout.team)continue;
+                // A scout without track memory can only improve the closest spotter
+                // or its bounded broadcast list. Every received fix is a captured
+                // position. If even their enclosing box cannot improve either
+                // strict ranking, there is no other use for this observation.
+                if (rankOnly && hostile.sensorHistory.allPositionsBeyond(scout.x, scout.y,
+                        Math.max(closest[hostile.id], distances[broadcastCapacity - 1])))
+                    continue;
                 // Only a measured observation can justify selection for
                 // broadcast, even if the enemy has since moved or cloaked.
                 if(relayScanDiagnostic!=null)relayScanDiagnostic[2]++;
@@ -6229,7 +6238,63 @@ public final class Battle {
             }
         }
     }
+    // Within the ballistic phase, damage may kill a target, but no target
+    // moves or leaves either list. Index its entire collision diameter so a
+    // shot crossing a cell boundary cannot miss a tangent. Set bits preserve
+    // roster order, including the existing hull-before-craft tie break.
+    private static final class BallisticTargetColumns {
+        private static final int WIDTH = 64;
+        private final BitSet[] columns = new BitSet[
+                1 + (int)((BattleArena.MAX_X - BattleArena.MIN_X) / WIDTH)];
+        private final BitSet crossed = new BitSet();
+
+        BallisticTargetColumns() {
+            Arrays.setAll(columns, i -> new BitSet());
+        }
+
+        private int column(double x) {
+            return Math.max(0, Math.min(columns.length - 1,
+                    (int)((x - BattleArena.MIN_X) / WIDTH)));
+        }
+
+        private void insert(int index, double x, double radius) {
+            int last = column(x + radius + 1e-6);
+            for (int i = column(x - radius - 1e-6); i <= last; i++)
+                columns[i].set(index);
+        }
+
+        void rebuild(List<Ship> ships, List<Craft> crafts) {
+            for (BitSet column : columns) column.clear();
+            for (int i = 0; i < ships.size(); i++) {
+                Ship ship = ships.get(i);
+                if (ship.alive()) insert(i, ship.x, 12 * ship.visualScale());
+            }
+            for (int i = 0; i < crafts.size(); i++) {
+                Craft craft = crafts.get(i);
+                if (craft.integrity > 0)
+                    insert(ships.size() + i, craft.x, craft.fighter ? 5.5 : 4.2);
+            }
+        }
+
+        BitSet candidates(double minX, double maxX) {
+            int first = column(minX), last = column(maxX);
+            if (first == last) return columns[first];
+            crossed.clear();
+            for (int i = first; i <= last; i++) crossed.or(columns[i]);
+            return crossed;
+        }
+    }
+
+    private BallisticTargetColumns ballisticTargetColumns;
+
     private void updateBallistics() {
+        boolean useColumns = indexedOpponents && ballistics.size() >= 8 &&
+                ships.size() + crafts.size() >= 32;
+        if (useColumns) {
+            if (ballisticTargetColumns == null)
+                ballisticTargetColumns = new BallisticTargetColumns();
+            ballisticTargetColumns.rebuild(ships, crafts);
+        }
         for(int i=ballistics.size()-1;i>=0;i--){
             Ballistic p=ballistics.get(i);
             if((p.life-=DT)<=0 ||
@@ -6245,26 +6310,41 @@ public final class Battle {
             double maxX=StrictMath.max(p.x,nextX);
             double minY=StrictMath.min(p.y,nextY);
             double maxY=StrictMath.max(p.y,nextY);
-            Ship closest=null;double earliest=Double.POSITIVE_INFINITY;
-            for(Ship candidate:opponentCandidates(p.team)){
-                if(candidate.team==p.team||!candidate.alive())continue;
-                double radius=12*candidate.visualScale();
-                if(!sweptAabbMayHit(minX,maxX,minY,maxY,
-                        candidate.x,candidate.y,radius))continue;
-                double contact=segmentHit(p.x,p.y,nextX,nextY,candidate.x,candidate.y,
-                        radius);
-                if(contact<earliest){earliest=contact;closest=candidate;}
-            }
-            Craft closestCraft=null;
-            if(p.team==0||p.team==1)for(Craft craft:crafts)
-                if(craft.team!=p.team&&craft.integrity>0){
-                    double radius=craft.fighter?5.5:4.2;
-                    if(!sweptAabbMayHit(minX,maxX,minY,maxY,
-                            craft.x,craft.y,radius))continue;
-                    double contact=segmentHit(p.x,p.y,nextX,nextY,craft.x,craft.y,
-                            radius);
-                    if(contact<earliest){earliest=contact;closest=null;closestCraft=craft;}
+            Ship closest = null;
+            Craft closestCraft = null;
+            double earliest = Double.POSITIVE_INFINITY;
+            boolean targetsCraft = p.team == 0 || p.team == 1;
+            BitSet nearby = useColumns && targetsCraft
+                    ? ballisticTargetColumns.candidates(minX, maxX) : null;
+            List<Ship> hulls = nearby == null ? opponentCandidates(p.team) : ships;
+            int targetCount = hulls.size() + (targetsCraft ? crafts.size() : 0);
+            for (int slot = nearby == null ? 0 : nearby.nextSetBit(0);
+                 slot >= 0 && slot < targetCount;
+                 slot = nearby == null ? slot + 1 : nearby.nextSetBit(slot + 1)) {
+                Ship ship = null;
+                Craft craft = null;
+                double x, y, radius;
+                if (slot < hulls.size()) {
+                    ship = hulls.get(slot);
+                    if (ship.team == p.team || !ship.alive()) continue;
+                    x = ship.x;
+                    y = ship.y;
+                    radius = 12 * ship.visualScale();
+                } else {
+                    craft = crafts.get(slot - hulls.size());
+                    if (craft.team == p.team || craft.integrity <= 0) continue;
+                    x = craft.x;
+                    y = craft.y;
+                    radius = craft.fighter ? 5.5 : 4.2;
                 }
+                if (!sweptAabbMayHit(minX, maxX, minY, maxY, x, y, radius)) continue;
+                double contact = segmentHit(p.x, p.y, nextX, nextY, x, y, radius);
+                if (contact < earliest) {
+                    earliest = contact;
+                    closest = ship;
+                    closestCraft = craft;
+                }
+            }
             if(closestCraft!=null) {
                 p.x+=(nextX-p.x)*earliest;p.y+=(nextY-p.y)*earliest;
                 hitCraft(closestCraft,p.damage,findShip(p.sourceId),p.visualId,"KINETIC");
