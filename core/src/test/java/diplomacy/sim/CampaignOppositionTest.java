@@ -130,6 +130,66 @@ public final class CampaignOppositionTest {
                 "Enemy loadout generation replaced the player's vessel");
         check(battle.alive(1)==CampaignEncounter.enemyCount(LevelEconomy.level(151),6,2),
                 "Wrong second-wave fleet size");
+        // Enemy funding and research status survive their existing checksummed
+        // codecs before influencing the real live encounter generator.
+        var npcWallet=new CampaignProgress.State(Battle.Faction.DRAXIAN,2,
+                100_000,1,1,1,0,CampaignProgress.Project.NONE,0);
+        var npcEmpty=new CampaignTechnology.State(Battle.Faction.DRAXIAN);
+        String npcId="TECH-DRA-LAS-OUTPUT-01";
+        var npcQuote=npcEmpty.quote(npcId,npcWallet,catalog);
+        check(npcQuote.allowed()&&npcQuote.cost()>0,"NPC quote unavailable");
+        var spending=npcWallet.spend(npcQuote.cost());
+        var pending=npcEmpty.begin(npcId,npcWallet,catalog);
+        check(pending.remaining()==1&&!pending.has(npcId),"Pending NPC project unlocked early");
+        var restoredWallet=CampaignProgress.decode(CampaignProgress.encode(spending));
+        var restoredTech=CampaignTechnology.decode(
+                CampaignTechnology.encode(pending.victory()),catalog);
+        check(restoredWallet.credits()==npcWallet.credits()-npcQuote.cost() &&
+                restoredTech.has(npcId),"NPC funded project did not persist");
+        int earnedFittings=0;
+        for(int stagedMission:new int[]{51,62,75,100}){
+            int count=Math.min(32,LevelEconomy.level(stagedMission).maximumFleet());
+            var locked=CampaignOpposition.fleet(stagedMission,1,count,
+                    Battle.Faction.DRAXIAN,catalog,npcWallet,npcEmpty);
+            var earned=CampaignOpposition.fleet(stagedMission,1,count,
+                    Battle.Faction.DRAXIAN,catalog,restoredWallet,restoredTech);
+            for(Shipyard.Design design:locked){
+                diplomacy.shipyard.CampaignShipyardRules.requireAllowed(
+                        design,npcWallet,npcEmpty,catalog);
+                for(int slot=0;slot<design.slots();slot++)if(design.at(slot)!=null)
+                    for(Shipyard.Track track:Shipyard.Track.values())
+                        check(design.at(slot).stage(track)==0,
+                                "Unresearched NPC received stage equipment");
+            }
+            for(Shipyard.Design design:earned){
+                diplomacy.shipyard.CampaignShipyardRules.requireAllowed(
+                        design,restoredWallet,restoredTech,catalog);
+                for(int slot=0;slot<design.slots();slot++)if(design.at(slot)!=null)
+                    for(Shipyard.Track track:Shipyard.Track.values()){
+                        int rank=design.at(slot).stage(track);
+                        if(rank>0){
+                            String tech=design.at(slot).component.replaceFirst("^BASE-","TECH-")+
+                                    "-"+track.name()+"-"+
+                                    String.format(java.util.Locale.ROOT,"%02d",rank);
+                            check(restoredTech.has(tech),"NPC fitted unearned tech "+tech);
+                            earnedFittings++;
+                        }
+                    }
+            }
+        }
+        check(earnedFittings>0,"NPC purchased research never affected physical fittings");
+        var earnedEncounter=CampaignEncounter.start(51,
+                new CampaignDeployment.Loadout(1,CampaignDeployment.Formation.LINE),
+                List.of(friendly),hostile,catalog,restoredWallet,restoredTech);
+        check(earnedEncounter.battle().alive(1)==CampaignEncounter.enemyCount(
+                        LevelEconomy.level(51),1,1),
+                "Saved NPC research was not applied to actual campaign battle");
+        boolean foreignRejected=false;
+        try{
+            CampaignOpposition.fleet(51,1,1,Battle.Faction.DRAXIAN,catalog,
+                    restoredWallet,new CampaignTechnology.State(Battle.Faction.TERRAN));
+        }catch(IllegalArgumentException expected){foreignRejected=true;}
+        check(foreignRejected,"Foreign research inventory authorized enemy fleet");
         System.out.println("PASS campaign opposition: 500 map systems, 0..IX physical tech, "+
                 "mixed faction fleets, seeded replay and active battle reinforcements");
     }

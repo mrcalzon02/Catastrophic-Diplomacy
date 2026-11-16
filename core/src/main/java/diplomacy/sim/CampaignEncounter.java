@@ -17,12 +17,15 @@ public final class CampaignEncounter {
     private final TechnologyCatalog catalog;
     private final Battle battle;
     private final CampaignDeployment.Loadout deployment;
+    private final CampaignProgress.State enemyWallet;
+    private final CampaignTechnology.State enemyResearch;
     private int wave = 1;
     private int hostileSerial;
 
     private CampaignEncounter(LevelEconomy.Level level,CampaignDeployment.Loadout deployment,
                               List<Shipyard.Design> friendlies,Shipyard.Design hostile,
-                              TechnologyCatalog catalog) {
+                              TechnologyCatalog catalog,CampaignProgress.State enemyWallet,
+                              CampaignTechnology.State enemyResearch) {
         if(level==null||deployment==null||friendlies==null||hostile==null||catalog==null)
             throw new IllegalArgumentException("Campaign requires a stage and fitted fleets");
         int deployed=deployment.ships();
@@ -34,6 +37,12 @@ public final class CampaignEncounter {
         this.deployment=deployment;
         this.opponent=hostile;
         this.catalog=catalog;
+        if((enemyWallet==null)!=(enemyResearch==null)||
+                (enemyWallet!=null&&(enemyWallet.faction()!=hostile.faction
+                        ||enemyResearch.faction()!=hostile.faction)))
+            throw new IllegalArgumentException("Enemy research account faction mismatch");
+        this.enemyWallet=enemyWallet;
+        this.enemyResearch=enemyResearch;
         battle=new Battle(level.seed());
         // Each owned ship has its own fitting; do not clone one generic design.
         for(Shipyard.Design friendly:friendlies)
@@ -53,18 +62,32 @@ public final class CampaignEncounter {
                                           Shipyard.Design friendly,Shipyard.Design hostile,
                                           TechnologyCatalog catalog) {
         return new CampaignEncounter(LevelEconomy.level(level),deployment,
-                java.util.Collections.nCopies(deployment.ships(),friendly),hostile,catalog);
+                java.util.Collections.nCopies(deployment.ships(),friendly),hostile,catalog,null,null);
     }
     public static CampaignEncounter start(int level,CampaignDeployment.Loadout deployment,
                                           List<Shipyard.Design> friendlies,Shipyard.Design hostile,
                                           TechnologyCatalog catalog){
-        return new CampaignEncounter(LevelEconomy.level(level),deployment,friendlies,hostile,catalog);
+        return new CampaignEncounter(LevelEconomy.level(level),deployment,friendlies,hostile,catalog,null,null);
+    }
+
+    /** Build an actual combat encounter from an independently funded enemy
+     * research account. The client still owns durable account storage. */
+    public static CampaignEncounter start(int level,CampaignDeployment.Loadout deployment,
+                                          List<Shipyard.Design> friendlies,Shipyard.Design hostile,
+                                          TechnologyCatalog catalog,CampaignProgress.State enemyWallet,
+                                          CampaignTechnology.State enemyResearch){
+        return new CampaignEncounter(LevelEconomy.level(level),deployment,friendlies,hostile,
+                catalog,enemyWallet,enemyResearch);
     }
 
     private void deployHostiles(){
         int first=battle.ships().size();
-        var fittings=CampaignOpposition.fleet(level.index(),wave,
-                enemyCount(level,deployed,wave),opponent.faction,catalog);
+        var fittings=enemyWallet==null?
+                CampaignOpposition.fleet(level.index(),wave,
+                        enemyCount(level,deployed,wave),opponent.faction,catalog):
+                CampaignOpposition.fleet(level.index(),wave,
+                        enemyCount(level,deployed,wave),opponent.faction,catalog,
+                        enemyWallet,enemyResearch);
         // Actual independent ship designs, not a wing of copies of one template.
         battle.spawnFleet(1,fittings,catalog,970,335);
         CampaignOpposition.assignOrders(battle,first,level.index(),wave);

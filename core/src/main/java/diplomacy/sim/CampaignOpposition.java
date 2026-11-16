@@ -1,6 +1,7 @@
 package diplomacy.sim;
 
 import diplomacy.shipyard.HullProgression;
+import diplomacy.shipyard.CampaignShipyardRules;
 import diplomacy.shipyard.ModuleVersions;
 import diplomacy.shipyard.Shipyard;
 import diplomacy.tech.TechnologyCatalog;
@@ -103,21 +104,41 @@ public final class CampaignOpposition {
         return list[random.nextInt(list.length)];
     }
 
+    /** Apply funded per-faction research to real enemy fittings. The legacy
+     * tier-only path remains until opponent accounts are durable in the
+     * player campaign ledger and supplied by the normal game controller. */
+    private static boolean authorized(Shipyard.Design design,TechnologyCatalog catalog,
+                                      CampaignProgress.State wallet,
+                                      CampaignTechnology.State discoveries){
+        if(!Shipyard.inspect(design,catalog).valid())return false;
+        if(wallet==null)return true;
+        try{
+            CampaignShipyardRules.requireAllowed(design,wallet,discoveries,catalog);
+            return true;
+        }catch(IllegalArgumentException unauthorized){
+            return false;
+        }
+    }
+
     private static Shipyard.Design validOr(Shipyard.Design current,Shipyard.Design proposed,
-                                           TechnologyCatalog catalog){
-        return Shipyard.inspect(proposed,catalog).valid()?proposed:current;
+                                           TechnologyCatalog catalog,
+                                           CampaignProgress.State wallet,
+                                           CampaignTechnology.State discoveries){
+        return authorized(proposed,catalog,wallet,discoveries)?proposed:current;
     }
 
     private static Shipyard.Design fit(Random random,Shipyard.Hull hull,
                                        Battle.Faction faction,int tier,Operation operation,
-                                       TechnologyCatalog catalog){
+                                       TechnologyCatalog catalog,
+                                       CampaignProgress.State wallet,
+                                       CampaignTechnology.State discoveries){
         Shipyard.Design design=Shipyard.starter(faction,hull);
-        if(!Shipyard.inspect(design,catalog).valid()){
+        if(!authorized(design,catalog,wallet,discoveries)){
             // Some experimental chassis require unfinished service modules.
             // Keep all actual deployments buildable and never fabricate stats.
             design=Shipyard.starter(faction,hull.spriteHull());
         }
-        if(!Shipyard.inspect(design,catalog).valid())
+        if(!authorized(design,catalog,wallet,discoveries))
             throw new IllegalStateException("Unbuildable campaign starter "+faction+" "+hull);
         String prefix="BASE-"+Shipyard.factionId(faction)+"-";
         int weaponIndex=0;
@@ -126,7 +147,7 @@ public final class CampaignOpposition {
             // Retain actual purpose-fitted support/hull weapon configurations
             // only when replacing a module passes full engineering inspection.
             String family=weapon(random,tier,operation);
-            design=validOr(design,design.install(slot.index(),prefix+family),catalog);
+            design=validOr(design,design.install(slot.index(),prefix+family),catalog,wallet,discoveries);
         }
         // Base templates mount only two guns, even on capital hulls with
         // extensive spare batteries. Escalate through actual installed
@@ -138,7 +159,7 @@ public final class CampaignOpposition {
                         ||plants>=plantLimit)continue;
                 String component=plants%2==0?"REA":"RAD";
                 Shipyard.Design candidate=design.install(slot.index(),prefix+component);
-                if(Shipyard.inspect(candidate,catalog).valid()){
+                if(authorized(candidate,catalog,wallet,discoveries)){
                     design=candidate;plants++;
                 }
             }
@@ -148,7 +169,7 @@ public final class CampaignOpposition {
                         ||additionalBatteries>=maximumAdditional)continue;
                 Shipyard.Design candidate=design.install(slot.index(),
                         prefix+weapon(random,tier,operation));
-                if(Shipyard.inspect(candidate,catalog).valid()){
+                if(authorized(candidate,catalog,wallet,discoveries)){
                     design=candidate;additionalBatteries++;
                 }
             }
@@ -157,7 +178,7 @@ public final class CampaignOpposition {
                 if(slot.mount()!=Shipyard.Mount.DEFENSE||design.at(slot.index())!=null
                         ||additionalScreens>=screenLimit)continue;
                 Shipyard.Design candidate=design.install(slot.index(),prefix+"SHD");
-                if(Shipyard.inspect(candidate,catalog).valid()){
+                if(authorized(candidate,catalog,wallet,discoveries)){
                     design=candidate;additionalScreens++;
                 }
             }
@@ -165,7 +186,7 @@ public final class CampaignOpposition {
         if(tier>=3&&(operation==Operation.STRIKE_WING||operation==Operation.COMMAND)
                 &&design.hull.spriteHull()==Shipyard.Hull.CARRIER){
             for(Shipyard.Slot slot:design.hull.slots)if(slot.mount()==Shipyard.Mount.SUPPORT){
-                design=validOr(design,design.install(slot.index(),prefix+"FTR"),catalog);
+                design=validOr(design,design.install(slot.index(),prefix+"FTR"),catalog,wallet,discoveries);
                 break;
             }
         }
@@ -192,7 +213,7 @@ public final class CampaignOpposition {
             for(int stage=rank;stage>=1;stage--){
                 try{
                     Shipyard.Design candidate=design.stage(slot.index(),track,stage);
-                    if(Shipyard.inspect(candidate,catalog).valid()){
+                    if(authorized(candidate,catalog,wallet,discoveries)){
                         design=candidate;break;
                     }
                 }catch(IllegalArgumentException unavailable){
@@ -205,13 +226,13 @@ public final class CampaignOpposition {
                     Shipyard.Design candidate=design.withModuleVersion(slot.index(),
                             patterns[random.nextInt(patterns.length)],
                             1+random.nextInt(Math.min(4,tier+1)));
-                    design=validOr(design,candidate,catalog);
+                    design=validOr(design,candidate,catalog,wallet,discoveries);
                 }catch(IllegalArgumentException unavailable){
                     // Retain the proven conventional installed module.
                 }
             }
         }
-        if(!Shipyard.inspect(design,catalog).valid())
+        if(!authorized(design,catalog,wallet,discoveries))
             throw new IllegalStateException("Campaign generated invalid fitting");
         return design;
     }
@@ -222,13 +243,27 @@ public final class CampaignOpposition {
      */
     public static List<Shipyard.Design> fleet(int mission,int wave,int count,
                                              Battle.Faction faction,TechnologyCatalog catalog){
+        return fleet(mission,wave,count,faction,catalog,null,null);
+    }
+
+    /** Apply a separately funded and saved enemy wallet/research entitlement;
+     * a mission difficulty ceiling alone cannot purchase or unlock technology. */
+    public static List<Shipyard.Design> fleet(int mission,int wave,int count,
+                                             Battle.Faction faction,TechnologyCatalog catalog,
+                                             CampaignProgress.State wallet,
+                                             CampaignTechnology.State discoveries){
         LevelEconomy.Level level=LevelEconomy.level(mission);
         if(wave<1||wave>level.waves()||count<1||count>level.maximumFleet()
                 ||faction==null||catalog==null)
             throw new IllegalArgumentException("Invalid campaign enemy wave");
+        if((wallet==null)!=(discoveries==null)||
+                (wallet!=null&&(wallet.faction()!=faction||discoveries.faction()!=faction)))
+            throw new IllegalArgumentException("Enemy faction research authority mismatch");
+        if(discoveries!=null)discoveries.validateCatalog(catalog);
         Random random=new Random(LevelSky.mix(level.seed()^
                 ((long)wave*0x9e3779b97f4a7c15L)^((long)faction.ordinal()<<40)));
-        int tier=maximumTier(mission);
+        int tier=wallet==null?maximumTier(mission):
+                Math.min(maximumTier(mission),wallet.researchRank());
         Operation operation=operation(mission);
         List<Shipyard.Design> ships=new ArrayList<>(count);
         for(int i=0;i<count;i++){
@@ -236,7 +271,7 @@ public final class CampaignOpposition {
             // The commander's flagship is at the mission's full engineering ceiling.
             if(i==0&&wave==level.waves())fittedTier=tier;
             Shipyard.Hull hull=chooseHull(random,fittedTier,operation);
-            ships.add(fit(random,hull,faction,fittedTier,operation,catalog));
+            ships.add(fit(random,hull,faction,fittedTier,operation,catalog,wallet,discoveries));
         }
         return List.copyOf(ships);
     }
