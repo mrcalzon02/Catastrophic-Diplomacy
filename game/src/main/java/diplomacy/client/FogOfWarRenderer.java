@@ -20,6 +20,9 @@ final class FogOfWarRenderer implements AutoCloseable {
     private static final int MASK_W=320,MASK_H=180;
     private static final float SCREEN_W=1280f,SCREEN_H=720f;
     private final float[] revealed=new float[MASK_W*MASK_H];
+    // Reused scratch columns: a scout's horizontal distance is constant for
+    // every mask row, so avoid calculating it once per pixel and ship.
+    private final double[] columnDxSquared=new double[MASK_W];
     private final Pixmap bitmap=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
     private final Texture texture=new Texture(bitmap);
     private Battle lastBattle;
@@ -69,15 +72,18 @@ final class FogOfWarRenderer implements AutoCloseable {
             int y0=Math.max(0,(int)Math.floor(MASK_H*.5-(top-camera.position.y)/pyWorld));
             int y1=Math.min(MASK_H-1,(int)Math.ceil(MASK_H*.5-(bottom-camera.position.y)/pyWorld));
             if(x0>x1||y0>y1)continue;
+            for(int x=x0;x<=x1;x++){
+                double wx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld;
+                double dx=wx-pose.x();
+                columnDxSquared[x]=dx*dx;
+            }
             for(int y=y0;y<=y1;y++){
                 double wy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld;
                 double dy=wy-pose.y();
                 for(int x=x0;x<=x1;x++){
                     int offset=y*MASK_W+x;
                     if(revealed[offset]>=1f)continue;
-                    double wx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld;
-                    double dx=wx-pose.x();
-                    double d2=dx*dx+dy*dy;
+                    double d2=columnDxSquared[x]+dy*dy;
                     if(d2>=outer2)continue;
                     float v=d2<=inner2?1f:FogOfWarModel.visible(Math.sqrt(d2),range);
                     if(v>revealed[offset])revealed[offset]=v;
