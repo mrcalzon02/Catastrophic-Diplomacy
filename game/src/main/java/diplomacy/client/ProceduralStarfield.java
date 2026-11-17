@@ -51,6 +51,7 @@ public final class ProceduralStarfield implements Disposable {
             uniform vec3 u_secondary;
             uniform vec4 u_shape; // angle, opacity, scale, type index
             uniform float u_zoom;
+            uniform vec2 u_orientation;
             void main() {
                 vec2 centered = v_texCoords - vec2(0.5);
                 vec2 p = (centered * u_zoom + u_pan * 0.00018) * u_shape.z;
@@ -58,14 +59,14 @@ public final class ProceduralStarfield implements Disposable {
                 vec4 b = texture2D(u_texture, p * 1.35 + u_offset * 0.73 + vec2(0.21, 0.14));
                 float n = 0.60 * a.r + 0.40 * b.g;
                 float wisps = 0.65 * a.g + 0.35 * b.b;
-                vec2 normal = vec2(cos(u_shape.x), sin(u_shape.x));
+                vec2 normal = u_orientation;
                 float dist = abs(dot(centered, normal) + (wisps - 0.5) * 0.32);
                 float band = 1.0 - smoothstep(0.10, 0.55, dist);
                 float cloud = smoothstep(0.34, 0.72, n);
                 float mode = u_shape.w;
                 if (mode > 0.5 && mode < 1.5) cloud *= 0.28 + 0.95 * band; // dust lane
                 if (mode > 1.5 && mode < 2.5) { // inclined spiral disk and luminous core
-                    float sn = sin(u_shape.x), cs = cos(u_shape.x);
+                    float sn = u_orientation.y, cs = u_orientation.x;
                     vec2 diskPos = vec2(dot(centered, vec2(cs, sn)),
                                         dot(centered, vec2(-sn, cs)) * 1.9);
                     float r = length(diskPos);
@@ -174,6 +175,10 @@ public final class ProceduralStarfield implements Disposable {
             nebulaShader.setUniformf("u_shape", recipe.angle(), recipe.nebulaIntensity(),
                     recipe.cloudScale(), (float)recipe.formation().ordinal());
             nebulaShader.setUniformf("u_zoom", battleCamera.zoom);
+            // Orientation depends on level, never on screen pixel. Preserve the
+            // original trigonometric values while avoiding per-fragment work.
+            nebulaShader.setUniformf("u_orientation",
+                    (float)Math.cos(recipe.angle()), (float)Math.sin(recipe.angle()));
             batch.setColor(1, 1, 1, 1);
             batch.draw(noise, 0, 0, width, height);
             batch.end();
