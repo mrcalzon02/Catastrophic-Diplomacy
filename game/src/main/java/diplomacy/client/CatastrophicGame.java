@@ -134,6 +134,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean wikiVisible,wikiRestoreRunning;
     private int wikiTouchPointer=-1;
     private GameMenuPanel.Screen screen=GameMenuPanel.Screen.HOME;
+    private int optionsTab;
     private ScenarioCatalog.Preset scenario=ScenarioCatalog.Preset.CUSTOM;
     private SkirmishTechnologyRules skirmishRules=ScenarioCatalog.challenge(ScenarioCatalog.Preset.CUSTOM);
     private String skirmishNotice="Use SHIPYARD > TECH LOADOUT to configure challenge rules.";
@@ -374,6 +375,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 diagnosticsHud=preferences.getBoolean("hud",false);
                 performanceCaptureEnabled=preferences.getBoolean("capture",true);
                 fpsOverlayEnabled=preferences.getBoolean("fps",true);
+                weatherEnabled=preferences.getBoolean("skirmishWeather",true);
                 paceGovernor.request(speed);
                 paceGovernor.setEnabled(preferences.getBoolean("adaptive",true));
             }catch(RuntimeException failure){
@@ -570,12 +572,22 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }
                     if(screen==GameMenuPanel.Screen.DEV)return true;
                     if(screen==GameMenuPanel.Screen.OPTIONS){
-                        if(key==Input.Keys.U)audio.toggleMusic();
-                        if(key==Input.Keys.I)audio.toggleEffects();
-                        if(key==Input.Keys.J)audio.toggleTrack();
-                        if(key==Input.Keys.LEFT){audio.stepVoiceVolume(-1);return true;}
-                        if(key==Input.Keys.RIGHT){audio.stepVoiceVolume(1);return true;}
-                        if(key==Input.Keys.K&&updateCheck!=null)updateCheck.run();
+                        if(key==Input.Keys.TAB||key==Input.Keys.PAGE_DOWN)
+                            optionsTab=(optionsTab+1)%GameMenuPanel.OPTION_TABS.length;
+                        else if(key==Input.Keys.PAGE_UP)
+                            optionsTab=Math.floorMod(optionsTab-1,GameMenuPanel.OPTION_TABS.length);
+                        else if(optionsTab==0){
+                            if(key==Input.Keys.U)audio.toggleMusic();
+                            if(key==Input.Keys.I)audio.toggleEffects();
+                            if(key==Input.Keys.J)audio.toggleTrack();
+                            if(key==Input.Keys.LEFT)audio.stepVoiceVolume(-1);
+                            if(key==Input.Keys.RIGHT)audio.stepVoiceVolume(1);
+                        }else if(optionsTab==1){
+                            if(key==Input.Keys.LEFT)changePace(-1);
+                            if(key==Input.Keys.RIGHT)changePace(1);
+                            if(key==Input.Keys.W)toggleSkirmishWeather();
+                        }else if(optionsTab==4&&key==Input.Keys.K&&updateCheck!=null)
+                            updateCheck.run();
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
@@ -2175,20 +2187,38 @@ public final class CatastrophicGame extends ApplicationAdapter {
             return;
         }
         if(screen==GameMenuPanel.Screen.OPTIONS){
-            switch(GameMenuPanel.optionsAction(x,y,updateCheck!=null,menuPanel.mobileLayout())){
-                case 7 -> {audio.stepVoiceVolume(-1);Gdx.app.log("CD-OPTIONS","VOICE "+Math.round(audio.voiceVolume()*100)+"%");}
-                case 8 -> {audio.stepVoiceVolume(1);Gdx.app.log("CD-OPTIONS","VOICE "+Math.round(audio.voiceVolume()*100)+"%");}
-                case 1 -> audio.toggleMusic();
-                case 2 -> audio.toggleEffects();
-                case 3 -> audio.toggleTrack();
-                case 4 -> {if(updateCheck!=null)updateCheck.run();}
-                case 5 -> {
+            int action=GameMenuPanel.optionsPageAction(x,y,optionsTab,updateCheck!=null);
+            if(action>=100){optionsTab=action-100;audio.uiPress();return;}
+            if(action==6){screen=GameMenuPanel.Screen.HOME;audio.uiBack();menuButtonPointer=-1;return;}
+            if(optionsTab==0){
+                switch(action){
+                    case 7 -> audio.stepVoiceVolume(-1);
+                    case 8 -> audio.stepVoiceVolume(1);
+                    case 21 -> audio.toggleMusic();
+                    case 22 -> audio.toggleEffects();
+                    case 23 -> audio.toggleTrack();
+                    default -> {}
+                }
+            }else if(optionsTab==1){
+                switch(action){
+                    case 20 -> changePace(-1);
+                    case 21 -> changePace(1);
+                    case 22 -> toggleSkirmishWeather();
+                    default -> {}
+                }
+            }else if(optionsTab==2){
+                if(action==20)toggleFpsOverlay();
+                else if(action==21)toggleDiagnosticsHud();
+            }else if(optionsTab==3){
+                if(action==20)toggleAdaptivePacing();
+                else if(action==21)toggleDiagnosticsCapture();
+                else if(action==22)exportDiagnostics();
+            }else if(optionsTab==4){
+                if(action==20&&updateCheck!=null)updateCheck.run();
+                else if(action==21){
                     devReturnToBattle=false;
                     screen=GameMenuPanel.Screen.DEV;
-                    Gdx.app.log("CD-DEV","OPEN FROM OPTIONS");
                 }
-                case 6 -> {screen=GameMenuPanel.Screen.HOME;audio.uiBack();menuButtonPointer=-1;}
-                default -> {}
             }
             return;
         }
@@ -2705,6 +2735,15 @@ public final class CatastrophicGame extends ApplicationAdapter {
         // player combat speed when browsing unattended screensaver battles.
         if(!screensaverMode)savePerformancePreferences();
     }
+    private void toggleSkirmishWeather(){
+        weatherEnabled=!weatherEnabled;
+        try{
+            Gdx.app.getPreferences(PERFORMANCE_PREFS)
+                    .putBoolean("skirmishWeather",weatherEnabled).flush();
+        }catch(RuntimeException failure){Gdx.app.error("CD-OPTIONS","Cannot save skirmish weather",failure);}
+        performanceNotice(weatherEnabled?"SKIRMISH WEATHER ON":"SKIRMISH WEATHER OFF");
+        // Takes effect in the next skirmish; campaign environments remain authoritative.
+    }
     private void toggleAdaptivePacing(){
         paceGovernor.setEnabled(!paceGovernor.enabled());
         diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),
@@ -2984,7 +3023,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     technology,discoveries,technologyPage,technologyModule,technologyTrack,
                     technologyStage,technologyBranch,technologyNotice,armedTechnology,
                     fpsOverlayEnabled,diagnosticsHud,performanceCaptureEnabled,
-                    paceGovernor.enabled(),diagnosticRecorder.framesRecorded());
+                    paceGovernor.enabled(),diagnosticRecorder.framesRecorded(),
+                     optionsTab,weatherEnabled,speed);
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
                 // An actual completed framebuffer menu draw, not merely a
                 // click-handler state transition. Android campaign CI requires it.

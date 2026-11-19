@@ -94,6 +94,31 @@ final class GameMenuPanel {
     private static float mobileHomeY(int slot){return 464-(slot/2)*120;}
     private static float mobileOptionY(int slot){return 350-(slot/2)*115;}
     private static float mobileDevY(int slot){return 440-(slot/2)*140;}
+    static final String[] OPTION_TABS={"AUDIO","COMBAT","DISPLAY","PERFORMANCE","SYSTEM"};
+    private static float optionX(int slot){return 55+(slot%2)*595;}
+    private static float optionY(int slot){return 426-(slot/2)*112;}
+    /** Options pages use the identical touch and mouse hit contract. */
+    static int optionsTabHit(float x,float y){
+        for(int i=0;i<OPTION_TABS.length;i++)
+            if(hit(x,y,32+i*248,548,238,64))return 100+i;
+        return -1;
+    }
+    /** Page items: 20..25; audio arrows 7/8; back 6; unavailable action -2. */
+    static int optionsPageAction(float x,float y,int tab,boolean updaterAvailable){
+        int selected=optionsTabHit(x,y);
+        if(selected>=0)return selected;
+        if(hit(x,y,471,41,338,67))return 6;
+        if(tab==0&&hit(x,y,optionX(0),optionY(0),548,92)){
+            if(x<optionX(0)+160)return 7;
+            if(x>optionX(0)+388)return 8;
+            return -1;
+        }
+        int count=switch(tab){case 0->4;case 1->3;case 2->2;case 3->3;case 4->2;default->0;};
+        for(int i=0;i<count;i++)
+            if(hit(x,y,optionX(i),optionY(i),548,92))
+                return tab==4&&i==0&&!updaterAvailable?-2:20+i;
+        return -1;
+    }
     private final boolean mobileLayout;
     GameMenuPanel(){this(false);}
     GameMenuPanel(boolean mobileLayout){this.mobileLayout=mobileLayout;}
@@ -463,7 +488,8 @@ final class GameMenuPanel {
                int technologyPage,int technologyModule,int technologyTrack,int technologyStage,
                int technologyBranch,String technologyNotice,String armedTechnology,
                boolean fpsEnabled,boolean diagnosticsHud,boolean captureEnabled,
-               boolean adaptiveEnabled,long capturedFrames){
+               boolean adaptiveEnabled,long capturedFrames,
+               int optionsTab,boolean weatherEnabled,float requestedSpeed){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -715,17 +741,19 @@ final class GameMenuPanel {
                 button(shapes,900,32,300,55,false);
             }
             case OPTIONS -> {
-                float vx=mobileLayout?120:405, vy=mobileLayout?462:544;
-                float vw=mobileLayout?160:120, vh=mobileLayout?108:72;
-                button(shapes,vx,vy,vw,vh,false);
-                button(shapes,mobileLayout?1000:755,vy,vw,vh,false);
-                for(int i=0;i<6;i++){
-                    float x=mobileLayout?mobileColumnX(i):405;
-                    float y=mobileLayout?mobileOptionY(i):472-i*78;
-                    float w=mobileLayout?MOBILE_COLUMN_WIDTH:470,h=mobileLayout?94:59;
-                    if(i==3&&!updaterAvailable)disabledButton(shapes,x,y,w,h);
-                    else button(shapes,x,y,w,h,false);
+                for(int i=0;i<OPTION_TABS.length;i++)
+                    button(shapes,32+i*248,548,238,64,i==optionsTab);
+                rectangle(shapes,35,119,1210,417,PANEL);
+                int count=switch(optionsTab){case 0->4;case 1->3;case 2->2;case 3->3;case 4->2;default->0;};
+                for(int i=0;i<count;i++){
+                    if(optionsTab==0&&i==0){
+                        button(shapes,optionX(0),optionY(0),160,92,false);
+                        button(shapes,optionX(0)+388,optionY(0),160,92,false);
+                    }else if(optionsTab==4&&i==0&&!updaterAvailable)
+                        disabledButton(shapes,optionX(i),optionY(i),548,92);
+                    else button(shapes,optionX(i),optionY(i),548,92,false);
                 }
+                button(shapes,471,41,338,67,false);
             }
             case DEV -> {
                 for(int i=0;i<6;i++){
@@ -1189,40 +1217,45 @@ final class GameMenuPanel {
                 label(batch,font,editNotice,48,86,Color.GOLD);
             }
             case OPTIONS -> {
-                if(mobileLayout){
-                    float original=font.getData().scaleX;
-                    font.getData().setScale(2.10f);
-                    label(batch,font,"OPTIONS",73,662,Color.WHITE);
-                    font.getData().setScale(1.52f);
-                    label(batch,font,"AUDIO AND APPLICATION",74,613,MUTED);
-                    font.getData().setScale(1.85f);
-                    buttonLabel(batch,font,"<",120,462,160,108,Color.WHITE);
-                    buttonLabel(batch,font,">",1000,462,160,108,Color.WHITE);
-                    buttonLabel(batch,font,"VOICE  "+Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
-                            290,462,700,108,Color.WHITE);
-                    String[] names={"MUSIC: "+(music?"ON":"OFF"),
-                            "SOUND EFFECTS: "+(effects?"ON":"OFF"),
-                            "SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),
-                            updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
-                            "DEV", "BACK"};
-                    for(int i=0;i<names.length;i++)
-                        buttonLabel(batch,font,names[i],mobileColumnX(i),mobileOptionY(i),
-                                MOBILE_COLUMN_WIDTH,94,i==3&&!updaterAvailable?MUTED:Color.WHITE);
-                    font.getData().setScale(original);
-                }else{
-                title(batch,font,"OPTIONS","AUDIO AND APPLICATION");
-                buttonLabel(batch,font,"<",405,544,120,72,Color.WHITE);
-                buttonLabel(batch,font,">",755,544,120,72,Color.WHITE);
-                buttonLabel(batch,font,"VOICE  "+Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
-                        525,544,230,72,Color.WHITE);
-                String[] names={"MUSIC: "+(music?"ON":"OFF"),
-                        "SOUND EFFECTS: "+(effects?"ON":"OFF"),
-                        "SOUNDTRACK: "+(trackFinal?"BATTLE MIX":"COLD DRONE"),
-                        updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE","DEV","BACK"};
-                for(int i=0;i<names.length;i++)buttonLabel(batch,font,names[i],405,472-i*78,
-                        470,59,i==3&&!updaterAvailable?MUTED:Color.WHITE);
-
+                float previous=font.getData().scaleX;
+                font.getData().setScale(mobileLayout?1.44f:1.22f);
+                label(batch,font,"OPTIONS / "+OPTION_TABS[Math.max(0,Math.min(optionsTab,4))],51,675,Color.WHITE);
+                for(int i=0;i<OPTION_TABS.length;i++)
+                    buttonLabel(batch,font,OPTION_TABS[i],32+i*248,548,238,64,
+                            i==optionsTab?Color.GOLD:Color.WHITE);
+                String[] entries=switch(optionsTab){
+                    case 0 -> new String[]{"","MUSIC  "+(music?"ON":"OFF"),
+                            "SOUND EFFECTS  "+(effects?"ON":"OFF"),
+                            "SOUNDTRACK  "+(trackFinal?"BATTLE MIX":"COLD DRONE")};
+                    case 1 -> new String[]{"SPEED SLOWER","SPEED FASTER",
+                            "SKIRMISH WEATHER  "+(weatherEnabled?"ON":"OFF")};
+                    case 2 -> new String[]{"FPS COUNTER  "+(fpsEnabled?"ON":"OFF"),
+                            "PERFORMANCE HUD  "+(diagnosticsHud?"ON":"OFF")};
+                    case 3 -> new String[]{"ADAPTIVE PACE  "+(adaptiveEnabled?"ON":"OFF"),
+                            "DIAGNOSTIC CAPTURE  "+(captureEnabled?"ON":"OFF"),
+                            "EXPORT PERFORMANCE ZIP"};
+                    case 4 -> new String[]{updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
+                            "DEVELOPER CONTROLS"};
+                    default -> new String[0];
+                };
+                for(int i=0;i<entries.length;i++){
+                    if(optionsTab==0&&i==0){
+                        buttonLabel(batch,font,"-",optionX(0),optionY(0),160,92,Color.WHITE);
+                        buttonLabel(batch,font,"VOICE  "+Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
+                                optionX(0)+160,optionY(0),228,92,Color.WHITE);
+                        buttonLabel(batch,font,"+",optionX(0)+388,optionY(0),160,92,Color.WHITE);
+                    }else buttonLabel(batch,font,entries[i],optionX(i),optionY(i),548,92,
+                            optionsTab==4&&i==0&&!updaterAvailable?MUTED:Color.WHITE);
                 }
+                if(optionsTab==1)
+                    label(batch,font,"REQUESTED SPEED  "+String.format(java.util.Locale.ROOT,"%.1fx",requestedSpeed)
+                            +"  |  WEATHER APPLIES TO SKIRMISH",66,140,MUTED);
+                if(optionsTab==3)
+                    label(batch,font,"RETAINED "+capturedFrames+" FRAMES  |  F2 HUD  F3 CAPTURE  F4 EXPORT",66,140,MUTED);
+                if(optionsTab==4)
+                    label(batch,font,"UPDATER FEEDBACK APPEARS IN THE APPLICATION",66,140,MUTED);
+                buttonLabel(batch,font,"BACK TO MAIN MENU",471,41,338,67,Color.WHITE);
+                font.getData().setScale(previous);
             }
             case DEV -> {
                 String[] actions={

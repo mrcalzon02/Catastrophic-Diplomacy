@@ -56,6 +56,15 @@ tasks.register('campaignRecoverySmoke', JavaExec) {
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('campaignRecoverySmoke') }
 
+tasks.register('optionsTabsSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify all five options tabs, native touch hitboxes and disabled updater behavior.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.OptionsTabsTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('optionsTabsSmoke') }
+
 // Isolated behavioral UI verification: do not drag the unrelated audio,
 // shaders or optional art diagnostics into the fuel-order integration gate.
 tasks.register('fuelOrdersTouchSmoke', JavaExec) {
