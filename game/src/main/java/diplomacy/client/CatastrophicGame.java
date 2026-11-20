@@ -3209,7 +3209,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
-        shapes.setColor(0.11f, 0.16f, 0.26f,
+        // ShapeRenderer may run with GL blending disabled after SpriteBatch.
+        // Scale RGB as well as alpha so low/medium are distinct on both paths.
+        float gridIntensity=GameMenuPanel.gridContrastIntensity(tacticalGridContrast);
+        shapes.setColor(0.11f*gridIntensity, 0.16f*gridIntensity,
+                0.26f*gridIntensity,
                 tacticalGridContrast==0?0.30f:tacticalGridContrast==1?0.52f:0.75f);
         if(!screensaverMode && tacticalGridEnabled){
             for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);

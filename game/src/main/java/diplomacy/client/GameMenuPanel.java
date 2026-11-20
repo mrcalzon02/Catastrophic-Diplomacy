@@ -95,6 +95,9 @@ final class GameMenuPanel {
     private static float mobileOptionY(int slot){return 350-(slot/2)*115;}
     private static float mobileDevY(int slot){return 440-(slot/2)*140;}
     static final String[] OPTION_TABS={"AUDIO","COMBAT","DISPLAY","PERFORMANCE","SYSTEM"};
+    static float gridContrastIntensity(int level){
+        return switch(level){case 0 -> 0.40f;case 1 -> 0.70f;default -> 1f;};
+    }
     static String gridContrastName(int level){
         return switch(level){case 0 -> "LOW";case 1 -> "MEDIUM";default -> "HIGH";};
     }

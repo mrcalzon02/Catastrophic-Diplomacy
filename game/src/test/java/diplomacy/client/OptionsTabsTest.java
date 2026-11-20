@@ -30,6 +30,11 @@ public final class OptionsTabsTest {
                 !"MEDIUM".equals(GameMenuPanel.gridContrastName(1)) ||
                 !"HIGH".equals(GameMenuPanel.gridContrastName(2)))
             throw new AssertionError("Grid contrast labels");
+        float low=GameMenuPanel.gridContrastIntensity(0);
+        float medium=GameMenuPanel.gridContrastIntensity(1);
+        float high=GameMenuPanel.gridContrastIntensity(2);
+        if(!(low>0f && low<medium && medium<high && high==1f))
+            throw new AssertionError("Grid contrast must remain visible without GL blending");
         eq(GameMenuPanel.optionsPageAction(160,455,3,true),20,"adaptive");
         eq(GameMenuPanel.optionsPageAction(730,455,3,true),21,"capture");
         eq(GameMenuPanel.optionsPageAction(160,350,3,true),22,"export");
