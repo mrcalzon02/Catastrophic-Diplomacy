@@ -83,6 +83,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private boolean performanceCaptureEnabled=true;
     private boolean fpsOverlayEnabled=true;
     private boolean tacticalGridEnabled=true;
+    /** 0=low, 1=medium, 2=high (legacy appearance). */
+    private int tacticalGridContrast=2;
     /** Return to the paused tactical menu when Dev was opened during combat. */
     private boolean devReturnToBattle;
     private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
@@ -378,6 +380,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 performanceCaptureEnabled=preferences.getBoolean("capture",true);
                 fpsOverlayEnabled=preferences.getBoolean("fps",true);
                 tacticalGridEnabled=preferences.getBoolean("tacticalGrid",true);
+                tacticalGridContrast=Math.max(0,Math.min(2,preferences.getInteger("tacticalGridContrast",2)));
                 weatherEnabled=preferences.getBoolean("skirmishWeather",true);
                 paceGovernor.request(speed);
                 paceGovernor.setEnabled(preferences.getBoolean("adaptive",true));
@@ -593,6 +596,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             if(key==Input.Keys.F)toggleFpsOverlay();
                             if(key==Input.Keys.H)toggleDiagnosticsHud();
                             if(key==Input.Keys.G)toggleTacticalGrid();
+                            if(key==Input.Keys.B)cycleTacticalGridContrast();
                         }else if(optionsTab==3){
                             if(key==Input.Keys.A)toggleAdaptivePacing();
                             if(key==Input.Keys.C)toggleDiagnosticsCapture();
@@ -2227,6 +2231,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(action==20)toggleFpsOverlay();
                 else if(action==21)toggleDiagnosticsHud();
                 else if(action==22)toggleTacticalGrid();
+                else if(action==23)cycleTacticalGridContrast();
             }else if(optionsTab==3){
                 if(action==20)toggleAdaptivePacing();
                 else if(action==21)toggleDiagnosticsCapture();
@@ -2737,6 +2742,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             preferences.putBoolean("capture",performanceCaptureEnabled);
             preferences.putBoolean("fps",fpsOverlayEnabled);
             preferences.putBoolean("tacticalGrid",tacticalGridEnabled);
+            preferences.putInteger("tacticalGridContrast",tacticalGridContrast);
             preferences.flush();
         }catch(RuntimeException failure){Gdx.app.error("CD-PERF","Cannot save preferences",failure);}
     }
@@ -2784,6 +2790,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
             updaterNotice="UPDATE CHECK COULD NOT START";
             Gdx.app.error("CD-UPDATER","Unable to start manual update check",failure);
         }
+    }
+    private void cycleTacticalGridContrast(){
+        tacticalGridContrast=(tacticalGridContrast+1)%3;
+        performanceNotice("GRID CONTRAST "+GameMenuPanel.gridContrastName(tacticalGridContrast));
+        savePerformancePreferences();
     }
     private void toggleTacticalGrid(){
         tacticalGridEnabled=!tacticalGridEnabled;
@@ -3063,7 +3074,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     technologyStage,technologyBranch,technologyNotice,armedTechnology,
                     fpsOverlayEnabled,diagnosticsHud,performanceCaptureEnabled,
                     paceGovernor.enabled(),diagnosticRecorder.framesRecorded(),
-                     optionsTab,weatherEnabled,speed,tacticalGridEnabled,updaterNotice);
+                     optionsTab,weatherEnabled,speed,tacticalGridEnabled,tacticalGridContrast,updaterNotice);
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
                 // An actual completed framebuffer menu draw, not merely a
                 // click-handler state transition. Android campaign CI requires it.
@@ -3198,7 +3209,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
         if (weatherVfx != null) weatherVfx.behind(shapes,batch,battleCamera,battle.weather());
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
-        shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
+        shapes.setColor(0.11f, 0.16f, 0.26f,
+                tacticalGridContrast==0?0.30f:tacticalGridContrast==1?0.52f:0.75f);
         if(!screensaverMode && tacticalGridEnabled){
             for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
             for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
