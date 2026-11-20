@@ -119,7 +119,7 @@ final class GameMenuPanel {
             if(x>optionX(0)+388)return 8;
             return -1;
         }
-        int count=switch(tab){case 0->4;case 1->3;case 2->4;case 3->3;case 4->2;default->0;};
+        int count=switch(tab){case 0->4;case 1->3;case 2->5;case 3->3;case 4->2;default->0;};
         for(int i=0;i<count;i++)
             if(hit(x,y,optionX(i),optionY(i),548,92))
                 return tab==4&&i==0&&!updaterAvailable?-2:20+i;
@@ -751,7 +751,7 @@ final class GameMenuPanel {
                 for(int i=0;i<OPTION_TABS.length;i++)
                     button(shapes,32+i*248,548,238,64,i==optionsTab);
                 rectangle(shapes,35,119,1210,417,PANEL);
-                int count=switch(optionsTab){case 0->4;case 1->3;case 2->4;case 3->3;case 4->2;default->0;};
+                int count=switch(optionsTab){case 0->4;case 1->3;case 2->5;case 3->3;case 4->2;default->0;};
                 for(int i=0;i<count;i++){
                     if(optionsTab==0&&i==0){
                         button(shapes,optionX(0),optionY(0),160,92,false);
@@ -1235,7 +1235,7 @@ final class GameMenuPanel {
                 int entryCount=switch(optionsTab){
                     case 0 -> 4;
                     case 1,3 -> 3;
-                    case 2 -> 4;
+                    case 2 -> 5;
                     case 4 -> 2;
                     default -> 0;
                 };
@@ -1261,7 +1261,8 @@ final class GameMenuPanel {
                                 case 0 -> fpsEnabled?"FPS COUNTER  ON":"FPS COUNTER  OFF";
                                 case 1 -> diagnosticsHud?"PERFORMANCE HUD  ON":"PERFORMANCE HUD  OFF";
                                 case 2 -> tacticalGridEnabled?"TACTICAL GRID  ON":"TACTICAL GRID  OFF";
-                                default -> "GRID CONTRAST  "+gridContrastName(tacticalGridContrast);
+                                case 3 -> "GRID CONTRAST  "+gridContrastName(tacticalGridContrast);
+                                default -> "RESTORE DISPLAY DEFAULTS";
                             };
                             case 3 -> switch(i){
                                 case 0 -> adaptiveEnabled?"ADAPTIVE PACE  ON":"ADAPTIVE PACE  OFF";
@@ -1283,7 +1284,7 @@ final class GameMenuPanel {
                     label(batch,font,"SPEED  "+String.format(java.util.Locale.ROOT,"%.1fx",requestedSpeed)
                             +"  |  LEFT/RIGHT SPEED  |  W SKIRMISH WEATHER",66,140,MUTED);
                 if(optionsTab==2)
-                    label(batch,font,"KEYS: F FPS  |  H HUD  |  G GRID  |  B CONTRAST",66,140,MUTED);
+                    label(batch,font,"F FPS  |  H HUD  |  G GRID  |  B CONTRAST  |  R RESET",66,140,MUTED);
                 if(optionsTab==3)
                     label(batch,font,"RETAINED "+capturedFrames+" FRAMES  |  A ADAPTIVE  |  C CAPTURE  |  E EXPORT",66,140,MUTED);
                 if(optionsTab==4){

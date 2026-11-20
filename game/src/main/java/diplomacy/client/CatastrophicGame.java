@@ -597,6 +597,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             if(key==Input.Keys.H)toggleDiagnosticsHud();
                             if(key==Input.Keys.G)toggleTacticalGrid();
                             if(key==Input.Keys.B)cycleTacticalGridContrast();
+                            if(key==Input.Keys.R)restoreDisplayDefaults();
                         }else if(optionsTab==3){
                             if(key==Input.Keys.A)toggleAdaptivePacing();
                             if(key==Input.Keys.C)toggleDiagnosticsCapture();
@@ -2232,6 +2233,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 else if(action==21)toggleDiagnosticsHud();
                 else if(action==22)toggleTacticalGrid();
                 else if(action==23)cycleTacticalGridContrast();
+                else if(action==24)restoreDisplayDefaults();
             }else if(optionsTab==3){
                 if(action==20)toggleAdaptivePacing();
                 else if(action==21)toggleDiagnosticsCapture();
@@ -2790,6 +2792,14 @@ public final class CatastrophicGame extends ApplicationAdapter {
             updaterNotice="UPDATE CHECK COULD NOT START";
             Gdx.app.error("CD-UPDATER","Unable to start manual update check",failure);
         }
+    }
+    private void restoreDisplayDefaults(){
+        fpsOverlayEnabled=true;
+        diagnosticsHud=false;
+        tacticalGridEnabled=true;
+        tacticalGridContrast=2;
+        performanceNotice("DISPLAY DEFAULTS RESTORED");
+        savePerformancePreferences();
     }
     private void cycleTacticalGridContrast(){
         tacticalGridContrast=(tacticalGridContrast+1)%3;

@@ -26,6 +26,7 @@ public final class OptionsTabsTest {
         eq(GameMenuPanel.optionsPageAction(730,455,2,true),21,"hud");
         eq(GameMenuPanel.optionsPageAction(160,350,2,true),22,"tactical grid");
         eq(GameMenuPanel.optionsPageAction(735,350,2,true),23,"grid contrast");
+        eq(GameMenuPanel.optionsPageAction(160,245,2,true),24,"restore display defaults");
         if(!"LOW".equals(GameMenuPanel.gridContrastName(0)) ||
                 !"MEDIUM".equals(GameMenuPanel.gridContrastName(1)) ||
                 !"HIGH".equals(GameMenuPanel.gridContrastName(2)))
