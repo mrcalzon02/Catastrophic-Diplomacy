@@ -83,10 +83,11 @@ final class FogOfWarRenderer implements AutoCloseable {
             for(int y=y0;y<=y1;y++){
                 double wy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld;
                 double dy=wy-pose.y();
+                double dySquared=dy*dy;
                 for(int x=x0;x<=x1;x++){
                     int offset=y*MASK_W+x;
                     if(revealed[offset]>=1f)continue;
-                    double d2=columnDxSquared[x]+dy*dy;
+                    double d2=columnDxSquared[x]+dySquared;
                     if(d2>=outer2)continue;
                     float v=d2<=inner2?1f:FogOfWarModel.visible(Math.sqrt(d2),range);
                     if(v>revealed[offset])revealed[offset]=v;
@@ -118,10 +119,11 @@ final class FogOfWarRenderer implements AutoCloseable {
             }
             for(int y=y0;y<=y1;y++){
                 double dy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld-pose.y();
+                double dySquared=dy*dy;
                 for(int x=x0;x<=x1;x++){
                     int index=y*MASK_W+x;
                     if(revealed[index]>=1f)continue;
-                    double d2=columnDxSquared[x]+dy*dy;
+                    double d2=columnDxSquared[x]+dySquared;
                     if(d2>outerSq)continue;
                     float value=d2<=radius*radius?1f:
                             FogOfWarModel.visible(Math.sqrt(d2),outerRadius/1.14);
