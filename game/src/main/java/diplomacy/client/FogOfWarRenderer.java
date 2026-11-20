@@ -30,6 +30,15 @@ final class FogOfWarRenderer implements AutoCloseable {
     private float lastX=Float.NaN,lastY=Float.NaN,lastZoom=Float.NaN;
     FogOfWarRenderer(){
         texture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
+        // The concealed-space RGB color never changes. Initialize it once
+        // and update only alpha on later mask rebuilds.
+        ByteBuffer pixels=bitmap.getPixels();
+        for(int i=0;i<MASK_W*MASK_H;i++){
+            int p=i*4;
+            pixels.put(p,(byte)3);
+            pixels.put(p+1,(byte)7);
+            pixels.put(p+2,(byte)16);
+        }
     }
     void render(Battle battle,OrthographicCamera world,OrthographicCamera hud,
                 SpriteBatch batch,BattleRenderPoses poses,int team,
@@ -108,13 +117,17 @@ final class FogOfWarRenderer implements AutoCloseable {
                     (pose.y()+outerRadius-camera.position.y)/pyWorld));
             int y1=Math.min(MASK_H-1,(int)Math.ceil(MASK_H*.5-
                     (pose.y()-outerRadius-camera.position.y)/pyWorld));
+            if(x0>x1||y0>y1)continue;
+            for(int x=x0;x<=x1;x++){
+                double dx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld-pose.x();
+                columnDxSquared[x]=dx*dx;
+            }
             for(int y=y0;y<=y1;y++){
                 double dy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld-pose.y();
                 for(int x=x0;x<=x1;x++){
                     int index=y*MASK_W+x;
                     if(revealed[index]>=1f)continue;
-                    double dx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld-pose.x();
-                    double d2=dx*dx+dy*dy;
+                    double d2=columnDxSquared[x]+dy*dy;
                     if(d2>outerSq)continue;
                     float value=d2<=radius*radius?1f:
                             FogOfWarModel.visible(Math.sqrt(d2),outerRadius/1.14);
@@ -127,9 +140,6 @@ final class FogOfWarRenderer implements AutoCloseable {
             int p=i*4;
             // Deep navy uncharted space. Fully opaque when there is no optical
             // sight; high-quality art and unknown hulls cannot bleed through.
-            buffer.put(p,(byte)3);
-            buffer.put(p+1,(byte)7);
-            buffer.put(p+2,(byte)16);
             buffer.put(p+3,(byte)Math.round(255*(1-revealed[i])));
         }
         texture.draw(bitmap,0,0);
