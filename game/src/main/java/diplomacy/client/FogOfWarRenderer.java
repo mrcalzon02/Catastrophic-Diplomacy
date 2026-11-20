@@ -32,13 +32,7 @@ final class FogOfWarRenderer implements AutoCloseable {
         texture.setFilter(Texture.TextureFilter.Linear,Texture.TextureFilter.Linear);
         // The concealed-space RGB color never changes. Initialize it once
         // and update only alpha on later mask rebuilds.
-        ByteBuffer pixels=bitmap.getPixels();
-        for(int i=0;i<MASK_W*MASK_H;i++){
-            int p=i*4;
-            pixels.put(p,(byte)3);
-            pixels.put(p+1,(byte)7);
-            pixels.put(p+2,(byte)16);
-        }
+        FogMaskEncoding.initialize(bitmap.getPixels(),MASK_W*MASK_H);
     }
     void render(Battle battle,OrthographicCamera world,OrthographicCamera hud,
                 SpriteBatch batch,BattleRenderPoses poses,int team,
@@ -135,13 +129,7 @@ final class FogOfWarRenderer implements AutoCloseable {
                 }
             }
         }
-        ByteBuffer buffer=bitmap.getPixels();
-        for(int i=0;i<revealed.length;i++){
-            int p=i*4;
-            // Deep navy uncharted space. Fully opaque when there is no optical
-            // sight; high-quality art and unknown hulls cannot bleed through.
-            buffer.put(p+3,(byte)Math.round(255*(1-revealed[i])));
-        }
+        FogMaskEncoding.updateAlpha(bitmap.getPixels(),revealed);
         texture.draw(bitmap,0,0);
     }
     @Override public void close(){

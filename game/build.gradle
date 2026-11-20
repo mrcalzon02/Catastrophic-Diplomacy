@@ -501,3 +501,12 @@ tasks.register('remoteNetworkPresentationSmoke', JavaExec) {
 tasks.matching { it.name == 'menuFlowSmoke' }.configureEach {
     dependsOn(tasks.named('remoteNetworkPresentationSmoke'))
 }
+
+tasks.register('fogMaskEncodingSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Assert exact 320x180 fog RGBA matches the pre-optimization encoder.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.FogMaskEncodingTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('fogMaskEncodingSmoke') }
