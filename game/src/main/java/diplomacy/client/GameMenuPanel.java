@@ -1224,36 +1224,60 @@ final class GameMenuPanel {
                 for(int i=0;i<OPTION_TABS.length;i++)
                     buttonLabel(batch,font,OPTION_TABS[i],32+i*248,548,238,64,
                             i==optionsTab?Color.GOLD:Color.WHITE);
-                String[] entries=switch(optionsTab){
-                    case 0 -> new String[]{"","MUSIC  "+(music?"ON":"OFF"),
-                            "SOUND EFFECTS  "+(effects?"ON":"OFF"),
-                            "SOUNDTRACK  "+(trackFinal?"BATTLE MIX":"COLD DRONE")};
-                    case 1 -> new String[]{"SPEED SLOWER","SPEED FASTER",
-                            "SKIRMISH WEATHER  "+(weatherEnabled?"ON":"OFF")};
-                    case 2 -> new String[]{"FPS COUNTER  "+(fpsEnabled?"ON":"OFF"),
-                            "PERFORMANCE HUD  "+(diagnosticsHud?"ON":"OFF"),
-                            "TACTICAL GRID  "+(tacticalGridEnabled?"ON":"OFF")};
-                    case 3 -> new String[]{"ADAPTIVE PACE  "+(adaptiveEnabled?"ON":"OFF"),
-                            "DIAGNOSTIC CAPTURE  "+(captureEnabled?"ON":"OFF"),
-                            "EXPORT PERFORMANCE ZIP"};
-                    case 4 -> new String[]{updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE",
-                            "DEVELOPER CONTROLS"};
-                    default -> new String[0];
+                // No per-frame String[] creation; only active-page controls
+                // are formatted. The shape and touch routes use the same count.
+                int entryCount=switch(optionsTab){
+                    case 0 -> 4;
+                    case 1,2,3 -> 3;
+                    case 4 -> 2;
+                    default -> 0;
                 };
-                for(int i=0;i<entries.length;i++){
+                for(int i=0;i<entryCount;i++){
                     if(optionsTab==0&&i==0){
                         buttonLabel(batch,font,"-",optionX(0),optionY(0),160,92,Color.WHITE);
                         buttonLabel(batch,font,"VOICE  "+Math.round(VoiceVolumeControl.clamp(voiceVolume)*100f)+"%",
                                 optionX(0)+160,optionY(0),228,92,Color.WHITE);
                         buttonLabel(batch,font,"+",optionX(0)+388,optionY(0),160,92,Color.WHITE);
-                    }else buttonLabel(batch,font,entries[i],optionX(i),optionY(i),548,92,
-                            optionsTab==4&&i==0&&!updaterAvailable?MUTED:Color.WHITE);
+                    }else{
+                        String text=switch(optionsTab){
+                            case 0 -> switch(i){
+                                case 1 -> music?"MUSIC  ON":"MUSIC  OFF";
+                                case 2 -> effects?"SOUND EFFECTS  ON":"SOUND EFFECTS  OFF";
+                                default -> trackFinal?"SOUNDTRACK  BATTLE MIX":"SOUNDTRACK  COLD DRONE";
+                            };
+                            case 1 -> switch(i){
+                                case 0 -> "SPEED SLOWER";
+                                case 1 -> "SPEED FASTER";
+                                default -> weatherEnabled?"SKIRMISH WEATHER  ON":"SKIRMISH WEATHER  OFF";
+                            };
+                            case 2 -> switch(i){
+                                case 0 -> fpsEnabled?"FPS COUNTER  ON":"FPS COUNTER  OFF";
+                                case 1 -> diagnosticsHud?"PERFORMANCE HUD  ON":"PERFORMANCE HUD  OFF";
+                                default -> tacticalGridEnabled?"TACTICAL GRID  ON":"TACTICAL GRID  OFF";
+                            };
+                            case 3 -> switch(i){
+                                case 0 -> adaptiveEnabled?"ADAPTIVE PACE  ON":"ADAPTIVE PACE  OFF";
+                                case 1 -> captureEnabled?"DIAGNOSTIC CAPTURE  ON":"DIAGNOSTIC CAPTURE  OFF";
+                                default -> "EXPORT PERFORMANCE ZIP";
+                            };
+                            case 4 -> i==0
+                                    ?(updaterAvailable?"CHECK FOR UPDATES":"UPDATES UNAVAILABLE")
+                                    :"DEVELOPER CONTROLS";
+                            default -> "";
+                        };
+                        buttonLabel(batch,font,text,optionX(i),optionY(i),548,92,
+                                optionsTab==4&&i==0&&!updaterAvailable?MUTED:Color.WHITE);
+                    }
                 }
+                if(optionsTab==0)
+                    label(batch,font,"KEYS: LEFT/RIGHT VOICE  |  U MUSIC  |  I EFFECTS  |  J TRACK",66,140,MUTED);
                 if(optionsTab==1)
-                    label(batch,font,"REQUESTED SPEED  "+String.format(java.util.Locale.ROOT,"%.1fx",requestedSpeed)
-                            +"  |  WEATHER APPLIES TO SKIRMISH",66,140,MUTED);
+                    label(batch,font,"SPEED  "+String.format(java.util.Locale.ROOT,"%.1fx",requestedSpeed)
+                            +"  |  LEFT/RIGHT SPEED  |  W SKIRMISH WEATHER",66,140,MUTED);
+                if(optionsTab==2)
+                    label(batch,font,"KEYS: F FPS  |  H PERFORMANCE HUD  |  G TACTICAL GRID",66,140,MUTED);
                 if(optionsTab==3)
-                    label(batch,font,"RETAINED "+capturedFrames+" FRAMES  |  F2 HUD  F3 CAPTURE  F4 EXPORT",66,140,MUTED);
+                    label(batch,font,"RETAINED "+capturedFrames+" FRAMES  |  A ADAPTIVE  |  C CAPTURE  |  E EXPORT",66,140,MUTED);
                 if(optionsTab==4){
                     label(batch,font,"UPDATE STATUS",66,169,Color.GOLD);
                     label(batch,font,updaterNotice,66,140,MUTED);

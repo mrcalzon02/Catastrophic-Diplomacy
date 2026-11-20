@@ -585,14 +585,25 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             if(key==Input.Keys.J)audio.toggleTrack();
                             if(key==Input.Keys.LEFT)audio.stepVoiceVolume(-1);
                             if(key==Input.Keys.RIGHT)audio.stepVoiceVolume(1);
-                        }else if(optionsTab==2){
-                            if(key==Input.Keys.G)toggleTacticalGrid();
                         }else if(optionsTab==1){
                             if(key==Input.Keys.LEFT)changePace(-1);
                             if(key==Input.Keys.RIGHT)changePace(1);
                             if(key==Input.Keys.W)toggleSkirmishWeather();
-                        }else if(optionsTab==4&&key==Input.Keys.K&&updateCheck!=null)
-                            requestUpdateCheck();
+                        }else if(optionsTab==2){
+                            if(key==Input.Keys.F)toggleFpsOverlay();
+                            if(key==Input.Keys.H)toggleDiagnosticsHud();
+                            if(key==Input.Keys.G)toggleTacticalGrid();
+                        }else if(optionsTab==3){
+                            if(key==Input.Keys.A)toggleAdaptivePacing();
+                            if(key==Input.Keys.C)toggleDiagnosticsCapture();
+                            if(key==Input.Keys.E)exportDiagnostics();
+                        }else if(optionsTab==4){
+                            if(key==Input.Keys.K&&updateCheck!=null)requestUpdateCheck();
+                            if(key==Input.Keys.D){
+                                devReturnToBattle=false;
+                                screen=GameMenuPanel.Screen.DEV;
+                            }
+                        }
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
