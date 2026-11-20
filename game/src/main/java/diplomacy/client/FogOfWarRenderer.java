@@ -23,6 +23,7 @@ final class FogOfWarRenderer implements AutoCloseable {
     // Reused scratch columns: a scout's horizontal distance is constant for
     // every mask row, so avoid calculating it once per pixel and ship.
     private final double[] columnDxSquared=new double[MASK_W];
+    private final FogMaskCoordinates pixelWorld=new FogMaskCoordinates();
     private final Pixmap bitmap=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
     private final Texture texture=new Texture(bitmap);
     private Battle lastBattle;
@@ -63,6 +64,7 @@ final class FogOfWarRenderer implements AutoCloseable {
         float zoom=camera.zoom;
         float pxWorld=SCREEN_W*zoom/MASK_W;
         float pyWorld=SCREEN_H*zoom/MASK_H;
+        pixelWorld.update(camera.position.x,camera.position.y,zoom);
         // Bounded per-source rectangles avoid 200 x full-mask work in 200v200.
         for(Battle.Ship scout:battle.ships()){
             if(!scout.alive()||scout.team!=team)continue;
@@ -76,12 +78,12 @@ final class FogOfWarRenderer implements AutoCloseable {
             int y1=Math.min(MASK_H-1,(int)Math.ceil(MASK_H*.5-(bottom-camera.position.y)/pyWorld));
             if(x0>x1||y0>y1)continue;
             for(int x=x0;x<=x1;x++){
-                double wx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld;
+                double wx=pixelWorld.x(x);
                 double dx=wx-pose.x();
                 columnDxSquared[x]=dx*dx;
             }
             for(int y=y0;y<=y1;y++){
-                double wy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld;
+                double wy=pixelWorld.y(y);
                 double dy=wy-pose.y();
                 double dySquared=dy*dy;
                 for(int x=x0;x<=x1;x++){
@@ -114,11 +116,11 @@ final class FogOfWarRenderer implements AutoCloseable {
                     (pose.y()-outerRadius-camera.position.y)/pyWorld));
             if(x0>x1||y0>y1)continue;
             for(int x=x0;x<=x1;x++){
-                double dx=camera.position.x+(x+.5-MASK_W*.5)*pxWorld-pose.x();
+                double dx=pixelWorld.x(x)-pose.x();
                 columnDxSquared[x]=dx*dx;
             }
             for(int y=y0;y<=y1;y++){
-                double dy=camera.position.y+(MASK_H*.5-y-.5)*pyWorld-pose.y();
+                double dy=pixelWorld.y(y)-pose.y();
                 double dySquared=dy*dy;
                 for(int x=x0;x<=x1;x++){
                     int index=y*MASK_W+x;

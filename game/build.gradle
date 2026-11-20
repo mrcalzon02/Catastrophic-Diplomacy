@@ -510,3 +510,12 @@ tasks.register('fogMaskEncodingSmoke', JavaExec) {
     mainClass = 'diplomacy.client.FogMaskEncodingTest'
 }
 tasks.named('menuFlowSmoke') { dependsOn tasks.named('fogMaskEncodingSmoke') }
+
+tasks.register('fogMaskCoordinatesSmoke', JavaExec) {
+    group = 'verification'
+    description = 'Verify cached fog mask world coordinates exactly match direct camera mapping.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'diplomacy.client.FogMaskCoordinatesTest'
+}
+tasks.named('menuFlowSmoke') { dependsOn tasks.named('fogMaskCoordinatesSmoke') }
