@@ -255,6 +255,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     private int armorCaptureFrame,armorCaptureStage,armorCaptureView;
     private ShipSurfaceDamageCapture.Snapshot currentArmorCapture;
     private final Runnable updateCheck;
+    private String updaterNotice="USE CHECK FOR UPDATES TO CHECK PUBLISHED RELEASES";
     private final java.util.function.Consumer<String> diagnosticExportHandler;
     private long verifiedSequence;
     private int verifiedFrames,verifiedShots,verifiedImpacts,peakAnimations,peakCraft,peakOrdnance,peakSpriteShips,peakLightQuads,peakSmokeQuads,peakShieldEvents,peakShieldDrawn;
@@ -591,7 +592,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             if(key==Input.Keys.RIGHT)changePace(1);
                             if(key==Input.Keys.W)toggleSkirmishWeather();
                         }else if(optionsTab==4&&key==Input.Keys.K&&updateCheck!=null)
-                            updateCheck.run();
+                            requestUpdateCheck();
                         return true;
                     }
                     if(screen==GameMenuPanel.Screen.CAMPAIGN_SETUP){
@@ -675,7 +676,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (key == Input.Keys.U) { audio.toggleMusic(); audio.ui(); return true; }
                 if (key == Input.Keys.I) { audio.toggleEffects(); audio.ui(); return true; }
                 if (key == Input.Keys.J) { audio.toggleTrack(); audio.ui(); return true; }
-                if (key == Input.Keys.K && updateCheck!=null){updateCheck.run();return true;}
+                if (key == Input.Keys.K && updateCheck!=null){requestUpdateCheck();return true;}
                 if(fleetOrdersPanel!=null && fleetOrdersPanel.open()) {
                     if(key==Input.Keys.ESCAPE || key==Input.Keys.F)closeFleetOrders();
                     return true;
@@ -816,7 +817,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if(!shipyard.open() && updateCheck!=null
                         && world.x>=1010 && world.x<1135
                         && world.y>=71 && world.y<=124){
-                    updateCheck.run();return true;
+                    requestUpdateCheck();return true;
                 }
                 if (!shipyard.open() && world.x >= 1140 && world.y >= 71 && world.y <= 124) {
                     openTacticalMenu(); return true;
@@ -2220,7 +2221,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 else if(action==21)toggleDiagnosticsCapture();
                 else if(action==22)exportDiagnostics();
             }else if(optionsTab==4){
-                if(action==20&&updateCheck!=null)updateCheck.run();
+                if(action==20&&updateCheck!=null)requestUpdateCheck();
                 else if(action==21){
                     devReturnToBattle=false;
                     screen=GameMenuPanel.Screen.DEV;
@@ -2758,6 +2759,21 @@ public final class CatastrophicGame extends ApplicationAdapter {
         performanceNotice(paceGovernor.enabled()?"ADAPTIVE ON":"ADAPTIVE OFF");
         savePerformancePreferences();
     }
+    /** The platform updater owns the final outcome and native result dialog.
+     * This notice confirms dispatch only; it never claims an update exists. */
+    private void requestUpdateCheck(){
+        if(updateCheck==null){
+            updaterNotice="UPDATE CHECK UNAVAILABLE ON THIS BUILD";
+            return;
+        }
+        updaterNotice="CHECK REQUESTED - SEE PLATFORM UPDATE DIALOG FOR RESULT";
+        try{
+            updateCheck.run();
+        }catch(RuntimeException failure){
+            updaterNotice="UPDATE CHECK COULD NOT START";
+            Gdx.app.error("CD-UPDATER","Unable to start manual update check",failure);
+        }
+    }
     private void toggleTacticalGrid(){
         tacticalGridEnabled=!tacticalGridEnabled;
         performanceNotice(tacticalGridEnabled?"TACTICAL GRID ON":"TACTICAL GRID OFF");
@@ -3036,7 +3052,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     technologyStage,technologyBranch,technologyNotice,armedTechnology,
                     fpsOverlayEnabled,diagnosticsHud,performanceCaptureEnabled,
                     paceGovernor.enabled(),diagnosticRecorder.framesRecorded(),
-                     optionsTab,weatherEnabled,speed,tacticalGridEnabled);
+                     optionsTab,weatherEnabled,speed,tacticalGridEnabled,updaterNotice);
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
                 // An actual completed framebuffer menu draw, not merely a
                 // click-handler state transition. Android campaign CI requires it.

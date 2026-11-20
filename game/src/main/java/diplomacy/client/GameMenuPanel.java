@@ -490,7 +490,7 @@ final class GameMenuPanel {
                boolean fpsEnabled,boolean diagnosticsHud,boolean captureEnabled,
                boolean adaptiveEnabled,long capturedFrames,
                int optionsTab,boolean weatherEnabled,float requestedSpeed,
-               boolean tacticalGridEnabled){
+               boolean tacticalGridEnabled,String updaterNotice){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -1254,8 +1254,10 @@ final class GameMenuPanel {
                             +"  |  WEATHER APPLIES TO SKIRMISH",66,140,MUTED);
                 if(optionsTab==3)
                     label(batch,font,"RETAINED "+capturedFrames+" FRAMES  |  F2 HUD  F3 CAPTURE  F4 EXPORT",66,140,MUTED);
-                if(optionsTab==4)
-                    label(batch,font,"UPDATER FEEDBACK APPEARS IN THE APPLICATION",66,140,MUTED);
+                if(optionsTab==4){
+                    label(batch,font,"UPDATE STATUS",66,169,Color.GOLD);
+                    label(batch,font,updaterNotice,66,140,MUTED);
+                }
                 buttonLabel(batch,font,"BACK TO MAIN MENU",471,41,338,67,Color.WHITE);
                 font.getData().setScale(previous);
             }
