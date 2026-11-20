@@ -113,7 +113,7 @@ final class GameMenuPanel {
             if(x>optionX(0)+388)return 8;
             return -1;
         }
-        int count=switch(tab){case 0->4;case 1->3;case 2->2;case 3->3;case 4->2;default->0;};
+        int count=switch(tab){case 0->4;case 1->3;case 2->3;case 3->3;case 4->2;default->0;};
         for(int i=0;i<count;i++)
             if(hit(x,y,optionX(i),optionY(i),548,92))
                 return tab==4&&i==0&&!updaterAvailable?-2:20+i;
@@ -489,7 +489,8 @@ final class GameMenuPanel {
                int technologyBranch,String technologyNotice,String armedTechnology,
                boolean fpsEnabled,boolean diagnosticsHud,boolean captureEnabled,
                boolean adaptiveEnabled,long capturedFrames,
-               int optionsTab,boolean weatherEnabled,float requestedSpeed){
+               int optionsTab,boolean weatherEnabled,float requestedSpeed,
+               boolean tacticalGridEnabled){
         chromeCount=0;
         boolean textured=backgrounds.prepare(screen);
         if(textured){
@@ -744,7 +745,7 @@ final class GameMenuPanel {
                 for(int i=0;i<OPTION_TABS.length;i++)
                     button(shapes,32+i*248,548,238,64,i==optionsTab);
                 rectangle(shapes,35,119,1210,417,PANEL);
-                int count=switch(optionsTab){case 0->4;case 1->3;case 2->2;case 3->3;case 4->2;default->0;};
+                int count=switch(optionsTab){case 0->4;case 1->3;case 2->3;case 3->3;case 4->2;default->0;};
                 for(int i=0;i<count;i++){
                     if(optionsTab==0&&i==0){
                         button(shapes,optionX(0),optionY(0),160,92,false);
@@ -1230,7 +1231,8 @@ final class GameMenuPanel {
                     case 1 -> new String[]{"SPEED SLOWER","SPEED FASTER",
                             "SKIRMISH WEATHER  "+(weatherEnabled?"ON":"OFF")};
                     case 2 -> new String[]{"FPS COUNTER  "+(fpsEnabled?"ON":"OFF"),
-                            "PERFORMANCE HUD  "+(diagnosticsHud?"ON":"OFF")};
+                            "PERFORMANCE HUD  "+(diagnosticsHud?"ON":"OFF"),
+                            "TACTICAL GRID  "+(tacticalGridEnabled?"ON":"OFF")};
                     case 3 -> new String[]{"ADAPTIVE PACE  "+(adaptiveEnabled?"ON":"OFF"),
                             "DIAGNOSTIC CAPTURE  "+(captureEnabled?"ON":"OFF"),
                             "EXPORT PERFORMANCE ZIP"};

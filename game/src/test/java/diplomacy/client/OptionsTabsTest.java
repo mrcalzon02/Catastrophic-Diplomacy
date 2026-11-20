@@ -24,6 +24,7 @@ public final class OptionsTabsTest {
         eq(GameMenuPanel.optionsPageAction(160,350,1,true),22,"weather");
         eq(GameMenuPanel.optionsPageAction(160,455,2,true),20,"fps");
         eq(GameMenuPanel.optionsPageAction(730,455,2,true),21,"hud");
+        eq(GameMenuPanel.optionsPageAction(160,350,2,true),22,"tactical grid");
         eq(GameMenuPanel.optionsPageAction(160,455,3,true),20,"adaptive");
         eq(GameMenuPanel.optionsPageAction(730,455,3,true),21,"capture");
         eq(GameMenuPanel.optionsPageAction(160,350,3,true),22,"export");

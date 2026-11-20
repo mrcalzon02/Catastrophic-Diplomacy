@@ -82,6 +82,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
     /** Development capture is ON by default; F3 is the persistent opt-out toggle. */
     private boolean performanceCaptureEnabled=true;
     private boolean fpsOverlayEnabled=true;
+    private boolean tacticalGridEnabled=true;
     /** Return to the paused tactical menu when Dev was opened during combat. */
     private boolean devReturnToBattle;
     private int diagnosticTicksLastFrame,diagnosticDrawCallsLastFrame,diagnosticBindsLastFrame;
@@ -375,6 +376,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 diagnosticsHud=preferences.getBoolean("hud",false);
                 performanceCaptureEnabled=preferences.getBoolean("capture",true);
                 fpsOverlayEnabled=preferences.getBoolean("fps",true);
+                tacticalGridEnabled=preferences.getBoolean("tacticalGrid",true);
                 weatherEnabled=preferences.getBoolean("skirmishWeather",true);
                 paceGovernor.request(speed);
                 paceGovernor.setEnabled(preferences.getBoolean("adaptive",true));
@@ -582,6 +584,8 @@ public final class CatastrophicGame extends ApplicationAdapter {
                             if(key==Input.Keys.J)audio.toggleTrack();
                             if(key==Input.Keys.LEFT)audio.stepVoiceVolume(-1);
                             if(key==Input.Keys.RIGHT)audio.stepVoiceVolume(1);
+                        }else if(optionsTab==2){
+                            if(key==Input.Keys.G)toggleTacticalGrid();
                         }else if(optionsTab==1){
                             if(key==Input.Keys.LEFT)changePace(-1);
                             if(key==Input.Keys.RIGHT)changePace(1);
@@ -687,11 +691,12 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     return true;
                 }
                 if (key == Input.Keys.F) { openFleetOrders(); return true; }
+                if (key == Input.Keys.G) { toggleTacticalGrid(); return true; }
                 if (key == Input.Keys.SPACE) { running = !running; return true; }
                 if (key == Input.Keys.R) { reset(); return true; }
                 if (key == Input.Keys.N) { changeBattlefieldLevel(1); return true; }
                 if (key == Input.Keys.B) { changeBattlefieldLevel(-1); return true; }
-                if (key == Input.Keys.W) { if(!playedCampaign){weatherEnabled = !weatherEnabled; reset();} return true; }
+                if (key == Input.Keys.W) { if(!playedCampaign){toggleSkirmishWeather(); reset();} return true; }
                 if (key == Input.Keys.Z) { zoomBy(-1); return true; }
                 if (key == Input.Keys.X) { zoomBy(1); return true; }
                 if (key == Input.Keys.C) { resetBattleView(); return true; }
@@ -828,7 +833,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     }
                 }
                 if (world.y >= 613 && world.y < 649) {
-                    if (world.x < 830) { if(!playedCampaign){weatherEnabled = !weatherEnabled; reset();} return true; }
+                    if (world.x < 830) { if(!playedCampaign){toggleSkirmishWeather(); reset();} return true; }
                     if (world.x >= 900 && world.x < 1040) { changeBattlefieldLevel(-1); return true; }
                     if (world.x >= 1170) { changeBattlefieldLevel(1); return true; }
                 }
@@ -2209,6 +2214,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }else if(optionsTab==2){
                 if(action==20)toggleFpsOverlay();
                 else if(action==21)toggleDiagnosticsHud();
+                else if(action==22)toggleTacticalGrid();
             }else if(optionsTab==3){
                 if(action==20)toggleAdaptivePacing();
                 else if(action==21)toggleDiagnosticsCapture();
@@ -2718,6 +2724,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             preferences.putBoolean("hud",diagnosticsHud);
             preferences.putBoolean("capture",performanceCaptureEnabled);
             preferences.putBoolean("fps",fpsOverlayEnabled);
+            preferences.putBoolean("tacticalGrid",tacticalGridEnabled);
             preferences.flush();
         }catch(RuntimeException failure){Gdx.app.error("CD-PERF","Cannot save preferences",failure);}
     }
@@ -2749,6 +2756,11 @@ public final class CatastrophicGame extends ApplicationAdapter {
         diagnosticRecorder.event(battle==null?0:battle.tick,speed,paceGovernor.effective(),
                 paceGovernor.enabled()?"AUTO ENABLED":"AUTO DISABLED");
         performanceNotice(paceGovernor.enabled()?"ADAPTIVE ON":"ADAPTIVE OFF");
+        savePerformancePreferences();
+    }
+    private void toggleTacticalGrid(){
+        tacticalGridEnabled=!tacticalGridEnabled;
+        performanceNotice(tacticalGridEnabled?"TACTICAL GRID ON":"TACTICAL GRID OFF");
         savePerformancePreferences();
     }
     private void toggleFpsOverlay(){
@@ -3024,7 +3036,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                     technologyStage,technologyBranch,technologyNotice,armedTechnology,
                     fpsOverlayEnabled,diagnosticsHud,performanceCaptureEnabled,
                     paceGovernor.enabled(),diagnosticRecorder.framesRecorded(),
-                     optionsTab,weatherEnabled,speed);
+                     optionsTab,weatherEnabled,speed,tacticalGridEnabled);
                 if(mouse&&menuPanel.enteredNewButton(screen)&&audio!=null)audio.uiHover();
                 // An actual completed framebuffer menu draw, not merely a
                 // click-handler state transition. Android campaign CI requires it.
@@ -3160,7 +3172,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
         shapes.setProjectionMatrix(battleCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         shapes.setColor(0.11f, 0.16f, 0.26f, 0.75f);
-        if(!screensaverMode){
+        if(!screensaverMode && tacticalGridEnabled){
             for (int x = 40; x <= 1240; x += 40) shapes.line(x, 25, x, 645);
             for (int y = 25; y <= 645; y += 40) shapes.line(40, y, 1240, y);
         }
