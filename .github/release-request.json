@@ -2,7 +2,7 @@
   "action": "verified-three-platform-release",
   "requested_by": "user",
   "request_date": "2026-11-20",
-  "revision": 26,
-  "source_base_commit": "ddcdc122d40e5149c259fab5487d2838c9beca51",
-  "note": "Owner-requested current development prerelease after successful exact-source focused regression and headed OpenGL frame comparison (run 44861331856, commit ddcdc122d40e5149c259fab5487d2838c9beca51). Build actual signed Android APK, Windows MSI and Linux ZIP from this release-request commit on main; enforce all existing build, launch, multiplayer, updater, Android 10/14 emulator campaign and retention-signer checks. Verify package identities, signatures, upgrade/state persistence, exact source, hashes and published asset readback. Publish only after every required job succeeds. Do not retag, overwrite assets, change signing keys, weaken gates or claim physical-device GPU acceptance. Include five-tab options, tactical display/fog rendering efficiency, combat presentation, and latest checked-in changes."
+  "revision": 27,
+  "source_base_commit": "8ab304f8a1bd5a09da6e2dca460d2a981e34945f",
+  "note": "Owner-authorized replacement release after dev.700 attempt 1 GitHub HTTP403 and attempt 2 stale Android five-tab menu smoke stopped publication. Exact source 8ab304f8a1bd5a09da6e2dca460d2a981e34945f includes repaired five-tab Audio/System/Dev hardware navigation receipts, restored actual voice-volume event logging, and faster live battle initial cruise up to 84% of fitted ship rated speed (previously capped at 6 world units/second). Preserve 30Hz fixed simulation, physically bounded engine speed and paid fuel, all existing functional and Android update/signing/persistence gates. Build and publish Windows MSI, Linux ZIP and retained-signer Android APK only after platform install/launch, real 200v200 rendering, all Android 10 faction campaigns, Android 14 real production updater, full asset checksum/signature/source readback. No draft counted as latest; no retagging, re-signing or workflow gate weakening. Visual/fleet-speed acceptance remains diagnostic; report actual tests not invented GPU FPS."
 }
