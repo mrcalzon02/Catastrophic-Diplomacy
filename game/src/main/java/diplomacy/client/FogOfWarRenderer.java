@@ -27,6 +27,7 @@ final class FogOfWarRenderer implements AutoCloseable {
     private final Pixmap bitmap=new Pixmap(MASK_W,MASK_H,Pixmap.Format.RGBA8888);
     private final Texture texture=new Texture(bitmap);
     private Battle lastBattle;
+    private boolean maskUploaded;
     private long lastTick=Long.MIN_VALUE;
     private float lastX=Float.NaN,lastY=Float.NaN,lastZoom=Float.NaN;
     FogOfWarRenderer(){
@@ -133,8 +134,14 @@ final class FogOfWarRenderer implements AutoCloseable {
                 }
             }
         }
-        FogMaskEncoding.updateAlpha(bitmap.getPixels(),revealed);
-        texture.draw(bitmap,0,0);
+        boolean changed=FogMaskEncoding.updateAlpha(bitmap.getPixels(),revealed);
+        // Texture was constructed before the bitmap RGB initialization, so
+        // upload the first completed mask even when all alpha bytes remain zero.
+        // Later byte-identical rebuilds need no redundant GL texture upload.
+        if(changed||!maskUploaded){
+            texture.draw(bitmap,0,0);
+            maskUploaded=true;
+        }
     }
     @Override public void close(){
         texture.dispose();
