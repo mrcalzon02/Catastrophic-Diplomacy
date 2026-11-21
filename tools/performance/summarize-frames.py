@@ -29,6 +29,7 @@ for scene, runs, count, metric in (("fleet", 4, 120, "complete_ms"), ("skirmish"
     ends = set()
     for side in ("base", "candidate"):
         pooled = []
+        draw_calls, texture_binds = [], []
         stationary = 0
         for run in range(1, runs + 1):
             lines, rows = data(scene, side, run)
@@ -38,7 +39,12 @@ for scene, runs, count, metric in (("fleet", 4, 120, "complete_ms"), ("skirmish"
             values = [float(row[metric]) for row in rows]
             print(f"{scene} {side} {run}: {metric} p50/95/99 {quantiles(values)} ms")
             pooled.extend(values)
+            draw_calls.extend(int(row["draws"]) for row in rows)
+            texture_binds.extend(int(row["binds"]) for row in rows)
             stationary += sum(row["stationary_camera"] == "true" for row in rows)
+        assert all(x >= 0 for x in draw_calls + texture_binds), "Headed OpenGL profiler was not enabled"
+        print(f"{scene} {side} OpenGL draws p50/p95/p99 {quantiles(draw_calls)}; "
+              f"texture binds p50/p95/p99 {quantiles(texture_binds)}")
         print(f"{scene} {side} pooled: {quantiles(pooled)} ms; over 16.67 / 33.33 ms "
               f"{sum(n > 16.67 for n in pooled)} / {sum(n > 33.33 for n in pooled)} of {len(pooled)}; "
               f"stationary camera {stationary}/{len(pooled)}")
@@ -48,7 +54,7 @@ for scene, runs, count, metric in (("fleet", 4, 120, "complete_ms"), ("skirmish"
 
 for scene, runs, count in (("network", 2, 100), ("network-fleet", 2, 80)):
     for side in ("base", "candidate"):
-        durations, cpu = [], []
+        durations, cpu, draw_calls, texture_binds = [], [], [], []
         for run in range(1, runs + 1):
             lines, rows = data(scene, side, run)
             assert any(line.startswith("PASS renderedTicks=") and "acks=1/1" in line for line in lines)
@@ -56,6 +62,11 @@ for scene, runs, count in (("network", 2, 100), ("network-fleet", 2, 80)):
             assert int(rows[-1]["rendered_tick"]) > int(rows[0]["rendered_tick"])
             durations.extend(float(row["interval_ms"]) for row in rows)
             cpu.extend(float(row["render_thread_cpu_ms"]) for row in rows)
+            draw_calls.extend(int(row["draws"]) for row in rows)
+            texture_binds.extend(int(row["binds"]) for row in rows)
+        assert all(x >= 0 for x in draw_calls + texture_binds), "Headed network OpenGL profiler was not enabled"
+        print(f"{scene} {side}: OpenGL draws p50/p95/p99 {quantiles(draw_calls)}; "
+              f"texture binds p50/p95/p99 {quantiles(texture_binds)}")
         print(f"{scene} {side}: frame intervals {quantiles(durations)} ms; render thread CPU "
               f"{quantiles(cpu)} ms; over 16.67 / 33.33 ms {sum(x > 16.67 for x in durations)} / "
               f"{sum(x > 33.33 for x in durations)} of {len(durations)}")

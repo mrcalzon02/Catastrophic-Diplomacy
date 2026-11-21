@@ -49,23 +49,26 @@ for side_run in base-1 candidate-1 candidate-2 base-2 base-3 candidate-3 candida
     run=${side_run#*-}
     extra=()
     if [[ $run == 1 ]]; then extra+=("-Dbench.output=$output/fleet-$side"); fi
-    trial "$side" "$run" fleet DesktopFrameBenchmark -Dbench.warm=48 -Dbench.frames=120 "${extra[@]}"
+    # Headed OpenGL: include actual draw/texture-binding counters in every
+    # timed renderer path. Both revisions use this same candidate-built
+    # benchmark fixture so instrumentation overhead is paired fairly.
+    trial "$side" "$run" fleet DesktopFrameBenchmark -Dbench.counters=true -Dbench.warm=48 -Dbench.frames=120 "${extra[@]}"
     if (( run <= 2 )); then
-        trial "$side" "$run" paused DesktopFrameBenchmark -Dbench.paused=true -Dbench.warm=30 -Dbench.frames=80
-        trial "$side" "$run" skirmish DesktopFrameBenchmark -Dbench.engaged=true \
+        trial "$side" "$run" paused DesktopFrameBenchmark -Dbench.counters=true -Dbench.paused=true -Dbench.warm=30 -Dbench.frames=80
+        trial "$side" "$run" skirmish DesktopFrameBenchmark -Dbench.counters=true -Dbench.engaged=true \
             -Dbench.live=true -Dbench.warm=48 -Dbench.frames=160
         net_image=()
         if (( run == 1 )); then net_image+=("-Dbench.net.output=$output/network-$side.png"); fi
-        trial "$side" "$run" network NetworkFrameBenchmark -Dbench.net.ships=16 \
+        trial "$side" "$run" network NetworkFrameBenchmark -Dbench.net.counters=true -Dbench.net.ships=16 \
             -Dbench.net.warm=24 -Dbench.net.frames=100 -Dbench.net.proofRows="$temp/snapshot.rows" "${net_image[@]}"
         net_image=()
         if (( run == 1 )); then net_image+=("-Dbench.net.output=$output/network-fleet-$side.png"); fi
-        trial "$side" "$run" network-fleet NetworkFrameBenchmark -Dbench.net.ships=200 \
+        trial "$side" "$run" network-fleet NetworkFrameBenchmark -Dbench.net.counters=true -Dbench.net.ships=200 \
             -Dbench.net.zoom=.40 -Dbench.net.warm=24 -Dbench.net.frames=80 \
             -Dbench.net.proofRows="$temp/snapshot.rows" "${net_image[@]}"
     fi
     if (( run == 1 )); then
-        trial "$side" "$run" close DesktopFrameBenchmark -Dbench.zoom=.35 -Dbench.warm=18 \
+        trial "$side" "$run" close DesktopFrameBenchmark -Dbench.counters=true -Dbench.zoom=.35 -Dbench.warm=18 \
             -Dbench.frames=80 -Dbench.output="$output/close-$side"
         trial "$side" "$run" sky SkyFrameBenchmark
         trial "$side" "$run" sky-gl20 SkyFrameBenchmark -Dbench.es2=true
