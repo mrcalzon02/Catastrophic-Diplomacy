@@ -2243,6 +2243,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 else if(action==21){
                     devReturnToBattle=false;
                     screen=GameMenuPanel.Screen.DEV;
+                    Gdx.app.log("CD-DEV","OPEN FROM OPTIONS");
                 }
             }
             return;

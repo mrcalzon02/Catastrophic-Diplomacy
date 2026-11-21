@@ -109,7 +109,11 @@ capture options-voice-restored
 adb logcat -d -v time > "$report/voice-options-logcat.txt"
 grep -q 'CD-OPTIONS.*VOICE 95%' "$report/voice-options-logcat.txt"
 grep -q 'CD-OPTIONS.*VOICE 100%' "$report/voice-options-logcat.txt"
-touch_ui options-voice-restored 350 165
+# Dev controls live under SYSTEM in the five-tab Options screen.
+touch_ui options-voice-restored 1143 580
+sleep 1
+capture options-system
+touch_ui options-system 750 455
 sleep 1
 capture dev-menu-default
 adb logcat -d -v time > "$report/dev-menu-logcat.txt"
@@ -134,7 +138,7 @@ capture dev-fps-restored
 touch_ui dev-fps-restored 930 207
 sleep 1
 capture dev-back-options
-touch_ui dev-back-options 930 165
+touch_ui dev-back-options 640 75
 sleep 1
 capture dev-back-home
 adb logcat -d -v time > "$report/dev-toggles-logcat.txt"

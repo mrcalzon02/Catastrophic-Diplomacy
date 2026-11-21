@@ -44,6 +44,15 @@ class ReleaseEmulatorInvocationTest(unittest.TestCase):
         self.assertIn("posix.setPermissions(", executable)
         self.assertIn('"rwx------":"rw-------"', executable)
 
+    def test_android_menu_uses_five_tab_options_navigation(self):
+        script = pathlib.Path("tools/android_verify_menu.sh").read_text()
+        self.assertIn("touch_ui options-voice-restored 1143 580", script)
+        self.assertIn("touch_ui options-system 750 455", script)
+        self.assertIn("touch_ui dev-back-options 640 75", script)
+        self.assertLess(script.index("capture options-system"),
+                        script.index("capture dev-menu-default"))
+        self.assertNotIn("touch_ui options-voice-restored 350 165", script)
+
     def test_production_updater_waits_for_package_installer_completion(self):
         script = pathlib.Path("tools/android_verify_real_update.sh").read_text()
         open_wait = script.index('if [[ -z "$open_coords" ]]')

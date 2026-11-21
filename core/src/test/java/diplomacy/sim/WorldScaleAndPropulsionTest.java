@@ -248,6 +248,12 @@ public final class WorldScaleAndPropulsionTest {
         ok(StrictMath.abs(friendly.vx)<=SublightPropulsion.maximumSpeed(friendly)
                         &&StrictMath.abs(hostile.vx)<=SublightPropulsion.maximumSpeed(hostile),
                 "Deployment inherited an impossible super-rated ship velocity");
+        close(friendly.vx,StrictMath.min(72.0,
+                SublightPropulsion.maximumSpeed(friendly)*.84),1e-8,
+                "Deployment cruise must not be capped at the old six-unit crawl");
+        close(-hostile.vx,StrictMath.min(72.0,
+                SublightPropulsion.maximumSpeed(hostile)*.84),1e-8,
+                "Hostile deployment must receive the same fitted-speed approach");
         double startX=friendly.x;
         for(int i=0;i<60;i++)fight.step();
         ok(friendly.x>startX+2,

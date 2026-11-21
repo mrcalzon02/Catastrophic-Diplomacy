@@ -187,7 +187,11 @@ public final class CombatAudio implements AutoCloseable {
         if(save)persist();
     }
     public void stepVoiceVolume(int direction){
-        setVoiceVolume(VoiceVolumeControl.step(voiceVolume,direction),true);uiAdjust();
+        setVoiceVolume(VoiceVolumeControl.step(voiceVolume,direction),true);
+        // Exact saved value for release navigation diagnostics after tab migration.
+        if(Gdx.app!=null)Gdx.app.log("CD-OPTIONS",
+                "VOICE "+Math.round(voiceVolume*100f)+"%");
+        uiAdjust();
     }
     public void saveVoiceVolume(){persist();}
     public void toggleMusic() {

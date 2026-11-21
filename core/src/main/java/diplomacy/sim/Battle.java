@@ -2008,14 +2008,14 @@ public final class Battle {
         }
         return s;
     }
-    /** Fleet ships approach the deployment line already under way. This is
-     * inherited sublight momentum from before combat, not an instantaneous
-     * in-battle acceleration or free fuel impulse. The conservative entry
-     * fraction respects each paid drive's physical speed cap; ordinary
-     * maneuvers, braking and retreat still consume real fuel at rated g. */
+    /** Enter combat already moving at a meaningful fraction of the FITTED
+     * drive's rated tactical speed. The previous 6 world-unit/sec ceiling left
+     * even high-energy capital ships visibly stationary at normal pace.
+     * Momentum is inherited before deployment, not free mid-battle thrust;
+     * subsequent maneuvers and braking still spend real finite fuel. */
     private static void initializeEntryCruise(Ship ship){
-        double speed=StrictMath.min(6.0,
-                SublightPropulsion.maximumSpeed(ship)*0.18);
+        double speed=StrictMath.min(72.0,
+                SublightPropulsion.maximumSpeed(ship)*0.84);
         ship.vx=(ship.team==0?1:-1)*speed;
         ship.vy=0;
     }
