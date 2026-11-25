@@ -7,7 +7,8 @@ permissions:
   actions: write
 jobs:
   remove_exact_old_builds:
-    if: github.repository == 'mrcalzon02/Catastrophic-Diplomacy' && github.event.head_commit.message == 'chore(ci): remove three superseded run 44862441127 build artifacts'
+    if: >-
+      github.repository == 'mrcalzon02/Catastrophic-Diplomacy' && github.event.head_commit.message == 'chore(ci): remove three superseded run 44862441127 build artifacts'
     runs-on: ubuntu-24.04
     timeout-minutes: 4
     steps:
