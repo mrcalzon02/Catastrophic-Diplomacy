@@ -99,16 +99,21 @@ adb logcat -d -v time > "$report/dev-options-logcat.txt"
 grep -q 'CD-DEV.*OPTIONS OPEN' "$report/dev-options-logcat.txt" || {
   echo "FAIL: signed APK did not open Options" >&2; exit 1;
 }
-# Exercise the real volume buttons and preserve readable Options evidence.
-touch_ui options 200 510
+# The five-tab Audio page keeps both voice arrows in its left-hand tile.
+# The old right-hand coordinate now toggles Music instead of restoring Voice.
+touch_ui options 125 455
 sleep 1
 capture options-voice-decreased
-touch_ui options-voice-decreased 1080 510
+touch_ui options-voice-decreased 530 455
 sleep 1
 capture options-voice-restored
 adb logcat -d -v time > "$report/voice-options-logcat.txt"
-grep -q 'CD-OPTIONS.*VOICE 95%' "$report/voice-options-logcat.txt"
-grep -q 'CD-OPTIONS.*VOICE 100%' "$report/voice-options-logcat.txt"
+grep -q 'CD-OPTIONS.*VOICE 95%' "$report/voice-options-logcat.txt" || {
+  echo "FAIL: signed APK Audio page did not decrease Voice to 95%" >&2; exit 1;
+}
+grep -q 'CD-OPTIONS.*VOICE 100%' "$report/voice-options-logcat.txt" || {
+  echo "FAIL: signed APK Audio page did not restore Voice to 100%" >&2; exit 1;
+}
 # Dev controls live under SYSTEM in the five-tab Options screen.
 touch_ui options-voice-restored 1143 580
 sleep 1

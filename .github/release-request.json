@@ -1,8 +1,8 @@
 {
   "action": "verified-three-platform-release",
   "requested_by": "user",
-  "request_date": "2026-11-20",
-  "revision": 27,
-  "source_base_commit": "8ab304f8a1bd5a09da6e2dca460d2a981e34945f",
-  "note": "Owner-authorized replacement release after dev.700 attempt 1 GitHub HTTP403 and attempt 2 stale Android five-tab menu smoke stopped publication. Exact source 8ab304f8a1bd5a09da6e2dca460d2a981e34945f includes repaired five-tab Audio/System/Dev hardware navigation receipts, restored actual voice-volume event logging, and faster live battle initial cruise up to 84% of fitted ship rated speed (previously capped at 6 world units/second). Preserve 30Hz fixed simulation, physically bounded engine speed and paid fuel, all existing functional and Android update/signing/persistence gates. Build and publish Windows MSI, Linux ZIP and retained-signer Android APK only after platform install/launch, real 200v200 rendering, all Android 10 faction campaigns, Android 14 real production updater, full asset checksum/signature/source readback. No draft counted as latest; no retagging, re-signing or workflow gate weakening. Visual/fleet-speed acceptance remains diagnostic; report actual tests not invented GPU FPS."
+  "request_date": "2026-11-26",
+  "revision": 28,
+  "source_base_commit": "b5b021878d35e6184ddb7fa3ae38516935462919",
+  "note": "Owner-authorized demonstration beta from current main. Preserve the existing fleet movement, five-tab options, campaign, multiplayer, fixed simulation, Android signing identity and updater behavior. Repair the Android menu acceptance taps to the actual five-tab Voice minus/plus controls (125,455 and 530,455); keep the 95%/100% behavior assertions and all required runtime/install/update/save-retention checks. Build and publish fresh Windows MSI, Linux ZIP and retained-signer Android APK after the existing functional gates pass. No new performance refactors, no draft counted as latest, no retagging or signing-key rotation. Read back public prerelease assets, source and updater manifest."
 }
