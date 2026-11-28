@@ -419,6 +419,7 @@ public final class CatastrophicGame extends ApplicationAdapter {
             }
         },leftDesign,rightDesign,terranSprites);
         shipyard.setIcons(uiIcons);
+        shipyard.setViewport(viewport);
         shipyard.setSkirmishRules(()->skirmishRules,rules->{
             skirmishRules=rules;
             skirmishNotice="CHALLENGE TECH "+rules.maxStage()+"/9, HULL GEN "+rules.maxHullGeneration()+"/10";
@@ -978,13 +979,20 @@ public final class CatastrophicGame extends ApplicationAdapter {
                 if (activated && audio != null) audio.ui();
                 return activated;
             }
+            @Override public boolean touchCancelled(int x,int y,int pointer,int button){
+                if(shipyard.open()){shipyard.cancelTouch();return true;}
+                return false;
+            }
             @Override public boolean scrolled(float amountX,float amountY) {
                 if(wikiVisible){wiki.pageText((int)Math.signum(amountY)*3);return true;}
                 if(screensaverMode){
                     screensaverCamera.manualScale((float)Math.pow(1.18,amountY));
                     return true;
                 }
-                if(shipyard.open())return shipyard.scroll(amountY);
+                if(shipyard.open()){
+                    com.badlogic.gdx.math.Vector2 mouse=viewport.unproject(new com.badlogic.gdx.math.Vector2(Gdx.input.getX(),Gdx.input.getY()));
+                    return shipyard.scrollAt(mouse.x,mouse.y,amountY);
+                }
                 if(tacticalMenuOpen || (fleetOrdersPanel!=null&&fleetOrdersPanel.open()))return false;
                 zoomBy(amountY);
                 return true;

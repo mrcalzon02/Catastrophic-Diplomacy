@@ -76,9 +76,24 @@ public final class GuidedShipyardPanelTest {
         editor.show();
         check(editor.prefersHullArt(),"Shipyard must prefer real vessel artwork on open");
         var chosen=stock.placements().get(2);
-        check(editor.tap(562f+chosen.x()*2.65f,343f+chosen.y()*2.65f)
+        check(editor.tap(editor.hardpointX(chosen),editor.hardpointY(chosen))
                 &&editor.selectedHardpoint()==chosen.index(),
                 "Hardpoints must remain selectable in the schematic fallback");
+        var initialDraft=editor.draftDesign();
+        editor.startTouch(500,380,0);editor.startTouch(600,380,1);
+        editor.drag(1,650,380);editor.endTouch(1,650,380);editor.endTouch(0,500,380);
+        check(editor.previewZoom()>1&&editor.selectedHardpoint()==chosen.index()
+                &&editor.draftDesign()==initialDraft,"Pinch must zoom without editing or selecting");
+        editor.tap(515,560);
+        check(editor.previewZoom()==1,"FIT must restore entire hull");
+        editor.tap(710,560);
+        check(editor.selectedHardpoint()==(chosen.index()+1)%stock.slots(),"Next mount must select a real socket");
+        editor.tap(610,560);
+        check(editor.selectedHardpoint()==chosen.index(),"Previous mount must reverse selection");
+        editor.startTouch(500,380,0);editor.startTouch(600,380,1);
+        editor.drag(1,700,380);editor.cancelTouch();editor.endTouch(0,500,380);
+        check(editor.draftDesign()==initialDraft,"Cancelled gesture must never edit the draft");
+        editor.tap(515,560);
         var alternatives=Shipyard.choices(catalog,stock.faction,stock.hull,chosen.index());
         check(!alternatives.isEmpty(),"Selected mount must offer compatible alternative modules");
         String originalFitting=editor.draftDesign().at(chosen.index())==null?null:
