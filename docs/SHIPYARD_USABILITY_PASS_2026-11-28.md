@@ -5,7 +5,7 @@ The first batch isolates the fitting canvas from other controls on the existing
 socket markers and hit-testing, clipped with the real FitViewport. Drag/pinch
 captures cannot commit a fitting or purchase. Wheel zoom is cursor-anchored;
 FIT restores the entire hull; previous/next mount navigation remains available
-even when sockets overlap. The displayed zoom is bounded to 100–400%.
+even when sockets overlap; navigating to an offscreen socket pans it into view. The displayed zoom is bounded to 100–400%.
 The shared blueprint, engineering, campaign spend and combat rules are unchanged.
 
 ## Next batches (not implemented by this change)
@@ -25,3 +25,11 @@ The shared blueprint, engineering, campaign spend and combat rules are unchanged
    results; do not infer them from a source-only change.
 
 No new release request, signing changes, or battle simulation changes.
+
+## Logic verification
+
+`ShipyardCanvasTest` is a Java 17-compatible standalone diagnostic. The canvas
+and existing BattleTouchNavigation source blobs were matched against GitHub and
+compiled locally with `javac --release 17`; the diagnostic passed. This checks
+geometry and pointer state only. The full Gradle build and actual render/device
+acceptance remain outstanding. No release or additional workflow was requested.

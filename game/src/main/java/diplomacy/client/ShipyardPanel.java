@@ -136,7 +136,18 @@ final class ShipyardPanel {
     private void canvasAction(int action){
         if(action==0||action==1)canvas.scale(action==0?1/1.25f:1.25f,MAP_CX,MAP_CY,MAP_CX,MAP_CY);
         else if(action==2)canvas.fit();
-        else if(action==3||action==4)select(Math.floorMod(selectedSlot+(action==3?-1:1),draft.slots()));
+        else if(action==3||action==4){
+            select(Math.floorMod(selectedSlot+(action==3?-1:1),draft.slots()));
+            revealSelected();
+        }
+    }
+    private void revealSelected(){
+        if(technologyView||guidedView)return;
+        Shipyard.Slot slot=draft.placements().get(selectedSlot);
+        float x=hardpointX(slot),y=hardpointY(slot);
+        if(x<ShipyardCanvas.X+18||x>ShipyardCanvas.X+ShipyardCanvas.W-18||
+                y<ShipyardCanvas.Y+18||y>ShipyardCanvas.Y+ShipyardCanvas.H-18)
+            canvas.pan(MAP_CX-x,MAP_CY-y);
     }
     float previewZoom(){return canvas.zoom();}
     void setSkirmishRules(Supplier<SkirmishTechnologyRules> rules,
@@ -618,8 +629,8 @@ final class ShipyardPanel {
         }
         if(code==com.badlogic.gdx.Input.Keys.PAGE_UP){hullGroup(-1);return true;}
         if(code==com.badlogic.gdx.Input.Keys.PAGE_DOWN){hullGroup(1);return true;}
-        if(code==com.badlogic.gdx.Input.Keys.UP){selectedSlot=Math.max(0,selectedSlot-1);scroll=Math.min(scroll,selectedSlot);return true;}
-        if(code==com.badlogic.gdx.Input.Keys.DOWN){selectedSlot=Math.min(draft.slots()-1,selectedSlot+1);scroll=Math.max(scroll,selectedSlot-SLOT_ROWS+1);return true;}
+        if(code==com.badlogic.gdx.Input.Keys.UP){select(Math.max(0,selectedSlot-1));revealSelected();return true;}
+        if(code==com.badlogic.gdx.Input.Keys.DOWN){select(Math.min(draft.slots()-1,selectedSlot+1));revealSelected();return true;}
         return true;
     }
     boolean scroll(float dy) {
