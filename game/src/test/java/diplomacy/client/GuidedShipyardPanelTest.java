@@ -81,7 +81,7 @@ public final class GuidedShipyardPanelTest {
                 "Hardpoints must remain selectable in the schematic fallback");
         var initialDraft=editor.draftDesign();
         editor.startTouch(500,380,0);editor.startTouch(600,380,1);
-        editor.drag(1,650,380);editor.endTouch(1,650,380);editor.endTouch(0,500,380);
+        editor.drag(650,380,1);editor.endTouch(650,380,1);editor.endTouch(500,380,0);
         check(editor.previewZoom()>1&&editor.selectedHardpoint()==chosen.index()
                 &&editor.draftDesign()==initialDraft,"Pinch must zoom without editing or selecting");
         editor.tap(515,560);
@@ -91,7 +91,7 @@ public final class GuidedShipyardPanelTest {
         editor.tap(610,560);
         check(editor.selectedHardpoint()==chosen.index(),"Previous mount must reverse selection");
         editor.startTouch(500,380,0);editor.startTouch(600,380,1);
-        editor.drag(1,700,380);editor.cancelTouch();editor.endTouch(0,500,380);
+        editor.drag(700,380,1);editor.cancelTouch();editor.endTouch(500,380,0);
         check(editor.draftDesign()==initialDraft,"Cancelled gesture must never edit the draft");
         editor.tap(515,560);
         var alternatives=Shipyard.choices(catalog,stock.faction,stock.hull,chosen.index());
